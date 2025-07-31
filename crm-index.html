@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Choosers CRM</title>
+    <link rel="stylesheet" href="https://your-github-username.github.io/your-crm-repo/crm-styles.css">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <div class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left-title">
+                <h1 id="page-title">Power Choosers CRM</h1>
+            </div>
+            <div class="nav-icons-center">
+                <!-- Dashboard Button -->
+                <button class="app-button active" id="dashboard-btn" data-view="dashboard">
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    <span class="app-label">Dashboard</span>
+                </button>
+                
+                <!-- Accounts Button -->
+                <button class="app-button" id="accounts-btn" data-view="accounts">
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="m22 21-1.5-1.5"/>
+                        <circle cx="19" cy="17" r="3"/>
+                    </svg>
+                    <span class="app-label">Accounts</span>
+                </button>
+                
+                <!-- Contacts Button -->
+                <button class="app-button" id="contacts-btn" data-view="contacts">
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="m22 21-3-3"/>
+                        <circle cx="19" cy="17" r="3"/>
+                    </svg>
+                    <span class="app-label">Contacts</span>
+                </button>
+                
+                <!-- Cold Calling Hub Link -->
+                <a href="https://powerchoosers.github.io/powerchoosers-assets/" class="app-button" target="_blank">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d37e95a4c0686b08c267_images.jpg" alt="Cold Calling Hub" class="app-icon">
+                    <span class="app-label">Calls Hub</span>
+                </a>
+            </div>
+            <div class="nav-right-logo"></div>
+        </div>
+    </div>
+
+    <!-- Main Content Container -->
+    <div class="main-container" id="main-container">
+        
+        <!-- Dashboard View -->
+        <div class="view-container active" id="dashboard-view">
+            <div class="dashboard-layout">
+                <div class="dashboard-main">
+                    <div class="crm-card">
+                        <h2 class="card-title">📊 Dashboard Overview</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <span class="stat-number" id="total-accounts">0</span>
+                                <span class="stat-label">Total Accounts</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="total-contacts">0</span>
+                                <span class="stat-label">Total Contacts</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="recent-activities">0</span>
+                                <span class="stat-label">Recent Activities</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="hot-leads">0</span>
+                                <span class="stat-label">Hot Leads</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h2 class="card-title">🔥 Recent Activities</h2>
+                        <div id="recent-activities-list">
+                            <p class="empty-state">No recent activities</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="dashboard-sidebar">
+                    <div class="crm-card">
+                        <h2 class="card-title">⚡ Quick Actions</h2>
+                        <button class="action-btn" id="add-account-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 8v8M8 12h8"/>
+                            </svg>
+                            Add New Account
+                        </button>
+                        <button class="action-btn" id="add-contact-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M19 8v6M22 11h-6"/>
+                            </svg>
+                            Add New Contact
+                        </button>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h2 class="card-title">📞 Today's Calls</h2>
+                        <div id="todays-calls">
+                            <p class="empty-state">No calls scheduled</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Accounts View -->
+        <div class="view-container" id="accounts-view">
+            <div class="view-header">
+                <h2>🏢 Accounts</h2>
+                <button class="primary-btn" id="new-account-btn">+ New Account</button>
+            </div>
+            <div class="accounts-grid" id="accounts-grid">
+                <p class="empty-state">No accounts found. Click "New Account" to get started.</p>
+            </div>
+        </div>
+
+        <!-- Contacts View -->
+        <div class="view-container" id="contacts-view">
+            <div class="view-header">
+                <h2>👤 Contacts</h2>
+                <button class="primary-btn" id="new-contact-btn">+ New Contact</button>
+            </div>
+            <div class="contacts-grid" id="contacts-grid">
+                <p class="empty-state">No contacts found. Click "New Contact" to get started.</p>
+            </div>
+        </div>
+
+        <!-- Account Detail View -->
+        <div class="view-container" id="account-detail-view">
+            <div class="account-detail-layout">
+                <div class="account-detail-main">
+                    <div class="view-header">
+                        <button class="back-btn" id="back-to-accounts">← Back to Accounts</button>
+                        <h2 id="account-detail-title">Account Details</h2>
+                        <button class="primary-btn" id="edit-account-btn">Edit Account</button>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h3 class="card-title">🏢 Company Information</h3>
+                        <div id="account-info-display">
+                            <!-- Account info will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h3 class="card-title">👥 Contacts at this Account</h3>
+                        <div id="account-contacts-list">
+                            <p class="empty-state">No contacts for this account</p>
+                        </div>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h3 class="card-title">📝 Recent Activities</h3>
+                        <div id="account-activities-list">
+                            <p class="empty-state">No recent activities</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="account-detail-sidebar">
+                    <div class="crm-card">
+                        <h3 class="card-title">⚡ Energy Contract Details</h3>
+                        <div id="energy-contract-display">
+                            <p class="empty-state">No contract information</p>
+                        </div>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h3 class="card-title">📝 Add Note</h3>
+                        <textarea id="account-note-input" placeholder="Add a note about this account..."></textarea>
+                        <button class="primary-btn" id="save-account-note">Save Note</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Adding/Editing Accounts -->
+    <div class="modal-overlay" id="account-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="account-modal-title">Add New Account</h3>
+                <button class="close-btn" id="close-account-modal">×</button>
+            </div>
+            <form id="account-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-name">Company Name *</label>
+                        <input type="text" id="account-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-industry">Industry</label>
+                        <input type="text" id="account-industry">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-phone">Phone</label>
+                        <input type="tel" id="account-phone">
+                    </div>
+                    <div class="form-group">
+                        <label for="account-website">Website</label>
+                        <input type="url" id="account-website">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="account-address">Address</label>
+                    <textarea id="account-address" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="secondary-btn" id="cancel-account">Cancel</button>
+                    <button type="submit" class="primary-btn">Save Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Adding/Editing Contacts -->
+    <div class="modal-overlay" id="contact-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="contact-modal-title">Add New Contact</h3>
+                <button class="close-btn" id="close-contact-modal">×</button>
+            </div>
+            <form id="contact-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-first-name">First Name *</label>
+                        <input type="text" id="contact-first-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-last-name">Last Name *</label>
+                        <input type="text" id="contact-last-name" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-title">Job Title</label>
+                        <input type="text" id="contact-title">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-account">Account</label>
+                        <select id="contact-account">
+                            <option value="">Select an account...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-email">Email</label>
+                        <input type="email" id="contact-email">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-phone">Phone</label>
+                        <input type="tel" id="contact-phone">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="contact-notes">Notes</label>
+                    <textarea id="contact-notes" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="secondary-btn" id="cancel-contact">Cancel</button>
+                    <button type="submit" class="primary-btn">Save Contact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://your-github-username.github.io/your-crm-repo/firebase-config.js"></script>
+    <script src="https://your-github-username.github.io/your-crm-repo/crm-app.js"></script>
+</body>
+</html>
