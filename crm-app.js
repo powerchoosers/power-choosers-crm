@@ -1,4 +1,4 @@
-// CRM Application Main JavaScript File
+// // CRM Application Main JavaScript File
 
 // Global state management
 const CRMApp = {
@@ -16,35 +16,6 @@ let activeButton = null;
 
 // Helper to get element by ID (saves characters and improves readability)
 const gId = id => document.getElementById(id);
-
-// Placeholder object (from your script.js)
-const placeholders = {
-    'N': '', // Contact Name
-    'YN': 'Lewis', // Your Name (static)
-    'CN': '', // Company Name
-    'CI': '', // Company Industry
-    'SB': '', // Specific Benefit
-    'PP': '', // Pain Point
-    'CT': '', // Contact Title
-    'TIA': '', // Their Industry/Area (alias for CI)
-    'TE': '', // Their Email (not directly from input, but could be set)
-    'DT': '', // Day/Time (not directly from input, but could be set)
-    'EAC': '', // Email Address Confirmed (not directly from input, but could be set)
-    'TF': '', // Timeframe (not directly from input, but could be set)
-    'OP': 'the responsible party', // Other Person (default)
-    'XX': '$XX.00/40%' // Placeholder for dynamic % or amount, user can update in input if needed
-};
-
-// Map input IDs to placeholder keys for easy update (from your script.js)
-const inputMap = {
-    'input-name': 'N',
-    'input-title': 'CT',
-    'input-company-name': 'CN',
-    'input-company-industry': 'CI',
-    'input-benefit': 'SB',
-    'input-pain': 'PP'
-};
-
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -877,6 +848,12 @@ function setupSearchFunctionality() {
 
 }
 
+// The following functions are duplicates from script.js and should be defined
+// globally in a single file or managed more cleanly. For this project, they 
+// are needed for both crm-app.js and script.js, so they should be defined 
+// globally in a shared utility file. However, since they are already
+// defined in both, let's assume for this specific correction that they are
+// needed and should not be removed entirely.
 function openSearch(type, event) {
     const button = event.target.closest('.app-button');
     const searchBar = gId('search-bar');
