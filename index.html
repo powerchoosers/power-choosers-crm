@@ -7,14 +7,12 @@
     <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/crm-styles.css">
 </head>
 <body>
-    <!-- Top Navigation Bar (from Cold Calling Hub) -->
     <div class="top-nav">
         <div class="nav-container">
             <div class="nav-left-title">
                 <h1 id="page-title">Power Choosers CRM</h1>
             </div>
             <div class="nav-icons-center">
-                <!-- Dashboard Button -->
                 <button class="app-button" id="dashboard-btn" data-view="dashboard">
                     <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -23,7 +21,6 @@
                     <span class="app-label">Dashboard</span>
                 </button>
                 
-                <!-- Accounts Button -->
                 <button class="app-button" id="accounts-btn" data-view="accounts">
                     <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -34,7 +31,6 @@
                     <span class="app-label">Accounts</span>
                 </button>
                 
-                <!-- Contacts Button -->
                 <button class="app-button" id="contacts-btn" data-view="contacts">
                     <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -45,7 +41,6 @@
                     <span class="app-label">Contacts</span>
                 </button>
 
-                <!-- Cold Calling Hub App Buttons -->
                 <a href="https://powerchoosers.github.io/powerchoosers-assets/" class="app-button" target="_blank">
                     <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d37e95a4c0686b08c267_images.jpg" alt="Cold Calling Hub" class="app-icon">
                     <span class="app-label">Calls Hub</span>
@@ -71,7 +66,6 @@
         </div>
     </div>
     
-    <!-- Search Bar (from Cold Calling Hub) -->
     <div class="search-bar" id="search-bar">
         <div class="search-container">
             <div class="search-label" id="search-label">Search Google:</div>
@@ -86,10 +80,8 @@
         </div>
     </div>
 
-    <!-- Main Content Container -->
     <div class="main-container" id="main-container">
         
-        <!-- Dashboard View -->
         <div class="view-container active" id="dashboard-view">
             <div class="dashboard-layout">
                 <div class="dashboard-main">
@@ -126,6 +118,12 @@
                 <div class="dashboard-sidebar">
                     <div class="crm-card">
                         <h2 class="card-title">⚡ Quick Actions</h2>
+                        <a href="https://powerchoosers.github.io/powerchoosers-assets/" class="action-btn" target="_blank">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            Go to Calls Hub
+                        </a>
                         <button class="action-btn" id="add-account-btn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="12" cy="12" r="10"/>
@@ -153,7 +151,6 @@
             </div>
         </div>
 
-        <!-- Accounts View -->
         <div class="view-container" id="accounts-view">
             <div class="view-header">
                 <h2>🏢 Accounts</h2>
@@ -164,7 +161,6 @@
             </div>
         </div>
 
-        <!-- Contacts View -->
         <div class="view-container" id="contacts-view">
             <div class="view-header">
                 <h2>👤 Contacts</h2>
@@ -175,7 +171,6 @@
             </div>
         </div>
 
-        <!-- Account Detail View -->
         <div class="view-container" id="account-detail-view">
             <div class="account-detail-layout">
                 <div class="account-detail-main">
@@ -188,8 +183,7 @@
                     <div class="crm-card">
                         <h3 class="card-title">🏢 Company Information</h3>
                         <div id="account-info-display">
-                            <!-- Account info will be populated here -->
-                        </div>
+                            </div>
                     </div>
                     
                     <div class="crm-card">
@@ -211,7 +205,7 @@
                     <div class="crm-card">
                         <h3 class="card-title">⚡ Energy Contract Details</h3>
                         <div id="energy-contract-display">
-                            <p class="empty-state">No contract information</p>
+                            <p class="empty-state">No contract information available</p>
                         </div>
                     </div>
                     
@@ -225,7 +219,6 @@
         </div>
     </div>
 
-    <!-- Modal for Adding/Editing Accounts -->
     <div class="modal-overlay" id="account-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -265,7 +258,6 @@
         </div>
     </div>
 
-    <!-- Modal for Adding/Editing Contacts -->
     <div class="modal-overlay" id="contact-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -317,15 +309,12 @@
         </div>
     </div>
 
-    <!-- Loading Overlay -->
     <div class="loading-overlay" id="loading-overlay">
         <div class="spinner"></div>
     </div>
 
-    <!-- Toast Notifications -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- Scripts -->
     <script src="https://powerchoosers.github.io/power-choosers-crm/firebase-config.js"></script>
     <script src="https://powerchoosers.github.io/power-choosers-crm/crm-app.js"></script>
 </body>
