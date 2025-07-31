@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Power Choosers Cold Calling Hub</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="search-bar" id="search-bar">
+    <div class="search-container">
+        <div class="search-label" id="search-label">Search Google:</div>
+        <input type="text" class="search-input" id="search-input" placeholder="Type your search query...">
+        <input type="text" class="search-input city" id="search-city" placeholder="City" style="display:none">
+        <input type="text" class="search-input state" id="search-state" placeholder="State" style="display:none">
+        <input type="text" class="search-input location" id="search-location" placeholder="Location (e.g. Fort Worth, TX)" style="display:none">
+        <div class="search-actions">
+            <button class="search-btn" onclick="performSearch()">Go</button>
+            <button class="search-btn close" onclick="closeSearch()">✕</button>
+        </div>
+    </div>
+</div>
+
+<div class="top-nav">
+    <div class="nav-container">
+        <div class="nav-left-title">
+            <h1>Power Choosers Cold Calling Hub</h1>
+        </div>
+        <div class="nav-icons-center">
+            <div class="app-button" id="google-button">
+                <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google" class="app-icon">
+                <span class="app-label">Google</span>
+            </div>
+            <div class="app-button" id="maps-button">
+                <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d37e95a4c0686b08c267_images.jpg" alt="Google Maps" class="app-icon">
+                <span class="app-label">Maps</span>
+            </div>
+            <div class="app-button" id="apollo-button">
+                <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851d2771f4c6e42a09731_images.png" alt="Apollo" class="app-icon">
+                <span class="app-label">Apollo</span>
+            </div>
+            <div class="app-button" id="beenverified-button">
+                <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68885144c4bbad742f397a18_unnamed.png" alt="BeenVerified" class="app-icon">
+                <span class="app-label">BeenVerified</span>
+            </div>
+        </div>
+        <div class="nav-right-logo"></div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="main-content">
+        <div id="script-display" class="script-display mood-neutral">
+            Click 'Dial' to begin the call
+        </div>
+        <div id="responses-container" class="responses-grid">
+            <button class="dial-button" onclick="startCall()">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                </svg>
+                Dial
+            </button>
+        </div>
+        <div class="nav-buttons">
+            <button id="back-btn" class="nav-btn" onclick="goBack()" disabled>← Back</button>
+            <button id="restart-btn" class="nav-btn" onclick="restart()">🔄 Restart</button>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="sidebar-card">
+            <h3 class="sidebar-title">📋 Prospect Info</h3>
+            <div class="input-group">
+                <label for="input-company-name">Company Name:</label>
+                <input type="text" id="input-company-name" placeholder="ABC Manufacturing" oninput="updateScript()">
+            </div>
+            <div class="input-group">
+                <label for="input-name">Contact Name:</label>
+                <input type="text" id="input-name" placeholder="John Smith" oninput="updateScript()">
+            </div>
+            <div class="input-group">
+                <label for="input-title">Contact Title:</label>
+                <input type="text" id="input-title" placeholder="Company Leader" oninput="updateScript()">
+            </div>
+            <div class="input-group">
+                <label for="input-company-industry">Company Industry:</label>
+                <input type="text" id="input-company-industry" placeholder="businesses" oninput="updateScript()">
+            </div>
+            <div class="input-group">
+                <label for="input-benefit">Specific Benefit:</label>
+                <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" oninput="updateScript()">
+            </div>
+            <div class="input-group">
+                <label for="input-pain">Pain Point:</label>
+                <input type="text" id="input-pain" placeholder="you're not stuck paying more" oninput="updateScript()">
+            </div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3 class="sidebar-title">📝 Call Notes</h3>
+            <textarea id="call-notes" placeholder="Type your call notes here...
+• Company:
+• Contact:
+• Title:
+• Phone:
+• Email:
+• Contract expiration:
+• Current provider:
+• Pain points:
+• Interest level:
+• Next steps:
+• Follow-up date: "></textarea>
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+                <button onclick="copyNotes()" style="flex:1;background:#238636;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.9rem">📋 Copy Notes</button>
+                <button onclick="clearNotes()" style="flex:1;background:#da3633;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.9rem">🗑️ Clear</button>
+            </div>
+            <div id="copy-status"></div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3 class="sidebar-title">💡 Call Strategy Tips</h3>
+            <div class="tip-item"><strong>Mirror their energy:</strong> Match their speaking pace and enthusiasm level to build rapport naturally.</div>
+            <div class="tip-item"><strong>Use their name:</strong> Say their name 2-3 times during the call to maintain personal connection.</div>
+            <div class="tip-item"><strong>Pause power:</strong> Use 2-3 second pauses after questions to let them process and respond.</div>
+            <div class="tip-item"><strong>Permission-based selling:</strong> Always ask permission before moving to the next topic or scheduling.</div>
+            <div class="tip-item"><strong>Assume the close:</strong> When scheduling, offer two specific times rather than asking "when works?"</div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3 class="sidebar-title">📊 Market Intelligence</h3>
+            <div class="stat-grid">
+                <div class="stat-card"><span class="stat-number">60%</span><span class="stat-label">Rate increase since 2021</span></div>
+                <div class="stat-card"><span class="stat-number">29%</span><span class="stat-label">TX cost advantage</span></div>
+                <div class="stat-card"><span class="stat-number">2026</span><span class="stat-label">Supply concerns begin</span></div>
+                <div class="stat-card"><span class="stat-number">85%</span><span class="stat-label">Businesses unprepared</span></div>
+            </div>
+            <div class="tip-item"><strong>Key Message:</strong> "Texas maintains a 29% cost advantage over national averages, but only if you're positioned correctly in the market."</div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3 class="sidebar-title">📰 This Week's Energy News</h3>
+            
+            <div class="news-item">
+                <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
+                <div class="news-summary">Grid operator warns electricity demand may surpass available supply as soon as summer 2026, driven by massive data center growth and extreme weather patterns.</div>
+                <div class="news-talking-point">💬 "With ERCOT projecting supply shortages, how is your company preparing for potential capacity constraints?"</div>
+            </div>
+            
+            <div class="news-item">
+                <div class="news-title">Data Centers Drive 218GW Demand Surge</div>
+                <div class="news-summary">Texas electricity demand projected to reach 218GW by 2031 - more than doubling current levels. AI data centers alone account for 86GW of new demand growth.</div>
+                <div class="news-talking-point">💬 "Are you factoring the massive industrial load growth into your energy procurement strategy?"</div>
+            </div>
+            
+            <div class="news-item">
+                <div class="news-title">"One Big Beautiful Bill" Impacts Texas Markets</div>
+                <div class="news-summary">Federal legislation cuts clean energy subsidies while expanding fossil fuel production. Analysis shows wholesale electricity prices could rise 25% by 2030 and 74% by 2035.</div>
+                <div class="news-talking-point">💬 "How are recent federal policy changes affecting your long-term energy cost planning?"</div>
+            </div>
+            
+            <div class="news-item">
+                <div class="news-title">Texas Wholesale Prices Expected to Drop Short-Term</div>
+                <div class="news-summary">EIA forecasts ERCOT North Hub prices to decrease to $27-34/MWh in 2025 due to solar expansion, but forward contracts remain elevated at $50+/MWh reflecting market risk.</div>
+                <div class="news-talking-point">💬 "Are you taking advantage of current market conditions to lock in favorable rates?"</div>
+            </div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3 class="sidebar-title">🛡️ Quick Objection Responses</h3>
+            <div class="tip-item"><strong>"We're happy with our provider"</strong><br>"That's great to hear. This isn't about changing providers - it's about optimizing your position within the current market structure."</div>
+            <div class="tip-item"><strong>"We just renewed our contract"</strong><br>"Perfect timing actually. This gives us a chance to prepare strategically for your next cycle rather than scrambling later."</div>
+            <div class="tip-item"><strong>"Send me some information"</strong><br>"I can definitely do that. What specific information would be most valuable - rate comparisons or market timing strategies?"</div>
+            <div class="tip-item"><strong>"We handle it internally"</strong><br>"Smart approach. My role isn't to replace your team - it's to provide market intelligence that helps you make better decisions."</div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3 class="sidebar-title">🎯 Daily Goals</h3>
+            <div class="stat-grid">
+                <div class="stat-card"><span class="stat-number">50</span><span class="stat-label">Dials target</span></div>
+                <div class="stat-card"><span class="stat-number">15</span><span class="stat-label">Conversations</span></div>
+                <div class="stat-card"><span class="stat-number">5</span><span class="stat-label">Qualified leads</span></div>
+                <div class="stat-card"><span class="stat-number">2</span><span class="stat-label">Appointments</span></div>
+            </div>
+            <div class="tip-item"><strong>Success Rate:</strong> Track your conversion from dials to conversations to appointments. Aim for 30% conversation rate and 15% appointment rate.</div>
+        </div>
+
+        <div class="sidebar-card">
+            <h3 class="sidebar-title">🏭 Industry Talking Points</h3>
+            <div class="tip-item"><strong>Manufacturing:</strong> "Energy costs can represent 15-30% of operating expenses. How are you managing that exposure to volatility?"</div>
+            <div class="tip-item"><strong>Healthcare:</strong> "Critical facilities need reliable power strategies. Are you prepared for supply constraints in 2026?"</div>
+            <div class="tip-item"><strong>Retail:</strong> "Multiple locations mean complex energy management. How are you optimizing across all sites?"</div>
+            <div class="tip-item"><strong>Technology:</strong> "Data centers have unique load profiles. Are you maximizing your demand response opportunities?"</div>
+        </div>
+    </div>
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

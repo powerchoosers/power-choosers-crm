@@ -832,7 +832,7 @@ function openCallsHubWithData(contactId) {
 
     const account = CRMApp.accounts.find(a => a.id === contact.accountId);
     
-    let url = `https://powerchoosers.github.io/powerchoosers-assets/`;
+    let url = `callinghub.html`;
     url += `?name=${encodeURIComponent(contact.firstName + ' ' + contact.lastName)}`;
     url += `&title=${encodeURIComponent(contact.title || '')}`;
     url += `&company=${encodeURIComponent(account ? account.name : '')}`;
