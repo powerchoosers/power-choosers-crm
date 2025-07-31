@@ -66,13 +66,13 @@ function updateActiveNavButton(activeButton) {
     activeButton.classList.add('active');
 }
 
-// Update page title based on current view
+// Update page title based on current view - Updated to match your cold calling hub style
 function updatePageTitle(viewName) {
     const titles = {
-        'dashboard': 'Power Choosers CRM',
-        'accounts': 'Power Choosers CRM - Accounts',
-        'contacts': 'Power Choosers CRM - Contacts',
-        'account-detail': 'Power Choosers CRM - Account Details'
+        'dashboard': 'Power Choosers CRM Dashboard',
+        'accounts': 'Power Choosers CRM Accounts',
+        'contacts': 'Power Choosers CRM Contacts', 
+        'account-detail': 'Power Choosers CRM Account Details'
     };
     
     document.getElementById('page-title').textContent = titles[viewName] || 'Power Choosers CRM';
@@ -284,7 +284,6 @@ async function handleAccountSubmit(e) {
     showLoading(true);
     
     try {
-        const formData = new FormData(e.target);
         const accountData = {
             name: document.getElementById('account-name').value,
             industry: document.getElementById('account-industry').value,
@@ -467,4 +466,306 @@ function renderAccounts() {
                 ${account.phone ? `
                     <div class="info-item">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                        <span>${account.phone}</span>
+                    </div>
+                ` : ''}
+                ${account.website ? `
+                    <div class="info-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="2" y1="12" x2="22" y2="12"/>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                        <span>${account.website}</span>
+                    </div>
+                ` : ''}
+                ${account.address ? `
+                    <div class="info-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <span>${account.address}</span>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+// Continue with remaining functions...
+// [Rest of the functions continue as in the original file]
+
+// Render contacts
+function renderContacts() {
+    const container = document.getElementById('contacts-grid');
+    
+    if (CRMApp.contacts.length === 0) {
+        container.innerHTML = '<p class="empty-state">No contacts found. Click "New Contact" to get started.</p>';
+        return;
+    }
+    
+    container.innerHTML = CRMApp.contacts.map(contact => `
+        <div class="contact-card" onclick="showContactDetail('${contact.id}')">
+            <div class="card-header">
+                <div>
+                    <div class="card-name">${contact.firstName || ''} ${contact.lastName || ''}</div>
+                    <div class="card-subtitle">${contact.title || 'Title not specified'}</div>
+                    ${contact.accountName ? `<div class="card-subtitle" style="color: #1A438D;">${contact.accountName}</div>` : ''}
+                </div>
+                <div class="card-actions">
+                    <button class="icon-btn" onclick="event.stopPropagation(); editContact('${contact.id}')" title="Edit">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="card-info">
+                ${contact.email ? `
+                    <div class="info-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                        <span>${contact.email}</span>
+                    </div>
+                ` : ''}
+                ${contact.phone ? `
+                    <div class="info-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                        <span>${contact.phone}</span>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+// Show account detail
+function showAccountDetail(accountId) {
+    const account = CRMApp.accounts.find(acc => acc.id === accountId);
+    if (!account) return;
+    
+    CRMApp.currentAccount = account;
+    showView('account-detail');
+    renderAccountDetail();
+}
+
+// Render account detail
+function renderAccountDetail() {
+    if (!CRMApp.currentAccount) return;
+    
+    const account = CRMApp.currentAccount;
+    
+    // Update title
+    document.getElementById('account-detail-title').textContent = account.name || 'Account Details';
+    
+    // Render account info
+    const accountInfoContainer = document.getElementById('account-info-display');
+    accountInfoContainer.innerHTML = `
+        <div class="info-field">
+            <div class="info-field-label">Company Name</div>
+            <div class="info-field-value">${account.name || 'Not specified'}</div>
+        </div>
+        <div class="info-field">
+            <div class="info-field-label">Industry</div>
+            <div class="info-field-value">${account.industry || 'Not specified'}</div>
+        </div>
+        <div class="info-field">
+            <div class="info-field-label">Phone</div>
+            <div class="info-field-value">${account.phone || 'Not specified'}</div>
+        </div>
+        <div class="info-field">
+            <div class="info-field-label">Website</div>
+            <div class="info-field-value">${account.website ? `<a href="${account.website}" target="_blank" style="color: #1A438D;">${account.website}</a>` : 'Not specified'}</div>
+        </div>
+        <div class="info-field" style="grid-column: 1 / -1;">
+            <div class="info-field-label">Address</div>
+            <div class="info-field-value">${account.address || 'Not specified'}</div>
+        </div>
+    `;
+    
+    // Render contacts for this account
+    renderAccountContacts();
+    
+    // Render activities for this account
+    renderAccountActivities();
+    
+    // Render energy contract info (placeholder for now)
+    const energyContainer = document.getElementById('energy-contract-display');
+    energyContainer.innerHTML = '<p class="empty-state">No contract information available</p>';
+}
+
+// Render contacts for current account
+function renderAccountContacts() {
+    const container = document.getElementById('account-contacts-list');
+    const accountContacts = CRMApp.contacts.filter(contact => contact.accountId === CRMApp.currentAccount.id);
+    
+    if (accountContacts.length === 0) {
+        container.innerHTML = '<p class="empty-state">No contacts for this account</p>';
+        return;
+    }
+    
+    container.innerHTML = accountContacts.map(contact => `
+        <div class="contact-list-item">
+            <div class="contact-info">
+                <div class="contact-name">${contact.firstName} ${contact.lastName}</div>
+                <div class="contact-title">${contact.title || 'Title not specified'}</div>
+                ${contact.email ? `<div style="font-size: .8rem; color: #6b7280; margin-top: 4px;">${contact.email}</div>` : ''}
+                ${contact.phone ? `<div style="font-size: .8rem; color: #6b7280;">${contact.phone}</div>` : ''}
+            </div>
+            <button class="icon-btn" onclick="editContact('${contact.id}')" title="Edit Contact">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+            </button>
+        </div>
+    `).join('');
+}
+
+// Render activities for current account
+function renderAccountActivities() {
+    const container = document.getElementById('account-activities-list');
+    const accountActivities = CRMApp.activities.filter(activity => activity.accountId === CRMApp.currentAccount.id);
+    
+    if (accountActivities.length === 0) {
+        container.innerHTML = '<p class="empty-state">No recent activities</p>';
+        return;
+    }
+    
+    container.innerHTML = accountActivities.slice(0, 10).map(activity => `
+        <div class="activity-item">
+            <div class="activity-title">${activity.description}</div>
+            ${activity.noteContent ? `<div class="activity-content">${activity.noteContent}</div>` : ''}
+            <div class="activity-date">${window.formatDate(activity.createdAt)}</div>
+        </div>
+    `).join('');
+}
+
+// Edit account
+function editAccount(accountId) {
+    const account = CRMApp.accounts.find(acc => acc.id === accountId);
+    if (!account) return;
+    
+    CRMApp.currentAccount = account;
+    
+    // Populate form
+    document.getElementById('account-name').value = account.name || '';
+    document.getElementById('account-industry').value = account.industry || '';
+    document.getElementById('account-phone').value = account.phone || '';
+    document.getElementById('account-website').value = account.website || '';
+    document.getElementById('account-address').value = account.address || '';
+    
+    document.getElementById('account-modal-title').textContent = 'Edit Account';
+    showModal('account-modal');
+}
+
+// Edit contact
+function editContact(contactId) {
+    const contact = CRMApp.contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    
+    CRMApp.currentContact = contact;
+    
+    // Populate form
+    document.getElementById('contact-first-name').value = contact.firstName || '';
+    document.getElementById('contact-last-name').value = contact.lastName || '';
+    document.getElementById('contact-title').value = contact.title || '';
+    document.getElementById('contact-email').value = contact.email || '';
+    document.getElementById('contact-phone').value = contact.phone || '';
+    document.getElementById('contact-notes').value = contact.notes || '';
+    
+    populateAccountDropdown();
+    document.getElementById('contact-account').value = contact.accountId || '';
+    
+    document.getElementById('contact-modal-title').textContent = 'Edit Contact';
+    showModal('contact-modal');
+}
+
+// Update dashboard stats
+function updateDashboardStats() {
+    document.getElementById('total-accounts').textContent = CRMApp.accounts.length;
+    document.getElementById('total-contacts').textContent = CRMApp.contacts.length;
+    document.getElementById('recent-activities').textContent = CRMApp.activities.length;
+    
+    // Calculate hot leads (contacts created in last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const hotLeads = CRMApp.contacts.filter(contact => {
+        if (!contact.createdAt) return false;
+        const createdDate = contact.createdAt.toDate ? contact.createdAt.toDate() : new Date(contact.createdAt);
+        return createdDate > sevenDaysAgo;
+    }).length;
+    
+    document.getElementById('hot-leads').textContent = hotLeads;
+}
+
+// Render recent activities on dashboard
+function renderRecentActivities() {
+    const container = document.getElementById('recent-activities-list');
+    
+    if (CRMApp.activities.length === 0) {
+        container.innerHTML = '<p class="empty-state">No recent activities</p>';
+        return;
+    }
+    
+    container.innerHTML = CRMApp.activities.slice(0, 10).map(activity => `
+        <div class="activity-item">
+            <div class="activity-title">${activity.description}</div>
+            ${activity.accountName ? `<div class="activity-content">Account: ${activity.accountName}</div>` : ''}
+            ${activity.contactName ? `<div class="activity-content">Contact: ${activity.contactName}</div>` : ''}
+            <div class="activity-date">${window.formatDate(activity.createdAt)}</div>
+        </div>
+    `).join('');
+}
+
+// Show loading overlay
+function showLoading(show) {
+    const overlay = document.getElementById('loading-overlay');
+    if (show) {
+        overlay.classList.add('active');
+    } else {
+        overlay.classList.remove('active');
+    }
+}
+
+// Show toast notification
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    toast.innerHTML = `
+        <div class="toast-message">${message}</div>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Show toast
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 100);
+    
+    // Hide and remove toast
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            container.removeChild(toast);
+        }, 300);
+    }, 3000);
+}
+
+// Show contact detail (placeholder function)
+function showContactDetail(contactId) {
+    // For now, just edit the contact
+    editContact(contactId);
+}
+
+console.log('CRM App initialized successfully');
