@@ -550,7 +550,7 @@ function renderContacts() {
     }
     
     container.innerHTML = CRMApp.contacts.map(contact => `
-        <div class="contact-card" onclick="showContactDetail('${contact.id}')">
+        <div class="contact-card">
             <div class="card-header">
                 <div>
                     <div class="card-name">${contact.firstName || ''} ${contact.lastName || ''}</div>
@@ -558,7 +558,12 @@ function renderContacts() {
                     ${contact.accountName ? `<div class="card-subtitle" style="color: #1A438D;">${contact.accountName}</div>` : ''}
                 </div>
                 <div class="card-actions">
-                    <button class="icon-btn" onclick="event.stopPropagation(); editContact('${contact.id}')" title="Edit">
+                    <button class="icon-btn" onclick="event.stopPropagation(); openCallsHubWithData('${contact.id}')" title="Call Prospect">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                    </button>
+                    <button class="icon-btn" onclick="event.stopPropagation(); editContact('${contact.id}')" title="Edit Contact">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -566,7 +571,7 @@ function renderContacts() {
                     </button>
                 </div>
             </div>
-            <div class="card-info">
+            <div class="card-info" onclick="showContactDetail('${contact.id}')">
                 ${contact.email ? `
                     <div class="info-item">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -662,12 +667,19 @@ function renderAccountContacts() {
                 ${contact.email ? `<div style="font-size: .8rem; color: #6b7280; margin-top: 4px;">${contact.email}</div>` : ''}
                 ${contact.phone ? `<div style="font-size: .8rem; color: #6b7280;">${contact.phone}</div>` : ''}
             </div>
-            <button class="icon-btn" onclick="editContact('${contact.id}')" title="Edit Contact">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-            </button>
+            <div class="contact-actions">
+                <button class="icon-btn" onclick="event.stopPropagation(); openCallsHubWithData('${contact.id}')" title="Call Prospect">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                </button>
+                <button class="icon-btn" onclick="event.stopPropagation(); editContact('${contact.id}')" title="Edit Contact">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     `).join('');
 }
@@ -810,6 +822,29 @@ function showContactDetail(contactId) {
     editContact(contactId);
 }
 
+// Function to open the Calls Hub with data from a specific contact
+function openCallsHubWithData(contactId) {
+    const contact = CRMApp.contacts.find(c => c.id === contactId);
+    if (!contact) {
+        showToast('Contact not found.', 'error');
+        return;
+    }
+
+    const account = CRMApp.accounts.find(a => a.id === contact.accountId);
+    
+    let url = `https://powerchoosers.github.io/powerchoosers-assets/`;
+    url += `?name=${encodeURIComponent(contact.firstName + ' ' + contact.lastName)}`;
+    url += `&title=${encodeURIComponent(contact.title || '')}`;
+    url += `&company=${encodeURIComponent(account ? account.name : '')}`;
+    url += `&industry=${encodeURIComponent(account ? account.industry : '')}`;
+    url += `&phone=${encodeURIComponent(contact.phone || '')}`;
+    url += `&email=${encodeURIComponent(contact.email || '')}`;
+    url += `&accountId=${encodeURIComponent(contact.accountId || '')}`;
+    url += `&contactId=${encodeURIComponent(contact.id || '')}`;
+    
+    window.open(url, '_blank');
+}
+
 // --- NEW: Cold Calling Hub Search Functions ---
 function setupSearchFunctionality() {
     // Add event listeners to search app buttons dynamically
@@ -943,4 +978,3 @@ function performSearch() {
 // --- END NEW CODE ---
 
 console.log('CRM App initialized successfully');
-
