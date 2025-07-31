@@ -10,9 +10,46 @@ const CRMApp = {
     activities: []
 };
 
+// Global state for search functionality
+let currentSearchType = '';
+let activeButton = null;
+
+// Helper to get element by ID (saves characters and improves readability)
+const gId = id => document.getElementById(id);
+
+// Placeholder object (from your script.js)
+const placeholders = {
+    'N': '', // Contact Name
+    'YN': 'Lewis', // Your Name (static)
+    'CN': '', // Company Name
+    'CI': '', // Company Industry
+    'SB': '', // Specific Benefit
+    'PP': '', // Pain Point
+    'CT': '', // Contact Title
+    'TIA': '', // Their Industry/Area (alias for CI)
+    'TE': '', // Their Email (not directly from input, but could be set)
+    'DT': '', // Day/Time (not directly from input, but could be set)
+    'EAC': '', // Email Address Confirmed (not directly from input, but could be set)
+    'TF': '', // Timeframe (not directly from input, but could be set)
+    'OP': 'the responsible party', // Other Person (default)
+    'XX': '$XX.00/40%' // Placeholder for dynamic % or amount, user can update in input if needed
+};
+
+// Map input IDs to placeholder keys for easy update (from your script.js)
+const inputMap = {
+    'input-name': 'N',
+    'input-title': 'CT',
+    'input-company-name': 'CN',
+    'input-company-industry': 'CI',
+    'input-benefit': 'SB',
+    'input-pain': 'PP'
+};
+
+
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
+    setupSearchFunctionality(); // Call the new setup function for search
 });
 
 // Main initialization function
@@ -66,7 +103,7 @@ function updateActiveNavButton(activeButton) {
     activeButton.classList.add('active');
 }
 
-// Update page title based on current view - Updated to match your cold calling hub style
+// Update page title based on current view
 function updatePageTitle(viewName) {
     const titles = {
         'dashboard': 'Power Choosers CRM Dashboard',
@@ -124,6 +161,14 @@ function setupEventListeners() {
     
     // Save account note button
     document.getElementById('save-account-note').addEventListener('click', saveAccountNote);
+
+    // Edit account button
+    document.getElementById('edit-account-btn').addEventListener('click', () => {
+        if (CRMApp.currentAccount) {
+            editAccount(CRMApp.currentAccount.id);
+        }
+    });
+
 }
 
 // Load initial data
@@ -495,9 +540,6 @@ function renderAccounts() {
     `).join('');
 }
 
-// Continue with remaining functions...
-// [Rest of the functions continue as in the original file]
-
 // Render contacts
 function renderContacts() {
     const container = document.getElementById('contacts-grid');
@@ -768,4 +810,137 @@ function showContactDetail(contactId) {
     editContact(contactId);
 }
 
+// --- NEW: Cold Calling Hub Search Functions ---
+function setupSearchFunctionality() {
+    // Add event listeners to search app buttons dynamically
+    const googleBtn = gId('google-button');
+    if (googleBtn) {
+        googleBtn.addEventListener('click', (e) => openSearch('google', e));
+    }
+    const mapsBtn = gId('maps-button');
+    if (mapsBtn) {
+        mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
+    }
+    const apolloBtn = gId('apollo-button');
+    if (apolloBtn) {
+        apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
+    }
+    const beenverifiedBtn = gId('beenverified-button');
+    if (beenverifiedBtn) {
+        beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
+    }
+
+    // Add event listeners for Enter key on search inputs
+    ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
+        const input = gId(id);
+        if (input) {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') performSearch();
+            });
+        }
+    });
+
+}
+
+function openSearch(type, event) {
+    const button = event.target.closest('.app-button');
+    const searchBar = gId('search-bar');
+    const mainContainer = gId('main-container');
+
+    if (currentSearchType === type && activeButton === button) {
+        closeSearch();
+        return;
+    }
+    
+    if (activeButton) activeButton.classList.remove('active');
+    currentSearchType = type;
+    activeButton = button;
+    button.classList.add('active');
+    
+    const label = gId('search-label');
+    const input = gId('search-input');
+    const cityInput = gId('search-city');
+    const stateInput = gId('search-state');
+    const locationInput = gId('search-location');
+    
+    cityInput.style.display = 'none';
+    stateInput.style.display = 'none';
+    locationInput.style.display = 'none';
+    
+    if (type === 'google') {
+        label.textContent = 'Search Google:';
+        input.placeholder = 'Type your search query...';
+    } else if (type === 'maps') {
+        label.textContent = 'Search Maps:';
+        input.placeholder = 'Search places, addresses, businesses...';
+    } else if (type === 'beenverified') {
+        label.textContent = 'Search BeenVerified:';
+        input.placeholder = 'Enter full name (e.g. John Smith)...';
+        cityInput.style.display = 'block';
+        stateInput.style.display = 'block';
+    } else if (type === 'apollo') {
+        label.textContent = 'Search Apollo:';
+        input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
+        locationInput.style.display = 'block';
+    }
+    
+    searchBar.classList.add('active');
+    if (mainContainer) {
+        mainContainer.classList.add('search-active');
+    }
+    setTimeout(() => input.focus(), 300);
+    input.value = '';
+    cityInput.value = '';
+    stateInput.value = '';
+    locationInput.value = '';
+}
+
+function closeSearch() {
+    const searchBar = gId('search-bar');
+    const mainContainer = gId('main-container');
+    if (searchBar) {
+        searchBar.classList.remove('active');
+    }
+    if (mainContainer) {
+        mainContainer.classList.remove('search-active');
+    }
+    if (activeButton) {
+        activeButton.classList.remove('active');
+        activeButton = null;
+    }
+    currentSearchType = '';
+}
+
+function performSearch() {
+    const query = gId('search-input').value.trim();
+    if (!query) return;
+    
+    let searchUrl = '';
+    
+    if (currentSearchType === 'google') {
+        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    } else if (currentSearchType === 'maps') {
+        searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+    } else if (currentSearchType === 'beenverified') {
+        const city = gId('search-city').value.trim();
+        const state = gId('search-state').value.trim().toUpperCase();
+        const nameParts = query.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
+    } else if (currentSearchType === 'apollo') {
+        const location = gId('search-location').value.trim();
+        let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
+        if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
+        searchUrl = apolloUrl;
+    }
+    
+    if (searchUrl) {
+        window.open(searchUrl, '_blank');
+        closeSearch();
+    }
+}
+// --- END NEW CODE ---
+
 console.log('CRM App initialized successfully');
+

@@ -1,10 +1,9 @@
-/* Reset and Base Styles */
+  /* Reset and Base Styles */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
-
 body {
     font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
     background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
@@ -115,13 +114,79 @@ body {
     text-align: center;
 }
 
+/* Search Bar */
+.search-bar {
+    position: fixed;
+    top: 92px; /* Adjusted to be below the top-nav */
+    left: 0;
+    right: 0;
+    background: white;
+    border-bottom: 2px solid #1A438D;
+    box-shadow: 0 8px 32px rgba(26,67,141,.15);
+    padding: 0;
+    height: 0;
+    overflow: hidden;
+    transition: all .3s ease;
+    z-index: 500;
+}
+.search-bar.active {
+    height: 80px;
+    padding: 20px;
+}
+.search-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.search-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1A438D;
+    min-width: 150px;
+}
+.search-input {
+    flex: 2;
+    padding: 12px 16px;
+    font-size: 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background: white;
+    color: #1e293b;
+}
+.search-input.city, .search-input.state, .search-input.location {
+    flex: 1;
+}
+.search-input:focus {
+    outline: none;
+    border-color: #1A438D;
+}
+.search-actions {
+    display: flex;
+    gap: 8px;
+}
+.search-btn {
+    background: #1A438D;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.search-btn.close {
+    background: #6b7280;
+    padding: 10px 12px;
+}
+
 /* Main Container */
 .main-container {
-    margin-top: 100px;
+    margin-top: 180px; /* Adjusted to account for nav and search bars */
     padding: 20px;
     flex-grow: 1;
     overflow-y: auto;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 180px); /* Adjusted height */
 }
 
 /* View Management */
@@ -154,7 +219,7 @@ body {
     display: grid;
     grid-template-columns: 1fr 350px;
     gap: 30px;
-    height: calc(100vh - 140px);
+    height: calc(100vh - 220px); /* Adjusted for new nav/search bar height */
 }
 
 .dashboard-main {
@@ -188,7 +253,7 @@ body {
     display: grid;
     grid-template-columns: 1fr 350px;
     gap: 30px;
-    height: calc(100vh - 140px);
+    height: calc(100vh - 220px); /* Adjusted for new nav/search bar height */
 }
 
 .account-detail-main {
@@ -794,6 +859,9 @@ form {
     .app-icon-svg {width: 28px; height: 28px;}
     .app-label {font-size: .6rem;}
     .nav-icons-center {gap: 30px;}
+    .search-bar {top: 92px;}
+    .search-bar.active {height: 70px; padding: 15px;}
+    .search-label {min-width: 120px;}
 }
 
 @media (max-width: 768px) {
@@ -823,7 +891,7 @@ form {
     
     .main-container {
         padding: 140px 15px 30px 15px;
-        margin-top: 82px;
+        margin-top: 140px;
     }
     
     .view-header {
@@ -874,6 +942,8 @@ form {
     }
     
     .top-nav {padding: 10px 0;}
+    .search-bar {top: 82px;}
+    .search-bar.active {height: 60px; padding: 12px;}
 }
 
 @media (max-width: 480px) {
@@ -905,7 +975,7 @@ form {
     
     .main-container {
         padding: 130px 10px 25px 10px;
-        margin-top: 72px;
+        margin-top: 130px;
     }
     
     .crm-card {
@@ -940,4 +1010,6 @@ form {
     }
     
     .top-nav {padding: 8px 0;}
+    .search-bar {top: 72px;}
+    .search-bar.active {height: 50px; padding: 10px;}
 }
