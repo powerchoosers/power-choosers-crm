@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Choosers CRM</title>
-    <link rel="stylesheet" href="crm-styles.css">
+    
+    <!-- Firebase Scripts - MUST come before firebase-config.js -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <!-- Your CSS and JS files -->
+    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/crm-styles.css">
+    <script src="https://powerchoosers.github.io/power-choosers-crm/firebase-config.js"></script>
+    <script src="https://powerchoosers.github.io/power-choosers-crm/crm-app.js"></script>
 </head>
 <body>
     <div class="top-nav">
@@ -13,7 +21,7 @@
                 <h1 id="page-title">Power Choosers CRM</h1>
             </div>
             <div class="nav-icons-center">
-                <button class="app-button" id="dashboard-btn" data-view="dashboard">
+                <button class="app-button active" id="dashboard-btn" data-view="dashboard">
                     <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                         <polyline points="9 22 9 12 15 12 15 22"/>
@@ -205,7 +213,28 @@
                     <div class="crm-card">
                         <h3 class="card-title">⚡ Energy Contract Details</h3>
                         <div id="energy-contract-display">
-                            <p class="empty-state">No contract information available</p>
+                            <div class="input-group">
+                                <label for="contract-provider">Current Provider:</label>
+                                <input type="text" id="contract-provider" placeholder="Enter provider name">
+                            </div>
+                            <div class="input-group">
+                                <label for="contract-rate">Current Rate:</label>
+                                <input type="text" id="contract-rate" placeholder="e.g. 12.5¢/kWh">
+                            </div>
+                            <div class="input-group">
+                                <label for="contract-expiration">Contract Expiration:</label>
+                                <input type="date" id="contract-expiration">
+                            </div>
+                            <div class="input-group">
+                                <label for="contract-type">Contract Type:</label>
+                                <select id="contract-type">
+                                    <option value="">Select type</option>
+                                    <option value="fixed">Fixed Rate</option>
+                                    <option value="variable">Variable Rate</option>
+                                    <option value="indexed">Indexed Rate</option>
+                                </select>
+                            </div>
+                            <button class="primary-btn" id="save-contract-btn">Save Contract Info</button>
                         </div>
                     </div>
                     
@@ -314,8 +343,5 @@
     </div>
 
     <div class="toast-container" id="toast-container"></div>
-
-    <script src="firebase-config.js"></script>
-    <script src="crm-app.js"></script>
 </body>
 </html>
