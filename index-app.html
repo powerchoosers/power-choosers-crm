@@ -25,6 +25,9 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            /* Added to try and fix layering issues when embedded */
+            position: relative;
+            z-index: 1;
         }
         
         /* Top Navigation Bar */
