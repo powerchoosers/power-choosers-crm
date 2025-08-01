@@ -1401,3 +1401,534 @@ form {
     .search-bar.active {height: 45px; padding: 8px;}
     .nav-left-title h1 {font-size: 1.4rem;}
 }
+}
+{
+type: uploaded file
+fileName: index.html
+fullText:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Choosers CRM</title>
+    
+    <!-- Firebase Scripts - MUST come before firebase-config.js -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <!-- Your CSS and JS files -->
+    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/crm-styles.css">
+    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/style.css">
+    <script src="https://powerchoosers.github.io/power-choosers-crm/firebase-config.js"></script>
+    <script src="https://powerchoosers.github.io/power-choosers-crm/crm-app.js"></script>
+</head>
+<body>
+    <div class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left-title">
+                <h1 id="page-title">Power Choosers CRM</h1>
+            </div>
+            <div class="nav-icons-center">
+                <button class="app-button active" id="dashboard-btn" data-view="dashboard">
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    <span class="app-label">Dashboard</span>
+                </button>
+                
+                <button class="app-button" id="accounts-btn" data-view="accounts">
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="m22 21-1.5-1.5"/>
+                        <circle cx="19" cy="17" r="3"/>
+                    </svg>
+                    <span class="app-label">Accounts</span>
+                </button>
+                
+                <button class="app-button" id="contacts-btn" data-view="contacts">
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="m22 21-3-3"/>
+                        <circle cx="19" cy="17" r="3"/>
+                    </svg>
+                    <span class="app-label">Contacts</span>
+                </button>
+
+                <!-- This is the Calls Hub button, now toggling an internal view -->
+                <button class="app-button" id="calls-hub-btn" data-view="calls-hub">
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                    <span class="app-label">Calls Hub</span>
+                </button>
+
+                <!-- Search buttons are now part of the CRM functionality -->
+                <div class="app-button" id="google-button">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google" class="app-icon">
+                    <span class="app-label">Google</span>
+                </div>
+                <div class="app-button" id="maps-button">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d37e95a4c0686b08c267_images.jpg" alt="Google Maps" class="app-icon">
+                    <span class="app-label">Maps</span>
+                </div>
+                <div class="app-button" id="apollo-button">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851d2771f4c6e42a09731_images.png" alt="Apollo" class="app-icon">
+                    <span class="app-label">Apollo</span>
+                </div>
+                <div class="app-button" id="beenverified-button">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68885144c4bbad742f397a18_unnamed.png" alt="BeenVerified" class="app-icon">
+                    <span class="app-label">BeenVerified</span>
+                </div>
+            </div>
+            <div class="nav-right-logo"></div>
+        </div>
+    </div>
+    
+    <div class="search-bar" id="search-bar">
+        <div class="search-container">
+            <div class="search-label" id="search-label">Search Google:</div>
+            <input type="text" class="search-input" id="search-input" placeholder="Type your search query...">
+            <input type="text" class="search-input city" id="search-city" placeholder="City" style="display:none">
+            <input type="text" class="search-input state" id="search-state" placeholder="State" style="display:none">
+            <input type="text" class="search-input location" id="search-location" placeholder="Location (e.g. Fort Worth, TX)" style="display:none">
+            <div class="search-actions">
+                <button class="search-btn" onclick="performSearch()">Go</button>
+                <button class="search-btn close" onclick="closeSearch()">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container" id="main-container">
+        
+        <div class="view-container active" id="dashboard-view">
+            <div class="dashboard-layout">
+                <div class="dashboard-main">
+                    <div class="crm-card">
+                        <h2 class="card-title">📊 Dashboard Overview</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <span class="stat-number" id="total-accounts">0</span>
+                                <span class="stat-label">Total Accounts</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="total-contacts">0</span>
+                                <span class="stat-label">Total Contacts</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="recent-activities">0</span>
+                                <span class="stat-label">Recent Activities</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="hot-leads">0</span>
+                                <span class="stat-label">Hot Leads</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h2 class="card-title">🔥 Recent Activities</h2>
+                        <div id="recent-activities-list">
+                            <p class="empty-state">No recent activities</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="dashboard-sidebar">
+                    <div class="crm-card">
+                        <h2 class="card-title">⚡ Quick Actions</h2>
+                        <button class="action-btn" id="go-to-calls-hub-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            Go to Calls Hub
+                        </button>
+                        <button class="action-btn" id="add-account-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 8v8M8 12h8"/>
+                            </svg>
+                            Add New Account
+                        </button>
+                        <button class="action-btn" id="add-contact-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M19 8v6M22 11h-6"/>
+                            </svg>
+                            Add New Contact
+                        </button>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h2 class="card-title">📞 Today's Calls</h2>
+                        <div id="todays-calls">
+                            <p class="empty-state">No calls scheduled</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="view-container" id="accounts-view">
+            <div class="view-header">
+                <h2>🏢 Accounts</h2>
+                <button class="primary-btn" id="new-account-btn">+ New Account</button>
+            </div>
+            <div class="accounts-grid" id="accounts-grid">
+                <p class="empty-state">No accounts found. Click "New Account" to get started.</p>
+            </div>
+        </div>
+
+        <div class="view-container" id="contacts-view">
+            <div class="view-header">
+                <h2>👤 Contacts</h2>
+                <button class="primary-btn" id="new-contact-btn">+ New Contact</button>
+            </div>
+            <div class="contacts-grid" id="contacts-grid">
+                <p class="empty-state">No contacts found. Click "New Contact" to get started.</p>
+            </div>
+        </div>
+
+        <div class="view-container" id="account-detail-view">
+            <div class="account-detail-layout">
+                <div class="account-detail-main">
+                    <div class="view-header">
+                        <button class="back-btn" id="back-to-accounts">← Back to Accounts</button>
+                        <h2 id="account-detail-title">Account Details</h2>
+                        <button class="primary-btn" id="edit-account-btn">Edit Account</button>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h3 class="card-title">🏢 Company Information</h3>
+                        <div id="account-info-display">
+                        </div>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h3 class="card-title">👥 Contacts at this Account</h3>
+                        <div id="account-contacts-list">
+                            <p class="empty-state">No contacts for this account</p>
+                        </div>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h3 class="card-title">📝 Recent Activities</h3>
+                        <div id="account-activities-list">
+                            <p class="empty-state">No recent activities</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="account-detail-sidebar">
+                    <div class="crm-card">
+                        <h3 class="card-title">⚡ Energy Contract Details</h3>
+                        <form id="energy-contract-form">
+                            <div class="input-group">
+                                <label for="contract-provider">Current Provider:</label>
+                                <input type="text" id="contract-provider" placeholder="Enter provider name">
+                            </div>
+                            <div class="input-group">
+                                <label for="contract-rate">Current Rate:</label>
+                                <input type="text" id="contract-rate" placeholder="e.g. 12.5¢/kWh">
+                            </div>
+                            <div class="input-group">
+                                <label for="contract-expiration">Contract Expiration:</label>
+                                <input type="date" id="contract-expiration">
+                            </div>
+                            <div class="input-group">
+                                <label for="contract-type">Contract Type:</label>
+                                <select id="contract-type">
+                                    <option value="">Select type</option>
+                                    <option value="fixed">Fixed Rate</option>
+                                    <option value="variable">Variable Rate</option>
+                                    <option value="indexed">Indexed Rate</option>
+                                </select>
+                            </div>
+                            <button class="primary-btn" type="submit">Save Contract Info</button>
+                        </form>
+                    </div>
+                    
+                    <div class="crm-card">
+                        <h3 class="card-title">📝 Add Note</h3>
+                        <textarea id="account-note-input" placeholder="Add a note about this account..."></textarea>
+                        <button class="primary-btn" id="save-account-note">Save Note</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CALLING HUB VIEW - INTEGRATED INTO THE MAIN PAGE -->
+        <div class="view-container" id="calls-hub-view">
+            <div class="container">
+                <div class="main-content">
+                    <div id="script-display" class="script-display mood-neutral">
+                        Click 'Dial' to begin the call
+                    </div>
+                    <div id="responses-container" class="responses-grid">
+                        <!-- The dial button will be dynamically injected here by crm-app.js -->
+                    </div>
+                    <div class="nav-buttons">
+                        <button id="back-btn" class="nav-btn" onclick="goBack()" disabled>← Back</button>
+                        <button id="restart-btn" class="nav-btn" onclick="restart()">🔄 Restart</button>
+                    </div>
+                </div>
+            
+                <div class="sidebar">
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">📋 Prospect Info</h3>
+                        <div class="input-group">
+                            <label for="input-company-name">Company Name:</label>
+                            <input type="text" id="input-company-name" placeholder="ABC Manufacturing" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-name">Contact Name:</label>
+                            <input type="text" id="input-name" placeholder="John Smith" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-title">Contact Title:</label>
+                            <input type="text" id="input-title" placeholder="Company Leader" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-company-industry">Company Industry:</label>
+                            <input type="text" id="input-company-industry" placeholder="businesses" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-benefit">Specific Benefit:</label>
+                            <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-pain">Pain Point:</label>
+                            <input type="text" id="input-pain" placeholder="you're not stuck paying more" oninput="updateScript()">
+                        </div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">📝 Call Notes</h3>
+                        <textarea id="call-notes" placeholder="Type your call notes here...
+• Company:
+• Contact:
+• Title:
+• Phone:
+• Email:
+• Contract expiration:
+• Current provider:
+• Pain points:
+• Interest level:
+• Next steps:
+• Follow-up date: "></textarea>
+                        <div style="display:flex;gap:8px;margin-bottom:16px">
+                            <button onclick="saveProspectAndNotes()" class="add-notes-btn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 8v8M8 12h8"/>
+                                </svg>
+                                Add Notes
+                            </button>
+                            <button onclick="clearNotes()" style="flex:1;background:#da3633;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.9rem">🗑️ Clear</button>
+                        </div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">💡 Call Strategy Tips</h3>
+                        <div class="tip-item"><strong>Mirror their energy:</strong> Match their speaking pace and enthusiasm level to build rapport naturally.</div>
+                        <div class="tip-item"><strong>Use their name:</strong> Say their name 2-3 times during the call to maintain personal connection.</div>
+                        <div class="tip-item"><strong>Pause power:</strong> Use 2-3 second pauses after questions to let them process and respond.</div>
+                        <div class="tip-item"><strong>Permission-based selling:</strong> Always ask permission before moving to the next topic or scheduling.</div>
+                        <div class="tip-item"><strong>Assume the close:</strong> When scheduling, offer two specific times rather than asking "when works?"</div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">📊 Market Intelligence</h3>
+                        <div class="stat-grid">
+                            <div class="stat-card"><span class="stat-number">60%</span><span class="stat-label">Rate increase since 2021</span></div>
+                            <div class="stat-card"><span class="stat-number">29%</span><span class="stat-label">TX cost advantage</span></div>
+                            <div class="stat-card"><span class="stat-number">2026</span><span class="stat-label">Supply concerns begin</span></div>
+                            <div class="stat-card"><span class="stat-number">85%</span><span class="stat-label">Businesses unprepared</span></div>
+                        </div>
+                        <div class="tip-item"><strong>Key Message:</strong> "Texas maintains a 29% cost advantage over national averages, but only if you're positioned correctly in the market."</div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">📰 This Week's Energy News</h3>
+                        
+                        <div class="news-item">
+                            <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
+                            <div class="news-summary">Grid operator warns electricity demand may surpass available supply as soon as summer 2026, driven by massive data center growth and extreme weather patterns.</div>
+                            <div class="news-talking-point">💬 "With ERCOT projecting supply shortages, how is your company preparing for potential capacity constraints?"</div>
+                        </div>
+                        
+                        <div class="news-item">
+                            <div class="news-title">Data Centers Drive 218GW Demand Surge</div>
+                            <div class="news-summary">Texas electricity demand projected to reach 218GW by 2031 - more than doubling current levels. AI data centers alone account for 86GW of new demand growth.</div>
+                            <div class="news-talking-point">💬 "Are you factoring the massive industrial load growth into your energy procurement strategy?"</div>
+                        </div>
+                        
+                        <div class="news-item">
+                            <div class="news-title">"One Big Beautiful Bill" Impacts Texas Markets</div>
+                            <div class="news-summary">Federal legislation cuts clean energy subsidies while expanding fossil fuel production. Analysis shows wholesale electricity prices could rise 25% by 2030 and 74% by 2035.</div>
+                            <div class="news-talking-point">💬 "How are recent federal policy changes affecting your long-term energy cost planning?"</div>
+                        </div>
+                        
+                        <div class="news-item">
+                            <div class="news-title">Texas Wholesale Prices Expected to Drop Short-Term</div>
+                            <div class="news-summary">EIA forecasts ERCOT North Hub prices to decrease to $27-34/MWh in 2025 due to solar expansion, but forward contracts remain elevated at $50+/MWh reflecting market risk.</div>
+                            <div class="news-talking-point">💬 "Are you taking advantage of current market conditions to lock in favorable rates?"</div>
+                        </div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">🛡️ Quick Objection Responses</h3>
+                        <div class="tip-item"><strong>"We're happy with our provider"</strong><br>"That's great to hear. This isn't about changing providers - it's about optimizing your position within the current market structure."</div>
+                        <div class="tip-item"><strong>"We just renewed our contract"</strong><br>"Perfect timing actually. This gives us a chance to prepare strategically for your next cycle rather than scrambling later."</div>
+                        <div class="tip-item"><strong>"Send me some information"</strong><br>"I can definitely do that. What specific information would be most valuable - rate comparisons or market timing strategies?"</div>
+                        <div class="tip-item"><strong>"We handle it internally"</strong><br>"Smart approach. My role isn't to replace your team - it's to provide market intelligence that helps you make better decisions."</div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">🎯 Daily Goals</h3>
+                        <div class="stat-grid">
+                            <div class="stat-card"><span class="stat-number">50</span><span class="stat-label">Dials target</span></div>
+                            <div class="stat-card"><span class="stat-number">15</span><span class="stat-label">Conversations</span></div>
+                            <div class="stat-card"><span class="stat-number">5</span><span class="stat-label">Qualified leads</span></div>
+                            <div class="stat-card"><span class="stat-number">2</span><span class="stat-label">Appointments</span></div>
+                        </div>
+                        <div class="tip-item"><strong>Success Rate:</strong> Track your conversion from dials to conversations to appointments. Aim for 30% conversation rate and 15% appointment rate.</div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">🏭 Industry Talking Points</h3>
+                        <div class="tip-item"><strong>Manufacturing:</strong> "Energy costs can represent 15-30% of operating expenses. How are you managing that exposure to volatility?"</div>
+                        <div class="tip-item"><strong>Healthcare:</strong> "Critical facilities need reliable power strategies. Are you prepared for supply constraints in 2026?"</div>
+                        <div class="tip-item"><strong>Retail:</strong> "Multiple locations mean complex energy management. How are you optimizing across all sites?"</div>
+                        <div class="tip-item"><strong>Technology:</strong> "Data centers have unique load profiles. Are you maximizing your demand response opportunities?"</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="modal-overlay" id="account-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="account-modal-title">Add New Account</h3>
+                <button class="close-btn" id="close-account-modal">×</button>
+            </div>
+            <form id="account-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-name">Company Name *</label>
+                        <input type="text" id="account-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-industry">Industry</label>
+                        <input type="text" id="account-industry">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-phone">Phone</label>
+                        <input type="tel" id="account-phone">
+                    </div>
+                    <div class="form-group">
+                        <label for="account-website">Website</label>
+                        <input type="url" id="account-website">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="account-address">Address</label>
+                    <textarea id="account-address" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-pain-points">Pain Points</label>
+                        <textarea id="account-pain-points" rows="3" placeholder="What challenges does this company face?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-benefits">Benefits</label>
+                        <textarea id="account-benefits" rows="3" placeholder="What benefits can we provide?"></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="secondary-btn" id="cancel-account">Cancel</button>
+                    <button type="submit" class="primary-btn">Save Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="contact-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="contact-modal-title">Add New Contact</h3>
+                <button class="close-btn" id="close-contact-modal">×</button>
+            </div>
+            <form id="contact-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-first-name">First Name *</label>
+                        <input type="text" id="contact-first-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-last-name">Last Name *</label>
+                        <input type="text" id="contact-last-name" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-title">Job Title</label>
+                        <input type="text" id="contact-title">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-account">Account</label>
+                        <select id="contact-account">
+                            <option value="">Select an account...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-email">Email</label>
+                        <input type="email" id="contact-email">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-phone">Phone</label>
+                        <input type="tel" id="contact-phone">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="contact-notes">Notes</label>
+                    <textarea id="contact-notes" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="secondary-btn" id="cancel-contact">Cancel</button>
+                    <button type="submit" class="primary-btn">Save Contact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+    <script>
+        // Setup the "Go to Calls Hub" button after DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            const goToCallsHubBtn = document.getElementById('go-to-calls-hub-btn');
+            if (goToCallsHubBtn) {
+                goToCallsHubBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showView('calls-hub');
+                    updateActiveNavButton(document.getElementById('calls-hub-btn'));
+                });
+            }
+        });
+    </script>
+</body>
+</html>
