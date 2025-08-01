@@ -17,20 +17,22 @@
         }
         body {
             font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-            color: #1e293b;
+            background: #0f1419;
+            color: #e4e7eb;
             height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            margin: 0;
+            padding: 0;
         }
 
         /* Fixed Top Navigation Bar */
         .top-nav {
-            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            background: #1a202c;
             padding: 8px 0;
-            box-shadow: 0 8px 32px rgba(0,0,0,.08);
-            border-bottom: 1px solid rgba(30,90,168,.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,.3);
+            border-bottom: 1px solid #2d3748;
             z-index: 1000;
             position: fixed;
             top: 0;
@@ -53,7 +55,7 @@
         .nav-left-title h1 {
             font-size: 1.6rem;
             font-weight: 800;
-            color: #1A438D;
+            color: #f97316;
             margin: 0;
         }
 
@@ -71,38 +73,38 @@
             justify-content: center;
             width: 60px;
             height: 60px;
-            border-radius: 12px;
-            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
-            box-shadow: 0 4px 16px rgba(0,0,0,.06);
-            border: 1px solid rgba(30,90,168,.1);
+            border-radius: 8px;
+            background: #2d3748;
+            border: 1px solid #4a5568;
             cursor: pointer;
-            transition: all .3s ease;
+            transition: all .2s ease;
             position: relative;
             text-decoration: none;
             padding: 4px;
         }
 
         .app-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 32px rgba(0,0,0,.12);
+            background: #4a5568;
+            transform: translateY(-1px);
         }
 
         .app-button.active {
-            background: linear-gradient(145deg, #1A438D 0%, #2563EB 100%);
+            background: #1e3a8a;
+            border-color: #3b82f6;
             color: white;
         }
 
         .app-button.active .app-icon {
             filter: brightness(0) invert(1);
-            background: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.1);
         }
 
         .app-button.active .app-label {
-            color: white;
+            color: #e2e8f0;
         }
 
         .app-button.active .app-icon-svg {
-            color: white;
+            color: #e2e8f0;
         }
 
         .app-icon {
@@ -123,10 +125,10 @@
         .app-icon-svg {
             width: 22px;
             height: 22px;
-            color: #374151;
+            color: #a0aec0;
             margin: 0 0 2px 0;
             transition: color .3s ease;
-            background: rgba(107, 114, 128, 0.1);
+            background: rgba(160, 174, 192, 0.1);
             border-radius: 4px;
             padding: 3px;
             display: flex;
@@ -138,7 +140,7 @@
         .app-label {
             font-size: .55rem;
             font-weight: 600;
-            color: #374151;
+            color: #a0aec0;
             text-align: center;
             line-height: 1.1;
             white-space: nowrap;
@@ -328,11 +330,11 @@
 
         /* Primary Button Styling */
         .primary-btn, .action-btn {
-            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
             color: white;
             border: none;
             padding: 12px 20px;
-            border-radius: 12px;
+            border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
             font-size: .9rem;
@@ -340,15 +342,13 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            transition: all .3s ease;
-            box-shadow: 0 4px 16px rgba(26,67,141,.2);
+            transition: all .2s ease;
             margin-bottom: 12px;
         }
 
         .primary-btn:hover, .action-btn:hover {
-            background: linear-gradient(135deg, #153775 0%, #1D4ED8 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(26,67,141,.3);
+            background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+            transform: translateY(-1px);
         }
 
         .secondary-btn {
@@ -424,19 +424,29 @@
         /* Quick Actions Layout */
         .quick-actions-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto;
             gap: 12px;
             margin-bottom: 16px;
         }
 
         .quick-action-main {
-            grid-column: 1 / 4;
+            grid-column: 1;
             grid-row: 1;
+            padding: 16px 20px;
+        }
+
+        .quick-actions-secondary {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            grid-column: 1;
+            grid-row: 2;
         }
 
         .quick-action-item {
-            grid-row: 2;
+            padding: 10px 12px;
+            font-size: .8rem;
         }
 
         /* Chart Container */
@@ -586,17 +596,16 @@
 
         /* Cards */
         .crm-card {
-            background: white;
-            border-radius: 16px;
+            background: #1a202c;
+            border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
-            border: 1px solid rgba(30, 90, 168, .1);
+            border: 1px solid #2d3748;
         }
 
         .card-title {
             font-size: 1.3rem;
             font-weight: 700;
-            color: #1A438D;
+            color: #e2e8f0;
             margin-bottom: 12px;
             display: flex;
             align-items: center;
@@ -612,23 +621,23 @@
         }
 
         .stat-card {
-            background: linear-gradient(135deg, #fef7ff 0%, #f3e8ff 100%);
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
             padding: 14px;
-            border-radius: 12px;
+            border-radius: 8px;
             text-align: center;
-            border: 1px solid #c084fc;
+            border: 1px solid #4a5568;
         }
 
         .stat-number {
             font-size: 1.6rem;
             font-weight: 800;
-            color: #7c3aed;
+            color: #f97316;
             display: block;
         }
 
         .stat-label {
             font-size: .75rem;
-            color: #6b21a8;
+            color: #a0aec0;
             font-weight: 600;
         }
 
@@ -975,7 +984,7 @@
         /* Empty States */
         .empty-state {
             text-align: center;
-            color: #9ca3af;
+            color: #718096;
             font-style: italic;
             padding: 40px 20px;
             font-size: .9rem;
@@ -1599,29 +1608,31 @@
                                 </svg>
                                 Go to Calls Hub
                             </button>
-                            <button class="action-btn quick-action-item" id="add-account-btn">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <path d="M12 8v8M8 12h8"/>
-                                </svg>
-                                Add Account
-                            </button>
-                            <button class="action-btn quick-action-item" id="add-contact-btn">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                                    <circle cx="9" cy="7" r="4"/>
-                                    <path d="M19 8v6M22 11h-6"/>
-                                </svg>
-                                Add Contact
-                            </button>
-                            <button class="action-btn quick-action-item" id="bulk-import-btn">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                    <polyline points="7 10 12 15 17 10"/>
-                                    <line x1="12" y1="15" x2="12" y2="3"/>
-                                </svg>
-                                Bulk Import
-                            </button>
+                            <div class="quick-actions-secondary">
+                                <button class="action-btn quick-action-item" id="add-account-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 8v8M8 12h8"/>
+                                    </svg>
+                                    Add Account
+                                </button>
+                                <button class="action-btn quick-action-item" id="add-contact-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="9" cy="7" r="4"/>
+                                        <path d="M19 8v6M22 11h-6"/>
+                                    </svg>
+                                    Add Contact
+                                </button>
+                                <button class="action-btn quick-action-item" id="bulk-import-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="7 10 12 15 17 10"/>
+                                        <line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                    Bulk Import
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
