@@ -444,7 +444,7 @@ async function saveCallNotesToCRM() {
             createdAt: serverTimestamp()
         };
 
-        // Use addDoc to automatically generate a document ID
+        // Use a new document with an auto-generated ID
         const docRef = await addDoc(collection(db, 'activities'), activityData);
         console.log('Call notes saved to CRM with ID:', docRef.id);
     } catch (error) {
