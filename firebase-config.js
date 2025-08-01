@@ -80,3 +80,4 @@ window.formatDateOnly = function(timestamp) {
 };
 
 console.log('Firebase initialized successfully');
+console.log('Available functions:', Object.keys(window.FirebaseDB));
