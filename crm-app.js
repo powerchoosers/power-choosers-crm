@@ -250,7 +250,7 @@ function loadViewData(viewName) {
 
 // Initialize calls hub
 function initializeCallsHub() {
-    // If we don't have current prospect data, allow manual entry
+    // If we don't have current prospect data, allow manual entry (clean slate)
     if (!currentProspect.name && !currentProspect.company) {
         currentProspect = {
             name: '',
@@ -260,19 +260,23 @@ function initializeCallsHub() {
             phone: '',
             email: '',
             accountId: '',
-            contactId: ''
+            contactId: '',
+            painPoints: '',
+            benefits: ''
         };
+        // Enable all fields for clean slate access
+        enableAllProspectInputs();
+    } else {
+        // If we have data from a contact/account, enable only certain fields
+        enableSelectiveProspectInputs();
     }
     
     // Populate the input fields
     populateFromGlobalProspect();
-    
-    // Enable all input fields for editing
-    enableProspectInputs();
 }
 
-// Enable prospect input fields for editing
-function enableProspectInputs() {
+// Enable all prospect input fields for editing (clean slate)
+function enableAllProspectInputs() {
     const inputs = ['input-name', 'input-title', 'input-company-name', 'input-company-industry', 'input-benefit', 'input-pain'];
     inputs.forEach(inputId => {
         const input = gId(inputId);
@@ -280,6 +284,29 @@ function enableProspectInputs() {
             input.disabled = false;
             input.style.backgroundColor = 'white';
             input.style.color = '#1e293b';
+        }
+    });
+}
+
+// Enable selective prospect input fields (when coming from contact/account)
+function enableSelectiveProspectInputs() {
+    const allInputs = ['input-name', 'input-title', 'input-company-name', 'input-company-industry', 'input-benefit', 'input-pain'];
+    const alwaysEditableInputs = ['input-benefit', 'input-pain']; // Pain points and benefits always editable
+    
+    allInputs.forEach(inputId => {
+        const input = gId(inputId);
+        if (input) {
+            if (alwaysEditableInputs.includes(inputId)) {
+                // Always allow editing of pain points and benefits
+                input.disabled = false;
+                input.style.backgroundColor = 'white';
+                input.style.color = '#1e293b';
+            } else {
+                // Disable known fields when coming from contact/account
+                input.disabled = true;
+                input.style.backgroundColor = '#f1f5f9';
+                input.style.color = '#6b7280';
+            }
         }
     });
 }
@@ -453,6 +480,8 @@ async function handleAccountSubmit(e) {
             phone: document.getElementById('account-phone').value,
             website: document.getElementById('account-website').value,
             address: document.getElementById('account-address').value,
+            painPoints: document.getElementById('account-pain-points')?.value || '',
+            benefits: document.getElementById('account-benefits')?.value || '',
             updatedAt: window.FirebaseDB.serverTimestamp(),
             createdAt: CRMApp.currentAccount ? CRMApp.currentAccount.createdAt : window.FirebaseDB.serverTimestamp()
         };
@@ -658,6 +687,181 @@ async function saveAccountNote() {
     }
 }
 
+// Create new account from calls hub data
+async function createAccountFromCallsHub() {
+    try {
+        if (!window.FirebaseDB) {
+            throw new Error('Firebase not available');
+        }
+
+        const accountData = {
+            name: currentProspect.company || 'Unknown Company',
+            industry: currentProspect.industry || '',
+            phone: currentProspect.phone || '',
+            website: '',
+            address: '',
+            painPoints: currentProspect.painPoints || '',
+            benefits: currentProspect.benefits || '',
+            createdAt: window.FirebaseDB.serverTimestamp(),
+            updatedAt: window.FirebaseDB.serverTimestamp()
+        };
+        
+        const accountId = window.generateId();
+        const accountRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'accounts', accountId);
+        
+        await window.FirebaseDB.setDoc(accountRef, accountData);
+        
+        // Log activity
+        await logActivity({
+            type: 'account_created',
+            description: `Created account from calls hub: ${accountData.name}`,
+            accountId: accountId,
+            accountName: accountData.name
+        });
+        
+        // Update current prospect with the new account ID
+        currentProspect.accountId = accountId;
+        
+        return accountId;
+        
+    } catch (error) {
+        console.error('Error creating account from calls hub:', error);
+        throw error;
+    }
+}
+
+// Create new contact from calls hub data
+async function createContactFromCallsHub(accountId) {
+    try {
+        if (!window.FirebaseDB) {
+            throw new Error('Firebase not available');
+        }
+
+        const nameParts = (currentProspect.name || '').split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        const contactData = {
+            firstName: firstName,
+            lastName: lastName,
+            title: currentProspect.title || '',
+            accountId: accountId,
+            accountName: currentProspect.company || '',
+            email: currentProspect.email || '',
+            phone: currentProspect.phone || '',
+            notes: '',
+            createdAt: window.FirebaseDB.serverTimestamp(),
+            updatedAt: window.FirebaseDB.serverTimestamp()
+        };
+        
+        const contactId = window.generateId();
+        const contactRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'contacts', contactId);
+        
+        await window.FirebaseDB.setDoc(contactRef, contactData);
+        
+        // Log activity
+        await logActivity({
+            type: 'contact_created',
+            description: `Created contact from calls hub: ${firstName} ${lastName}`,
+            contactId: contactId,
+            contactName: `${firstName} ${lastName}`,
+            accountId: accountId,
+            accountName: currentProspect.company || ''
+        });
+        
+        // Update current prospect with the new contact ID
+        currentProspect.contactId = contactId;
+        
+        return contactId;
+        
+    } catch (error) {
+        console.error('Error creating contact from calls hub:', error);
+        throw error;
+    }
+}
+
+// Save prospect and notes - combined function
+async function saveProspectAndNotes() {
+    showLoading(true);
+    
+    try {
+        // Get notes content
+        const notesElement = gId('call-notes');
+        const notesContent = notesElement ? notesElement.value.trim() : '';
+        
+        // Update current prospect with form data
+        const nameInput = gId('input-name');
+        const titleInput = gId('input-title');
+        const companyInput = gId('input-company-name');
+        const industryInput = gId('input-company-industry');
+        const benefitInput = gId('input-benefit');
+        const painInput = gId('input-pain');
+        
+        if (nameInput) currentProspect.name = nameInput.value.trim();
+        if (titleInput) currentProspect.title = titleInput.value.trim();
+        if (companyInput) currentProspect.company = companyInput.value.trim();
+        if (industryInput) currentProspect.industry = industryInput.value.trim();
+        if (benefitInput) currentProspect.benefits = benefitInput.value.trim();
+        if (painInput) currentProspect.painPoints = painInput.value.trim();
+        
+        let accountId = currentProspect.accountId;
+        let contactId = currentProspect.contactId;
+        
+        // If we have new data and no existing account/contact, create them
+        if (currentProspect.company && !accountId) {
+            accountId = await createAccountFromCallsHub();
+        }
+        
+        if (currentProspect.name && !contactId && accountId) {
+            contactId = await createContactFromCallsHub(accountId);
+        }
+        
+        // Update existing account with pain points and benefits if we have them
+        if (accountId && (currentProspect.painPoints || currentProspect.benefits)) {
+            const accountRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'accounts', accountId);
+            const updateData = {
+                updatedAt: window.FirebaseDB.serverTimestamp()
+            };
+            
+            if (currentProspect.painPoints) updateData.painPoints = currentProspect.painPoints;
+            if (currentProspect.benefits) updateData.benefits = currentProspect.benefits;
+            
+            await window.FirebaseDB.updateDoc(accountRef, updateData);
+        }
+        
+        // Save notes as activity if we have notes
+        if (notesContent) {
+            await logActivity({
+                type: 'call_note',
+                description: `Call note: ${notesContent.substring(0, 50)}${notesContent.length > 50 ? '...' : ''}`,
+                noteContent: notesContent,
+                accountId: accountId,
+                accountName: currentProspect.company || 'Unknown Company',
+                contactId: contactId,
+                contactName: currentProspect.name || 'Unknown Contact'
+            });
+        }
+        
+        // Reload data
+        await Promise.all([
+            loadAccounts(),
+            loadContacts(),
+            loadActivities()
+        ]);
+        
+        showToast('Prospect info and notes saved successfully!');
+        
+        // Clear notes after saving
+        if (notesElement) notesElement.value = '';
+        
+    } catch (error) {
+        console.error('Error saving prospect and notes:', error);
+        showToast('Error saving data', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
 // Render accounts
 function renderAccounts() {
     const container = document.getElementById('accounts-grid');
@@ -820,6 +1024,14 @@ function renderAccountDetail() {
                 <div class="info-field-label">Address</div>
                 <div class="info-field-value">${account.address || 'Not specified'}</div>
             </div>
+            <div class="info-field">
+                <div class="info-field-label">Pain Points</div>
+                <div class="info-field-value">${account.painPoints || 'Not specified'}</div>
+            </div>
+            <div class="info-field">
+                <div class="info-field-label">Benefits</div>
+                <div class="info-field-value">${account.benefits || 'Not specified'}</div>
+            </div>
         `;
     }
     
@@ -915,6 +1127,12 @@ function editAccount(accountId) {
     document.getElementById('account-phone').value = account.phone || '';
     document.getElementById('account-website').value = account.website || '';
     document.getElementById('account-address').value = account.address || '';
+    
+    // Populate new fields
+    const painPointsField = document.getElementById('account-pain-points');
+    const benefitsField = document.getElementById('account-benefits');
+    if (painPointsField) painPointsField.value = account.painPoints || '';
+    if (benefitsField) benefitsField.value = account.benefits || '';
     
     document.getElementById('account-modal-title').textContent = 'Edit Account';
     showModal('account-modal');
@@ -1052,7 +1270,9 @@ function openCallsHubWithData(contactId) {
         phone: contact.phone || '',
         email: contact.email || '',
         accountId: contact.accountId || '',
-        contactId: contact.id || ''
+        contactId: contact.id || '',
+        painPoints: account ? account.painPoints || '' : '',
+        benefits: account ? account.benefits || '' : ''
     };
     
     // Now switch to the calls hub view on the same page
@@ -1073,7 +1293,9 @@ function openCallsHubWithPhone(phone, companyName = '', industry = '') {
         phone: phone,
         email: '',
         accountId: '',
-        contactId: ''
+        contactId: '',
+        painPoints: '',
+        benefits: ''
     };
     
     showView('calls-hub');
@@ -1183,354 +1405,3 @@ const scriptData = {
         responses: [
             { text: "🔄 Start New Call", next: "start" }
         ]
-    },
-    transfer_dialing: {
-        you: "Being transferred... Ringing...",
-        mood: "neutral",
-        responses: [
-            { text: "📞 Decision Maker Answers", next: "main_script_start" },
-            { text: "🚫 No Answer", next: "voicemail_or_hangup" }
-        ]
-    }
-};
-
-let currentStep = 'start';
-let history = [];
-let scriptDisplay, responsesContainer, backBtn;
-
-function populateFromGlobalProspect() {
-    // This function is now used to populate the input fields from the global currentProspect object
-    const inputName = gId('input-name');
-    if (inputName) {
-        inputName.value = currentProspect.name || '';
-        placeholders['N'] = currentProspect.name || '';
-    }
-    const inputTitle = gId('input-title');
-    if (inputTitle) {
-        inputTitle.value = currentProspect.title || '';
-        placeholders['CT'] = currentProspect.title || '';
-    }
-    const inputCompanyName = gId('input-company-name');
-    if (inputCompanyName) {
-        inputCompanyName.value = currentProspect.company || '';
-        placeholders['CN'] = currentProspect.company || '';
-    }
-    const inputCompanyIndustry = gId('input-company-industry');
-    if (inputCompanyIndustry) {
-        inputCompanyIndustry.value = currentProspect.industry || '';
-        placeholders['CI'] = currentProspect.industry || '';
-        placeholders['TIA'] = currentProspect.industry || '';
-    }
-}
-
-async function saveCallNotesToCRM() {
-    // This is the save notes function
-    const notesElement = gId('call-notes');
-    if (!notesElement) {
-        console.warn("Call notes element not found");
-        return;
-    }
-
-    const notesContent = notesElement.value.trim();
-    if (notesContent.length === 0) {
-        console.log("No notes to save.");
-        return;
-    }
-
-    try {
-        await logActivity({
-            type: 'call_note',
-            description: `Call note: ${notesContent.substring(0, 50)}${notesContent.length > 50 ? '...' : ''}`,
-            noteContent: notesContent,
-            accountName: currentProspect.company || 'Unknown Company',
-            contactName: currentProspect.name || 'Unknown Contact'
-        });
-        showToast('Call notes saved successfully!');
-    } catch (error) {
-        console.error('Error saving call notes:', error);
-        showToast('Error saving notes.', 'error');
-    }
-}
-
-function applyPlaceholders(text) {
-    let newText = text;
-    for (const key in placeholders) {
-        const regex = new RegExp('\\[' + key + '\\]', 'g');
-        newText = newText.replace(regex, placeholders[key]);
-    }
-    return newText;
-}
-
-function updateScript() {
-    for (const inputId in inputMap) {
-        const placeholderKey = inputMap[inputId];
-        const inputElement = gId(inputId);
-        if (inputElement) {
-            const inputValue = inputElement.value || inputElement.placeholder;
-            placeholders[placeholderKey] = inputValue;
-        }
-    }
-    placeholders['TIA'] = placeholders['CI'];
-    displayCurrentStep();
-}
-
-function displayCurrentStep() {
-    const step = scriptData[currentStep];
-    if (!step) return;
-    
-    scriptDisplay = gId('script-display');
-    responsesContainer = gId('responses-container');
-    backBtn = gId('back-btn');
-    
-    const processedText = applyPlaceholders(step.you);
-    
-    if (scriptDisplay) {
-        scriptDisplay.innerHTML = processedText;
-        scriptDisplay.className = `script-display mood-${step.mood}`;
-    }
-    
-    if (responsesContainer) {
-        responsesContainer.innerHTML = '';
-        if (currentStep === 'start') {
-            // Always show dial button on start
-            const dialButtonHtml = `
-                <button class="dial-button" onclick="handleDialClick()">
-                    <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                    </svg>
-                    Dial
-                </button>
-            `;
-            responsesContainer.innerHTML = dialButtonHtml;
-        } else if (step.responses && step.responses.length > 0) {
-            step.responses.forEach(response => {
-                const button = document.createElement('button');
-                button.className = 'response-btn';
-                button.innerHTML = applyPlaceholders(response.text);
-                button.onclick = () => selectResponse(response.next, response.action);
-                responsesContainer.appendChild(button);
-            });
-        }
-    }
-    
-    if (backBtn) {
-        backBtn.disabled = history.length === 0;
-    }
-
-    populateFromGlobalProspect();
-}
-
-function handleDialClick() {
-    showToast('Starting call script...', 'info');
-    selectResponse('dialing'); 
-}
-
-function selectResponse(nextStep, action) {
-    if (nextStep && scriptData[nextStep]) {
-        history.push(currentStep);
-        currentStep = nextStep;
-        displayCurrentStep();
-    }
-
-    // Handle special actions
-    if (action === 'saveNotes') {
-        saveCallNotesToCRM();
-    }
-}
-
-function goBack() {
-    if (history.length > 0) {
-        currentStep = history.pop();
-        displayCurrentStep();
-    }
-}
-
-function restart() {
-    currentStep = 'start';
-    history = [];
-    
-    const callNotesElement = gId('call-notes');
-    if (callNotesElement) {
-        callNotesElement.value = '';
-    }
-
-    currentProspect = {
-        name: '',
-        title: '',
-        company: '',
-        industry: '',
-        phone: '',
-        email: '',
-        accountId: '',
-        contactId: ''
-    };
-    
-    displayCurrentStep();
-}
-
-function copyNotes() {
-    const notesTextarea = gId('call-notes');
-    const statusDiv = gId('copy-status');
-    
-    if (!notesTextarea || !statusDiv) return;
-    
-    notesTextarea.select();
-    try {
-        document.execCommand('copy');
-        statusDiv.textContent = '✅ Notes copied to clipboard!';
-        statusDiv.style.opacity = '1';
-        setTimeout(() => statusDiv.style.opacity = '0', 3000);
-    } catch (err) {
-        statusDiv.textContent = '❌ Copy failed';
-        statusDiv.style.color = '#ef4444';
-        statusDiv.style.opacity = '1';
-        setTimeout(() => {
-            statusDiv.style.opacity = '0';
-            statusDiv.style.color = '#22c55e';
-        }, 3000);
-    }
-}
-
-function clearNotes() {
-    const notesTextarea = gId('call-notes');
-    const statusDiv = gId('copy-status');
-    
-    if (!notesTextarea || !statusDiv) return;
-
-    if (confirm('Are you sure you want to clear all notes?')) {
-        notesTextarea.value = '';
-        statusDiv.textContent = '🗑️ Notes cleared';
-        statusDiv.style.opacity = '1';
-        setTimeout(() => statusDiv.style.opacity = '0', 2000);
-    }
-}
-
-// --- Search Functions ---
-function setupSearchFunctionality() {
-    const googleBtn = gId('google-button');
-    if (googleBtn) {
-        googleBtn.addEventListener('click', (e) => openSearch('google', e));
-    }
-    const mapsBtn = gId('maps-button');
-    if (mapsBtn) {
-        mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
-    }
-    const apolloBtn = gId('apollo-button');
-    if (apolloBtn) {
-        apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
-    }
-    const beenverifiedBtn = gId('beenverified-button');
-    if (beenverifiedBtn) {
-        beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
-    }
-
-    ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
-        const input = gId(id);
-        if (input) {
-            input.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') performSearch();
-            });
-        }
-    });
-}
-
-function openSearch(type, event) {
-    const button = event.target.closest('.app-button');
-    const searchBar = gId('search-bar');
-    const mainContainer = gId('main-container');
-
-    if (currentSearchType === type && activeButton === button) {
-        closeSearch();
-        return;
-    }
-    
-    if (activeButton) activeButton.classList.remove('active');
-    currentSearchType = type;
-    activeButton = button;
-    button.classList.add('active');
-    
-    const label = gId('search-label');
-    const input = gId('search-input');
-    const cityInput = gId('search-city');
-    const stateInput = gId('search-state');
-    const locationInput = gId('search-location');
-    
-    if (!label || !input) return;
-    
-    if (cityInput) cityInput.style.display = 'none';
-    if (stateInput) stateInput.style.display = 'none';
-    if (locationInput) locationInput.style.display = 'none';
-    
-    if (type === 'google') {
-        label.textContent = 'Search Google:';
-        input.placeholder = 'Type your search query...';
-    } else if (type === 'maps') {
-        label.textContent = 'Search Maps:';
-        input.placeholder = 'Search places, addresses, businesses...';
-    } else if (type === 'beenverified') {
-        label.textContent = 'Search BeenVerified:';
-        input.placeholder = 'Enter full name (e.g. John Smith)...';
-        if (cityInput) cityInput.style.display = 'block';
-        if (stateInput) stateInput.style.display = 'block';
-    } else if (type === 'apollo') {
-        label.textContent = 'Search Apollo:';
-        input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
-        if (locationInput) locationInput.style.display = 'block';
-    }
-    
-    if (searchBar) searchBar.classList.add('active');
-    if (mainContainer) {
-        mainContainer.classList.add('search-active');
-    }
-    setTimeout(() => input.focus(), 300);
-    input.value = '';
-    if (cityInput) cityInput.value = '';
-    if (stateInput) stateInput.value = '';
-    if (locationInput) locationInput.value = '';
-}
-
-function closeSearch() {
-    const searchBar = gId('search-bar');
-    const mainContainer = gId('main-container');
-    if (searchBar) {
-        searchBar.classList.remove('active');
-    }
-    if (mainContainer) {
-        mainContainer.classList.remove('search-active');
-    }
-    if (activeButton) {
-        activeButton.classList.remove('active');
-        activeButton = null;
-    }
-    currentSearchType = '';
-}
-
-function performSearch() {
-    const query = gId('search-input').value.trim();
-    if (!query) return;
-    
-    let searchUrl = '';
-    
-    if (currentSearchType === 'google') {
-        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    } else if (currentSearchType === 'maps') {
-        searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
-    } else if (currentSearchType === 'beenverified') {
-        const city = gId('search-city').value.trim();
-        const state = gId('search-state').value.trim().toUpperCase();
-        const nameParts = query.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
-        searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
-    } else if (currentSearchType === 'apollo') {
-        const location = gId('search-location').value.trim();
-        let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
-        if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
-        searchUrl = apolloUrl;
-    }
-    
-    if (searchUrl) {
-        window.open(searchUrl, '_blank');
-        closeSearch();
-    }
-}
