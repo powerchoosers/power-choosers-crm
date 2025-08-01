@@ -1,4 +1,4 @@
-// Global state for search functionality
+// Global state for search functionality - REMOVE any duplicate declarations
 let currentSearchType = '';
 let activeButton = null;
 let currentProspect = {}; // New object to hold CRM data from URL
