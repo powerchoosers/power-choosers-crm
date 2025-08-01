@@ -11,7 +11,7 @@ const CRMApp = {
 };
 
 // Global state for search functionality
-let currentSearchType = currentSearchType || '';
+let currentSearchType = '';
 let activeButton = null;
 
 // Helper to get element by ID (saves characters and improves readability)
