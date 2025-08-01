@@ -261,7 +261,7 @@
                         Click 'Dial' to begin the call
                     </div>
                     <div id="responses-container" class="responses-grid">
-                        <!-- The dial button will be dynamically injected here by script.js -->
+                        <!-- The dial button will be dynamically injected here by crm-app.js -->
                     </div>
                     <div class="nav-buttons">
                         <button id="back-btn" class="nav-btn" onclick="goBack()" disabled>← Back</button>
@@ -509,19 +509,5 @@
     </div>
 
     <div class="toast-container" id="toast-container"></div>
-
-    <script>
-        // Setup the "Go to Calls Hub" button after DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            const goToCallsHubBtn = document.getElementById('go-to-calls-hub-btn');
-            if (goToCallsHubBtn) {
-                goToCallsHubBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    showView('calls-hub');
-                    updateActiveNavButton(document.getElementById('calls-hub-btn'));
-                });
-            }
-        });
-    </script>
 </body>
 </html>
