@@ -154,9 +154,9 @@
             top: 80px; 
             left: 0;
             right: 0;
-            background: white;
-            border-bottom: 2px solid #1A438D;
-            box-shadow: 0 8px 32px rgba(26,67,141,.15);
+            background: #1a202c;
+            border-bottom: 2px solid #f97316;
+            box-shadow: 0 8px 32px rgba(249,115,22,.15);
             padding: 0;
             height: 0;
             overflow: hidden;
@@ -177,31 +177,31 @@
         .search-label {
             font-size: 1rem;
             font-weight: 600;
-            color: #1A438D;
+            color: #ffffff;
             min-width: 140px;
         }
         .search-input {
             flex: 2;
             padding: 10px 14px;
             font-size: 1rem;
-            border: 2px solid #e2e8f0;
+            border: 2px solid #4a5568;
             border-radius: 8px;
-            background: white;
-            color: #1e293b;
+            background: #2d3748;
+            color: #ffffff;
         }
         .search-input.city, .search-input.state, .search-input.location {
             flex: 1;
         }
         .search-input:focus {
             outline: none;
-            border-color: #1A438D;
+            border-color: #f97316;
         }
         .search-actions {
             display: flex;
             gap: 8px;
         }
         .search-btn {
-            background: #1A438D;
+            background: #f97316;
             color: white;
             border: none;
             padding: 8px 14px;
@@ -220,12 +220,12 @@
             top: 100%;
             left: 15px;
             right: 15px;
-            background: white;
-            border: 1px solid #e2e8f0;
+            background: #1a202c;
+            border: 1px solid #4a5568;
             border-radius: 8px;
             max-height: 300px;
             overflow-y: auto;
-            box-shadow: 0 8px 24px rgba(0,0,0,.12);
+            box-shadow: 0 8px 24px rgba(0,0,0,.3);
             z-index: 1000;
             display: none;
         }
@@ -236,13 +236,13 @@
 
         .search-result-item {
             padding: 12px 16px;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid #2d3748;
             cursor: pointer;
             transition: background-color .3s ease;
         }
 
         .search-result-item:hover {
-            background: #f8fafc;
+            background: #2d3748;
         }
 
         .search-result-item:last-child {
@@ -251,19 +251,19 @@
 
         .search-result-name {
             font-weight: 600;
-            color: #1A438D;
+            color: #ffffff;
             margin-bottom: 4px;
         }
 
         .search-result-info {
             font-size: .85rem;
-            color: #64748b;
+            color: #cbd5e0;
         }
 
         .search-result-type {
             display: inline-block;
-            background: #e2e8f0;
-            color: #64748b;
+            background: #4a5568;
+            color: #ffffff;
             padding: 2px 8px;
             border-radius: 12px;
             font-size: .75rem;
@@ -275,17 +275,17 @@
             display: block;
             width: 100%;
             padding: 12px 16px;
-            background: #f8fafc;
+            background: #2d3748;
             border: none;
             text-align: center;
             font-weight: 600;
-            color: #1A438D;
+            color: #ffffff;
             cursor: pointer;
             transition: background-color .3s ease;
         }
 
         .view-all-btn:hover {
-            background: #f1f5f9;
+            background: #4a5568;
         }
 
         /* Main Container */
@@ -405,8 +405,8 @@
         }
 
         .dashboard-main::-webkit-scrollbar {width: 8px;}
-        .dashboard-main::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
-        .dashboard-main::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+        .dashboard-main::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
+        .dashboard-main::-webkit-scrollbar-thumb {background: #f97316; border-radius: 4px;}
 
         .dashboard-sidebar {
             display: flex;
@@ -419,8 +419,8 @@
         }
 
         .dashboard-sidebar::-webkit-scrollbar {width: 8px;}
-        .dashboard-sidebar::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
-        .dashboard-sidebar::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+        .dashboard-sidebar::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
+        .dashboard-sidebar::-webkit-scrollbar-thumb {background: #f97316; border-radius: 4px;}
 
         /* Quick Actions Layout */
         .quick-actions-grid {
@@ -505,12 +505,12 @@
 
         .contact-item {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             padding: 8px 12px;
-            background: #f8fafc;
+            background: #2d3748;
             border-radius: 6px;
-            border-left: 3px solid #1A438D;
+            border-left: 3px solid #f97316;
         }
 
         .contact-item-info {
@@ -543,22 +543,22 @@
         }
 
         .mini-btn.edit {
-            background: #e2e8f0;
-            color: #64748b;
+            background: #4a5568;
+            color: #ffffff;
         }
 
         .mini-btn.delete {
-            background: #fee2e2;
-            color: #dc2626;
+            background: #dc2626;
+            color: #ffffff;
         }
 
         .mini-btn:hover.edit {
-            background: #cbd5e1;
+            background: #718096;
         }
 
         .mini-btn:hover.delete {
-            background: #fecaca;
-        }}
+            background: #ef4444;
+        }
 
         /* Account Detail Layout */
         .account-detail-layout {
@@ -579,8 +579,8 @@
         }
 
         .account-detail-main::-webkit-scrollbar {width: 8px;}
-        .account-detail-main::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
-        .account-detail-main::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+        .account-detail-main::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
+        .account-detail-main::-webkit-scrollbar-thumb {background: #f97316; border-radius: 4px;}
 
         .account-detail-sidebar {
             display: flex;
@@ -592,8 +592,8 @@
         }
 
         .account-detail-sidebar::-webkit-scrollbar {width: 8px;}
-        .account-detail-sidebar::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
-        .account-detail-sidebar::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+        .account-detail-sidebar::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
+        .account-detail-sidebar::-webkit-scrollbar-thumb {background: #f97316; border-radius: 4px;}
 
         /* Cards */
         .crm-card {
@@ -711,7 +711,7 @@
             color: #374151;
         }
 
-        /* New Add Notes Button Styling */
+        /* Add Notes Button Styling */
         .add-notes-btn {
             background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
             color: white;
@@ -748,7 +748,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, .5);
+            background: rgba(0, 0, 0, .8);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -764,15 +764,15 @@
         }
 
         .modal-content {
-            background: white;
+            background: #1a202c;
             border-radius: 20px;
             padding: 0;
             max-width: 600px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
-            box-shadow: 0 20px 40px rgba(0,0,0,.08);
-            border: 1px solid rgba(30,90,168,.1);
+            box-shadow: 0 20px 40px rgba(0,0,0,.3);
+            border: 1px solid #4a5568;
             transform: scale(.9);
             transition: transform .3s ease;
         }
@@ -792,7 +792,7 @@
         .modal-header h3 {
             font-size: 1.3rem;
             font-weight: 700;
-            color: #1A438D;
+            color: #ffffff;
         }
 
         .close-btn {
@@ -800,14 +800,14 @@
             border: none;
             font-size: 1.5rem;
             cursor: pointer;
-            color: #6b7280;
+            color: #cbd5e0;
             padding: 4px;
             border-radius: 4px;
             transition: color .3s ease;
         }
 
         .close-btn:hover {
-            color: #374151;
+            color: #ffffff;
         }
 
         /* Forms */
@@ -832,7 +832,7 @@
             display: block;
             font-size: .9rem;
             font-weight: 600;
-            color: #374151;
+            color: #ffffff;
             margin-bottom: 6px;
         }
 
@@ -841,10 +841,11 @@
         .form-group textarea {
             width: 100%;
             padding: 12px 14px;
-            border: 2px solid #e2e8f0;
+            border: 2px solid #4a5568;
             border-radius: 8px;
             font-size: .9rem;
-            color: #1e293b;
+            color: #ffffff;
+            background: #2d3748;
             transition: border-color .3s ease;
             font-family: inherit;
         }
@@ -853,7 +854,7 @@
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #1A438D;
+            border-color: #f97316;
         }
 
         .form-group textarea {
@@ -867,7 +868,7 @@
             justify-content: flex-end;
             margin-top: 24px;
             padding-top: 24px;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid #4a5568;
         }
 
         /* Account Detail Specific */
@@ -878,8 +879,8 @@
         }
 
         .info-field {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-left: 4px solid #F7921F;
+            background: #2d3748;
+            border-left: 4px solid #f97316;
             padding: 14px;
             border-radius: 0 8px 8px 0;
         }
@@ -887,19 +888,19 @@
         .info-field-label {
             font-size: .8rem;
             font-weight: 600;
-            color: #6b7280;
+            color: #cbd5e0;
             margin-bottom: 4px;
         }
 
         .info-field-value {
             font-size: .9rem;
-            color: #1e293b;
+            color: #ffffff;
             font-weight: 500;
         }
 
         .contact-list-item {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-left: 4px solid #F7921F;
+            background: #2d3748;
+            border-left: 4px solid #f97316;
             padding: 14px;
             margin-bottom: 10px;
             border-radius: 0 8px 8px 0;
@@ -915,19 +916,19 @@
 
         .contact-name {
             font-weight: 600;
-            color: #1A438D;
+            color: #ffffff;
             font-size: 1rem;
             margin-bottom: 4px;
         }
 
         .contact-title {
             font-size: .85rem;
-            color: #64748b;
+            color: #cbd5e0;
         }
 
         /* Activities */
         .activity-item {
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #4a5568;
             padding-bottom: 14px;
             margin-bottom: 14px;
         }
@@ -939,21 +940,21 @@
 
         .activity-title {
             font-weight: 600;
-            color: #1e293b;
+            color: #ffffff;
             margin-bottom: 6px;
             font-size: .9rem;
             line-height: 1.4;
         }
 
         .activity-content {
-            color: #64748b;
+            color: #cbd5e0;
             font-size: .8rem;
             line-height: 1.4;
             margin-bottom: 6px;
         }
 
         .activity-date {
-            color: #64748b;
+            color: #a0aec0;
             font-size: .8rem;
             line-height: 1.4;
             margin-bottom: 6px;
@@ -964,9 +965,9 @@
             width: 100%;
             height: 150px;
             padding: 10px;
-            background: white;
-            color: #1e293b;
-            border: 1px solid #e2e8f0;
+            background: #2d3748;
+            color: #ffffff;
+            border: 2px solid #4a5568;
             border-radius: 6px;
             font-family: inherit;
             font-size: .85rem;
@@ -974,6 +975,11 @@
             resize: vertical;
             margin-bottom: 10px;
             box-sizing: border-box;
+        }
+
+        #account-note-input:focus {
+            outline: none;
+            border-color: #f97316;
         }
 
         #energy-contract-display {
@@ -998,7 +1004,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(255, 255, 255, .8);
+            background: rgba(0, 0, 0, .8);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1016,8 +1022,8 @@
         .spinner {
             width: 40px;
             height: 40px;
-            border: 4px solid #e2e8f0;
-            border-top: 4px solid #1A438D;
+            border: 4px solid #4a5568;
+            border-top: 4px solid #f97316;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -1039,10 +1045,10 @@
         }
 
         .toast {
-            background: white;
+            background: #1a202c;
             padding: 16px 20px;
             border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0,0,0,.12);
+            box-shadow: 0 8px 24px rgba(0,0,0,.3);
             border-left: 4px solid #22c55e;
             min-width: 300px;
             transform: translateX(400px);
@@ -1070,7 +1076,7 @@
 
         .toast-message {
             font-size: .9rem;
-            color: #1e293b;
+            color: #ffffff;
             font-weight: 500;
         }
 
@@ -1307,15 +1313,6 @@
             border-color: #1A438D;
         }
 
-        #copy-status {
-            font-size: .8rem;
-            color: #22c55e;
-            opacity: 0;
-            transition: opacity .3s ease;
-            text-align: center;
-            margin-top: 8px;
-        }
-
         .tip-item {
             padding: 8px 0;
             border-bottom: 1px solid #f1f5f9;
@@ -1490,7 +1487,6 @@
                     <span class="app-label">BeenVerified</span>
                 </div>
             </div>
-            <div class="nav-right-logo"></div>
         </div>
     </div>
     
@@ -1589,12 +1585,6 @@
                                 <span class="mini-stat-number">34%</span>
                                 <span class="mini-stat-label">Close Rate</span>
                             </div>
-                        </div>
-                        <div style="margin-top: 12px; padding: 10px; background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%); border-radius: 8px; border-left: 4px solid #f97316;">
-                            <div style="font-size: .85rem; font-weight: 600; color: #ffffff; margin-bottom: 4px;">Priority Renewals This Month</div>
-                            <div style="font-size: .75rem; color: #cbd5e0;">• Manufacturing Corp (500kW) - Expires 8/15</div>
-                            <div style="font-size: .75rem; color: #cbd5e0;">• Healthcare Systems (1.2MW) - Expires 8/28</div>
-                            <div style="font-size: .75rem; color: #cbd5e0;">• Tech Campus (850kW) - Expires 8/31</div>
                         </div>
                     </div>
                 </div>
@@ -2023,6 +2013,7 @@
     <div class="toast-container" id="toast-container"></div>
     
     <script>
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
             authDomain: "power-choosers-crm.firebaseapp.com",
@@ -2032,12 +2023,16 @@
             appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
             measurementId: "G-XEC3BFHJHW"
         };
+        
+        // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const db = app.firestore();
         const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
         
+        // Utility Functions
         const gId = id => document.getElementById(id);
 
+        // Application State
         const CRMApp = {
             currentView: 'dashboard',
             currentAccount: null,
@@ -2047,53 +2042,27 @@
             activities: []
         };
         
+        // Search State
         let currentSearchType = '';
         let activeButton = null;
         let currentProspect = {}; 
 
+        // Script Placeholders
         const placeholders = {
-            'N': '', 
-            'YN': 'Lewis', 
-            'CN': '', 
-            'CI': '', 
-            'SB': '', 
-            'PP': '', 
-            'CT': '', 
-            'TIA': '', 
-            'TE': '', 
-            'DT': '', 
-            'EAC': '', 
-            'TF': '', 
-            'OP': 'the responsible party',
-            'XX': '$XX.00/40%'
+            'N': '', 'YN': 'Lewis', 'CN': '', 'CI': '', 'SB': '', 'PP': '', 'CT': '', 'TIA': '', 
+            'TE': '', 'DT': '', 'EAC': '', 'TF': '', 'OP': 'the responsible party', 'XX': '$XX.00/40%'
         };
 
         const inputMap = {
-            'input-name': 'N',
-            'input-title': 'CT',
-            'input-company-name': 'CN',
-            'input-company-industry': 'CI',
-            'input-benefit': 'SB',
-            'input-pain': 'PP'
+            'input-name': 'N', 'input-title': 'CT', 'input-company-name': 'CN',
+            'input-company-industry': 'CI', 'input-benefit': 'SB', 'input-pain': 'PP'
         };
 
-        // Handle editable field focus behavior
-        function handleEditableFocus(input) {
-            if (currentProspect.contactId) {
-                // For locked fields from contacts, check if they're in the locked list
-                const lockedFields = ['input-company-name', 'input-name', 'input-title'];
-                if (lockedFields.includes(input.id)) {
-                    return; // Don't allow editing
-                }
-            }
-            
-            // For editable fields, clear on focus
-            if (input.value === input.placeholder || input.classList.contains('editable-locked')) {
-                input.value = '';
-                input.classList.remove('editable-locked');
-            }
-        }
+        // Script State
+        let currentStep = 'start';
+        let history = [];
 
+        // Script Data (consolidated)
         const scriptData = {
             start: {
                 you: "Click 'Dial' to begin the call",
@@ -2107,14 +2076,6 @@
                     { text: "📞 Call Connected", next: "hook" },
                     { text: "📞 Transferred - Decision Maker Answers", next: "main_script_start" },
                     { text: "🚫 No Answer", next: "voicemail_or_hangup" }
-                ]
-            },
-            voicemail_or_hangup: {
-                you: "No answer. What would you like to do?",
-                mood: "neutral",
-                responses: [
-                    { text: "Leave Voicemail", next: "voicemail" },
-                    { text: "Hang Up / Start New Call", next: "start" }
                 ]
             },
             hook: {
@@ -2146,86 +2107,25 @@
                     { text: "🚫 They're not available / Take a message", next: "voicemail" }
                 ]
             },
-            gatekeeper_whats_about: {
-                you: "My name is Lewis with PowerChoosers.com and I'm needin' to speak with someone about the future electricity agreements for <strong>[CN]</strong>. Do you know who might be the best person for that?",
-                mood: "neutral",
-                responses: [
-                    { text: "🔗 I'll connect you", next: "transfer_dialing" },
-                    { text: "🚫 They're not available / Take a message", next: "voicemail" },
-                    { text: "✅ I can help you", next: "pathA" }
-                ]
-            },
             voicemail: {
                 you: "Good afternoon/morning <strong>[N]</strong>, this is Lewis and I was told to speak with you. You can give me a call at 817-409-4215. Also, I shot you over a short email kinda explaining why I'm reaching out to you today. The email should be coming from Lewis Patterson that's (L.E.W.I.S) Thank you so much and you have a great day.",
                 mood: "neutral",
-                responses: [
-                    { text: "🔄 End Call / Start New Call", next: "start" }
-                ]
+                responses: [{ text: "🔄 End Call / Start New Call", next: "start" }]
             },
             pathA: {
-                you: "Perfect <span class='pause'>--</span> So <strong>[N]</strong> I've been working closely with <strong>[CI]</strong> across Texas with electricity agreements <span class='pause'>--</span> and we're about to see an unprecedented dip in the market in the next few months <span class='pause'>--</span><br><br><strong><span class='emphasis'>Is getting the best price for your next renewal a priority for you and [CN]?</span></strong><br><br><strong><span class='emphasis'>Do you know when your contract expires?</span></strong><br><br><strong><span class='emphasis'>So since rates have gone up tremendously over the past 5 years, how are you guys handling such a sharp increase on your future renewals?</span></strong>",
+                you: "Perfect <span class='pause'>--</span> So <strong>[N]</strong> I've been working closely with <strong>[CI]</strong> across Texas with electricity agreements <span class='pause'>--</span> and we're about to see an unprecedented dip in the market in the next few months <span class='pause'>--</span><br><br><strong><span class='emphasis'>Is getting the best price for your next renewal a priority for you and [CN]?</span></strong><br><br><strong><span class='emphasis'>Do you know when your contract expires?</span></strong>",
                 mood: "neutral",
                 responses: [
-                    { text: "😰 Struggling / It's tough", next: "resStruggle" },
-                    { text: "📅 Haven't renewed / Contract not up yet", next: "resNotRenewed" },
-                    { text: "🔒 Locked in / Just renewed", next: "resLockedIn" },
-                    { text: "🛒 Shopping around / Looking at options", next: "resShopping" },
-                    { text: "🤝 Have someone handling it / Work with broker", next: "resBroker" },
-                    { text: "🤷 Haven't thought about it / It is what it is", next: "resNoThought" }
-                ]
-            },
-            pathD: {
-                you: "No worries if you're not sure. I work with Texas businesses on energy contract optimization <span class='pause'>--</span> basically helping companies navigate rate volatility and strategic positioning in our deregulated market. Does energy procurement fall under your area of responsibility, or would someone else be better positioned for this conversation?",
-                mood: "unsure",
-                responses: [
-                    { text: "✅ Yes, that's my responsibility", next: "pathA" },
-                    { text: "👥 Someone else handles it", next: "gatekeeper_intro" }
-                ]
-            },
-            resStruggle: {
-                you: "Yeah, I'm hearing that from a lot of <strong>[CT]</strong>. The thing is, most companies are approaching renewals the same way they did pre-2021, but the rules have completely changed. Do you currently have a strategy in place to help mitigate these increases?",
-                mood: "challenging",
-                responses: [
-                    { text: "🎯 Continue to Discovery", next: "discovery" }
-                ]
-            },
-            resNotRenewed: {
-                you: "Actually, that timing works in your favor. Most businesses wait until 60-90 days before expiration to start looking, but with the market set to increase in 2026, people are reserving their rates in advance to avoid paying more in the future. Do you currently have a plan in place to <span class='pause'>--</span> mitigate these increases?",
-                mood: "positive",
-                responses: [
-                    { text: "🎯 Continue to Discovery", next: "discovery" }
-                ]
-            },
-            resLockedIn: {
-                you: "Smart move getting locked in during this volatility. How long did you guys end up going with the term? Because here's what I'm seeing <span class='pause'>--</span> even with companies who just renewed, there are often optimization opportunities within existing contracts that most people don't know about. Plus, it gives us time to develop a strategic approach for your next cycle rather than scrambling when rates spike again.",
-                mood: "neutral",
-                responses: [
-                    { text: "🎯 Continue to Discovery", next: "discovery" }
-                ]
-            },
-            resShopping: {
-                you: "Perfect timing then. Here's what I'm seeing though <span class='pause'>--</span> typically people just shop for rates but the rate is only about <span class='metric'>60%</span> of your bill if you're lucky. How are you guys evaluating the options <span class='pause'>--</span> just on rate, or are you looking at other ways to lower your final dollar amount?",
-                mood: "positive",
-                responses: [
-                    { text: "🎯 Continue to Discovery", next: "discovery" }
-                ]
-            },
-            resBroker: {
-                you: "That's smart <span class='pause'>--</span> having someone who understands the Texas market is crucial right now. Have they let you know about ERCOT's supply concerns for 2026? Because there's some huge changes happening right now that could impact <strong>[CN]</strong>'s costs significantly. Would it be worth understanding what that looks like, even if you're happy with your current relationship?",
-                mood: "neutral",
-                responses: [
-                    { text: "🎯 Continue to Discovery", next: "discovery" }
-                ]
-            },
-            resNoThought: {
-                you: "I get it <span class='pause'>--</span> energy's not the first thing you think about when you wake up. How much are you typically spending on energy? And if your bills were to increase by <span class='emphasis'>[XX]</span>, would that impact your budget at all? If I could show you what other companies are doing to reduce their spending, would you be open to discussing this further?",
-                mood: "challenging",
-                responses: [
-                    { text: "🎯 Continue to Discovery", next: "discovery" }
+                    { text: "😰 Struggling / It's tough", next: "discovery" },
+                    { text: "📅 Haven't renewed / Contract not up yet", next: "discovery" },
+                    { text: "🔒 Locked in / Just renewed", next: "discovery" },
+                    { text: "🛒 Shopping around / Looking at options", next: "discovery" },
+                    { text: "🤝 Have someone handling it / Work with broker", next: "discovery" },
+                    { text: "🤷 Haven't thought about it / It is what it is", next: "discovery" }
                 ]
             },
             discovery: {
-                you: "Gotcha! So <strong>[N]</strong>, Just so I understand your situation a little better. <span class='pause'>--</span> What's your current approach to renewing your electricity agreements <span class='pause'>--</span> do you handle it internally or work with a consultant?<br><br><strong><span class='emphasis'>And how that been?</span></strong><br><br><strong><span class='emphasis'>What is most concerning/important to you when it comes to energy?</span></strong><br><br><strong><span class='emphasis'>And how has that impacted you and [CN]?</span></strong><span class='pause'>--</span>I watch the markets daily and here's what I'm seeing. Rates have gone up <span class='metric'>60%</span> since 2021 <span class='pause'>--</span> Most businesses <span class='pause'>--</span> <strong>they've taken an incredible hit</strong>, but many others have been able to find <strong>other ways</strong> to pay way less than other companies in their <strong>same area</strong>. If I could show you what they're doing, would you be open to talking about this further?",
+                you: "Gotcha! So <strong>[N]</strong>, Just so I understand your situation a little better. <span class='pause'>--</span> What's your current approach to renewing your electricity agreements <span class='pause'>--</span> do you handle it internally or work with a consultant?",
                 mood: "neutral",
                 responses: [
                     { text: "💚 Prospect is engaged / ready for appointment", next: "closeForAppointment" },
@@ -2234,33 +2134,25 @@
                     { text: "❌ Objection: No time", next: "objNoTime" }
                 ]
             },
+            closeForAppointment: {
+                you: "Awesome! So, <strong>[N]</strong><span class='pause'>--</span> I really believe you'll be able to benefit from <span class='emphasis'>[SB]</span> that way you won't have to <span class='emphasis'>[PP]</span>. Our process is super simple! We start with an <span class='emphasis'>energy health check</span> where I look at your usage, contract terms, and then we can talk about what options might look like for <strong>[CN]</strong> moving forward.",
+                mood: "positive",
+                responses: [
+                    { text: "📅 Schedule Friday 11 AM", next: "callSuccess" },
+                    { text: "📅 Schedule Monday 2 PM", next: "callSuccess" },
+                    { text: "🤔 Still hesitant", next: "handleHesitation" }
+                ]
+            },
+            handleHesitation: {
+                you: "I get it <span class='pause'>--</span> And called you out the blue so now is probably not the best time. How about this <span class='pause'>--</span> let me put together a quick case study specific to <span class='emphasis'>[TIA]</span>s in your area.",
+                mood: "unsure",
+                responses: [
+                    { text: "✅ Yes, send analysis", next: "callSuccess" },
+                    { text: "❌ No, not interested", next: "softClose" }
+                ]
+            },
             objHappy: {
                 you: "That's actually great to hear, and I'm not suggesting you should be unhappy or you need to switch your supplier today. Is it the customer service that you're happy with or are you just getting a rate that you can't find anywhere else?",
-                mood: "positive",
-                responses: [
-                    { text: "💰 It's the rate / Great pricing", next: "objHappyRate" },
-                    { text: "🤝 Customer service / Overall experience", next: "objHappyService" },
-                    { text: "🔄 Both rate and service", next: "objHappyBoth" }
-                ]
-            },
-            objHappyRate: {
-                you: "That's awesome you locked in a great price, however, the rules of Texas Energy have completely changed over the past few years. Even satisfied clients I work with are <span class='pause'>--</span>shocked to find out they that their supplier's new rate is about <span class='metric'>15-25%</span> more than what they were paying before. Would it be worth re-evaluating where you're at now, just to make sure <strong>[CN]</strong> isn't left paying more than they should?",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
-                    { text: "❌ No, not interested", next: "softClose" }
-                ]
-            },
-            objHappyService: {
-                you: "That's great - good service is hard to find. What I'm seeing though is that satisfaction with service and getting the best price are two separate conversations. The Texas energy market rules have changed significantly over the past few years. Even satisfied clients I work with discover they can can save <span class='metric'>15-25%</span> without sacrificing great customer service. Would it be worth looking into some options just to see if there is something more affordable for <strong>[CN]</strong>?",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
-                    { text: "❌ No, not interested", next: "softClose" }
-                ]
-            },
-            objHappyBoth: {
-                you: "Perfect - that's exactly what you want. I have exclusive partnerships with the suppliers, so I can make them work 10 times harder for your business. If i can show you how to get better pricing and support for your energy, would that be helpful for you and <strong>[CN]</strong>?",
                 mood: "positive",
                 responses: [
                     { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
@@ -2268,122 +2160,15 @@
                 ]
             },
             objNoTime: {
-                you: "I completely get it <span class='pause'>--</span> that's exactly why most businesses end up overpaying. Energy is a complicated market that requires ongoing attention that most internal teams <span class='pause'>--</span> simply don't have time for. Here's what I'd suggest <span class='pause'>--</span> give me <span class='emphasis'>10 minutes</span> to review your current setup <span class='pause'>--</span> against where we are today. And that should be able tell you exactly where you stand and what you should be expecting for the future. Would that be helpful for you?",
+                you: "I completely get it <span class='pause'>--</span> that's exactly why most businesses end up overpaying. Energy is a complicated market that requires ongoing attention that most internal teams <span class='pause'>--</span> simply don't have time for.",
                 mood: "challenging",
                 responses: [
-                    { text: "✅ Yes, schedule 10-minute assessment", next: "scheduleAppointment" },
+                    { text: "✅ Yes, schedule 10-minute assessment", next: "callSuccess" },
                     { text: "❌ Still no time", next: "softClose" }
                 ]
             },
-            handleHesitation: {
-                you: "I get it <span class='pause'>--</span> And called you out the blue so now is probably not the best time. How about this <span class='pause'>--</span> let me put together a quick case study specific to <span class='emphasis'>[TIA]</span>s in your area. Takes me about 10 minutes to prepare, it'll give you a snapshot into the market and it'll show you what other companies are doing to stay afloat in today's market.<br><br><strong><span class='emphasis'>Would that be useful for your future planning?</span></strong>",
-                mood: "unsure",
-                responses: [
-                    { text: "✅ Yes, send analysis", next: "getEmail" },
-                    { text: "❌ No, not interested", next: "softClose" }
-                ]
-            },
-            closeForAppointment: {
-                you: "Awesome! So, <strong>[N]</strong><span class='pause'>--</span> I really believe you'll be able to benefit from <span class='emphasis'>[SB]</span> that way you won't have to <span class='emphasis'>[PP]</span>. Our process is super simple! We start with an <span class='emphasis'>energy health check</span> where I look at your usage, contract terms, and then we can talk about what options might look like for <strong>[CN]</strong> moving forward. It should take <span class='emphasis'>10-15 minutes</span> of your time. Would you prefer to connect this <span class='emphasis'>Friday morning around 11 AM</span>, or would <span class='emphasis'>Monday afternoon around 2 PM</span> work better for your schedule?",
-                mood: "positive",
-                responses: [
-                    { text: "📅 Schedule Friday 11 AM", next: "appointmentConfirmed" },
-                    { text: "📅 Schedule Monday 2 PM", next: "appointmentConfirmed" },
-                    { text: "🤔 Still hesitant", next: "getEmail" }
-                ]
-            },
-            scheduleAppointment: {
-                you: "Perfect! Let's get that <span class='emphasis'>10-minute market assessment</span> scheduled. I'll walk through your current situation, show you common supplier traps, and outline 2-3 strategic options based on your specific situation. Would <span class='emphasis'>Friday morning</span> or <span class='emphasis'>Monday afternoon</span> work better?",
-                mood: "positive",
-                responses: [
-                    { text: "📅 Friday morning works", next: "appointmentConfirmed" },
-                    { text: "📅 Monday afternoon works", next: "appointmentConfirmed" }
-                ]
-            },
-            appointmentConfirmed: {
-                you: "Perfect! I'll send you a calendar invite for <span class='emphasis'>[DT]</span>, and I'll put together some information specific to <span class='emphasis'>[TIA]</span> to give you better context for our meeting. Do you have a copy of your bill?",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Yes, I have a copy", next: "billYes" },
-                    { text: "❌ No, I don't have one readily available", next: "billNo" }
-                ]
-            },
-            billYes: {
-                you: "Perfect! I'm going to also send you a standard invoice request. Could you reply back with a recent copy?",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Yes, I can send that", next: "confirmEmail" },
-                    { text: "❌ I'd prefer not to share that", next: "billOptional" }
-                ]
-            },
-            billNo: {
-                you: "No problem. How do you typically receive your bills <span class='pause'>--</span> physical copy or through email?",
-                mood: "positive",
-                responses: [
-                    { text: "📧 Through email", next: "billEmailAdvice" },
-                    { text: "📄 Physical copy", next: "billPhysicalAdvice" }
-                ]
-            },
-            billEmailAdvice: {
-                you: "Perfect! Be sure to have a copy ready for us to go over at <span class='emphasis'>[DT]</span>. You should be able to find it in your email from your provider. Looking forward to our conversation!",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Sounds great - end call", next: "callSuccess" }
-                ]
-            },
-            billPhysicalAdvice: {
-                you: "Perfect! Be sure to have a copy ready for us to go over at <span class='emphasis'>[DT]</span>. If you can find your most recent physical bill, that would be ideal for our review. Looking forward to our conversation!",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Sounds great - end call", next: "callSuccess" }
-                ]
-            },
-            confirmEmail: {
-                you: "Excellent! So I have your email as <span class='emphasis'>[TE]</span> <span class='pause'>--</span> is that correct? I'll send both the calendar invite and the invoice request to that address. You should receive them within the next few minutes. Looking forward to our conversation at <span class='emphasis'>[DT]</span>!",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Email confirmed - end call", next: "callSuccess" },
-                    { text: "❌ Different email address", next: "getCorrectEmail" }
-                ]
-            },
-            getCorrectEmail: {
-                you: "No problem! What's the best email address for you?",
-                mood: "positive",
-                responses: [
-                    { text: "📧 Provide correct email", next: "emailConfirmed" }
-                ]
-            },
-            emailConfirmed: {
-                you: "Perfect! I'll send the calendar invite and invoice request to <span class='emphasis'>[EAC]</span>. You should receive them within the next few minutes. Looking forward to our conversation at <span class='emphasis'>[DT]</span>!",
-                mood: "positive",
-                responses: [
-                    { text: "✅ All set - end call", next: "callSuccess" }
-                ]
-            },
-            billOptional: {
-                you: "No worries at all! Having a bill helps with the analysis, but we can still have a productive conversation without it. I'll send you the calendar invite for <span class='emphasis'>[DT]</span> and some industry-specific information. Looking forward to our conversation!",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Sounds good - end call", next: "callSuccess" }
-                ]
-            },
-            getEmail: {
-                you: "Great! I'll put together a quick case study specific to <span class='emphasis'>[TIA]</span>. It takes me about 10 minutes to prepare, and it'll give you a baseline understanding of where your company stands competitively. I can email that over by tomorrow, and if you see value in diving deeper, we can schedule a brief follow-up. What's a good email for you?",
-                mood: "unsure",
-                responses: [
-                    { text: "✅ Yes, send analysis", next: "emailFollowUp" },
-                    { text: "❌ Don't want to provide email", next: "softClose" }
-                ]
-            },
-            emailFollowUp: {
-                you: "Perfect! I've got <span class='emphasis'>[EAC]</span>. I'll get that market analysis over to you by <span class='emphasis'>[TF]</span>, and it'll give you a good baseline for understanding your competitive position. If you have any immediate questions before then, feel free to reach out. Otherwise, I'll follow up once you've had a chance to review the information. Sound good?",
-                mood: "positive",
-                responses: [
-                    { text: "✅ Sounds good - end call", next: "callSuccess" }
-                ]
-            },
             softClose: {
-                you: "No problem at all <span class='pause'>--</span> I know energy strategy isn't urgent until it becomes critical. Here's what I'll do: I'm going to add you to my <span class='emphasis'>quarterly market intelligence updates</span>. These go out to CFOs and facilities managers across Texas and include trend analysis, regulatory updates, and strategic insights. <span class='emphasis'>No sales content, just market intelligence</span> that helps you stay informed. If market conditions create opportunities that make sense for <span class='emphasis'>[CN]</span>, I'll reach out. Sound reasonable?",
+                you: "No problem at all <span class='pause'>--</span> I know energy strategy isn't urgent until it becomes critical. Here's what I'll do: I'm going to add you to my <span class='emphasis'>quarterly market intelligence updates</span>.",
                 mood: "neutral",
                 responses: [
                     { text: "✅ That sounds reasonable", next: "callSuccess" },
@@ -2391,70 +2176,50 @@
                 ]
             },
             callSuccess: {
-                you: "🎉 <strong>Call Completed Successfully!</strong><br><br>Remember to track:<br>• Decision maker level<br>• Current contract status and timeline<br>• Pain points identified<br>• Interest level (Hot/Warm/Cold/Future)<br>• Next action committed<br>• Best callback timing<br><br><span class='emphasis'>Great job keeping the energy high and positioning as a strategic advisor!</span>",
+                you: "🎉 <strong>Call Completed Successfully!</strong><br><br>Remember to track:<br>• Decision maker level<br>• Current contract status<br>• Pain points identified<br>• Interest level<br>• Next action committed",
                 mood: "positive",
-                responses: [
-                    { text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }
-                ]
+                responses: [{ text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }]
             },
             callEnd: {
                 you: "Thanks for your time. Have a great day!",
                 mood: "neutral",
-                responses: [
-                    { text: "🔄 Start New Call", next: "start" }
-                ]
-            },
-            transfer_dialing: {
-                you: "Being transferred... Ringing...",
-                mood: "neutral",
-                responses: [
-                    { text: "📞 Decision Maker Answers", next: "main_script_start" },
-                    { text: "🚫 No Answer", next: "voicemail_or_hangup" }
-                ]
+                responses: [{ text: "🔄 Start New Call", next: "start" }]
             }
         };
 
-        let currentStep = 'start';
-        let history = [];
-        let scriptDisplay, responsesContainer, backBtn;
+        // Core Functions
+        function handleEditableFocus(input) {
+            if (currentProspect.contactId) {
+                const lockedFields = ['input-company-name', 'input-name', 'input-title'];
+                if (lockedFields.includes(input.id)) return;
+            }
+            if (input.value === input.placeholder || input.classList.contains('editable-locked')) {
+                input.value = '';
+                input.classList.remove('editable-locked');
+            }
+        }
 
         function populateFromGlobalProspect() {
-            const inputName = gId('input-name');
-            if (inputName) {
-                inputName.value = currentProspect.name || '';
-                placeholders['N'] = currentProspect.name || '';
-            }
-            const inputTitle = gId('input-title');
-            if (inputTitle) {
-                inputTitle.value = currentProspect.title || '';
-                placeholders['CT'] = currentProspect.title || '';
-            }
-            const inputCompanyName = gId('input-company-name');
-            if (inputCompanyName) {
-                inputCompanyName.value = currentProspect.company || '';
-                placeholders['CN'] = currentProspect.company || '';
-            }
-            const inputCompanyIndustry = gId('input-company-industry');
-            if (inputCompanyIndustry) {
-                inputCompanyIndustry.value = currentProspect.industry || '';
-                placeholders['CI'] = currentProspect.industry || '';
-                placeholders['TIA'] = currentProspect.industry || '';
-            }
-            const inputBenefit = gId('input-benefit');
-            if (inputBenefit) {
-                inputBenefit.value = currentProspect.benefits || '';
-                placeholders['SB'] = currentProspect.benefits || '';
-            }
-            const inputPain = gId('input-pain');
-            if (inputPain) {
-                inputPain.value = currentProspect.painPoints || '';
-                placeholders['PP'] = currentProspect.painPoints || '';
-            }
-            
-            // Handle field locking for contact-derived data
-            const lockedFields = ['input-company-name', 'input-name', 'input-title'];
+            const fields = [
+                { id: 'input-name', key: 'N', value: currentProspect.name },
+                { id: 'input-title', key: 'CT', value: currentProspect.title },
+                { id: 'input-company-name', key: 'CN', value: currentProspect.company },
+                { id: 'input-company-industry', key: 'CI', value: currentProspect.industry },
+                { id: 'input-benefit', key: 'SB', value: currentProspect.benefits },
+                { id: 'input-pain', key: 'PP', value: currentProspect.painPoints }
+            ];
+
+            fields.forEach(field => {
+                const input = gId(field.id);
+                if (input) {
+                    input.value = field.value || '';
+                    placeholders[field.key] = field.value || '';
+                }
+            });
+            placeholders['TIA'] = placeholders['CI'];
+
             if (currentProspect.contactId) {
-                lockedFields.forEach(fieldId => {
+                ['input-company-name', 'input-name', 'input-title'].forEach(fieldId => {
                     const input = gId(fieldId);
                     if (input) {
                         input.disabled = true;
@@ -2462,120 +2227,7 @@
                         input.style.cursor = 'not-allowed';
                     }
                 });
-            } else {
-                lockedFields.forEach(fieldId => {
-                    const input = gId(fieldId);
-                    if (input) {
-                        input.disabled = false;
-                        input.style.backgroundColor = '';
-                        input.style.cursor = '';
-                    }
-                });
             }
-        }
-
-        async function saveProspectAndNotes() {
-            const notesContent = gId('call-notes').value.trim();
-            const prospectData = {
-                name: gId('input-name').value.trim(),
-                title: gId('input-title').value.trim(),
-                company: gId('input-company-name').value.trim(),
-                industry: gId('input-company-industry').value.trim(),
-                benefits: gId('input-benefit').value.trim(),
-                painPoints: gId('input-pain').value.trim()
-            };
-
-            showLoading(true);
-
-            try {
-                let accountId = currentProspect.accountId;
-                let contactId = currentProspect.contactId;
-                let accountName = prospectData.company;
-                let contactName = prospectData.name;
-                let isNewAccount = false;
-                let isNewContact = false;
-
-                if (accountId) {
-                    const accountRef = db.collection('accounts').doc(accountId);
-                    await accountRef.update({
-                        name: prospectData.company,
-                        industry: prospectData.industry,
-                        painPoints: prospectData.painPoints,
-                        benefits: prospectData.benefits,
-                        updatedAt: serverTimestamp()
-                    });
-                } else if (prospectData.company) {
-                    const newAccountRef = await db.collection('accounts').add({
-                        name: prospectData.company,
-                        industry: prospectData.industry,
-                        painPoints: prospectData.painPoints,
-                        benefits: prospectData.benefits,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    });
-                    accountId = newAccountRef.id;
-                    isNewAccount = true;
-                }
-
-                if (contactId) {
-                    const contactRef = db.collection('contacts').doc(contactId);
-                    await contactRef.update({
-                        firstName: prospectData.name.split(' ')[0] || '',
-                        lastName: prospectData.name.split(' ')[1] || '',
-                        title: prospectData.title,
-                        accountId: accountId,
-                        accountName: accountName,
-                        notes: notesContent,
-                        updatedAt: serverTimestamp()
-                    });
-                } else if (prospectData.name) {
-                    const newContactRef = await db.collection('contacts').add({
-                        firstName: prospectData.name.split(' ')[0] || '',
-                        lastName: prospectData.name.split(' ')[1] || '',
-                        title: prospectData.title,
-                        accountId: accountId,
-                        accountName: accountName,
-                        notes: notesContent,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    });
-                    contactId = newContactRef.id;
-                    isNewContact = true;
-                }
-                
-                if (notesContent) {
-                    await logActivity({
-                        type: 'call_note',
-                        description: `Call note for ${contactName || accountName || 'prospect'}`,
-                        noteContent: notesContent,
-                        accountId: accountId,
-                        accountName: accountName,
-                        contactId: contactId,
-                        contactName: contactName
-                    });
-                }
-
-                showToast(`Call notes and prospect data saved!${isNewAccount ? ' New account created.' : ''}${isNewContact ? ' New contact created.' : ''}`);
-                
-                // Reload data to refresh the UI
-                await loadInitialData();
-                restart();
-
-            } catch (error) {
-                console.error('Error saving prospect and notes:', error);
-                showToast('Error saving data. See console for details.', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        function applyPlaceholders(text) {
-            let newText = text;
-            for (const key in placeholders) {
-                const regex = new RegExp('\\[' + key + '\\]', 'g');
-                newText = newText.replace(regex, placeholders[key]);
-            }
-            return newText;
         }
 
         function updateScript() {
@@ -2591,13 +2243,22 @@
             displayCurrentStep();
         }
 
+        function applyPlaceholders(text) {
+            let newText = text;
+            for (const key in placeholders) {
+                const regex = new RegExp('\\[' + key + '\\]', 'g');
+                newText = newText.replace(regex, placeholders[key]);
+            }
+            return newText;
+        }
+
         function displayCurrentStep() {
             const step = scriptData[currentStep];
             if (!step) return;
             
-            scriptDisplay = gId('script-display');
-            responsesContainer = gId('responses-container');
-            backBtn = gId('back-btn');
+            const scriptDisplay = gId('script-display');
+            const responsesContainer = gId('responses-container');
+            const backBtn = gId('back-btn');
             
             const processedText = applyPlaceholders(step.you);
             
@@ -2649,7 +2310,6 @@
                 currentStep = nextStep;
                 displayCurrentStep();
             }
-
             if (action === 'saveProspectAndNotes') {
                 saveProspectAndNotes();
             }
@@ -2665,29 +2325,15 @@
         function restart() {
             currentStep = 'start';
             history = [];
-            
             const callNotesElement = gId('call-notes');
-            if (callNotesElement) {
-                callNotesElement.value = '';
-            }
+            if (callNotesElement) callNotesElement.value = '';
             
-            // Only reset prospect data if not from a contact
             if (!currentProspect.contactId) {
                 currentProspect = {
-                    name: '',
-                    title: '',
-                    company: '',
-                    industry: '',
-                    phone: '',
-                    email: '',
-                    accountId: '',
-                    contactId: '',
-                    painPoints: '',
-                    benefits: ''
+                    name: '', title: '', company: '', industry: '', phone: '', email: '',
+                    accountId: '', contactId: '', painPoints: '', benefits: ''
                 };
-                
-                const inputs = ['input-name', 'input-title', 'input-company-name', 'input-company-industry', 'input-benefit', 'input-pain'];
-                inputs.forEach(inputId => {
+                ['input-name', 'input-title', 'input-company-name', 'input-company-industry', 'input-benefit', 'input-pain'].forEach(inputId => {
                     const input = gId(inputId);
                     if (input) {
                         input.value = '';
@@ -2697,60 +2343,79 @@
                     }
                 });
             }
-            
             displayCurrentStep();
         }
         
         function clearNotes() {
             const notesTextarea = gId('call-notes');
             if (!notesTextarea) return;
-
             if (window.confirm('Are you sure you want to clear all notes?')) {
                 notesTextarea.value = '';
                 showToast('Notes cleared.', 'warning');
             }
         }
 
+        // Utility Functions
+        function showLoading(show) {
+            const overlay = gId('loading-overlay');
+            if (overlay) {
+                overlay.classList.toggle('active', show);
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = gId('toast-container');
+            if (!container) return;
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<div class="toast-message">${message}</div>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (container.contains(toast)) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'Unknown date';
+            try {
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            } catch (e) {
+                return 'Invalid date';
+            }
+        }
+
+        // Search Functions
         function setupSearchFunctionality() {
-            const googleBtn = gId('google-button');
-            if (googleBtn) {
-                googleBtn.addEventListener('click', (e) => openSearch('google', e));
-            }
-            const mapsBtn = gId('maps-button');
-            if (mapsBtn) {
-                mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
-            }
-            const apolloBtn = gId('apollo-button');
-            if (apolloBtn) {
-                apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
-            }
-            const beenverifiedBtn = gId('beenverified-button');
-            if (beenverifiedBtn) {
-                beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
-            }
-            
-            // Add search functionality for accounts and contacts
-            const accountsBtn = gId('accounts-btn');
-            if (accountsBtn) {
-                accountsBtn.addEventListener('click', (e) => {
-                    if (e.ctrlKey || e.metaKey) {
-                        openSearch('accounts', e);
-                        e.preventDefault();
-                        return false;
-                    }
-                });
-            }
-            
-            const contactsBtn = gId('contacts-btn');
-            if (contactsBtn) {
-                contactsBtn.addEventListener('click', (e) => {
-                    if (e.ctrlKey || e.metaKey) {
-                        openSearch('contacts', e);
-                        e.preventDefault();
-                        return false;
-                    }
-                });
-            }
+            const searchButtons = ['google-button', 'maps-button', 'apollo-button', 'beenverified-button'];
+            searchButtons.forEach(btnId => {
+                const btn = gId(btnId);
+                if (btn) {
+                    const type = btnId.replace('-button', '');
+                    btn.addEventListener('click', (e) => openSearch(type, e));
+                }
+            });
+
+            ['accounts-btn', 'contacts-btn'].forEach(btnId => {
+                const btn = gId(btnId);
+                if (btn) {
+                    btn.addEventListener('click', (e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                            const type = btnId.replace('-btn', '');
+                            openSearch(type, e);
+                            e.preventDefault();
+                        }
+                    });
+                }
+            });
 
             ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
                 const input = gId(id);
@@ -2758,7 +2423,6 @@
                     input.addEventListener('keypress', function(e) {
                         if (e.key === 'Enter') performSearch();
                     });
-                    
                     if (id === 'search-input') {
                         input.addEventListener('input', function(e) {
                             if (currentSearchType === 'accounts' || currentSearchType === 'contacts') {
@@ -2794,53 +2458,47 @@
             
             if (!label || !input) return;
             
-            if (cityInput) cityInput.style.display = 'none';
-            if (stateInput) stateInput.style.display = 'none';
-            if (locationInput) locationInput.style.display = 'none';
+            [cityInput, stateInput, locationInput].forEach(inp => {
+                if (inp) inp.style.display = 'none';
+            });
             if (resultsDiv) resultsDiv.classList.remove('active');
             
-            if (type === 'google') {
-                label.textContent = 'Search Google:';
-                input.placeholder = 'Type your search query...';
-            } else if (type === 'maps') {
-                label.textContent = 'Search Maps:';
-                input.placeholder = 'Search places, addresses, businesses...';
-            } else if (type === 'beenverified') {
-                label.textContent = 'Search BeenVerified:';
-                input.placeholder = 'Enter full name (e.g. John Smith)...';
-                if (cityInput) cityInput.style.display = 'block';
-                if (stateInput) stateInput.style.display = 'block';
-            } else if (type === 'apollo') {
-                label.textContent = 'Search Apollo:';
-                input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
-                if (locationInput) locationInput.style.display = 'block';
-            } else if (type === 'accounts') {
-                label.textContent = 'Search Accounts:';
-                input.placeholder = 'Type to search accounts...';
-                if (resultsDiv) resultsDiv.classList.add('active');
-            } else if (type === 'contacts') {
-                label.textContent = 'Search Contacts:';
-                input.placeholder = 'Type to search contacts...';
-                if (resultsDiv) resultsDiv.classList.add('active');
+            const searchConfigs = {
+                google: { label: 'Search Google:', placeholder: 'Type your search query...' },
+                maps: { label: 'Search Maps:', placeholder: 'Search places, addresses, businesses...' },
+                beenverified: { label: 'Search BeenVerified:', placeholder: 'Enter full name (e.g. John Smith)...', extras: [cityInput, stateInput] },
+                apollo: { label: 'Search Apollo:', placeholder: 'Enter name (e.g. Lewis Patterson)...', extras: [locationInput] },
+                accounts: { label: 'Search Accounts:', placeholder: 'Type to search accounts...', showResults: true },
+                contacts: { label: 'Search Contacts:', placeholder: 'Type to search contacts...', showResults: true }
+            };
+
+            const config = searchConfigs[type];
+            if (config) {
+                label.textContent = config.label;
+                input.placeholder = config.placeholder;
+                if (config.extras) {
+                    config.extras.forEach(inp => {
+                        if (inp) inp.style.display = 'block';
+                    });
+                }
+                if (config.showResults && resultsDiv) {
+                    resultsDiv.classList.add('active');
+                }
             }
             
-            if (searchBar) searchBar.classList.add('active');
-            if (mainContainer) {
-                mainContainer.classList.add('search-active');
-            }
+            searchBar.classList.add('active');
+            mainContainer.classList.add('search-active');
             setTimeout(() => input.focus(), 300);
             input.value = '';
-            if (cityInput) cityInput.value = '';
-            if (stateInput) stateInput.value = '';
-            if (locationInput) locationInput.value = '';
+            [cityInput, stateInput, locationInput].forEach(inp => {
+                if (inp) inp.value = '';
+            });
         }
 
         function performInternalSearch(query) {
             const resultsDiv = gId('search-results');
-            if (!resultsDiv) return;
-            
-            if (query.length < 2) {
-                resultsDiv.innerHTML = '';
+            if (!resultsDiv || query.length < 2) {
+                if (resultsDiv) resultsDiv.innerHTML = '';
                 return;
             }
             
@@ -2858,8 +2516,7 @@
                         id: account.id,
                         name: account.name,
                         info: account.industry || 'No Industry',
-                        type: 'Account',
-                        action: () => showAccountDetail(account.id)
+                        type: 'Account'
                     }));
             } else if (currentSearchType === 'contacts') {
                 results = CRMApp.contacts
@@ -2873,19 +2530,11 @@
                         id: contact.id,
                         name: `${contact.firstName} ${contact.lastName}`,
                         info: `${contact.title || 'No Title'} at ${contact.accountName || 'No Account'}`,
-                        type: 'Contact',
-                        action: () => {
-                            if (contact.accountId) {
-                                showAccountDetail(contact.accountId);
-                            } else {
-                                showToast('This contact is not linked to an account.', 'warning');
-                            }
-                        }
+                        type: 'Contact'
                     }));
             }
             
             let html = '';
-            
             results.forEach(result => {
                 html += `
                     <div class="search-result-item" onclick="handleSearchResultClick('${result.id}', '${currentSearchType}')">
@@ -2896,11 +2545,7 @@
             });
             
             if (results.length > 0) {
-                html += `
-                    <button class="view-all-btn" onclick="handleViewAll('${currentSearchType}')">
-                        View All ${currentSearchType === 'accounts' ? 'Accounts' : 'Contacts'}
-                    </button>
-                `;
+                html += `<button class="view-all-btn" onclick="handleViewAll('${currentSearchType}')">View All ${currentSearchType === 'accounts' ? 'Accounts' : 'Contacts'}</button>`;
             } else {
                 html = `<div class="search-result-item">No ${currentSearchType} found</div>`;
             }
@@ -2932,12 +2577,8 @@
             const mainContainer = gId('main-container');
             const resultsDiv = gId('search-results');
             
-            if (searchBar) {
-                searchBar.classList.remove('active');
-            }
-            if (mainContainer) {
-                mainContainer.classList.remove('search-active');
-            }
+            if (searchBar) searchBar.classList.remove('active');
+            if (mainContainer) mainContainer.classList.remove('search-active');
             if (resultsDiv) {
                 resultsDiv.classList.remove('active');
                 resultsDiv.innerHTML = '';
@@ -2953,140 +2594,30 @@
             const query = gId('search-input').value.trim();
             if (!query) return;
             
-            if (currentSearchType === 'accounts' || currentSearchType === 'contacts') {
-                // Internal search is handled by performInternalSearch
-                return;
-            }
+            if (currentSearchType === 'accounts' || currentSearchType === 'contacts') return;
             
-            let searchUrl = '';
+            const searchUrls = {
+                google: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+                maps: `https://www.google.com/maps/search/${encodeURIComponent(query)}`,
+                apollo: `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query)}`,
+                beenverified: (() => {
+                    const city = gId('search-city').value.trim();
+                    const state = gId('search-state').value.trim().toUpperCase();
+                    const nameParts = query.split(' ');
+                    const firstName = nameParts[0] || '';
+                    const lastName = nameParts.slice(1).join(' ') || '';
+                    return `https://www.beenverified.com/rf/search/v2?fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
+                })()
+            };
             
-            if (currentSearchType === 'google') {
-                searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-            } else if (currentSearchType === 'maps') {
-                searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
-            } else if (currentSearchType === 'beenverified') {
-                const city = gId('search-city').value.trim();
-                const state = gId('search-state').value.trim().toUpperCase();
-                const nameParts = query.split(' ');
-                const firstName = nameParts[0] || '';
-                const lastName = nameParts.slice(1).join(' ') || '';
-                searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
-            } else if (currentSearchType === 'apollo') {
-                const location = gId('search-location').value.trim();
-                let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
-                if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
-                searchUrl = apolloUrl;
-            }
-            
+            const searchUrl = searchUrls[currentSearchType];
             if (searchUrl) {
                 window.open(searchUrl, '_blank');
                 closeSearch();
             }
         }
-        
-        function showLoading(show) {
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) {
-                if (show) {
-                    overlay.classList.add('active');
-                } else {
-                    overlay.classList.remove('active');
-                }
-            }
-        }
 
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-            
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            
-            toast.innerHTML = `<div class="toast-message">${message}</div>`;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 100);
-            
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    if (container.contains(toast)) {
-                        container.removeChild(toast);
-                    }
-                }, 300);
-            }, 3000);
-        }
-
-        function formatDate(timestamp) {
-            if (!timestamp) return 'Unknown date';
-            try {
-                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            } catch (e) {
-                return 'Invalid date';
-            }
-        }
-        
-        function formatDateOnly(timestamp) {
-            if (!timestamp) return 'Unknown date';
-            try {
-                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-                return date.toLocaleDateString();
-            } catch (e) {
-                return 'Invalid date';
-            }
-        }
-        
-        // Firebase wrapper for compatibility
-        window.FirebaseDB = {
-            db: db,
-            doc: (db, collection, id) => db.collection(collection).doc(id),
-            setDoc: (docRef, data) => docRef.set(data),
-            getDoc: (docRef) => docRef.get(),
-            getDocs: (query) => query.get(),
-            collection: (db, path) => db.collection(path),
-            query: (collection, ...constraints) => {
-                let query = collection;
-                constraints.forEach(constraint => {
-                    if (constraint && constraint.type === 'orderBy') {
-                        query = query.orderBy(constraint.field, constraint.direction);
-                    } else if (constraint && constraint.type === 'limit') {
-                        query = query.limit(constraint.limit);
-                    } else if (constraint && constraint.type === 'where') {
-                        query = query.where(constraint.field, constraint.op, constraint.value);
-                    }
-                });
-                return query;
-            },
-            orderBy: (field, direction = 'asc') => ({ type: 'orderBy', field, direction }),
-            limit: (limit) => ({ type: 'limit', limit }),
-            serverTimestamp: firebase.firestore.FieldValue.serverTimestamp,
-            updateDoc: (docRef, data) => docRef.update(data),
-            deleteDoc: (docRef) => docRef.delete(),
-            arrayUnion: firebase.firestore.FieldValue.arrayUnion,
-            Timestamp: firebase.firestore.Timestamp,
-            where: (field, op, value) => ({ type: 'where', field, op, value }),
-            addDoc: (collectionRef, data) => collectionRef.add(data)
-        };
-        
-        window.generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-        });
-        
-        function initializeApp() {
-            setupNavigation();
-            setupModals();
-            setupEventListeners();
-            setupSearchFunctionality();
-            loadInitialData();
-            showView('dashboard');
-        }
-
+        // Navigation Functions
         function setupNavigation() {
             const navButtons = document.querySelectorAll('.app-button[data-view]');
             navButtons.forEach(button => {
@@ -3111,7 +2642,7 @@
             document.querySelectorAll('.view-container').forEach(view => {
                 view.classList.remove('active');
             });
-            const targetView = document.getElementById(viewName + '-view');
+            const targetView = gId(viewName + '-view');
             if (targetView) {
                 targetView.classList.add('active');
                 CRMApp.currentView = viewName;
@@ -3136,54 +2667,38 @@
                 'account-detail': 'Power Choosers CRM Account Details',
                 'calls-hub': 'Power Choosers Cold Calling Hub'
             };
-            const titleElement = document.getElementById('page-title');
+            const titleElement = gId('page-title');
             if (titleElement) {
                 titleElement.textContent = titles[viewName] || 'Power Choosers CRM';
             }
         }
 
         function loadViewData(viewName) {
-            switch(viewName) {
-                case 'dashboard':
-                    renderDashboard();
-                    renderRecentActivities();
-                    break;
-                case 'accounts':
-                    renderAccounts();
-                    break;
-                case 'contacts':
-                    renderContacts();
-                    break;
-                case 'account-detail':
-                    if (CRMApp.currentAccount) {
-                        renderAccountDetail();
-                    }
-                    break;
-                case 'calls-hub':
-                    initializeCallsHub();
-                    break;
+            const loadActions = {
+                'dashboard': () => { renderDashboard(); renderRecentActivities(); },
+                'accounts': () => renderAccounts(),
+                'contacts': () => renderContacts(),
+                'account-detail': () => { if (CRMApp.currentAccount) renderAccountDetail(); },
+                'calls-hub': () => initializeCallsHub()
+            };
+            
+            if (loadActions[viewName]) {
+                loadActions[viewName]();
             }
         }
 
         function initializeCallsHub() {
             if (!currentProspect.name && !currentProspect.company) {
                 currentProspect = {
-                    name: '',
-                    title: '',
-                    company: '',
-                    industry: '',
-                    phone: '',
-                    email: '',
-                    accountId: '',
-                    contactId: '',
-                    painPoints: '',
-                    benefits: ''
+                    name: '', title: '', company: '', industry: '', phone: '', email: '',
+                    accountId: '', contactId: '', painPoints: '', benefits: ''
                 };
             }
             populateFromGlobalProspect();
             displayCurrentStep();
         }
-        
+
+        // Data Functions
         async function loadInitialData() {
             showLoading(true);
             try {
@@ -3211,21 +2726,117 @@
             }
         }
 
+        async function logActivity(activityData) {
+            try {
+                await db.collection('activities').add({
+                    ...activityData,
+                    createdAt: serverTimestamp()
+                });
+            } catch (error) {
+                console.error('Error logging activity:', error);
+            }
+        }
+
+        async function saveProspectAndNotes() {
+            const notesContent = gId('call-notes').value.trim();
+            const prospectData = {
+                name: gId('input-name').value.trim(),
+                title: gId('input-title').value.trim(),
+                company: gId('input-company-name').value.trim(),
+                industry: gId('input-company-industry').value.trim(),
+                benefits: gId('input-benefit').value.trim(),
+                painPoints: gId('input-pain').value.trim()
+            };
+
+            showLoading(true);
+            try {
+                let { accountId, contactId } = currentProspect;
+                let isNewAccount = false, isNewContact = false;
+
+                // Handle account creation/update
+                if (accountId && prospectData.company) {
+                    await db.collection('accounts').doc(accountId).update({
+                        name: prospectData.company,
+                        industry: prospectData.industry,
+                        painPoints: prospectData.painPoints,
+                        benefits: prospectData.benefits,
+                        updatedAt: serverTimestamp()
+                    });
+                } else if (prospectData.company) {
+                    const newAccountRef = await db.collection('accounts').add({
+                        name: prospectData.company,
+                        industry: prospectData.industry,
+                        painPoints: prospectData.painPoints,
+                        benefits: prospectData.benefits,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    accountId = newAccountRef.id;
+                    isNewAccount = true;
+                }
+
+                // Handle contact creation/update
+                if (contactId && prospectData.name) {
+                    await db.collection('contacts').doc(contactId).update({
+                        firstName: prospectData.name.split(' ')[0] || '',
+                        lastName: prospectData.name.split(' ')[1] || '',
+                        title: prospectData.title,
+                        accountId: accountId,
+                        accountName: prospectData.company,
+                        notes: notesContent,
+                        updatedAt: serverTimestamp()
+                    });
+                } else if (prospectData.name) {
+                    const newContactRef = await db.collection('contacts').add({
+                        firstName: prospectData.name.split(' ')[0] || '',
+                        lastName: prospectData.name.split(' ')[1] || '',
+                        title: prospectData.title,
+                        accountId: accountId,
+                        accountName: prospectData.company,
+                        notes: notesContent,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    contactId = newContactRef.id;
+                    isNewContact = true;
+                }
+                
+                if (notesContent) {
+                    await logActivity({
+                        type: 'call_note',
+                        description: `Call note for ${prospectData.name || prospectData.company || 'prospect'}`,
+                        noteContent: notesContent,
+                        accountId: accountId,
+                        accountName: prospectData.company,
+                        contactId: contactId,
+                        contactName: prospectData.name
+                    });
+                }
+
+                showToast(`Call notes saved!${isNewAccount ? ' New account created.' : ''}${isNewContact ? ' New contact created.' : ''}`);
+                await loadInitialData();
+                restart();
+
+            } catch (error) {
+                console.error('Error saving prospect and notes:', error);
+                showToast('Error saving data.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Render Functions
         function renderDashboard() {
             if (gId('total-accounts')) gId('total-accounts').textContent = CRMApp.accounts.length;
             if (gId('total-contacts')) gId('total-contacts').textContent = CRMApp.contacts.length;
             if (gId('recent-activities')) gId('recent-activities').textContent = CRMApp.activities.length;
             if (gId('hot-leads')) gId('hot-leads').textContent = '0';
-            
             renderDashboardContacts();
         }
 
         function renderRecentActivities() {
             const list = gId('recent-activities-list');
             if (!list) return;
-            list.innerHTML = '';
-            
-            // Limit to 4 most recent activities
             const recentActivities = CRMApp.activities.slice(0, 4);
             
             if (recentActivities.length === 0) {
@@ -3233,25 +2844,18 @@
                 return;
             }
             
-            recentActivities.forEach(activity => {
-                const item = document.createElement('div');
-                item.className = 'activity-item';
-                item.innerHTML = `
+            list.innerHTML = recentActivities.map(activity => `
+                <div class="activity-item">
                     <div class="activity-title">${activity.description}</div>
                     <div class="activity-content">${activity.noteContent ? activity.noteContent.substring(0, 100) + '...' : ''}</div>
                     <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
-                `;
-                list.appendChild(item);
-            });
+                </div>
+            `).join('');
         }
 
         function renderDashboardContacts() {
             const container = gId('dashboard-contacts');
             if (!container) return;
-            
-            container.innerHTML = '';
-            
-            // Show 5 most recent contacts
             const recentContacts = CRMApp.contacts.slice(0, 5);
             
             if (recentContacts.length === 0) {
@@ -3259,10 +2863,8 @@
                 return;
             }
             
-            recentContacts.forEach(contact => {
-                const item = document.createElement('div');
-                item.className = 'contact-item';
-                item.innerHTML = `
+            container.innerHTML = recentContacts.map(contact => `
+                <div class="contact-item">
                     <div class="contact-item-info">
                         <div class="contact-item-name">${contact.firstName} ${contact.lastName}</div>
                         <div class="contact-item-detail">${contact.title || 'No Title'} • ${contact.accountName || 'No Account'}</div>
@@ -3271,9 +2873,504 @@
                         <button class="mini-btn edit" onclick="openContactModal(CRMApp.contacts.find(c => c.id === '${contact.id}'))">Edit</button>
                         <button class="mini-btn delete" onclick="deleteContact('${contact.id}')">Delete</button>
                     </div>
-                `;
-                container.appendChild(item);
+                </div>
+            `).join('');
+        }
+
+        function renderAccounts() {
+            const grid = gId('accounts-grid');
+            if (!grid) return;
+            
+            if (CRMApp.accounts.length === 0) {
+                grid.innerHTML = '<p class="empty-state">No accounts found. Click "New Account" to get started.</p>';
+                return;
+            }
+            
+            grid.innerHTML = CRMApp.accounts.map(account => `
+                <div class="account-card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-name" style="cursor: pointer;" onclick="showAccountDetail('${account.id}')">${account.name}</div>
+                            <div class="card-subtitle">${account.industry || 'No Industry'}</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-btn edit-account" onclick="openAccountModal(CRMApp.accounts.find(a => a.id === '${account.id}'))" title="Edit Account">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                    <path d="m15 5 4 4"/>
+                                </svg>
+                            </button>
+                            <button class="icon-btn delete-account" onclick="deleteAccount('${account.id}')" title="Delete Account" style="color: #dc2626;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3,6 5,6 21,6"/>
+                                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="card-subtitle">${account.phone || 'No Phone'}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderContacts() {
+            const grid = gId('contacts-grid');
+            if (!grid) return;
+            
+            if (CRMApp.contacts.length === 0) {
+                grid.innerHTML = '<p class="empty-state">No contacts found. Click "New Contact" to get started.</p>';
+                return;
+            }
+            
+            grid.innerHTML = CRMApp.contacts.map(contact => `
+                <div class="contact-card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-name" style="cursor: pointer;" onclick="handleContactClick('${contact.id}')">${contact.firstName} ${contact.lastName}</div>
+                            <div class="card-subtitle">${contact.title || 'No Title'}</div>
+                            <div class="card-subtitle">${contact.accountName || 'No Account'}</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-btn call-prospect" onclick="openCallsHubWithData('${contact.id}')" title="Call Prospect">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                                </svg>
+                            </button>
+                            <button class="icon-btn edit-contact" onclick="openContactModal(CRMApp.contacts.find(c => c.id === '${contact.id}'))" title="Edit Contact">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                    <path d="m15 5 4 4"/>
+                                </svg>
+                            </button>
+                            <button class="icon-btn delete-contact" onclick="deleteContact('${contact.id}')" title="Delete Contact" style="color: #dc2626;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3,6 5,6 21,6"/>
+                                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="card-subtitle">${contact.email || 'No Email'}</p>
+                    <p class="card-subtitle">${contact.phone || 'No Phone'}</p>
+                </div>
+            `).join('');
+        }
+
+        function handleContactClick(contactId) {
+            const contact = CRMApp.contacts.find(c => c.id === contactId);
+            if (contact && contact.accountId) {
+                showAccountDetail(contact.accountId);
+            } else {
+                showToast('This contact is not linked to an account.', 'warning');
+            }
+        }
+        
+        function showAccountDetail(accountId) {
+            CRMApp.currentAccount = CRMApp.accounts.find(a => a.id === accountId);
+            if (!CRMApp.currentAccount) {
+                showToast('Account not found.', 'error');
+                return;
+            }
+            showView('account-detail');
+        }
+
+        function renderAccountDetail() {
+            if (!CRMApp.currentAccount) return;
+            const account = CRMApp.currentAccount;
+            gId('account-detail-title').textContent = account.name;
+            renderAccountInfo(account);
+            renderAccountContacts(account.id);
+            renderAccountActivities(account.id);
+        }
+
+        function renderAccountInfo(account) {
+            const display = gId('account-info-display');
+            if (!display) return;
+            
+            const fields = [
+                { label: 'Industry', value: account.industry },
+                { label: 'Phone', value: account.phone },
+                { label: 'Website', value: account.website },
+                { label: 'Address', value: account.address },
+                { label: 'Pain Points', value: account.painPoints },
+                { label: 'Benefits', value: account.benefits },
+                { label: 'Created At', value: formatDate(account.createdAt) },
+                { label: 'Last Updated', value: formatDate(account.updatedAt) }
+            ];
+            
+            display.innerHTML = fields.map(field => `
+                <div class="info-field">
+                    <div class="info-field-label">${field.label}</div>
+                    <div class="info-field-value">${field.value || 'N/A'}</div>
+                </div>
+            `).join('');
+            
+            // Populate contract form
+            ['contract-provider', 'contract-rate', 'contract-expiration', 'contract-type'].forEach(id => {
+                const element = gId(id);
+                if (element) {
+                    element.value = account[id.replace('-', '')] || '';
+                }
             });
+        }
+
+        function renderAccountContacts(accountId) {
+            const list = gId('account-contacts-list');
+            if (!list) return;
+            const accountContacts = CRMApp.contacts.filter(c => c.accountId === accountId);
+            
+            if (accountContacts.length === 0) {
+                list.innerHTML = '<p class="empty-state">No contacts for this account</p>';
+                return;
+            }
+            
+            list.innerHTML = accountContacts.map(contact => `
+                <div class="contact-list-item">
+                    <div class="contact-info">
+                        <div class="contact-name">${contact.firstName} ${contact.lastName}</div>
+                        <div class="contact-title">${contact.title || 'No Title'}</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="icon-btn call-prospect" onclick="openCallsHubWithData('${contact.id}')" title="Call Prospect">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                        </button>
+                        <button class="icon-btn edit-contact" onclick="openContactModal(CRMApp.contacts.find(c => c.id === '${contact.id}'))" title="Edit Contact">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                <path d="m15 5 4 4"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderAccountActivities(accountId) {
+            const list = gId('account-activities-list');
+            if (!list) return;
+            const accountActivities = CRMApp.activities.filter(a => a.accountId === accountId);
+            
+            if (accountActivities.length === 0) {
+                list.innerHTML = '<p class="empty-state">No recent activities</p>';
+                return;
+            }
+            
+            list.innerHTML = accountActivities.map(activity => `
+                <div class="activity-item">
+                    <div class="activity-title">${activity.description}</div>
+                    <div class="activity-content">${activity.noteContent || ''}</div>
+                    <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
+                </div>
+            `).join('');
+        }
+
+        // Modal Functions
+        function setupModals() {
+            const modalElements = [
+                { modal: 'account-modal', openBtns: ['new-account-btn', 'add-account-btn', 'edit-account-btn'], closeBtns: ['close-account-modal', 'cancel-account'], openFn: 'openAccountModal', closeFn: 'closeAccountModal' },
+                { modal: 'contact-modal', openBtns: ['new-contact-btn', 'add-contact-btn', 'quick-add-contact'], closeBtns: ['close-contact-modal', 'cancel-contact'], openFn: 'openContactModal', closeFn: 'closeContactModal' }
+            ];
+
+            modalElements.forEach(({ modal, openBtns, closeBtns, openFn, closeFn }) => {
+                const modalEl = gId(modal);
+                
+                openBtns.forEach(btnId => {
+                    const btn = gId(btnId);
+                    if (btn) {
+                        btn.addEventListener('click', () => {
+                            if (btnId.includes('edit')) {
+                                window[openFn](CRMApp.currentAccount || CRMApp.currentContact);
+                            } else {
+                                window[openFn]();
+                            }
+                        });
+                    }
+                });
+                
+                closeBtns.forEach(btnId => {
+                    const btn = gId(btnId);
+                    if (btn) {
+                        btn.addEventListener('click', () => window[closeFn]());
+                    }
+                });
+                
+                if (modalEl) {
+                    modalEl.addEventListener('click', (e) => {
+                        if (e.target.id === modal) window[closeFn]();
+                    });
+                }
+            });
+        }
+        
+        function openAccountModal(account = null) {
+            const modal = gId('account-modal');
+            const form = gId('account-form');
+            form.reset();
+            
+            if (account) {
+                gId('account-modal-title').textContent = 'Edit Account';
+                const fields = ['name', 'industry', 'phone', 'website', 'address', 'pain-points', 'benefits'];
+                fields.forEach(field => {
+                    const element = gId(`account-${field}`);
+                    if (element) {
+                        const key = field === 'pain-points' ? 'painPoints' : field === 'benefits' ? 'benefits' : field;
+                        element.value = account[key] || '';
+                    }
+                });
+                CRMApp.currentAccount = account;
+            } else {
+                gId('account-modal-title').textContent = 'Add New Account';
+                CRMApp.currentAccount = null;
+            }
+            modal.classList.add('active');
+        }
+        
+        function closeAccountModal() {
+            gId('account-modal').classList.remove('active');
+        }
+        
+        function openContactModal(contact = null) {
+            const modal = gId('contact-modal');
+            const form = gId('contact-form');
+            form.reset();
+            updateContactAccountDropdown();
+            
+            if (contact) {
+                gId('contact-modal-title').textContent = 'Edit Contact';
+                const fields = [
+                    { id: 'contact-first-name', key: 'firstName' },
+                    { id: 'contact-last-name', key: 'lastName' },
+                    { id: 'contact-title', key: 'title' },
+                    { id: 'contact-email', key: 'email' },
+                    { id: 'contact-phone', key: 'phone' },
+                    { id: 'contact-notes', key: 'notes' },
+                    { id: 'contact-account', key: 'accountId' }
+                ];
+                fields.forEach(field => {
+                    const element = gId(field.id);
+                    if (element) {
+                        element.value = contact[field.key] || '';
+                    }
+                });
+                CRMApp.currentContact = contact;
+            } else {
+                gId('contact-modal-title').textContent = 'Add New Contact';
+                CRMApp.currentContact = null;
+            }
+            modal.classList.add('active');
+        }
+        
+        function closeContactModal() {
+            gId('contact-modal').classList.remove('active');
+        }
+        
+        function updateContactAccountDropdown() {
+            const select = gId('contact-account');
+            if (!select) return;
+            select.innerHTML = '<option value="">Select an account...</option>';
+            CRMApp.accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = account.name;
+                select.appendChild(option);
+            });
+        }
+
+        // Event Handlers
+        function setupEventListeners() {
+            const handlers = [
+                { id: 'account-form', event: 'submit', handler: handleAccountSubmit },
+                { id: 'contact-form', event: 'submit', handler: handleContactSubmit },
+                { id: 'back-to-accounts', event: 'click', handler: () => showView('accounts') },
+                { id: 'energy-contract-form', event: 'submit', handler: handleEnergyContractSubmit },
+                { id: 'save-account-note', event: 'click', handler: handleSaveAccountNote },
+                { id: 'bulk-import-btn', event: 'click', handler: handleBulkImport }
+            ];
+
+            handlers.forEach(({ id, event, handler }) => {
+                const element = gId(id);
+                if (element) {
+                    element.addEventListener(event, handler);
+                }
+            });
+        }
+
+        async function handleAccountSubmit(e) {
+            e.preventDefault();
+            showLoading(true);
+            const accountId = CRMApp.currentAccount ? CRMApp.currentAccount.id : null;
+            const accountData = {
+                name: gId('account-name').value,
+                industry: gId('account-industry').value,
+                phone: gId('account-phone').value,
+                website: gId('account-website').value,
+                address: gId('account-address').value,
+                painPoints: gId('account-pain-points').value,
+                benefits: gId('account-benefits').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                if (accountId) {
+                    await db.collection('accounts').doc(accountId).update(accountData);
+                    showToast('Account updated successfully!');
+                    await logActivity({
+                        type: 'account_updated',
+                        description: `Updated account: ${accountData.name}`,
+                        accountId: accountId,
+                        accountName: accountData.name
+                    });
+                } else {
+                    const newDoc = await db.collection('accounts').add({
+                        ...accountData,
+                        createdAt: serverTimestamp()
+                    });
+                    showToast('Account created successfully!');
+                    await logActivity({
+                        type: 'account_created',
+                        description: `Created new account: ${accountData.name}`,
+                        accountId: newDoc.id,
+                        accountName: accountData.name
+                    });
+                }
+                await loadInitialData();
+            } catch (error) {
+                console.error('Error saving account:', error);
+                showToast('Error saving account.', 'error');
+            } finally {
+                closeAccountModal();
+                showLoading(false);
+            }
+        }
+
+        async function handleContactSubmit(e) {
+            e.preventDefault();
+            showLoading(true);
+            const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : null;
+            const accountId = gId('contact-account').value;
+            const accountName = accountId ? CRMApp.accounts.find(a => a.id === accountId)?.name : 'Unassigned';
+            
+            const contactData = {
+                firstName: gId('contact-first-name').value,
+                lastName: gId('contact-last-name').value,
+                title: gId('contact-title').value,
+                accountId: accountId,
+                accountName: accountName,
+                email: gId('contact-email').value,
+                phone: gId('contact-phone').value,
+                notes: gId('contact-notes').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                if (contactId) {
+                    await db.collection('contacts').doc(contactId).update(contactData);
+                    showToast('Contact updated successfully!');
+                    await logActivity({
+                        type: 'contact_updated',
+                        description: `Updated contact: ${contactData.firstName} ${contactData.lastName}`,
+                        contactId: contactId,
+                        contactName: `${contactData.firstName} ${contactData.lastName}`,
+                        accountId: accountId,
+                        accountName: accountName
+                    });
+                } else {
+                    const newDoc = await db.collection('contacts').add({
+                        ...contactData,
+                        createdAt: serverTimestamp()
+                    });
+                    showToast('Contact created successfully!');
+                    await logActivity({
+                        type: 'contact_created',
+                        description: `Created new contact: ${contactData.firstName} ${contactData.lastName}`,
+                        contactId: newDoc.id,
+                        contactName: `${contactData.firstName} ${contactData.lastName}`,
+                        accountId: accountId,
+                        accountName: accountName
+                    });
+                }
+                await loadInitialData();
+            } catch (error) {
+                console.error('Error saving contact:', error);
+                showToast('Error saving contact.', 'error');
+            } finally {
+                closeContactModal();
+                showLoading(false);
+            }
+        }
+
+        async function handleEnergyContractSubmit(e) {
+            e.preventDefault();
+            if (!CRMApp.currentAccount) return;
+            
+            showLoading(true);
+            const contractData = {
+                contractProvider: gId('contract-provider').value,
+                contractRate: gId('contract-rate').value,
+                contractExpiration: gId('contract-expiration').value,
+                contractType: gId('contract-type').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                await db.collection('accounts').doc(CRMApp.currentAccount.id).update(contractData);
+                showToast('Energy contract updated successfully!');
+                await logActivity({
+                    type: 'contract_updated',
+                    description: `Updated contract for: ${CRMApp.currentAccount.name}`,
+                    accountId: CRMApp.currentAccount.id,
+                    accountName: CRMApp.currentAccount.name
+                });
+            } catch (error) {
+                console.error('Error saving contract info:', error);
+                showToast('Error saving contract info.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function handleSaveAccountNote() {
+            if (!CRMApp.currentAccount) return;
+            
+            const noteContent = gId('account-note-input').value;
+            if (!noteContent.trim()) {
+                showToast('Note cannot be empty.', 'warning');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                await logActivity({
+                    type: 'account_note',
+                    description: `Added a note to ${CRMApp.currentAccount.name}`,
+                    noteContent: noteContent,
+                    accountId: CRMApp.currentAccount.id,
+                    accountName: CRMApp.currentAccount.name
+                });
+                
+                showToast('Note saved successfully!');
+                gId('account-note-input').value = '';
+                await loadInitialData();
+            } catch (error) {
+                console.error('Error saving note:', error);
+                showToast('Error saving note.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function handleBulkImport() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.csv,.xlsx,.xls';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                showToast('Bulk import functionality would be implemented here. File selected: ' + file.name, 'info');
+            };
+            input.click();
         }
 
         async function deleteContact(contactId) {
@@ -3309,12 +3406,10 @@
                 const account = CRMApp.accounts.find(a => a.id === accountId);
                 const associatedContacts = CRMApp.contacts.filter(c => c.accountId === accountId);
                 
-                // Delete associated contacts first
                 for (const contact of associatedContacts) {
                     await db.collection('contacts').doc(contact.id).delete();
                 }
                 
-                // Delete account
                 await db.collection('accounts').doc(accountId).delete();
                 
                 await logActivity({
@@ -3331,527 +3426,6 @@
                 showToast('Error deleting account.', 'error');
             } finally {
                 showLoading(false);
-            }
-        }
-        
-        function renderAccounts() {
-            const grid = gId('accounts-grid');
-            if (!grid) return;
-            grid.innerHTML = '';
-            if (CRMApp.accounts.length === 0) {
-                grid.innerHTML = '<p class="empty-state">No accounts found. Click "New Account" to get started.</p>';
-                return;
-            }
-            CRMApp.accounts.forEach(account => {
-                const card = document.createElement('div');
-                card.className = 'account-card';
-                card.innerHTML = `
-                    <div class="card-header">
-                        <div>
-                            <div class="card-name" style="cursor: pointer;" onclick="showAccountDetail('${account.id}')">${account.name}</div>
-                            <div class="card-subtitle">${account.industry || 'No Industry'}</div>
-                        </div>
-                        <div class="card-actions">
-                            <button class="icon-btn edit-account" data-id="${account.id}" title="Edit Account">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                    <path d="m15 5 4 4"/>
-                                </svg>
-                            </button>
-                            <button class="icon-btn delete-account" data-id="${account.id}" title="Delete Account" style="color: #dc2626;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="3,6 5,6 21,6"/>
-                                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
-                                    <line x1="10" y1="11" x2="10" y2="17"/>
-                                    <line x1="14" y1="11" x2="14" y2="17"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <p class="card-subtitle">${account.phone || 'No Phone'}</p>
-                `;
-                
-                card.querySelector('.edit-account').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openAccountModal(account);
-                });
-                card.querySelector('.delete-account').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteAccount(account.id);
-                });
-                grid.appendChild(card);
-            });
-        }
-
-        function renderContacts() {
-            const grid = gId('contacts-grid');
-            if (!grid) return;
-            grid.innerHTML = '';
-            if (CRMApp.contacts.length === 0) {
-                grid.innerHTML = '<p class="empty-state">No contacts found. Click "New Contact" to get started.</p>';
-                return;
-            }
-            CRMApp.contacts.forEach(contact => {
-                const card = document.createElement('div');
-                card.className = 'contact-card';
-                card.innerHTML = `
-                    <div class="card-header">
-                        <div>
-                            <div class="card-name" style="cursor: pointer;" onclick="handleContactClick('${contact.id}')">${contact.firstName} ${contact.lastName}</div>
-                            <div class="card-subtitle">${contact.title || 'No Title'}</div>
-                            <div class="card-subtitle">${contact.accountName || 'No Account'}</div>
-                        </div>
-                        <div class="card-actions">
-                            <button class="icon-btn call-prospect" data-id="${contact.id}" title="Call Prospect">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                                </svg>
-                            </button>
-                            <button class="icon-btn edit-contact" data-id="${contact.id}" title="Edit Contact">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                    <path d="m15 5 4 4"/>
-                                </svg>
-                            </button>
-                            <button class="icon-btn delete-contact" data-id="${contact.id}" title="Delete Contact" style="color: #dc2626;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="3,6 5,6 21,6"/>
-                                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
-                                    <line x1="10" y1="11" x2="10" y2="17"/>
-                                    <line x1="14" y1="11" x2="14" y2="17"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <p class="card-subtitle">${contact.email || 'No Email'}</p>
-                    <p class="card-subtitle">${contact.phone || 'No Phone'}</p>
-                `;
-                
-                card.querySelector('.edit-contact').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openContactModal(contact);
-                });
-                card.querySelector('.call-prospect').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openCallsHubWithData(contact.id);
-                });
-                card.querySelector('.delete-contact').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteContact(contact.id);
-                });
-                grid.appendChild(card);
-            });
-        }
-
-        function handleContactClick(contactId) {
-            const contact = CRMApp.contacts.find(c => c.id === contactId);
-            if (contact && contact.accountId) {
-                showAccountDetail(contact.accountId);
-            } else {
-                showToast('This contact is not linked to an account.', 'warning');
-            }
-        }
-        
-        function showAccountDetail(accountId) {
-            CRMApp.currentAccount = CRMApp.accounts.find(a => a.id === accountId);
-            if (!CRMApp.currentAccount) {
-                showToast('Account not found.', 'error');
-                return;
-            }
-            showView('account-detail');
-        }
-
-        function renderAccountDetail() {
-            if (!CRMApp.currentAccount) return;
-            const account = CRMApp.currentAccount;
-            gId('account-detail-title').textContent = account.name;
-            renderAccountInfo(account);
-            renderAccountContacts(account.id);
-            renderAccountActivities(account.id);
-        }
-
-        function renderAccountInfo(account) {
-            const display = gId('account-info-display');
-            if (!display) return;
-            display.innerHTML = '';
-            
-            const fields = [
-                { label: 'Industry', value: account.industry },
-                { label: 'Phone', value: account.phone },
-                { label: 'Website', value: account.website },
-                { label: 'Address', value: account.address },
-                { label: 'Pain Points', value: account.painPoints },
-                { label: 'Benefits', value: account.benefits },
-                { label: 'Created At', value: formatDate(account.createdAt) },
-                { label: 'Last Updated', value: formatDate(account.updatedAt) }
-            ];
-            
-            fields.forEach(field => {
-                const fieldHtml = `
-                    <div class="info-field">
-                        <div class="info-field-label">${field.label}</div>
-                        <div class="info-field-value">${field.value || 'N/A'}</div>
-                    </div>
-                `;
-                display.innerHTML += fieldHtml;
-            });
-            
-            gId('contract-provider').value = account.contractProvider || '';
-            gId('contract-rate').value = account.contractRate || '';
-            gId('contract-expiration').value = account.contractExpiration || '';
-            gId('contract-type').value = account.contractType || '';
-        }
-
-        function renderAccountContacts(accountId) {
-            const list = gId('account-contacts-list');
-            if (!list) return;
-            list.innerHTML = '';
-            const accountContacts = CRMApp.contacts.filter(c => c.accountId === accountId);
-            if (accountContacts.length === 0) {
-                list.innerHTML = '<p class="empty-state">No contacts for this account</p>';
-                return;
-            }
-            accountContacts.forEach(contact => {
-                const item = document.createElement('div');
-                item.className = 'contact-list-item';
-                item.innerHTML = `
-                    <div class="contact-info">
-                        <div class="contact-name">${contact.firstName} ${contact.lastName}</div>
-                        <div class="contact-title">${contact.title || 'No Title'}</div>
-                    </div>
-                    <div class="card-actions">
-                        <button class="icon-btn call-prospect" data-id="${contact.id}" title="Call Prospect">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                            </svg>
-                        </button>
-                        <button class="icon-btn edit-contact" data-id="${contact.id}" title="Edit Contact">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                <path d="m15 5 4 4"/>
-                            </svg>
-                        </button>
-                    </div>
-                `;
-                item.querySelector('.call-prospect').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openCallsHubWithData(contact.id);
-                });
-                item.querySelector('.edit-contact').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openContactModal(contact);
-                });
-                list.appendChild(item);
-            });
-        }
-        
-        function renderAccountActivities(accountId) {
-            const list = gId('account-activities-list');
-            if (!list) return;
-            list.innerHTML = '';
-            const accountActivities = CRMApp.activities.filter(a => a.accountId === accountId);
-            if (accountActivities.length === 0) {
-                list.innerHTML = '<p class="empty-state">No recent activities</p>';
-                return;
-            }
-            accountActivities.forEach(activity => {
-                const item = document.createElement('div');
-                item.className = 'activity-item';
-                item.innerHTML = `
-                    <div class="activity-title">${activity.description}</div>
-                    <div class="activity-content">${activity.noteContent || ''}</div>
-                    <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
-                `;
-                list.appendChild(item);
-            });
-        }
-        
-        function setupModals() {
-            const accountModal = gId('account-modal');
-            const contactModal = gId('contact-modal');
-            
-            gId('new-account-btn').addEventListener('click', () => openAccountModal());
-            gId('add-account-btn').addEventListener('click', () => openAccountModal());
-            gId('new-contact-btn').addEventListener('click', () => openContactModal());
-            gId('add-contact-btn').addEventListener('click', () => openContactModal());
-            gId('edit-account-btn').addEventListener('click', () => openAccountModal(CRMApp.currentAccount));
-            gId('close-account-modal').addEventListener('click', () => closeAccountModal());
-            gId('cancel-account').addEventListener('click', () => closeAccountModal());
-            gId('close-contact-modal').addEventListener('click', () => closeContactModal());
-            gId('cancel-contact').addEventListener('click', () => closeContactModal());
-            
-            accountModal.addEventListener('click', (e) => {
-                if (e.target.id === 'account-modal') closeAccountModal();
-            });
-            contactModal.addEventListener('click', (e) => {
-                if (e.target.id === 'contact-modal') closeContactModal();
-            });
-        }
-        
-        function openAccountModal(account = null) {
-            const modal = gId('account-modal');
-            const form = gId('account-form');
-            form.reset();
-            
-            if (account) {
-                gId('account-modal-title').textContent = 'Edit Account';
-                gId('account-name').value = account.name || '';
-                gId('account-industry').value = account.industry || '';
-                gId('account-phone').value = account.phone || '';
-                gId('account-website').value = account.website || '';
-                gId('account-address').value = account.address || '';
-                gId('account-pain-points').value = account.painPoints || '';
-                gId('account-benefits').value = account.benefits || '';
-                CRMApp.currentAccount = account;
-            } else {
-                gId('account-modal-title').textContent = 'Add New Account';
-                CRMApp.currentAccount = null;
-            }
-            modal.classList.add('active');
-        }
-        
-        function closeAccountModal() {
-            gId('account-modal').classList.remove('active');
-        }
-        
-        function openContactModal(contact = null) {
-            const modal = gId('contact-modal');
-            const form = gId('contact-form');
-            form.reset();
-            updateContactAccountDropdown();
-            
-            if (contact) {
-                gId('contact-modal-title').textContent = 'Edit Contact';
-                gId('contact-first-name').value = contact.firstName || '';
-                gId('contact-last-name').value = contact.lastName || '';
-                gId('contact-title').value = contact.title || '';
-                gId('contact-email').value = contact.email || '';
-                gId('contact-phone').value = contact.phone || '';
-                gId('contact-notes').value = contact.notes || '';
-                gId('contact-account').value = contact.accountId || '';
-                CRMApp.currentContact = contact;
-            } else {
-                gId('contact-modal-title').textContent = 'Add New Contact';
-                CRMApp.currentContact = null;
-            }
-            modal.classList.add('active');
-        }
-        
-        function closeContactModal() {
-            gId('contact-modal').classList.remove('active');
-        }
-        
-        function updateContactAccountDropdown() {
-            const select = gId('contact-account');
-            if (!select) return;
-            select.innerHTML = '<option value="">Select an account...</option>';
-            CRMApp.accounts.forEach(account => {
-                const option = document.createElement('option');
-                option.value = account.id;
-                option.textContent = account.name;
-                select.appendChild(option);
-            });
-        }
-        
-        function setupEventListeners() {
-            gId('account-form').addEventListener('submit', handleAccountSubmit);
-            gId('contact-form').addEventListener('submit', handleContactSubmit);
-            gId('back-to-accounts').addEventListener('click', () => showView('accounts'));
-            gId('energy-contract-form').addEventListener('submit', handleEnergyContractSubmit);
-            gId('save-account-note').addEventListener('click', handleSaveAccountNote);
-            gId('bulk-import-btn').addEventListener('click', handleBulkImport);
-            gId('quick-add-contact').addEventListener('click', () => openContactModal());
-        }
-
-        function handleBulkImport() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.csv,.xlsx,.xls';
-            input.onchange = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                showToast('Bulk import functionality would be implemented here. File selected: ' + file.name, 'info');
-                // In a real implementation, you would parse the CSV/Excel file and import the data
-            };
-            input.click();
-        }
-
-        async function handleAccountSubmit(e) {
-            e.preventDefault();
-            showLoading(true);
-            const accountId = CRMApp.currentAccount ? CRMApp.currentAccount.id : null;
-            const accountData = {
-                name: gId('account-name').value,
-                industry: gId('account-industry').value,
-                phone: gId('account-phone').value,
-                website: gId('account-website').value,
-                address: gId('account-address').value,
-                painPoints: gId('account-pain-points').value,
-                benefits: gId('account-benefits').value,
-                updatedAt: serverTimestamp()
-            };
-            
-            try {
-                if (accountId) {
-                    await db.collection('accounts').doc(accountId).update(accountData);
-                    showToast('Account updated successfully!');
-                    logActivity({
-                        type: 'account_updated',
-                        description: `Updated account: ${accountData.name}`,
-                        accountId: accountId,
-                        accountName: accountData.name
-                    });
-                } else {
-                    const newDoc = await db.collection('accounts').add({
-                        ...accountData,
-                        createdAt: serverTimestamp()
-                    });
-                    showToast('Account created successfully!');
-                    logActivity({
-                        type: 'account_created',
-                        description: `Created new account: ${accountData.name}`,
-                        accountId: newDoc.id,
-                        accountName: accountData.name
-                    });
-                }
-                await loadInitialData();
-            } catch (error) {
-                console.error('Error saving account:', error);
-                showToast('Error saving account. See console for details.', 'error');
-            } finally {
-                closeAccountModal();
-                showLoading(false);
-            }
-        }
-
-        async function handleContactSubmit(e) {
-            e.preventDefault();
-            showLoading(true);
-            const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : null;
-            const accountId = gId('contact-account').value;
-            const accountName = accountId ? CRMApp.accounts.find(a => a.id === accountId)?.name : 'Unassigned';
-            
-            const contactData = {
-                firstName: gId('contact-first-name').value,
-                lastName: gId('contact-last-name').value,
-                title: gId('contact-title').value,
-                accountId: accountId,
-                accountName: accountName,
-                email: gId('contact-email').value,
-                phone: gId('contact-phone').value,
-                notes: gId('contact-notes').value,
-                updatedAt: serverTimestamp()
-            };
-            
-            try {
-                if (contactId) {
-                    await db.collection('contacts').doc(contactId).update(contactData);
-                    showToast('Contact updated successfully!');
-                    logActivity({
-                        type: 'contact_updated',
-                        description: `Updated contact: ${contactData.firstName} ${contactData.lastName}`,
-                        contactId: contactId,
-                        contactName: `${contactData.firstName} ${contactData.lastName}`,
-                        accountId: accountId,
-                        accountName: accountName
-                    });
-                } else {
-                    const newDoc = await db.collection('contacts').add({
-                        ...contactData,
-                        createdAt: serverTimestamp()
-                    });
-                    showToast('Contact created successfully!');
-                    logActivity({
-                        type: 'contact_created',
-                        description: `Created new contact: ${contactData.firstName} ${contactData.lastName}`,
-                        contactId: newDoc.id,
-                        contactName: `${contactData.firstName} ${contactData.lastName}`,
-                        accountId: accountId,
-                        accountName: accountName
-                    });
-                }
-                await loadInitialData();
-            } catch (error) {
-                console.error('Error saving contact:', error);
-                showToast('Error saving contact. See console for details.', 'error');
-            } finally {
-                closeContactModal();
-                showLoading(false);
-            }
-        }
-        
-        async function handleEnergyContractSubmit(e) {
-            e.preventDefault();
-            if (!CRMApp.currentAccount) return;
-            
-            showLoading(true);
-            
-            const contractData = {
-                contractProvider: gId('contract-provider').value,
-                contractRate: gId('contract-rate').value,
-                contractExpiration: gId('contract-expiration').value,
-                contractType: gId('contract-type').value,
-                updatedAt: serverTimestamp()
-            };
-            
-            try {
-                await db.collection('accounts').doc(CRMApp.currentAccount.id).update(contractData);
-                showToast('Energy contract updated successfully!');
-                logActivity({
-                    type: 'contract_updated',
-                    description: `Updated contract for: ${CRMApp.currentAccount.name}`,
-                    accountId: CRMApp.currentAccount.id,
-                    accountName: CRMApp.currentAccount.name
-                });
-            } catch (error) {
-                console.error('Error saving contract info:', error);
-                showToast('Error saving contract info. See console for details.', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-        
-        async function handleSaveAccountNote() {
-            if (!CRMApp.currentAccount) return;
-            
-            const noteContent = gId('account-note-input').value;
-            if (!noteContent.trim()) {
-                showToast('Note cannot be empty.', 'warning');
-                return;
-            }
-            
-            showLoading(true);
-            
-            try {
-                await logActivity({
-                    type: 'account_note',
-                    description: `Added a note to ${CRMApp.currentAccount.name}`,
-                    noteContent: noteContent,
-                    accountId: CRMApp.currentAccount.id,
-                    accountName: CRMApp.currentAccount.name
-                });
-                
-                showToast('Note saved successfully!');
-                gId('account-note-input').value = '';
-                await loadInitialData();
-            } catch (error) {
-                console.error('Error saving note:', error);
-                showToast('Error saving note. See console for details.', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function logActivity(activityData) {
-            try {
-                await db.collection('activities').add({
-                    ...activityData,
-                    createdAt: serverTimestamp()
-                });
-            } catch (error) {
-                console.error('Error logging activity:', error);
-                showToast('Error logging activity. See console for details.', 'error');
             }
         }
 
@@ -3885,7 +3459,6 @@
                         }
                         
                         gId('call-notes').value = contact.notes || '';
-
                     } else {
                         showToast('Contact not found.', 'error');
                     }
@@ -3901,6 +3474,42 @@
             showView('calls-hub');
             displayCurrentStep();
         }
+
+        // Application Initialization
+        function initializeApp() {
+            setupNavigation();
+            setupModals();
+            setupEventListeners();
+            setupSearchFunctionality();
+            loadInitialData();
+            showView('dashboard');
+        }
+
+        // Make global functions available
+        window.performSearch = performSearch;
+        window.closeSearch = closeSearch;
+        window.goBack = goBack;
+        window.restart = restart;
+        window.handleDialClick = handleDialClick;
+        window.updateScript = updateScript;
+        window.handleEditableFocus = handleEditableFocus;
+        window.saveProspectAndNotes = saveProspectAndNotes;
+        window.clearNotes = clearNotes;
+        window.showView = showView;
+        window.showAccountDetail = showAccountDetail;
+        window.handleContactClick = handleContactClick;
+        window.openAccountModal = openAccountModal;
+        window.openContactModal = openContactModal;
+        window.closeAccountModal = closeAccountModal;
+        window.closeContactModal = closeContactModal;
+        window.deleteContact = deleteContact;
+        window.deleteAccount = deleteAccount;
+        window.handleSearchResultClick = handleSearchResultClick;
+        window.handleViewAll = handleViewAll;
+        window.openCallsHubWithData = openCallsHubWithData;
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
-    </body>
+</body>
 </html>
