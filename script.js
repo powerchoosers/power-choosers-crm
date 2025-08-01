@@ -1,12 +1,18 @@
-// Global state for search functionality - REMOVE any duplicate declarations
+// Universal script for the Power Choosers Cold Calling Hub.
+// This file handles the dynamic call script, user interactions,
+// CRM data integration, and saving call notes to Firebase.
+
+// Global state for search functionality and current call data.
+// The 'currentSearchType' is declared only once to avoid syntax errors.
 let currentSearchType = '';
 let activeButton = null;
-let currentProspect = {}; // New object to hold CRM data from URL
+let currentProspect = {}; // Object to hold CRM data from URL parameters.
 
-// Helper to get element by ID (saves characters and improves readability)
+// Helper function to get an element by its ID.
 const gId = id => document.getElementById(id);
 
-// Placeholders object - short keys for brevity in scriptData, mapped to full input IDs
+// Placeholder map for dynamic text in the call script.
+// Keys are short for efficiency, values are populated from user inputs or CRM data.
 const placeholders = {
     'N': '', // Contact Name
     'YN': 'Lewis', // Your Name (static)
@@ -16,15 +22,15 @@ const placeholders = {
     'PP': '', // Pain Point
     'CT': '', // Contact Title
     'TIA': '', // Their Industry/Area (alias for CI)
-    'TE': '', // Their Email (not directly from input, but could be set)
-    'DT': '', // Day/Time (not directly from input, but could be set)
-    'EAC': '', // Email Address Confirmed (not directly from input, but could be set)
-    'TF': '', // Timeframe (not directly from input, but could be set)
+    'TE': '', // Their Email (not directly from input)
+    'DT': '', // Day/Time (not directly from input)
+    'EAC': '', // Email Address Confirmed (not directly from input)
+    'TF': '', // Timeframe (not directly from input)
     'OP': 'the responsible party', // Other Person (default)
-    'XX': '$XX.00/40%' // Placeholder for dynamic % or amount, user can update in input if needed
+    'XX': '$XX.00/40%' // Placeholder for dynamic % or amount
 };
 
-// Map input IDs to placeholder keys for easy update
+// Map input field IDs to the placeholder keys for automatic updates.
 const inputMap = {
     'input-name': 'N',
     'input-title': 'CT',
@@ -34,7 +40,7 @@ const inputMap = {
     'input-pain': 'PP'
 };
 
-// Main script data with shortened placeholder keys
+// The main call script, structured as a state machine.
 const scriptData = {
     start: {
         you: "Click 'Dial' to begin the call",
@@ -368,20 +374,33 @@ function populateFromURL() {
     const title = params.get('title');
     const company = params.get('company');
     const industry = params.get('industry');
+    const phone = params.get('phone'); // New: Get phone from URL
+    const email = params.get('email'); // New: Get email from URL
     const accountId = params.get('accountId');
     const contactId = params.get('contactId');
 
     if (name && gId('input-name')) {
         gId('input-name').value = name;
+        placeholders['N'] = name; // Update placeholder immediately
     }
     if (title && gId('input-title')) {
         gId('input-title').value = title;
+        placeholders['CT'] = title; // Update placeholder immediately
     }
     if (company && gId('input-company-name')) {
         gId('input-company-name').value = company;
+        placeholders['CN'] = company; // Update placeholder immediately
     }
     if (industry && gId('input-company-industry')) {
         gId('input-company-industry').value = industry;
+        placeholders['CI'] = industry; // Update placeholder immediately
+        placeholders['TIA'] = industry; // Update alias
+    }
+    if (phone) {
+        currentProspect.phone = phone; // Store phone for dialer link
+    }
+    if (email) {
+        currentProspect.email = email; // Store email for notes
     }
 
     // Store CRM identifiers for later use
@@ -389,8 +408,6 @@ function populateFromURL() {
     currentProspect.contactId = contactId;
     currentProspect.accountName = company;
     currentProspect.contactName = name;
-
-    updateScript();
 }
 
 // Function to save call notes to CRM activities collection
@@ -414,11 +431,9 @@ async function saveCallNotesToCRM() {
 
     try {
         // Use globally exposed functions from firebase-config.js
-        const { db, doc, setDoc, serverTimestamp } = window.FirebaseDB;
-        const activityId = window.generateId();
+        const { db, collection, addDoc, serverTimestamp } = window.FirebaseDB;
         
         const activityData = {
-            id: activityId,
             type: 'call_note',
             description: `Call note for ${currentProspect.contactName} at ${currentProspect.accountName}`,
             noteContent: notesContent,
@@ -429,8 +444,9 @@ async function saveCallNotesToCRM() {
             createdAt: serverTimestamp()
         };
 
-        await setDoc(doc(db, 'activities', activityId), activityData);
-        console.log('Call notes saved to CRM!');
+        // Use addDoc to automatically generate a document ID
+        const docRef = await addDoc(collection(db, 'activities'), activityData);
+        console.log('Call notes saved to CRM with ID:', docRef.id);
     } catch (error) {
         console.error('Error saving call notes to Firebase:', error);
     }
@@ -548,8 +564,6 @@ function performSearch() {
 function applyPlaceholders(text) {
     let newText = text;
     for (const key in placeholders) {
-        // Create a regex to find placeholders like [N], [CN], etc.
-        // Escaping brackets is important for regex
         const regex = new RegExp('\\[' + key + '\\]', 'g');
         newText = newText.replace(regex, placeholders[key]);
     }
@@ -565,15 +579,12 @@ function updateScript() {
         const placeholderKey = inputMap[inputId];
         const inputElement = gId(inputId);
         if (inputElement) {
-            // Use actual input value if present, otherwise use placeholder text
             const inputValue = inputElement.value || inputElement.placeholder;
             placeholders[placeholderKey] = inputValue;
         }
     }
-    // Alias for consistency in script (e.g., [TIA] for [CI])
     placeholders['TIA'] = placeholders['CI'];
-
-    displayCurrentStep(); // Redraw the current step to apply updated placeholders
+    displayCurrentStep();
 }
 
 /**
@@ -583,69 +594,46 @@ function displayCurrentStep() {
     const step = scriptData[currentStep];
     if (!step || !scriptDisplay) return;
     
-    // Apply placeholders to the script text
     const processedText = applyPlaceholders(step.you);
     
-    // Update script display
     scriptDisplay.innerHTML = processedText;
     scriptDisplay.className = `script-display mood-${step.mood}`;
     
-    // Update responses
     if (responsesContainer) {
         responsesContainer.innerHTML = '';
-        
-        if (step.responses && step.responses.length > 0) {
+
+        if (currentStep === 'start' && currentProspect.phone) {
+            // Display the dial button only if a phone number exists
+            const dialButtonHtml = `
+                <a href="tel:${currentProspect.phone}" class="dial-button" target="_self">
+                    <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                    </svg>
+                    Dial
+                </a>
+            `;
+            responsesContainer.innerHTML = dialButtonHtml;
+        } else if (step.responses && step.responses.length > 0) {
             step.responses.forEach(response => {
                 const button = document.createElement('button');
                 button.className = 'response-btn';
-                button.textContent = applyPlaceholders(response.text);
+                button.innerHTML = applyPlaceholders(response.text); // Use innerHTML to allow for emoji/markup
                 button.onclick = () => selectResponse(response.next);
                 responsesContainer.appendChild(button);
             });
         }
     }
     
-    // Update back button state
     if (backBtn) {
         backBtn.disabled = history.length === 0;
     }
 }
 
-/**
- * Initiates a call sequence, setting the current step to 'dialing' and
- * starting a visual ringing animation. After a delay, it updates the responses
- * to reflect call connection options.
- */
+// Function to start the call (not used with the 'tel:' link, but kept for clarity)
 function startCall() {
-    history.push(currentStep);
-    currentStep = 'dialing';
-    displayCurrentStep();
-    
-    if (scriptDisplay) {
-        scriptDisplay.classList.add('ringing-animation');
-    }
-    
-    setTimeout(() => {
-        if (scriptDisplay) {
-            scriptDisplay.classList.remove('ringing-animation');
-        }
-        // Ensure responses are updated only if still in 'dialing' state
-        if (currentStep === 'dialing' && responsesContainer) {
-            responsesContainer.innerHTML = '';
-            
-            const callConnectedBtn = document.createElement('button');
-            callConnectedBtn.className = 'response-btn';
-            callConnectedBtn.textContent = '📞 Call Connected';
-            callConnectedBtn.onclick = () => selectResponse('hook');
-            responsesContainer.appendChild(callConnectedBtn);
-            
-            const noAnswerBtn = document.createElement('button');
-            noAnswerBtn.className = 'response-btn';
-            noAnswerBtn.textContent = '🚫 No Answer';
-            noAnswerBtn.onclick = () => selectResponse('voicemail_or_hangup');
-            responsesContainer.appendChild(noAnswerBtn);
-        }
-    }, 3000); // Simulate ringing for 3 seconds
+    // This function is no longer needed since we are using an <a> tag with tel: protocol.
+    // The link itself will handle the call initiation.
+    // The previous implementation was a placeholder.
 }
 
 /**
@@ -654,7 +642,7 @@ function startCall() {
  */
 function selectResponse(nextStep) {
     if (nextStep && scriptData[nextStep]) {
-        history.push(currentStep); // Add current step to history
+        history.push(currentStep);
         currentStep = nextStep;
         displayCurrentStep();
     }
@@ -684,7 +672,6 @@ function restart() {
     currentStep = 'start';
     history = [];
     
-    // Clear all input fields in the Prospect Info widget
     for (const inputId in inputMap) {
         const element = gId(inputId);
         if (element) {
@@ -692,21 +679,23 @@ function restart() {
         }
     }
     
-    // Reset placeholders to their default or empty values
     for (const key in placeholders) {
-        if (key !== 'YN') { // Keep 'Your Name' static
+        if (key !== 'YN') {
             placeholders[key] = '';
         }
     }
-    placeholders['OP'] = 'the responsible party'; // Reset default
-    placeholders['XX'] = '$XX.00/40%'; // Reset default
+    placeholders['OP'] = 'the responsible party';
+    placeholders['XX'] = '$XX.00/40%';
 
     const callNotesElement = gId('call-notes');
     if (callNotesElement) {
-        callNotesElement.value = ''; // Clear call notes on restart
+        callNotesElement.value = '';
     }
 
-    displayCurrentStep(); // Redraw to show cleared state
+    // Also clear the `currentProspect` object
+    currentProspect = {};
+    
+    displayCurrentStep();
 }
 
 /**
@@ -718,19 +707,19 @@ function copyNotes() {
     
     if (!notesTextarea || !statusDiv) return;
     
-    notesTextarea.select(); // Select the text in the textarea
+    notesTextarea.select();
     try {
-        document.execCommand('copy'); // Execute copy command
+        document.execCommand('copy');
         statusDiv.textContent = '✅ Notes copied to clipboard!';
         statusDiv.style.opacity = '1';
-        setTimeout(() => statusDiv.style.opacity = '0', 3000); // Hide status after 3 seconds
+        setTimeout(() => statusDiv.style.opacity = '0', 3000);
     } catch (err) {
         statusDiv.textContent = '❌ Copy failed';
-        statusDiv.style.color = '#ef4444'; // Red for error
+        statusDiv.style.color = '#ef4444';
         statusDiv.style.opacity = '1';
         setTimeout(() => {
             statusDiv.style.opacity = '0';
-            statusDiv.style.color = '#22c55e'; // Revert to green
+            statusDiv.style.color = '#22c55e';
         }, 3000);
     }
 }
@@ -743,25 +732,33 @@ function clearNotes() {
     const statusDiv = gId('copy-status');
     
     if (!notesTextarea || !statusDiv) return;
-    
-    // Using a custom modal for confirmation is preferred over `confirm()` for iframes.
-    // For this example, keeping `confirm()` as it was in original code.
-    if (confirm('Are you sure you want to clear all notes?')) {
-        notesTextarea.value = '• Company: \n• Contact: \n• Title: \n• Phone: \n• Email: \n• Contract expiration: \n• Current provider: \n• Pain points: \n• Interest level: \n• Next steps: \n• Follow-up date: ';
+
+    // Custom modal logic to replace browser `confirm`
+    showCustomModal('Are you sure you want to clear all notes?', () => {
+        notesTextarea.value = '';
         statusDiv.textContent = '🗑️ Notes cleared';
         statusDiv.style.opacity = '1';
-        setTimeout(() => statusDiv.style.opacity = '0', 2000); // Hide status after 2 seconds
+        setTimeout(() => statusDiv.style.opacity = '0', 2000);
+    });
+}
+
+// Custom modal functions (placeholder for a real modal implementation)
+function showCustomModal(message, onConfirm) {
+    // In a real application, you would create a modal div here.
+    // For now, we'll just use a simple log and call the function.
+    console.log(message);
+    if (onConfirm) {
+      onConfirm();
     }
 }
 
 // Initialize the script display when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize DOM elements
     scriptDisplay = gId('script-display');
     responsesContainer = gId('responses-container');
     backBtn = gId('back-btn');
     
-    // Check if the elements exist before adding listeners to prevent errors on pages without them
+    // Check if the elements exist before adding listeners
     const googleBtn = gId('google-button');
     if (googleBtn) {
         googleBtn.addEventListener('click', (e) => openSearch('google', e));
@@ -788,6 +785,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    // Event listener for the dial button, as it's now a link inside the responses-container
+    const dialLink = document.querySelector('.dial-button');
+    if(dialLink) {
+        // No need for a separate event listener, as the href="tel:..." handles it.
+        // The displayCurrentStep function will dynamically create this link.
+    }
     
     // Populate form fields from URL parameters
     populateFromURL();
