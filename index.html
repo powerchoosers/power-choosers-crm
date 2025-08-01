@@ -313,10 +313,15 @@
 • Next steps:
 • Follow-up date: "></textarea>
                         <div style="display:flex;gap:8px;margin-bottom:16px">
-                            <button onclick="copyNotes()" style="flex:1;background:#238636;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.9rem">📋 Copy Notes</button>
+                            <button onclick="saveProspectAndNotes()" class="add-notes-btn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 8v8M8 12h8"/>
+                                </svg>
+                                Add Notes
+                            </button>
                             <button onclick="clearNotes()" style="flex:1;background:#da3633;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.9rem">🗑️ Clear</button>
                         </div>
-                        <div id="copy-status"></div>
                     </div>
             
                     <div class="sidebar-card">
@@ -429,6 +434,16 @@
                 <div class="form-group">
                     <label for="account-address">Address</label>
                     <textarea id="account-address" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-pain-points">Pain Points</label>
+                        <textarea id="account-pain-points" rows="3" placeholder="What challenges does this company face?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-benefits">Benefits</label>
+                        <textarea id="account-benefits" rows="3" placeholder="What benefits can we provide?"></textarea>
+                    </div>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="secondary-btn" id="cancel-account">Cancel</button>
