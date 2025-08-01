@@ -1,0 +1,2004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Choosers CRM</title>
+    <!-- Tailwind CSS CDN for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Font - Inter -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <style>
+        /* Base Styles from crm-styles.css */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            color: #1e293b;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* Top Navigation Bar */
+        .top-nav {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            padding: 6px 0;
+            box-shadow: 0 8px 32px rgba(0,0,0,.08);
+            border-bottom: 1px solid rgba(30,90,168,.1);
+            z-index: 1000;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+        }
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+        .nav-left-title h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #1A438D;
+            margin: 0;
+        }
+        .nav-icons-center {
+            display: flex;
+            justify-content: flex-end;
+            flex-grow: 1;
+            gap: 25px;
+        }
+
+        /* App Buttons */
+        .app-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            box-shadow: 0 4px 16px rgba(0,0,0,.06);
+            border: 1px solid rgba(30,90,168,.1);
+            cursor: pointer;
+            transition: all .3s ease;
+            position: relative;
+            text-decoration: none;
+            padding: 6px;
+        }
+        .app-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px rgba(0,0,0,.12);
+        }
+        .app-button.active {
+            background: linear-gradient(145deg, #1A438D 0%, #2563EB 100%);
+            color: white;
+        }
+        .app-button.active .app-icon-svg {
+            color: white;
+        }
+        .app-button.active .app-label {
+            color: white;
+        }
+        .app-icon-svg {
+            width: 24px;
+            height: 24px;
+            color: #374151;
+            margin: 0 0 4px 0;
+            transition: color .3s ease;
+            background: rgba(107, 114, 128, 0.1);
+            border-radius: 6px;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .app-icon {
+             width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            margin: 0 0 4px 0;
+            object-fit: contain;
+            background: rgba(107, 114, 128, 0.1);
+            padding: 4px;
+            transition: all .3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .app-button.active .app-icon {
+            filter: brightness(0) invert(1);
+            background: rgba(255,255,255,0.15);
+        }
+        .app-label {
+            font-size: .55rem;
+            font-weight: 600;
+            color: #374151;
+            text-align: center;
+            line-height: 1.1;
+            white-space: nowrap;
+            margin-top: auto;
+        }
+
+        /* Search Bar */
+        .search-bar {
+            position: fixed;
+            top: 72px;
+            left: 0;
+            right: 0;
+            background: white;
+            border-bottom: 2px solid #1A438D;
+            box-shadow: 0 8px 32px rgba(26,67,141,.15);
+            padding: 0;
+            height: 0;
+            overflow: hidden;
+            transition: all .3s ease;
+            z-index: 500;
+        }
+        .search-bar.active {
+            height: 70px;
+            padding: 15px;
+        }
+        .search-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .search-label {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1A438D;
+            min-width: 140px;
+        }
+        .search-input {
+            flex: 2;
+            padding: 10px 14px;
+            font-size: 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            color: #1e293b;
+        }
+        .search-input.city, .search-input.state, .search-input.location {
+            flex: 1;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #1A438D;
+        }
+        .search-btn {
+            background: #1A438D;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .search-btn.close {
+            background: #6b7280;
+            padding: 8px 10px;
+        }
+
+        /* Main Container */
+        .main-container {
+            margin-top: 80px;
+            padding: 15px;
+            flex-grow: 1;
+            overflow-y: auto;
+            height: calc(100vh - 80px);
+        }
+        .main-container.search-active {
+            margin-top: 142px;
+            height: calc(100vh - 142px);
+        }
+
+        /* View Management */
+        .view-container {
+            display: none;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .view-container.active {
+            display: block;
+        }
+        .view-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+        .view-header h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1A438D;
+        }
+        .back-btn {
+            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .primary-btn {
+            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .primary-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .secondary-btn {
+            background: #e2e8f0;
+            color: #1e293b;
+            border: 1px solid #cbd5e1;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .secondary-btn:hover {
+            background: #cbd5e1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .action-btn {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+            color: #1A438D;
+            border: 1px solid #a5b4fc;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        .action-btn:hover {
+            background: linear-gradient(135deg, #c7d2fe 0%, #a5b4fc 100%);
+            transform: translateY(-2px);
+        }
+        .action-btn svg {
+            color: #1A438D;
+        }
+
+        /* Dashboard Layout */
+        .dashboard-layout, .account-detail-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+            height: calc(100vh - 120px);
+            padding-top: 20px;
+        }
+        .dashboard-main, .account-detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            padding-right: 8px;
+            margin-right: -8px;
+        }
+        .dashboard-sidebar, .account-detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            padding-right: 8px;
+            margin-right: -8px;
+        }
+
+        /* Cards */
+        .crm-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+            border: 1px solid rgba(30, 90, 168, .1);
+        }
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #1A438D;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #fef7ff 0%, #f3e8ff 100%);
+            padding: 14px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #c084fc;
+        }
+        .stat-number {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #7c3aed;
+            display: block;
+        }
+        .stat-label {
+            font-size: .75rem;
+            color: #6b21a8;
+            font-weight: 600;
+        }
+        .accounts-grid, .contacts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .account-card, .contact-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.06);
+            border: 1px solid rgba(30,90,168,.1);
+            cursor: pointer;
+            transition: all .3s ease;
+        }
+        .account-card:hover, .contact-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0,0,0,.12);
+        }
+        .card-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1A438D;
+            margin-bottom: 4px;
+        }
+        .card-subtitle {
+            font-size: .9rem;
+            color: #64748b;
+        }
+        .info-field {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-left: 4px solid #F7921F;
+            padding: 14px;
+            border-radius: 0 8px 8px 0;
+        }
+        .info-field-label {
+            font-size: .8rem;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+        .info-field-value {
+            font-size: .9rem;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        /* Forms & Modals */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, .5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all .3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,.08);
+            border: 1px solid rgba(30,90,168,.1);
+            transform: scale(.9);
+            transition: transform .3s ease;
+        }
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .form-group label {
+            display: block;
+            font-size: .85rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: .9rem;
+            color: #1e293b;
+            transition: border-color .3s ease;
+        }
+        
+        /* Calls Hub Specific */
+        .calls-hub-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            height: calc(100vh - 120px);
+            max-width: 1400px;
+            margin: 0 auto;
+            padding-top: 20px;
+        }
+        .calls-hub-main {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+            border: 1px solid rgba(30, 90, 168, .1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow-y: auto;
+        }
+        .script-display {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            min-height: 200px;
+            border-left: 4px solid #e2e8f0;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        .script-display.mood-neutral { border-left-color: #6b7280; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }
+        .script-display.mood-positive { border-left-color: #22c55e; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); }
+        .script-display.mood-challenging { border-left-color: #f59e0b; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); }
+        .script-display.mood-unsure { border-left-color: #8b5cf6; background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); }
+        .response-btn {
+            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: .9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .3s ease;
+            text-align: left;
+            box-shadow: 0 4px 16px rgba(26,67,141,.2);
+        }
+        .response-btn:hover {
+            background: linear-gradient(135deg, #153775 0%, #1D4ED8 100%);
+            transform: translateY(-2px);
+        }
+        .dial-button {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            border: none;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .3s ease;
+        }
+        .dial-button:hover {
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+            transform: translateY(-3px);
+        }
+        .nav-btn {
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: .9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .3s ease;
+        }
+        .nav-btn:hover:not(:disabled) { background: #4b5563; transform: translateY(-2px); }
+        .nav-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .calls-hub-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            padding-right: 8px;
+            margin-right: -8px;
+        }
+        .sidebar-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
+            border: 1px solid rgba(30, 90, 168, .1);
+        }
+        .add-notes-btn {
+            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        /* Utility */
+        .hidden { display: none !important; }
+        .empty-state {
+            text-align: center;
+            color: #9ca3af;
+            font-style: italic;
+            padding: 40px 20px;
+            font-size: .9rem;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, .8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all .3s ease;
+        }
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #1A438D;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .toast {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.12);
+            border-left: 4px solid #22c55e;
+            min-width: 300px;
+            transform: translateX(400px);
+            transition: transform .3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.error { border-left-color: #ef4444; }
+        .toast.warning { border-left-color: #f59e0b; }
+        .toast-message { font-size: .9rem; color: #1e293b; font-weight: 500; }
+        
+        /* Custom modal for confirm() replacement */
+        .custom-confirm {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5000;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.3s;
+        }
+        .custom-confirm.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+        .custom-confirm-box {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        .custom-confirm.visible .custom-confirm-box {
+            transform: scale(1);
+        }
+        .custom-confirm-box p {
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        .custom-confirm-box button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 0 5px;
+        }
+        .custom-confirm-box .confirm-yes { background-color: #dc2626; color: white; }
+        .custom-confirm-box .confirm-no { background-color: #d1d5db; color: #374151; }
+        
+        /* Media Queries */
+        @media (max-width: 1200px) {
+            .dashboard-layout, .account-detail-layout, .calls-hub-layout {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                height: auto;
+                min-height: calc(100vh - 100px);
+                overflow: visible;
+            }
+            .dashboard-sidebar, .account-detail-sidebar, .calls-hub-sidebar {
+                flex-direction: row;
+                overflow-x: auto;
+                max-height: none;
+                padding-bottom: 10px;
+            }
+            .dashboard-sidebar .crm-card, .account-detail-sidebar .crm-card, .calls-hub-sidebar .sidebar-card {
+                min-width: 300px;
+                flex-shrink: 0;
+            }
+        }
+        @media (max-width: 768px) {
+            .nav-container { gap: 12px; padding: 0 15px; }
+            .app-button { width: 50px; height: 50px; }
+            .app-icon-svg { width: 18px; height: 18px; }
+            .app-label { font-size: .45rem; }
+            .nav-icons-center { gap: 15px; }
+            .main-container { padding: 12px; margin-top: 65px; }
+            .main-container.search-active { margin-top: 120px; }
+            .view-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .view-header h2 { font-size: 1.6rem; }
+            .accounts-grid, .contacts-grid { grid-template-columns: 1fr; }
+            .modal-content { width: 95%; margin: 20px; }
+        }
+        @media (max-width: 480px) {
+            .nav-container { gap: 8px; padding: 0 10px; justify-content: space-around; }
+            .app-button { width: 45px; height: 45px; }
+            .app-icon-svg { width: 16px; height: 16px; }
+            .app-label { font-size: .4rem; line-height: 1.1; }
+            .nav-icons-center { gap: 10px; }
+            .main-container { padding: 10px; margin-top: 55px; }
+            .main-container.search-active { margin-top: 105px; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+    <!-- Top Navigation Bar -->
+    <div class="top-nav px-4 py-3 bg-white shadow-lg z-50 fixed w-full">
+        <div class="nav-container px-4 py-2">
+            <div class="flex-shrink-0">
+                <h1 id="page-title" class="text-xl font-extrabold text-blue-900">Power Choosers CRM</h1>
+            </div>
+            <div class="flex-1 flex justify-end items-center space-x-4">
+                <button class="app-button active" id="dashboard-btn" data-view="dashboard">
+                    <i class="fas fa-home app-icon-svg"></i>
+                    <span class="app-label">Dashboard</span>
+                </button>
+                <button class="app-button" id="accounts-btn" data-view="accounts">
+                    <i class="fas fa-building app-icon-svg"></i>
+                    <span class="app-label">Accounts</span>
+                </button>
+                <button class="app-button" id="contacts-btn" data-view="contacts">
+                    <i class="fas fa-user-circle app-icon-svg"></i>
+                    <span class="app-label">Contacts</span>
+                </button>
+                <button class="app-button" id="calls-hub-btn" data-view="calls-hub">
+                    <i class="fas fa-phone app-icon-svg"></i>
+                    <span class="app-label">Calls Hub</span>
+                </button>
+                <!-- Search Buttons -->
+                <div class="app-button" id="google-button">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google" class="app-icon">
+                    <span class="app-label">Google</span>
+                </div>
+                <div class="app-button" id="maps-button">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d37e95a4c0686b08c267_images.jpg" alt="Google Maps" class="app-icon">
+                    <span class="app-label">Maps</span>
+                </div>
+                <div class="app-button" id="apollo-button">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851d2771f4c6e42a09731_images.png" alt="Apollo" class="app-icon">
+                    <span class="app-label">Apollo</span>
+                </div>
+                <div class="app-button" id="beenverified-button">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68885144c4bbad742f397a18_unnamed.png" alt="BeenVerified" class="app-icon">
+                    <span class="app-label">BeenVerified</span>
+                </div>
+            </div>
+            <div class="nav-right-logo"></div>
+        </div>
+    </div>
+    
+    <!-- Search Bar -->
+    <div class="search-bar" id="search-bar">
+        <div class="search-container px-4">
+            <div class="search-label" id="search-label">Search:</div>
+            <input type="text" class="search-input" id="search-input" placeholder="Type your search query...">
+            <input type="text" class="search-input city" id="search-city" placeholder="City" style="display:none">
+            <input type="text" class="search-input state" id="search-state" placeholder="State" style="display:none">
+            <input type="text" class="search-input location" id="search-location" placeholder="Location (e.g. Fort Worth, TX)" style="display:none">
+            <div class="search-actions">
+                <button class="search-btn" onclick="performSearch()">Go</button>
+                <button class="search-btn close" onclick="closeSearch()">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-container" id="main-container">
+        <!-- Dashboard View -->
+        <div class="view-container active" id="dashboard-view">
+            <div class="dashboard-layout">
+                <div class="dashboard-main">
+                    <div class="crm-card">
+                        <h2 class="card-title"><i class="fas fa-chart-line text-blue-900"></i> Dashboard Overview</h2>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="stat-card">
+                                <span class="stat-number" id="total-accounts">0</span>
+                                <span class="stat-label">Total Accounts</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="total-contacts">0</span>
+                                <span class="stat-label">Total Contacts</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="recent-activities-count">0</span>
+                                <span class="stat-label">Recent Activities</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-number" id="hot-leads-count">0</span>
+                                <span class="stat-label">Hot Leads</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="crm-card">
+                        <h2 class="card-title"><i class="fas fa-history text-blue-900"></i> Recent Activities</h2>
+                        <div id="recent-activities-list">
+                            <p class="empty-state">No recent activities</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-sidebar">
+                    <div class="crm-card">
+                        <h2 class="card-title"><i class="fas fa-bolt text-blue-900"></i> Quick Actions</h2>
+                        <div class="flex flex-col space-y-3">
+                            <button class="action-btn" id="go-to-calls-hub-btn">
+                                <i class="fas fa-phone"></i> Go to Calls Hub
+                            </button>
+                            <button class="action-btn" id="add-account-btn">
+                                <i class="fas fa-plus-circle"></i> Add New Account
+                            </button>
+                            <button class="action-btn" id="add-contact-btn">
+                                <i class="fas fa-user-plus"></i> Add New Contact
+                            </button>
+                        </div>
+                    </div>
+                    <div class="crm-card">
+                        <h2 class="card-title"><i class="fas fa-phone-volume text-blue-900"></i> Today's Calls</h2>
+                        <div id="todays-calls">
+                            <p class="empty-state">No calls scheduled</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Accounts View -->
+        <div class="view-container" id="accounts-view">
+            <div class="view-header">
+                <h2><i class="fas fa-building text-blue-900"></i> Accounts</h2>
+                <button class="primary-btn" id="new-account-btn">+ New Account</button>
+            </div>
+            <div class="accounts-grid" id="accounts-grid">
+                <p class="empty-state">No accounts found. Click "New Account" to get started.</p>
+            </div>
+        </div>
+
+        <!-- Contacts View -->
+        <div class="view-container" id="contacts-view">
+            <div class="view-header">
+                <h2><i class="fas fa-users text-blue-900"></i> Contacts</h2>
+                <button class="primary-btn" id="new-contact-btn">+ New Contact</button>
+            </div>
+            <div class="contacts-grid" id="contacts-grid">
+                <p class="empty-state">No contacts found. Click "New Contact" to get started.</p>
+            </div>
+        </div>
+
+        <!-- Account Detail View -->
+        <div class="view-container" id="account-detail-view">
+            <div class="account-detail-layout">
+                <div class="account-detail-main">
+                    <div class="view-header">
+                        <button class="back-btn" id="back-to-accounts"><i class="fas fa-arrow-left"></i> Back to Accounts</button>
+                        <h2 id="account-detail-title">Account Details</h2>
+                        <button class="primary-btn" id="edit-account-btn"><i class="fas fa-edit"></i> Edit Account</button>
+                    </div>
+                    <div class="crm-card">
+                        <h3 class="card-title"><i class="fas fa-info-circle text-blue-900"></i> Company Information</h3>
+                        <div id="account-info-display" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                    </div>
+                    <div class="crm-card">
+                        <h3 class="card-title"><i class="fas fa-user-friends text-blue-900"></i> Contacts at this Account</h3>
+                        <div id="account-contacts-list">
+                            <p class="empty-state">No contacts for this account</p>
+                        </div>
+                    </div>
+                    <div class="crm-card">
+                        <h3 class="card-title"><i class="fas fa-calendar-alt text-blue-900"></i> Recent Activities</h3>
+                        <div id="account-activities-list">
+                            <p class="empty-state">No recent activities</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="account-detail-sidebar">
+                    <div class="crm-card">
+                        <h3 class="card-title"><i class="fas fa-file-contract text-blue-900"></i> Energy Contract Details</h3>
+                        <form id="energy-contract-form" class="space-y-4">
+                            <div class="form-group">
+                                <label for="contract-provider">Current Provider:</label>
+                                <input type="text" id="contract-provider" placeholder="Enter provider name" class="w-full p-2 border border-slate-300 rounded-md">
+                            </div>
+                            <div class="form-group">
+                                <label for="contract-rate">Current Rate:</label>
+                                <input type="text" id="contract-rate" placeholder="e.g. 12.5¢/kWh" class="w-full p-2 border border-slate-300 rounded-md">
+                            </div>
+                            <div class="form-group">
+                                <label for="contract-expiration">Contract Expiration:</label>
+                                <input type="date" id="contract-expiration" class="w-full p-2 border border-slate-300 rounded-md">
+                            </div>
+                            <div class="form-group">
+                                <label for="contract-type">Contract Type:</label>
+                                <select id="contract-type" class="w-full p-2 border border-slate-300 rounded-md">
+                                    <option value="">Select type</option>
+                                    <option value="fixed">Fixed Rate</option>
+                                    <option value="variable">Variable Rate</option>
+                                    <option value="indexed">Indexed Rate</option>
+                                </select>
+                            </div>
+                            <button class="primary-btn w-full" type="submit">Save Contract Info</button>
+                        </form>
+                    </div>
+                    <div class="crm-card">
+                        <h3 class="card-title"><i class="fas fa-sticky-note text-blue-900"></i> Add Note</h3>
+                        <textarea id="account-note-input" placeholder="Add a note about this account..." class="w-full h-32 p-2 border border-slate-300 rounded-md"></textarea>
+                        <button class="primary-btn w-full mt-2" id="save-account-note">Save Note</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calls Hub View -->
+        <div class="view-container" id="calls-hub-view">
+            <div class="calls-hub-layout">
+                <div class="calls-hub-main">
+                    <div id="script-display" class="script-display mood-neutral">
+                        Click 'Dial' to begin the call
+                    </div>
+                    <div id="responses-container" class="flex flex-col space-y-3"></div>
+                    <div class="nav-buttons flex space-x-4 justify-center mt-4">
+                        <button id="back-btn" class="nav-btn" onclick="goBack()" disabled>← Back</button>
+                        <button id="restart-btn" class="nav-btn" onclick="restart()">🔄 Restart</button>
+                    </div>
+                </div>
+            
+                <div class="calls-hub-sidebar">
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title"><i class="fas fa-address-card text-blue-900"></i> Prospect Info</h3>
+                        <div class="space-y-3">
+                            <div class="input-group">
+                                <label for="input-company-name" class="block text-sm font-semibold text-slate-700">Company Name:</label>
+                                <input type="text" id="input-company-name" placeholder="ABC Manufacturing" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
+                            </div>
+                            <div class="input-group">
+                                <label for="input-name" class="block text-sm font-semibold text-slate-700">Contact Name:</label>
+                                <input type="text" id="input-name" placeholder="John Smith" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
+                            </div>
+                            <div class="input-group">
+                                <label for="input-title" class="block text-sm font-semibold text-slate-700">Contact Title:</label>
+                                <input type="text" id="input-title" placeholder="Company Leader" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
+                            </div>
+                            <div class="input-group">
+                                <label for="input-company-industry" class="block text-sm font-semibold text-slate-700">Company Industry:</label>
+                                <input type="text" id="input-company-industry" placeholder="businesses" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
+                            </div>
+                            <div class="input-group">
+                                <label for="input-benefit" class="block text-sm font-semibold text-slate-700">Specific Benefit:</label>
+                                <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
+                            </div>
+                            <div class="input-group">
+                                <label for="input-pain" class="block text-sm font-semibold text-slate-700">Pain Point:</label>
+                                <input type="text" id="input-pain" placeholder="you're not stuck paying more" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
+                            </div>
+                        </div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title"><i class="fas fa-file-alt text-blue-900"></i> Call Notes</h3>
+                        <textarea id="call-notes" placeholder="Type your call notes here..." class="w-full h-48 p-2 border border-slate-300 rounded-md text-sm"></textarea>
+                        <div class="flex space-x-2 mt-3">
+                            <button onclick="saveProspectAndNotes()" class="add-notes-btn flex-1 flex items-center justify-center space-x-2">
+                                <i class="fas fa-plus"></i>
+                                <span>Save Notes</span>
+                            </button>
+                            <button onclick="clearNotes()" class="secondary-btn bg-red-600 text-white flex-1 flex items-center justify-center space-x-2">
+                                <i class="fas fa-trash-alt"></i>
+                                <span>Clear</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals (Account, Contact) -->
+    <div class="modal-overlay" id="account-modal">
+        <div class="modal-content">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="account-modal-title" class="text-xl font-bold text-blue-900">Add New Account</h3>
+                    <button class="text-slate-500 hover:text-slate-700 text-2xl" id="close-account-modal">&times;</button>
+                </div>
+                <form id="account-form" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label for="account-name" class="block font-semibold text-sm text-slate-700">Company Name *</label>
+                            <input type="text" id="account-name" required class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div class="form-group">
+                            <label for="account-industry" class="block font-semibold text-sm text-slate-700">Industry</label>
+                            <input type="text" id="account-industry" class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label for="account-phone" class="block font-semibold text-sm text-slate-700">Phone</label>
+                            <input type="tel" id="account-phone" class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div class="form-group">
+                            <label for="account-website" class="block font-semibold text-sm text-slate-700">Website</label>
+                            <input type="url" id="account-website" class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-address" class="block font-semibold text-sm text-slate-700">Address</label>
+                        <textarea id="account-address" rows="3" class="w-full p-2 border border-slate-300 rounded-md"></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label for="account-pain-points" class="block font-semibold text-sm text-slate-700">Pain Points</label>
+                            <textarea id="account-pain-points" rows="3" placeholder="What challenges does this company face?" class="w-full p-2 border border-slate-300 rounded-md"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="account-benefits" class="block font-semibold text-sm text-slate-700">Benefits</label>
+                            <textarea id="account-benefits" rows="3" placeholder="What benefits can we provide?" class="w-full p-2 border border-slate-300 rounded-md"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions border-t pt-4 mt-4">
+                        <button type="button" class="secondary-btn" id="cancel-account">Cancel</button>
+                        <button type="submit" class="primary-btn">Save Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="contact-modal">
+        <div class="modal-content">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="contact-modal-title" class="text-xl font-bold text-blue-900">Add New Contact</h3>
+                    <button class="text-slate-500 hover:text-slate-700 text-2xl" id="close-contact-modal">&times;</button>
+                </div>
+                <form id="contact-form" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label for="contact-first-name" class="block font-semibold text-sm text-slate-700">First Name *</label>
+                            <input type="text" id="contact-first-name" required class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-last-name" class="block font-semibold text-sm text-slate-700">Last Name *</label>
+                            <input type="text" id="contact-last-name" required class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label for="contact-title" class="block font-semibold text-sm text-slate-700">Job Title</label>
+                            <input type="text" id="contact-title" class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-account" class="block font-semibold text-sm text-slate-700">Account</label>
+                            <select id="contact-account" class="w-full p-2 border border-slate-300 rounded-md">
+                                <option value="">Select an account...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label for="contact-email" class="block font-semibold text-sm text-slate-700">Email</label>
+                            <input type="email" id="contact-email" class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-phone" class="block font-semibold text-sm text-slate-700">Phone</label>
+                            <input type="tel" id="contact-phone" class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-notes" class="block font-semibold text-sm text-slate-700">Notes</label>
+                        <textarea id="contact-notes" rows="3" class="w-full p-2 border border-slate-300 rounded-md"></textarea>
+                    </div>
+                    <div class="form-actions border-t pt-4 mt-4">
+                        <button type="button" class="secondary-btn" id="cancel-contact">Cancel</button>
+                        <button type="submit" class="primary-btn">Save Contact</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="custom-confirm" id="custom-confirm-modal">
+        <div class="custom-confirm-box">
+            <p id="custom-confirm-message"></p>
+            <button class="confirm-no secondary-btn" id="confirm-no-btn">Cancel</button>
+            <button class="confirm-yes primary-btn" id="confirm-yes-btn">Confirm</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+    
+    <!-- User Info for Firestore -->
+    <div id="user-info" class="hidden fixed bottom-4 left-4 p-2 bg-slate-200 rounded-md text-sm">
+        <span class="font-bold">User ID:</span> <span id="user-id"></span>
+    </div>
+
+    <!-- Firebase SDK - v9 module -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, updateDoc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase (will be assigned later)
+        let app;
+        let db;
+        let auth;
+        let userId = '';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // IIFE to initialize Firebase and authentication
+        (async () => {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Sign in with the provided custom token or anonymously
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Listen for auth state changes to get the user ID
+                onAuthStateChanged(auth, user => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log('User signed in with UID:', userId);
+                        document.getElementById('user-id').textContent = userId;
+                        // Now that we have the user ID, start the app and data listeners
+                        startAppAfterAuth();
+                    } else {
+                        console.log('No user signed in.');
+                        // Fallback in case of anonymous sign-in failure, though it shouldn't happen
+                        userId = 'anonymous';
+                        startAppAfterAuth();
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+                showToast("Failed to connect to the database. Please try again.", "error");
+            }
+        })();
+        
+        // Main app initialization function to be called after auth is ready
+        function startAppAfterAuth() {
+            setupNavigation();
+            setupModals();
+            setupEventListeners();
+            loadInitialData(); // Load data and set up listeners
+            showView('dashboard');
+            setupSearchFunctionality();
+        }
+
+        // Global state management
+        const CRMApp = {
+            currentView: 'dashboard',
+            currentAccount: null,
+            currentContact: null,
+            accounts: [],
+            contacts: [],
+            activities: []
+        };
+
+        // Global state for search functionality and current call data.
+        let currentSearchType = '';
+        let activeButton = null;
+        let currentProspect = {}; 
+
+        // Helper to get element by ID (saves characters and improves readability)
+        const gId = id => document.getElementById(id);
+
+        // Placeholder map for dynamic text in the call script.
+        const placeholders = {
+            'N': '', // Contact Name
+            'YN': 'Lewis', // Your Name (static)
+            'CN': '', // Company Name
+            'CI': '', // Company Industry
+            'SB': '', // Specific Benefit
+            'PP': '', // Pain Point
+            'CT': '', // Contact Title
+            'TIA': '', // Their Industry/Area (alias for CI)
+            'TE': '', // Their Email (not directly from input)
+            'DT': '', // Day/Time (not directly from input)
+            'EAC': '', // Email Address Confirmed (not directly from input)
+            'TF': '', // Timeframe (not directly from input)
+            'OP': 'the responsible party', // Other Person (default)
+            'XX': '$XX.00/40%' // Placeholder for dynamic % or amount
+        };
+
+        // Map input field IDs to the placeholder keys for automatic updates.
+        const inputMap = {
+            'input-name': 'N',
+            'input-title': 'CT',
+            'input-company-name': 'CN',
+            'input-company-industry': 'CI',
+            'input-benefit': 'SB',
+            'input-pain': 'PP'
+        };
+
+        // The main call script, structured as a state machine.
+        const scriptData = {
+            start: {
+                you: "Click 'Dial' to begin the call",
+                mood: "neutral",
+                responses: []
+            },
+            dialing: {
+                you: "Dialing... Ringing...",
+                mood: "neutral",
+                responses: [
+                    { text: "📞 Call Connected", next: "hook" },
+                    { text: "📞 Transferred - Decision Maker Answers", next: "main_script_start" },
+                    { text: "🚫 No Answer", next: "voicemail_or_hangup" }
+                ]
+            },
+            voicemail_or_hangup: {
+                you: "No answer. What would you like to do?",
+                mood: "neutral",
+                responses: [
+                    { text: "Leave Voicemail", next: "voicemail" },
+                    { text: "Hang Up / Start New Call", next: "start" }
+                ]
+            },
+            hook: {
+                you: "Hi, is this <strong>[N]</strong>?",
+                mood: "neutral",
+                responses: [
+                    { text: "✅ Yes, this is [N]", next: "main_script_start" },
+                    { text: "🗣️ Speaking", next: "main_script_start" },
+                    { text: "❓ Who's calling?", next: "main_script_start" },
+                    { text: "👥 Gatekeeper / Not the right person", next: "gatekeeper_intro" }
+                ]
+            },
+            main_script_start: {
+                you: "Good mornin'/afternoon, <strong>[N]</strong>! This is <strong>[YN]</strong> <span class='pause'>--</span> and I'm needin' to speak with someone over electricity agreements and contracts for <strong>[CN]</strong> would that be yourself?",
+                mood: "neutral",
+                responses: [
+                    { text: "✅ Yes, that's me / I handle that", next: "pathA" },
+                    { text: "👥 That would be [OP] / Not the right person", next: "gatekeeper_intro" },
+                    { text: "🤝 We both handle it / Team decision", next: "pathA" },
+                    { text: "🤔 Unsure or hesitant", next: "pathD" }
+                ]
+            },
+            gatekeeper_intro: {
+                you: "Good afternoon/morning. I'm needin' to speak with someone over electricity agreements and contracts for <strong>[CN]</strong> do you know who would be responsible for that?",
+                mood: "neutral",
+                responses: [
+                    { text: "❓ What's this about?", next: "gatekeeper_whats_about" },
+                    { text: "🔗 I'll connect you", next: "transfer_dialing" },
+                    { text: "🚫 They're not available / Take a message", next: "voicemail" }
+                ]
+            },
+            gatekeeper_whats_about: {
+                you: "My name is Lewis with PowerChoosers.com and I'm needin' to speak with someone about the future electricity agreements for <strong>[CN]</strong>. Do you know who might be the best person for that?",
+                mood: "neutral",
+                responses: [
+                    { text: "🔗 I'll connect you", next: "transfer_dialing" },
+                    { text: "🚫 They're not available / Take a message", next: "voicemail" },
+                    { text: "✅ I can help you", next: "pathA" }
+                ]
+            },
+            voicemail: {
+                you: "Good afternoon/morning <strong>[N]</strong>, this is Lewis and I was told to speak with you. You can give me a call at 817-409-4215. Also, I shot you over a short email kinda explaining why I'm reaching out to you today. The email should be coming from Lewis Patterson that's (L.E.W.I.S) Thank you so much and you have a great day.",
+                mood: "neutral",
+                responses: [
+                    { text: "🔄 End Call / Start New Call", next: "start" }
+                ]
+            },
+            pathA: {
+                you: "Perfect <span class='pause'>--</span> So <strong>[N]</strong> I've been working closely with <strong>[CI]</strong> across Texas with electricity agreements <span class='pause'>--</span> and we're about to see an unprecedented dip in the market in the next few months <span class='pause'>--</span><br><br><strong><span class='emphasis'>Is getting the best price for your next renewal a priority for you and [CN]?</span></strong><br><br><strong><span class='emphasis'>Do you know when your contract expires?</span></strong><br><br><strong><span class='emphasis'>So since rates have gone up tremendously over the past 5 years, how are you guys handling such a sharp increase on your future renewals?</span></strong>",
+                mood: "neutral",
+                responses: [
+                    { text: "😰 Struggling / It's tough", next: "resStruggle" },
+                    { text: "📅 Haven't renewed / Contract not up yet", next: "resNotRenewed" },
+                    { text: "🔒 Locked in / Just renewed", next: "resLockedIn" },
+                    { text: "🛒 Shopping around / Looking at options", next: "resShopping" },
+                    { text: "🤝 Have someone handling it / Work with broker", next: "resBroker" },
+                    { text: "🤷 Haven't thought about it / It is what it is", next: "resNoThought" }
+                ]
+            },
+            pathD: {
+                you: "No worries if you're not sure. I work with Texas businesses on energy contract optimization <span class='pause'>--</span> basically helping companies navigate rate volatility and strategic positioning in our deregulated market. Does energy procurement fall under your area of responsibility, or would someone else be better positioned for this conversation?",
+                mood: "unsure",
+                responses: [
+                    { text: "✅ Yes, that's my responsibility", next: "pathA" },
+                    { text: "👥 Someone else handles it", next: "gatekeeper_intro" }
+                ]
+            },
+            resStruggle: {
+                you: "Yeah, I'm hearing that from a lot of <strong>[CT]</strong>. The thing is, most companies are approaching renewals the same way they did pre-2021, but the rules have completely changed. Do you currently have a strategy in place to help mitigate these increases?",
+                mood: "challenging",
+                responses: [
+                    { text: "🎯 Continue to Discovery", next: "discovery" }
+                ]
+            },
+            resNotRenewed: {
+                you: "Actually, that timing works in your favor. Most businesses wait until 60-90 days before expiration to start looking, but with the market set to increase in 2026, people are reserving their rates in advance to avoid paying more in the future. Do you currently have a plan in place to <span class='pause'>--</span> mitigate these increases?",
+                mood: "positive",
+                responses: [
+                    { text: "🎯 Continue to Discovery", next: "discovery" }
+                ]
+            },
+            resLockedIn: {
+                you: "Smart move getting locked in during this volatility. How long did you guys end up going with the term? Because here's what I'm seeing <span class='pause'>--</span> even with companies who just renewed, there are often optimization opportunities within existing contracts that most people don't know about. Plus, it gives us time to develop a strategic approach for your next cycle rather than scrambling when rates spike again.",
+                mood: "neutral",
+                responses: [
+                    { text: "🎯 Continue to Discovery", next: "discovery" }
+                ]
+            },
+            resShopping: {
+                you: "Perfect timing then. Here's what I'm seeing though <span class='pause'>--</span> typically people just shop for rates but the rate is only about <span class='metric'>60%</span> of your bill if you're lucky. How are you guys evaluating the options <span class='pause'>--</span> just on rate, or are you looking at other ways to lower your final dollar amount?",
+                mood: "positive",
+                responses: [
+                    { text: "🎯 Continue to Discovery", next: "discovery" }
+                ]
+            },
+            resBroker: {
+                you: "That's smart <span class='pause'>--</span> having someone who understands the Texas market is crucial right now. Have they let you know about ERCOT's supply concerns for 2026? Because there's some huge changes happening right now that could impact <strong>[CN]</strong>'s costs significantly. Would it be worth understanding what that looks like, even if you're happy with your current relationship?",
+                mood: "neutral",
+                responses: [
+                    { text: "🎯 Continue to Discovery", next: "discovery" }
+                ]
+            },
+            resNoThought: {
+                you: "I get it <span class='pause'>--</span> energy's not the first thing you think about when you wake up. How much are you typically spending on energy? And if your bills were to increase by <span class='emphasis'>[XX]</span>, would that impact your budget at all? If I could show you what other companies are doing to reduce their spending, would you be open to discussing this further?",
+                mood: "challenging",
+                responses: [
+                    { text: "🎯 Continue to Discovery", next: "discovery" }
+                ]
+            },
+            discovery: {
+                you: "Gotcha! So <strong>[N]</strong>, Just so I understand your situation a little better. <span class='pause'>--</span> What's your current approach to renewing your electricity agreements <span class='pause'>--</span> do you handle it internally or work with a consultant?<br><br><strong><span class='emphasis'>And how that been?</span></strong><br><br><strong><span class='emphasis'>What is most concerning/important to you when it comes to energy?</span></strong><br><br><strong><span class='emphasis'>And how has that impacted you and [CN]?</span></strong><span class='pause'>--</span>I watch the markets daily and here's what I'm seeing. Rates have gone up <span class='metric'>60%</span> since 2021 <span class='pause'>--</span> Most businesses <span class='pause'>--</span> <strong>they've taken an incredible hit</strong>, but many others have been able to find <strong>other ways</strong> to pay way less than other companies in their <strong>same area</strong>. If I could show you what they're doing, would you be open to talking about this further?",
+                mood: "neutral",
+                responses: [
+                    { text: "💚 Prospect is engaged / ready for appointment", next: "closeForAppointment" },
+                    { text: "🟡 Prospect is hesitant / needs more info", next: "handleHesitation" },
+                    { text: "❌ Objection: Happy with current provider", next: "objHappy" },
+                    { text: "❌ Objection: No time", next: "objNoTime" }
+                ]
+            },
+            objHappy: {
+                you: "That's actually great to hear, and I'm not suggesting you should be unhappy or you need to switch your supplier today. Is it the customer service that you're happy with or are you just getting a rate that you can't find anywhere else?",
+                mood: "positive",
+                responses: [
+                    { text: "💰 It's the rate / Great pricing", next: "objHappyRate" },
+                    { text: "🤝 Customer service / Overall experience", next: "objHappyService" },
+                    { text: "🔄 Both rate and service", next: "objHappyBoth" }
+                ]
+            },
+            objHappyRate: {
+                you: "That's awesome you locked in a great price, however, the rules of Texas Energy have completely changed over the past few years. Even satisfied clients I work with are <span class='pause'>--</span>shocked to find out they that their supplier's new rate is about <span class='metric'>15-25%</span> more than what they were paying before. Would it be worth re-evaluating where you're at now, just to make sure <strong>[CN]</strong> isn't left paying more than they should?",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
+                    { text: "❌ No, not interested", next: "softClose" }
+                ]
+            },
+            objHappyService: {
+                you: "That's great - good service is hard to find. What I'm seeing though is that satisfaction with service and getting the best price are two separate conversations. The Texas energy market rules have changed significantly over the past few years. Even satisfied clients I work with discover they can can save <span class='metric'>15-25%</span> without sacrificing great customer service. Would it be worth looking into some options just to see if there is something more affordable for <strong>[CN]</strong>?",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
+                    { text: "❌ No, not interested", next: "softClose" }
+                ]
+            },
+            objHappyBoth: {
+                you: "Perfect - that's exactly what you want. I have exclusive partnerships with the suppliers, so I can make them work 10 times harder for your business. If i can show you how to get better pricing and support for your energy, would that be helpful for you and <strong>[CN]</strong>?",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
+                    { text: "❌ No, not interested", next: "softClose" }
+                ]
+            },
+            objNoTime: {
+                you: "I completely get it <span class='pause'>--</span> that's exactly why most businesses end up overpaying. Energy is a complicated market that requires ongoing attention that most internal teams <span class='pause'>--</span> simply don't have time for. Here's what I'd suggest <span class='pause'>--</span> give me <span class='emphasis'>10 minutes</span> to review your current setup <span class='pause'>--</span> against where we are today. And that should be able tell you exactly where you stand and what you should be expecting for the future. Would that be helpful for you?",
+                mood: "challenging",
+                responses: [
+                    { text: "✅ Yes, schedule 10-minute assessment", next: "scheduleAppointment" },
+                    { text: "❌ Still no time", next: "softClose" }
+                ]
+            },
+            handleHesitation: {
+                you: "I get it <span class='pause'>--</span> And called you out the blue so now is probably not the best time. How about this <span class='pause'>--</span> let me put together a quick case study specific to <span class='emphasis'>[TIA]</span>s in your area. Takes me about 10 minutes to prepare, it'll give you a snapshot into the market and it'll show you what other companies are doing to stay afloat in today's market.<br><br><strong><span class='emphasis'>Would that be useful for your future planning?</span></strong>",
+                mood: "unsure",
+                responses: [
+                    { text: "✅ Yes, send analysis", next: "getEmail" },
+                    { text: "❌ No, not interested", next: "softClose" }
+                ]
+            },
+            closeForAppointment: {
+                you: "Awesome! So, <strong>[N]</strong><span class='pause'>--</span> I really believe you'll be able to benefit from <span class='emphasis'>[SB]</span> that way you won't have to <span class='emphasis'>[PP]</span>. Our process is super simple! We start with an <span class='emphasis'>energy health check</span> where I look at your usage, contract terms, and then we can talk about what options might look like for <strong>[CN]</strong> moving forward. It should take <span class='emphasis'>10-15 minutes</span> of your time. Would you prefer to connect this <span class='emphasis'>Friday morning around 11 AM</span>, or would <span class='emphasis'>Monday afternoon around 2 PM</span> work better for your schedule?",
+                mood: "positive",
+                responses: [
+                    { text: "📅 Schedule Friday 11 AM", next: "appointmentConfirmed" },
+                    { text: "📅 Schedule Monday 2 PM", next: "appointmentConfirmed" },
+                    { text: "🤔 Still hesitant", next: "getEmail" }
+                ]
+            },
+            scheduleAppointment: {
+                you: "Perfect! Let's get that <span class='emphasis'>10-minute market assessment</span> scheduled. I'll walk through your current situation, show you common supplier traps, and outline 2-3 strategic options based on your specific situation. Would <span class='emphasis'>Friday morning</span> or <span class='emphasis'>Monday afternoon</span> work better?",
+                mood: "positive",
+                responses: [
+                    { text: "📅 Friday morning works", next: "appointmentConfirmed" },
+                    { text: "📅 Monday afternoon works", next: "appointmentConfirmed" }
+                ]
+            },
+            appointmentConfirmed: {
+                you: "Perfect! I'll send you a calendar invite for <span class='emphasis'>[DT]</span>, and I'll put together some information specific to <span class='emphasis'>[TIA]</span> to give you better context for our meeting. Do you have a copy of your bill?",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Yes, I have a copy", next: "billYes" },
+                    { text: "❌ No, I don't have one readily available", next: "billNo" }
+                ]
+            },
+            billYes: {
+                you: "Perfect! I'm going to also send you a standard invoice request. Could you reply back with a recent copy?",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Yes, I can send that", next: "confirmEmail" },
+                    { text: "❌ I'd prefer not to share that", next: "billOptional" }
+                ]
+            },
+            billNo: {
+                you: "No problem. How do you typically receive your bills <span class='pause'>--</span> physical copy or through email?",
+                mood: "positive",
+                responses: [
+                    { text: "📧 Through email", next: "billEmailAdvice" },
+                    { text: "📄 Physical copy", next: "billPhysicalAdvice" }
+                ]
+            },
+            billEmailAdvice: {
+                you: "Perfect! Be sure to have a copy ready for us to go over at <span class='emphasis'>[DT]</span>. You should be able to find it in your email from your provider. Looking forward to our conversation!",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Sounds great - end call", next: "callSuccess" }
+                ]
+            },
+            billPhysicalAdvice: {
+                you: "Perfect! Be sure to have a copy ready for us to go over at <span class='emphasis'>[DT]</span>. If you can find your most recent physical bill, that would be ideal for our review. Looking forward to our conversation!",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Sounds great - end call", next: "callSuccess" }
+                ]
+            },
+            confirmEmail: {
+                you: "Excellent! So I have your email as <span class='emphasis'>[TE]</span> <span class='pause'>--</span> is that correct? I'll send both the calendar invite and the invoice request to that address. You should receive them within the next few minutes. Looking forward to our conversation at <span class='emphasis'>[DT]</span>!",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Email confirmed - end call", next: "callSuccess" },
+                    { text: "❌ Different email address", next: "getCorrectEmail" }
+                ]
+            },
+            getCorrectEmail: {
+                you: "No problem! What's the best email address for you?",
+                mood: "positive",
+                responses: [
+                    { text: "📧 Provide correct email", next: "emailConfirmed" }
+                ]
+            },
+            emailConfirmed: {
+                you: "Perfect! I'll send the calendar invite and invoice request to <span class='emphasis'>[EAC]</span>. You should receive them within the next few minutes. Looking forward to our conversation at <span class='emphasis'>[DT]</span>!",
+                mood: "positive",
+                responses: [
+                    { text: "✅ All set - end call", next: "callSuccess" }
+                ]
+            },
+            billOptional: {
+                you: "No worries at all! Having a bill helps with the analysis, but we can still have a productive conversation without it. I'll send you the calendar invite for <span class='emphasis'>[DT]</span> and some industry-specific information. Looking forward to our conversation!",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Sounds good - end call", next: "callSuccess" }
+                ]
+            },
+            getEmail: {
+                you: "Great! I'll put together a quick case study specific to <span class='emphasis'>[TIA]</span>. It takes me about 10 minutes to prepare, and it'll give you a snapshot into the market and it'll show you what other companies are doing to stay afloat in today's market. What's a good email for you?",
+                mood: "unsure",
+                responses: [
+                    { text: "✅ Yes, send analysis", next: "emailFollowUp" },
+                    { text: "❌ Don't want to provide email", next: "softClose" }
+                ]
+            },
+            emailFollowUp: {
+                you: "Perfect! I've got <span class='emphasis'>[EAC]</span>. I'll get that market analysis over to you by <span class='emphasis'>[TF]</span>, and it'll give you a good baseline for understanding your competitive position. If you have any immediate questions before then, feel free to reach out. Otherwise, I'll follow up once you've had a chance to review the information. Sound good?",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Sounds good - end call", next: "callSuccess" }
+                ]
+            },
+            softClose: {
+                you: "No problem at all <span class='pause'>--</span> I know energy strategy isn't urgent until it becomes critical. Here's what I'll do: I'm going to add you to my <span class='emphasis'>quarterly market intelligence updates</span>. These go out to CFOs and facilities managers across Texas and include trend analysis, regulatory updates, and strategic insights. <span class='emphasis'>No sales content, just market intelligence</span> that helps you stay informed. If market conditions create opportunities that make sense for <span class='emphasis'>[CN]</span>, I'll reach out. Sound reasonable?",
+                mood: "neutral",
+                responses: [
+                    { text: "✅ That sounds reasonable", next: "callSuccess" },
+                    { text: "❌ No thanks", next: "callEnd" }
+                ]
+            },
+            callSuccess: {
+                you: "🎉 <strong>Call Completed Successfully!</strong><br><br>Remember to track:<br>• Decision maker level<br>• Current contract status and timeline<br>• Pain points identified<br>• Interest level (Hot/Warm/Cold/Future)<br>• Next action committed<br>• Best callback timing<br><br><span class='emphasis'>Great job keeping the energy high and positioning as a strategic advisor!</span>",
+                mood: "positive",
+                responses: [
+                    { text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }
+                ]
+            },
+            callEnd: {
+                you: "Thanks for your time. Have a great day!",
+                mood: "neutral",
+                responses: [
+                    { text: "🔄 Start New Call", next: "start" }
+                ]
+            },
+            transfer_dialing: {
+                you: "Being transferred... Ringing...",
+                mood: "neutral",
+                responses: [
+                    { text: "📞 Decision Maker Answers", next: "main_script_start" },
+                    { text: "🚫 No Answer", next: "voicemail_or_hangup" }
+                ]
+            }
+        };
+
+        let currentStep = 'start';
+        let history = [];
+        let scriptDisplay, responsesContainer, backBtn;
+
+        function populateFromGlobalProspect() {
+            const inputName = gId('input-name');
+            if (inputName) {
+                inputName.value = currentProspect.name || '';
+                placeholders['N'] = currentProspect.name || '';
+            }
+            const inputTitle = gId('input-title');
+            if (inputTitle) {
+                inputTitle.value = currentProspect.title || '';
+                placeholders['CT'] = currentProspect.title || '';
+            }
+            const inputCompanyName = gId('input-company-name');
+            if (inputCompanyName) {
+                inputCompanyName.value = currentProspect.company || '';
+                placeholders['CN'] = currentProspect.company || '';
+            }
+            const inputCompanyIndustry = gId('input-company-industry');
+            if (inputCompanyIndustry) {
+                inputCompanyIndustry.value = currentProspect.industry || '';
+                placeholders['CI'] = currentProspect.industry || '';
+                placeholders['TIA'] = currentProspect.industry || '';
+            }
+            const inputBenefit = gId('input-benefit');
+            if (inputBenefit) {
+                inputBenefit.value = currentProspect.benefits || '';
+                placeholders['SB'] = currentProspect.benefits || '';
+            }
+            const inputPain = gId('input-pain');
+            if (inputPain) {
+                inputPain.value = currentProspect.painPoints || '';
+                placeholders['PP'] = currentProspect.painPoints || '';
+            }
+            
+            const fieldsToDisable = ['input-name', 'input-title', 'input-company-name', 'input-company-industry'];
+            if (currentProspect.contactId) {
+                fieldsToDisable.forEach(fieldId => {
+                    const input = gId(fieldId);
+                    if (input) {
+                        input.disabled = true;
+                    }
+                });
+            } else {
+                fieldsToDisable.forEach(fieldId => {
+                    const input = gId(fieldId);
+                    if (input) {
+                        input.disabled = false;
+                    }
+                });
+            }
+        }
+
+        async function saveProspectAndNotes() {
+            const notesContent = gId('call-notes').value.trim();
+            const prospectData = {
+                name: gId('input-name').value.trim(),
+                title: gId('input-title').value.trim(),
+                company: gId('input-company-name').value.trim(),
+                industry: gId('input-company-industry').value.trim(),
+                benefits: gId('input-benefit').value.trim(),
+                painPoints: gId('input-pain').value.trim()
+            };
+
+            showLoading(true);
+
+            try {
+                let accountId = currentProspect.accountId;
+                let contactId = currentProspect.contactId;
+                let accountName = prospectData.company;
+                let contactName = prospectData.name;
+                let isNewAccount = false;
+                let isNewContact = false;
+
+                // Handle account logic
+                if (accountId) {
+                    const accountRef = doc(db, `artifacts/${appId}/users/${userId}/accounts`, accountId);
+                    await updateDoc(accountRef, {
+                        name: prospectData.company,
+                        industry: prospectData.industry,
+                        painPoints: prospectData.painPoints,
+                        benefits: prospectData.benefits,
+                        updatedAt: serverTimestamp()
+                    });
+                } else if (prospectData.company) {
+                    const newAccountRef = await addDoc(collection(db, `artifacts/${appId}/users/${userId}/accounts`), {
+                        name: prospectData.company,
+                        industry: prospectData.industry,
+                        painPoints: prospectData.painPoints,
+                        benefits: prospectData.benefits,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    accountId = newAccountRef.id;
+                    isNewAccount = true;
+                }
+
+                // Handle contact logic
+                if (contactId) {
+                    const contactRef = doc(db, `artifacts/${appId}/users/${userId}/contacts`, contactId);
+                    await updateDoc(contactRef, {
+                        firstName: prospectData.name.split(' ')[0] || '',
+                        lastName: prospectData.name.split(' ')[1] || '',
+                        title: prospectData.title,
+                        accountId: accountId,
+                        accountName: accountName,
+                        notes: notesContent, // Assuming notes are tied to contact for simplicity
+                        updatedAt: serverTimestamp()
+                    });
+                } else if (prospectData.name) {
+                    const newContactRef = await addDoc(collection(db, `artifacts/${appId}/users/${userId}/contacts`), {
+                        firstName: prospectData.name.split(' ')[0] || '',
+                        lastName: prospectData.name.split(' ')[1] || '',
+                        title: prospectData.title,
+                        accountId: accountId,
+                        accountName: accountName,
+                        notes: notesContent,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    contactId = newContactRef.id;
+                    isNewContact = true;
+                }
+                
+                // Log the call notes as an activity
+                if (notesContent) {
+                    await logActivity({
+                        type: 'call_note',
+                        description: `Call note for ${contactName || accountName || 'prospect'}`,
+                        noteContent: notesContent,
+                        accountId: accountId,
+                        accountName: accountName,
+                        contactId: contactId,
+                        contactName: contactName
+                    });
+                }
+
+                showToast(`Call notes and prospect data saved!${isNewAccount ? ' New account created.' : ''}${isNewContact ? ' New contact created.' : ''}`);
+                restart();
+
+            } catch (error) {
+                console.error('Error saving prospect and notes:', error);
+                showToast('Error saving data. See console for details.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function applyPlaceholders(text) {
+            let newText = text;
+            for (const key in placeholders) {
+                const regex = new RegExp('\\[' + key + '\\]', 'g');
+                newText = newText.replace(regex, placeholders[key]);
+            }
+            return newText;
+        }
+
+        function updateScript() {
+            for (const inputId in inputMap) {
+                const placeholderKey = inputMap[inputId];
+                const inputElement = gId(inputId);
+                if (inputElement) {
+                    const inputValue = inputElement.value || inputElement.placeholder;
+                    placeholders[placeholderKey] = inputValue;
+                }
+            }
+            placeholders['TIA'] = placeholders['CI'];
+            displayCurrentStep();
+        }
+
+        function displayCurrentStep() {
+            const step = scriptData[currentStep];
+            if (!step) return;
+            
+            scriptDisplay = gId('script-display');
+            responsesContainer = gId('responses-container');
+            backBtn = gId('back-btn');
+            
+            const processedText = applyPlaceholders(step.you);
+            
+            if (scriptDisplay) {
+                scriptDisplay.innerHTML = processedText;
+                scriptDisplay.className = `script-display mood-${step.mood}`;
+            }
+            
+            if (responsesContainer) {
+                responsesContainer.innerHTML = '';
+                if (currentStep === 'start') {
+                    const dialButtonHtml = `
+                        <button class="dial-button" onclick="handleDialClick()">
+                            <i class="fas fa-phone-alt"></i>
+                            Dial
+                        </button>
+                    `;
+                    responsesContainer.innerHTML = dialButtonHtml;
+                } else if (step.responses && step.responses.length > 0) {
+                    step.responses.forEach(response => {
+                        const button = document.createElement('button');
+                        button.className = 'response-btn';
+                        button.innerHTML = applyPlaceholders(response.text);
+                        button.onclick = () => selectResponse(response.next, response.action);
+                        responsesContainer.appendChild(button);
+                    });
+                }
+            }
+            
+            if (backBtn) {
+                backBtn.disabled = history.length === 0;
+            }
+
+            populateFromGlobalProspect();
+        }
+
+        function handleDialClick() {
+            if (currentProspect.phone) {
+                showToast(`Dialing ${currentProspect.phone}...`, 'info');
+            } else {
+                showToast('No phone number available for this prospect. Manual dialing is required.', 'warning');
+            }
+            selectResponse('dialing'); 
+        }
+
+        function selectResponse(nextStep, action) {
+            if (nextStep && scriptData[nextStep]) {
+                history.push(currentStep);
+                currentStep = nextStep;
+                displayCurrentStep();
+            }
+
+            if (action === 'saveProspectAndNotes') {
+                saveProspectAndNotes();
+            }
+        }
+
+        function goBack() {
+            if (history.length > 0) {
+                currentStep = history.pop();
+                displayCurrentStep();
+            }
+        }
+
+        function restart() {
+            currentStep = 'start';
+            history = [];
+            
+            const callNotesElement = gId('call-notes');
+            if (callNotesElement) {
+                callNotesElement.value = '';
+            }
+            
+            currentProspect = {
+                name: '',
+                title: '',
+                company: '',
+                industry: '',
+                phone: '',
+                email: '',
+                accountId: '',
+                contactId: '',
+                painPoints: '',
+                benefits: ''
+            };
+            
+            const inputs = ['input-name', 'input-title', 'input-company-name', 'input-company-industry', 'input-benefit', 'input-pain'];
+            inputs.forEach(inputId => {
+                const input = gId(inputId);
+                if (input) {
+                    input.value = '';
+                    input.disabled = false;
+                }
+            });
+            
+            displayCurrentStep();
+        }
+
+        function clearNotes() {
+            const notesTextarea = gId('call-notes');
+            if (!notesTextarea) return;
+
+            customConfirm('Are you sure you want to clear all notes?', () => {
+                notesTextarea.value = '';
+                showToast('Notes cleared.', 'warning');
+            });
+        }
+
+        // --- Search Functions ---
+        function setupSearchFunctionality() {
+            const googleBtn = gId('google-button');
+            if (googleBtn) {
+                googleBtn.addEventListener('click', (e) => openSearch('google', e));
+            }
+            const mapsBtn = gId('maps-button');
+            if (mapsBtn) {
+                mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
+            }
+            const apolloBtn = gId('apollo-button');
+            if (apolloBtn) {
+                apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
+            }
+            const beenverifiedBtn = gId('beenverified-button');
+            if (beenverifiedBtn) {
+                beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
+            }
+
+            ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
+                const input = gId(id);
+                if (input) {
+                    input.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') performSearch();
+                    });
+                }
+            });
+        }
+
+        function openSearch(type, event) {
+            const button = event.target.closest('.app-button');
+            const searchBar = gId('search-bar');
+            const mainContainer = gId('main-container');
+
+            if (currentSearchType === type && activeButton === button) {
+                closeSearch();
+                return;
+            }
+            
+            if (activeButton) activeButton.classList.remove('active');
+            currentSearchType = type;
+            activeButton = button;
+            button.classList.add('active');
+            
+            const label = gId('search-label');
+            const input = gId('search-input');
+            const cityInput = gId('search-city');
+            const stateInput = gId('search-state');
+            const locationInput = gId('search-location');
+            
+            if (!label || !input) return;
+            
+            if (cityInput) cityInput.style.display = 'none';
+            if (stateInput) stateInput.style.display = 'none';
+            if (locationInput) locationInput.style.display = 'none';
+            
+            if (type === 'google') {
+                label.textContent = 'Search Google:';
+                input.placeholder = 'Type your search query...';
+            } else if (type === 'maps') {
+                label.textContent = 'Search Maps:';
+                input.placeholder = 'Search places, addresses, businesses...';
+            } else if (type === 'beenverified') {
+                label.textContent = 'Search BeenVerified:';
+                input.placeholder = 'Enter full name (e.g. John Smith)...';
+                if (cityInput) cityInput.style.display = 'block';
+                if (stateInput) stateInput.style.display = 'block';
+            } else if (type === 'apollo') {
+                label.textContent = 'Search Apollo:';
+                input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
+                if (locationInput) locationInput.style.display = 'block';
+            }
+            
+            if (searchBar) searchBar.classList.add('active');
+            if (mainContainer) {
+                mainContainer.classList.add('search-active');
+            }
+            setTimeout(() => input.focus(), 300);
+            input.value = '';
+            if (cityInput) cityInput.value = '';
+            if (stateInput) stateInput.value = '';
+            if (locationInput) locationInput.value = '';
+        }
+
+        function closeSearch() {
+            const searchBar = gId('search-bar');
+            const mainContainer = gId('main-container');
+            if (searchBar) {
+                searchBar.classList.remove('active');
+            }
+            if (mainContainer) {
+                mainContainer.classList.remove('search-active');
+            }
+            if (activeButton) {
+                activeButton.classList.remove('active');
+                activeButton = null;
+            }
+            currentSearchType = '';
+        }
+
+        function performSearch() {
+            const query = gId('search-input').value.trim();
+            if (!query) return;
+            
+            let searchUrl = '';
+            
+            if (currentSearchType === 'google') {
+                searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+            } else if (currentSearchType === 'maps') {
+                searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+            } else if (currentSearchType === 'beenverified') {
+                const city = gId('search-city').value.trim();
+                const state = gId('search-state').value.trim().toUpperCase();
+                const nameParts = query.split(' ');
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ') || '';
+                searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
+            } else if (currentSearchType === 'apollo') {
+                const location = gId('search-location').value.trim();
+                let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
+                if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
+                searchUrl = apolloUrl;
+            }
+            
+            if (searchUrl) {
+                window.open(searchUrl, '_blank');
+                closeSearch();
+            }
+        }
+        
+        // Universal utility functions
+        function formatDate(timestamp) {
+            if (!timestamp) return 'Unknown date';
+            try {
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            } catch (e) {
+                return 'Invalid date';
+            }
+        }
+        
+        function formatDateOnly(timestamp) {
+            if (!timestamp) return 'Unknown date';
+            try {
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString();
+            } catch (e) {
+                return 'Invalid date';
+            }
+        }
+    </script>
+</body>
+</html>
