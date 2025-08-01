@@ -801,27 +801,6 @@ function renderAccountContacts() {
     `).join('');
 }
 
-// Render activities for current account
-function renderAccountActivities() {
-    const container = document.getElementById('account-activities-list');
-    if (!container || !CRMApp.currentAccount) return;
-    
-    const accountActivities = CRMApp.activities.filter(activity => activity.accountId === CRMApp.currentAccount.id);
-    
-    if (accountActivities.length === 0) {
-        container.innerHTML = '<p class="empty-state">No recent activities</p>';
-        return;
-    }
-    
-    container.innerHTML = accountActivities.slice(0, 10).map(activity => `
-        <div class="activity-item">
-            <div class="activity-title">${activity.description}</div>
-            ${activity.noteContent ? `<div class="activity-content">${activity.noteContent}</div>` : ''}
-            <div class="activity-date">${window.formatDate(activity.createdAt)}</div>
-        </div>
-    `).join('');
-}
-
 // Edit account
 function editAccount(accountId) {
     const account = CRMApp.accounts.find(acc => acc.id === accountId);
