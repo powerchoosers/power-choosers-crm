@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Wait a bit for Firebase to load
     setTimeout(() => {
         initializeApp();
-        setupSearchFunctionality();
     }, 500);
 });
 
@@ -34,6 +33,7 @@ function initializeApp() {
     setupEventListeners();
     loadInitialData();
     showView('dashboard');
+    setupSearchFunctionality(); // Call search setup here
 }
 
 // Navigation setup
@@ -1107,5 +1107,3 @@ function performSearch() {
         closeSearch();
     }
 }
-
-console.log('CRM App initialized successfully');
