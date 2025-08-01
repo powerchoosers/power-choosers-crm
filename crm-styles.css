@@ -401,111 +401,6 @@ body {
     gap: 8px;
 }
 
-.card-info {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.info-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: .9rem;
-    color: #4b5563;
-}
-
-.info-item svg {
-    width: 16px;
-    height: 16px;
-    color: #6b7280;
-}
-
-/* Buttons */
-.primary-btn {
-    background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    border-radius: 10px;
-    font-size: .9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .3s ease;
-    box-shadow: 0 4px 16px rgba(26,67,141,.2);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.primary-btn:hover {
-    background: linear-gradient(135deg, #153775 0%, #1D4ED8 100%);
-    transform: translateY(-2px);
-}
-
-.secondary-btn {
-    background: transparent;
-    color: #6b7280;
-    border: 1px solid #d1d5db;
-    padding: 12px 25px;
-    border-radius: 10px;
-    font-size: .9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .3s ease;
-}
-
-.secondary-btn:hover {
-    background: #f9fafb;
-    border-color: #9ca3af;
-}
-
-.back-btn {
-    background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    border-radius: 10px;
-    font-size: .9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .3s ease;
-    box-shadow: 0 4px 16px rgba(26,67,141,.2);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.back-btn:hover {
-    background: linear-gradient(135deg, #153775 0%, #1D4ED8 100%);
-    transform: translateY(-2px);
-}
-
-.action-btn {
-    background: linear-gradient(135deg, #F7921F 0%, #EA580C 100%);
-    color: white;
-    border: none;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: .9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    justify-content: flex-start;
-    margin-bottom: 12px;
-    box-shadow: 0 8px 24px rgba(247,146,31,.25);
-}
-
-.action-btn:hover {
-    background: linear-gradient(135deg, #EA580C 0%, #DC2626 100%);
-    transform: translateY(-3px);
-    box-shadow: 0 12px 32px rgba(247,146,31,.35);
-}
-
 .icon-btn {
     background: transparent;
     border: none;
@@ -521,9 +416,8 @@ body {
     color: #374151;
 }
 
-/* Add Notes Button Styling */
+/* New Add Notes Button Styling */
 .add-notes-btn {
-    flex: 1;
     background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
     color: white;
     border: none;
@@ -1404,531 +1298,1077 @@ form {
 }
 {
 type: uploaded file
-fileName: index.html
+fileName: firebase-config.js
 fullText:
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Power Choosers CRM</title>
+// Universal Firebase Configuration
+// Works for both CRM Dashboard and Calling Hub
+
+// Your Firebase project configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
+    authDomain: "power-choosers-crm.firebaseapp.com",
+    projectId: "power-choosers-crm",
+    storageBucket: "power-choosers-crm.firebasestorage.app",
+    messagingSenderId: "792458658491",
+    appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
+    measurementId: "G-XEC3BFHJHW"
+};
+
+// Initialize Firebase only if not already initialized
+let app;
+let db;
+
+// Check if we're in a Firebase v9 environment (CRM) or v8 environment (Calling Hub)
+if (typeof firebase !== 'undefined') {
+    // Firebase v8 (script tags) - for Calling Hub
+    if (!firebase.apps.length) {
+        app = firebase.initializeApp(firebaseConfig);
+    } else {
+        app = firebase.app();
+    }
+    db = firebase.firestore();
+
+    // Export Firebase functions for v8
+    window.FirebaseDB = {
+        db: db,
+        doc: function(db, collection, id) {
+            return db.collection(collection).doc(id);
+        },
+        setDoc: function(docRef, data) {
+            return docRef.set(data);
+        },
+        getDoc: function(docRef) {
+            return docRef.get();
+        },
+        getDocs: function(query) {
+            return query.get();
+        },
+        collection: function(db, path) {
+            return db.collection(path);
+        },
+        query: function(collection, ...constraints) {
+            let query = collection;
+            constraints.forEach(constraint => {
+                if (constraint && constraint.type === 'orderBy') {
+                    query = query.orderBy(constraint.field, constraint.direction);
+                } else if (constraint && constraint.type === 'limit') {
+                    query = query.limit(constraint.limit);
+                } else if (constraint && constraint.type === 'where') {
+                    query = query.where(constraint.field, constraint.op, constraint.value);
+                }
+            });
+            return query;
+        },
+        orderBy: function(field, direction = 'asc') {
+            return { type: 'orderBy', field, direction };
+        },
+        limit: function(limit) {
+            return { type: 'limit', limit };
+        },
+        serverTimestamp: firebase.firestore.FieldValue.serverTimestamp,
+        updateDoc: function(docRef, data) {
+            return docRef.update(data);
+        },
+        deleteDoc: function(docRef) {
+            return docRef.delete();
+        },
+        arrayUnion: firebase.firestore.FieldValue.arrayUnion,
+        Timestamp: firebase.firestore.Timestamp,
+        where: function(field, op, value) {
+            return { type: 'where', field, op, value };
+        },
+        addDoc: function(collectionRef, data) {
+            return collectionRef.add(data);
+        }
+    };
+} else {
+    // Firebase v9 (modules) - for CRM Dashboard
+    // This will be handled by import statements in the CRM
+    console.log('Firebase v9 module environment detected');
+}
+
+// Universal utility functions
+window.generateId = function() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+window.formatDate = function(timestamp) {
+    if (!timestamp) return 'Unknown date';
+    try {
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    } catch (e) {
+        return 'Invalid date';
+    }
+};
+
+window.formatDateOnly = function(timestamp) {
+    if (!timestamp) return 'Unknown date';
+    try {
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        return date.toLocaleDateString();
+    } catch (e) {
+        return 'Invalid date';
+    }
+};
+
+console.log('Universal Firebase config loaded successfully');
+if (window.FirebaseDB) {
+    console.log('Firebase v8 functions available:', Object.keys(window.FirebaseDB));
+}
+}
+{
+type: uploaded file
+fileName: README.md
+fullText:
+# Power Choosers CRM
+
+A comprehensive Customer Relationship Management system built for Power Choosers energy sales team.
+
+## Features
+
+### 🏢 Account Management
+- Create, edit, and manage company accounts
+- Track company information (name, industry, phone, website, address)
+- View detailed account pages with contacts and activities
+- Add notes and track interactions
+
+### 👤 Contact Management
+- Create and manage individual contacts
+- Link contacts to specific accounts
+- Track contact information (name, title, email, phone)
+- Add notes and track communication history
+
+### 📊 Dashboard
+- Overview of total accounts and contacts
+- Recent activities tracking
+- Hot leads identification
+- Quick action buttons for common tasks
+
+### 📝 Activity Tracking
+- Automatic logging of account and contact creation/updates
+- Note-taking functionality
+- Activity history for accounts and contacts
+- Real-time activity feed on dashboard
+
+## File Structure
+
+```
+/your-crm-repo
+├── crm-index.html      # Main HTML file
+├── crm-styles.css      # All CSS styles
+├── crm-app.js          # Main application logic
+├── firebase-config.js  # Firebase configuration
+└── README.md          # This file
+```
+
+## Setup Instructions
+
+### 1. GitHub Pages Setup
+1. Create a new repository on GitHub for your CRM
+2. Upload all the files to your repository
+3. Enable GitHub Pages in repository settings
+4. Update the file paths in `crm-index.html` to match your GitHub Pages URL
+
+### 2. Update File Paths
+In `crm-index.html`, update these lines with your actual GitHub username and repository name:
+
+```html
+<link rel="stylesheet" href="[https://YOUR-GITHUB-USERNAME.github.io/YOUR-CRM-REPO/crm-styles.css](https://YOUR-GITHUB-USERNAME.github.io/YOUR-CRM-REPO/crm-styles.css)">
+<script src="[https://YOUR-GITHUB-USERNAME.github.io/YOUR-CRM-REPO/firebase-config.js](https://YOUR-GITHUB-USERNAME.github.io/YOUR-CRM-REPO/firebase-config.js)"></script>
+<script src="[https://YOUR-GITHUB-USERNAME.github.io/YOUR-CRM-REPO/crm-app.js](https://YOUR-GITHUB-USERNAME.github.io/YOUR-CRM-REPO/crm-app.js)"></script>
+```
+
+### 3. Firebase Configuration
+The system is already configured to use your existing Firebase project:
+- Project ID: `power-choosers-crm`
+- Collections used: `accounts`, `contacts`, `activities`
+
+No additional Firebase setup is required as it uses your existing configuration.
+
+## Usage
+
+### Navigation
+- **Dashboard**: Overview and quick stats
+- **Accounts**: Manage company accounts
+- **Contacts**: Manage individual contacts
+- **Calls Hub**: Link to your existing cold calling system
+
+### Adding Data
+1. Click "New Account" or "New Contact" buttons
+2. Fill out the required information
+3. Save to store in Firebase
+
+### Account Details
+- Click on any account card to view detailed information
+- See all contacts associated with the account
+- View activity history
+- Add notes and track interactions
+
+### Activities
+- All actions are automatically logged
+- View recent activities on the dashboard
+- Account-specific activities on account detail pages
+
+## Data Structure
+
+### Accounts Collection
+```javascript
+{
+  id: "unique-id",
+  name: "Company Name",
+  industry: "Manufacturing",
+  phone: "555-123-4567",
+  website: "[https://company.com](https://company.com)",
+  address: "123 Main St, City, State",
+  createdAt: timestamp,
+  updatedAt: timestamp
+}
+```
+
+### Contacts Collection
+```javascript
+{
+  id: "unique-id",
+  firstName: "John",
+  lastName: "Doe",
+  title: "Manager",
+  accountId: "account-id",
+  accountName: "Company Name",
+  email: "john@company.com",
+  phone: "555-123-4567",
+  notes: "Contact notes",
+  createdAt: timestamp,
+  updatedAt: timestamp
+}
+```
+
+### Activities Collection
+```javascript
+{
+  id: "unique-id",
+  type: "account_created",
+  description: "Created account: Company Name",
+  accountId: "account-id",
+  accountName: "Company Name",
+  contactId: "contact-id", // optional
+  contactName: "John Doe", // optional
+  noteContent: "Note text", // optional
+  createdAt: timestamp
+}
+```
+
+## Customization
+
+### Adding New Fields
+1. Update the HTML forms in `crm-index.html`
+2. Modify the form submission handlers in `crm-app.js`
+3. Update the display functions to show new fields
+
+### Styling Changes
+- All styles are in `crm-styles.css`
+- Uses CSS Grid and Flexbox for responsive design
+- Color scheme based on Power Choosers branding
+
+### Adding New Features
+- Add new view containers in `crm-index.html`
+- Create navigation buttons and update routing
+- Add corresponding functions in `crm-app.js`
+
+## Responsive Design
+
+The CRM is fully responsive and works on:
+- Desktop computers
+- Tablets (landscape and portrait)
+- Mobile phones
+- All modern browsers
+
+## Browser Compatibility
+
+- Chrome (recommended)
+- Firefox
+- Safari
+- Edge
+
+## Support
+
+For questions or issues:
+1. Check the browser console for error messages
+2. Verify Firebase connection
+3. Ensure all file paths are correct for GitHub Pages
+
+## Future Enhancements
+
+Potential features to add:
+- Email integration
+- Calendar integration
+- Advanced reporting
+- Task management
+- Document storage
+- Mobile app
+- Export functionality
+
+## Security Notes
+
+- All data is stored in Firebase with your existing security rules
+- No sensitive data should be stored in the client-side code
+- Consider implementing user authentication for production use
+}
+I appreciate you providing the exact code you were working with. This is incredibly helpful. My last response was flawed because I was trying to fix what I thought was an issue in `crm-app.js` without fully understanding the current state of your code. You are right, the code you provided for `crm-app.js` and `index.html` was the one I generated previously, which unfortunately had an error and broke the functionality. I sincerely apologize for that.
+
+I will now provide a single, comprehensive fix that incorporates all of your requests and corrects the errors. The "Uncaught SyntaxError" is the key to this issue, as it's a critical error that stops the entire script from running.
+
+Here is the plan for a full, working solution:
+
+1.  **Fix the `crm-app.js` Syntax Error**: The primary issue is an incomplete file, likely from a copy/paste error. I will provide a new, complete `crm-app.js` file that is correctly structured and free of syntax errors.
+2.  **Add Pain Points and Benefits**: I will add these fields to the `account` collection in Firebase. This will allow you to save and edit this data.
+3.  **Update Call Hub Logic**: The `openCallsHubWithData` and `openCallsHubWithPhone` functions will be updated to correctly pass and handle all of the necessary data. I will also make sure that the `restart` function allows you to clear all fields and start fresh.
+4.  **Implement "Add Notes" Button**: The "Copy Notes" button will be replaced with an "Add Notes" button that correctly saves the notes to your Firebase activities feed.
+5.  **Lock/Unlock Fields**: The code will be updated to correctly disable fields in the calls hub when you come from a contact card, and enable them when you access the calls hub directly.
+6.  **Fix Rendering for Call Buttons**: The rendering functions (`renderContacts` and `renderAccountContacts`) will be updated to correctly display the call buttons with the `openCallsHubWithData` function.
+
+This is a comprehensive fix that addresses all of your requirements. I will provide a new `crm-app.js` file below that you can copy and paste to replace your current one. This should resolve all of your issues and get your site working as intended.
+
+
+```javascript
+// CRM Application Main JavaScript File
+// Consolidated file for single-page application functionality
+
+// Global state management
+const CRMApp = {
+    currentView: 'dashboard',
+    currentAccount: null,
+    currentContact: null,
+    accounts: [],
+    contacts: [],
+    activities: []
+};
+
+// Global state for search functionality and current call data.
+let currentSearchType = '';
+let activeButton = null;
+let currentProspect = {}; 
+
+// Helper to get element by ID (saves characters and improves readability)
+const gId = id => document.getElementById(id);
+
+// Placeholder map for dynamic text in the call script.
+const placeholders = {
+    'N': '', // Contact Name
+    'YN': 'Lewis', // Your Name (static)
+    'CN': '', // Company Name
+    'CI': '', // Company Industry
+    'SB': '', // Specific Benefit
+    'PP': '', // Pain Point
+    'CT': '', // Contact Title
+    'TIA': '', // Their Industry/Area (alias for CI)
+    'TE': '', // Their Email (not directly from input)
+    'DT': '', // Day/Time (not directly from input)
+    'EAC': '', // Email Address Confirmed (not directly from input)
+    'TF': '', // Timeframe (not directly from input)
+    'OP': 'the responsible party', // Other Person (default)
+    'XX': '$XX.00/40%' // Placeholder for dynamic % or amount
+};
+
+// Map input field IDs to the placeholder keys for automatic updates.
+const inputMap = {
+    'input-name': 'N',
+    'input-title': 'CT',
+    'input-company-name': 'CN',
+    'input-company-industry': 'CI',
+    'input-benefit': 'SB',
+    'input-pain': 'PP'
+};
+
+
+// The main call script, structured as a state machine.
+const scriptData = {
+    start: {
+        you: "Click 'Dial' to begin the call",
+        mood: "neutral",
+        responses: []
+    },
+    dialing: {
+        you: "Dialing... Ringing...",
+        mood: "neutral",
+        responses: [
+            { text: "📞 Call Connected", next: "hook" },
+            { text: "📞 Transferred - Decision Maker Answers", next: "main_script_start" },
+            { text: "🚫 No Answer", next: "voicemail_or_hangup" }
+        ]
+    },
+    voicemail_or_hangup: {
+        you: "No answer. What would you like to do?",
+        mood: "neutral",
+        responses: [
+            { text: "Leave Voicemail", next: "voicemail" },
+            { text: "Hang Up / Start New Call", next: "start" }
+        ]
+    },
+    hook: {
+        you: "Hi, is this <strong>[N]</strong>?",
+        mood: "neutral",
+        responses: [
+            { text: "✅ Yes, this is [N]", next: "main_script_start" },
+            { text: "🗣️ Speaking", next: "main_script_start" },
+            { text: "❓ Who's calling?", next: "main_script_start" },
+            { text: "👥 Gatekeeper / Not the right person", next: "gatekeeper_intro" }
+        ]
+    },
+    main_script_start: {
+        you: "Good mornin'/afternoon, <strong>[N]</strong>! This is <strong>[YN]</strong> <span class='pause'>--</span> and I'm needin' to speak with someone over electricity agreements and contracts for <strong>[CN]</strong> would that be yourself?",
+        mood: "neutral",
+        responses: [
+            { text: "✅ Yes, that's me / I handle that", next: "pathA" },
+            { text: "👥 That would be [OP] / Not the right person", next: "gatekeeper_intro" },
+            { text: "🤝 We both handle it / Team decision", next: "pathA" },
+            { text: "🤔 Unsure or hesitant", next: "pathD" }
+        ]
+    },
+    gatekeeper_intro: {
+        you: "Good afternoon/morning. I'm needin' to speak with someone over electricity agreements and contracts for <strong>[CN]</strong> do you know who would be responsible for that?",
+        mood: "neutral",
+        responses: [
+            { text: "❓ What's this about?", next: "gatekeeper_whats_about" },
+            { text: "🔗 I'll connect you", next: "transfer_dialing" },
+            { text: "🚫 They're not available / Take a message", next: "voicemail" }
+        ]
+    },
+    gatekeeper_whats_about: {
+        you: "My name is Lewis with PowerChoosers.com and I'm needin' to speak with someone about the future electricity agreements for <strong>[CN]</strong>. Do you know who might be the best person for that?",
+        mood: "neutral",
+        responses: [
+            { text: "🔗 I'll connect you", next: "transfer_dialing" },
+            { text: "🚫 They're not available / Take a message", next: "voicemail" },
+            { text: "✅ I can help you", next: "pathA" }
+        ]
+    },
+    voicemail: {
+        you: "Good afternoon/morning <strong>[N]</strong>, this is Lewis and I was told to speak with you. You can give me a call at 817-409-4215. Also, I shot you over a short email kinda explaining why I'm reaching out to you today. The email should be coming from Lewis Patterson that's (L.E.W.I.S) Thank you so much and you have a great day.",
+        mood: "neutral",
+        responses: [
+            { text: "🔄 End Call / Start New Call", next: "start" }
+        ]
+    },
+    pathA: {
+        you: "Perfect <span class='pause'>--</span> So <strong>[N]</strong> I've been working closely with <strong>[CI]</strong> across Texas with electricity agreements <span class='pause'>--</span> and we're about to see an unprecedented dip in the market in the next few months <span class='pause'>--</span><br><br><strong><span class='emphasis'>Is getting the best price for your next renewal a priority for you and [CN]?</span></strong><br><br><strong><span class='emphasis'>Do you know when your contract expires?</span></strong><br><br><strong><span class='emphasis'>So since rates have gone up tremendously over the past 5 years, how are you guys handling such a sharp increase on your future renewals?</span></strong>",
+        mood: "neutral",
+        responses: [
+            { text: "😰 Struggling / It's tough", next: "resStruggle" },
+            { text: "📅 Haven't renewed / Contract not up yet", next: "resNotRenewed" },
+            { text: "🔒 Locked in / Just renewed", next: "resLockedIn" },
+            { text: "🛒 Shopping around / Looking at options", next: "resShopping" },
+            { text: "🤝 Have someone handling it / Work with broker", next: "resBroker" },
+            { text: "🤷 Haven't thought about it / It is what it is", next: "resNoThought" }
+        ]
+    },
+    pathD: {
+        you: "No worries if you're not sure. I work with Texas businesses on energy contract optimization <span class='pause'>--</span> basically helping companies navigate rate volatility and strategic positioning in our deregulated market. Does energy procurement fall under your area of responsibility, or would someone else be better positioned for this conversation?",
+        mood: "unsure",
+        responses: [
+            { text: "✅ Yes, that's my responsibility", next: "pathA" },
+            { text: "👥 Someone else handles it", next: "gatekeeper_intro" }
+        ]
+    },
+    resStruggle: {
+        you: "Yeah, I'm hearing that from a lot of <strong>[CT]</strong>. The thing is, most companies are approaching renewals the same way they did pre-2021, but the rules have completely changed. Do you currently have a strategy in place to help mitigate these increases?",
+        mood: "challenging",
+        responses: [
+            { text: "🎯 Continue to Discovery", next: "discovery" }
+        ]
+    },
+    resNotRenewed: {
+        you: "Actually, that timing works in your favor. Most businesses wait until 60-90 days before expiration to start looking, but with the market set to increase in 2026, people are reserving their rates in advance to avoid paying more in the future. Do you currently have a plan in place to <span class='pause'>--</span> mitigate these increases?",
+        mood: "positive",
+        responses: [
+            { text: "🎯 Continue to Discovery", next: "discovery" }
+        ]
+    },
+    resLockedIn: {
+        you: "Smart move getting locked in during this volatility. How long did you guys end up going with the term? Because here's what I'm seeing <span class='pause'>--</span> even with companies who just renewed, there are often optimization opportunities within existing contracts that most people don't know about. Plus, it gives us time to develop a strategic approach for your next cycle rather than scrambling when rates spike again.",
+        mood: "neutral",
+        responses: [
+            { text: "🎯 Continue to Discovery", next: "discovery" }
+        ]
+    },
+    resShopping: {
+        you: "Perfect timing then. Here's what I'm seeing though <span class='pause'>--</span> typically people just shop for rates but the rate is only about <span class='metric'>60%</span> of your bill if you're lucky. How are you guys evaluating the options <span class='pause'>--</span> just on rate, or are you looking at other ways to lower your final dollar amount?",
+        mood: "positive",
+        responses: [
+            { text: "🎯 Continue to Discovery", next: "discovery" }
+        ]
+    },
+    resBroker: {
+        you: "That's smart <span class='pause'>--</span> having someone who understands the Texas market is crucial right now. Have they let you know about ERCOT's supply concerns for 2026? Because there's some huge changes happening right now that could impact <strong>[CN]</strong>'s costs significantly. Would it be worth understanding what that looks like, even if you're happy with your current relationship?",
+        mood: "neutral",
+        responses: [
+            { text: "🎯 Continue to Discovery", next: "discovery" }
+        ]
+    },
+    resNoThought: {
+        you: "I get it <span class='pause'>--</span> energy's not the first thing you think about when you wake up. How much are you typically spending on energy? And if your bills were to increase by <span class='emphasis'>[XX]</span>, would that impact your budget at all? If I could show you what other companies are doing to reduce their spending, would you be open to discussing this further?",
+        mood: "challenging",
+        responses: [
+            { text: "🎯 Continue to Discovery", next: "discovery" }
+        ]
+    },
+    discovery: {
+        you: "Gotcha! So <strong>[N]</strong>, Just so I understand your situation a little better. <span class='pause'>--</span> What's your current approach to renewing your electricity agreements <span class='pause'>--</span> do you handle it internally or work with a consultant?<br><br><strong><span class='emphasis'>And how that been?</span></strong><br><br><strong><span class='emphasis'>What is most concerning/important to you when it comes to energy?</span></strong><br><br><strong><span class='emphasis'>And how has that impacted you and [CN]?</span></strong><br><br>I watch the markets daily and here's what I'm seeing. Rates have gone up <span class='metric'>60%</span> since 2021 <span class='pause'>--</span> Most businesses <span class='pause'>--</span> <strong>they've taken an incredible hit</strong>, but many others have been able to find <strong>other ways</strong> to pay way less than other companies in their <strong>same area</strong>. If I could show you what they're doing, would you be open to talking about this further?",
+        mood: "neutral",
+        responses: [
+            { text: "💚 Prospect is engaged / ready for appointment", next: "closeForAppointment" },
+            { text: "🟡 Prospect is hesitant / needs more info", next: "handleHesitation" },
+            { text: "❌ Objection: Happy with current provider", next: "objHappy" },
+            { text: "❌ Objection: No time", next: "objNoTime" }
+        ]
+    },
+    objHappy: {
+        you: "That's actually great to hear, and I'm not suggesting you should be unhappy or you need to switch your supplier today. Is it the customer service that you're happy with or are you just getting a rate that you can't find anywhere else?",
+        mood: "positive",
+        responses: [
+            { text: "💰 It's the rate / Great pricing", next: "objHappyRate" },
+            { text: "🤝 Customer service / Overall experience", next: "objHappyService" },
+            { text: "🔄 Both rate and service", next: "objHappyBoth" }
+        ]
+    },
+    objHappyRate: {
+        you: "That's awesome you locked in a great price, however, the rules of Texas Energy have completely changed over the past few years. Even satisfied clients I work with are <span class='pause'>--</span>shocked to find out they that their supplier's new rate is about <span class='metric'>15-25%</span> more than what they were paying before. Would it be worth re-evaluating where you're at now, just to make sure <strong>[CN]</strong> isn't left paying more than they should?",
+        mood: "positive",
+        responses: [
+            { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
+            { text: "❌ No, not interested", next: "softClose" }
+        ]
+    },
+    objHappyService: {
+        you: "That's great - good service is hard to find. What I'm seeing though is that satisfaction with service and getting the best price are two separate conversations. The Texas energy market rules have changed significantly over the past few years. Even satisfied clients I work with discover they can can save <span class='metric'>15-25%</span> without sacrificing great customer service. Would it be worth looking into some options just to see if there is something more affordable for <strong>[CN]</strong>?",
+        mood: "positive",
+        responses: [
+            { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
+            { text: "❌ No, not interested", next: "softClose" }
+        ]
+    },
+    objHappyBoth: {
+        you: "Perfect - that's exactly what you want. I have exclusive partnerships with the suppliers, so I can make them work 10 times harder for your business. If i can show you how to get better pricing and support for your energy, would that be helpful for you and <strong>[CN]</strong>?",
+        mood: "positive",
+        responses: [
+            { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
+            { text: "❌ No, not interested", next: "softClose" }
+        ]
+    },
+    objNoTime: {
+        you: "I completely get it <span class='pause'>--</span> that's exactly why most businesses end up overpaying. Energy is a complicated market that requires ongoing attention that most internal teams <span class='pause'>--</span> simply don't have time for. Here's what I'd suggest <span class='pause'>--</span> give me <span class='emphasis'>10 minutes</span> to review your current setup <span class='pause'>--</span> against where we are today. And that should be able tell you exactly where you stand and what you should be expecting for the future. Would that be helpful for you?",
+        mood: "challenging",
+        responses: [
+            { text: "✅ Yes, schedule 10-minute assessment", next: "scheduleAppointment" },
+            { text: "❌ Still no time", next: "softClose" }
+        ]
+    },
+    handleHesitation: {
+        you: "I get it <span class='pause'>--</span> And called you out the blue so now is probably not the best time. How about this <span class='pause'>--</span> let me put together a quick case study specific to <span class='emphasis'>[TIA]</span>s in your area. Takes me about 10 minutes to prepare, it'll give you a snapshot into the market and it'll show you what other companies are doing to stay afloat in today's market.<br><br><strong><span class='emphasis'>Would that be useful for your future planning?</span></strong>",
+        mood: "unsure",
+        responses: [
+            { text: "✅ Yes, send analysis", next: "getEmail" },
+            { text: "❌ No, not interested", next: "softClose" }
+        ]
+    },
+    closeForAppointment: {
+        you: "Awesome! So, <strong>[N]</strong><span class='pause'>--</span> I really believe you'll be able to benefit from <span class='emphasis'>[SB]</span> that way you won't have to <span class='emphasis'>[PP]</span>. Our process is super simple! We start with an <span class='emphasis'>energy health check</span> where I look at your usage, contract terms, and then we can talk about what options might look like for <strong>[CN]</strong> moving forward. It should take <span class='emphasis'>10-15 minutes</span> of your time. Would you prefer to connect this <span class='emphasis'>Friday morning around 11 AM</span>, or would <span class='emphasis'>Monday afternoon around 2 PM</span> work better for your schedule?",
+        mood: "positive",
+        responses: [
+            { text: "📅 Schedule Friday 11 AM", next: "appointmentConfirmed" },
+            { text: "📅 Schedule Monday 2 PM", next: "appointmentConfirmed" },
+            { text: "🤔 Still hesitant", next: "getEmail" }
+        ]
+    },
+    scheduleAppointment: {
+        you: "Perfect! Let's get that <span class='emphasis'>10-minute market assessment</span> scheduled. I'll walk through your current situation, show you common supplier traps, and outline 2-3 strategic options based on your specific situation. Would <span class='emphasis'>Friday morning</span> or <span class='emphasis'>Monday afternoon</span> work better?",
+        mood: "positive",
+        responses: [
+            { text: "📅 Friday morning works", next: "appointmentConfirmed" },
+            { text: "📅 Monday afternoon works", next: "appointmentConfirmed" }
+        ]
+    },
+    appointmentConfirmed: {
+        you: "Perfect! I'll send you a calendar invite for <span class='emphasis'>[DT]</span>, and I'll put together some information specific to <span class='emphasis'>[TIA]</span> to give you better context for our meeting. Do you have a copy of your bill?",
+        mood: "positive",
+        responses: [
+            { text: "✅ Yes, I have a copy", next: "billYes" },
+            { text: "❌ No, I don't have one readily available", next: "billNo" }
+        ]
+    },
+    billYes: {
+        you: "Perfect! I'm going to also send you a standard invoice request. Could you reply back with a recent copy?",
+        mood: "positive",
+        responses: [
+            { text: "✅ Yes, I can send that", next: "confirmEmail" },
+            { text: "❌ I'd prefer not to share that", next: "billOptional" }
+        ]
+    },
+    billNo: {
+        you: "No problem. How do you typically receive your bills <span class='pause'>--</span> physical copy or through email?",
+        mood: "positive",
+        responses: [
+            { text: "📧 Through email", next: "billEmailAdvice" },
+            { text: "📄 Physical copy", next: "billPhysicalAdvice" }
+        ]
+    },
+    billEmailAdvice: {
+        you: "Perfect! Be sure to have a copy ready for us to go over at <span class='emphasis'>[DT]</span>. You should be able to find it in your email from your provider. Looking forward to our conversation!",
+        mood: "positive",
+        responses: [
+            { text: "✅ Sounds great - end call", next: "callSuccess" }
+        ]
+    },
+    billPhysicalAdvice: {
+        you: "Perfect! Be sure to have a copy ready for us to go over at <span class='emphasis'>[DT]</span>. If you can find your most recent physical bill, that would be ideal for our review. Looking forward to our conversation!",
+        mood: "positive",
+        responses: [
+            { text: "✅ Sounds great - end call", next: "callSuccess" }
+        ]
+    },
+    confirmEmail: {
+        you: "Excellent! So I have your email as <span class='emphasis'>[TE]</span> <span class='pause'>--</span> is that correct? I'll send both the calendar invite and the invoice request to that address. You should receive them within the next few minutes. Looking forward to our conversation at <span class='emphasis'>[DT]</span>!",
+        mood: "positive",
+        responses: [
+            { text: "✅ Email confirmed - end call", next: "callSuccess" },
+            { text: "❌ Different email address", next: "getCorrectEmail" }
+        ]
+    },
+    getCorrectEmail: {
+        you: "No problem! What's the best email address for you?",
+        mood: "positive",
+        responses: [
+            { text: "📧 Provide correct email", next: "emailConfirmed" }
+        ]
+    },
+    emailConfirmed: {
+        you: "Perfect! I'll send the calendar invite and invoice request to <span class='emphasis'>[EAC]</span>. You should receive them within the next few minutes. Looking forward to our conversation at <span class='emphasis'>[DT]</span>!",
+        mood: "positive",
+        responses: [
+            { text: "✅ All set - end call", next: "callSuccess" }
+        ]
+    },
+    billOptional: {
+        you: "No worries at all! Having a bill helps with the analysis, but we can still have a productive conversation without it. I'll send you the calendar invite for <span class='emphasis'>[DT]</span> and some industry-specific information. Looking forward to our conversation!",
+        mood: "positive",
+        responses: [
+            { text: "✅ Sounds good - end call", next: "callSuccess" }
+        ]
+    },
+    getEmail: {
+        you: "Great! I'll put together a quick case study specific to <span class='emphasis'>[TIA]</span>. It takes me about 10 minutes to prepare, and it'll give you a baseline understanding of where your company stands competitively. I can email that over by tomorrow, and if you see value in diving deeper, we can schedule a brief follow-up. What's a good email for you?",
+        mood: "unsure",
+        responses: [
+            { text: "✅ Yes, send analysis", next: "emailFollowUp" },
+            { text: "❌ Don't want to provide email", next: "softClose" }
+        ]
+    },
+    emailFollowUp: {
+        you: "Perfect! I've got <span class='emphasis'>[EAC]</span>. I'll get that market analysis over to you by <span class='emphasis'>[TF]</span>, and it'll give you a good baseline for understanding your competitive position. If you have any immediate questions before then, feel free to reach out. Otherwise, I'll follow up once you've had a chance to review the information. Sound good?",
+        mood: "positive",
+        responses: [
+            { text: "✅ Sounds good - end call", next: "callSuccess" }
+        ]
+    },
+    softClose: {
+        you: "No problem at all <span class='pause'>--</span> I know energy strategy isn't urgent until it becomes critical. Here's what I'll do: I'm going to add you to my <span class='emphasis'>quarterly market intelligence updates</span>. These go out to CFOs and facilities managers across Texas and include trend analysis, regulatory updates, and strategic insights. <span class='emphasis'>No sales content, just market intelligence</span> that helps you stay informed. If market conditions create opportunities that make sense for <span class='emphasis'>[CN]</span>, I'll reach out. Sound reasonable?",
+        mood: "neutral",
+        responses: [
+            { text: "✅ That sounds reasonable", next: "callSuccess" },
+            { text: "❌ No thanks", next: "callEnd" }
+        ]
+    },
+    callSuccess: {
+        you: "🎉 <strong>Call Completed Successfully!</strong><br><br>Remember to track:<br>• Decision maker level<br>• Current contract status and timeline<br>• Pain points identified<br>• Interest level (Hot/Warm/Cold/Future)<br>• Next action committed<br>• Best callback timing<br><br><span class='emphasis'>Great job keeping the energy high and positioning as a strategic advisor!</span>",
+        mood: "positive",
+        responses: [
+            { text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }
+        ]
+    },
+    callEnd: {
+        you: "Thanks for your time. Have a great day!",
+        mood: "neutral",
+        responses: [
+            { text: "🔄 Start New Call", next: "start" }
+        ]
+    },
+    transfer_dialing: {
+        you: "Being transferred... Ringing...",
+        mood: "neutral",
+        responses: [
+            { text: "📞 Decision Maker Answers", next: "main_script_start" },
+            { text: "🚫 No Answer", next: "voicemail_or_hangup" }
+        ]
+    }
+};
+
+let currentStep = 'start';
+let history = [];
+let scriptDisplay, responsesContainer, backBtn;
+
+// This function is no longer needed since the app is a single page app.
+// The data is passed via the openCallsHubWithData function instead of URL parameters.
+// function populateFromURL() { ... } 
+
+function populateFromGlobalProspect() {
+    const inputName = gId('input-name');
+    if (inputName) {
+        inputName.value = currentProspect.name || '';
+        placeholders['N'] = currentProspect.name || '';
+    }
+    const inputTitle = gId('input-title');
+    if (inputTitle) {
+        inputTitle.value = currentProspect.title || '';
+        placeholders['CT'] = currentProspect.title || '';
+    }
+    const inputCompanyName = gId('input-company-name');
+    if (inputCompanyName) {
+        inputCompanyName.value = currentProspect.company || '';
+        placeholders['CN'] = currentProspect.company || '';
+    }
+    const inputCompanyIndustry = gId('input-company-industry');
+    if (inputCompanyIndustry) {
+        inputCompanyIndustry.value = currentProspect.industry || '';
+        placeholders['CI'] = currentProspect.industry || '';
+        placeholders['TIA'] = currentProspect.industry || '';
+    }
+    const inputBenefit = gId('input-benefit');
+    if (inputBenefit) {
+        inputBenefit.value = currentProspect.benefits || '';
+        placeholders['SB'] = currentProspect.benefits || '';
+    }
+    const inputPain = gId('input-pain');
+    if (inputPain) {
+        inputPain.value = currentProspect.painPoints || '';
+        placeholders['PP'] = currentProspect.painPoints || '';
+    }
     
-    <!-- Firebase Scripts - MUST come before firebase-config.js -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    
-    <!-- Your CSS and JS files -->
-    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/crm-styles.css">
-    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/style.css">
-    <script src="https://powerchoosers.github.io/power-choosers-crm/firebase-config.js"></script>
-    <script src="https://powerchoosers.github.io/power-choosers-crm/crm-app.js"></script>
-</head>
-<body>
-    <div class="top-nav">
-        <div class="nav-container">
-            <div class="nav-left-title">
-                <h1 id="page-title">Power Choosers CRM</h1>
-            </div>
-            <div class="nav-icons-center">
-                <button class="app-button active" id="dashboard-btn" data-view="dashboard">
-                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                    <span class="app-label">Dashboard</span>
-                </button>
-                
-                <button class="app-button" id="accounts-btn" data-view="accounts">
-                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="m22 21-1.5-1.5"/>
-                        <circle cx="19" cy="17" r="3"/>
-                    </svg>
-                    <span class="app-label">Accounts</span>
-                </button>
-                
-                <button class="app-button" id="contacts-btn" data-view="contacts">
-                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="m22 21-3-3"/>
-                        <circle cx="19" cy="17" r="3"/>
-                    </svg>
-                    <span class="app-label">Contacts</span>
-                </button>
-
-                <!-- This is the Calls Hub button, now toggling an internal view -->
-                <button class="app-button" id="calls-hub-btn" data-view="calls-hub">
-                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                    </svg>
-                    <span class="app-label">Calls Hub</span>
-                </button>
-
-                <!-- Search buttons are now part of the CRM functionality -->
-                <div class="app-button" id="google-button">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google" class="app-icon">
-                    <span class="app-label">Google</span>
-                </div>
-                <div class="app-button" id="maps-button">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d37e95a4c0686b08c267_images.jpg" alt="Google Maps" class="app-icon">
-                    <span class="app-label">Maps</span>
-                </div>
-                <div class="app-button" id="apollo-button">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851d2771f4c6e42a09731_images.png" alt="Apollo" class="app-icon">
-                    <span class="app-label">Apollo</span>
-                </div>
-                <div class="app-button" id="beenverified-button">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68885144c4bbad742f397a18_unnamed.png" alt="BeenVerified" class="app-icon">
-                    <span class="app-label">BeenVerified</span>
-                </div>
-            </div>
-            <div class="nav-right-logo"></div>
-        </div>
-    </div>
-    
-    <div class="search-bar" id="search-bar">
-        <div class="search-container">
-            <div class="search-label" id="search-label">Search Google:</div>
-            <input type="text" class="search-input" id="search-input" placeholder="Type your search query...">
-            <input type="text" class="search-input city" id="search-city" placeholder="City" style="display:none">
-            <input type="text" class="search-input state" id="search-state" placeholder="State" style="display:none">
-            <input type="text" class="search-input location" id="search-location" placeholder="Location (e.g. Fort Worth, TX)" style="display:none">
-            <div class="search-actions">
-                <button class="search-btn" onclick="performSearch()">Go</button>
-                <button class="search-btn close" onclick="closeSearch()">✕</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="main-container" id="main-container">
-        
-        <div class="view-container active" id="dashboard-view">
-            <div class="dashboard-layout">
-                <div class="dashboard-main">
-                    <div class="crm-card">
-                        <h2 class="card-title">📊 Dashboard Overview</h2>
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <span class="stat-number" id="total-accounts">0</span>
-                                <span class="stat-label">Total Accounts</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-number" id="total-contacts">0</span>
-                                <span class="stat-label">Total Contacts</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-number" id="recent-activities">0</span>
-                                <span class="stat-label">Recent Activities</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-number" id="hot-leads">0</span>
-                                <span class="stat-label">Hot Leads</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="crm-card">
-                        <h2 class="card-title">🔥 Recent Activities</h2>
-                        <div id="recent-activities-list">
-                            <p class="empty-state">No recent activities</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="dashboard-sidebar">
-                    <div class="crm-card">
-                        <h2 class="card-title">⚡ Quick Actions</h2>
-                        <button class="action-btn" id="go-to-calls-hub-btn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                            </svg>
-                            Go to Calls Hub
-                        </button>
-                        <button class="action-btn" id="add-account-btn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 8v8M8 12h8"/>
-                            </svg>
-                            Add New Account
-                        </button>
-                        <button class="action-btn" id="add-contact-btn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                                <circle cx="9" cy="7" r="4"/>
-                                <path d="M19 8v6M22 11h-6"/>
-                            </svg>
-                            Add New Contact
-                        </button>
-                    </div>
-                    
-                    <div class="crm-card">
-                        <h2 class="card-title">📞 Today's Calls</h2>
-                        <div id="todays-calls">
-                            <p class="empty-state">No calls scheduled</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="view-container" id="accounts-view">
-            <div class="view-header">
-                <h2>🏢 Accounts</h2>
-                <button class="primary-btn" id="new-account-btn">+ New Account</button>
-            </div>
-            <div class="accounts-grid" id="accounts-grid">
-                <p class="empty-state">No accounts found. Click "New Account" to get started.</p>
-            </div>
-        </div>
-
-        <div class="view-container" id="contacts-view">
-            <div class="view-header">
-                <h2>👤 Contacts</h2>
-                <button class="primary-btn" id="new-contact-btn">+ New Contact</button>
-            </div>
-            <div class="contacts-grid" id="contacts-grid">
-                <p class="empty-state">No contacts found. Click "New Contact" to get started.</p>
-            </div>
-        </div>
-
-        <div class="view-container" id="account-detail-view">
-            <div class="account-detail-layout">
-                <div class="account-detail-main">
-                    <div class="view-header">
-                        <button class="back-btn" id="back-to-accounts">← Back to Accounts</button>
-                        <h2 id="account-detail-title">Account Details</h2>
-                        <button class="primary-btn" id="edit-account-btn">Edit Account</button>
-                    </div>
-                    
-                    <div class="crm-card">
-                        <h3 class="card-title">🏢 Company Information</h3>
-                        <div id="account-info-display">
-                        </div>
-                    </div>
-                    
-                    <div class="crm-card">
-                        <h3 class="card-title">👥 Contacts at this Account</h3>
-                        <div id="account-contacts-list">
-                            <p class="empty-state">No contacts for this account</p>
-                        </div>
-                    </div>
-                    
-                    <div class="crm-card">
-                        <h3 class="card-title">📝 Recent Activities</h3>
-                        <div id="account-activities-list">
-                            <p class="empty-state">No recent activities</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="account-detail-sidebar">
-                    <div class="crm-card">
-                        <h3 class="card-title">⚡ Energy Contract Details</h3>
-                        <form id="energy-contract-form">
-                            <div class="input-group">
-                                <label for="contract-provider">Current Provider:</label>
-                                <input type="text" id="contract-provider" placeholder="Enter provider name">
-                            </div>
-                            <div class="input-group">
-                                <label for="contract-rate">Current Rate:</label>
-                                <input type="text" id="contract-rate" placeholder="e.g. 12.5¢/kWh">
-                            </div>
-                            <div class="input-group">
-                                <label for="contract-expiration">Contract Expiration:</label>
-                                <input type="date" id="contract-expiration">
-                            </div>
-                            <div class="input-group">
-                                <label for="contract-type">Contract Type:</label>
-                                <select id="contract-type">
-                                    <option value="">Select type</option>
-                                    <option value="fixed">Fixed Rate</option>
-                                    <option value="variable">Variable Rate</option>
-                                    <option value="indexed">Indexed Rate</option>
-                                </select>
-                            </div>
-                            <button class="primary-btn" type="submit">Save Contract Info</button>
-                        </form>
-                    </div>
-                    
-                    <div class="crm-card">
-                        <h3 class="card-title">📝 Add Note</h3>
-                        <textarea id="account-note-input" placeholder="Add a note about this account..."></textarea>
-                        <button class="primary-btn" id="save-account-note">Save Note</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- CALLING HUB VIEW - INTEGRATED INTO THE MAIN PAGE -->
-        <div class="view-container" id="calls-hub-view">
-            <div class="container">
-                <div class="main-content">
-                    <div id="script-display" class="script-display mood-neutral">
-                        Click 'Dial' to begin the call
-                    </div>
-                    <div id="responses-container" class="responses-grid">
-                        <!-- The dial button will be dynamically injected here by crm-app.js -->
-                    </div>
-                    <div class="nav-buttons">
-                        <button id="back-btn" class="nav-btn" onclick="goBack()" disabled>← Back</button>
-                        <button id="restart-btn" class="nav-btn" onclick="restart()">🔄 Restart</button>
-                    </div>
-                </div>
-            
-                <div class="sidebar">
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-title">📋 Prospect Info</h3>
-                        <div class="input-group">
-                            <label for="input-company-name">Company Name:</label>
-                            <input type="text" id="input-company-name" placeholder="ABC Manufacturing" oninput="updateScript()">
-                        </div>
-                        <div class="input-group">
-                            <label for="input-name">Contact Name:</label>
-                            <input type="text" id="input-name" placeholder="John Smith" oninput="updateScript()">
-                        </div>
-                        <div class="input-group">
-                            <label for="input-title">Contact Title:</label>
-                            <input type="text" id="input-title" placeholder="Company Leader" oninput="updateScript()">
-                        </div>
-                        <div class="input-group">
-                            <label for="input-company-industry">Company Industry:</label>
-                            <input type="text" id="input-company-industry" placeholder="businesses" oninput="updateScript()">
-                        </div>
-                        <div class="input-group">
-                            <label for="input-benefit">Specific Benefit:</label>
-                            <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" oninput="updateScript()">
-                        </div>
-                        <div class="input-group">
-                            <label for="input-pain">Pain Point:</label>
-                            <input type="text" id="input-pain" placeholder="you're not stuck paying more" oninput="updateScript()">
-                        </div>
-                    </div>
-            
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-title">📝 Call Notes</h3>
-                        <textarea id="call-notes" placeholder="Type your call notes here...
-• Company:
-• Contact:
-• Title:
-• Phone:
-• Email:
-• Contract expiration:
-• Current provider:
-• Pain points:
-• Interest level:
-• Next steps:
-• Follow-up date: "></textarea>
-                        <div style="display:flex;gap:8px;margin-bottom:16px">
-                            <button onclick="saveProspectAndNotes()" class="add-notes-btn">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <path d="M12 8v8M8 12h8"/>
-                                </svg>
-                                Add Notes
-                            </button>
-                            <button onclick="clearNotes()" style="flex:1;background:#da3633;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.9rem">🗑️ Clear</button>
-                        </div>
-                    </div>
-            
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-title">💡 Call Strategy Tips</h3>
-                        <div class="tip-item"><strong>Mirror their energy:</strong> Match their speaking pace and enthusiasm level to build rapport naturally.</div>
-                        <div class="tip-item"><strong>Use their name:</strong> Say their name 2-3 times during the call to maintain personal connection.</div>
-                        <div class="tip-item"><strong>Pause power:</strong> Use 2-3 second pauses after questions to let them process and respond.</div>
-                        <div class="tip-item"><strong>Permission-based selling:</strong> Always ask permission before moving to the next topic or scheduling.</div>
-                        <div class="tip-item"><strong>Assume the close:</strong> When scheduling, offer two specific times rather than asking "when works?"</div>
-                    </div>
-            
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-title">📊 Market Intelligence</h3>
-                        <div class="stat-grid">
-                            <div class="stat-card"><span class="stat-number">60%</span><span class="stat-label">Rate increase since 2021</span></div>
-                            <div class="stat-card"><span class="stat-number">29%</span><span class="stat-label">TX cost advantage</span></div>
-                            <div class="stat-card"><span class="stat-number">2026</span><span class="stat-label">Supply concerns begin</span></div>
-                            <div class="stat-card"><span class="stat-number">85%</span><span class="stat-label">Businesses unprepared</span></div>
-                        </div>
-                        <div class="tip-item"><strong>Key Message:</strong> "Texas maintains a 29% cost advantage over national averages, but only if you're positioned correctly in the market."</div>
-                    </div>
-            
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-title">📰 This Week's Energy News</h3>
-                        
-                        <div class="news-item">
-                            <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
-                            <div class="news-summary">Grid operator warns electricity demand may surpass available supply as soon as summer 2026, driven by massive data center growth and extreme weather patterns.</div>
-                            <div class="news-talking-point">💬 "With ERCOT projecting supply shortages, how is your company preparing for potential capacity constraints?"</div>
-                        </div>
-                        
-                        <div class="news-item">
-                            <div class="news-title">Data Centers Drive 218GW Demand Surge</div>
-                            <div class="news-summary">Texas electricity demand projected to reach 218GW by 2031 - more than doubling current levels. AI data centers alone account for 86GW of new demand growth.</div>
-                            <div class="news-talking-point">💬 "Are you factoring the massive industrial load growth into your energy procurement strategy?"</div>
-                        </div>
-                        
-                        <div class="news-item">
-                            <div class="news-title">"One Big Beautiful Bill" Impacts Texas Markets</div>
-                            <div class="news-summary">Federal legislation cuts clean energy subsidies while expanding fossil fuel production. Analysis shows wholesale electricity prices could rise 25% by 2030 and 74% by 2035.</div>
-                            <div class="news-talking-point">💬 "How are recent federal policy changes affecting your long-term energy cost planning?"</div>
-                        </div>
-                        
-                        <div class="news-item">
-                            <div class="news-title">Texas Wholesale Prices Expected to Drop Short-Term</div>
-                            <div class="news-summary">EIA forecasts ERCOT North Hub prices to decrease to $27-34/MWh in 2025 due to solar expansion, but forward contracts remain elevated at $50+/MWh reflecting market risk.</div>
-                            <div class="news-talking-point">💬 "Are you taking advantage of current market conditions to lock in favorable rates?"</div>
-                        </div>
-                    </div>
-            
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-title">🛡️ Quick Objection Responses</h3>
-                        <div class="tip-item"><strong>"We're happy with our provider"</strong><br>"That's great to hear. This isn't about changing providers - it's about optimizing your position within the current market structure."</div>
-                        <div class="tip-item"><strong>"We just renewed our contract"</strong><br>"Perfect timing actually. This gives us a chance to prepare strategically for your next cycle rather than scrambling later."</div>
-                        <div class="tip-item"><strong>"Send me some information"</strong><br>"I can definitely do that. What specific information would be most valuable - rate comparisons or market timing strategies?"</div>
-                        <div class="tip-item"><strong>"We handle it internally"</strong><br>"Smart approach. My role isn't to replace your team - it's to provide market intelligence that helps you make better decisions."</div>
-                    </div>
-            
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-title">🎯 Daily Goals</h3>
-                        <div class="stat-grid">
-                            <div class="stat-card"><span class="stat-number">50</span><span class="stat-label">Dials target</span></div>
-                            <div class="stat-card"><span class="stat-number">15</span><span class="stat-label">Conversations</span></div>
-                            <div class="stat-card"><span class="stat-number">5</span><span class="stat-label">Qualified leads</span></div>
-                            <div class="stat-card"><span class="stat-number">2</span><span class="stat-label">Appointments</span></div>
-                        </div>
-                        <div class="tip-item"><strong>Success Rate:</strong> Track your conversion from dials to conversations to appointments. Aim for 30% conversation rate and 15% appointment rate.</div>
-                    </div>
-            
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-title">🏭 Industry Talking Points</h3>
-                        <div class="tip-item"><strong>Manufacturing:</strong> "Energy costs can represent 15-30% of operating expenses. How are you managing that exposure to volatility?"</div>
-                        <div class="tip-item"><strong>Healthcare:</strong> "Critical facilities need reliable power strategies. Are you prepared for supply constraints in 2026?"</div>
-                        <div class="tip-item"><strong>Retail:</strong> "Multiple locations mean complex energy management. How are you optimizing across all sites?"</div>
-                        <div class="tip-item"><strong>Technology:</strong> "Data centers have unique load profiles. Are you maximizing your demand response opportunities?"</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-    <div class="modal-overlay" id="account-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="account-modal-title">Add New Account</h3>
-                <button class="close-btn" id="close-account-modal">×</button>
-            </div>
-            <form id="account-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="account-name">Company Name *</label>
-                        <input type="text" id="account-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="account-industry">Industry</label>
-                        <input type="text" id="account-industry">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="account-phone">Phone</label>
-                        <input type="tel" id="account-phone">
-                    </div>
-                    <div class="form-group">
-                        <label for="account-website">Website</label>
-                        <input type="url" id="account-website">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="account-address">Address</label>
-                    <textarea id="account-address" rows="3"></textarea>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="account-pain-points">Pain Points</label>
-                        <textarea id="account-pain-points" rows="3" placeholder="What challenges does this company face?"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="account-benefits">Benefits</label>
-                        <textarea id="account-benefits" rows="3" placeholder="What benefits can we provide?"></textarea>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="secondary-btn" id="cancel-account">Cancel</button>
-                    <button type="submit" class="primary-btn">Save Account</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="contact-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="contact-modal-title">Add New Contact</h3>
-                <button class="close-btn" id="close-contact-modal">×</button>
-            </div>
-            <form id="contact-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="contact-first-name">First Name *</label>
-                        <input type="text" id="contact-first-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="contact-last-name">Last Name *</label>
-                        <input type="text" id="contact-last-name" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="contact-title">Job Title</label>
-                        <input type="text" id="contact-title">
-                    </div>
-                    <div class="form-group">
-                        <label for="contact-account">Account</label>
-                        <select id="contact-account">
-                            <option value="">Select an account...</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="contact-email">Email</label>
-                        <input type="email" id="contact-email">
-                    </div>
-                    <div class="form-group">
-                        <label for="contact-phone">Phone</label>
-                        <input type="tel" id="contact-phone">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="contact-notes">Notes</label>
-                    <textarea id="contact-notes" rows="3"></textarea>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="secondary-btn" id="cancel-contact">Cancel</button>
-                    <button type="submit" class="primary-btn">Save Contact</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="loading-overlay" id="loading-overlay">
-        <div class="spinner"></div>
-    </div>
-
-    <div class="toast-container" id="toast-container"></div>
-    <script>
-        // Setup the "Go to Calls Hub" button after DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            const goToCallsHubBtn = document.getElementById('go-to-calls-hub-btn');
-            if (goToCallsHubBtn) {
-                goToCallsHubBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    showView('calls-hub');
-                    updateActiveNavButton(document.getElementById('calls-hub-btn'));
-                });
+    // Check if coming from a contact and disable fields
+    if (currentProspect.contactId) {
+        const fieldsToDisable = ['input-name', 'input-title', 'input-company-name', 'input-company-industry'];
+        fieldsToDisable.forEach(fieldId => {
+            const input = gId(fieldId);
+            if (input) {
+                input.disabled = true;
             }
         });
-    </script>
-</body>
-</html>
+    } else {
+        const fieldsToDisable = ['input-name', 'input-title', 'input-company-name', 'input-company-industry'];
+        fieldsToDisable.forEach(fieldId => {
+            const input = gId(fieldId);
+            if (input) {
+                input.disabled = false;
+            }
+        });
+    }
+}
+
+async function saveCallNotesToCRM() {
+    // This function is no longer used directly as saveProspectAndNotes is the new entry point
+}
+
+function applyPlaceholders(text) {
+    let newText = text;
+    for (const key in placeholders) {
+        const regex = new RegExp('\\[' + key + '\\]', 'g');
+        newText = newText.replace(regex, placeholders[key]);
+    }
+    return newText;
+}
+
+function updateScript() {
+    for (const inputId in inputMap) {
+        const placeholderKey = inputMap[inputId];
+        const inputElement = gId(inputId);
+        if (inputElement) {
+            const inputValue = inputElement.value || inputElement.placeholder;
+            placeholders[placeholderKey] = inputValue;
+        }
+    }
+    placeholders['TIA'] = placeholders['CI'];
+    displayCurrentStep();
+}
+
+function displayCurrentStep() {
+    const step = scriptData[currentStep];
+    if (!step) return;
+    
+    scriptDisplay = gId('script-display');
+    responsesContainer = gId('responses-container');
+    backBtn = gId('back-btn');
+    
+    const processedText = applyPlaceholders(step.you);
+    
+    if (scriptDisplay) {
+        scriptDisplay.innerHTML = processedText;
+        scriptDisplay.className = `script-display mood-${step.mood}`;
+    }
+    
+    if (responsesContainer) {
+        responsesContainer.innerHTML = '';
+        if (currentStep === 'start' && currentProspect.phone) {
+            const dialButtonHtml = `
+                <button class="dial-button" onclick="handleDialClick()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
+                        <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                    </svg>
+                    Dial
+                </button>
+            `;
+            responsesContainer.innerHTML = dialButtonHtml;
+        } else if (currentStep === 'start') {
+            responsesContainer.innerHTML = `
+                <button class="dial-button" onclick="handleDialClick()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
+                        <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                    </svg>
+                    Dial
+                </button>
+            `;
+        } else if (step.responses && step.responses.length > 0) {
+            step.responses.forEach(response => {
+                const button = document.createElement('button');
+                button.className = 'response-btn';
+                button.innerHTML = applyPlaceholders(response.text);
+                button.onclick = () => selectResponse(response.next, response.action);
+                responsesContainer.appendChild(button);
+            });
+        }
+    }
+    
+    if (backBtn) {
+        backBtn.disabled = history.length === 0;
+    }
+
+    populateFromGlobalProspect();
+}
+
+function handleDialClick() {
+    if (currentProspect.phone) {
+        window.location.href = `tel:${currentProspect.phone}`;
+    } else {
+        showToast('No phone number available for this prospect. Manual dialing is required.', 'info');
+    }
+    selectResponse('dialing');
+}
+
+function selectResponse(nextStep, action) {
+    if (nextStep && scriptData[nextStep]) {
+        history.push(currentStep);
+        currentStep = nextStep;
+        displayCurrentStep();
+    }
+
+    if (action === 'saveProspectAndNotes') {
+        saveProspectAndNotes();
+    }
+}
+
+function goBack() {
+    if (history.length > 0) {
+        currentStep = history.pop();
+        displayCurrentStep();
+    }
+}
+
+function restart() {
+    currentStep = 'start';
+    history = [];
+    
+    const callNotesElement = gId('call-notes');
+    if (callNotesElement) {
+        callNotesElement.value = '';
+    }
+    
+    currentProspect = {
+        name: '',
+        title: '',
+        company: '',
+        industry: '',
+        phone: '',
+        email: '',
+        accountId: '',
+        contactId: '',
+        painPoints: '',
+        benefits: ''
+    };
+    
+    const inputs = ['input-name', 'input-title', 'input-company-name', 'input-company-industry', 'input-benefit', 'input-pain'];
+    inputs.forEach(inputId => {
+        const input = gId(inputId);
+        if (input) {
+            input.value = '';
+            input.disabled = false;
+        }
+    });
+    
+    displayCurrentStep();
+}
+
+function copyNotes() {
+    const notesTextarea = gId('call-notes');
+    const statusDiv = gId('copy-status');
+    
+    if (!notesTextarea || !statusDiv) return;
+    
+    notesTextarea.select();
+    try {
+        document.execCommand('copy');
+        statusDiv.textContent = '✅ Notes copied to clipboard!';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => statusDiv.style.opacity = '0', 3000);
+    } catch (err) {
+        statusDiv.textContent = '❌ Copy failed';
+        statusDiv.style.color = '#ef4444';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => {
+            statusDiv.style.opacity = '0';
+            statusDiv.style.color = '#22c55e';
+        }, 3000);
+    }
+}
+
+function clearNotes() {
+    const notesTextarea = gId('call-notes');
+    const statusDiv = gId('copy-status');
+    
+    if (!notesTextarea || !statusDiv) return;
+
+    if (confirm('Are you sure you want to clear all notes?')) {
+        notesTextarea.value = '';
+        statusDiv.textContent = '🗑️ Notes cleared';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => statusDiv.style.opacity = '0', 2000);
+    }
+}
+
+// --- Search Functions ---
+function setupSearchFunctionality() {
+    const googleBtn = gId('google-button');
+    if (googleBtn) {
+        googleBtn.addEventListener('click', (e) => openSearch('google', e));
+    }
+    const mapsBtn = gId('maps-button');
+    if (mapsBtn) {
+        mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
+    }
+    const apolloBtn = gId('apollo-button');
+    if (apolloBtn) {
+        apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
+    }
+    const beenverifiedBtn = gId('beenverified-button');
+    if (beenverifiedBtn) {
+        beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
+    }
+
+    ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
+        const input = gId(id);
+        if (input) {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') performSearch();
+            });
+        }
+    });
+}
+
+function openSearch(type, event) {
+    const button = event.target.closest('.app-button');
+    const searchBar = gId('search-bar');
+    const mainContainer = gId('main-container');
+
+    if (currentSearchType === type && activeButton === button) {
+        closeSearch();
+        return;
+    }
+    
+    if (activeButton) activeButton.classList.remove('active');
+    currentSearchType = type;
+    activeButton = button;
+    button.classList.add('active');
+    
+    const label = gId('search-label');
+    const input = gId('search-input');
+    const cityInput = gId('search-city');
+    const stateInput = gId('search-state');
+    const locationInput = gId('search-location');
+    
+    if (!label || !input) return;
+    
+    if (cityInput) cityInput.style.display = 'none';
+    if (stateInput) stateInput.style.display = 'none';
+    if (locationInput) locationInput.style.display = 'none';
+    
+    if (type === 'google') {
+        label.textContent = 'Search Google:';
+        input.placeholder = 'Type your search query...';
+    } else if (type === 'maps') {
+        label.textContent = 'Search Maps:';
+        input.placeholder = 'Search places, addresses, businesses...';
+    } else if (type === 'beenverified') {
+        label.textContent = 'Search BeenVerified:';
+        input.placeholder = 'Enter full name (e.g. John Smith)...';
+        if (cityInput) cityInput.style.display = 'block';
+        if (stateInput) stateInput.style.display = 'block';
+    } else if (type === 'apollo') {
+        label.textContent = 'Search Apollo:';
+        input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
+        if (locationInput) locationInput.style.display = 'block';
+    }
+    
+    if (searchBar) searchBar.classList.add('active');
+    if (mainContainer) {
+        mainContainer.classList.add('search-active');
+    }
+    setTimeout(() => input.focus(), 300);
+    input.value = '';
+    if (cityInput) cityInput.value = '';
+    if (stateInput) stateInput.value = '';
+    if (locationInput) locationInput.value = '';
+}
+
+function closeSearch() {
+    const searchBar = gId('search-bar');
+    const mainContainer = gId('main-container');
+    if (searchBar) {
+        searchBar.classList.remove('active');
+    }
+    if (mainContainer) {
+        mainContainer.classList.remove('search-active');
+    }
+    if (activeButton) {
+        activeButton.classList.remove('active');
+        activeButton = null;
+    }
+    currentSearchType = '';
+}
+
+function performSearch() {
+    const query = gId('search-input').value.trim();
+    if (!query) return;
+    
+    let searchUrl = '';
+    
+    if (currentSearchType === 'google') {
+        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    } else if (currentSearchType === 'maps') {
+        searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+    } else if (currentSearchType === 'beenverified') {
+        const city = gId('search-city').value.trim();
+        const state = gId('search-state').value.trim().toUpperCase();
+        const nameParts = query.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
+    } else if (currentSearchType === 'apollo') {
+        const location = gId('search-location').value.trim();
+        let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
+        if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
+        searchUrl = apolloUrl;
+    }
+    
+    if (searchUrl) {
+        window.open(searchUrl, '_blank');
+        closeSearch();
+    }
+}
+
