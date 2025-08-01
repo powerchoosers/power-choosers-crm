@@ -46,13 +46,250 @@ const inputMap = {
     'input-pain': 'PP'
 };
 
-
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Wait a bit for Firebase to load
     setTimeout(() => {
         initializeApp();
-    }, 500);
+    }
+    
+    if (backBtn) {
+        backBtn.disabled = history.length === 0;
+    }
+
+    populateFromGlobalProspect();
+}
+
+function handleDialClick() {
+    // Show a message about dialing but still proceed with the script
+    if (currentProspect.phone) {
+        showToast(`Dialing ${currentProspect.phone}...`, 'info');
+    } else {
+        showToast('Starting call script (no phone number provided)', 'info');
+    }
+    
+    // Move to the "dialing" script step
+    selectResponse('dialing'); 
+}
+
+function selectResponse(nextStep, action) {
+    if (nextStep && scriptData[nextStep]) {
+        history.push(currentStep);
+        currentStep = nextStep;
+        displayCurrentStep();
+    }
+
+    // Handle special actions
+    if (action === 'saveNotes') {
+        saveCallNotesToCRM();
+    }
+}
+
+function goBack() {
+    if (history.length > 0) {
+        currentStep = history.pop();
+        displayCurrentStep();
+    }
+}
+
+function restart() {
+    currentStep = 'start';
+    history = [];
+    
+    const callNotesElement = gId('call-notes');
+    if (callNotesElement) {
+        callNotesElement.value = '';
+    }
+
+    // Don't clear currentProspect completely - allow manual editing
+    if (!currentProspect.contactId && !currentProspect.accountId) {
+        currentProspect = {
+            name: '',
+            title: '',
+            company: '',
+            industry: '',
+            phone: '',
+            email: '',
+            accountId: '',
+            contactId: ''
+        };
+    }
+    
+    displayCurrentStep();
+}
+
+function copyNotes() {
+    const notesTextarea = gId('call-notes');
+    const statusDiv = gId('copy-status');
+    
+    if (!notesTextarea || !statusDiv) return;
+    
+    notesTextarea.select();
+    try {
+        document.execCommand('copy');
+        statusDiv.textContent = '✅ Notes copied to clipboard!';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => statusDiv.style.opacity = '0', 3000);
+    } catch (err) {
+        statusDiv.textContent = '❌ Copy failed';
+        statusDiv.style.color = '#ef4444';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => {
+            statusDiv.style.opacity = '0';
+            statusDiv.style.color = '#22c55e';
+        }, 3000);
+    }
+}
+
+function clearNotes() {
+    const notesTextarea = gId('call-notes');
+    const statusDiv = gId('copy-status');
+    
+    if (!notesTextarea || !statusDiv) return;
+
+    showCustomModal('Are you sure you want to clear all notes?', () => {
+        notesTextarea.value = '';
+        statusDiv.textContent = '🗑️ Notes cleared';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => statusDiv.style.opacity = '0', 2000);
+    });
+}
+
+function showCustomModal(message, onConfirm) {
+    if (confirm(message)) {
+        onConfirm();
+    }
+}
+
+// --- Search Functions ---
+function setupSearchFunctionality() {
+    const googleBtn = gId('google-button');
+    if (googleBtn) {
+        googleBtn.addEventListener('click', (e) => openSearch('google', e));
+    }
+    const mapsBtn = gId('maps-button');
+    if (mapsBtn) {
+        mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
+    }
+    const apolloBtn = gId('apollo-button');
+    if (apolloBtn) {
+        apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
+    }
+    const beenverifiedBtn = gId('beenverified-button');
+    if (beenverifiedBtn) {
+        beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
+    }
+
+    ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
+        const input = gId(id);
+        if (input) {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') performSearch();
+            });
+        }
+    });
+}
+
+function openSearch(type, event) {
+    const button = event.target.closest('.app-button');
+    const searchBar = gId('search-bar');
+    const mainContainer = gId('main-container');
+
+    if (currentSearchType === type && activeButton === button) {
+        closeSearch();
+        return;
+    }
+    
+    if (activeButton) activeButton.classList.remove('active');
+    currentSearchType = type;
+    activeButton = button;
+    button.classList.add('active');
+    
+    const label = gId('search-label');
+    const input = gId('search-input');
+    const cityInput = gId('search-city');
+    const stateInput = gId('search-state');
+    const locationInput = gId('search-location');
+    
+    if (!label || !input) return;
+    
+    if (cityInput) cityInput.style.display = 'none';
+    if (stateInput) stateInput.style.display = 'none';
+    if (locationInput) locationInput.style.display = 'none';
+    
+    if (type === 'google') {
+        label.textContent = 'Search Google:';
+        input.placeholder = 'Type your search query...';
+    } else if (type === 'maps') {
+        label.textContent = 'Search Maps:';
+        input.placeholder = 'Search places, addresses, businesses...';
+    } else if (type === 'beenverified') {
+        label.textContent = 'Search BeenVerified:';
+        input.placeholder = 'Enter full name (e.g. John Smith)...';
+        if (cityInput) cityInput.style.display = 'block';
+        if (stateInput) stateInput.style.display = 'block';
+    } else if (type === 'apollo') {
+        label.textContent = 'Search Apollo:';
+        input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
+        if (locationInput) locationInput.style.display = 'block';
+    }
+    
+    if (searchBar) searchBar.classList.add('active');
+    if (mainContainer) {
+        mainContainer.classList.add('search-active');
+    }
+    setTimeout(() => input.focus(), 300);
+    input.value = '';
+    if (cityInput) cityInput.value = '';
+    if (stateInput) stateInput.value = '';
+    if (locationInput) locationInput.value = '';
+}
+
+function closeSearch() {
+    const searchBar = gId('search-bar');
+    const mainContainer = gId('main-container');
+    if (searchBar) {
+        searchBar.classList.remove('active');
+    }
+    if (mainContainer) {
+        mainContainer.classList.remove('search-active');
+    }
+    if (activeButton) {
+        activeButton.classList.remove('active');
+        activeButton = null;
+    }
+    currentSearchType = '';
+}
+
+function performSearch() {
+    const query = gId('search-input').value.trim();
+    if (!query) return;
+    
+    let searchUrl = '';
+    
+    if (currentSearchType === 'google') {
+        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    } else if (currentSearchType === 'maps') {
+        searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+    } else if (currentSearchType === 'beenverified') {
+        const city = gId('search-city').value.trim();
+        const state = gId('search-state').value.trim().toUpperCase();
+        const nameParts = query.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
+    } else if (currentSearchType === 'apollo') {
+        const location = gId('search-location').value.trim();
+        let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
+        if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
+        searchUrl = apolloUrl;
+    }
+    
+    if (searchUrl) {
+        window.open(searchUrl, '_blank');
+        closeSearch();
+    }
+}, 500);
 });
 
 // Main initialization function
@@ -75,7 +312,6 @@ function setupNavigation() {
             
             // Special handling for the calls hub button
             if (view === 'calls-hub') {
-                // Do not go to calls hub directly unless from a contact card
                 showView(view);
                 updateActiveNavButton(button);
             } else {
@@ -203,11 +439,35 @@ function setupEventListeners() {
     }
 
     // Call hub specific listeners
-    // Note: The click events for the buttons are dynamically generated in displayCurrentStep()
     const restartBtn = gId('restart-btn');
     if (restartBtn) restartBtn.addEventListener('click', restart);
     const backBtn = gId('back-btn');
     if (backBtn) backBtn.addEventListener('click', goBack);
+
+    // Setup "Go to Calls Hub" button to work internally instead of external link
+    setupGoToCallsHubButton();
+}
+
+// Setup the "Go to Calls Hub" button to work internally
+function setupGoToCallsHubButton() {
+    // Find all "Go to Calls Hub" buttons and update them
+    const goToCallsHubButtons = document.querySelectorAll('a[href*="callinghub.html"]');
+    goToCallsHubButtons.forEach(button => {
+        // Remove the href to prevent navigation
+        button.removeAttribute('href');
+        button.removeAttribute('target');
+        
+        // Add click event to switch to calls hub view
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            showView('calls-hub');
+            updateActiveNavButton(document.getElementById('calls-hub-btn'));
+        });
+        
+        // Update styling to look like a button
+        button.style.cursor = 'pointer';
+        button.style.textDecoration = 'none';
+    });
 }
 
 // Load initial data
@@ -254,11 +514,47 @@ function loadViewData(viewName) {
             }
             break;
         case 'calls-hub':
-            // The calls hub is now a view within the main page.
-            // When we switch to this view, we need to make sure we're in the right state.
+            // Initialize calls hub with current prospect data or empty data
+            initializeCallsHub();
             displayCurrentStep();
             break;
     }
+}
+
+// Initialize calls hub
+function initializeCallsHub() {
+    // If we don't have current prospect data, allow manual entry
+    if (!currentProspect.name && !currentProspect.company) {
+        currentProspect = {
+            name: '',
+            title: '',
+            company: '',
+            industry: '',
+            phone: '',
+            email: '',
+            accountId: '',
+            contactId: ''
+        };
+    }
+    
+    // Populate the input fields
+    populateFromGlobalProspect();
+    
+    // Enable all input fields for editing
+    enableProspectInputs();
+}
+
+// Enable prospect input fields for editing
+function enableProspectInputs() {
+    const inputs = ['input-name', 'input-title', 'input-company-name', 'input-company-industry', 'input-benefit', 'input-pain'];
+    inputs.forEach(inputId => {
+        const input = gId(inputId);
+        if (input) {
+            input.disabled = false;
+            input.style.backgroundColor = 'white';
+            input.style.color = '#1e293b';
+        }
+    });
 }
 
 // Load accounts from Firebase
@@ -435,114 +731,6 @@ async function handleAccountSubmit(e) {
         };
         
         const accountId = CRMApp.currentAccount ? CRMApp.currentAccount.id : window.generateId();
-        const accountRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'accounts', accountId);
-        
-        await window.FirebaseDB.setDoc(accountRef, accountData);
-        
-        // Log activity
-        await logActivity({
-            type: CRMApp.currentAccount ? 'account_updated' : 'account_created',
-            description: `${CRMApp.currentAccount ? 'Updated' : 'Created'} account: ${accountData.name}`,
-            accountId: accountId,
-            accountName: accountData.name
-        });
-        
-        hideModal('account-modal');
-        showToast(`Account ${CRMApp.currentAccount ? 'updated' : 'created'} successfully!`);
-        
-        await loadAccounts();
-        renderAccounts();
-        updateDashboardStats();
-        
-    } catch (error) {
-        console.error('Error saving account:', error);
-        showToast('Error saving account', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Handle contact form submission
-async function handleContactSubmit(e) {
-    e.preventDefault();
-    showLoading(true);
-    
-    try {
-        if (!window.FirebaseDB) {
-            throw new Error('Firebase not available');
-        }
-
-        const contactData = {
-            firstName: document.getElementById('contact-first-name').value,
-            lastName: document.getElementById('contact-last-name').value,
-            title: document.getElementById('contact-title').value,
-            accountId: document.getElementById('contact-account').value,
-            email: document.getElementById('contact-email').value,
-            phone: document.getElementById('contact-phone').value,
-            notes: document.getElementById('contact-notes').value,
-            updatedAt: window.FirebaseDB.serverTimestamp(),
-            createdAt: CRMApp.currentContact ? CRMApp.currentContact.createdAt : window.FirebaseDB.serverTimestamp()
-        };
-        
-        // Get account name for reference
-        let accountName = '';
-        if (contactData.accountId) {
-            const account = CRMApp.accounts.find(acc => acc.id === contactData.accountId);
-            accountName = account ? account.name : '';
-            contactData.accountName = accountName;
-        }
-        
-        const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : window.generateId();
-        const contactRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'contacts', contactId);
-        
-        await window.FirebaseDB.setDoc(contactRef, contactData);
-        
-        // Log activity
-        await logActivity({
-            type: CRMApp.currentContact ? 'contact_updated' : 'contact_created',
-            description: `${CRMApp.currentContact ? 'Updated' : 'Created'} contact: ${contactData.firstName} ${contactData.lastName}`,
-            contactId: contactId,
-            contactName: `${contactData.firstName} ${contactData.lastName}`,
-            accountId: contactData.accountId,
-            accountName: accountName
-        });
-        
-        hideModal('contact-modal');
-        showToast(`Contact ${CRMApp.currentContact ? 'updated' : 'created'} successfully!`);
-        
-        await loadContacts();
-        renderContacts();
-        updateDashboardStats();
-        
-    } catch (error) {
-        console.error('Error saving contact:', error);
-        showToast('Error saving contact', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Handle energy contract submission
-async function handleEnergyContractSubmit(e) {
-    e.preventDefault();
-    if (!CRMApp.currentAccount) {
-        showToast('Please select an account first.', 'warning');
-        return;
-    }
-    showLoading(true);
-
-    try {
-        if (!window.FirebaseDB) {
-            throw new Error('Firebase not available');
-        }
-
-        const contractData = {
-            provider: document.getElementById('contract-provider').value,
-            rate: document.getElementById('contract-rate').value,
-            expiration: document.getElementById('contract-expiration').value,
-            type: document.getElementById('contract-type').value
-        };
-
         const accountRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'accounts', CRMApp.currentAccount.id);
 
         await window.FirebaseDB.updateDoc(accountRef, {
@@ -653,6 +841,13 @@ function renderAccounts() {
                     <div class="card-subtitle">${account.industry || 'Industry not specified'}</div>
                 </div>
                 <div class="card-actions">
+                    ${account.phone ? `
+                    <button class="icon-btn" onclick="event.stopPropagation(); openCallsHubWithAccountData('${account.id}')" title="Call Account">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                    </button>
+                    ` : ''}
                     <button class="icon-btn" onclick="event.stopPropagation(); editAccount('${account.id}')" title="Edit">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -667,7 +862,7 @@ function renderAccounts() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                         </svg>
-                        <span>${account.phone}</span>
+                        <span onclick="event.stopPropagation(); openCallsHubWithAccountData('${account.id}')" style="cursor: pointer; color: #1A438D;" title="Click to call">${account.phone}</span>
                     </div>
                 ` : ''}
                 ${account.website ? `
@@ -743,7 +938,7 @@ function renderContacts() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                         </svg>
-                        <span>${contact.phone}</span>
+                        <span onclick="event.stopPropagation(); openCallsHubWithData('${contact.id}')" style="cursor: pointer; color: #1A438D;" title="Click to call">${contact.phone}</span>
                     </div>
                 ` : ''}
             </div>
@@ -787,7 +982,12 @@ function renderAccountDetail() {
             </div>
             <div class="info-field">
                 <div class="info-field-label">Phone</div>
-                <div class="info-field-value">${account.phone || 'Not specified'}</div>
+                <div class="info-field-value">
+                    ${account.phone ? 
+                        `<span onclick="openCallsHubWithAccountData('${account.id}')" style="cursor: pointer; color: #1A438D;" title="Click to call">${account.phone}</span>` 
+                        : 'Not specified'
+                    }
+                </div>
             </div>
             <div class="info-field">
                 <div class="info-field-label">Website</div>
@@ -834,7 +1034,7 @@ function renderAccountContacts() {
                 <div class="contact-name">${contact.firstName} ${contact.lastName}</div>
                 <div class="contact-title">${contact.title || 'Title not specified'}</div>
                 ${contact.email ? `<div style="font-size: .8rem; color: #6b7280; margin-top: 4px;">${contact.email}</div>` : ''}
-                ${contact.phone ? `<div style="font-size: .8rem; color: #6b7280;">${contact.phone}</div>` : ''}
+                ${contact.phone ? `<div style="font-size: .8rem; color: #6b7280;"><span onclick="openCallsHubWithData('${contact.id}')" style="cursor: pointer; color: #1A438D;" title="Click to call">${contact.phone}</span></div>` : ''}
             </div>
             <div class="contact-actions">
                 ${contact.phone ? `
@@ -851,6 +1051,30 @@ function renderAccountContacts() {
                     </svg>
                 </button>
             </div>
+        </div>
+    `).join('');
+}
+
+// Render activities for current account
+function renderAccountActivities() {
+    const container = document.getElementById('account-activities-list');
+    if (!container || !CRMApp.currentAccount) return;
+    
+    const accountActivities = CRMApp.activities.filter(activity => 
+        activity.accountId === CRMApp.currentAccount.id
+    );
+    
+    if (accountActivities.length === 0) {
+        container.innerHTML = '<p class="empty-state">No recent activities</p>';
+        return;
+    }
+    
+    container.innerHTML = accountActivities.slice(0, 20).map(activity => `
+        <div class="activity-item">
+            <div class="activity-title">${activity.description}</div>
+            ${activity.contactName ? `<div class="activity-content">Contact: ${activity.contactName}</div>` : ''}
+            ${activity.noteContent ? `<div class="activity-content">Note: ${activity.noteContent}</div>` : ''}
+            <div class="activity-date">${window.formatDate(activity.createdAt)}</div>
         </div>
     `).join('');
 }
@@ -1005,14 +1229,101 @@ function openCallsHubWithData(contactId) {
         phone: contact.phone || '',
         email: contact.email || '',
         accountId: contact.accountId || '',
-        contactId: contact.id || ''
+        contactId: contact.id || '',
+        accountName: account ? account.name : '',
+        contactName: contact.firstName + ' ' + contact.lastName
     };
     
     // Now switch to the calls hub view on the same page
     showView('calls-hub');
+    updateActiveNavButton(document.getElementById('calls-hub-btn'));
 
     // Manually trigger the initial display for the calls hub view
     displayCurrentStep();
+}
+
+// Function to open the Calls Hub with data from a specific account
+function openCallsHubWithAccountData(accountId) {
+    const account = CRMApp.accounts.find(a => a.id === accountId);
+    if (!account) {
+        showToast('Account not found.', 'error');
+        return;
+    }
+
+    // Update the global currentProspect object with the account data
+    currentProspect = {
+        name: '', // No specific contact name from account
+        title: '',
+        company: account.name || '',
+        industry: account.industry || '',
+        phone: account.phone || '',
+        email: '',
+        accountId: account.id || '',
+        contactId: '',
+        accountName: account.name || '',
+        contactName: ''
+    };
+    
+    // Now switch to the calls hub view on the same page
+    showView('calls-hub');
+    updateActiveNavButton(document.getElementById('calls-hub-btn'));
+
+    // Manually trigger the initial display for the calls hub view
+    displayCurrentStep();
+}
+
+// Save prospect info updates from calls hub back to CRM
+async function saveProspectUpdates() {
+    try {
+        // Get current values from input fields
+        const name = gId('input-name')?.value || '';
+        const title = gId('input-title')?.value || '';
+        const company = gId('input-company-name')?.value || '';
+        const industry = gId('input-company-industry')?.value || '';
+        const benefit = gId('input-benefit')?.value || '';
+        const pain = gId('input-pain')?.value || '';
+
+        // If we have a contact ID, update the contact
+        if (currentProspect.contactId && name && title) {
+            const contactRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'contacts', currentProspect.contactId);
+            const [firstName, ...lastNameParts] = name.split(' ');
+            const lastName = lastNameParts.join(' ');
+            
+            await window.FirebaseDB.updateDoc(contactRef, {
+                firstName: firstName,
+                lastName: lastName,
+                title: title,
+                updatedAt: window.FirebaseDB.serverTimestamp()
+            });
+        }
+
+        // If we have an account ID, update the account
+        if (currentProspect.accountId && company && industry) {
+            const accountRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'accounts', currentProspect.accountId);
+            
+            await window.FirebaseDB.updateDoc(accountRef, {
+                name: company,
+                industry: industry,
+                updatedAt: window.FirebaseDB.serverTimestamp()
+            });
+        }
+
+        // Update currentProspect object
+        currentProspect.name = name;
+        currentProspect.title = title;
+        currentProspect.company = company;
+        currentProspect.industry = industry;
+
+        showToast('Prospect information updated successfully!');
+        
+        // Reload data to reflect changes
+        await loadAccounts();
+        await loadContacts();
+        
+    } catch (error) {
+        console.error('Error saving prospect updates:', error);
+        showToast('Error saving prospect updates', 'error');
+    }
 }
 
 // --- Calls Hub Logic (moved here for single page app) ---
@@ -1340,11 +1651,6 @@ let currentStep = 'start';
 let history = [];
 let scriptDisplay, responsesContainer, backBtn;
 
-function populateFromURL() {
-    // We are no longer using this function because we are now using a single page app.
-    // The data is passed via the openCallsHubWithData function instead of URL parameters.
-}
-
 function populateFromGlobalProspect() {
     // This function is now used to populate the input fields from the global currentProspect object
     const inputName = gId('input-name');
@@ -1372,8 +1678,29 @@ function populateFromGlobalProspect() {
 
 async function saveCallNotesToCRM() {
     // This is the save notes function from script.js
-    if (!currentProspect.accountId || !currentProspect.contactId) {
+    if (!currentProspect.accountId && !currentProspect.contactId) {
         console.warn("Cannot save notes: Missing accountId or contactId.");
+        
+        // Save prospect updates if any changes were made
+        await saveProspectUpdates();
+        
+        // Still save the notes as a general activity
+        const notesElement = gId('call-notes');
+        if (notesElement && notesElement.value.trim()) {
+            try {
+                await logActivity({
+                    type: 'call_note',
+                    description: `Call note: ${notesElement.value.substring(0, 50)}${notesElement.value.length > 50 ? '...' : ''}`,
+                    noteContent: notesElement.value.trim(),
+                    accountName: currentProspect.company || 'Unknown Company',
+                    contactName: currentProspect.name || 'Unknown Contact'
+                });
+                showToast('Call notes saved successfully!');
+            } catch (error) {
+                console.error('Error saving call notes:', error);
+                showToast('Error saving notes.', 'error');
+            }
+        }
         return;
     }
 
@@ -1386,6 +1713,7 @@ async function saveCallNotesToCRM() {
     const notesContent = notesElement.value.trim();
     if (notesContent.length === 0) {
         console.log("No notes to save.");
+        await saveProspectUpdates(); // Still save prospect updates
         return;
     }
 
@@ -1394,18 +1722,25 @@ async function saveCallNotesToCRM() {
         
         const activityData = {
             type: 'call_note',
-            description: `Call note for ${currentProspect.contactName} at ${currentProspect.accountName}`,
+            description: `Call note for ${currentProspect.contactName || currentProspect.name} at ${currentProspect.accountName || currentProspect.company}`,
             noteContent: notesContent,
             accountId: currentProspect.accountId,
-            accountName: currentProspect.accountName,
+            accountName: currentProspect.accountName || currentProspect.company,
             contactId: currentProspect.contactId,
-            contactName: currentProspect.contactName,
+            contactName: currentProspect.contactName || currentProspect.name,
             createdAt: serverTimestamp()
         };
 
         const docRef = await addDoc(collection(db, 'activities'), activityData);
         console.log('Call notes saved to CRM with ID:', docRef.id);
         showToast('Call notes saved successfully!');
+        
+        // Save prospect updates as well
+        await saveProspectUpdates();
+        
+        // Reload activities to show the new note
+        await loadActivities();
+        
     } catch (error) {
         console.error('Error saving call notes to Firebase:', error);
         showToast('Error saving notes.', 'error');
@@ -1451,11 +1786,12 @@ function displayCurrentStep() {
     
     if (responsesContainer) {
         responsesContainer.innerHTML = '';
-        if (currentStep === 'start' && currentProspect.phone) {
+        if (currentStep === 'start') {
+            // Always show dial button on start, regardless of phone number
             const dialButtonHtml = `
                 <button class="dial-button" onclick="handleDialClick()">
                     <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                     </svg>
                     Dial
                 </button>
@@ -1466,232 +1802,117 @@ function displayCurrentStep() {
                 const button = document.createElement('button');
                 button.className = 'response-btn';
                 button.innerHTML = applyPlaceholders(response.text);
-                button.onclick = () => selectResponse(response.next);
+                button.onclick = () => selectResponse(response.next, response.action);
                 responsesContainer.appendChild(button);
             });
         }
     }
-    
-    if (backBtn) {
-        backBtn.disabled = history.length === 0;
-    }
-
-    populateFromGlobalProspect();
-}
-
-function handleDialClick() {
-    showToast('Dialing is not enabled in this version.', 'warning');
-    // You can add other functionality here, like logging the attempt
-    // to the activities feed, if you want.
-    selectResponse('dialing'); // Move to the "dialing" script step
-}
-
-function selectResponse(nextStep) {
-    if (nextStep && scriptData[nextStep]) {
-        history.push(currentStep);
-        currentStep = nextStep;
-        displayCurrentStep();
-    }
-
-    const currentStepData = scriptData[currentStep];
-    const selectedResponse = currentStepData.responses ? currentStepData.responses.find(res => res.next === nextStep) : null;
-
-    if (selectedResponse && selectedResponse.action === 'saveNotes') {
-        saveCallNotesToCRM();
+    'accounts', accountId);
+        
+        await window.FirebaseDB.setDoc(accountRef, accountData);
+        
+        // Log activity
+        await logActivity({
+            type: CRMApp.currentAccount ? 'account_updated' : 'account_created',
+            description: `${CRMApp.currentAccount ? 'Updated' : 'Created'} account: ${accountData.name}`,
+            accountId: accountId,
+            accountName: accountData.name
+        });
+        
+        hideModal('account-modal');
+        showToast(`Account ${CRMApp.currentAccount ? 'updated' : 'created'} successfully!`);
+        
+        await loadAccounts();
+        renderAccounts();
+        updateDashboardStats();
+        
+    } catch (error) {
+        console.error('Error saving account:', error);
+        showToast('Error saving account', 'error');
+    } finally {
+        showLoading(false);
     }
 }
 
-function goBack() {
-    if (history.length > 0) {
-        currentStep = history.pop();
-        displayCurrentStep();
-    }
-}
-
-function restart() {
-    currentStep = 'start';
-    history = [];
+// Handle contact form submission
+async function handleContactSubmit(e) {
+    e.preventDefault();
+    showLoading(true);
     
-    const callNotesElement = gId('call-notes');
-    if (callNotesElement) {
-        callNotesElement.value = '';
-    }
-
-    currentProspect = {};
-    
-    displayCurrentStep();
-}
-
-function copyNotes() {
-    const notesTextarea = gId('call-notes');
-    const statusDiv = gId('copy-status');
-    
-    if (!notesTextarea || !statusDiv) return;
-    
-    notesTextarea.select();
     try {
-        document.execCommand('copy');
-        statusDiv.textContent = '✅ Notes copied to clipboard!';
-        statusDiv.style.opacity = '1';
-        setTimeout(() => statusDiv.style.opacity = '0', 3000);
-    } catch (err) {
-        statusDiv.textContent = '❌ Copy failed';
-        statusDiv.style.color = '#ef4444';
-        statusDiv.style.opacity = '1';
-        setTimeout(() => {
-            statusDiv.style.opacity = '0';
-            statusDiv.style.color = '#22c55e';
-        }, 3000);
-    }
-}
-
-function clearNotes() {
-    const notesTextarea = gId('call-notes');
-    const statusDiv = gId('copy-status');
-    
-    if (!notesTextarea || !statusDiv) return;
-
-    showCustomModal('Are you sure you want to clear all notes?', () => {
-        notesTextarea.value = '';
-        statusDiv.textContent = '🗑️ Notes cleared';
-        statusDiv.style.opacity = '1';
-        setTimeout(() => statusDiv.style.opacity = '0', 2000);
-    });
-}
-
-function showCustomModal(message, onConfirm) {
-    console.log(message);
-    if (onConfirm) {
-      onConfirm();
-    }
-}
-
-// --- Search Functions ---
-function setupSearchFunctionality() {
-    const googleBtn = gId('google-button');
-    if (googleBtn) {
-        googleBtn.addEventListener('click', (e) => openSearch('google', e));
-    }
-    const mapsBtn = gId('maps-button');
-    if (mapsBtn) {
-        mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
-    }
-    const apolloBtn = gId('apollo-button');
-    if (apolloBtn) {
-        apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
-    }
-    const beenverifiedBtn = gId('beenverified-button');
-    if (beenverifiedBtn) {
-        beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
-    }
-
-    ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
-        const input = gId(id);
-        if (input) {
-            input.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') performSearch();
-            });
+        if (!window.FirebaseDB) {
+            throw new Error('Firebase not available');
         }
-    });
+
+        const contactData = {
+            firstName: document.getElementById('contact-first-name').value,
+            lastName: document.getElementById('contact-last-name').value,
+            title: document.getElementById('contact-title').value,
+            accountId: document.getElementById('contact-account').value,
+            email: document.getElementById('contact-email').value,
+            phone: document.getElementById('contact-phone').value,
+            notes: document.getElementById('contact-notes').value,
+            updatedAt: window.FirebaseDB.serverTimestamp(),
+            createdAt: CRMApp.currentContact ? CRMApp.currentContact.createdAt : window.FirebaseDB.serverTimestamp()
+        };
+        
+        // Get account name for reference
+        let accountName = '';
+        if (contactData.accountId) {
+            const account = CRMApp.accounts.find(acc => acc.id === contactData.accountId);
+            accountName = account ? account.name : '';
+            contactData.accountName = accountName;
+        }
+        
+        const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : window.generateId();
+        const contactRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'contacts', contactId);
+        
+        await window.FirebaseDB.setDoc(contactRef, contactData);
+        
+        // Log activity
+        await logActivity({
+            type: CRMApp.currentContact ? 'contact_updated' : 'contact_created',
+            description: `${CRMApp.currentContact ? 'Updated' : 'Created'} contact: ${contactData.firstName} ${contactData.lastName}`,
+            contactId: contactId,
+            contactName: `${contactData.firstName} ${contactData.lastName}`,
+            accountId: contactData.accountId,
+            accountName: accountName
+        });
+        
+        hideModal('contact-modal');
+        showToast(`Contact ${CRMApp.currentContact ? 'updated' : 'created'} successfully!`);
+        
+        await loadContacts();
+        renderContacts();
+        updateDashboardStats();
+        
+    } catch (error) {
+        console.error('Error saving contact:', error);
+        showToast('Error saving contact', 'error');
+    } finally {
+        showLoading(false);
+    }
 }
 
-function openSearch(type, event) {
-    const button = event.target.closest('.app-button');
-    const searchBar = gId('search-bar');
-    const mainContainer = gId('main-container');
-
-    if (currentSearchType === type && activeButton === button) {
-        closeSearch();
+// Handle energy contract submission
+async function handleEnergyContractSubmit(e) {
+    e.preventDefault();
+    if (!CRMApp.currentAccount) {
+        showToast('Please select an account first.', 'warning');
         return;
     }
-    
-    if (activeButton) activeButton.classList.remove('active');
-    currentSearchType = type;
-    activeButton = button;
-    button.classList.add('active');
-    
-    const label = gId('search-label');
-    const input = gId('search-input');
-    const cityInput = gId('search-city');
-    const stateInput = gId('search-state');
-    const locationInput = gId('search-location');
-    
-    if (!label || !input) return;
-    
-    if (cityInput) cityInput.style.display = 'none';
-    if (stateInput) stateInput.style.display = 'none';
-    if (locationInput) locationInput.style.display = 'none';
-    
-    if (type === 'google') {
-        label.textContent = 'Search Google:';
-        input.placeholder = 'Type your search query...';
-    } else if (type === 'maps') {
-        label.textContent = 'Search Maps:';
-        input.placeholder = 'Search places, addresses, businesses...';
-    } else if (type === 'beenverified') {
-        label.textContent = 'Search BeenVerified:';
-        input.placeholder = 'Enter full name (e.g. John Smith)...';
-        if (cityInput) cityInput.style.display = 'block';
-        if (stateInput) stateInput.style.display = 'block';
-    } else if (type === 'apollo') {
-        label.textContent = 'Search Apollo:';
-        input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
-        if (locationInput) locationInput.style.display = 'block';
-    }
-    
-    if (searchBar) searchBar.classList.add('active');
-    if (mainContainer) {
-        mainContainer.classList.add('search-active');
-    }
-    setTimeout(() => input.focus(), 300);
-    input.value = '';
-    if (cityInput) cityInput.value = '';
-    if (stateInput) stateInput.value = '';
-    if (locationInput) locationInput.value = '';
-}
+    showLoading(true);
 
-function closeSearch() {
-    const searchBar = gId('search-bar');
-    const mainContainer = gId('main-container');
-    if (searchBar) {
-        searchBar.classList.remove('active');
-    }
-    if (mainContainer) {
-        mainContainer.classList.remove('search-active');
-    }
-    if (activeButton) {
-        activeButton.classList.remove('active');
-        activeButton = null;
-    }
-    currentSearchType = '';
-}
+    try {
+        if (!window.FirebaseDB) {
+            throw new Error('Firebase not available');
+        }
 
-function performSearch() {
-    const query = gId('search-input').value.trim();
-    if (!query) return;
-    
-    let searchUrl = '';
-    
-    if (currentSearchType === 'google') {
-        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    } else if (currentSearchType === 'maps') {
-        searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
-    } else if (currentSearchType === 'beenverified') {
-        const city = gId('search-city').value.trim();
-        const state = gId('search-state').value.trim().toUpperCase();
-        const nameParts = query.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
-        searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
-    } else if (currentSearchType === 'apollo') {
-        const location = gId('search-location').value.trim();
-        let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
-        if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
-        searchUrl = apolloUrl;
-    }
-    
-    if (searchUrl) {
-        window.open(searchUrl, '_blank');
-        closeSearch();
-    }
-}
+        const contractData = {
+            provider: document.getElementById('contract-provider').value,
+            rate: document.getElementById('contract-rate').value,
+            expiration: document.getElementById('contract-expiration').value,
+            type: document.getElementById('contract-type').value
+        };
+
+        const accountRef = window.FirebaseDB.doc(window.FirebaseDB.db,
