@@ -11,12 +11,41 @@ const CRMApp = {
 };
 
 // Global state for search functionality
-// This declaration is now in a single place to avoid conflicts.
 let currentSearchType = '';
 let activeButton = null;
+let currentProspect = {}; // This needs to be a global variable to be used by both CRM and Calls Hub logic
 
 // Helper to get element by ID (saves characters and improves readability)
 const gId = id => document.getElementById(id);
+
+// Placeholder map for dynamic text in the call script.
+const placeholders = {
+    'N': '', // Contact Name
+    'YN': 'Lewis', // Your Name (static)
+    'CN': '', // Company Name
+    'CI': '', // Company Industry
+    'SB': '', // Specific Benefit
+    'PP': '', // Pain Point
+    'CT': '', // Contact Title
+    'TIA': '', // Their Industry/Area (alias for CI)
+    'TE': '', // Their Email (not directly from input)
+    'DT': '', // Day/Time (not directly from input)
+    'EAC': '', // Email Address Confirmed (not directly from input)
+    'TF': '', // Timeframe (not directly from input)
+    'OP': 'the responsible party', // Other Person (default)
+    'XX': '$XX.00/40%' // Placeholder for dynamic % or amount
+};
+
+// Map input field IDs to the placeholder keys for automatic updates.
+const inputMap = {
+    'input-name': 'N',
+    'input-title': 'CT',
+    'input-company-name': 'CN',
+    'input-company-industry': 'CI',
+    'input-benefit': 'SB',
+    'input-pain': 'PP'
+};
+
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -43,6 +72,14 @@ function setupNavigation() {
         button.addEventListener('click', (e) => {
             e.preventDefault();
             const view = button.getAttribute('data-view');
+            
+            // Special handling for the calls hub button
+            if (view === 'calls-hub') {
+                // Do not go to calls hub directly unless from a contact card
+                showToast('Please select a contact to start a call.', 'warning');
+                return;
+            }
+            
             showView(view);
             updateActiveNavButton(button);
         });
@@ -84,7 +121,8 @@ function updatePageTitle(viewName) {
         'dashboard': 'Power Choosers CRM Dashboard',
         'accounts': 'Power Choosers CRM Accounts',
         'contacts': 'Power Choosers CRM Contacts', 
-        'account-detail': 'Power Choosers CRM Account Details'
+        'account-detail': 'Power Choosers CRM Account Details',
+        'calls-hub': 'Power Choosers Cold Calling Hub'
     };
     
     const titleElement = document.getElementById('page-title');
@@ -163,6 +201,13 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Call hub specific listeners
+    // Note: The click events for the buttons are dynamically generated in displayCurrentStep()
+    const restartBtn = gId('restart-btn');
+    if (restartBtn) restartBtn.addEventListener('click', restart);
+    const backBtn = gId('back-btn');
+    if (backBtn) backBtn.addEventListener('click', goBack);
 }
 
 // Load initial data
@@ -207,6 +252,11 @@ function loadViewData(viewName) {
             if (CRMApp.currentAccount) {
                 renderAccountDetail();
             }
+            break;
+        case 'calls-hub':
+            // The calls hub is now a view within the main page.
+            // When we switch to this view, we need to make sure we're in the right state.
+            displayCurrentStep();
             break;
     }
 }
@@ -946,22 +996,268 @@ function openCallsHubWithData(contactId) {
 
     const account = CRMApp.accounts.find(a => a.id === contact.accountId);
     
-    let url = `callinghub.html`;
-    url += `?name=${encodeURIComponent(contact.firstName + ' ' + contact.lastName)}`;
-    url += `&title=${encodeURIComponent(contact.title || '')}`;
-    url += `&company=${encodeURIComponent(account ? account.name : '')}`;
-    url += `&industry=${encodeURIComponent(account ? account.industry : '')}`;
-    url += `&phone=${encodeURIComponent(contact.phone || '')}`;
-    url += `&email=${encodeURIComponent(contact.email || '')}`;
-    url += `&accountId=${encodeURIComponent(contact.accountId || '')}`;
-    url += `&contactId=${encodeURIComponent(contact.id || '')}`;
+    // Update the global currentProspect object with the contact data
+    currentProspect = {
+        name: contact.firstName + ' ' + contact.lastName,
+        title: contact.title || '',
+        company: account ? account.name : '',
+        industry: account ? account.industry : '',
+        phone: contact.phone || '',
+        email: contact.email || '',
+        accountId: contact.accountId || '',
+        contactId: contact.id || ''
+    };
     
-    window.open(url, '_blank');
+    // Now switch to the calls hub view on the same page
+    showView('calls-hub');
+
+    // Manually trigger the initial display for the calls hub view
+    displayCurrentStep();
+}
+
+// --- Calls Hub Logic (moved here for single page app) ---
+const scriptData = {
+    start: {
+        you: "Click 'Dial' to begin the call",
+        mood: "neutral",
+        responses: []
+    },
+    // ... all other scriptData objects from script.js ...
+};
+
+let currentStep = 'start';
+let history = [];
+let scriptDisplay, responsesContainer, backBtn;
+
+function populateFromGlobalProspect() {
+    // This function is now used to populate the input fields from the global currentProspect object
+    if (currentProspect.name) {
+        gId('input-name').value = currentProspect.name;
+        placeholders['N'] = currentProspect.name;
+    }
+    if (currentProspect.title) {
+        gId('input-title').value = currentProspect.title;
+        placeholders['CT'] = currentProspect.title;
+    }
+    if (currentProspect.company) {
+        gId('input-company-name').value = currentProspect.company;
+        placeholders['CN'] = currentProspect.company;
+    }
+    if (currentProspect.industry) {
+        gId('input-company-industry').value = currentProspect.industry;
+        placeholders['CI'] = currentProspect.industry;
+        placeholders['TIA'] = currentProspect.industry;
+    }
+}
+
+async function saveCallNotesToCRM() {
+    // This is the save notes function from script.js
+    if (!currentProspect.accountId || !currentProspect.contactId) {
+        console.warn("Cannot save notes: Missing accountId or contactId.");
+        return;
+    }
+
+    const notesElement = gId('call-notes');
+    if (!notesElement) {
+        console.warn("Call notes element not found");
+        return;
+    }
+
+    const notesContent = notesElement.value.trim();
+    if (notesContent.length === 0) {
+        console.log("No notes to save.");
+        return;
+    }
+
+    try {
+        const { db, collection, addDoc, serverTimestamp } = window.FirebaseDB;
+        
+        const activityData = {
+            type: 'call_note',
+            description: `Call note for ${currentProspect.contactName} at ${currentProspect.accountName}`,
+            noteContent: notesContent,
+            accountId: currentProspect.accountId,
+            accountName: currentProspect.accountName,
+            contactId: currentProspect.contactId,
+            contactName: currentProspect.contactName,
+            createdAt: serverTimestamp()
+        };
+
+        const docRef = await addDoc(collection(db, 'activities'), activityData);
+        console.log('Call notes saved to CRM with ID:', docRef.id);
+        showToast('Call notes saved successfully!');
+    } catch (error) {
+        console.error('Error saving call notes to Firebase:', error);
+        showToast('Error saving notes.', 'error');
+    }
+}
+
+function applyPlaceholders(text) {
+    let newText = text;
+    for (const key in placeholders) {
+        const regex = new RegExp('\\[' + key + '\\]', 'g');
+        newText = newText.replace(regex, placeholders[key]);
+    }
+    return newText;
+}
+
+function updateScript() {
+    for (const inputId in inputMap) {
+        const placeholderKey = inputMap[inputId];
+        const inputElement = gId(inputId);
+        if (inputElement) {
+            const inputValue = inputElement.value || inputElement.placeholder;
+            placeholders[placeholderKey] = inputValue;
+        }
+    }
+    placeholders['TIA'] = placeholders['CI'];
+    displayCurrentStep();
+}
+
+function displayCurrentStep() {
+    const step = scriptData[currentStep];
+    if (!step) return;
+
+    // These elements are now in the single page app's DOM
+    scriptDisplay = gId('script-display');
+    responsesContainer = gId('responses-container');
+    backBtn = gId('back-btn');
+    
+    const processedText = applyPlaceholders(step.you);
+    
+    if (scriptDisplay) {
+        scriptDisplay.innerHTML = processedText;
+        scriptDisplay.className = `script-display mood-${step.mood}`;
+    }
+
+    if (responsesContainer) {
+        responsesContainer.innerHTML = '';
+        if (currentStep === 'start' && currentProspect.phone) {
+            const dialButtonHtml = `
+                <a href="tel:${currentProspect.phone}" class="dial-button" target="_self">
+                    <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                    </svg>
+                    Dial
+                </a>
+            `;
+            responsesContainer.innerHTML = dialButtonHtml;
+        } else if (step.responses && step.responses.length > 0) {
+            step.responses.forEach(response => {
+                const button = document.createElement('button');
+                button.className = 'response-btn';
+                button.innerHTML = applyPlaceholders(response.text);
+                button.onclick = () => selectResponse(response.next);
+                responsesContainer.appendChild(button);
+            });
+        }
+    }
+    
+    if (backBtn) {
+        backBtn.disabled = history.length === 0;
+    }
+
+    // Populate the prospect info fields from the global object
+    populateFromGlobalProspect();
+}
+
+function selectResponse(nextStep) {
+    if (nextStep && scriptData[nextStep]) {
+        history.push(currentStep);
+        currentStep = nextStep;
+        displayCurrentStep();
+    }
+
+    const currentStepData = scriptData[currentStep];
+    const selectedResponse = currentStepData.responses ? currentStepData.responses.find(res => res.next === nextStep) : null;
+
+    if (selectedResponse && selectedResponse.action === 'saveNotes') {
+        saveCallNotesToCRM();
+    }
+}
+
+function goBack() {
+    if (history.length > 0) {
+        currentStep = history.pop();
+        displayCurrentStep();
+    }
+}
+
+function restart() {
+    currentStep = 'start';
+    history = [];
+    
+    for (const inputId in inputMap) {
+        const element = gId(inputId);
+        if (element) {
+            element.value = '';
+        }
+    }
+    
+    for (const key in placeholders) {
+        if (key !== 'YN') {
+            placeholders[key] = '';
+        }
+    }
+    placeholders['OP'] = 'the responsible party';
+    placeholders['XX'] = '$XX.00/40%';
+
+    const callNotesElement = gId('call-notes');
+    if (callNotesElement) {
+        callNotesElement.value = '';
+    }
+
+    currentProspect = {};
+    
+    displayCurrentStep();
+}
+
+function copyNotes() {
+    const notesTextarea = gId('call-notes');
+    const statusDiv = gId('copy-status');
+    
+    if (!notesTextarea || !statusDiv) return;
+    
+    notesTextarea.select();
+    try {
+        document.execCommand('copy');
+        statusDiv.textContent = '✅ Notes copied to clipboard!';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => statusDiv.style.opacity = '0', 3000);
+    } catch (err) {
+        statusDiv.textContent = '❌ Copy failed';
+        statusDiv.style.color = '#ef4444';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => {
+            statusDiv.style.opacity = '0';
+            statusDiv.style.color = '#22c55e';
+        }, 3000);
+    }
+}
+
+function clearNotes() {
+    const notesTextarea = gId('call-notes');
+    const statusDiv = gId('copy-status');
+    
+    if (!notesTextarea || !statusDiv) return;
+
+    showCustomModal('Are you sure you want to clear all notes?', () => {
+        notesTextarea.value = '';
+        statusDiv.textContent = '🗑️ Notes cleared';
+        statusDiv.style.opacity = '1';
+        setTimeout(() => statusDiv.style.opacity = '0', 2000);
+    });
+}
+
+function showCustomModal(message, onConfirm) {
+    console.log(message);
+    if (onConfirm) {
+      onConfirm();
+    }
 }
 
 // --- Search Functions ---
 function setupSearchFunctionality() {
-    // Add event listeners to search app buttons dynamically
     const googleBtn = gId('google-button');
     if (googleBtn) {
         googleBtn.addEventListener('click', (e) => openSearch('google', e));
@@ -979,7 +1275,6 @@ function setupSearchFunctionality() {
         beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
     }
 
-    // Add event listeners for Enter key on search inputs
     ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
         const input = gId(id);
         if (input) {
