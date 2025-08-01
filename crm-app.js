@@ -1,4 +1,4 @@
-// // CRM Application Main JavaScript File
+// CRM Application Main JavaScript File
 
 // Global state management
 const CRMApp = {
@@ -11,7 +11,7 @@ const CRMApp = {
 };
 
 // Global state for search functionality
-let currentSearchType = '';
+let currentSearchType = currentSearchType || '';
 let activeButton = null;
 
 // Helper to get element by ID (saves characters and improves readability)
@@ -19,8 +19,11 @@ const gId = id => document.getElementById(id);
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-    setupSearchFunctionality(); // Call the new setup function for search
+    // Wait a bit for Firebase to load
+    setTimeout(() => {
+        initializeApp();
+        setupSearchFunctionality();
+    }, 500);
 });
 
 // Main initialization function
@@ -83,7 +86,10 @@ function updatePageTitle(viewName) {
         'account-detail': 'Power Choosers CRM Account Details'
     };
     
-    document.getElementById('page-title').textContent = titles[viewName] || 'Power Choosers CRM';
+    const titleElement = document.getElementById('page-title');
+    if (titleElement) {
+        titleElement.textContent = titles[viewName] || 'Power Choosers CRM';
+    }
 }
 
 // Setup modal functionality
@@ -93,16 +99,16 @@ function setupModals() {
     const closeAccountModal = document.getElementById('close-account-modal');
     const cancelAccount = document.getElementById('cancel-account');
     
-    closeAccountModal.addEventListener('click', () => hideModal('account-modal'));
-    cancelAccount.addEventListener('click', () => hideModal('account-modal'));
+    if (closeAccountModal) closeAccountModal.addEventListener('click', () => hideModal('account-modal'));
+    if (cancelAccount) cancelAccount.addEventListener('click', () => hideModal('account-modal'));
     
     // Contact modal
     const contactModal = document.getElementById('contact-modal');
     const closeContactModal = document.getElementById('close-contact-modal');
     const cancelContact = document.getElementById('cancel-contact');
     
-    closeContactModal.addEventListener('click', () => hideModal('contact-modal'));
-    cancelContact.addEventListener('click', () => hideModal('contact-modal'));
+    if (closeContactModal) closeContactModal.addEventListener('click', () => hideModal('contact-modal'));
+    if (cancelContact) cancelContact.addEventListener('click', () => hideModal('contact-modal'));
     
     // Close modals when clicking outside
     document.addEventListener('click', (e) => {
@@ -115,37 +121,58 @@ function setupModals() {
 // Setup event listeners
 function setupEventListeners() {
     // Quick action buttons
-    document.getElementById('add-account-btn').addEventListener('click', () => showNewAccountModal());
-    document.getElementById('add-contact-btn').addEventListener('click', () => showNewContactModal());
-    document.getElementById('new-account-btn').addEventListener('click', () => showNewAccountModal());
-    document.getElementById('new-contact-btn').addEventListener('click', () => showNewContactModal());
+    const addAccountBtn = document.getElementById('add-account-btn');
+    const addContactBtn = document.getElementById('add-contact-btn');
+    const newAccountBtn = document.getElementById('new-account-btn');
+    const newContactBtn = document.getElementById('new-contact-btn');
+    
+    if (addAccountBtn) addAccountBtn.addEventListener('click', () => showNewAccountModal());
+    if (addContactBtn) addContactBtn.addEventListener('click', () => showNewContactModal());
+    if (newAccountBtn) newAccountBtn.addEventListener('click', () => showNewAccountModal());
+    if (newContactBtn) newContactBtn.addEventListener('click', () => showNewContactModal());
     
     // Form submissions
-    document.getElementById('account-form').addEventListener('submit', handleAccountSubmit);
-    document.getElementById('contact-form').addEventListener('submit', handleContactSubmit);
+    const accountForm = document.getElementById('account-form');
+    const contactForm = document.getElementById('contact-form');
+    
+    if (accountForm) accountForm.addEventListener('submit', handleAccountSubmit);
+    if (contactForm) contactForm.addEventListener('submit', handleContactSubmit);
     
     // Back to accounts button
-    document.getElementById('back-to-accounts').addEventListener('click', () => {
-        showView('accounts');
-        updateActiveNavButton(document.getElementById('accounts-btn'));
-    });
+    const backToAccountsBtn = document.getElementById('back-to-accounts');
+    if (backToAccountsBtn) {
+        backToAccountsBtn.addEventListener('click', () => {
+            showView('accounts');
+            updateActiveNavButton(document.getElementById('accounts-btn'));
+        });
+    }
     
     // Save account note button
-    document.getElementById('save-account-note').addEventListener('click', saveAccountNote);
+    const saveAccountNoteBtn = document.getElementById('save-account-note');
+    if (saveAccountNoteBtn) saveAccountNoteBtn.addEventListener('click', saveAccountNote);
 
     // Edit account button
-    document.getElementById('edit-account-btn').addEventListener('click', () => {
-        if (CRMApp.currentAccount) {
-            editAccount(CRMApp.currentAccount.id);
-        }
-    });
-
+    const editAccountBtn = document.getElementById('edit-account-btn');
+    if (editAccountBtn) {
+        editAccountBtn.addEventListener('click', () => {
+            if (CRMApp.currentAccount) {
+                editAccount(CRMApp.currentAccount.id);
+            }
+        });
+    }
 }
 
 // Load initial data
 async function loadInitialData() {
     showLoading(true);
     try {
+        // Check if Firebase is available
+        if (!window.FirebaseDB) {
+            console.warn('Firebase not available yet, retrying...');
+            setTimeout(loadInitialData, 1000);
+            return;
+        }
+        
         await Promise.all([
             loadAccounts(),
             loadContacts(),
@@ -184,9 +211,13 @@ function loadViewData(viewName) {
 // Load accounts from Firebase
 async function loadAccounts() {
     try {
-        const { db, collection, getDocs, orderBy, query } = window.FirebaseDB;
-        const accountsQuery = query(collection(db, 'accounts'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(accountsQuery);
+        if (!window.FirebaseDB) {
+            console.warn('Firebase not available');
+            return [];
+        }
+
+        const accountsCollection = window.FirebaseDB.collection(window.FirebaseDB.db, 'accounts');
+        const snapshot = await window.FirebaseDB.getDocs(accountsCollection);
         
         CRMApp.accounts = [];
         snapshot.forEach(doc => {
@@ -194,6 +225,13 @@ async function loadAccounts() {
                 id: doc.id,
                 ...doc.data()
             });
+        });
+        
+        // Sort by createdAt desc
+        CRMApp.accounts.sort((a, b) => {
+            const aTime = a.createdAt?.seconds || 0;
+            const bTime = b.createdAt?.seconds || 0;
+            return bTime - aTime;
         });
         
         return CRMApp.accounts;
@@ -207,9 +245,13 @@ async function loadAccounts() {
 // Load contacts from Firebase
 async function loadContacts() {
     try {
-        const { db, collection, getDocs, orderBy, query } = window.FirebaseDB;
-        const contactsQuery = query(collection(db, 'contacts'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(contactsQuery);
+        if (!window.FirebaseDB) {
+            console.warn('Firebase not available');
+            return [];
+        }
+
+        const contactsCollection = window.FirebaseDB.collection(window.FirebaseDB.db, 'contacts');
+        const snapshot = await window.FirebaseDB.getDocs(contactsCollection);
         
         CRMApp.contacts = [];
         snapshot.forEach(doc => {
@@ -217,6 +259,13 @@ async function loadContacts() {
                 id: doc.id,
                 ...doc.data()
             });
+        });
+        
+        // Sort by createdAt desc
+        CRMApp.contacts.sort((a, b) => {
+            const aTime = a.createdAt?.seconds || 0;
+            const bTime = b.createdAt?.seconds || 0;
+            return bTime - aTime;
         });
         
         return CRMApp.contacts;
@@ -230,13 +279,13 @@ async function loadContacts() {
 // Load activities from Firebase
 async function loadActivities() {
     try {
-        const { db, collection, getDocs, orderBy, query, limit } = window.FirebaseDB;
-        const activitiesQuery = query(
-            collection(db, 'activities'), 
-            orderBy('createdAt', 'desc'),
-            limit(50)
-        );
-        const snapshot = await getDocs(activitiesQuery);
+        if (!window.FirebaseDB) {
+            console.warn('Firebase not available');
+            return [];
+        }
+
+        const activitiesCollection = window.FirebaseDB.collection(window.FirebaseDB.db, 'activities');
+        const snapshot = await window.FirebaseDB.getDocs(activitiesCollection);
         
         CRMApp.activities = [];
         snapshot.forEach(doc => {
@@ -245,6 +294,14 @@ async function loadActivities() {
                 ...doc.data()
             });
         });
+        
+        // Sort by createdAt desc and limit to 50
+        CRMApp.activities.sort((a, b) => {
+            const aTime = a.createdAt?.seconds || 0;
+            const bTime = b.createdAt?.seconds || 0;
+            return bTime - aTime;
+        });
+        CRMApp.activities = CRMApp.activities.slice(0, 50);
         
         return CRMApp.activities;
     } catch (error) {
@@ -256,16 +313,22 @@ async function loadActivities() {
 
 // Show new account modal
 function showNewAccountModal() {
-    document.getElementById('account-modal-title').textContent = 'Add New Account';
-    document.getElementById('account-form').reset();
+    const modalTitle = document.getElementById('account-modal-title');
+    const accountForm = document.getElementById('account-form');
+    
+    if (modalTitle) modalTitle.textContent = 'Add New Account';
+    if (accountForm) accountForm.reset();
     CRMApp.currentAccount = null;
     showModal('account-modal');
 }
 
 // Show new contact modal
 function showNewContactModal() {
-    document.getElementById('contact-modal-title').textContent = 'Add New Contact';
-    document.getElementById('contact-form').reset();
+    const modalTitle = document.getElementById('contact-modal-title');
+    const contactForm = document.getElementById('contact-form');
+    
+    if (modalTitle) modalTitle.textContent = 'Add New Contact';
+    if (contactForm) contactForm.reset();
     CRMApp.currentContact = null;
     populateAccountDropdown();
     showModal('contact-modal');
@@ -273,17 +336,21 @@ function showNewContactModal() {
 
 // Show modal
 function showModal(modalId) {
-    document.getElementById(modalId).classList.add('active');
+    const modal = document.getElementById(modalId);
+    if (modal) modal.classList.add('active');
 }
 
 // Hide modal
 function hideModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
+    const modal = document.getElementById(modalId);
+    if (modal) modal.classList.remove('active');
 }
 
 // Populate account dropdown in contact form
 function populateAccountDropdown() {
     const select = document.getElementById('contact-account');
+    if (!select) return;
+    
     select.innerHTML = '<option value="">Select an account...</option>';
     
     CRMApp.accounts.forEach(account => {
@@ -300,6 +367,10 @@ async function handleAccountSubmit(e) {
     showLoading(true);
     
     try {
+        if (!window.FirebaseDB) {
+            throw new Error('Firebase not available');
+        }
+
         const accountData = {
             name: document.getElementById('account-name').value,
             industry: document.getElementById('account-industry').value,
@@ -310,10 +381,10 @@ async function handleAccountSubmit(e) {
             createdAt: CRMApp.currentAccount ? CRMApp.currentAccount.createdAt : window.FirebaseDB.serverTimestamp()
         };
         
-        const { db, doc, setDoc } = window.FirebaseDB;
         const accountId = CRMApp.currentAccount ? CRMApp.currentAccount.id : window.generateId();
+        const accountRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'accounts', accountId);
         
-        await setDoc(doc(db, 'accounts', accountId), accountData);
+        await window.FirebaseDB.setDoc(accountRef, accountData);
         
         // Log activity
         await logActivity({
@@ -344,6 +415,10 @@ async function handleContactSubmit(e) {
     showLoading(true);
     
     try {
+        if (!window.FirebaseDB) {
+            throw new Error('Firebase not available');
+        }
+
         const contactData = {
             firstName: document.getElementById('contact-first-name').value,
             lastName: document.getElementById('contact-last-name').value,
@@ -364,10 +439,10 @@ async function handleContactSubmit(e) {
             contactData.accountName = accountName;
         }
         
-        const { db, doc, setDoc } = window.FirebaseDB;
         const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : window.generateId();
+        const contactRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'contacts', contactId);
         
-        await setDoc(doc(db, 'contacts', contactId), contactData);
+        await window.FirebaseDB.setDoc(contactRef, contactData);
         
         // Log activity
         await logActivity({
@@ -397,16 +472,21 @@ async function handleContactSubmit(e) {
 // Log activity to Firebase
 async function logActivity(activityData) {
     try {
-        const { db, doc, setDoc, serverTimestamp } = window.FirebaseDB;
+        if (!window.FirebaseDB) {
+            console.warn('Firebase not available for logging activity');
+            return;
+        }
+
         const activityId = window.generateId();
         
         const activity = {
             ...activityData,
-            createdAt: serverTimestamp(),
+            createdAt: window.FirebaseDB.serverTimestamp(),
             id: activityId
         };
         
-        await setDoc(doc(db, 'activities', activityId), activity);
+        const activityRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'activities', activityId);
+        await window.FirebaseDB.setDoc(activityRef, activity);
         
         // Add to local activities array
         CRMApp.activities.unshift(activity);
@@ -420,7 +500,10 @@ async function logActivity(activityData) {
 async function saveAccountNote() {
     if (!CRMApp.currentAccount) return;
     
-    const noteContent = document.getElementById('account-note-input').value.trim();
+    const noteInput = document.getElementById('account-note-input');
+    if (!noteInput) return;
+    
+    const noteContent = noteInput.value.trim();
     if (!noteContent) {
         showToast('Please enter a note', 'warning');
         return;
@@ -438,7 +521,7 @@ async function saveAccountNote() {
             noteContent: noteContent
         });
         
-        document.getElementById('account-note-input').value = '';
+        noteInput.value = '';
         showToast('Note saved successfully!');
         
         // Refresh activities
@@ -456,6 +539,7 @@ async function saveAccountNote() {
 // Render accounts
 function renderAccounts() {
     const container = document.getElementById('accounts-grid');
+    if (!container) return;
     
     if (CRMApp.accounts.length === 0) {
         container.innerHTML = '<p class="empty-state">No accounts found. Click "New Account" to get started.</p>';
@@ -514,6 +598,7 @@ function renderAccounts() {
 // Render contacts
 function renderContacts() {
     const container = document.getElementById('contacts-grid');
+    if (!container) return;
     
     if (CRMApp.contacts.length === 0) {
         container.innerHTML = '<p class="empty-state">No contacts found. Click "New Contact" to get started.</p>';
@@ -582,32 +667,37 @@ function renderAccountDetail() {
     const account = CRMApp.currentAccount;
     
     // Update title
-    document.getElementById('account-detail-title').textContent = account.name || 'Account Details';
+    const titleElement = document.getElementById('account-detail-title');
+    if (titleElement) {
+        titleElement.textContent = account.name || 'Account Details';
+    }
     
     // Render account info
     const accountInfoContainer = document.getElementById('account-info-display');
-    accountInfoContainer.innerHTML = `
-        <div class="info-field">
-            <div class="info-field-label">Company Name</div>
-            <div class="info-field-value">${account.name || 'Not specified'}</div>
-        </div>
-        <div class="info-field">
-            <div class="info-field-label">Industry</div>
-            <div class="info-field-value">${account.industry || 'Not specified'}</div>
-        </div>
-        <div class="info-field">
-            <div class="info-field-label">Phone</div>
-            <div class="info-field-value">${account.phone || 'Not specified'}</div>
-        </div>
-        <div class="info-field">
-            <div class="info-field-label">Website</div>
-            <div class="info-field-value">${account.website ? `<a href="${account.website}" target="_blank" style="color: #1A438D;">${account.website}</a>` : 'Not specified'}</div>
-        </div>
-        <div class="info-field" style="grid-column: 1 / -1;">
-            <div class="info-field-label">Address</div>
-            <div class="info-field-value">${account.address || 'Not specified'}</div>
-        </div>
-    `;
+    if (accountInfoContainer) {
+        accountInfoContainer.innerHTML = `
+            <div class="info-field">
+                <div class="info-field-label">Company Name</div>
+                <div class="info-field-value">${account.name || 'Not specified'}</div>
+            </div>
+            <div class="info-field">
+                <div class="info-field-label">Industry</div>
+                <div class="info-field-value">${account.industry || 'Not specified'}</div>
+            </div>
+            <div class="info-field">
+                <div class="info-field-label">Phone</div>
+                <div class="info-field-value">${account.phone || 'Not specified'}</div>
+            </div>
+            <div class="info-field">
+                <div class="info-field-label">Website</div>
+                <div class="info-field-value">${account.website ? `<a href="${account.website}" target="_blank" style="color: #1A438D;">${account.website}</a>` : 'Not specified'}</div>
+            </div>
+            <div class="info-field" style="grid-column: 1 / -1;">
+                <div class="info-field-label">Address</div>
+                <div class="info-field-value">${account.address || 'Not specified'}</div>
+            </div>
+        `;
+    }
     
     // Render contacts for this account
     renderAccountContacts();
@@ -617,12 +707,16 @@ function renderAccountDetail() {
     
     // Render energy contract info (placeholder for now)
     const energyContainer = document.getElementById('energy-contract-display');
-    energyContainer.innerHTML = '<p class="empty-state">No contract information available</p>';
+    if (energyContainer) {
+        energyContainer.innerHTML = '<p class="empty-state">No contract information available</p>';
+    }
 }
 
 // Render contacts for current account
 function renderAccountContacts() {
     const container = document.getElementById('account-contacts-list');
+    if (!container || !CRMApp.currentAccount) return;
+    
     const accountContacts = CRMApp.contacts.filter(contact => contact.accountId === CRMApp.currentAccount.id);
     
     if (accountContacts.length === 0) {
@@ -658,6 +752,8 @@ function renderAccountContacts() {
 // Render activities for current account
 function renderAccountActivities() {
     const container = document.getElementById('account-activities-list');
+    if (!container || !CRMApp.currentAccount) return;
+    
     const accountActivities = CRMApp.activities.filter(activity => activity.accountId === CRMApp.currentAccount.id);
     
     if (accountActivities.length === 0) {
@@ -716,9 +812,14 @@ function editContact(contactId) {
 
 // Update dashboard stats
 function updateDashboardStats() {
-    document.getElementById('total-accounts').textContent = CRMApp.accounts.length;
-    document.getElementById('total-contacts').textContent = CRMApp.contacts.length;
-    document.getElementById('recent-activities').textContent = CRMApp.activities.length;
+    const totalAccountsEl = document.getElementById('total-accounts');
+    const totalContactsEl = document.getElementById('total-contacts');
+    const recentActivitiesEl = document.getElementById('recent-activities');
+    const hotLeadsEl = document.getElementById('hot-leads');
+    
+    if (totalAccountsEl) totalAccountsEl.textContent = CRMApp.accounts.length;
+    if (totalContactsEl) totalContactsEl.textContent = CRMApp.contacts.length;
+    if (recentActivitiesEl) recentActivitiesEl.textContent = CRMApp.activities.length;
     
     // Calculate hot leads (contacts created in last 7 days)
     const sevenDaysAgo = new Date();
@@ -729,12 +830,13 @@ function updateDashboardStats() {
         return createdDate > sevenDaysAgo;
     }).length;
     
-    document.getElementById('hot-leads').textContent = hotLeads;
+    if (hotLeadsEl) hotLeadsEl.textContent = hotLeads;
 }
 
 // Render recent activities on dashboard
 function renderRecentActivities() {
     const container = document.getElementById('recent-activities-list');
+    if (!container) return;
     
     if (CRMApp.activities.length === 0) {
         container.innerHTML = '<p class="empty-state">No recent activities</p>';
@@ -754,16 +856,20 @@ function renderRecentActivities() {
 // Show loading overlay
 function showLoading(show) {
     const overlay = document.getElementById('loading-overlay');
-    if (show) {
-        overlay.classList.add('active');
-    } else {
-        overlay.classList.remove('active');
+    if (overlay) {
+        if (show) {
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+        }
     }
 }
 
 // Show toast notification
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
+    if (!container) return;
+    
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     
@@ -782,7 +888,9 @@ function showToast(message, type = 'success') {
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => {
-            container.removeChild(toast);
+            if (container.contains(toast)) {
+                container.removeChild(toast);
+            }
         }, 300);
     }, 3000);
 }
@@ -816,7 +924,7 @@ function openCallsHubWithData(contactId) {
     window.open(url, '_blank');
 }
 
-// --- NEW: Cold Calling Hub Search Functions ---
+// --- Search Functions ---
 function setupSearchFunctionality() {
     // Add event listeners to search app buttons dynamically
     const googleBtn = gId('google-button');
@@ -845,15 +953,8 @@ function setupSearchFunctionality() {
             });
         }
     });
-
 }
 
-// The following functions are duplicates from script.js and should be defined
-// globally in a single file or managed more cleanly. For this project, they 
-// are needed for both crm-app.js and script.js, so they should be defined 
-// globally in a shared utility file. However, since they are already
-// defined in both, let's assume for this specific correction that they are
-// needed and should not be removed entirely.
 function openSearch(type, event) {
     const button = event.target.closest('.app-button');
     const searchBar = gId('search-bar');
@@ -875,9 +976,11 @@ function openSearch(type, event) {
     const stateInput = gId('search-state');
     const locationInput = gId('search-location');
     
-    cityInput.style.display = 'none';
-    stateInput.style.display = 'none';
-    locationInput.style.display = 'none';
+    if (!label || !input) return;
+    
+    if (cityInput) cityInput.style.display = 'none';
+    if (stateInput) stateInput.style.display = 'none';
+    if (locationInput) locationInput.style.display = 'none';
     
     if (type === 'google') {
         label.textContent = 'Search Google:';
@@ -888,23 +991,23 @@ function openSearch(type, event) {
     } else if (type === 'beenverified') {
         label.textContent = 'Search BeenVerified:';
         input.placeholder = 'Enter full name (e.g. John Smith)...';
-        cityInput.style.display = 'block';
-        stateInput.style.display = 'block';
+        if (cityInput) cityInput.style.display = 'block';
+        if (stateInput) stateInput.style.display = 'block';
     } else if (type === 'apollo') {
         label.textContent = 'Search Apollo:';
         input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
-        locationInput.style.display = 'block';
+        if (locationInput) locationInput.style.display = 'block';
     }
     
-    searchBar.classList.add('active');
+    if (searchBar) searchBar.classList.add('active');
     if (mainContainer) {
         mainContainer.classList.add('search-active');
     }
     setTimeout(() => input.focus(), 300);
     input.value = '';
-    cityInput.value = '';
-    stateInput.value = '';
-    locationInput.value = '';
+    if (cityInput) cityInput.value = '';
+    if (stateInput) stateInput.value = '';
+    if (locationInput) locationInput.value = '';
 }
 
 function closeSearch() {
@@ -952,6 +1055,5 @@ function performSearch() {
         closeSearch();
     }
 }
-// --- END NEW CODE ---
 
 console.log('CRM App initialized successfully');
