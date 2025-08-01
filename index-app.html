@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Choosers CRM</title>
-    <!-- Tailwind CSS CDN for modern styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Google Font - Inter -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/crm-styles.css">
+    <script src="https://powerchoosers.github.io/power-choosers-crm/firebase-config.js"></script>
+    <script src="https://powerchoosers.github.io/power-choosers-crm/crm-app.js"></script>
+    
     <style>
-        /* Base Styles from crm-styles.css */
+        /* Reset and Base Styles */
         * {
             margin: 0;
             padding: 0;
@@ -25,12 +26,9 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            /* Added to try and fix layering issues when embedded */
-            position: relative;
-            z-index: 1;
         }
-        
-        /* Top Navigation Bar */
+
+        /* Top Navigation Bar - Updated with properly centered icons */
         .top-nav {
             background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
             padding: 6px 0;
@@ -42,6 +40,7 @@
             left: 0;
             right: 0;
         }
+
         .nav-container {
             max-width: 1400px;
             margin: 0 auto;
@@ -51,12 +50,14 @@
             align-items: center;
             gap: 15px;
         }
+
         .nav-left-title h1 {
             font-size: 1.6rem;
             font-weight: 800;
             color: #1A438D;
             margin: 0;
         }
+
         .nav-icons-center {
             display: flex;
             justify-content: flex-end;
@@ -64,7 +65,7 @@
             gap: 25px;
         }
 
-        /* App Buttons */
+        /* Updated app buttons - properly centered icons */
         .app-button {
             display: flex;
             flex-direction: column;
@@ -82,20 +83,46 @@
             text-decoration: none;
             padding: 6px;
         }
+
         .app-button:hover {
             transform: translateY(-3px);
             box-shadow: 0 12px 32px rgba(0,0,0,.12);
         }
+
         .app-button.active {
             background: linear-gradient(145deg, #1A438D 0%, #2563EB 100%);
             color: white;
         }
-        .app-button.active .app-icon-svg {
-            color: white;
+
+        .app-button.active .app-icon {
+            filter: brightness(0) invert(1);
+            background: rgba(255,255,255,0.15);
         }
+
         .app-button.active .app-label {
             color: white;
         }
+
+        .app-button.active .app-icon-svg {
+            color: white;
+        }
+
+        /* Properly centered icon styles */
+        .app-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            margin: 0 0 4px 0;
+            object-fit: contain;
+            background: rgba(107, 114, 128, 0.1);
+            padding: 4px;
+            transition: all .3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
         .app-icon-svg {
             width: 24px;
             height: 24px;
@@ -110,24 +137,7 @@
             justify-content: center;
             flex-shrink: 0;
         }
-        .app-icon {
-             width: 24px;
-            height: 24px;
-            border-radius: 6px;
-            margin: 0 0 4px 0;
-            object-fit: contain;
-            background: rgba(107, 114, 128, 0.1);
-            padding: 4px;
-            transition: all .3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        .app-button.active .app-icon {
-            filter: brightness(0) invert(1);
-            background: rgba(255,255,255,0.15);
-        }
+
         .app-label {
             font-size: .55rem;
             font-weight: 600;
@@ -138,10 +148,10 @@
             margin-top: auto;
         }
 
-        /* Search Bar */
+        /* Search Bar - Reduced top positioning */
         .search-bar {
             position: fixed;
-            top: 72px;
+            top: 72px; /* Adjusted to be directly below the top nav bar */
             left: 0;
             right: 0;
             background: white;
@@ -186,6 +196,10 @@
             outline: none;
             border-color: #1A438D;
         }
+        .search-actions {
+            display: flex;
+            gap: 8px;
+        }
         .search-btn {
             background: #1A438D;
             color: white;
@@ -200,7 +214,7 @@
             padding: 8px 10px;
         }
 
-        /* Main Container */
+        /* Main Container - Reduced top margin and added padding */
         .main-container {
             margin-top: 80px;
             padding: 15px;
@@ -208,6 +222,7 @@
             overflow-y: auto;
             height: calc(100vh - 80px);
         }
+
         .main-container.search-active {
             margin-top: 142px;
             height: calc(100vh - 142px);
@@ -219,9 +234,11 @@
             max-width: 1400px;
             margin: 0 auto;
         }
+
         .view-container.active {
             display: block;
         }
+
         .view-header {
             display: flex;
             justify-content: space-between;
@@ -229,84 +246,23 @@
             margin-bottom: 20px;
             padding: 0 10px;
         }
+
         .view-header h2 {
             font-size: 2rem;
             font-weight: 700;
             color: #1A438D;
         }
-        .back-btn {
-            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .back-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        .primary-btn {
-            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .primary-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        .secondary-btn {
-            background: #e2e8f0;
-            color: #1e293b;
-            border: 1px solid #cbd5e1;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .secondary-btn:hover {
-            background: #cbd5e1;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        .action-btn {
-            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-            color: #1A438D;
-            border: 1px solid #a5b4fc;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-        }
-        .action-btn:hover {
-            background: linear-gradient(135deg, #c7d2fe 0%, #a5b4fc 100%);
-            transform: translateY(-2px);
-        }
-        .action-btn svg {
-            color: #1A438D;
-        }
 
-        /* Dashboard Layout */
-        .dashboard-layout, .account-detail-layout {
+        /* Dashboard Layout - Adjusted height */
+        .dashboard-layout {
             display: grid;
             grid-template-columns: 1fr 350px;
             gap: 30px;
             height: calc(100vh - 120px);
-            padding-top: 20px;
+            padding-top: 20px; /* Added padding here */
         }
-        .dashboard-main, .account-detail-main {
+
+        .dashboard-main {
             display: flex;
             flex-direction: column;
             gap: 20px;
@@ -314,7 +270,12 @@
             padding-right: 8px;
             margin-right: -8px;
         }
-        .dashboard-sidebar, .account-detail-sidebar {
+
+        .dashboard-main::-webkit-scrollbar {width: 8px;}
+        .dashboard-main::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
+        .dashboard-main::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+
+        .dashboard-sidebar {
             display: flex;
             flex-direction: column;
             gap: 20px;
@@ -322,6 +283,44 @@
             padding-right: 8px;
             margin-right: -8px;
         }
+
+        .dashboard-sidebar::-webkit-scrollbar {width: 8px;}
+        .dashboard-sidebar::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
+        .dashboard-sidebar::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+
+        /* Account Detail Layout - Adjusted height */
+        .account-detail-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+            height: calc(100vh - 120px);
+        }
+
+        .account-detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            padding-right: 8px;
+            margin-right: -8px;
+        }
+
+        .account-detail-main::-webkit-scrollbar {width: 8px;}
+        .account-detail-main::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
+        .account-detail-main::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+
+        .account-detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            padding-right: 8px;
+            margin-right: -8px;
+        }
+
+        .account-detail-sidebar::-webkit-scrollbar {width: 8px;}
+        .account-detail-sidebar::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
+        .account-detail-sidebar::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
 
         /* Cards */
         .crm-card {
@@ -331,6 +330,7 @@
             box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
             border: 1px solid rgba(30, 90, 168, .1);
         }
+
         .card-title {
             font-size: 1.3rem;
             font-weight: 700;
@@ -340,6 +340,15 @@
             align-items: center;
             gap: 8px;
         }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
         .stat-card {
             background: linear-gradient(135deg, #fef7ff 0%, #f3e8ff 100%);
             padding: 14px;
@@ -347,22 +356,27 @@
             text-align: center;
             border: 1px solid #c084fc;
         }
+
         .stat-number {
             font-size: 1.6rem;
             font-weight: 800;
             color: #7c3aed;
             display: block;
         }
+
         .stat-label {
             font-size: .75rem;
             color: #6b21a8;
             font-weight: 600;
         }
+
+        /* Grids */
         .accounts-grid, .contacts-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 20px;
         }
+
         .account-card, .contact-card {
             background: white;
             border-radius: 16px;
@@ -372,39 +386,82 @@
             cursor: pointer;
             transition: all .3s ease;
         }
+
         .account-card:hover, .contact-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 12px 32px rgba(0,0,0,.12);
         }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
         .card-name {
             font-size: 1.2rem;
             font-weight: 700;
             color: #1A438D;
             margin-bottom: 4px;
         }
+
         .card-subtitle {
             font-size: .9rem;
             color: #64748b;
         }
-        .info-field {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-left: 4px solid #F7921F;
-            padding: 14px;
-            border-radius: 0 8px 8px 0;
-        }
-        .info-field-label {
-            font-size: .8rem;
-            font-weight: 600;
-            color: #6b7280;
-            margin-bottom: 4px;
-        }
-        .info-field-value {
-            font-size: .9rem;
-            color: #1e293b;
-            font-weight: 500;
+
+        .card-actions {
+            display: flex;
+            gap: 8px;
         }
 
-        /* Forms & Modals */
+        .icon-btn {
+            background: transparent;
+            border: none;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all .3s ease;
+            color: #6b7280;
+        }
+
+        .icon-btn:hover {
+            background: rgba(107, 114, 128, .1);
+            color: #374151;
+        }
+
+        /* New Add Notes Button Styling */
+        .add-notes-btn {
+            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: .9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all .3s ease;
+            box-shadow: 0 4px 16px rgba(26,67,141,.2);
+        }
+
+        .add-notes-btn:hover {
+            background: linear-gradient(135deg, #153775 0%, #1D4ED8 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(26,67,141,.3);
+        }
+
+        .add-notes-btn svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        /* Modals */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -420,13 +477,16 @@
             visibility: hidden;
             transition: all .3s ease;
         }
+
         .modal-overlay.active {
             opacity: 1;
             visibility: visible;
         }
+
         .modal-content {
             background: white;
             border-radius: 20px;
+            padding: 0;
             max-width: 600px;
             width: 90%;
             max-height: 80vh;
@@ -436,17 +496,58 @@
             transform: scale(.9);
             transition: transform .3s ease;
         }
+
         .modal-overlay.active .modal-content {
             transform: scale(1);
         }
-        .form-actions {
+
+        .modal-header {
             display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-            margin-top: 24px;
-            padding-top: 24px;
-            border-top: 1px solid #e2e8f0;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 24px 0 24px;
+            margin-bottom: 24px;
         }
+
+        .modal-header h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #1A438D;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 4px;
+            border-radius: 4px;
+            transition: color .3s ease;
+        }
+
+        .close-btn:hover {
+            color: #374151;
+        }
+
+        /* Forms */
+        form {
+            padding: 0 24px 24px 24px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 16px;
+        }
+
         .form-group label {
             display: block;
             font-size: .85rem;
@@ -466,116 +567,136 @@
             color: #1e293b;
             transition: border-color .3s ease;
         }
-        
-        /* Calls Hub Specific */
-        .calls-hub-layout {
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #1A438D;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        /* Account Detail Specific */
+        #account-info-display {
             display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 20px;
-            height: calc(100vh - 120px);
-            max-width: 1400px;
-            margin: 0 auto;
-            padding-top: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
         }
-        .calls-hub-main {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
-            border: 1px solid rgba(30, 90, 168, .1);
+
+        .info-field {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-left: 4px solid #F7921F;
+            padding: 14px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .info-field-label {
+            font-size: .8rem;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .info-field-value {
+            font-size: .9rem;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        .contact-list-item {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-left: 4px solid #F7921F;
+            padding: 14px;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
             display: flex;
-            flex-direction: column;
             justify-content: space-between;
-            overflow-y: auto;
+            align-items: center;
         }
-        .script-display {
-            font-size: 1.1rem;
-            line-height: 1.6;
-            padding: 20px;
-            background: #f8fafc;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            min-height: 200px;
-            border-left: 4px solid #e2e8f0;
-            flex-grow: 1;
-            overflow-y: auto;
-        }
-        .script-display.mood-neutral { border-left-color: #6b7280; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }
-        .script-display.mood-positive { border-left-color: #22c55e; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); }
-        .script-display.mood-challenging { border-left-color: #f59e0b; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); }
-        .script-display.mood-unsure { border-left-color: #8b5cf6; background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); }
-        .response-btn {
-            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
-            color: white;
-            border: none;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: .9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all .3s ease;
-            text-align: left;
-            box-shadow: 0 4px 16px rgba(26,67,141,.2);
-        }
-        .response-btn:hover {
-            background: linear-gradient(135deg, #153775 0%, #1D4ED8 100%);
-            transform: translateY(-2px);
-        }
-        .dial-button {
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            color: white;
-            border: none;
-            padding: 16px 24px;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all .3s ease;
-        }
-        .dial-button:hover {
-            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-            transform: translateY(-3px);
-        }
-        .nav-btn {
-            background: #6b7280;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: .9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all .3s ease;
-        }
-        .nav-btn:hover:not(:disabled) { background: #4b5563; transform: translateY(-2px); }
-        .nav-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .calls-hub-sidebar {
+
+        .contact-info {
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            overflow-y: auto;
-            padding-right: 8px;
-            margin-right: -8px;
         }
-        .sidebar-card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
-            border: 1px solid rgba(30, 90, 168, .1);
-        }
-        .add-notes-btn {
-            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 6px;
+
+        .contact-name {
             font-weight: 600;
-            cursor: pointer;
+            color: #1A438D;
+            font-size: 1rem;
+            margin-bottom: 4px;
         }
-        
-        /* Utility */
-        .hidden { display: none !important; }
+
+        .contact-title {
+            font-size: .85rem;
+            color: #64748b;
+        }
+
+        /* Activities */
+        .activity-item {
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 14px;
+            margin-bottom: 14px;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .activity-title {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 6px;
+            font-size: .9rem;
+            line-height: 1.4;
+        }
+
+        .activity-content {
+            color: #64748b;
+            font-size: .8rem;
+            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+
+        .activity-date {
+            color: #64748b;
+            font-size: .8rem;
+            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+
+        /* Sidebar specific styles */
+        #account-note-input {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            background: white;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: .85rem;
+            line-height: 1.4;
+            resize: vertical;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        #energy-contract-display {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Empty States */
         .empty-state {
             text-align: center;
             color: #9ca3af;
@@ -583,6 +704,8 @@
             padding: 40px 20px;
             font-size: .9rem;
         }
+
+        /* Loading Overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -598,10 +721,12 @@
             visibility: hidden;
             transition: all .3s ease;
         }
+
         .loading-overlay.active {
             opacity: 1;
             visibility: visible;
         }
+
         .spinner {
             width: 40px;
             height: 40px;
@@ -610,10 +735,13 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Toast Notifications */
         .toast-container {
             position: fixed;
             top: 20px;
@@ -623,6 +751,7 @@
             flex-direction: column;
             gap: 12px;
         }
+
         .toast {
             background: white;
             padding: 16px 20px;
@@ -636,129 +765,596 @@
             align-items: center;
             gap: 12px;
         }
-        .toast.show { transform: translateX(0); }
-        .toast.error { border-left-color: #ef4444; }
-        .toast.warning { border-left-color: #f59e0b; }
-        .toast-message { font-size: .9rem; color: #1e293b; font-weight: 500; }
-        
-        /* Custom modal for confirm() replacement */
-        .custom-confirm {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            border-left-color: #ef4444;
+        }
+
+        .toast.warning {
+            border-left-color: #f59e0b;
+        }
+
+        .toast-message {
+            font-size: .9rem;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        /* CALLING HUB STYLES - Integrated */
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            height: calc(100vh - 120px);
+            max-width: 1400px;
+            margin: 0 auto;
+            padding-top: 20px; /* Added padding here */
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+            border: 1px solid rgba(30, 90, 168, .1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow-y: auto;
+        }
+
+        .script-display {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            min-height: 200px;
+            border-left: 4px solid #e2e8f0;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .script-display.mood-neutral {
+            border-left-color: #6b7280;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+
+        .script-display.mood-positive {
+            border-left-color: #22c55e;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        }
+
+        .script-display.mood-challenging {
+            border-left-color: #f59e0b;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        }
+
+        .script-display.mood-unsure {
+            border-left-color: #8b5cf6;
+            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+        }
+
+        .pause {
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        .emphasis {
+            font-weight: 600;
+            color: #1A438D;
+        }
+
+        .metric {
+            font-weight: 700;
+            color: #dc2626;
+        }
+
+        .responses-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .response-btn {
+            background: linear-gradient(135deg, #1A438D 0%, #2563EB 100%);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: .9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .3s ease;
+            text-align: left;
+            box-shadow: 0 4px 16px rgba(26,67,141,.2);
+        }
+
+        .response-btn:hover {
+            background: linear-gradient(135deg, #153775 0%, #1D4ED8 100%);
+            transform: translateY(-2px);
+        }
+
+        .dial-button {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            border: none;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .3s ease;
             display: flex;
             align-items: center;
+            gap: 12px;
             justify-content: center;
-            z-index: 5000;
-            visibility: hidden;
-            opacity: 0;
-            transition: visibility 0s, opacity 0.3s;
+            box-shadow: 0 8px 24px rgba(34,197,94,.25);
         }
-        .custom-confirm.visible {
-            visibility: visible;
-            opacity: 1;
+
+        .dial-button:hover {
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px rgba(34,197,94,.35);
         }
-        .custom-confirm-box {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-            transform: scale(0.9);
-            transition: transform 0.3s;
+
+        .dial-button svg {
+            width: 20px;
+            height: 20px;
         }
-        .custom-confirm.visible .custom-confirm-box {
-            transform: scale(1);
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
         }
-        .custom-confirm-box p {
-            margin-bottom: 20px;
-            font-size: 1.1rem;
-        }
-        .custom-confirm-box button {
-            padding: 8px 16px;
+
+        .nav-btn {
+            background: #6b7280;
+            color: white;
             border: none;
-            border-radius: 6px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: .9rem;
+            font-weight: 600;
             cursor: pointer;
-            font-weight: bold;
-            margin: 0 5px;
+            transition: all .3s ease;
         }
-        .custom-confirm-box .confirm-yes { background-color: #dc2626; color: white; }
-        .custom-confirm-box .confirm-no { background-color: #d1d5db; color: #374151; }
-        
-        /* Media Queries */
+
+        .nav-btn:hover:not(:disabled) {
+            background: #4b5563;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            padding-right: 8px;
+            margin-right: -8px;
+        }
+
+        .sidebar::-webkit-scrollbar {width: 8px;}
+        .sidebar::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
+        .sidebar::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+
+        .sidebar-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
+            border: 1px solid rgba(30, 90, 168, .1);
+        }
+
+        .sidebar-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1A438D;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: .8rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: .85rem;
+            color: #1e293b;
+            transition: border-color .3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #1A438D;
+        }
+
+        #call-notes {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: .8rem;
+            line-height: 1.4;
+            resize: vertical;
+            color: #1e293b;
+        }
+
+        #call-notes:focus {
+            outline: none;
+            border-color: #1A438D;
+        }
+
+        #copy-status {
+            font-size: .8rem;
+            color: #22c55e;
+            opacity: 0;
+            transition: opacity .3s ease;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .tip-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: .8rem;
+            line-height: 1.4;
+            color: #4b5563;
+        }
+
+        .tip-item:last-child {
+            border-bottom: none;
+        }
+
+        .tip-item strong {
+            color: #1A438D;
+            font-weight: 600;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #fef7ff 0%, #f3e8ff 100%);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #c084fc;
+        }
+
+        .stat-number {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #7c3aed;
+            display: block;
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            font-size: .65rem;
+            color: #6b21a8;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .news-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .news-item:last-child {
+            border-bottom: none;
+        }
+
+        .news-title {
+            font-size: .85rem;
+            font-weight: 600;
+            color: #1A438D;
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+
+        .news-summary {
+            font-size: .75rem;
+            color: #4b5563;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .news-talking-point {
+            font-size: .75rem;
+            color: #059669;
+            line-height: 1.4;
+            font-style: italic;
+            background: rgba(5, 150, 105, 0.05);
+            padding: 6px 8px;
+            border-left: 2px solid #059669;
+        }
+
+        /* Responsive Design */
         @media (max-width: 1200px) {
-            .dashboard-layout, .account-detail-layout, .calls-hub-layout {
+            .dashboard-layout,
+            .account-detail-layout,
+            .container {
                 grid-template-columns: 1fr;
                 gap: 20px;
                 height: auto;
+                padding: 0;
                 min-height: calc(100vh - 100px);
                 overflow: visible;
             }
-            .dashboard-sidebar, .account-detail-sidebar, .calls-hub-sidebar {
+
+            .dashboard-sidebar,
+            .account-detail-sidebar,
+            .sidebar {
                 flex-direction: row;
                 overflow-x: auto;
                 max-height: none;
                 padding-bottom: 10px;
+                padding-right: 0;
+                margin-right: 0;
             }
-            .dashboard-sidebar .crm-card, .account-detail-sidebar .crm-card, .calls-hub-sidebar .sidebar-card {
+
+            .dashboard-sidebar .crm-card,
+            .account-detail-sidebar .crm-card,
+            .sidebar .sidebar-card {
                 min-width: 300px;
                 flex-shrink: 0;
             }
+
+            .main-container {
+                height: auto;
+                min-height: calc(100vh - 80px);
+                padding: 15px;
+            }
+
+            .nav-container {gap: 20px;}
+            .app-button {width: 55px; height: 55px;}
+            .app-icon, .app-icon-svg {width: 20px; height: 20px;}
+            .app-label {font-size: .5rem;}
+            .nav-icons-center {gap: 18px;}
+            .search-bar {top: 67px;}
+            .search-bar.active {height: 60px; padding: 12px;}
+            .search-label {min-width: 120px;}
         }
+
         @media (max-width: 768px) {
-            .nav-container { gap: 12px; padding: 0 15px; }
-            .app-button { width: 50px; height: 50px; }
-            .app-icon-svg { width: 18px; height: 18px; }
-            .app-label { font-size: .45rem; }
-            .nav-icons-center { gap: 15px; }
-            .main-container { padding: 12px; margin-top: 65px; }
-            .main-container.search-active { margin-top: 120px; }
-            .view-header { flex-direction: column; align-items: flex-start; gap: 15px; }
-            .view-header h2 { font-size: 1.6rem; }
-            .accounts-grid, .contacts-grid { grid-template-columns: 1fr; }
-            .modal-content { width: 95%; margin: 20px; }
+            .nav-container {
+                gap: 12px;
+                padding: 0 15px;
+            }
+
+            .app-button {
+                width: 50px;
+                height: 50px;
+            }
+
+            .app-icon,
+            .app-icon-svg {
+                width: 18px;
+                height: 18px;
+            }
+
+            .app-label {
+                font-size: .45rem;
+            }
+
+            .nav-icons-center {
+                gap: 15px;
+            }
+
+            .main-container {
+                padding: 12px;
+                margin-top: 65px;
+            }
+
+            .main-container.search-active {
+                margin-top: 120px;
+            }
+
+            .view-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .view-header h2 {
+                font-size: 1.6rem;
+            }
+
+            .accounts-grid,
+            .contacts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 20px;
+            }
+
+            .dashboard-sidebar,
+            .account-detail-sidebar,
+            .sidebar {
+                flex-direction: column;
+                overflow-x: visible;
+                overflow-y: auto;
+                max-height: 50vh;
+            }
+
+            .dashboard-sidebar .crm-card,
+            .account-detail-sidebar .crm-card,
+            .sidebar .sidebar-card {
+                min-width: auto;
+            }
+
+            #account-info-display {
+                grid-template-columns: 1fr;
+            }
+
+            .top-nav {padding: 8px 0;}
+            .search-bar {top: 57px;}
+            .search-bar.active {height: 50px; padding: 10px;}
+            .nav-left-title h1 {font-size: 1.4rem;}
         }
+
         @media (max-width: 480px) {
-            .nav-container { gap: 8px; padding: 0 10px; justify-content: space-around; }
-            .app-button { width: 45px; height: 45px; }
-            .app-icon-svg { width: 16px; height: 16px; }
-            .app-label { font-size: .4rem; line-height: 1.1; }
-            .nav-icons-center { gap: 10px; }
-            .main-container { padding: 10px; margin-top: 55px; }
-            .main-container.search-active { margin-top: 105px; }
+            .nav-container {
+                gap: 8px;
+                padding: 0 10px;
+                justify-content: space-around;
+            }
+
+            .app-button {
+                width: 45px;
+                height: 45px;
+            }
+
+            .app-icon,
+            .app-icon-svg {
+                width: 16px;
+                height: 16px;
+            }
+
+            .app-label {
+                font-size: .4rem;
+                line-height: 1.1;
+            }
+
+            .nav-icons-center {
+                gap: 10px;
+            }
+
+            .main-container {
+                padding: 10px;
+                margin-top: 55px;
+            }
+
+            .main-container.search-active {
+                margin-top: 105px;
+            }
+
+            .crm-card, .sidebar-card {
+                padding: 14px;
+            }
+
+            .card-title, .sidebar-title {
+                font-size: 1.1rem;
+            }
+
+            .view-header h2 {
+                font-size: 1.4rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .stat-number {
+                font-size: 1.4rem;
+            }
+
+            .toast {
+                min-width: 250px;
+                margin: 0 10px;
+            }
+
+            .toast-container {
+                right: 10px;
+                left: 10px;
+            }
+
+            .top-nav {padding: 6px 0;}
+            .search-bar {top: 47px;}
+            .search-bar.active {height: 45px; padding: 8px;}
+            .nav-left-title h1 {font-size: 1.4rem;}
         }
     </style>
 </head>
-<body class="bg-slate-100 font-sans text-slate-800">
-    <!-- Top Navigation Bar -->
-    <div class="top-nav px-4 py-3 bg-white shadow-lg z-50 fixed w-full">
-        <div class="nav-container px-4 py-2">
-            <div class="flex-shrink-0">
-                <h1 id="page-title" class="text-xl font-extrabold text-blue-900">Power Choosers CRM</h1>
+<body>
+    <div class="top-nav">
+        <div class="nav-container">
+            <div class="nav-left-title">
+                <h1 id="page-title">Power Choosers CRM</h1>
             </div>
-            <div class="flex-1 flex justify-end items-center space-x-4">
+            <div class="nav-icons-center">
                 <button class="app-button active" id="dashboard-btn" data-view="dashboard">
-                    <i class="fas fa-home app-icon-svg"></i>
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
                     <span class="app-label">Dashboard</span>
                 </button>
+                
                 <button class="app-button" id="accounts-btn" data-view="accounts">
-                    <i class="fas fa-building app-icon-svg"></i>
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="m22 21-1.5-1.5"/>
+                        <circle cx="19" cy="17" r="3"/>
+                    </svg>
                     <span class="app-label">Accounts</span>
                 </button>
+                
                 <button class="app-button" id="contacts-btn" data-view="contacts">
-                    <i class="fas fa-user-circle app-icon-svg"></i>
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="m22 21-3-3"/>
+                        <circle cx="19" cy="17" r="3"/>
+                    </svg>
                     <span class="app-label">Contacts</span>
                 </button>
+
                 <button class="app-button" id="calls-hub-btn" data-view="calls-hub">
-                    <i class="fas fa-phone app-icon-svg"></i>
+                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
                     <span class="app-label">Calls Hub</span>
                 </button>
-                <!-- Search Buttons -->
+
                 <div class="app-button" id="google-button">
                     <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google" class="app-icon">
                     <span class="app-label">Google</span>
@@ -780,10 +1376,9 @@
         </div>
     </div>
     
-    <!-- Search Bar -->
     <div class="search-bar" id="search-bar">
-        <div class="search-container px-4">
-            <div class="search-label" id="search-label">Search:</div>
+        <div class="search-container">
+            <div class="search-label" id="search-label">Search Google:</div>
             <input type="text" class="search-input" id="search-input" placeholder="Type your search query...">
             <input type="text" class="search-input city" id="search-city" placeholder="City" style="display:none">
             <input type="text" class="search-input state" id="search-state" placeholder="State" style="display:none">
@@ -795,15 +1390,14 @@
         </div>
     </div>
 
-    <!-- Main Content Area -->
     <div class="main-container" id="main-container">
-        <!-- Dashboard View -->
+        
         <div class="view-container active" id="dashboard-view">
             <div class="dashboard-layout">
                 <div class="dashboard-main">
                     <div class="crm-card">
-                        <h2 class="card-title"><i class="fas fa-chart-line text-blue-900"></i> Dashboard Overview</h2>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <h2 class="card-title">📊 Dashboard Overview</h2>
+                        <div class="stats-grid">
                             <div class="stat-card">
                                 <span class="stat-number" id="total-accounts">0</span>
                                 <span class="stat-label">Total Accounts</span>
@@ -813,39 +1407,52 @@
                                 <span class="stat-label">Total Contacts</span>
                             </div>
                             <div class="stat-card">
-                                <span class="stat-number" id="recent-activities-count">0</span>
+                                <span class="stat-number" id="recent-activities">0</span>
                                 <span class="stat-label">Recent Activities</span>
                             </div>
                             <div class="stat-card">
-                                <span class="stat-number" id="hot-leads-count">0</span>
+                                <span class="stat-number" id="hot-leads">0</span>
                                 <span class="stat-label">Hot Leads</span>
                             </div>
                         </div>
                     </div>
+                    
                     <div class="crm-card">
-                        <h2 class="card-title"><i class="fas fa-history text-blue-900"></i> Recent Activities</h2>
+                        <h2 class="card-title">🔥 Recent Activities</h2>
                         <div id="recent-activities-list">
                             <p class="empty-state">No recent activities</p>
                         </div>
                     </div>
                 </div>
+                
                 <div class="dashboard-sidebar">
                     <div class="crm-card">
-                        <h2 class="card-title"><i class="fas fa-bolt text-blue-900"></i> Quick Actions</h2>
-                        <div class="flex flex-col space-y-3">
-                            <button class="action-btn" id="go-to-calls-hub-btn">
-                                <i class="fas fa-phone"></i> Go to Calls Hub
-                            </button>
-                            <button class="action-btn" id="add-account-btn">
-                                <i class="fas fa-plus-circle"></i> Add New Account
-                            </button>
-                            <button class="action-btn" id="add-contact-btn">
-                                <i class="fas fa-user-plus"></i> Add New Contact
-                            </button>
-                        </div>
+                        <h2 class="card-title">⚡ Quick Actions</h2>
+                        <button class="action-btn" id="go-to-calls-hub-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            Go to Calls Hub
+                        </button>
+                        <button class="action-btn" id="add-account-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 8v8M8 12h8"/>
+                            </svg>
+                            Add New Account
+                        </button>
+                        <button class="action-btn" id="add-contact-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M19 8v6M22 11h-6"/>
+                            </svg>
+                            Add New Contact
+                        </button>
                     </div>
+                    
                     <div class="crm-card">
-                        <h2 class="card-title"><i class="fas fa-phone-volume text-blue-900"></i> Today's Calls</h2>
+                        <h2 class="card-title">📞 Today's Calls</h2>
                         <div id="todays-calls">
                             <p class="empty-state">No calls scheduled</p>
                         </div>
@@ -854,10 +1461,9 @@
             </div>
         </div>
 
-        <!-- Accounts View -->
         <div class="view-container" id="accounts-view">
             <div class="view-header">
-                <h2><i class="fas fa-building text-blue-900"></i> Accounts</h2>
+                <h2>🏢 Accounts</h2>
                 <button class="primary-btn" id="new-account-btn">+ New Account</button>
             </div>
             <div class="accounts-grid" id="accounts-grid">
@@ -865,10 +1471,9 @@
             </div>
         </div>
 
-        <!-- Contacts View -->
         <div class="view-container" id="contacts-view">
             <div class="view-header">
-                <h2><i class="fas fa-users text-blue-900"></i> Contacts</h2>
+                <h2>👤 Contacts</h2>
                 <button class="primary-btn" id="new-contact-btn">+ New Contact</button>
             </div>
             <div class="contacts-grid" id="contacts-grid">
@@ -876,329 +1481,395 @@
             </div>
         </div>
 
-        <!-- Account Detail View -->
         <div class="view-container" id="account-detail-view">
             <div class="account-detail-layout">
                 <div class="account-detail-main">
                     <div class="view-header">
-                        <button class="back-btn" id="back-to-accounts"><i class="fas fa-arrow-left"></i> Back to Accounts</button>
+                        <button class="back-btn" id="back-to-accounts">← Back to Accounts</button>
                         <h2 id="account-detail-title">Account Details</h2>
-                        <button class="primary-btn" id="edit-account-btn"><i class="fas fa-edit"></i> Edit Account</button>
+                        <button class="primary-btn" id="edit-account-btn">Edit Account</button>
                     </div>
+                    
                     <div class="crm-card">
-                        <h3 class="card-title"><i class="fas fa-info-circle text-blue-900"></i> Company Information</h3>
-                        <div id="account-info-display" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                        <h3 class="card-title">🏢 Company Information</h3>
+                        <div id="account-info-display">
+                        </div>
                     </div>
+                    
                     <div class="crm-card">
-                        <h3 class="card-title"><i class="fas fa-user-friends text-blue-900"></i> Contacts at this Account</h3>
+                        <h3 class="card-title">👥 Contacts at this Account</h3>
                         <div id="account-contacts-list">
                             <p class="empty-state">No contacts for this account</p>
                         </div>
                     </div>
+                    
                     <div class="crm-card">
-                        <h3 class="card-title"><i class="fas fa-calendar-alt text-blue-900"></i> Recent Activities</h3>
+                        <h3 class="card-title">📝 Recent Activities</h3>
                         <div id="account-activities-list">
                             <p class="empty-state">No recent activities</p>
                         </div>
                     </div>
                 </div>
+                
                 <div class="account-detail-sidebar">
                     <div class="crm-card">
-                        <h3 class="card-title"><i class="fas fa-file-contract text-blue-900"></i> Energy Contract Details</h3>
-                        <form id="energy-contract-form" class="space-y-4">
-                            <div class="form-group">
+                        <h3 class="card-title">⚡ Energy Contract Details</h3>
+                        <form id="energy-contract-form">
+                            <div class="input-group">
                                 <label for="contract-provider">Current Provider:</label>
-                                <input type="text" id="contract-provider" placeholder="Enter provider name" class="w-full p-2 border border-slate-300 rounded-md">
+                                <input type="text" id="contract-provider" placeholder="Enter provider name">
                             </div>
-                            <div class="form-group">
+                            <div class="input-group">
                                 <label for="contract-rate">Current Rate:</label>
-                                <input type="text" id="contract-rate" placeholder="e.g. 12.5¢/kWh" class="w-full p-2 border border-slate-300 rounded-md">
+                                <input type="text" id="contract-rate" placeholder="e.g. 12.5¢/kWh">
                             </div>
-                            <div class="form-group">
+                            <div class="input-group">
                                 <label for="contract-expiration">Contract Expiration:</label>
-                                <input type="date" id="contract-expiration" class="w-full p-2 border border-slate-300 rounded-md">
+                                <input type="date" id="contract-expiration">
                             </div>
-                            <div class="form-group">
+                            <div class="input-group">
                                 <label for="contract-type">Contract Type:</label>
-                                <select id="contract-type" class="w-full p-2 border border-slate-300 rounded-md">
+                                <select id="contract-type">
                                     <option value="">Select type</option>
                                     <option value="fixed">Fixed Rate</option>
                                     <option value="variable">Variable Rate</option>
                                     <option value="indexed">Indexed Rate</option>
                                 </select>
                             </div>
-                            <button class="primary-btn w-full" type="submit">Save Contract Info</button>
+                            <button class="primary-btn" type="submit">Save Contract Info</button>
                         </form>
                     </div>
+                    
                     <div class="crm-card">
-                        <h3 class="card-title"><i class="fas fa-sticky-note text-blue-900"></i> Add Note</h3>
-                        <textarea id="account-note-input" placeholder="Add a note about this account..." class="w-full h-32 p-2 border border-slate-300 rounded-md"></textarea>
-                        <button class="primary-btn w-full mt-2" id="save-account-note">Save Note</button>
+                        <h3 class="card-title">📝 Add Note</h3>
+                        <textarea id="account-note-input" placeholder="Add a note about this account..."></textarea>
+                        <button class="primary-btn" id="save-account-note">Save Note</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Calls Hub View -->
         <div class="view-container" id="calls-hub-view">
-            <div class="calls-hub-layout">
-                <div class="calls-hub-main">
+            <div class="container">
+                <div class="main-content">
                     <div id="script-display" class="script-display mood-neutral">
                         Click 'Dial' to begin the call
                     </div>
-                    <div id="responses-container" class="flex flex-col space-y-3"></div>
-                    <div class="nav-buttons flex space-x-4 justify-center mt-4">
+                    <div id="responses-container" class="responses-grid">
+                        </div>
+                    <div class="nav-buttons">
                         <button id="back-btn" class="nav-btn" onclick="goBack()" disabled>← Back</button>
                         <button id="restart-btn" class="nav-btn" onclick="restart()">🔄 Restart</button>
                     </div>
                 </div>
             
-                <div class="calls-hub-sidebar">
+                <div class="sidebar">
                     <div class="sidebar-card">
-                        <h3 class="sidebar-title"><i class="fas fa-address-card text-blue-900"></i> Prospect Info</h3>
-                        <div class="space-y-3">
-                            <div class="input-group">
-                                <label for="input-company-name" class="block text-sm font-semibold text-slate-700">Company Name:</label>
-                                <input type="text" id="input-company-name" placeholder="ABC Manufacturing" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
-                            </div>
-                            <div class="input-group">
-                                <label for="input-name" class="block text-sm font-semibold text-slate-700">Contact Name:</label>
-                                <input type="text" id="input-name" placeholder="John Smith" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
-                            </div>
-                            <div class="input-group">
-                                <label for="input-title" class="block text-sm font-semibold text-slate-700">Contact Title:</label>
-                                <input type="text" id="input-title" placeholder="Company Leader" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
-                            </div>
-                            <div class="input-group">
-                                <label for="input-company-industry" class="block text-sm font-semibold text-slate-700">Company Industry:</label>
-                                <input type="text" id="input-company-industry" placeholder="businesses" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
-                            </div>
-                            <div class="input-group">
-                                <label for="input-benefit" class="block text-sm font-semibold text-slate-700">Specific Benefit:</label>
-                                <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
-                            </div>
-                            <div class="input-group">
-                                <label for="input-pain" class="block text-sm font-semibold text-slate-700">Pain Point:</label>
-                                <input type="text" id="input-pain" placeholder="you're not stuck paying more" class="w-full p-2 border border-slate-300 rounded-md" oninput="updateScript()">
-                            </div>
+                        <h3 class="sidebar-title">📋 Prospect Info</h3>
+                        <div class="input-group">
+                            <label for="input-company-name">Company Name:</label>
+                            <input type="text" id="input-company-name" placeholder="ABC Manufacturing" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-name">Contact Name:</label>
+                            <input type="text" id="input-name" placeholder="John Smith" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-title">Contact Title:</label>
+                            <input type="text" id="input-title" placeholder="Company Leader" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-company-industry">Company Industry:</label>
+                            <input type="text" id="input-company-industry" placeholder="businesses" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-benefit">Specific Benefit:</label>
+                            <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" oninput="updateScript()">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-pain">Pain Point:</label>
+                            <input type="text" id="input-pain" placeholder="you're not stuck paying more" oninput="updateScript()">
                         </div>
                     </div>
             
                     <div class="sidebar-card">
-                        <h3 class="sidebar-title"><i class="fas fa-file-alt text-blue-900"></i> Call Notes</h3>
-                        <textarea id="call-notes" placeholder="Type your call notes here..." class="w-full h-48 p-2 border border-slate-300 rounded-md text-sm"></textarea>
-                        <div class="flex space-x-2 mt-3">
-                            <button onclick="saveProspectAndNotes()" class="add-notes-btn flex-1 flex items-center justify-center space-x-2">
-                                <i class="fas fa-plus"></i>
-                                <span>Save Notes</span>
+                        <h3 class="sidebar-title">📝 Call Notes</h3>
+                        <textarea id="call-notes" placeholder="Type your call notes here...
+• Company:
+• Contact:
+• Title:
+• Phone:
+• Email:
+• Contract expiration:
+• Current provider:
+• Pain points:
+• Interest level:
+• Next steps:
+• Follow-up date: "></textarea>
+                        <div style="display:flex;gap:8px;margin-bottom:16px">
+                            <button onclick="saveProspectAndNotes()" class="add-notes-btn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 8v8M8 12h8"/>
+                                </svg>
+                                Add Notes
                             </button>
-                            <button onclick="clearNotes()" class="secondary-btn bg-red-600 text-white flex-1 flex items-center justify-center space-x-2">
-                                <i class="fas fa-trash-alt"></i>
-                                <span>Clear</span>
-                            </button>
+                            <button onclick="clearNotes()" style="flex:1;background:#da3633;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.9rem">🗑️ Clear</button>
                         </div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">💡 Call Strategy Tips</h3>
+                        <div class="tip-item"><strong>Mirror their energy:</strong> Match their speaking pace and enthusiasm level to build rapport naturally.</div>
+                        <div class="tip-item"><strong>Use their name:</strong> Say their name 2-3 times during the call to maintain personal connection.</div>
+                        <div class="tip-item"><strong>Pause power:</strong> Use 2-3 second pauses after questions to let them process and respond.</div>
+                        <div class="tip-item"><strong>Permission-based selling:</strong> Always ask permission before moving to the next topic or scheduling.</div>
+                        <div class="tip-item"><strong>Assume the close:</strong> When scheduling, offer two specific times rather than asking "when works?"</div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">📊 Market Intelligence</h3>
+                        <div class="stat-grid">
+                            <div class="stat-card"><span class="stat-number">60%</span><span class="stat-label">Rate increase since 2021</span></div>
+                            <div class="stat-card"><span class="stat-number">29%</span><span class="stat-label">TX cost advantage</span></div>
+                            <div class="stat-card"><span class="stat-number">2026</span><span class="stat-label">Supply concerns begin</span></div>
+                            <div class="stat-card"><span class="stat-number">85%</span><span class="stat-label">Businesses unprepared</span></div>
+                        </div>
+                        <div class="tip-item"><strong>Key Message:</strong> "Texas maintains a 29% cost advantage over national averages, but only if you're positioned correctly in the market."</div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">📰 This Week's Energy News</h3>
+                        
+                        <div class="news-item">
+                            <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
+                            <div class="news-summary">Grid operator warns electricity demand may surpass available supply as soon as summer 2026, driven by massive data center growth and extreme weather patterns.</div>
+                            <div class="news-talking-point">💬 "With ERCOT projecting supply shortages, how is your company preparing for potential capacity constraints?"</div>
+                        </div>
+                        
+                        <div class="news-item">
+                            <div class="news-title">Data Centers Drive 218GW Demand Surge</div>
+                            <div class="news-summary">Texas electricity demand projected to reach 218GW by 2031 - more than doubling current levels. AI data centers alone account for 86GW of new demand growth.</div>
+                            <div class="news-talking-point">💬 "Are you factoring the massive industrial load growth into your energy procurement strategy?"</div>
+                        </div>
+                        
+                        <div class="news-item">
+                            <div class="news-title">"One Big Beautiful Bill" Impacts Texas Markets</div>
+                            <div class="news-summary">Federal legislation cuts clean energy subsidies while expanding fossil fuel production. Analysis shows wholesale electricity prices could rise 25% by 2030 and 74% by 2035.</div>
+                            <div class="news-talking-point">💬 "How are recent federal policy changes affecting your long-term energy cost planning?"</div>
+                        </div>
+                        
+                        <div class="news-item">
+                            <div class="news-title">Texas Wholesale Prices Expected to Drop Short-Term</div>
+                            <div class="news-summary">EIA forecasts ERCOT North Hub prices to decrease to $27-34/MWh in 2025 due to solar expansion, but forward contracts remain elevated at $50+/MWh reflecting market risk.</div>
+                            <div class="news-talking-point">💬 "Are you taking advantage of current market conditions to lock in favorable rates?"</div>
+                        </div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">🛡️ Quick Objection Responses</h3>
+                        <div class="tip-item"><strong>"We're happy with our provider"</strong><br>"That's great to hear. This isn't about changing providers - it's about optimizing your position within the current market structure."</div>
+                        <div class="tip-item"><strong>"We just renewed our contract"</strong><br>"Perfect timing actually. This gives us a chance to prepare strategically for your next cycle rather than scrambling later."</div>
+                        <div class="tip-item"><strong>"Send me some information"</strong><br>"I can definitely do that. What specific information would be most valuable - rate comparisons or market timing strategies?"</div>
+                        <div class="tip-item"><strong>"We handle it internally"</strong><br>"Smart approach. My role isn't to replace your team - it's to provide market intelligence that helps you make better decisions."</div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">🎯 Daily Goals</h3>
+                        <div class="stat-grid">
+                            <div class="stat-card"><span class="stat-number">50</span><span class="stat-label">Dials target</span></div>
+                            <div class="stat-card"><span class="stat-number">15</span><span class="stat-label">Conversations</span></div>
+                            <div class="stat-card"><span class="stat-number">5</span><span class="stat-label">Qualified leads</span></div>
+                            <div class="stat-card"><span class="stat-number">2</span><span class="stat-label">Appointments</span></div>
+                        </div>
+                        <div class="tip-item"><strong>Success Rate:</strong> Track your conversion from dials to conversations to appointments. Aim for 30% conversation rate and 15% appointment rate.</div>
+                    </div>
+            
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-title">🏭 Industry Talking Points</h3>
+                        <div class="tip-item"><strong>Manufacturing:</strong> "Energy costs can represent 15-30% of operating expenses. How are you managing that exposure to volatility?"</div>
+                        <div class="tip-item"><strong>Healthcare:</strong> "Critical facilities need reliable power strategies. Are you prepared for supply constraints in 2026?"</div>
+                        <div class="tip-item"><strong>Retail:</strong> "Multiple locations mean complex energy management. How are you optimizing across all sites?"</div>
+                        <div class="tip-item"><strong>Technology:</strong> "Data centers have unique load profiles. Are you maximizing your demand response opportunities?"</div>
                     </div>
                 </div>
             </div>
         </div>
+
     </div>
-    
-    <!-- Modals (Account, Contact) -->
+
     <div class="modal-overlay" id="account-modal">
         <div class="modal-content">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 id="account-modal-title" class="text-xl font-bold text-blue-900">Add New Account</h3>
-                    <button class="text-slate-500 hover:text-slate-700 text-2xl" id="close-account-modal">&times;</button>
-                </div>
-                <form id="account-form" class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label for="account-name" class="block font-semibold text-sm text-slate-700">Company Name *</label>
-                            <input type="text" id="account-name" required class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
-                        <div class="form-group">
-                            <label for="account-industry" class="block font-semibold text-sm text-slate-700">Industry</label>
-                            <input type="text" id="account-industry" class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label for="account-phone" class="block font-semibold text-sm text-slate-700">Phone</label>
-                            <input type="tel" id="account-phone" class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
-                        <div class="form-group">
-                            <label for="account-website" class="block font-semibold text-sm text-slate-700">Website</label>
-                            <input type="url" id="account-website" class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
+            <div class="modal-header">
+                <h3 id="account-modal-title">Add New Account</h3>
+                <button class="close-btn" id="close-account-modal">×</button>
+            </div>
+            <form id="account-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-name">Company Name *</label>
+                        <input type="text" id="account-name" required>
                     </div>
                     <div class="form-group">
-                        <label for="account-address" class="block font-semibold text-sm text-slate-700">Address</label>
-                        <textarea id="account-address" rows="3" class="w-full p-2 border border-slate-300 rounded-md"></textarea>
+                        <label for="account-industry">Industry</label>
+                        <input type="text" id="account-industry">
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label for="account-pain-points" class="block font-semibold text-sm text-slate-700">Pain Points</label>
-                            <textarea id="account-pain-points" rows="3" placeholder="What challenges does this company face?" class="w-full p-2 border border-slate-300 rounded-md"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="account-benefits" class="block font-semibold text-sm text-slate-700">Benefits</label>
-                            <textarea id="account-benefits" rows="3" placeholder="What benefits can we provide?" class="w-full p-2 border border-slate-300 rounded-md"></textarea>
-                        </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-phone">Phone</label>
+                        <input type="tel" id="account-phone">
                     </div>
-                    <div class="form-actions border-t pt-4 mt-4">
-                        <button type="button" class="secondary-btn" id="cancel-account">Cancel</button>
-                        <button type="submit" class="primary-btn">Save Account</button>
+                    <div class="form-group">
+                        <label for="account-website">Website</label>
+                        <input type="url" id="account-website">
                     </div>
-                </form>
-            </div>
+                </div>
+                <div class="form-group">
+                    <label for="account-address">Address</label>
+                    <textarea id="account-address" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="account-pain-points">Pain Points</label>
+                        <textarea id="account-pain-points" rows="3" placeholder="What challenges does this company face?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-benefits">Benefits</label>
+                        <textarea id="account-benefits" rows="3" placeholder="What benefits can we provide?"></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="secondary-btn" id="cancel-account">Cancel</button>
+                    <button type="submit" class="primary-btn">Save Account</button>
+                </div>
+            </form>
         </div>
     </div>
-    
+
     <div class="modal-overlay" id="contact-modal">
         <div class="modal-content">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 id="contact-modal-title" class="text-xl font-bold text-blue-900">Add New Contact</h3>
-                    <button class="text-slate-500 hover:text-slate-700 text-2xl" id="close-contact-modal">&times;</button>
-                </div>
-                <form id="contact-form" class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label for="contact-first-name" class="block font-semibold text-sm text-slate-700">First Name *</label>
-                            <input type="text" id="contact-first-name" required class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
-                        <div class="form-group">
-                            <label for="contact-last-name" class="block font-semibold text-sm text-slate-700">Last Name *</label>
-                            <input type="text" id="contact-last-name" required class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label for="contact-title" class="block font-semibold text-sm text-slate-700">Job Title</label>
-                            <input type="text" id="contact-title" class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
-                        <div class="form-group">
-                            <label for="contact-account" class="block font-semibold text-sm text-slate-700">Account</label>
-                            <select id="contact-account" class="w-full p-2 border border-slate-300 rounded-md">
-                                <option value="">Select an account...</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label for="contact-email" class="block font-semibold text-sm text-slate-700">Email</label>
-                            <input type="email" id="contact-email" class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
-                        <div class="form-group">
-                            <label for="contact-phone" class="block font-semibold text-sm text-slate-700">Phone</label>
-                            <input type="tel" id="contact-phone" class="w-full p-2 border border-slate-300 rounded-md">
-                        </div>
+            <div class="modal-header">
+                <h3 id="contact-modal-title">Add New Contact</h3>
+                <button class="close-btn" id="close-contact-modal">×</button>
+            </div>
+            <form id="contact-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-first-name">First Name *</label>
+                        <input type="text" id="contact-first-name" required>
                     </div>
                     <div class="form-group">
-                        <label for="contact-notes" class="block font-semibold text-sm text-slate-700">Notes</label>
-                        <textarea id="contact-notes" rows="3" class="w-full p-2 border border-slate-300 rounded-md"></textarea>
+                        <label for="contact-last-name">Last Name *</label>
+                        <input type="text" id="contact-last-name" required>
                     </div>
-                    <div class="form-actions border-t pt-4 mt-4">
-                        <button type="button" class="secondary-btn" id="cancel-contact">Cancel</button>
-                        <button type="submit" class="primary-btn">Save Contact</button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-title">Job Title</label>
+                        <input type="text" id="contact-title">
                     </div>
-                </form>
-            </div>
+                    <div class="form-group">
+                        <label for="contact-account">Account</label>
+                        <select id="contact-account">
+                            <option value="">Select an account...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact-email">Email</label>
+                        <input type="email" id="contact-email">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-phone">Phone</label>
+                        <input type="tel" id="contact-phone">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="contact-notes">Notes</label>
+                    <textarea id="contact-notes" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="secondary-btn" id="cancel-contact">Cancel</button>
+                    <button type="submit" class="primary-btn">Save Contact</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- Confirmation Modal -->
-    <div class="custom-confirm" id="custom-confirm-modal">
-        <div class="custom-confirm-box">
-            <p id="custom-confirm-message"></p>
-            <button class="confirm-no secondary-btn" id="confirm-no-btn">Cancel</button>
-            <button class="confirm-yes primary-btn" id="confirm-yes-btn">Confirm</button>
-        </div>
-    </div>
-
-    <!-- Loading Overlay -->
     <div class="loading-overlay" id="loading-overlay">
         <div class="spinner"></div>
     </div>
-    
-    <!-- Toast Notifications -->
+
     <div class="toast-container" id="toast-container"></div>
     
-    <!-- User Info for Firestore -->
-    <div id="user-info" class="hidden fixed bottom-4 left-4 p-2 bg-slate-200 rounded-md text-sm">
-        <span class="font-bold">User ID:</span> <span id="user-id"></span>
-    </div>
+    <script>
+        // CRM Application Main JavaScript File
+        // Consolidated file for single-page application functionality
 
-    <!-- Firebase SDK - v9 module -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, updateDoc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
-
-        // Global variables for Firebase (will be assigned later)
-        let app;
-        let db;
-        let auth;
-        let userId = '';
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+        // Firebase configuration from firebase-config.js
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
+            authDomain: "power-choosers-crm.firebaseapp.com",
+            projectId: "power-choosers-crm",
+            storageBucket: "power-choosers-crm.firebasestorage.app",
+            messagingSenderId: "792458658491",
+            appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
+            measurementId: "G-XEC3BFHJHW"
         };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // IIFE to initialize Firebase and authentication
-        (async () => {
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                // Sign in with the provided custom token or anonymously
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                // Listen for auth state changes to get the user ID
-                onAuthStateChanged(auth, user => {
-                    if (user) {
-                        userId = user.uid;
-                        console.log('User signed in with UID:', userId);
-                        document.getElementById('user-id').textContent = userId;
-                        // Now that we have the user ID, start the app and data listeners
-                        startAppAfterAuth();
-                    } else {
-                        console.log('No user signed in.');
-                        // Fallback in case of anonymous sign-in failure, though it shouldn't happen
-                        userId = 'anonymous';
-                        startAppAfterAuth();
-                    }
-                });
-
-            } catch (error) {
-                console.error("Firebase initialization or authentication failed:", error);
-                showToast("Failed to connect to the database. Please try again.", "error");
-            }
-        })();
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = app.firestore();
+        const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
         
-        // Main app initialization function to be called after auth is ready
-        function startAppAfterAuth() {
-            setupNavigation();
-            setupModals();
-            setupEventListeners();
-            loadInitialData(); // Load data and set up listeners
-            showView('dashboard');
-            setupSearchFunctionality();
-        }
+        // --- Universal Utility Functions ---
+        const gId = id => document.getElementById(id);
+        const showLoading = (show) => {
+            const loadingOverlay = gId('loading-overlay');
+            if (loadingOverlay) {
+                loadingOverlay.classList.toggle('active', show);
+            }
+        };
 
-        // Global state management
+        const showToast = (message, type = 'success') => {
+            const toastContainer = gId('toast-container');
+            if (!toastContainer) return;
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<div class="toast-message">${message}</div>`;
+            toastContainer.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => toast.remove());
+            }, 5000);
+        };
+        
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'Unknown date';
+            try {
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            } catch (e) {
+                return 'Invalid date';
+            }
+        };
+
+        const formatDateOnly = (timestamp) => {
+            if (!timestamp) return 'Unknown date';
+            try {
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString();
+            } catch (e) {
+                return 'Invalid date';
+            }
+        };
+
+        // --- Global State Management ---
         const CRMApp = {
             currentView: 'dashboard',
             currentAccount: null,
@@ -1207,34 +1878,664 @@
             contacts: [],
             activities: []
         };
-
-        // Global state for search functionality and current call data.
+        
         let currentSearchType = '';
         let activeButton = null;
         let currentProspect = {}; 
 
-        // Helper to get element by ID (saves characters and improves readability)
-        const gId = id => document.getElementById(id);
+        // --- Core Application Logic ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM Content Loaded. Starting app initialization.');
+            setupNavigation();
+            setupModals();
+            setupEventListeners();
+            setupSearchFunctionality();
+            loadInitialData(); // This is the crucial function call
+            showView('dashboard');
+        });
 
-        // Placeholder map for dynamic text in the call script.
+        // The following functions were missing from your consolidated file and are now included.
+
+        // Load all data from Firebase on initial page load and subscribe to real-time updates.
+        function loadInitialData() {
+            showLoading(true);
+
+            // Fetch Accounts
+            db.collection('accounts').onSnapshot(snapshot => {
+                CRMApp.accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAccounts();
+                renderDashboard();
+                updateContactAccountDropdown();
+                showLoading(false);
+            }, error => {
+                console.error("Error fetching accounts:", error);
+                showToast('Error loading accounts.', 'error');
+                showLoading(false);
+            });
+
+            // Fetch Contacts
+            db.collection('contacts').onSnapshot(snapshot => {
+                CRMApp.contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderContacts();
+                renderDashboard();
+                showLoading(false);
+            }, error => {
+                console.error("Error fetching contacts:", error);
+                showToast('Error loading contacts.', 'error');
+                showLoading(false);
+            });
+
+            // Fetch Activities
+            db.collection('activities').orderBy('createdAt', 'desc').limit(20).onSnapshot(snapshot => {
+                CRMApp.activities = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderRecentActivities();
+                showLoading(false);
+            }, error => {
+                console.error("Error fetching activities:", error);
+                showToast('Error loading activities.', 'error');
+                showLoading(false);
+            });
+        }
+        
+        function renderDashboard() {
+            gId('total-accounts').textContent = CRMApp.accounts.length;
+            gId('total-contacts').textContent = CRMApp.contacts.length;
+            gId('recent-activities').textContent = CRMApp.activities.length;
+            gId('hot-leads').textContent = '0'; // Placeholder logic
+        }
+
+        function renderRecentActivities() {
+            const list = gId('recent-activities-list');
+            if (!list) return;
+            list.innerHTML = '';
+            if (CRMApp.activities.length === 0) {
+                list.innerHTML = '<p class="empty-state">No recent activities</p>';
+                return;
+            }
+            CRMApp.activities.forEach(activity => {
+                const item = document.createElement('div');
+                item.className = 'activity-item';
+                item.innerHTML = `
+                    <div class="activity-title">${activity.description}</div>
+                    <div class="activity-content">${activity.noteContent ? activity.noteContent.substring(0, 100) + '...' : ''}</div>
+                    <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
+                `;
+                list.appendChild(item);
+            });
+        }
+        
+        function renderAccounts() {
+            const grid = gId('accounts-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            if (CRMApp.accounts.length === 0) {
+                grid.innerHTML = '<p class="empty-state">No accounts found. Click "New Account" to get started.</p>';
+                return;
+            }
+            CRMApp.accounts.forEach(account => {
+                const card = document.createElement('div');
+                card.className = 'account-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div>
+                            <div class="card-name">${account.name}</div>
+                            <div class="card-subtitle">${account.industry || 'No Industry'}</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-btn edit-account" data-id="${account.id}" title="Edit Account">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                    <path d="m15 5 4 4"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="card-subtitle">${account.phone || 'No Phone'}</p>
+                `;
+                card.querySelector('.card-name').addEventListener('click', () => showAccountDetail(account.id));
+                card.querySelector('.edit-account').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openAccountModal(account);
+                });
+                grid.appendChild(card);
+            });
+        }
+
+        function renderContacts() {
+            const grid = gId('contacts-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            if (CRMApp.contacts.length === 0) {
+                grid.innerHTML = '<p class="empty-state">No contacts found. Click "New Contact" to get started.</p>';
+                return;
+            }
+            CRMApp.contacts.forEach(contact => {
+                const card = document.createElement('div');
+                card.className = 'contact-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div>
+                            <div class="card-name">${contact.firstName} ${contact.lastName}</div>
+                            <div class="card-subtitle">${contact.title || 'No Title'}</div>
+                            <div class="card-subtitle">${contact.accountName || 'No Account'}</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-btn call-prospect" data-id="${contact.id}" title="Call Prospect">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                                </svg>
+                            </button>
+                            <button class="icon-btn edit-contact" data-id="${contact.id}" title="Edit Contact">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                    <path d="m15 5 4 4"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="card-subtitle">${contact.email || 'No Email'}</p>
+                    <p class="card-subtitle">${contact.phone || 'No Phone'}</p>
+                `;
+                card.querySelector('.card-name').addEventListener('click', () => {
+                    if (contact.accountId) {
+                        showAccountDetail(contact.accountId);
+                    } else {
+                        showToast('This contact is not linked to an account.', 'warning');
+                    }
+                });
+                card.querySelector('.edit-contact').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openContactModal(contact);
+                });
+                card.querySelector('.call-prospect').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openCallsHubWithData(contact.id);
+                });
+                grid.appendChild(card);
+            });
+        }
+        
+        function showAccountDetail(accountId) {
+            CRMApp.currentAccount = CRMApp.accounts.find(a => a.id === accountId);
+            if (!CRMApp.currentAccount) {
+                showToast('Account not found.', 'error');
+                return;
+            }
+            
+            showView('account-detail-view');
+            gId('account-detail-title').textContent = CRMApp.currentAccount.name;
+            renderAccountInfo(CRMApp.currentAccount);
+            renderAccountContacts(CRMApp.currentAccount.id);
+            renderAccountActivities(CRMApp.currentAccount.id);
+        }
+        
+        function renderAccountInfo(account) {
+            const display = gId('account-info-display');
+            if (!display) return;
+            display.innerHTML = '';
+            
+            const fields = [
+                { label: 'Industry', value: account.industry },
+                { label: 'Phone', value: account.phone },
+                { label: 'Website', value: account.website },
+                { label: 'Address', value: account.address },
+                { label: 'Pain Points', value: account.painPoints },
+                { label: 'Benefits', value: account.benefits },
+                { label: 'Created At', value: formatDate(account.createdAt) },
+                { label: 'Last Updated', value: formatDate(account.updatedAt) }
+            ];
+            
+            fields.forEach(field => {
+                const fieldHtml = `
+                    <div class="info-field">
+                        <div class="info-field-label">${field.label}</div>
+                        <div class="info-field-value">${field.value || 'N/A'}</div>
+                    </div>
+                `;
+                display.innerHTML += fieldHtml;
+            });
+            
+            // Populate contract form if data exists
+            gId('contract-provider').value = account.contractProvider || '';
+            gId('contract-rate').value = account.contractRate || '';
+            gId('contract-expiration').value = account.contractExpiration || '';
+            gId('contract-type').value = account.contractType || '';
+        }
+        
+        function renderAccountContacts(accountId) {
+            const list = gId('account-contacts-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const accountContacts = CRMApp.contacts.filter(c => c.accountId === accountId);
+            if (accountContacts.length === 0) {
+                list.innerHTML = '<p class="empty-state">No contacts for this account</p>';
+                return;
+            }
+            accountContacts.forEach(contact => {
+                const item = document.createElement('div');
+                item.className = 'contact-list-item';
+                item.innerHTML = `
+                    <div class="contact-info">
+                        <div class="contact-name">${contact.firstName} ${contact.lastName}</div>
+                        <div class="contact-title">${contact.title || 'No Title'}</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="icon-btn call-prospect" data-id="${contact.id}" title="Call Prospect">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                        </button>
+                        <button class="icon-btn edit-contact" data-id="${contact.id}" title="Edit Contact">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                <path d="m15 5 4 4"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                item.querySelector('.call-prospect').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openCallsHubWithData(contact.id);
+                });
+                item.querySelector('.edit-contact').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openContactModal(contact);
+                });
+                list.appendChild(item);
+            });
+        }
+        
+        function renderAccountActivities(accountId) {
+            const list = gId('account-activities-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const accountActivities = CRMApp.activities.filter(a => a.accountId === accountId);
+            if (accountActivities.length === 0) {
+                list.innerHTML = '<p class="empty-state">No recent activities</p>';
+                return;
+            }
+            accountActivities.forEach(activity => {
+                const item = document.createElement('div');
+                item.className = 'activity-item';
+                item.innerHTML = `
+                    <div class="activity-title">${activity.description}</div>
+                    <div class="activity-content">${activity.noteContent || ''}</div>
+                    <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
+                `;
+                list.appendChild(item);
+            });
+        }
+        
+        // --- Navigation and Modals ---
+        function showView(viewName) {
+            document.querySelectorAll('.view-container').forEach(view => {
+                view.classList.remove('active');
+            });
+            const viewToShow = gId(`${viewName}-view`);
+            if (viewToShow) {
+                viewToShow.classList.add('active');
+                CRMApp.currentView = viewName;
+            }
+            
+            document.querySelectorAll('.app-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const navBtn = gId(`${viewName}-btn`);
+            if (navBtn) {
+                navBtn.classList.add('active');
+            }
+            
+            if (viewName === 'dashboard') renderDashboard();
+            if (viewName === 'accounts') renderAccounts();
+            if (viewName === 'contacts') renderContacts();
+        }
+        
+        function setupNavigation() {
+            gId('dashboard-btn').addEventListener('click', () => showView('dashboard'));
+            gId('accounts-btn').addEventListener('click', () => showView('accounts'));
+            gId('contacts-btn').addEventListener('click', () => showView('contacts'));
+            gId('calls-hub-btn').addEventListener('click', () => openCallsHubWithData());
+            gId('go-to-calls-hub-btn').addEventListener('click', () => openCallsHubWithData());
+        }
+
+        function setupModals() {
+            const accountModal = gId('account-modal');
+            const contactModal = gId('contact-modal');
+            
+            gId('new-account-btn').addEventListener('click', () => openAccountModal());
+            gId('add-account-btn').addEventListener('click', () => openAccountModal());
+            gId('new-contact-btn').addEventListener('click', () => openContactModal());
+            gId('add-contact-btn').addEventListener('click', () => openContactModal());
+            gId('edit-account-btn').addEventListener('click', () => openAccountModal(CRMApp.currentAccount));
+            gId('close-account-modal').addEventListener('click', () => closeAccountModal());
+            gId('cancel-account').addEventListener('click', () => closeAccountModal());
+            gId('close-contact-modal').addEventListener('click', () => closeContactModal());
+            gId('cancel-contact').addEventListener('click', () => closeContactModal());
+            
+            accountModal.addEventListener('click', (e) => {
+                if (e.target.id === 'account-modal') closeAccountModal();
+            });
+            contactModal.addEventListener('click', (e) => {
+                if (e.target.id === 'contact-modal') closeContactModal();
+            });
+        }
+        
+        function openAccountModal(account = null) {
+            const modal = gId('account-modal');
+            const form = gId('account-form');
+            form.reset();
+            
+            if (account) {
+                gId('account-modal-title').textContent = 'Edit Account';
+                gId('account-name').value = account.name || '';
+                gId('account-industry').value = account.industry || '';
+                gId('account-phone').value = account.phone || '';
+                gId('account-website').value = account.website || '';
+                gId('account-address').value = account.address || '';
+                gId('account-pain-points').value = account.painPoints || '';
+                gId('account-benefits').value = account.benefits || '';
+                CRMApp.currentAccount = account;
+            } else {
+                gId('account-modal-title').textContent = 'Add New Account';
+                CRMApp.currentAccount = null;
+            }
+            modal.classList.add('active');
+        }
+        
+        function closeAccountModal() {
+            gId('account-modal').classList.remove('active');
+        }
+        
+        function openContactModal(contact = null) {
+            const modal = gId('contact-modal');
+            const form = gId('contact-form');
+            form.reset();
+            updateContactAccountDropdown();
+            
+            if (contact) {
+                gId('contact-modal-title').textContent = 'Edit Contact';
+                gId('contact-first-name').value = contact.firstName || '';
+                gId('contact-last-name').value = contact.lastName || '';
+                gId('contact-title').value = contact.title || '';
+                gId('contact-email').value = contact.email || '';
+                gId('contact-phone').value = contact.phone || '';
+                gId('contact-notes').value = contact.notes || '';
+                gId('contact-account').value = contact.accountId || '';
+                CRMApp.currentContact = contact;
+            } else {
+                gId('contact-modal-title').textContent = 'Add New Contact';
+                CRMApp.currentContact = null;
+            }
+            modal.classList.add('active');
+        }
+        
+        function closeContactModal() {
+            gId('contact-modal').classList.remove('active');
+        }
+        
+        function updateContactAccountDropdown() {
+            const select = gId('contact-account');
+            if (!select) return;
+            select.innerHTML = '<option value="">Select an account...</option>';
+            CRMApp.accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = account.name;
+                select.appendChild(option);
+            });
+        }
+        
+        function setupEventListeners() {
+            gId('account-form').addEventListener('submit', handleAccountSubmit);
+            gId('contact-form').addEventListener('submit', handleContactSubmit);
+            gId('back-to-accounts').addEventListener('click', () => showView('accounts'));
+            gId('energy-contract-form').addEventListener('submit', handleEnergyContractSubmit);
+            gId('save-account-note').addEventListener('click', handleSaveAccountNote);
+        }
+
+        // --- Firebase Interactions ---
+        async function handleAccountSubmit(e) {
+            e.preventDefault();
+            showLoading(true);
+            const accountId = CRMApp.currentAccount ? CRMApp.currentAccount.id : null;
+            const accountData = {
+                name: gId('account-name').value,
+                industry: gId('account-industry').value,
+                phone: gId('account-phone').value,
+                website: gId('account-website').value,
+                address: gId('account-address').value,
+                painPoints: gId('account-pain-points').value,
+                benefits: gId('account-benefits').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                if (accountId) {
+                    await db.collection('accounts').doc(accountId).update(accountData);
+                    showToast('Account updated successfully!');
+                    logActivity({
+                        type: 'account_updated',
+                        description: `Updated account: ${accountData.name}`,
+                        accountId: accountId,
+                        accountName: accountData.name
+                    });
+                } else {
+                    const newDoc = await db.collection('accounts').add({
+                        ...accountData,
+                        createdAt: serverTimestamp()
+                    });
+                    showToast('Account created successfully!');
+                    logActivity({
+                        type: 'account_created',
+                        description: `Created new account: ${accountData.name}`,
+                        accountId: newDoc.id,
+                        accountName: accountData.name
+                    });
+                }
+            } catch (error) {
+                console.error('Error saving account:', error);
+                showToast('Error saving account. See console for details.', 'error');
+            } finally {
+                closeAccountModal();
+                showLoading(false);
+            }
+        }
+
+        async function handleContactSubmit(e) {
+            e.preventDefault();
+            showLoading(true);
+            const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : null;
+            const accountId = gId('contact-account').value;
+            const accountName = accountId ? CRMApp.accounts.find(a => a.id === accountId)?.name : 'Unassigned';
+            
+            const contactData = {
+                firstName: gId('contact-first-name').value,
+                lastName: gId('contact-last-name').value,
+                title: gId('contact-title').value,
+                accountId: accountId,
+                accountName: accountName,
+                email: gId('contact-email').value,
+                phone: gId('contact-phone').value,
+                notes: gId('contact-notes').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                if (contactId) {
+                    await db.collection('contacts').doc(contactId).update(contactData);
+                    showToast('Contact updated successfully!');
+                    logActivity({
+                        type: 'contact_updated',
+                        description: `Updated contact: ${contactData.firstName} ${contactData.lastName}`,
+                        contactId: contactId,
+                        contactName: `${contactData.firstName} ${contactData.lastName}`,
+                        accountId: accountId,
+                        accountName: accountName
+                    });
+                } else {
+                    const newDoc = await db.collection('contacts').add({
+                        ...contactData,
+                        createdAt: serverTimestamp()
+                    });
+                    showToast('Contact created successfully!');
+                    logActivity({
+                        type: 'contact_created',
+                        description: `Created new contact: ${contactData.firstName} ${contactData.lastName}`,
+                        contactId: newDoc.id,
+                        contactName: `${contactData.firstName} ${contactData.lastName}`,
+                        accountId: accountId,
+                        accountName: accountName
+                    });
+                }
+            } catch (error) {
+                console.error('Error saving contact:', error);
+                showToast('Error saving contact. See console for details.', 'error');
+            } finally {
+                closeContactModal();
+                showLoading(false);
+            }
+        }
+        
+        async function handleEnergyContractSubmit(e) {
+            e.preventDefault();
+            if (!CRMApp.currentAccount) return;
+            
+            showLoading(true);
+            
+            const contractData = {
+                contractProvider: gId('contract-provider').value,
+                contractRate: gId('contract-rate').value,
+                contractExpiration: gId('contract-expiration').value,
+                contractType: gId('contract-type').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                await db.collection('accounts').doc(CRMApp.currentAccount.id).update(contractData);
+                showToast('Energy contract updated successfully!');
+                logActivity({
+                    type: 'contract_updated',
+                    description: `Updated contract for: ${CRMApp.currentAccount.name}`,
+                    accountId: CRMApp.currentAccount.id,
+                    accountName: CRMApp.currentAccount.name
+                });
+            } catch (error) {
+                console.error('Error saving contract info:', error);
+                showToast('Error saving contract info. See console for details.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function handleSaveAccountNote() {
+            if (!CRMApp.currentAccount) return;
+            
+            const noteContent = gId('account-note-input').value;
+            if (!noteContent.trim()) {
+                showToast('Note cannot be empty.', 'warning');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                await logActivity({
+                    type: 'account_note',
+                    description: `Added a note to ${CRMApp.currentAccount.name}`,
+                    noteContent: noteContent,
+                    accountId: CRMApp.currentAccount.id,
+                    accountName: CRMApp.currentAccount.name
+                });
+                
+                showToast('Note saved successfully!');
+                gId('account-note-input').value = '';
+            } catch (error) {
+                console.error('Error saving note:', error);
+                showToast('Error saving note. See console for details.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function logActivity(activityData) {
+            try {
+                await db.collection('activities').add({
+                    ...activityData,
+                    createdAt: serverTimestamp()
+                });
+            } catch (error) {
+                console.error('Error logging activity:', error);
+                showToast('Error logging activity. See console for details.', 'error');
+            }
+        }
+
+        async function openCallsHubWithData(contactId = null) {
+            showLoading(true);
+            currentProspect = {};
+            currentStep = 'start';
+            history = [];
+
+            if (contactId) {
+                try {
+                    const contactDoc = await db.collection('contacts').doc(contactId).get();
+                    if (contactDoc.exists) {
+                        const contact = contactDoc.data();
+                        currentProspect.contactId = contactId;
+                        currentProspect.name = `${contact.firstName} ${contact.lastName}`;
+                        currentProspect.title = contact.title;
+                        currentProspect.phone = contact.phone;
+                        currentProspect.email = contact.email;
+                        currentProspect.accountId = contact.accountId;
+                        
+                        if (contact.accountId) {
+                            const accountDoc = await db.collection('accounts').doc(contact.accountId).get();
+                            if (accountDoc.exists) {
+                                const account = accountDoc.data();
+                                currentProspect.company = account.name;
+                                currentProspect.industry = account.industry;
+                                currentProspect.painPoints = account.painPoints;
+                                currentProspect.benefits = account.benefits;
+                            }
+                        }
+                        
+                        gId('call-notes').value = contact.notes || '';
+
+                    } else {
+                        showToast('Contact not found.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error fetching data for calls hub:', error);
+                    showToast('Error fetching contact data.', 'error');
+                }
+            } else {
+                gId('call-notes').value = '';
+            }
+
+            showLoading(false);
+            showView('calls-hub');
+            displayCurrentStep();
+        }
+
+
+        // --- Call Hub Logic ---
         const placeholders = {
-            'N': '', // Contact Name
-            'YN': 'Lewis', // Your Name (static)
-            'CN': '', // Company Name
-            'CI': '', // Company Industry
-            'SB': '', // Specific Benefit
-            'PP': '', // Pain Point
-            'CT': '', // Contact Title
-            'TIA': '', // Their Industry/Area (alias for CI)
-            'TE': '', // Their Email (not directly from input)
-            'DT': '', // Day/Time (not directly from input)
-            'EAC': '', // Email Address Confirmed (not directly from input)
-            'TF': '', // Timeframe (not directly from input)
-            'OP': 'the responsible party', // Other Person (default)
-            'XX': '$XX.00/40%' // Placeholder for dynamic % or amount
+            'N': '', 
+            'YN': 'Lewis', 
+            'CN': '', 
+            'CI': '', 
+            'SB': '', 
+            'PP': '', 
+            'CT': '', 
+            'TIA': '', 
+            'TE': '', 
+            'DT': '', 
+            'EAC': '', 
+            'TF': '', 
+            'OP': 'the responsible party',
+            'XX': '$XX.00/40%'
         };
 
-        // Map input field IDs to the placeholder keys for automatic updates.
         const inputMap = {
             'input-name': 'N',
             'input-title': 'CT',
@@ -1244,7 +2545,6 @@
             'input-pain': 'PP'
         };
 
-        // The main call script, structured as a state machine.
         const scriptData = {
             start: {
                 you: "Click 'Dial' to begin the call",
@@ -1519,7 +2819,7 @@
                 ]
             },
             getEmail: {
-                you: "Great! I'll put together a quick case study specific to <span class='emphasis'>[TIA]</span>. It takes me about 10 minutes to prepare, and it'll give you a snapshot into the market and it'll show you what other companies are doing to stay afloat in today's market. What's a good email for you?",
+                you: "Great! I'll put together a quick case study specific to <span class='emphasis'>[TIA]</span>. It takes me about 10 minutes to prepare, and it'll give you a baseline understanding of where your company stands competitively. I can email that over by tomorrow, and if you see value in diving deeper, we can schedule a brief follow-up. What's a good email for you?",
                 mood: "unsure",
                 responses: [
                     { text: "✅ Yes, send analysis", next: "emailFollowUp" },
@@ -1641,10 +2941,9 @@
                 let isNewAccount = false;
                 let isNewContact = false;
 
-                // Handle account logic
                 if (accountId) {
-                    const accountRef = doc(db, `artifacts/${appId}/users/${userId}/accounts`, accountId);
-                    await updateDoc(accountRef, {
+                    const accountRef = db.collection('accounts').doc(accountId);
+                    await accountRef.update({
                         name: prospectData.company,
                         industry: prospectData.industry,
                         painPoints: prospectData.painPoints,
@@ -1652,7 +2951,7 @@
                         updatedAt: serverTimestamp()
                     });
                 } else if (prospectData.company) {
-                    const newAccountRef = await addDoc(collection(db, `artifacts/${appId}/users/${userId}/accounts`), {
+                    const newAccountRef = await db.collection('accounts').add({
                         name: prospectData.company,
                         industry: prospectData.industry,
                         painPoints: prospectData.painPoints,
@@ -1664,20 +2963,19 @@
                     isNewAccount = true;
                 }
 
-                // Handle contact logic
                 if (contactId) {
-                    const contactRef = doc(db, `artifacts/${appId}/users/${userId}/contacts`, contactId);
-                    await updateDoc(contactRef, {
+                    const contactRef = db.collection('contacts').doc(contactId);
+                    await contactRef.update({
                         firstName: prospectData.name.split(' ')[0] || '',
                         lastName: prospectData.name.split(' ')[1] || '',
                         title: prospectData.title,
                         accountId: accountId,
                         accountName: accountName,
-                        notes: notesContent, // Assuming notes are tied to contact for simplicity
+                        notes: notesContent,
                         updatedAt: serverTimestamp()
                     });
                 } else if (prospectData.name) {
-                    const newContactRef = await addDoc(collection(db, `artifacts/${appId}/users/${userId}/contacts`), {
+                    const newContactRef = await db.collection('contacts').add({
                         firstName: prospectData.name.split(' ')[0] || '',
                         lastName: prospectData.name.split(' ')[1] || '',
                         title: prospectData.title,
@@ -1691,7 +2989,6 @@
                     isNewContact = true;
                 }
                 
-                // Log the call notes as an activity
                 if (notesContent) {
                     await logActivity({
                         type: 'call_note',
@@ -1757,7 +3054,9 @@
                 if (currentStep === 'start') {
                     const dialButtonHtml = `
                         <button class="dial-button" onclick="handleDialClick()">
-                            <i class="fas fa-phone-alt"></i>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                            </svg>
                             Dial
                         </button>
                     `;
@@ -1782,11 +3081,11 @@
 
         function handleDialClick() {
             if (currentProspect.phone) {
-                showToast(`Dialing ${currentProspect.phone}...`, 'info');
+                alert(`Dialing ${currentProspect.phone}...`);
             } else {
-                showToast('No phone number available for this prospect. Manual dialing is required.', 'warning');
+                showToast('No phone number available for this prospect. Manual dialing is required.', 'info');
             }
-            selectResponse('dialing'); 
+            selectResponse('dialing');
         }
 
         function selectResponse(nextStep, action) {
@@ -1841,15 +3140,15 @@
             
             displayCurrentStep();
         }
-
+        
         function clearNotes() {
             const notesTextarea = gId('call-notes');
             if (!notesTextarea) return;
 
-            customConfirm('Are you sure you want to clear all notes?', () => {
+            if (window.confirm('Are you sure you want to clear all notes?')) {
                 notesTextarea.value = '';
                 showToast('Notes cleared.', 'warning');
-            });
+            }
         }
 
         // --- Search Functions ---
@@ -1979,27 +3278,6 @@
             if (searchUrl) {
                 window.open(searchUrl, '_blank');
                 closeSearch();
-            }
-        }
-        
-        // Universal utility functions
-        function formatDate(timestamp) {
-            if (!timestamp) return 'Unknown date';
-            try {
-                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            } catch (e) {
-                return 'Invalid date';
-            }
-        }
-        
-        function formatDateOnly(timestamp) {
-            if (!timestamp) return 'Unknown date';
-            try {
-                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-                return date.toLocaleDateString();
-            } catch (e) {
-                return 'Invalid date';
             }
         }
     </script>
