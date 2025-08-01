@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Choosers CRM</title>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    
-    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/crm-styles.css">
-    <script src="https://powerchoosers.github.io/power-choosers-crm/firebase-config.js"></script>
-    <script src="https://powerchoosers.github.io/power-choosers-crm/crm-app.js"></script>
     
     <style>
         /* Reset and Base Styles */
@@ -28,7 +25,7 @@
             overflow: hidden;
         }
 
-        /* Top Navigation Bar - Updated with properly centered icons */
+        /* Top Navigation Bar */
         .top-nav {
             background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
             padding: 6px 0;
@@ -65,7 +62,6 @@
             gap: 25px;
         }
 
-        /* Updated app buttons - properly centered icons */
         .app-button {
             display: flex;
             flex-direction: column;
@@ -107,7 +103,6 @@
             color: white;
         }
 
-        /* Properly centered icon styles */
         .app-icon {
             width: 24px;
             height: 24px;
@@ -148,10 +143,10 @@
             margin-top: auto;
         }
 
-        /* Search Bar - Reduced top positioning */
+        /* Search Bar */
         .search-bar {
             position: fixed;
-            top: 72px; /* Adjusted to be directly below the top nav bar */
+            top: 72px; 
             left: 0;
             right: 0;
             background: white;
@@ -214,7 +209,7 @@
             padding: 8px 10px;
         }
 
-        /* Main Container - Reduced top margin and added padding */
+        /* Main Container */
         .main-container {
             margin-top: 80px;
             padding: 15px;
@@ -253,13 +248,13 @@
             color: #1A438D;
         }
 
-        /* Dashboard Layout - Adjusted height */
+        /* Dashboard Layout */
         .dashboard-layout {
             display: grid;
             grid-template-columns: 1fr 350px;
             gap: 30px;
             height: calc(100vh - 120px);
-            padding-top: 20px; /* Added padding here */
+            padding-top: 20px;
         }
 
         .dashboard-main {
@@ -288,7 +283,7 @@
         .dashboard-sidebar::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
         .dashboard-sidebar::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
 
-        /* Account Detail Layout - Adjusted height */
+        /* Account Detail Layout */
         .account-detail-layout {
             display: grid;
             grid-template-columns: 1fr 350px;
@@ -784,7 +779,7 @@
             font-weight: 500;
         }
 
-        /* CALLING HUB STYLES - Integrated */
+        /* CALLING HUB STYLES */
         .container {
             display: grid;
             grid-template-columns: 1fr 350px;
@@ -792,7 +787,7 @@
             height: calc(100vh - 120px);
             max-width: 1400px;
             margin: 0 auto;
-            padding-top: 20px; /* Added padding here */
+            padding-top: 20px;
         }
 
         .main-content {
@@ -1115,7 +1110,7 @@
                 min-height: calc(100vh - 100px);
                 overflow: visible;
             }
-
+            
             .dashboard-sidebar,
             .account-detail-sidebar,
             .sidebar {
@@ -1126,20 +1121,20 @@
                 padding-right: 0;
                 margin-right: 0;
             }
-
+            
             .dashboard-sidebar .crm-card,
             .account-detail-sidebar .crm-card,
             .sidebar .sidebar-card {
                 min-width: 300px;
                 flex-shrink: 0;
             }
-
+            
             .main-container {
                 height: auto;
                 min-height: calc(100vh - 80px);
                 padding: 15px;
             }
-
+            
             .nav-container {gap: 20px;}
             .app-button {width: 55px; height: 55px;}
             .app-icon, .app-icon-svg {width: 20px; height: 20px;}
@@ -1155,65 +1150,65 @@
                 gap: 12px;
                 padding: 0 15px;
             }
-
+            
             .app-button {
                 width: 50px;
                 height: 50px;
             }
-
+            
             .app-icon,
             .app-icon-svg {
                 width: 18px;
                 height: 18px;
             }
-
+            
             .app-label {
                 font-size: .45rem;
             }
-
+            
             .nav-icons-center {
                 gap: 15px;
             }
-
+            
             .main-container {
                 padding: 12px;
                 margin-top: 65px;
             }
-
+            
             .main-container.search-active {
                 margin-top: 120px;
             }
-
+            
             .view-header {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 15px;
             }
-
+            
             .view-header h2 {
                 font-size: 1.6rem;
             }
-
+            
             .accounts-grid,
             .contacts-grid {
                 grid-template-columns: 1fr;
             }
-
+            
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 10px;
             }
-
+            
             .form-row {
                 grid-template-columns: 1fr;
                 gap: 0;
             }
-
+            
             .modal-content {
                 width: 95%;
                 margin: 20px;
             }
-
+            
             .dashboard-sidebar,
             .account-detail-sidebar,
             .sidebar {
@@ -1222,17 +1217,17 @@
                 overflow-y: auto;
                 max-height: 50vh;
             }
-
+            
             .dashboard-sidebar .crm-card,
             .account-detail-sidebar .crm-card,
             .sidebar .sidebar-card {
                 min-width: auto;
             }
-
+            
             #account-info-display {
                 grid-template-columns: 1fr;
             }
-
+            
             .top-nav {padding: 8px 0;}
             .search-bar {top: 57px;}
             .search-bar.active {height: 50px; padding: 10px;}
@@ -1245,74 +1240,74 @@
                 padding: 0 10px;
                 justify-content: space-around;
             }
-
+            
             .app-button {
                 width: 45px;
                 height: 45px;
             }
-
+            
             .app-icon,
             .app-icon-svg {
                 width: 16px;
                 height: 16px;
             }
-
+            
             .app-label {
                 font-size: .4rem;
                 line-height: 1.1;
             }
-
+            
             .nav-icons-center {
                 gap: 10px;
             }
-
+            
             .main-container {
                 padding: 10px;
                 margin-top: 55px;
             }
-
+            
             .main-container.search-active {
                 margin-top: 105px;
             }
-
+            
             .crm-card, .sidebar-card {
                 padding: 14px;
             }
-
+            
             .card-title, .sidebar-title {
                 font-size: 1.1rem;
             }
-
+            
             .view-header h2 {
                 font-size: 1.4rem;
             }
-
+            
             .stats-grid {
                 grid-template-columns: 1fr;
                 gap: 10px;
             }
-
+            
             .stat-number {
                 font-size: 1.4rem;
             }
-
+            
             .toast {
                 min-width: 250px;
                 margin: 0 10px;
             }
-
+            
             .toast-container {
                 right: 10px;
                 left: 10px;
             }
-
+            
             .top-nav {padding: 6px 0;}
             .search-bar {top: 47px;}
             .search-bar.active {height: 45px; padding: 8px;}
             .nav-left-title h1 {font-size: 1.4rem;}
         }
     </style>
-</head>
+    </head>
 <body>
     <div class="top-nav">
         <div class="nav-container">
@@ -1805,10 +1800,6 @@
     <div class="toast-container" id="toast-container"></div>
     
     <script>
-        // CRM Application Main JavaScript File
-        // Consolidated file for single-page application functionality
-
-        // Firebase configuration from firebase-config.js
         const firebaseConfig = {
             apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
             authDomain: "power-choosers-crm.firebaseapp.com",
@@ -1818,58 +1809,12 @@
             appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
             measurementId: "G-XEC3BFHJHW"
         };
-
-        // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const db = app.firestore();
         const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
         
-        // --- Universal Utility Functions ---
         const gId = id => document.getElementById(id);
-        const showLoading = (show) => {
-            const loadingOverlay = gId('loading-overlay');
-            if (loadingOverlay) {
-                loadingOverlay.classList.toggle('active', show);
-            }
-        };
 
-        const showToast = (message, type = 'success') => {
-            const toastContainer = gId('toast-container');
-            if (!toastContainer) return;
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `<div class="toast-message">${message}</div>`;
-            toastContainer.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                toast.addEventListener('transitionend', () => toast.remove());
-            }, 5000);
-        };
-        
-        const formatDate = (timestamp) => {
-            if (!timestamp) return 'Unknown date';
-            try {
-                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            } catch (e) {
-                return 'Invalid date';
-            }
-        };
-
-        const formatDateOnly = (timestamp) => {
-            if (!timestamp) return 'Unknown date';
-            try {
-                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-                return date.toLocaleDateString();
-            } catch (e) {
-                return 'Invalid date';
-            }
-        };
-
-        // --- Global State Management ---
         const CRMApp = {
             currentView: 'dashboard',
             currentAccount: null,
@@ -1883,642 +1828,6 @@
         let activeButton = null;
         let currentProspect = {}; 
 
-        // --- Core Application Logic ---
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOM Content Loaded. Starting app initialization.');
-            setupNavigation();
-            setupModals();
-            setupEventListeners();
-            setupSearchFunctionality();
-            loadInitialData(); // This is the crucial function call
-            showView('dashboard');
-        });
-
-        // The following functions were missing from your consolidated file and are now included.
-
-        // Load all data from Firebase on initial page load and subscribe to real-time updates.
-        function loadInitialData() {
-            showLoading(true);
-
-            // Fetch Accounts
-            db.collection('accounts').onSnapshot(snapshot => {
-                CRMApp.accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderAccounts();
-                renderDashboard();
-                updateContactAccountDropdown();
-                showLoading(false);
-            }, error => {
-                console.error("Error fetching accounts:", error);
-                showToast('Error loading accounts.', 'error');
-                showLoading(false);
-            });
-
-            // Fetch Contacts
-            db.collection('contacts').onSnapshot(snapshot => {
-                CRMApp.contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderContacts();
-                renderDashboard();
-                showLoading(false);
-            }, error => {
-                console.error("Error fetching contacts:", error);
-                showToast('Error loading contacts.', 'error');
-                showLoading(false);
-            });
-
-            // Fetch Activities
-            db.collection('activities').orderBy('createdAt', 'desc').limit(20).onSnapshot(snapshot => {
-                CRMApp.activities = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderRecentActivities();
-                showLoading(false);
-            }, error => {
-                console.error("Error fetching activities:", error);
-                showToast('Error loading activities.', 'error');
-                showLoading(false);
-            });
-        }
-        
-        function renderDashboard() {
-            gId('total-accounts').textContent = CRMApp.accounts.length;
-            gId('total-contacts').textContent = CRMApp.contacts.length;
-            gId('recent-activities').textContent = CRMApp.activities.length;
-            gId('hot-leads').textContent = '0'; // Placeholder logic
-        }
-
-        function renderRecentActivities() {
-            const list = gId('recent-activities-list');
-            if (!list) return;
-            list.innerHTML = '';
-            if (CRMApp.activities.length === 0) {
-                list.innerHTML = '<p class="empty-state">No recent activities</p>';
-                return;
-            }
-            CRMApp.activities.forEach(activity => {
-                const item = document.createElement('div');
-                item.className = 'activity-item';
-                item.innerHTML = `
-                    <div class="activity-title">${activity.description}</div>
-                    <div class="activity-content">${activity.noteContent ? activity.noteContent.substring(0, 100) + '...' : ''}</div>
-                    <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
-                `;
-                list.appendChild(item);
-            });
-        }
-        
-        function renderAccounts() {
-            const grid = gId('accounts-grid');
-            if (!grid) return;
-            grid.innerHTML = '';
-            if (CRMApp.accounts.length === 0) {
-                grid.innerHTML = '<p class="empty-state">No accounts found. Click "New Account" to get started.</p>';
-                return;
-            }
-            CRMApp.accounts.forEach(account => {
-                const card = document.createElement('div');
-                card.className = 'account-card';
-                card.innerHTML = `
-                    <div class="card-header">
-                        <div>
-                            <div class="card-name">${account.name}</div>
-                            <div class="card-subtitle">${account.industry || 'No Industry'}</div>
-                        </div>
-                        <div class="card-actions">
-                            <button class="icon-btn edit-account" data-id="${account.id}" title="Edit Account">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                    <path d="m15 5 4 4"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <p class="card-subtitle">${account.phone || 'No Phone'}</p>
-                `;
-                card.querySelector('.card-name').addEventListener('click', () => showAccountDetail(account.id));
-                card.querySelector('.edit-account').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openAccountModal(account);
-                });
-                grid.appendChild(card);
-            });
-        }
-
-        function renderContacts() {
-            const grid = gId('contacts-grid');
-            if (!grid) return;
-            grid.innerHTML = '';
-            if (CRMApp.contacts.length === 0) {
-                grid.innerHTML = '<p class="empty-state">No contacts found. Click "New Contact" to get started.</p>';
-                return;
-            }
-            CRMApp.contacts.forEach(contact => {
-                const card = document.createElement('div');
-                card.className = 'contact-card';
-                card.innerHTML = `
-                    <div class="card-header">
-                        <div>
-                            <div class="card-name">${contact.firstName} ${contact.lastName}</div>
-                            <div class="card-subtitle">${contact.title || 'No Title'}</div>
-                            <div class="card-subtitle">${contact.accountName || 'No Account'}</div>
-                        </div>
-                        <div class="card-actions">
-                            <button class="icon-btn call-prospect" data-id="${contact.id}" title="Call Prospect">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                                </svg>
-                            </button>
-                            <button class="icon-btn edit-contact" data-id="${contact.id}" title="Edit Contact">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                    <path d="m15 5 4 4"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <p class="card-subtitle">${contact.email || 'No Email'}</p>
-                    <p class="card-subtitle">${contact.phone || 'No Phone'}</p>
-                `;
-                card.querySelector('.card-name').addEventListener('click', () => {
-                    if (contact.accountId) {
-                        showAccountDetail(contact.accountId);
-                    } else {
-                        showToast('This contact is not linked to an account.', 'warning');
-                    }
-                });
-                card.querySelector('.edit-contact').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openContactModal(contact);
-                });
-                card.querySelector('.call-prospect').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openCallsHubWithData(contact.id);
-                });
-                grid.appendChild(card);
-            });
-        }
-        
-        function showAccountDetail(accountId) {
-            CRMApp.currentAccount = CRMApp.accounts.find(a => a.id === accountId);
-            if (!CRMApp.currentAccount) {
-                showToast('Account not found.', 'error');
-                return;
-            }
-            
-            showView('account-detail-view');
-            gId('account-detail-title').textContent = CRMApp.currentAccount.name;
-            renderAccountInfo(CRMApp.currentAccount);
-            renderAccountContacts(CRMApp.currentAccount.id);
-            renderAccountActivities(CRMApp.currentAccount.id);
-        }
-        
-        function renderAccountInfo(account) {
-            const display = gId('account-info-display');
-            if (!display) return;
-            display.innerHTML = '';
-            
-            const fields = [
-                { label: 'Industry', value: account.industry },
-                { label: 'Phone', value: account.phone },
-                { label: 'Website', value: account.website },
-                { label: 'Address', value: account.address },
-                { label: 'Pain Points', value: account.painPoints },
-                { label: 'Benefits', value: account.benefits },
-                { label: 'Created At', value: formatDate(account.createdAt) },
-                { label: 'Last Updated', value: formatDate(account.updatedAt) }
-            ];
-            
-            fields.forEach(field => {
-                const fieldHtml = `
-                    <div class="info-field">
-                        <div class="info-field-label">${field.label}</div>
-                        <div class="info-field-value">${field.value || 'N/A'}</div>
-                    </div>
-                `;
-                display.innerHTML += fieldHtml;
-            });
-            
-            // Populate contract form if data exists
-            gId('contract-provider').value = account.contractProvider || '';
-            gId('contract-rate').value = account.contractRate || '';
-            gId('contract-expiration').value = account.contractExpiration || '';
-            gId('contract-type').value = account.contractType || '';
-        }
-        
-        function renderAccountContacts(accountId) {
-            const list = gId('account-contacts-list');
-            if (!list) return;
-            list.innerHTML = '';
-            const accountContacts = CRMApp.contacts.filter(c => c.accountId === accountId);
-            if (accountContacts.length === 0) {
-                list.innerHTML = '<p class="empty-state">No contacts for this account</p>';
-                return;
-            }
-            accountContacts.forEach(contact => {
-                const item = document.createElement('div');
-                item.className = 'contact-list-item';
-                item.innerHTML = `
-                    <div class="contact-info">
-                        <div class="contact-name">${contact.firstName} ${contact.lastName}</div>
-                        <div class="contact-title">${contact.title || 'No Title'}</div>
-                    </div>
-                    <div class="card-actions">
-                        <button class="icon-btn call-prospect" data-id="${contact.id}" title="Call Prospect">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                            </svg>
-                        </button>
-                        <button class="icon-btn edit-contact" data-id="${contact.id}" title="Edit Contact">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                <path d="m15 5 4 4"/>
-                            </svg>
-                        </button>
-                    </div>
-                `;
-                item.querySelector('.call-prospect').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openCallsHubWithData(contact.id);
-                });
-                item.querySelector('.edit-contact').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openContactModal(contact);
-                });
-                list.appendChild(item);
-            });
-        }
-        
-        function renderAccountActivities(accountId) {
-            const list = gId('account-activities-list');
-            if (!list) return;
-            list.innerHTML = '';
-            const accountActivities = CRMApp.activities.filter(a => a.accountId === accountId);
-            if (accountActivities.length === 0) {
-                list.innerHTML = '<p class="empty-state">No recent activities</p>';
-                return;
-            }
-            accountActivities.forEach(activity => {
-                const item = document.createElement('div');
-                item.className = 'activity-item';
-                item.innerHTML = `
-                    <div class="activity-title">${activity.description}</div>
-                    <div class="activity-content">${activity.noteContent || ''}</div>
-                    <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
-                `;
-                list.appendChild(item);
-            });
-        }
-        
-        // --- Navigation and Modals ---
-        function showView(viewName) {
-            document.querySelectorAll('.view-container').forEach(view => {
-                view.classList.remove('active');
-            });
-            const viewToShow = gId(`${viewName}-view`);
-            if (viewToShow) {
-                viewToShow.classList.add('active');
-                CRMApp.currentView = viewName;
-            }
-            
-            document.querySelectorAll('.app-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            const navBtn = gId(`${viewName}-btn`);
-            if (navBtn) {
-                navBtn.classList.add('active');
-            }
-            
-            if (viewName === 'dashboard') renderDashboard();
-            if (viewName === 'accounts') renderAccounts();
-            if (viewName === 'contacts') renderContacts();
-        }
-        
-        function setupNavigation() {
-            gId('dashboard-btn').addEventListener('click', () => showView('dashboard'));
-            gId('accounts-btn').addEventListener('click', () => showView('accounts'));
-            gId('contacts-btn').addEventListener('click', () => showView('contacts'));
-            gId('calls-hub-btn').addEventListener('click', () => openCallsHubWithData());
-            gId('go-to-calls-hub-btn').addEventListener('click', () => openCallsHubWithData());
-        }
-
-        function setupModals() {
-            const accountModal = gId('account-modal');
-            const contactModal = gId('contact-modal');
-            
-            gId('new-account-btn').addEventListener('click', () => openAccountModal());
-            gId('add-account-btn').addEventListener('click', () => openAccountModal());
-            gId('new-contact-btn').addEventListener('click', () => openContactModal());
-            gId('add-contact-btn').addEventListener('click', () => openContactModal());
-            gId('edit-account-btn').addEventListener('click', () => openAccountModal(CRMApp.currentAccount));
-            gId('close-account-modal').addEventListener('click', () => closeAccountModal());
-            gId('cancel-account').addEventListener('click', () => closeAccountModal());
-            gId('close-contact-modal').addEventListener('click', () => closeContactModal());
-            gId('cancel-contact').addEventListener('click', () => closeContactModal());
-            
-            accountModal.addEventListener('click', (e) => {
-                if (e.target.id === 'account-modal') closeAccountModal();
-            });
-            contactModal.addEventListener('click', (e) => {
-                if (e.target.id === 'contact-modal') closeContactModal();
-            });
-        }
-        
-        function openAccountModal(account = null) {
-            const modal = gId('account-modal');
-            const form = gId('account-form');
-            form.reset();
-            
-            if (account) {
-                gId('account-modal-title').textContent = 'Edit Account';
-                gId('account-name').value = account.name || '';
-                gId('account-industry').value = account.industry || '';
-                gId('account-phone').value = account.phone || '';
-                gId('account-website').value = account.website || '';
-                gId('account-address').value = account.address || '';
-                gId('account-pain-points').value = account.painPoints || '';
-                gId('account-benefits').value = account.benefits || '';
-                CRMApp.currentAccount = account;
-            } else {
-                gId('account-modal-title').textContent = 'Add New Account';
-                CRMApp.currentAccount = null;
-            }
-            modal.classList.add('active');
-        }
-        
-        function closeAccountModal() {
-            gId('account-modal').classList.remove('active');
-        }
-        
-        function openContactModal(contact = null) {
-            const modal = gId('contact-modal');
-            const form = gId('contact-form');
-            form.reset();
-            updateContactAccountDropdown();
-            
-            if (contact) {
-                gId('contact-modal-title').textContent = 'Edit Contact';
-                gId('contact-first-name').value = contact.firstName || '';
-                gId('contact-last-name').value = contact.lastName || '';
-                gId('contact-title').value = contact.title || '';
-                gId('contact-email').value = contact.email || '';
-                gId('contact-phone').value = contact.phone || '';
-                gId('contact-notes').value = contact.notes || '';
-                gId('contact-account').value = contact.accountId || '';
-                CRMApp.currentContact = contact;
-            } else {
-                gId('contact-modal-title').textContent = 'Add New Contact';
-                CRMApp.currentContact = null;
-            }
-            modal.classList.add('active');
-        }
-        
-        function closeContactModal() {
-            gId('contact-modal').classList.remove('active');
-        }
-        
-        function updateContactAccountDropdown() {
-            const select = gId('contact-account');
-            if (!select) return;
-            select.innerHTML = '<option value="">Select an account...</option>';
-            CRMApp.accounts.forEach(account => {
-                const option = document.createElement('option');
-                option.value = account.id;
-                option.textContent = account.name;
-                select.appendChild(option);
-            });
-        }
-        
-        function setupEventListeners() {
-            gId('account-form').addEventListener('submit', handleAccountSubmit);
-            gId('contact-form').addEventListener('submit', handleContactSubmit);
-            gId('back-to-accounts').addEventListener('click', () => showView('accounts'));
-            gId('energy-contract-form').addEventListener('submit', handleEnergyContractSubmit);
-            gId('save-account-note').addEventListener('click', handleSaveAccountNote);
-        }
-
-        // --- Firebase Interactions ---
-        async function handleAccountSubmit(e) {
-            e.preventDefault();
-            showLoading(true);
-            const accountId = CRMApp.currentAccount ? CRMApp.currentAccount.id : null;
-            const accountData = {
-                name: gId('account-name').value,
-                industry: gId('account-industry').value,
-                phone: gId('account-phone').value,
-                website: gId('account-website').value,
-                address: gId('account-address').value,
-                painPoints: gId('account-pain-points').value,
-                benefits: gId('account-benefits').value,
-                updatedAt: serverTimestamp()
-            };
-            
-            try {
-                if (accountId) {
-                    await db.collection('accounts').doc(accountId).update(accountData);
-                    showToast('Account updated successfully!');
-                    logActivity({
-                        type: 'account_updated',
-                        description: `Updated account: ${accountData.name}`,
-                        accountId: accountId,
-                        accountName: accountData.name
-                    });
-                } else {
-                    const newDoc = await db.collection('accounts').add({
-                        ...accountData,
-                        createdAt: serverTimestamp()
-                    });
-                    showToast('Account created successfully!');
-                    logActivity({
-                        type: 'account_created',
-                        description: `Created new account: ${accountData.name}`,
-                        accountId: newDoc.id,
-                        accountName: accountData.name
-                    });
-                }
-            } catch (error) {
-                console.error('Error saving account:', error);
-                showToast('Error saving account. See console for details.', 'error');
-            } finally {
-                closeAccountModal();
-                showLoading(false);
-            }
-        }
-
-        async function handleContactSubmit(e) {
-            e.preventDefault();
-            showLoading(true);
-            const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : null;
-            const accountId = gId('contact-account').value;
-            const accountName = accountId ? CRMApp.accounts.find(a => a.id === accountId)?.name : 'Unassigned';
-            
-            const contactData = {
-                firstName: gId('contact-first-name').value,
-                lastName: gId('contact-last-name').value,
-                title: gId('contact-title').value,
-                accountId: accountId,
-                accountName: accountName,
-                email: gId('contact-email').value,
-                phone: gId('contact-phone').value,
-                notes: gId('contact-notes').value,
-                updatedAt: serverTimestamp()
-            };
-            
-            try {
-                if (contactId) {
-                    await db.collection('contacts').doc(contactId).update(contactData);
-                    showToast('Contact updated successfully!');
-                    logActivity({
-                        type: 'contact_updated',
-                        description: `Updated contact: ${contactData.firstName} ${contactData.lastName}`,
-                        contactId: contactId,
-                        contactName: `${contactData.firstName} ${contactData.lastName}`,
-                        accountId: accountId,
-                        accountName: accountName
-                    });
-                } else {
-                    const newDoc = await db.collection('contacts').add({
-                        ...contactData,
-                        createdAt: serverTimestamp()
-                    });
-                    showToast('Contact created successfully!');
-                    logActivity({
-                        type: 'contact_created',
-                        description: `Created new contact: ${contactData.firstName} ${contactData.lastName}`,
-                        contactId: newDoc.id,
-                        contactName: `${contactData.firstName} ${contactData.lastName}`,
-                        accountId: accountId,
-                        accountName: accountName
-                    });
-                }
-            } catch (error) {
-                console.error('Error saving contact:', error);
-                showToast('Error saving contact. See console for details.', 'error');
-            } finally {
-                closeContactModal();
-                showLoading(false);
-            }
-        }
-        
-        async function handleEnergyContractSubmit(e) {
-            e.preventDefault();
-            if (!CRMApp.currentAccount) return;
-            
-            showLoading(true);
-            
-            const contractData = {
-                contractProvider: gId('contract-provider').value,
-                contractRate: gId('contract-rate').value,
-                contractExpiration: gId('contract-expiration').value,
-                contractType: gId('contract-type').value,
-                updatedAt: serverTimestamp()
-            };
-            
-            try {
-                await db.collection('accounts').doc(CRMApp.currentAccount.id).update(contractData);
-                showToast('Energy contract updated successfully!');
-                logActivity({
-                    type: 'contract_updated',
-                    description: `Updated contract for: ${CRMApp.currentAccount.name}`,
-                    accountId: CRMApp.currentAccount.id,
-                    accountName: CRMApp.currentAccount.name
-                });
-            } catch (error) {
-                console.error('Error saving contract info:', error);
-                showToast('Error saving contract info. See console for details.', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-        
-        async function handleSaveAccountNote() {
-            if (!CRMApp.currentAccount) return;
-            
-            const noteContent = gId('account-note-input').value;
-            if (!noteContent.trim()) {
-                showToast('Note cannot be empty.', 'warning');
-                return;
-            }
-            
-            showLoading(true);
-            
-            try {
-                await logActivity({
-                    type: 'account_note',
-                    description: `Added a note to ${CRMApp.currentAccount.name}`,
-                    noteContent: noteContent,
-                    accountId: CRMApp.currentAccount.id,
-                    accountName: CRMApp.currentAccount.name
-                });
-                
-                showToast('Note saved successfully!');
-                gId('account-note-input').value = '';
-            } catch (error) {
-                console.error('Error saving note:', error);
-                showToast('Error saving note. See console for details.', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function logActivity(activityData) {
-            try {
-                await db.collection('activities').add({
-                    ...activityData,
-                    createdAt: serverTimestamp()
-                });
-            } catch (error) {
-                console.error('Error logging activity:', error);
-                showToast('Error logging activity. See console for details.', 'error');
-            }
-        }
-
-        async function openCallsHubWithData(contactId = null) {
-            showLoading(true);
-            currentProspect = {};
-            currentStep = 'start';
-            history = [];
-
-            if (contactId) {
-                try {
-                    const contactDoc = await db.collection('contacts').doc(contactId).get();
-                    if (contactDoc.exists) {
-                        const contact = contactDoc.data();
-                        currentProspect.contactId = contactId;
-                        currentProspect.name = `${contact.firstName} ${contact.lastName}`;
-                        currentProspect.title = contact.title;
-                        currentProspect.phone = contact.phone;
-                        currentProspect.email = contact.email;
-                        currentProspect.accountId = contact.accountId;
-                        
-                        if (contact.accountId) {
-                            const accountDoc = await db.collection('accounts').doc(contact.accountId).get();
-                            if (accountDoc.exists) {
-                                const account = accountDoc.data();
-                                currentProspect.company = account.name;
-                                currentProspect.industry = account.industry;
-                                currentProspect.painPoints = account.painPoints;
-                                currentProspect.benefits = account.benefits;
-                            }
-                        }
-                        
-                        gId('call-notes').value = contact.notes || '';
-
-                    } else {
-                        showToast('Contact not found.', 'error');
-                    }
-                } catch (error) {
-                    console.error('Error fetching data for calls hub:', error);
-                    showToast('Error fetching contact data.', 'error');
-                }
-            } else {
-                gId('call-notes').value = '';
-            }
-
-            showLoading(false);
-            showView('calls-hub');
-            displayCurrentStep();
-        }
-
-
-        // --- Call Hub Logic ---
         const placeholders = {
             'N': '', 
             'YN': 'Lewis', 
@@ -3151,7 +2460,1200 @@
             }
         }
 
-        // --- Search Functions ---
+        function setupSearchFunctionality() {
+            const googleBtn = gId('google-button');
+            if (googleBtn) {
+                googleBtn.addEventListener('click', (e) => openSearch('google', e));
+            }
+            const mapsBtn = gId('maps-button');
+            if (mapsBtn) {
+                mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
+            }
+            const apolloBtn = gId('apollo-button');
+            if (apolloBtn) {
+                apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
+            }
+            const beenverifiedBtn = gId('beenverified-button');
+            if (beenverifiedBtn) {
+                beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
+            }
+
+            ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
+                const input = gId(id);
+                if (input) {
+                    input.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') performSearch();
+                    });
+                }
+            });
+        }
+
+        function openSearch(type, event) {
+            const button = event.target.closest('.app-button');
+            const searchBar = gId('search-bar');
+            const mainContainer = gId('main-container');
+
+            if (currentSearchType === type && activeButton === button) {
+                closeSearch();
+                return;
+            }
+            
+            if (activeButton) activeButton.classList.remove('active');
+            currentSearchType = type;
+            activeButton = button;
+            button.classList.add('active');
+            
+            const label = gId('search-label');
+            const input = gId('search-input');
+            const cityInput = gId('search-city');
+            const stateInput = gId('search-state');
+            const locationInput = gId('search-location');
+            
+            if (!label || !input) return;
+            
+            if (cityInput) cityInput.style.display = 'none';
+            if (stateInput) stateInput.style.display = 'none';
+            if (locationInput) locationInput.style.display = 'none';
+            
+            if (type === 'google') {
+                label.textContent = 'Search Google:';
+                input.placeholder = 'Type your search query...';
+            } else if (type === 'maps') {
+                label.textContent = 'Search Maps:';
+                input.placeholder = 'Search places, addresses, businesses...';
+            } else if (type === 'beenverified') {
+                label.textContent = 'Search BeenVerified:';
+                input.placeholder = 'Enter full name (e.g. John Smith)...';
+                if (cityInput) cityInput.style.display = 'block';
+                if (stateInput) stateInput.style.display = 'block';
+            } else if (type === 'apollo') {
+                label.textContent = 'Search Apollo:';
+                input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
+                if (locationInput) locationInput.style.display = 'block';
+            }
+            
+            if (searchBar) searchBar.classList.add('active');
+            if (mainContainer) {
+                mainContainer.classList.add('search-active');
+            }
+            setTimeout(() => input.focus(), 300);
+            input.value = '';
+            if (cityInput) cityInput.value = '';
+            if (stateInput) stateInput.value = '';
+            if (locationInput) locationInput.value = '';
+        }
+
+        function closeSearch() {
+            const searchBar = gId('search-bar');
+            const mainContainer = gId('main-container');
+            if (searchBar) {
+                searchBar.classList.remove('active');
+            }
+            if (mainContainer) {
+                mainContainer.classList.remove('search-active');
+            }
+            if (activeButton) {
+                activeButton.classList.remove('active');
+                activeButton = null;
+            }
+            currentSearchType = '';
+        }
+
+        function performSearch() {
+            const query = gId('search-input').value.trim();
+            if (!query) return;
+            
+            let searchUrl = '';
+            
+            if (currentSearchType === 'google') {
+                searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+            } else if (currentSearchType === 'maps') {
+                searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+            } else if (currentSearchType === 'beenverified') {
+                const city = gId('search-city').value.trim();
+                const state = gId('search-state').value.trim().toUpperCase();
+                const nameParts = query.split(' ');
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ') || '';
+                searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
+            } else if (currentSearchType === 'apollo') {
+                const location = gId('search-location').value.trim();
+                let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
+                if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
+                searchUrl = apolloUrl;
+            }
+            
+            if (searchUrl) {
+                window.open(searchUrl, '_blank');
+                closeSearch();
+            }
+        }
+        
+        function showLoading(show) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                if (show) {
+                    overlay.classList.add('active');
+                } else {
+                    overlay.classList.remove('active');
+                }
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            toast.innerHTML = `<div class="toast-message">${message}</div>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (container.contains(toast)) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'Unknown date';
+            try {
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            } catch (e) {
+                return 'Invalid date';
+            }
+        }
+        
+        function formatDateOnly(timestamp) {
+            if (!timestamp) return 'Unknown date';
+            try {
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString();
+            } catch (e) {
+                return 'Invalid date';
+            }
+        }
+        
+        // This is a placeholder for the original crm-app.js's Firebase wrapper
+        // The consolidated script uses the direct Firebase v8 API calls
+        window.FirebaseDB = {
+            db: db,
+            doc: (db, collection, id) => db.collection(collection).doc(id),
+            setDoc: (docRef, data) => docRef.set(data),
+            getDoc: (docRef) => docRef.get(),
+            getDocs: (query) => query.get(),
+            collection: (db, path) => db.collection(path),
+            query: (collection, ...constraints) => {
+                let query = collection;
+                constraints.forEach(constraint => {
+                    if (constraint && constraint.type === 'orderBy') {
+                        query = query.orderBy(constraint.field, constraint.direction);
+                    } else if (constraint && constraint.type === 'limit') {
+                        query = query.limit(constraint.limit);
+                    } else if (constraint && constraint.type === 'where') {
+                        query = query.where(constraint.field, constraint.op, constraint.value);
+                    }
+                });
+                return query;
+            },
+            orderBy: (field, direction = 'asc') => ({ type: 'orderBy', field, direction }),
+            limit: (limit) => ({ type: 'limit', limit }),
+            serverTimestamp: firebase.firestore.FieldValue.serverTimestamp,
+            updateDoc: (docRef, data) => docRef.update(data),
+            deleteDoc: (docRef) => docRef.delete(),
+            arrayUnion: firebase.firestore.FieldValue.arrayUnion,
+            Timestamp: firebase.firestore.Timestamp,
+            where: (field, op, value) => ({ type: 'where', field, op, value }),
+            addDoc: (collectionRef, data) => collectionRef.add(data)
+        };
+        
+        window.generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+        
+        function initializeApp() {
+            setupNavigation();
+            setupModals();
+            setupEventListeners();
+            setupSearchFunctionality();
+            loadInitialData();
+            showView('dashboard');
+        }
+
+        function setupNavigation() {
+            const navButtons = document.querySelectorAll('.app-button[data-view]');
+            navButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const view = button.getAttribute('data-view');
+                    if (view === 'calls-hub') {
+                        openCallsHubWithData(); // Call without pre-populating a specific contact
+                    } else {
+                        showView(view);
+                    }
+                });
+            });
+
+            gId('go-to-calls-hub-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                openCallsHubWithData();
+            });
+        }
+
+        function showView(viewName) {
+            document.querySelectorAll('.view-container').forEach(view => {
+                view.classList.remove('active');
+            });
+            const targetView = document.getElementById(viewName + '-view');
+            if (targetView) {
+                targetView.classList.add('active');
+                CRMApp.currentView = viewName;
+                updateActiveNavButton(gId(viewName + '-btn'));
+                updatePageTitle(viewName);
+                loadViewData(viewName);
+            }
+        }
+        
+        function updateActiveNavButton(activeButton) {
+            document.querySelectorAll('.app-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            if (activeButton) activeButton.classList.add('active');
+        }
+
+        function updatePageTitle(viewName) {
+            const titles = {
+                'dashboard': 'Power Choosers CRM Dashboard',
+                'accounts': 'Power Choosers CRM Accounts',
+                'contacts': 'Power Choosers CRM Contacts', 
+                'account-detail': 'Power Choosers CRM Account Details',
+                'calls-hub': 'Power Choosers Cold Calling Hub'
+            };
+            const titleElement = document.getElementById('page-title');
+            if (titleElement) {
+                titleElement.textContent = titles[viewName] || 'Power Choosers CRM';
+            }
+        }
+
+        function loadViewData(viewName) {
+            switch(viewName) {
+                case 'dashboard':
+                    renderDashboard();
+                    renderRecentActivities();
+                    break;
+                case 'accounts':
+                    renderAccounts();
+                    break;
+                case 'contacts':
+                    renderContacts();
+                    break;
+                case 'account-detail':
+                    if (CRMApp.currentAccount) {
+                        renderAccountDetail();
+                    }
+                    break;
+                case 'calls-hub':
+                    initializeCallsHub();
+                    break;
+            }
+        }
+
+        function initializeCallsHub() {
+            if (!currentProspect.name && !currentProspect.company) {
+                currentProspect = {
+                    name: '',
+                    title: '',
+                    company: '',
+                    industry: '',
+                    phone: '',
+                    email: '',
+                    accountId: '',
+                    contactId: '',
+                    painPoints: '',
+                    benefits: ''
+                };
+            }
+            populateFromGlobalProspect();
+            const inputs = ['input-name', 'input-title', 'input-company-name', 'input-company-industry'];
+            if(currentProspect.contactId){
+                inputs.forEach(id => gId(id).disabled = true);
+            } else {
+                inputs.forEach(id => gId(id).disabled = false);
+            }
+            displayCurrentStep();
+        }
+        
+        async function loadInitialData() {
+            showLoading(true);
+            try {
+                const [accountsSnapshot, contactsSnapshot, activitiesSnapshot] = await Promise.all([
+                    db.collection('accounts').get(),
+                    db.collection('contacts').get(),
+                    db.collection('activities').orderBy('createdAt', 'desc').limit(20).get()
+                ]);
+                
+                CRMApp.accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                CRMApp.contacts = contactsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                CRMApp.activities = activitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                renderDashboard();
+                renderAccounts();
+                renderContacts();
+                updateContactAccountDropdown();
+                renderRecentActivities();
+                
+            } catch (error) {
+                console.error('Error loading initial data:', error);
+                showToast('Error loading data.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function renderDashboard() {
+            if (gId('total-accounts')) gId('total-accounts').textContent = CRMApp.accounts.length;
+            if (gId('total-contacts')) gId('total-contacts').textContent = CRMApp.contacts.length;
+            if (gId('recent-activities')) gId('recent-activities').textContent = CRMApp.activities.length;
+            if (gId('hot-leads')) gId('hot-leads').textContent = '0';
+        }
+
+        function renderRecentActivities() {
+            const list = gId('recent-activities-list');
+            if (!list) return;
+            list.innerHTML = '';
+            if (CRMApp.activities.length === 0) {
+                list.innerHTML = '<p class="empty-state">No recent activities</p>';
+                return;
+            }
+            CRMApp.activities.forEach(activity => {
+                const item = document.createElement('div');
+                item.className = 'activity-item';
+                item.innerHTML = `
+                    <div class="activity-title">${activity.description}</div>
+                    <div class="activity-content">${activity.noteContent ? activity.noteContent.substring(0, 100) + '...' : ''}</div>
+                    <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
+                `;
+                list.appendChild(item);
+            });
+        }
+        
+        function renderAccounts() {
+            const grid = gId('accounts-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            if (CRMApp.accounts.length === 0) {
+                grid.innerHTML = '<p class="empty-state">No accounts found. Click "New Account" to get started.</p>';
+                return;
+            }
+            CRMApp.accounts.forEach(account => {
+                const card = document.createElement('div');
+                card.className = 'account-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div>
+                            <div class="card-name">${account.name}</div>
+                            <div class="card-subtitle">${account.industry || 'No Industry'}</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-btn edit-account" data-id="${account.id}" title="Edit Account">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                    <path d="m15 5 4 4"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="card-subtitle">${account.phone || 'No Phone'}</p>
+                `;
+                card.querySelector('.card-name').addEventListener('click', () => showAccountDetail(account.id));
+                card.querySelector('.edit-account').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openAccountModal(account);
+                });
+                grid.appendChild(card);
+            });
+        }
+
+        function renderContacts() {
+            const grid = gId('contacts-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            if (CRMApp.contacts.length === 0) {
+                grid.innerHTML = '<p class="empty-state">No contacts found. Click "New Contact" to get started.</p>';
+                return;
+            }
+            CRMApp.contacts.forEach(contact => {
+                const card = document.createElement('div');
+                card.className = 'contact-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div>
+                            <div class="card-name">${contact.firstName} ${contact.lastName}</div>
+                            <div class="card-subtitle">${contact.title || 'No Title'}</div>
+                            <div class="card-subtitle">${contact.accountName || 'No Account'}</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-btn call-prospect" data-id="${contact.id}" title="Call Prospect">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                                </svg>
+                            </button>
+                            <button class="icon-btn edit-contact" data-id="${contact.id}" title="Edit Contact">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                    <path d="m15 5 4 4"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="card-subtitle">${contact.email || 'No Email'}</p>
+                    <p class="card-subtitle">${contact.phone || 'No Phone'}</p>
+                `;
+                card.querySelector('.card-name').addEventListener('click', () => {
+                    if (contact.accountId) {
+                        showAccountDetail(contact.accountId);
+                    } else {
+                        showToast('This contact is not linked to an account.', 'warning');
+                    }
+                });
+                card.querySelector('.edit-contact').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openContactModal(contact);
+                });
+                card.querySelector('.call-prospect').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openCallsHubWithData(contact.id);
+                });
+                grid.appendChild(card);
+            });
+        }
+        
+        function showAccountDetail(accountId) {
+            CRMApp.currentAccount = CRMApp.accounts.find(a => a.id === accountId);
+            if (!CRMApp.currentAccount) {
+                showToast('Account not found.', 'error');
+                return;
+            }
+            showView('account-detail');
+        }
+
+        function renderAccountDetail() {
+            if (!CRMApp.currentAccount) return;
+            const account = CRMApp.currentAccount;
+            gId('account-detail-title').textContent = account.name;
+            renderAccountInfo(account);
+            renderAccountContacts(account.id);
+            renderAccountActivities(account.id);
+        }
+
+        function renderAccountInfo(account) {
+            const display = gId('account-info-display');
+            if (!display) return;
+            display.innerHTML = '';
+            
+            const fields = [
+                { label: 'Industry', value: account.industry },
+                { label: 'Phone', value: account.phone },
+                { label: 'Website', value: account.website },
+                { label: 'Address', value: account.address },
+                { label: 'Pain Points', value: account.painPoints },
+                { label: 'Benefits', value: account.benefits },
+                { label: 'Created At', value: formatDate(account.createdAt) },
+                { label: 'Last Updated', value: formatDate(account.updatedAt) }
+            ];
+            
+            fields.forEach(field => {
+                const fieldHtml = `
+                    <div class="info-field">
+                        <div class="info-field-label">${field.label}</div>
+                        <div class="info-field-value">${field.value || 'N/A'}</div>
+                    </div>
+                `;
+                display.innerHTML += fieldHtml;
+            });
+            
+            gId('contract-provider').value = account.contractProvider || '';
+            gId('contract-rate').value = account.contractRate || '';
+            gId('contract-expiration').value = account.contractExpiration || '';
+            gId('contract-type').value = account.contractType || '';
+        }
+
+        function renderAccountContacts(accountId) {
+            const list = gId('account-contacts-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const accountContacts = CRMApp.contacts.filter(c => c.accountId === accountId);
+            if (accountContacts.length === 0) {
+                list.innerHTML = '<p class="empty-state">No contacts for this account</p>';
+                return;
+            }
+            accountContacts.forEach(contact => {
+                const item = document.createElement('div');
+                item.className = 'contact-list-item';
+                item.innerHTML = `
+                    <div class="contact-info">
+                        <div class="contact-name">${contact.firstName} ${contact.lastName}</div>
+                        <div class="contact-title">${contact.title || 'No Title'}</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="icon-btn call-prospect" data-id="${contact.id}" title="Call Prospect">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                        </button>
+                        <button class="icon-btn edit-contact" data-id="${contact.id}" title="Edit Contact">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                <path d="m15 5 4 4"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                item.querySelector('.call-prospect').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openCallsHubWithData(contact.id);
+                });
+                item.querySelector('.edit-contact').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openContactModal(contact);
+                });
+                list.appendChild(item);
+            });
+        }
+        
+        function renderAccountActivities(accountId) {
+            const list = gId('account-activities-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const accountActivities = CRMApp.activities.filter(a => a.accountId === accountId);
+            if (accountActivities.length === 0) {
+                list.innerHTML = '<p class="empty-state">No recent activities</p>';
+                return;
+            }
+            accountActivities.forEach(activity => {
+                const item = document.createElement('div');
+                item.className = 'activity-item';
+                item.innerHTML = `
+                    <div class="activity-title">${activity.description}</div>
+                    <div class="activity-content">${activity.noteContent || ''}</div>
+                    <div class="activity-date">Time: ${formatDate(activity.createdAt)}</div>
+                `;
+                list.appendChild(item);
+            });
+        }
+        
+        function setupModals() {
+            const accountModal = gId('account-modal');
+            const contactModal = gId('contact-modal');
+            
+            gId('new-account-btn').addEventListener('click', () => openAccountModal());
+            gId('add-account-btn').addEventListener('click', () => openAccountModal());
+            gId('new-contact-btn').addEventListener('click', () => openContactModal());
+            gId('add-contact-btn').addEventListener('click', () => openContactModal());
+            gId('edit-account-btn').addEventListener('click', () => openAccountModal(CRMApp.currentAccount));
+            gId('close-account-modal').addEventListener('click', () => closeAccountModal());
+            gId('cancel-account').addEventListener('click', () => closeAccountModal());
+            gId('close-contact-modal').addEventListener('click', () => closeContactModal());
+            gId('cancel-contact').addEventListener('click', () => closeContactModal());
+            
+            accountModal.addEventListener('click', (e) => {
+                if (e.target.id === 'account-modal') closeAccountModal();
+            });
+            contactModal.addEventListener('click', (e) => {
+                if (e.target.id === 'contact-modal') closeContactModal();
+            });
+        }
+        
+        function openAccountModal(account = null) {
+            const modal = gId('account-modal');
+            const form = gId('account-form');
+            form.reset();
+            
+            if (account) {
+                gId('account-modal-title').textContent = 'Edit Account';
+                gId('account-name').value = account.name || '';
+                gId('account-industry').value = account.industry || '';
+                gId('account-phone').value = account.phone || '';
+                gId('account-website').value = account.website || '';
+                gId('account-address').value = account.address || '';
+                gId('account-pain-points').value = account.painPoints || '';
+                gId('account-benefits').value = account.benefits || '';
+                CRMApp.currentAccount = account;
+            } else {
+                gId('account-modal-title').textContent = 'Add New Account';
+                CRMApp.currentAccount = null;
+            }
+            modal.classList.add('active');
+        }
+        
+        function closeAccountModal() {
+            gId('account-modal').classList.remove('active');
+        }
+        
+        function openContactModal(contact = null) {
+            const modal = gId('contact-modal');
+            const form = gId('contact-form');
+            form.reset();
+            updateContactAccountDropdown();
+            
+            if (contact) {
+                gId('contact-modal-title').textContent = 'Edit Contact';
+                gId('contact-first-name').value = contact.firstName || '';
+                gId('contact-last-name').value = contact.lastName || '';
+                gId('contact-title').value = contact.title || '';
+                gId('contact-email').value = contact.email || '';
+                gId('contact-phone').value = contact.phone || '';
+                gId('contact-notes').value = contact.notes || '';
+                gId('contact-account').value = contact.accountId || '';
+                CRMApp.currentContact = contact;
+            } else {
+                gId('contact-modal-title').textContent = 'Add New Contact';
+                CRMApp.currentContact = null;
+            }
+            modal.classList.add('active');
+        }
+        
+        function closeContactModal() {
+            gId('contact-modal').classList.remove('active');
+        }
+        
+        function updateContactAccountDropdown() {
+            const select = gId('contact-account');
+            if (!select) return;
+            select.innerHTML = '<option value="">Select an account...</option>';
+            CRMApp.accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = account.name;
+                select.appendChild(option);
+            });
+        }
+        
+        function setupEventListeners() {
+            gId('account-form').addEventListener('submit', handleAccountSubmit);
+            gId('contact-form').addEventListener('submit', handleContactSubmit);
+            gId('back-to-accounts').addEventListener('click', () => showView('accounts'));
+            gId('energy-contract-form').addEventListener('submit', handleEnergyContractSubmit);
+            gId('save-account-note').addEventListener('click', handleSaveAccountNote);
+        }
+
+        async function handleAccountSubmit(e) {
+            e.preventDefault();
+            showLoading(true);
+            const accountId = CRMApp.currentAccount ? CRMApp.currentAccount.id : null;
+            const accountData = {
+                name: gId('account-name').value,
+                industry: gId('account-industry').value,
+                phone: gId('account-phone').value,
+                website: gId('account-website').value,
+                address: gId('account-address').value,
+                painPoints: gId('account-pain-points').value,
+                benefits: gId('account-benefits').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                if (accountId) {
+                    await db.collection('accounts').doc(accountId).update(accountData);
+                    showToast('Account updated successfully!');
+                    logActivity({
+                        type: 'account_updated',
+                        description: `Updated account: ${accountData.name}`,
+                        accountId: accountId,
+                        accountName: accountData.name
+                    });
+                } else {
+                    const newDoc = await db.collection('accounts').add({
+                        ...accountData,
+                        createdAt: serverTimestamp()
+                    });
+                    showToast('Account created successfully!');
+                    logActivity({
+                        type: 'account_created',
+                        description: `Created new account: ${accountData.name}`,
+                        accountId: newDoc.id,
+                        accountName: accountData.name
+                    });
+                }
+            } catch (error) {
+                console.error('Error saving account:', error);
+                showToast('Error saving account. See console for details.', 'error');
+            } finally {
+                closeAccountModal();
+                showLoading(false);
+            }
+        }
+
+        async function handleContactSubmit(e) {
+            e.preventDefault();
+            showLoading(true);
+            const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : null;
+            const accountId = gId('contact-account').value;
+            const accountName = accountId ? CRMApp.accounts.find(a => a.id === accountId)?.name : 'Unassigned';
+            
+            const contactData = {
+                firstName: gId('contact-first-name').value,
+                lastName: gId('contact-last-name').value,
+                title: gId('contact-title').value,
+                accountId: accountId,
+                accountName: accountName,
+                email: gId('contact-email').value,
+                phone: gId('contact-phone').value,
+                notes: gId('contact-notes').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                if (contactId) {
+                    await db.collection('contacts').doc(contactId).update(contactData);
+                    showToast('Contact updated successfully!');
+                    logActivity({
+                        type: 'contact_updated',
+                        description: `Updated contact: ${contactData.firstName} ${contactData.lastName}`,
+                        contactId: contactId,
+                        contactName: `${contactData.firstName} ${contactData.lastName}`,
+                        accountId: accountId,
+                        accountName: accountName
+                    });
+                } else {
+                    const newDoc = await db.collection('contacts').add({
+                        ...contactData,
+                        createdAt: serverTimestamp()
+                    });
+                    showToast('Contact created successfully!');
+                    logActivity({
+                        type: 'contact_created',
+                        description: `Created new contact: ${contactData.firstName} ${contactData.lastName}`,
+                        contactId: newDoc.id,
+                        contactName: `${contactData.firstName} ${contactData.lastName}`,
+                        accountId: accountId,
+                        accountName: accountName
+                    });
+                }
+            } catch (error) {
+                console.error('Error saving contact:', error);
+                showToast('Error saving contact. See console for details.', 'error');
+            } finally {
+                closeContactModal();
+                showLoading(false);
+            }
+        }
+        
+        async function handleEnergyContractSubmit(e) {
+            e.preventDefault();
+            if (!CRMApp.currentAccount) return;
+            
+            showLoading(true);
+            
+            const contractData = {
+                contractProvider: gId('contract-provider').value,
+                contractRate: gId('contract-rate').value,
+                contractExpiration: gId('contract-expiration').value,
+                contractType: gId('contract-type').value,
+                updatedAt: serverTimestamp()
+            };
+            
+            try {
+                await db.collection('accounts').doc(CRMApp.currentAccount.id).update(contractData);
+                showToast('Energy contract updated successfully!');
+                logActivity({
+                    type: 'contract_updated',
+                    description: `Updated contract for: ${CRMApp.currentAccount.name}`,
+                    accountId: CRMApp.currentAccount.id,
+                    accountName: CRMApp.currentAccount.name
+                });
+            } catch (error) {
+                console.error('Error saving contract info:', error);
+                showToast('Error saving contract info. See console for details.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function handleSaveAccountNote() {
+            if (!CRMApp.currentAccount) return;
+            
+            const noteContent = gId('account-note-input').value;
+            if (!noteContent.trim()) {
+                showToast('Note cannot be empty.', 'warning');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                await logActivity({
+                    type: 'account_note',
+                    description: `Added a note to ${CRMApp.currentAccount.name}`,
+                    noteContent: noteContent,
+                    accountId: CRMApp.currentAccount.id,
+                    accountName: CRMApp.currentAccount.name
+                });
+                
+                showToast('Note saved successfully!');
+                gId('account-note-input').value = '';
+            } catch (error) {
+                console.error('Error saving note:', error);
+                showToast('Error saving note. See console for details.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function logActivity(activityData) {
+            try {
+                await db.collection('activities').add({
+                    ...activityData,
+                    createdAt: serverTimestamp()
+                });
+            } catch (error) {
+                console.error('Error logging activity:', error);
+                showToast('Error logging activity. See console for details.', 'error');
+            }
+        }
+
+        async function openCallsHubWithData(contactId = null) {
+            showLoading(true);
+            currentProspect = {};
+            currentStep = 'start';
+            history = [];
+
+            if (contactId) {
+                try {
+                    const contactDoc = await db.collection('contacts').doc(contactId).get();
+                    if (contactDoc.exists) {
+                        const contact = contactDoc.data();
+                        currentProspect.contactId = contactId;
+                        currentProspect.name = `${contact.firstName} ${contact.lastName}`;
+                        currentProspect.title = contact.title;
+                        currentProspect.phone = contact.phone;
+                        currentProspect.email = contact.email;
+                        currentProspect.accountId = contact.accountId;
+                        
+                        if (contact.accountId) {
+                            const accountDoc = await db.collection('accounts').doc(contact.accountId).get();
+                            if (accountDoc.exists) {
+                                const account = accountDoc.data();
+                                currentProspect.company = account.name;
+                                currentProspect.industry = account.industry;
+                                currentProspect.painPoints = account.painPoints;
+                                currentProspect.benefits = account.benefits;
+                            }
+                        }
+                        
+                        gId('call-notes').value = contact.notes || '';
+
+                    } else {
+                        showToast('Contact not found.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error fetching data for calls hub:', error);
+                    showToast('Error fetching contact data.', 'error');
+                }
+            } else {
+                gId('call-notes').value = '';
+            }
+
+            showLoading(false);
+            showView('calls-hub');
+            displayCurrentStep();
+        }
+
+        function populateFromGlobalProspect() {
+            const inputName = gId('input-name');
+            if (inputName) {
+                inputName.value = currentProspect.name || '';
+                placeholders['N'] = currentProspect.name || '';
+            }
+            const inputTitle = gId('input-title');
+            if (inputTitle) {
+                inputTitle.value = currentProspect.title || '';
+                placeholders['CT'] = currentProspect.title || '';
+            }
+            const inputCompanyName = gId('input-company-name');
+            if (inputCompanyName) {
+                inputCompanyName.value = currentProspect.company || '';
+                placeholders['CN'] = currentProspect.company || '';
+            }
+            const inputCompanyIndustry = gId('input-company-industry');
+            if (inputCompanyIndustry) {
+                inputCompanyIndustry.value = currentProspect.industry || '';
+                placeholders['CI'] = currentProspect.industry || '';
+                placeholders['TIA'] = currentProspect.industry || '';
+            }
+            const inputBenefit = gId('input-benefit');
+            if (inputBenefit) {
+                inputBenefit.value = currentProspect.benefits || '';
+                placeholders['SB'] = currentProspect.benefits || '';
+            }
+            const inputPain = gId('input-pain');
+            if (inputPain) {
+                inputPain.value = currentProspect.painPoints || '';
+                placeholders['PP'] = currentProspect.painPoints || '';
+            }
+            
+            const fieldsToDisable = ['input-name', 'input-title', 'input-company-name', 'input-company-industry'];
+            if (currentProspect.contactId) {
+                fieldsToDisable.forEach(fieldId => {
+                    const input = gId(fieldId);
+                    if (input) {
+                        input.disabled = true;
+                    }
+                });
+            } else {
+                fieldsToDisable.forEach(fieldId => {
+                    const input = gId(fieldId);
+                    if (input) {
+                        input.disabled = false;
+                    }
+                });
+            }
+        }
+
+        async function saveProspectAndNotes() {
+            const notesContent = gId('call-notes').value.trim();
+            const prospectData = {
+                name: gId('input-name').value.trim(),
+                title: gId('input-title').value.trim(),
+                company: gId('input-company-name').value.trim(),
+                industry: gId('input-company-industry').value.trim(),
+                benefits: gId('input-benefit').value.trim(),
+                painPoints: gId('input-pain').value.trim()
+            };
+
+            showLoading(true);
+
+            try {
+                let accountId = currentProspect.accountId;
+                let contactId = currentProspect.contactId;
+                let accountName = prospectData.company;
+                let contactName = prospectData.name;
+                let isNewAccount = false;
+                let isNewContact = false;
+
+                if (accountId) {
+                    const accountRef = db.collection('accounts').doc(accountId);
+                    await accountRef.update({
+                        name: prospectData.company,
+                        industry: prospectData.industry,
+                        painPoints: prospectData.painPoints,
+                        benefits: prospectData.benefits,
+                        updatedAt: serverTimestamp()
+                    });
+                } else if (prospectData.company) {
+                    const newAccountRef = await db.collection('accounts').add({
+                        name: prospectData.company,
+                        industry: prospectData.industry,
+                        painPoints: prospectData.painPoints,
+                        benefits: prospectData.benefits,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    accountId = newAccountRef.id;
+                    isNewAccount = true;
+                }
+
+                if (contactId) {
+                    const contactRef = db.collection('contacts').doc(contactId);
+                    await contactRef.update({
+                        firstName: prospectData.name.split(' ')[0] || '',
+                        lastName: prospectData.name.split(' ')[1] || '',
+                        title: prospectData.title,
+                        accountId: accountId,
+                        accountName: accountName,
+                        notes: notesContent,
+                        updatedAt: serverTimestamp()
+                    });
+                } else if (prospectData.name) {
+                    const newContactRef = await db.collection('contacts').add({
+                        firstName: prospectData.name.split(' ')[0] || '',
+                        lastName: prospectData.name.split(' ')[1] || '',
+                        title: prospectData.title,
+                        accountId: accountId,
+                        accountName: accountName,
+                        notes: notesContent,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    contactId = newContactRef.id;
+                    isNewContact = true;
+                }
+                
+                if (notesContent) {
+                    await logActivity({
+                        type: 'call_note',
+                        description: `Call note for ${contactName || accountName || 'prospect'}`,
+                        noteContent: notesContent,
+                        accountId: accountId,
+                        accountName: accountName,
+                        contactId: contactId,
+                        contactName: contactName
+                    });
+                }
+
+                showToast(`Call notes and prospect data saved!${isNewAccount ? ' New account created.' : ''}${isNewContact ? ' New contact created.' : ''}`);
+                restart();
+
+            } catch (error) {
+                console.error('Error saving prospect and notes:', error);
+                showToast('Error saving data. See console for details.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function applyPlaceholders(text) {
+            let newText = text;
+            for (const key in placeholders) {
+                const regex = new RegExp('\\[' + key + '\\]', 'g');
+                newText = newText.replace(regex, placeholders[key]);
+            }
+            return newText;
+        }
+
+        function updateScript() {
+            for (const inputId in inputMap) {
+                const placeholderKey = inputMap[inputId];
+                const inputElement = gId(inputId);
+                if (inputElement) {
+                    const inputValue = inputElement.value || inputElement.placeholder;
+                    placeholders[placeholderKey] = inputValue;
+                }
+            }
+            placeholders['TIA'] = placeholders['CI'];
+            displayCurrentStep();
+        }
+
+        function displayCurrentStep() {
+            const step = scriptData[currentStep];
+            if (!step) return;
+            
+            scriptDisplay = gId('script-display');
+            responsesContainer = gId('responses-container');
+            backBtn = gId('back-btn');
+            
+            const processedText = applyPlaceholders(step.you);
+            
+            if (scriptDisplay) {
+                scriptDisplay.innerHTML = processedText;
+                scriptDisplay.className = `script-display mood-${step.mood}`;
+            }
+            
+            if (responsesContainer) {
+                responsesContainer.innerHTML = '';
+                if (currentStep === 'start') {
+                    const dialButtonHtml = `
+                        <button class="dial-button" onclick="handleDialClick()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                            </svg>
+                            Dial
+                        </button>
+                    `;
+                    responsesContainer.innerHTML = dialButtonHtml;
+                } else if (step.responses && step.responses.length > 0) {
+                    step.responses.forEach(response => {
+                        const button = document.createElement('button');
+                        button.className = 'response-btn';
+                        button.innerHTML = applyPlaceholders(response.text);
+                        button.onclick = () => selectResponse(response.next, response.action);
+                        responsesContainer.appendChild(button);
+                    });
+                }
+            }
+            
+            if (backBtn) {
+                backBtn.disabled = history.length === 0;
+            }
+
+            populateFromGlobalProspect();
+        }
+
+        function handleDialClick() {
+            if (currentProspect.phone) {
+                alert(`Dialing ${currentProspect.phone}...`);
+            } else {
+                showToast('No phone number available for this prospect. Manual dialing is required.', 'info');
+            }
+            selectResponse('dialing');
+        }
+
+        function selectResponse(nextStep, action) {
+            if (nextStep && scriptData[nextStep]) {
+                history.push(currentStep);
+                currentStep = nextStep;
+                displayCurrentStep();
+            }
+
+            if (action === 'saveProspectAndNotes') {
+                saveProspectAndNotes();
+            }
+        }
+
+        function goBack() {
+            if (history.length > 0) {
+                currentStep = history.pop();
+                displayCurrentStep();
+            }
+        }
+
+        function restart() {
+            currentStep = 'start';
+            history = [];
+            
+            const callNotesElement = gId('call-notes');
+            if (callNotesElement) {
+                callNotesElement.value = '';
+            }
+            
+            currentProspect = {
+                name: '',
+                title: '',
+                company: '',
+                industry: '',
+                phone: '',
+                email: '',
+                accountId: '',
+                contactId: '',
+                painPoints: '',
+                benefits: ''
+            };
+            
+            const inputs = ['input-name', 'input-title', 'input-company-name', 'input-company-industry', 'input-benefit', 'input-pain'];
+            inputs.forEach(inputId => {
+                const input = gId(inputId);
+                if (input) {
+                    input.value = '';
+                    input.disabled = false;
+                }
+            });
+            
+            displayCurrentStep();
+        }
+        
+        function clearNotes() {
+            const notesTextarea = gId('call-notes');
+            if (!notesTextarea) return;
+
+            if (window.confirm('Are you sure you want to clear all notes?')) {
+                notesTextarea.value = '';
+                showToast('Notes cleared.', 'warning');
+            }
+        }
+
         function setupSearchFunctionality() {
             const googleBtn = gId('google-button');
             if (googleBtn) {
@@ -3281,5 +3783,5 @@
             }
         }
     </script>
-</body>
+    </body>
 </html>
