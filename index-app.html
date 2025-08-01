@@ -1,4 +1,22 @@
-<!DOCTYPE html>
+.form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #4a5568;
+        }
+
+        .form-actions .primary-btn,
+        .form-actions .secondary-btn {
+            min-height: 44px;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .9rem;
+            font-weight: 600;
+        }<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -155,8 +173,8 @@
             left: 0;
             right: 0;
             background: #1a202c;
-            border-bottom: 2px solid #f97316;
-            box-shadow: 0 8px 32px rgba(249,115,22,.15);
+            border-bottom: 2px solid #3b82f6;
+            box-shadow: 0 8px 32px rgba(59,130,246,.15);
             padding: 0;
             height: 0;
             overflow: hidden;
@@ -406,7 +424,7 @@
 
         .dashboard-main::-webkit-scrollbar {width: 8px;}
         .dashboard-main::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
-        .dashboard-main::-webkit-scrollbar-thumb {background: #f97316; border-radius: 4px;}
+        .dashboard-main::-webkit-scrollbar-thumb {background: #3b82f6; border-radius: 4px;}
 
         .dashboard-sidebar {
             display: flex;
@@ -420,7 +438,7 @@
 
         .dashboard-sidebar::-webkit-scrollbar {width: 8px;}
         .dashboard-sidebar::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
-        .dashboard-sidebar::-webkit-scrollbar-thumb {background: #f97316; border-radius: 4px;}
+        .dashboard-sidebar::-webkit-scrollbar-thumb {background: #3b82f6; border-radius: 4px;}
 
         /* Quick Actions Layout */
         .quick-actions-grid {
@@ -510,7 +528,7 @@
             padding: 8px 12px;
             background: #2d3748;
             border-radius: 6px;
-            border-left: 3px solid #f97316;
+            border-left: 3px solid #3b82f6;
         }
 
         .contact-item-info {
@@ -580,7 +598,7 @@
 
         .account-detail-main::-webkit-scrollbar {width: 8px;}
         .account-detail-main::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
-        .account-detail-main::-webkit-scrollbar-thumb {background: #f97316; border-radius: 4px;}
+        .account-detail-main::-webkit-scrollbar-thumb {background: #3b82f6; border-radius: 4px;}
 
         .account-detail-sidebar {
             display: flex;
@@ -593,7 +611,7 @@
 
         .account-detail-sidebar::-webkit-scrollbar {width: 8px;}
         .account-detail-sidebar::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
-        .account-detail-sidebar::-webkit-scrollbar-thumb {background: #f97316; border-radius: 4px;}
+        .account-detail-sidebar::-webkit-scrollbar-thumb {background: #3b82f6; border-radius: 4px;}
 
         /* Cards */
         .crm-card {
@@ -655,21 +673,22 @@
 
         .accounts-grid::-webkit-scrollbar, .contacts-grid::-webkit-scrollbar {width: 6px;}
         .accounts-grid::-webkit-scrollbar-track, .contacts-grid::-webkit-scrollbar-track {background: #2d3748; border-radius: 3px;}
-        .accounts-grid::-webkit-scrollbar-thumb, .contacts-grid::-webkit-scrollbar-thumb {background: #f97316; border-radius: 3px;}
+        .accounts-grid::-webkit-scrollbar-thumb, .contacts-grid::-webkit-scrollbar-thumb {background: #3b82f6; border-radius: 3px;}
 
         .account-card, .contact-card {
-            background: white;
+            background: #1a202c;
             border-radius: 16px;
             padding: 20px;
-            box-shadow: 0 8px 24px rgba(0,0,0,.06);
-            border: 1px solid rgba(30,90,168,.1);
+            box-shadow: 0 8px 24px rgba(0,0,0,.3);
+            border: 1px solid #4a5568;
             cursor: pointer;
             transition: all .3s ease;
         }
 
         .account-card:hover, .contact-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 12px 32px rgba(0,0,0,.12);
+            box-shadow: 0 12px 32px rgba(0,0,0,.4);
+            border-color: #3b82f6;
         }
 
         .card-header {
@@ -682,13 +701,13 @@
         .card-name {
             font-size: 1.2rem;
             font-weight: 700;
-            color: #1A438D;
+            color: #ffffff;
             margin-bottom: 4px;
         }
 
         .card-subtitle {
             font-size: .9rem;
-            color: #64748b;
+            color: #cbd5e0;
         }
 
         .card-actions {
@@ -703,12 +722,12 @@
             border-radius: 6px;
             cursor: pointer;
             transition: all .3s ease;
-            color: #6b7280;
+            color: #cbd5e0;
         }
 
         .icon-btn:hover {
-            background: rgba(107, 114, 128, .1);
-            color: #374151;
+            background: rgba(203, 213, 224, .1);
+            color: #ffffff;
         }
 
         /* Add Notes Button Styling */
@@ -769,7 +788,7 @@
             padding: 0;
             max-width: 600px;
             width: 90%;
-            max-height: 80vh;
+            max-height: 90vh;
             overflow-y: auto;
             box-shadow: 0 20px 40px rgba(0,0,0,.3);
             border: 1px solid #4a5568;
@@ -854,7 +873,7 @@
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #f97316;
+            border-color: #3b82f6;
         }
 
         .form-group textarea {
@@ -979,7 +998,7 @@
 
         #account-note-input:focus {
             outline: none;
-            border-color: #f97316;
+            border-color: #3b82f6;
         }
 
         #energy-contract-display {
@@ -1092,11 +1111,11 @@
         }
 
         .main-content {
-            background: white;
+            background: #1a202c;
             border-radius: 16px;
             padding: 20px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
-            border: 1px solid rgba(30, 90, 168, .1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .3);
+            border: 1px solid #4a5568;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -1107,48 +1126,53 @@
             font-size: 1.1rem;
             line-height: 1.6;
             padding: 20px;
-            background: #f8fafc;
+            background: #2d3748;
             border-radius: 12px;
             margin-bottom: 20px;
             min-height: 200px;
-            border-left: 4px solid #e2e8f0;
+            border-left: 4px solid #4a5568;
             flex-grow: 1;
             overflow-y: auto;
+            color: #ffffff;
         }
 
         .script-display.mood-neutral {
             border-left-color: #6b7280;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            color: #ffffff;
         }
 
         .script-display.mood-positive {
             border-left-color: #22c55e;
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+            color: #ffffff;
         }
 
         .script-display.mood-challenging {
             border-left-color: #f59e0b;
-            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+            color: #ffffff;
         }
 
         .script-display.mood-unsure {
             border-left-color: #8b5cf6;
-            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+            background: linear-gradient(135deg, #581c87 0%, #6b21a8 100%);
+            color: #ffffff;
         }
 
         .pause {
-            color: #6b7280;
+            color: #cbd5e0;
             font-style: italic;
         }
 
         .emphasis {
             font-weight: 600;
-            color: #1A438D;
+            color: #60a5fa;
         }
 
         .metric {
             font-weight: 700;
-            color: #dc2626;
+            color: #fbbf24;
         }
 
         .responses-grid {
@@ -1243,21 +1267,21 @@
         }
 
         .sidebar::-webkit-scrollbar {width: 8px;}
-        .sidebar::-webkit-scrollbar-track {background: #f1f5f9; border-radius: 4px;}
-        .sidebar::-webkit-scrollbar-thumb {background: #1A438D; border-radius: 4px;}
+        .sidebar::-webkit-scrollbar-track {background: #2d3748; border-radius: 4px;}
+        .sidebar::-webkit-scrollbar-thumb {background: #3b82f6; border-radius: 4px;}
 
         .sidebar-card {
-            background: white;
+            background: #1a202c;
             border-radius: 12px;
             padding: 16px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
-            border: 1px solid rgba(30, 90, 168, .1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, .3);
+            border: 1px solid #4a5568;
         }
 
         .sidebar-title {
             font-size: 1rem;
             font-weight: 700;
-            color: #1A438D;
+            color: #ffffff;
             margin-bottom: 12px;
             display: flex;
             align-items: center;
@@ -1272,53 +1296,55 @@
             display: block;
             font-size: .8rem;
             font-weight: 600;
-            color: #374151;
+            color: #ffffff;
             margin-bottom: 4px;
         }
 
         .input-group input {
             width: 100%;
             padding: 8px 10px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #4a5568;
             border-radius: 6px;
             font-size: .85rem;
-            color: #1e293b;
+            color: #ffffff;
+            background: #2d3748;
             transition: border-color .3s ease;
         }
 
         .input-group input:focus {
             outline: none;
-            border-color: #1A438D;
+            border-color: #3b82f6;
         }
 
         .input-group input.editable-locked:focus {
-            background: #f8fafc;
+            background: #374151;
         }
 
         #call-notes {
             width: 100%;
             height: 200px;
             padding: 10px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #4a5568;
             border-radius: 6px;
             font-family: inherit;
             font-size: .8rem;
             line-height: 1.4;
             resize: vertical;
-            color: #1e293b;
+            color: #ffffff;
+            background: #2d3748;
         }
 
         #call-notes:focus {
             outline: none;
-            border-color: #1A438D;
+            border-color: #3b82f6;
         }
 
         .tip-item {
             padding: 8px 0;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid #4a5568;
             font-size: .8rem;
             line-height: 1.4;
-            color: #4b5563;
+            color: #cbd5e0;
         }
 
         .tip-item:last-child {
@@ -1326,7 +1352,7 @@
         }
 
         .tip-item strong {
-            color: #1A438D;
+            color: #60a5fa;
             font-weight: 600;
         }
 
@@ -1339,7 +1365,7 @@
 
         .news-item {
             padding: 12px 0;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid #4a5568;
         }
 
         .news-item:last-child {
@@ -1349,26 +1375,26 @@
         .news-title {
             font-size: .85rem;
             font-weight: 600;
-            color: #1A438D;
+            color: #60a5fa;
             margin-bottom: 6px;
             line-height: 1.3;
         }
 
         .news-summary {
             font-size: .75rem;
-            color: #4b5563;
+            color: #cbd5e0;
             line-height: 1.4;
             margin-bottom: 8px;
         }
 
         .news-talking-point {
             font-size: .75rem;
-            color: #059669;
+            color: #34d399;
             line-height: 1.4;
             font-style: italic;
-            background: rgba(5, 150, 105, 0.05);
+            background: rgba(52, 211, 153, 0.1);
             padding: 6px 8px;
-            border-left: 2px solid #059669;
+            border-left: 2px solid #34d399;
         }
 
         /* Responsive Design */
