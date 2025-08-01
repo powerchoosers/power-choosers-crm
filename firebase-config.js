@@ -25,7 +25,7 @@ if (typeof firebase !== 'undefined') {
         app = firebase.app();
     }
     db = firebase.firestore();
-    
+
     // Export Firebase functions for v8
     window.FirebaseDB = {
         db: db,
@@ -74,6 +74,9 @@ if (typeof firebase !== 'undefined') {
         Timestamp: firebase.firestore.Timestamp,
         where: function(field, op, value) {
             return { type: 'where', field, op, value };
+        },
+        addDoc: function(collectionRef, data) {
+            return collectionRef.add(data);
         }
     };
 } else {
