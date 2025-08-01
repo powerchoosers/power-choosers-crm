@@ -46,7 +46,6 @@ const inputMap = {
     'input-pain': 'PP'
 };
 
-
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Wait a bit for Firebase to load
@@ -62,7 +61,7 @@ function initializeApp() {
     setupEventListeners();
     loadInitialData();
     showView('dashboard');
-    setupSearchFunctionality(); // Call search setup here
+    setupSearchFunctionality();
 }
 
 // Navigation setup
@@ -72,15 +71,8 @@ function setupNavigation() {
         button.addEventListener('click', (e) => {
             e.preventDefault();
             const view = button.getAttribute('data-view');
-            
-            // Special handling for the calls hub button
-            if (view === 'calls-hub') {
-                showView(view);
-                updateActiveNavButton(button);
-            } else {
-                showView(view);
-                updateActiveNavButton(button);
-            }
+            showView(view);
+            updateActiveNavButton(button);
         });
     });
 }
@@ -133,7 +125,6 @@ function updatePageTitle(viewName) {
 // Setup modal functionality
 function setupModals() {
     // Account modal
-    const accountModal = document.getElementById('account-modal');
     const closeAccountModal = document.getElementById('close-account-modal');
     const cancelAccount = document.getElementById('cancel-account');
     
@@ -141,12 +132,11 @@ function setupModals() {
     if (cancelAccount) cancelAccount.addEventListener('click', () => hideModal('account-modal'));
     
     // Contact modal
-    const contactModal = document.getElementById('contact-modal');
     const closeContactModal = document.getElementById('close-contact-modal');
     const cancelContact = document.getElementById('cancel-contact');
     
     if (closeContactModal) closeContactModal.addEventListener('click', () => hideModal('contact-modal'));
-    if (cancelContact) cancelContact.addEventListener('click', () => hideModal('cancel-contact'));
+    if (cancelContact) cancelContact.addEventListener('click', () => hideModal('contact-modal'));
     
     // Close modals when clicking outside
     document.addEventListener('click', (e) => {
@@ -252,7 +242,6 @@ function loadViewData(viewName) {
             }
             break;
         case 'calls-hub':
-            // Initialize calls hub with current prospect data or empty data
             initializeCallsHub();
             displayCurrentStep();
             break;
@@ -701,7 +690,7 @@ function renderAccounts() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                         </svg>
-                        <span>${account.phone}</span>
+                        <span onclick="event.stopPropagation(); openCallsHubWithPhone('${account.phone}', '${account.name}', '${account.industry || ''}')">${account.phone}</span>
                     </div>
                 ` : ''}
                 ${account.website ? `
@@ -777,7 +766,7 @@ function renderContacts() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                         </svg>
-                        <span>${contact.phone}</span>
+                        <span onclick="event.stopPropagation(); openCallsHubWithData('${contact.id}')">${contact.phone}</span>
                     </div>
                 ` : ''}
             </div>
@@ -821,7 +810,7 @@ function renderAccountDetail() {
             </div>
             <div class="info-field">
                 <div class="info-field-label">Phone</div>
-                <div class="info-field-value">${account.phone || 'Not specified'}</div>
+                <div class="info-field-value">${account.phone ? `<span onclick="openCallsHubWithPhone('${account.phone}', '${account.name}', '${account.industry || ''}')" style="cursor: pointer; color: #1A438D;">${account.phone}</span>` : 'Not specified'}</div>
             </div>
             <div class="info-field">
                 <div class="info-field-label">Website</div>
@@ -868,7 +857,7 @@ function renderAccountContacts() {
                 <div class="contact-name">${contact.firstName} ${contact.lastName}</div>
                 <div class="contact-title">${contact.title || 'Title not specified'}</div>
                 ${contact.email ? `<div style="font-size: .8rem; color: #6b7280; margin-top: 4px;">${contact.email}</div>` : ''}
-                ${contact.phone ? `<div style="font-size: .8rem; color: #6b7280;">${contact.phone}</div>` : ''}
+                ${contact.phone ? `<div style="font-size: .8rem; color: #6b7280; cursor: pointer;" onclick="openCallsHubWithData('${contact.id}')">${contact.phone}</div>` : ''}
             </div>
             <div class="contact-actions">
                 ${contact.phone ? `
@@ -1074,7 +1063,25 @@ function openCallsHubWithData(contactId) {
     displayCurrentStep();
 }
 
-// --- Calls Hub Logic (moved here for single page app) ---
+// Function to open calls hub with just phone number
+function openCallsHubWithPhone(phone, companyName = '', industry = '') {
+    currentProspect = {
+        name: '',
+        title: '',
+        company: companyName,
+        industry: industry,
+        phone: phone,
+        email: '',
+        accountId: '',
+        contactId: ''
+    };
+    
+    showView('calls-hub');
+    updateActiveNavButton(document.getElementById('calls-hub-btn'));
+    displayCurrentStep();
+}
+
+// --- Calls Hub Logic ---
 const scriptData = {
     start: {
         you: "Click 'Dial' to begin the call",
@@ -1143,6 +1150,26 @@ const scriptData = {
             { text: "🔄 End Call / Start New Call", next: "start" }
         ]
     },
+    pathA: {
+        you: "Perfect <span class='pause'>--</span> So <strong>[N]</strong> I've been working closely with <strong>[CI]</strong> across Texas with electricity agreements <span class='pause'>--</span> and we're about to see an unprecedented dip in the market in the next few months <span class='pause'>--</span><br><br><strong><span class='emphasis'>Is getting the best price for your next renewal a priority for you and [CN]?</span></strong><br><br><strong><span class='emphasis'>Do you know when your contract expires?</span></strong><br><br><strong><span class='emphasis'>So since rates have gone up tremendously over the past 5 years, how are you guys handling such a sharp increase on your future renewals?</span></strong>",
+        mood: "neutral",
+        responses: [
+            { text: "😰 Struggling / It's tough", next: "resStruggle" },
+            { text: "📅 Haven't renewed / Contract not up yet", next: "resNotRenewed" },
+            { text: "🔒 Locked in / Just renewed", next: "resLockedIn" },
+            { text: "🛒 Shopping around / Looking at options", next: "resShopping" },
+            { text: "🤝 Have someone handling it / Work with broker", next: "resBroker" },
+            { text: "🤷 Haven't thought about it / It is what it is", next: "resNoThought" }
+        ]
+    },
+    pathD: {
+        you: "No worries if you're not sure. I work with Texas businesses on energy contract optimization <span class='pause'>--</span> basically helping companies navigate rate volatility and strategic positioning in our deregulated market. Does energy procurement fall under your area of responsibility, or would someone else be better positioned for this conversation?",
+        mood: "unsure",
+        responses: [
+            { text: "✅ Yes, that's my responsibility", next: "pathA" },
+            { text: "👥 Someone else handles it", next: "gatekeeper_intro" }
+        ]
+    },
     callSuccess: {
         you: "🎉 <strong>Call Completed Successfully!</strong><br><br>Remember to track:<br>• Decision maker level<br>• Current contract status and timeline<br>• Pain points identified<br>• Interest level (Hot/Warm/Cold/Future)<br>• Next action committed<br>• Best callback timing<br><br><span class='emphasis'>Great job keeping the energy high and positioning as a strategic advisor!</span>",
         mood: "positive",
@@ -1155,6 +1182,14 @@ const scriptData = {
         mood: "neutral",
         responses: [
             { text: "🔄 Start New Call", next: "start" }
+        ]
+    },
+    transfer_dialing: {
+        you: "Being transferred... Ringing...",
+        mood: "neutral",
+        responses: [
+            { text: "📞 Decision Maker Answers", next: "main_script_start" },
+            { text: "🚫 No Answer", next: "voicemail_or_hangup" }
         ]
     }
 };
