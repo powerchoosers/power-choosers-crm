@@ -3,9 +3,7 @@
 // CRM data integration, and saving call notes to Firebase.
 
 // Global state for search functionality and current call data.
-// The 'currentSearchType' is declared only once to avoid syntax errors.
-let currentSearchType = '';
-let activeButton = null;
+// The 'currentSearchType' is not declared here to avoid conflicts.
 let currentProspect = {}; // Object to hold CRM data from URL parameters.
 
 // Helper function to get an element by its ID.
@@ -452,108 +450,10 @@ async function saveCallNotesToCRM() {
     }
 }
 
-// Search Functions
-function openSearch(type, event) {
-    const button = event.target.closest('.app-button');
-    if (currentSearchType === type && activeButton === button) {
-        closeSearch();
-        return;
-    }
-    
-    if (activeButton) activeButton.classList.remove('active');
-    currentSearchType = type;
-    activeButton = button;
-    button.classList.add('active');
-    
-    const searchBar = gId('search-bar');
-    const container = document.querySelector('.container');
-    const label = gId('search-label');
-    const input = gId('search-input');
-    const cityInput = gId('search-city');
-    const stateInput = gId('search-state');
-    const locationInput = gId('search-location');
-    
-    if (!searchBar || !label || !input) return;
-    
-    cityInput.style.display = 'none';
-    stateInput.style.display = 'none';
-    locationInput.style.display = 'none';
-    
-    if (type === 'google') {
-        label.textContent = 'Search Google:';
-        input.placeholder = 'Type your search query...';
-    } else if (type === 'maps') {
-        label.textContent = 'Search Maps:';
-        input.placeholder = 'Search places, addresses, businesses...';
-    } else if (type === 'beenverified') {
-        label.textContent = 'Search BeenVerified:';
-        input.placeholder = 'Enter full name (e.g. John Smith)...';
-        if (cityInput) cityInput.style.display = 'block';
-        if (stateInput) stateInput.style.display = 'block';
-    } else if (type === 'apollo') {
-        label.textContent = 'Search Apollo:';
-        input.placeholder = 'Enter name (e.g. Lewis Patterson)...';
-        if (locationInput) locationInput.style.display = 'block';
-    }
-    
-    searchBar.classList.add('active');
-    if (container) container.classList.add('search-active');
-    setTimeout(() => input.focus(), 300);
-    input.value = '';
-    if (cityInput) cityInput.value = '';
-    if (stateInput) stateInput.value = '';
-    if (locationInput) locationInput.value = '';
-}
-
-function closeSearch() {
-    const searchBar = gId('search-bar');
-    const container = document.querySelector('.container');
-    
-    if (searchBar) searchBar.classList.remove('active');
-    if (container) container.classList.remove('search-active');
-    
-    if (activeButton) {
-        activeButton.classList.remove('active');
-        activeButton = null;
-    }
-    currentSearchType = '';
-}
-
-function performSearch() {
-    const queryElement = gId('search-input');
-    if (!queryElement) return;
-    
-    const query = queryElement.value.trim();
-    if (!query) return;
-    
-    let searchUrl = '';
-    
-    if (currentSearchType === 'google') {
-        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    } else if (currentSearchType === 'maps') {
-        searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
-    } else if (currentSearchType === 'beenverified') {
-        const cityElement = gId('search-city');
-        const stateElement = gId('search-state');
-        const city = cityElement ? cityElement.value.trim() : '';
-        const state = stateElement ? stateElement.value.trim().toUpperCase() : '';
-        const nameParts = query.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
-        searchUrl = `https://www.beenverified.com/rf/search/v2?age=0&city=${encodeURIComponent(city)}&fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&mn=&state=${encodeURIComponent(state)}&title=&company=&industry=&level=&companySizeMin=1&companySizeMax=9&birthMonth=&birthYear=&deathMonth=&deathYear=&address=&isDeceased=false&location=&country=&advancedSearch=true&eventType=none&eventMonth=&eventYear=&source=personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch`;
-    } else if (currentSearchType === 'apollo') {
-        const locationElement = gId('search-location');
-        const location = locationElement ? locationElement.value.trim() : '';
-        let apolloUrl = `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query + ' ')}`;
-        if (location) apolloUrl += `&personLocations[]=${encodeURIComponent(location)}`;
-        searchUrl = apolloUrl;
-    }
-    
-    if (searchUrl) {
-        window.open(searchUrl, '_blank');
-        closeSearch();
-    }
-}
+// The search functions are now handled by crm-app.js.
+// We are removing them from this file to avoid conflicts.
+// The `openSearch`, `closeSearch`, and `performSearch` functions
+// should be removed from this file.
 
 /**
  * Replaces placeholders in a given text string with values from the `placeholders` object.
@@ -758,34 +658,9 @@ document.addEventListener('DOMContentLoaded', () => {
     responsesContainer = gId('responses-container');
     backBtn = gId('back-btn');
     
-    // Check if the elements exist before adding listeners
-    const googleBtn = gId('google-button');
-    if (googleBtn) {
-        googleBtn.addEventListener('click', (e) => openSearch('google', e));
-    }
-    const mapsBtn = gId('maps-button');
-    if (mapsBtn) {
-        mapsBtn.addEventListener('click', (e) => openSearch('maps', e));
-    }
-    const apolloBtn = gId('apollo-button');
-    if (apolloBtn) {
-        apolloBtn.addEventListener('click', (e) => openSearch('apollo', e));
-    }
-    const beenverifiedBtn = gId('beenverified-button');
-    if (beenverifiedBtn) {
-        beenverifiedBtn.addEventListener('click', (e) => openSearch('beenverified', e));
-    }
+    // The search buttons and their event listeners are now handled in crm-app.js
+    // We will remove them from here to avoid conflicts and errors.
     
-    // Add event listeners for Enter key on search inputs
-    ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
-        const input = gId(id);
-        if (input) {
-            input.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') performSearch();
-            });
-        }
-    });
-
     // Event listener for the dial button, as it's now a link inside the responses-container
     const dialLink = document.querySelector('.dial-button');
     if(dialLink) {
