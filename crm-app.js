@@ -11,6 +11,7 @@ const CRMApp = {
 };
 
 // Global state for search functionality
+// This declaration is now in a single place to avoid conflicts.
 let currentSearchType = '';
 let activeButton = null;
 
@@ -134,9 +135,11 @@ function setupEventListeners() {
     // Form submissions
     const accountForm = document.getElementById('account-form');
     const contactForm = document.getElementById('contact-form');
-    
+    const energyContractForm = document.getElementById('energy-contract-form');
+
     if (accountForm) accountForm.addEventListener('submit', handleAccountSubmit);
     if (contactForm) contactForm.addEventListener('submit', handleContactSubmit);
+    if (energyContractForm) energyContractForm.addEventListener('submit', handleEnergyContractSubmit);
     
     // Back to accounts button
     const backToAccountsBtn = document.getElementById('back-to-accounts');
@@ -469,6 +472,56 @@ async function handleContactSubmit(e) {
     }
 }
 
+// Handle energy contract submission
+async function handleEnergyContractSubmit(e) {
+    e.preventDefault();
+    if (!CRMApp.currentAccount) {
+        showToast('Please select an account first.', 'warning');
+        return;
+    }
+    showLoading(true);
+
+    try {
+        if (!window.FirebaseDB) {
+            throw new Error('Firebase not available');
+        }
+
+        const contractData = {
+            provider: document.getElementById('contract-provider').value,
+            rate: document.getElementById('contract-rate').value,
+            expiration: document.getElementById('contract-expiration').value,
+            type: document.getElementById('contract-type').value
+        };
+
+        const accountRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'accounts', CRMApp.currentAccount.id);
+
+        await window.FirebaseDB.updateDoc(accountRef, {
+            energyContract: contractData,
+            updatedAt: window.FirebaseDB.serverTimestamp()
+        });
+
+        // Log activity
+        await logActivity({
+            type: 'contract_updated',
+            description: `Updated energy contract details for ${CRMApp.currentAccount.name}`,
+            accountId: CRMApp.currentAccount.id,
+            accountName: CRMApp.currentAccount.name
+        });
+
+        // Update the local account data
+        CRMApp.currentAccount.energyContract = contractData;
+
+        showToast('Energy contract saved successfully!');
+        renderAccountDetail();
+
+    } catch (error) {
+        console.error('Error saving energy contract:', error);
+        showToast('Error saving energy contract', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
 // Log activity to Firebase
 async function logActivity(activityData) {
     try {
@@ -477,19 +530,15 @@ async function logActivity(activityData) {
             return;
         }
 
-        const activityId = window.generateId();
-        
-        const activity = {
+        // Use addDoc for logging activities to get an auto-generated ID
+        const activityCollection = window.FirebaseDB.collection(window.FirebaseDB.db, 'activities');
+        await window.FirebaseDB.addDoc(activityCollection, {
             ...activityData,
-            createdAt: window.FirebaseDB.serverTimestamp(),
-            id: activityId
-        };
+            createdAt: window.FirebaseDB.serverTimestamp()
+        });
         
-        const activityRef = window.FirebaseDB.doc(window.FirebaseDB.db, 'activities', activityId);
-        await window.FirebaseDB.setDoc(activityRef, activity);
-        
-        // Add to local activities array
-        CRMApp.activities.unshift(activity);
+        // Add to local activities array for immediate display
+        await loadActivities();
         
     } catch (error) {
         console.error('Error logging activity:', error);
@@ -705,10 +754,13 @@ function renderAccountDetail() {
     // Render activities for this account
     renderAccountActivities();
     
-    // Render energy contract info (placeholder for now)
+    // Render energy contract info
     const energyContainer = document.getElementById('energy-contract-display');
-    if (energyContainer) {
-        energyContainer.innerHTML = '<p class="empty-state">No contract information available</p>';
+    if (energyContainer && account.energyContract) {
+        document.getElementById('contract-provider').value = account.energyContract.provider || '';
+        document.getElementById('contract-rate').value = account.energyContract.rate || '';
+        document.getElementById('contract-expiration').value = account.energyContract.expiration || '';
+        document.getElementById('contract-type').value = account.energyContract.type || '';
     }
 }
 
