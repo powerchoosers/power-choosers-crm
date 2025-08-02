@@ -126,6 +126,9 @@
             padding: 8px;
             border-radius: 8px;
             background: rgba(26, 32, 44, 0.9);
+            pointer-events: auto;
+            width: 44px;
+            overflow: hidden;
         }
 
         .power-choosers-logo:hover {
@@ -138,6 +141,7 @@
             height: 32px;
             border-radius: 6px;
             transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
+            flex-shrink: 0;
         }
 
         .power-choosers-logo .logo-text {
@@ -148,6 +152,22 @@
             transform: translateX(-10px);
             transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
             white-space: nowrap;
+        }
+
+        /* Show logo text when sidebar is hovered, but prevent logo hover from affecting sidebar */
+        .left-sidebar:hover + .top-nav .power-choosers-logo {
+            width: 180px;
+        }
+
+        .left-sidebar:hover + .top-nav .power-choosers-logo .logo-text {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Prevent logo hover from interfering with sidebar behavior */
+        .power-choosers-logo:hover {
+            background: rgba(16, 185, 129, 0.1);
+            transform: scale(1.05);
         }
 
         .power-choosers-logo:hover .logo-text {
@@ -308,33 +328,39 @@
             z-index: 500;
         }
         .search-bar.active {
-            height: 70px;
+            height: auto;
+            min-height: 70px;
+            max-height: 200px;
             padding: 15px;
         }
         .search-container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             display: flex;
-            align-items: center;
-            gap: 15px;
+            flex-direction: column;
+            gap: 12px;
         }
         .search-label {
             font-size: 1rem;
             font-weight: 600;
             color: #ffffff;
-            min-width: 140px;
+            margin-bottom: 8px;
+        }
+        .search-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
         }
         .search-input {
-            flex: 2;
+            flex: 1;
             padding: 10px 14px;
-            font-size: 1rem;
+            font-size: .9rem;
             border: 2px solid #4a5568;
             border-radius: 8px;
             background: #2d3748;
             color: #ffffff;
-        }
-        .search-input.city, .search-input.state, .search-input.location {
-            flex: 1;
+            min-width: 0;
         }
         .search-input:focus {
             outline: none;
@@ -346,6 +372,8 @@
         .search-actions {
             display: flex;
             gap: 8px;
+            justify-content: flex-end;
+            margin-top: 8px;
         }
         .search-btn {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -3196,7 +3224,7 @@
                 }
             });
 
-            ['search-input', 'search-city', 'search-state', 'search-location'].forEach(id => {
+            ['search-input', 'search-city', 'search-state', 'search-company', 'search-title', 'search-keywords', 'search-location'].forEach(id => {
                 const input = gId(id);
                 if (input) {
                     input.addEventListener('keypress', function(e) {
@@ -3371,21 +3399,86 @@
 
         function performSearch() {
             const query = gId('search-input').value.trim();
-            if (!query) return;
+            if (!query && currentSearchType !== 'apollo') return;
             
             if (currentSearchType === 'accounts' || currentSearchType === 'contacts') return;
             
             const searchUrls = {
                 google: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
                 maps: `https://www.google.com/maps/search/${encodeURIComponent(query)}`,
-                apollo: `https://app.apollo.io/#/people?page=1&qKeywords=${encodeURIComponent(query)}`,
+                apollo: (() => {
+                    const name = query;
+                    const city = gId('search-city').value.trim();
+                    const state = gId('search-state').value.trim();
+                    const company = gId('search-company').value.trim();
+                    const title = gId('search-title').value.trim();
+                    const keywords = gId('search-keywords').value.trim();
+                    const location = gId('search-location').value.trim();
+                    
+                    let url = 'https://app.apollo.io/#/';
+                    let params = new URLSearchParams();
+                    
+                    // Determine if searching for people or companies
+                    if (name || title || keywords) {
+                        url += 'people';
+                        params.append('page', '1');
+                        params.append('sortByField', '[none]');
+                        params.append('sortAscending', 'false');
+                        
+                        if (name) {
+                            params.append('qKeywords', name);
+                        }
+                        if (title) {
+                            params.append('personTitles[]', title);
+                        }
+                        if (keywords) {
+                            const existingKeywords = params.get('qKeywords') || '';
+                            params.set('qKeywords', existingKeywords ? `${existingKeywords} ${keywords}` : keywords);
+                        }
+                        if (location || (city && state)) {
+                            const loc = location || `${city}, ${state}`.replace(/^,\s*|,\s*$/g, '');
+                            if (loc) params.append('personLocations[]', loc);
+                        }
+                        if (company) {
+                            params.append('organizationNames[]', company);
+                        }
+                    } else if (company) {
+                        url += 'companies';
+                        params.append('page', '1');
+                        params.append('sortByField', '[none]');
+                        params.append('sortAscending', 'false');
+                        params.append('organizationNames[]', company);
+                        
+                        if (location || (city && state)) {
+                            const loc = location || `${city}, ${state}`.replace(/^,\s*|,\s*$/g, '');
+                            if (loc) params.append('organizationLocations[]', loc);
+                        }
+                    } else {
+                        // Default to people search
+                        url += 'people';
+                        params.append('page', '1');
+                        params.append('sortByField', '[none]');
+                        params.append('sortAscending', 'false');
+                    }
+                    
+                    return `${url}?${params.toString()}`;
+                })(),
                 beenverified: (() => {
                     const city = gId('search-city').value.trim();
                     const state = gId('search-state').value.trim().toUpperCase();
                     const nameParts = query.split(' ');
                     const firstName = nameParts[0] || '';
                     const lastName = nameParts.slice(1).join(' ') || '';
-                    return `https://www.beenverified.com/rf/search/v2?fullname=${encodeURIComponent(query)}&fname=${encodeURIComponent(firstName)}&ln=${encodeURIComponent(lastName)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
+                    
+                    const params = new URLSearchParams();
+                    params.append('age', '0');
+                    params.append('fullname', query);
+                    params.append('fname', firstName);
+                    params.append('ln', lastName);
+                    params.append('city', city);
+                    params.append('state', state);
+                    
+                    return `https://www.beenverified.com/rf/search/v2?${params.toString()}`;
                 })()
             };
             
