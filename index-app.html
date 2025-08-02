@@ -84,7 +84,7 @@
             background: #1a202c;
             padding: 8px 0;
             box-shadow: 0 1px 3px rgba(0,0,0,.3);
-            border-bottom: 1px solid #2d3748;
+            border-bottom: 2px solid #1e40af;
             z-index: 1000;
             position: fixed;
             top: 7px;
@@ -1968,7 +1968,7 @@
             width: 60px;
             height: 100vh;
             background: linear-gradient(180deg, #1a202c 0%, #2d3748 100%);
-            border-right: 1px solid #4a5568;
+            border-right: 2px solid #1e40af;
             z-index: 1001;
             transition: width .3s cubic-bezier(0.4, 0, 0.2, 1);
             overflow: hidden;
@@ -3493,13 +3493,19 @@
                 }
             }
             
-            searchBar.classList.add('active');
-            mainContainer.classList.add('search-active');
-            setTimeout(() => input.focus(), 300);
-            input.value = '';
-            [cityInput, stateInput, locationInput].forEach(inp => {
-                if (inp) inp.value = '';
-            });
+            if (searchBar && mainContainer) {
+                searchBar.classList.add('active');
+                mainContainer.classList.add('search-active');
+                setTimeout(() => {
+                    if (input) {
+                        input.focus();
+                        input.value = '';
+                    }
+                }, 300);
+                [cityInput, stateInput, locationInput].forEach(inp => {
+                    if (inp) inp.value = '';
+                });
+            }
         }
 
         function performInternalSearch(query) {
@@ -3818,9 +3824,9 @@
             const searchQuery = query.toLowerCase();
             let results = [];
             
-            // Check if query looks like a phone number (more flexible regex)
+            // Enhanced phone number detection - supports numbers with or without dashes/formatting
             const phoneRegex = /[\d\-\(\)\s\+\.]{7,}/;
-            const isPhoneSearch = phoneRegex.test(query);
+            const isPhoneSearch = phoneRegex.test(query) || /^\d{10,}$/.test(query.replace(/\D/g, ''));
             const cleanQuery = query.replace(/\D/g, ''); // Remove all non-digits for phone comparison
             
             // Search accounts
@@ -3831,11 +3837,17 @@
                     const cityMatch = account.city?.toLowerCase().includes(searchQuery);
                     const stateMatch = account.state?.toLowerCase().includes(searchQuery);
                     
-                    // Enhanced phone matching - check if cleaned phone contains cleaned query
+                    // Enhanced phone matching - supports partial matches and different formats
                     let phoneMatch = false;
-                    if (isPhoneSearch && account.phone) {
+                    if (isPhoneSearch && account.phone && cleanQuery.length >= 3) {
                         const cleanPhone = account.phone.replace(/\D/g, '');
-                        phoneMatch = cleanPhone.includes(cleanQuery) || cleanQuery.includes(cleanPhone);
+                        // Match if cleaned query is contained in phone or vice versa (for partial searches)
+                        phoneMatch = cleanPhone.includes(cleanQuery) ||
+                                   cleanQuery.includes(cleanPhone) ||
+                                   // Support partial matching from the beginning of the number
+                                   cleanPhone.startsWith(cleanQuery) ||
+                                   // Support matching last digits (useful for extensions)
+                                   cleanPhone.endsWith(cleanQuery);
                     }
                     
                     return nameMatch || industryMatch || cityMatch || stateMatch || phoneMatch;
@@ -3856,11 +3868,17 @@
                     const titleMatch = contact.title?.toLowerCase().includes(searchQuery);
                     const accountMatch = contact.accountName?.toLowerCase().includes(searchQuery);
                     
-                    // Enhanced phone matching - check if cleaned phone contains cleaned query
+                    // Enhanced phone matching - supports partial matches and different formats
                     let phoneMatch = false;
-                    if (isPhoneSearch && contact.phone) {
+                    if (isPhoneSearch && contact.phone && cleanQuery.length >= 3) {
                         const cleanPhone = contact.phone.replace(/\D/g, '');
-                        phoneMatch = cleanPhone.includes(cleanQuery) || cleanQuery.includes(cleanPhone);
+                        // Match if cleaned query is contained in phone or vice versa (for partial searches)
+                        phoneMatch = cleanPhone.includes(cleanQuery) ||
+                                   cleanQuery.includes(cleanPhone) ||
+                                   // Support partial matching from the beginning of the number
+                                   cleanPhone.startsWith(cleanQuery) ||
+                                   // Support matching last digits (useful for extensions)
+                                   cleanPhone.endsWith(cleanQuery);
                     }
                     
                     return nameMatch || titleMatch || accountMatch || phoneMatch;
