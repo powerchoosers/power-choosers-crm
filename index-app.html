@@ -86,13 +86,26 @@
             opacity: 1;
         }
 
+        /* Adjusted sidebar behavior for hover effect */
         .left-sidebar {
-            width: 6rem;
+            width: 5rem; /* Reduced initial width for a more collapsed look */
             transition: width 0.3s ease-in-out;
+            overflow: hidden;
         }
-
-        .left-sidebar:hover {
-            width: 16rem;
+        
+        .left-sidebar:hover, .left-sidebar:focus-within {
+            width: 20rem; /* Expanded width on hover or when an element inside has focus */
+        }
+        
+        /* Ensure sidebar labels are hidden initially and only shown when sidebar is expanded */
+        .sidebar-label {
+            display: none;
+        }
+        
+        .left-sidebar:hover .sidebar-label,
+        .left-sidebar:focus-within .sidebar-label {
+            display: inline;
+            transition: opacity 0.2s ease-in-out;
         }
 
         .left-sidebar:hover .search-input {
@@ -106,20 +119,6 @@
         }
 
         .left-sidebar:hover .search-input {
-            opacity: 1;
-        }
-        
-        /* Ensure navigation icons are always visible in collapsed state */
-        .sidebar-item {
-            justify-content: center;
-        }
-        .left-sidebar:hover .sidebar-item {
-            justify-content: flex-start;
-        }
-        .sidebar-item .sidebar-label {
-            opacity: 0;
-        }
-        .left-sidebar:hover .sidebar-item .sidebar-label {
             opacity: 1;
         }
     </style>
@@ -142,11 +141,12 @@
             </div>
 
             <!-- Search Bar -->
-            <div class="flex items-center space-x-2 bg-gray-700 rounded-full px-4 py-2 mb-8 transition-all duration-300 ease-in-out group-hover:w-full">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input type="text" id="main-search-input" placeholder="Search..." class="search-input bg-transparent text-gray-100 focus:outline-none placeholder-gray-400 flex-grow" oninput="performGlobalSearch(this.value)">
+            <!-- Moved and redesigned search bar in the top bar -->
+            <div class="top-nav">
+                <div class="nav-search-container">
+                    <input type="text" id="top-search-input" placeholder="Search..." class="nav-search-input bg-gray-700 text-gray-100 placeholder-gray-400 rounded-full px-4 py-2 w-full focus:ring-2 focus:ring-orange-500" />
+                    <button onclick="document.getElementById('top-search-input').value=''" class="cancel-search-btn" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: gray; cursor: pointer;">✕</button>
+                </div>
             </div>
             <div id="search-results-dropdown" class="absolute left-0 top-32 w-full bg-gray-700 rounded-lg shadow-xl hidden"></div>
 
