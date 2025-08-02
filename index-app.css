@@ -1,74 +1,52 @@
-/* Enhanced CSS for CRM sections */
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    background-color: #f4f4f4;
+/* CRM Dashboard Styles Inspired by form-actions.css */
+/* Dark Theme Base */
+body, html {
+    background-color: #0f1419; /* Dark background */
+    color: #e4e7eb; /* Light text */
+    font-family: "Inter", sans-serif;
 }
-header {
-    background-color: #007bff;
-    color: #ffffff;
-    padding: 20px 0;
-    text-align: center;
+
+/* Accent Colors and Interactive Elements */
+button, .button {
+    background-color: #ff8c00; /* Vibrant accent color */
+    color: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
 }
-nav ul {
-    list-style-type: none;
-    padding: 0;
+
+button:hover, .button:hover {
+    background-color: #ffa500; /* Lighter accent for hover state */
 }
-nav ul li {
-    display: inline;
-    margin: 0 10px;
+
+input, select, textarea {
+    background-color: #2d3748; /* Dark input backgrounds */
+    color: #e4e7eb; /* Light text */
+    border: 2px solid #4a5568; /* Subtle borders */
+    padding: 10px;
+    border-radius: 8px;
 }
-nav ul li a {
-    color: #ffffff;
-    text-decoration: none;
+
+input:focus, select:focus, textarea:focus {
+    border-color: #ff8c00; /* Accent color for focus state */
+    outline: none;
 }
-main {
-    padding: 20px;
+
+/* Navigation and Layout */
+.navbar, .sidebar {
+    background-color: #1a202c; /* Darker shade for navbar/sidebar */
+    border-right: 1px solid #2d3748;
 }
-section {
-    background-color: #ffffff;
-    margin-bottom: 20px;
-    padding: 20px;
-    border-radius: 5px;
+
+.nav-link, .sidebar-link {
+    color: #cbd5e0; /* Lighter text for better readability */
+    transition: color 0.3s ease;
 }
-footer {
-    background-color: #333;
-    color: #ffffff;
-    text-align: center;
-    padding: 10px 0;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
+
+.nav-link:hover, .sidebar-link:hover {
+    color: #ff8c00; /* Accent color for hover state */
 }
-header {
-    background-color: #007bff;
-    color: #ffffff;
-    padding: 20px 0;
-    text-align: center;
-}
-nav ul {
-    list-style-type: none;
-    padding: 0;
-}
-nav ul li {
-    display: inline;
-    margin: 0 10px;
-}
-nav ul li a {
-    color: #ffffff;
-    text-decoration: none;
-}
-main {
-    padding: 20px;
-}
-footer {
-    background-color: #333;
-    color: #ffffff;
-    text-align: center;
-    padding: 10px 0;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-}
+
+/* Additional styles can be adapted and expanded upon from form-actions.css */
