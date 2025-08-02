@@ -132,7 +132,7 @@
             border-radius: 4px;
             margin: 0 0 2px 0;
             object-fit: contain;
-            background: rgba(107, 114, 128, 0.1);
+            background: rgba(255, 255, 255, 0.9);
             padding: 3px;
             transition: all .3s ease;
             display: flex;
@@ -147,7 +147,7 @@
             color: #a0aec0;
             margin: 0 0 2px 0;
             transition: color .3s ease;
-            background: rgba(160, 174, 192, 0.1);
+            background: rgba(255, 255, 255, 0.9);
             border-radius: 4px;
             padding: 3px;
             display: flex;
@@ -349,7 +349,7 @@
 
         /* Primary Button Styling */
         .primary-btn, .action-btn {
-            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
             border: none;
             padding: 12px 20px;
@@ -366,7 +366,7 @@
         }
 
         .primary-btn:hover, .action-btn:hover {
-            background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
             transform: translateY(-1px);
         }
 
@@ -442,28 +442,25 @@
 
         /* Quick Actions Layout */
         .quick-actions-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            grid-template-rows: auto auto;
+            display: flex;
+            flex-direction: column;
             gap: 12px;
             margin-bottom: 16px;
         }
 
         .quick-action-main {
-            grid-column: 1;
-            grid-row: 1;
+            width: 100%;
             padding: 16px 20px;
         }
 
         .quick-actions-secondary {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            display: flex;
             gap: 8px;
-            grid-column: 1;
-            grid-row: 2;
+            width: 100%;
         }
 
         .quick-action-item {
+            flex: 1;
             padding: 10px 12px;
             font-size: .8rem;
         }
@@ -1216,12 +1213,23 @@
             gap: 12px;
             justify-content: center;
             box-shadow: 0 8px 24px rgba(34,197,94,.25);
+            position: relative;
         }
 
         .dial-button:hover {
             background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
             transform: translateY(-3px);
             box-shadow: 0 12px 32px rgba(34,197,94,.35);
+        }
+
+        .dial-button.ringing {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
 
         .dial-button svg {
@@ -2322,12 +2330,35 @@
         }
 
         function handleDialClick() {
+            const dialButton = document.querySelector('.dial-button');
+            
             if (currentProspect.phone) {
                 showToast(`Dialing ${currentProspect.phone}...`, 'info');
             } else {
                 showToast('No phone number available for this prospect. Manual dialing is required.', 'info');
             }
-            selectResponse('dialing');
+            
+            // Add ringing animation
+            if (dialButton) {
+                dialButton.classList.add('ringing');
+                dialButton.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02L6.62 10.79z"/>
+                    </svg>
+                    Ringing...
+                `;
+                
+                // After 3 seconds, proceed to next step
+                setTimeout(() => {
+                    dialButton.classList.remove('ringing');
+                    selectResponse('dialing');
+                }, 3000);
+            } else {
+                // Fallback if button not found
+                setTimeout(() => {
+                    selectResponse('dialing');
+                }, 3000);
+            }
         }
 
         function selectResponse(nextStep, action) {
