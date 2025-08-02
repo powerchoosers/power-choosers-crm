@@ -1249,6 +1249,23 @@
             font-family: inherit;
         }
 
+        /* White text and arrow for select dropdowns */
+        .form-group select {
+            color: #ffffff;
+            background-color: #2d3748;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 8px center;
+            background-repeat: no-repeat;
+            background-size: 16px 12px;
+            padding-right: 40px;
+            appearance: none;
+        }
+
+        .form-group select option {
+            color: #ffffff;
+            background-color: #2d3748;
+        }
+
         .form-group input:focus,
         .form-group select:focus,
         .form-group textarea:focus {
@@ -2721,7 +2738,7 @@
                 <div class="nav-search-results" id="nav-search-results"></div>
             </div>
             <div class="nav-icons-center">
-                <h1 id="page-title" style="color: #ffffff; font-size: 1.2rem; font-weight: 600;">Power Choosers CRM</h1>
+                <h1 id="page-title" style="color: #ffffff; font-size: 1.2rem; font-weight: 600; margin-right: 20px;">Power Choosers CRM</h1>
             </div>
         </div>
     </div>
@@ -2998,8 +3015,7 @@
                         <div class="card-header-with-actions">
                             <h3 class="card-title">📋 Company Summary</h3>
                             <div class="summary-actions">
-                                <button class="secondary-btn" id="import-summary-btn">📁 Import CSV</button>
-                                <button class="secondary-btn" id="edit-summary-btn">✏️ Edit</button>
+                                <button class="primary-btn" id="edit-summary-btn" style="background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%); color: white;">📝 Edit</button>
                             </div>
                         </div>
                         <div class="company-summary-container">
@@ -3040,21 +3056,12 @@
                                 <input type="text" id="contract-provider" placeholder="Enter provider name">
                             </div>
                             <div class="input-group">
-                                <label for="contract-rate">Current Rate:</label>
-                                <input type="text" id="contract-rate" placeholder="e.g. 12.5¢/kWh">
+                                <label for="contract-rate">Current Rate ($/kWh):</label>
+                                <input type="number" id="contract-rate" placeholder="e.g. 0.125" step="0.001">
                             </div>
                             <div class="input-group">
                                 <label for="contract-expiration">Contract Expiration:</label>
                                 <input type="date" id="contract-expiration">
-                            </div>
-                            <div class="input-group">
-                                <label for="contract-type">Contract Type:</label>
-                                <select id="contract-type">
-                                    <option value="">Select type</option>
-                                    <option value="fixed">Fixed Rate</option>
-                                    <option value="variable">Variable Rate</option>
-                                    <option value="indexed">Indexed Rate</option>
-                                </select>
                             </div>
                             <div class="input-group">
                                 <label for="annual-kwh">Annual kWh Usage:</label>
@@ -3063,6 +3070,19 @@
                             <div class="input-group">
                                 <label for="monthly-bill">Monthly Bill ($):</label>
                                 <input type="number" id="monthly-bill" placeholder="e.g. 1450" step="0.01">
+                            </div>
+                            <div class="input-group">
+                                <label for="sell-rate">Our Sell Rate ($/kWh):</label>
+                                <input type="number" id="sell-rate" placeholder="e.g. 0.07" step="0.001">
+                            </div>
+                            <div class="input-group">
+                                <label for="contract-type">Contract Type:</label>
+                                <select id="contract-type" style="color: white;">
+                                    <option value="">Select type</option>
+                                    <option value="fixed">Fixed Rate</option>
+                                    <option value="variable">Variable Rate</option>
+                                    <option value="indexed">Indexed Rate</option>
+                                </select>
                             </div>
                             <button class="primary-btn" type="submit">Save Contract Info</button>
                         </form>
@@ -4709,15 +4729,19 @@
             
             // Populate contract form with new fields
             const contractFields = [
-                'contract-provider', 'contract-rate', 'contract-expiration',
-                'contract-type', 'annual-kwh', 'monthly-bill'
+                { id: 'contract-provider', key: 'contractProvider' },
+                { id: 'contract-rate', key: 'contractrate' },
+                { id: 'contract-expiration', key: 'contractExpiration' },
+                { id: 'contract-type', key: 'contractType' },
+                { id: 'annual-kwh', key: 'annualkWh' },
+                { id: 'monthly-bill', key: 'monthlybill' },
+                { id: 'sell-rate', key: 'sellrate' }
             ];
             
-            contractFields.forEach(id => {
-                const element = gId(id);
+            contractFields.forEach(field => {
+                const element = gId(field.id);
                 if (element) {
-                    const key = id.replace('-', '').replace('kwh', 'kWh');
-                    element.value = account[key] || '';
+                    element.value = account[field.key] || '';
                 }
             });
 
@@ -4747,7 +4771,7 @@
             const calculatorContainer = gId('energy-calculator-container');
             if (!calculatorContainer) return;
 
-            const hasData = account.contractrate && account.annualkWh && account.monthlybill;
+            const hasData = account.contractrate && account.annualkWh && account.monthlybill && account.sellrate;
             
             calculatorContainer.innerHTML = `
                 <div class="calculator-container">
@@ -4768,10 +4792,18 @@
                     </div>
                     
                     <div class="calc-input-group">
-                        <label class="calc-input-label">Current Rate (¢/kWh)</label>
+                        <label class="calc-input-label">Current Rate ($/kWh)</label>
                         <input type="number" class="calc-form-input" id="calc-current-rate"
-                               placeholder="e.g., 6.2" step="0.001"
-                               value="${account.contractrate ? parseFloat(account.contractrate) : ''}"
+                               placeholder="e.g., 0.062" step="0.001"
+                               value="${account.contractrate || ''}"
+                               oninput="updateCalculator()">
+                    </div>
+                    
+                    <div class="calc-input-group">
+                        <label class="calc-input-label">Our Sell Rate ($/kWh)</label>
+                        <input type="number" class="calc-form-input" id="calc-sell-rate"
+                               placeholder="e.g., 0.07" step="0.001"
+                               value="${account.sellrate || ''}"
                                oninput="updateCalculator()">
                     </div>
                     
@@ -4805,6 +4837,7 @@
         function updateCalculator() {
             const monthlyBill = parseFloat(gId('calc-monthly-bill').value) || 0;
             const currentRate = parseFloat(gId('calc-current-rate').value) || 0;
+            const sellRate = parseFloat(gId('calc-sell-rate').value) || 0;
             const annualKwh = parseFloat(gId('calc-annual-kwh').value) || 0;
             const calcBtn = gId('calc-btn');
             const progress = gId('calc-progress');
@@ -4812,12 +4845,13 @@
             let completedFields = 0;
             if (monthlyBill > 0) completedFields++;
             if (currentRate > 0) completedFields++;
+            if (sellRate > 0) completedFields++;
             if (annualKwh > 0) completedFields++;
             
-            const progressPercent = (completedFields / 3) * 100;
+            const progressPercent = (completedFields / 4) * 100;
             progress.style.width = progressPercent + '%';
             
-            if (completedFields === 3) {
+            if (completedFields === 4) {
                 calcBtn.disabled = false;
                 calcBtn.textContent = 'Calculate Savings';
             } else {
@@ -4826,13 +4860,37 @@
             }
         }
 
-        function performEnergyCalculation() {
+        async function performEnergyCalculation() {
             const monthlyBill = parseFloat(gId('calc-monthly-bill').value);
             const currentRate = parseFloat(gId('calc-current-rate').value);
+            const sellRate = parseFloat(gId('calc-sell-rate').value);
             const annualKwh = parseFloat(gId('calc-annual-kwh').value);
             const resultsDiv = gId('calc-results');
             
-            if (!monthlyBill || !currentRate || !annualKwh) return;
+            if (!monthlyBill || !currentRate || !sellRate || !annualKwh) return;
+
+            // Auto-save calculator data to account
+            if (CRMApp.currentAccount) {
+                try {
+                    await db.collection('accounts').doc(CRMApp.currentAccount.id).update({
+                        contractrate: currentRate,
+                        sellrate: sellRate,
+                        annualkWh: annualKwh,
+                        monthlybill: monthlyBill,
+                        updatedAt: serverTimestamp()
+                    });
+                    
+                    // Update current account object
+                    Object.assign(CRMApp.currentAccount, {
+                        contractrate: currentRate,
+                        sellrate: sellRate,
+                        annualkWh: annualKwh,
+                        monthlybill: monthlyBill
+                    });
+                } catch (error) {
+                    console.error('Error auto-saving calculator data:', error);
+                }
+            }
 
             // Show loading animation
             resultsDiv.innerHTML = `
@@ -4848,12 +4906,12 @@
 
             // Simulate calculation delay for animation
             setTimeout(() => {
-                const ESTIMATED_DELIVERY_CHARGE = 5.0; // cents/kWh
-                const TARGET_ALL_IN_RATE = 12.8; // cents/kWh
-                
+                const ESTIMATED_DELIVERY_CHARGE = 0.05; // $0.05/kWh
+                const ourAllInRate = sellRate + ESTIMATED_DELIVERY_CHARGE;
                 const currentAllInRate = currentRate + ESTIMATED_DELIVERY_CHARGE;
+                
                 const annualCurrentCost = monthlyBill * 12;
-                const annualProjectedCost = (annualKwh * TARGET_ALL_IN_RATE) / 100;
+                const annualProjectedCost = annualKwh * ourAllInRate;
                 const annualSavings = annualCurrentCost - annualProjectedCost;
                 const percentageChange = (annualSavings / annualCurrentCost) * 100;
                 
@@ -4864,15 +4922,15 @@
                 if (annualSavings > (annualCurrentCost * 0.005)) {
                     resultClass = 'savings';
                     resultLabel = 'Potential Annual Savings';
-                    resultDescription = `You could save ${Math.abs(percentageChange).toFixed(1)}% annually with optimized rates!`;
+                    resultDescription = `You could save ${Math.abs(percentageChange).toFixed(1)}% annually with our rates!`;
                 } else if (annualSavings < -(annualCurrentCost * 0.005)) {
                     resultClass = 'increase';
-                    resultLabel = 'Projected Rate Increase Risk';
-                    resultDescription = `Your current rate is below market. Potential ${Math.abs(percentageChange).toFixed(1)}% increase at renewal.`;
+                    resultLabel = 'Projected Cost Increase';
+                    resultDescription = `Our rate would increase costs by ${Math.abs(percentageChange).toFixed(1)}% annually.`;
                 } else {
                     resultClass = 'neutral';
                     resultLabel = 'Competitive Rate Position';
-                    resultDescription = 'Your current rate is competitive with market conditions.';
+                    resultDescription = 'Our rate is competitive with your current costs.';
                 }
                 
                 resultsDiv.innerHTML = `
@@ -4885,7 +4943,7 @@
                     </div>
                     <div style="font-size: 0.8rem; color: #9ca3af; text-align: center; margin-top: 12px;">
                         Based on current usage: ${annualKwh.toLocaleString()} kWh/year<br>
-                        Current all-in rate: ${currentAllInRate.toFixed(2)}¢/kWh
+                        Current all-in rate: $${currentAllInRate.toFixed(3)}/kWh | Our all-in rate: $${ourAllInRate.toFixed(3)}/kWh
                     </div>
                 `;
             }, 2000);
@@ -5066,8 +5124,7 @@
                 { id: 'bulk-import-btn', event: 'click', handler: handleBulkImport },
                 { id: 'edit-summary-btn', event: 'click', handler: toggleSummaryEditor },
                 { id: 'save-summary-btn', event: 'click', handler: saveSummary },
-                { id: 'cancel-summary-btn', event: 'click', handler: cancelSummaryEdit },
-                { id: 'import-summary-btn', event: 'click', handler: importSummaryFromCSV }
+                { id: 'cancel-summary-btn', event: 'click', handler: cancelSummaryEdit }
             ];
 
             handlers.forEach(({ id, event, handler }) => {
@@ -5191,11 +5248,12 @@
             showLoading(true);
             const contractData = {
                 contractProvider: gId('contract-provider').value,
-                contractRate: gId('contract-rate').value,
+                contractrate: gId('contract-rate').value,
                 contractExpiration: gId('contract-expiration').value,
                 contractType: gId('contract-type').value,
                 annualkWh: gId('annual-kwh').value,
                 monthlybill: gId('monthly-bill').value,
+                sellrate: gId('sell-rate').value,
                 updatedAt: serverTimestamp()
             };
             
