@@ -1740,15 +1740,16 @@
         }
 
         .input-group input.editable-locked {
-            background: #f8fafc;
-            color: #1a202c;
+            background: #2d3748;
+            color: #ffffff;
             cursor: not-allowed;
+            border-color: #4a5568;
         }
 
         .input-group input.editable-locked:focus {
-            background: #f8fafc;
-            color: #1a202c;
-            border-color: #cbd5e0;
+            background: #2d3748;
+            color: #ffffff;
+            border-color: #4a5568;
             box-shadow: none;
             transform: none;
         }
@@ -2231,7 +2232,7 @@
                 <div class="sidebar-item" id="sidebar-contacts" data-view="contacts">
                     <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                        <path d="M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>
+                        <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>
                     </svg>
                     <span class="sidebar-label">Contacts</span>
                 </div>
@@ -2894,6 +2895,14 @@
                     { text: "🚫 No Answer", next: "voicemail_or_hangup" }
                 ]
             },
+            voicemail_or_hangup: {
+                you: "Call ended - No answer received.",
+                mood: "neutral",
+                responses: [
+                    { text: "📧 Leave Voicemail", next: "voicemail" },
+                    { text: "🔄 Start New Call", next: "start" }
+                ]
+            },
             hook: {
                 you: "Hi, is this <strong>[N]</strong>?",
                 mood: "neutral",
@@ -3063,7 +3072,14 @@
             let newText = text;
             for (const key in placeholders) {
                 const regex = new RegExp('\\[' + key + '\\]', 'g');
-                newText = newText.replace(regex, placeholders[key]);
+                let replacement = placeholders[key];
+                
+                // For name placeholder, use only first name
+                if (key === 'N' && replacement) {
+                    replacement = replacement.split(' ')[0];
+                }
+                
+                newText = newText.replace(regex, replacement);
             }
             return newText;
         }
