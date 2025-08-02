@@ -2396,10 +2396,24 @@
         <div class="search-container">
             <div class="search-label" id="search-label">Search:</div>
             <div class="search-type-indicator" id="search-type-indicator" style="display: none; position: absolute; top: -5px; right: 60px; background: rgba(255, 140, 0, 0.9); color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; z-index: 10;"></div>
-            <input type="text" class="search-input" id="search-input" placeholder="Type to search...">
-            <input type="text" class="search-input city" id="search-city" placeholder="City" style="display:none">
-            <input type="text" class="search-input state" id="search-state" placeholder="State" style="display:none">
-            <input type="text" class="search-input location" id="search-location" placeholder="Location (e.g. Fort Worth, TX)" style="display:none">
+            
+            <!-- Multi-row search form for external tools -->
+            <div class="search-form" id="search-form">
+                <!-- Row 1: Primary fields -->
+                <div class="search-row">
+                    <input type="text" class="search-input" id="search-input" placeholder="Type to search...">
+                    <input type="text" class="search-input" id="search-city" placeholder="City" style="display:none">
+                    <input type="text" class="search-input" id="search-state" placeholder="State" style="display:none">
+                </div>
+                
+                <!-- Row 2: Additional fields for Apollo -->
+                <div class="search-row" id="search-row-2" style="display:none;">
+                    <input type="text" class="search-input" id="search-company" placeholder="Company" style="display:none">
+                    <input type="text" class="search-input" id="search-industry" placeholder="Industry" style="display:none">
+                    <input type="text" class="search-input" id="search-keyword" placeholder="Keywords" style="display:none">
+                </div>
+            </div>
+            
             <div class="search-actions">
                 <button class="search-btn" onclick="performSearch()">Go</button>
                 <button class="search-btn close" onclick="closeSearch()">✕</button>
@@ -3377,29 +3391,12 @@
 
         // Search Functions
         function setupSearchFunctionality() {
-            const searchButtons = ['google-button', 'maps-button', 'apollo-button', 'beenverified-button'];
-            searchButtons.forEach(btnId => {
-                const btn = gId(btnId);
-                if (btn) {
-                    const type = btnId.replace('-button', '');
-                    btn.addEventListener('click', (e) => openSearch(type, e));
-                }
-            });
+            // External search buttons are handled in setupNavigation()
+            // This function now focuses on search input functionality
 
-            ['accounts-btn', 'contacts-btn'].forEach(btnId => {
-                const btn = gId(btnId);
-                if (btn) {
-                    btn.addEventListener('click', (e) => {
-                        if (e.ctrlKey || e.metaKey) {
-                            const type = btnId.replace('-btn', '');
-                            openSearch(type, e);
-                            e.preventDefault();
-                        }
-                    });
-                }
-            });
+            // Search input functionality
 
-            ['search-input', 'search-city', 'search-state', 'search-company', 'search-title', 'search-keywords', 'search-location'].forEach(id => {
+            ['search-input', 'search-city', 'search-state', 'search-company', 'search-industry', 'search-keyword'].forEach(id => {
                 const input = gId(id);
                 if (input) {
                     input.addEventListener('keypress', function(e) {
@@ -3417,19 +3414,30 @@
         }
 
         function openSearch(type, event) {
-            const button = event.target.closest('.app-button');
-            const searchBar = gId('search-bar');
-            const mainContainer = gId('main-container');
+            try {
+                const button = event.target.closest('.app-button') || event.target.closest('.sidebar-item');
+                const searchBar = gId('search-bar');
+                const mainContainer = gId('main-container');
 
-            if (currentSearchType === type && activeButton === button) {
-                closeSearch();
+                if (!searchBar || !mainContainer) {
+                    showToast('Search interface not available', 'error');
+                    return;
+                }
+
+                if (currentSearchType === type && activeButton === button) {
+                    closeSearch();
+                    return;
+                }
+                
+                if (activeButton) activeButton.classList.remove('active');
+                currentSearchType = type;
+                activeButton = button;
+                if (button) button.classList.add('active');
+            } catch (error) {
+                console.error('Error opening search:', error);
+                showToast('Error opening search interface', 'error');
                 return;
             }
-            
-            if (activeButton) activeButton.classList.remove('active');
-            currentSearchType = type;
-            activeButton = button;
-            button.classList.add('active');
             
             const label = gId('search-label');
             const input = gId('search-input');
@@ -3448,8 +3456,18 @@
             const searchConfigs = {
                 google: { label: 'Search Google:', placeholder: 'Type your search query...' },
                 maps: { label: 'Search Maps:', placeholder: 'Search places, addresses, businesses...' },
-                beenverified: { label: 'Search BeenVerified:', placeholder: 'Enter full name (e.g. John Smith)...', extras: [cityInput, stateInput] },
-                apollo: { label: 'Search Apollo:', placeholder: 'Enter name (e.g. Lewis Patterson)...', extras: [locationInput] },
+                beenverified: {
+                    label: 'Search BeenVerified:',
+                    placeholder: 'Enter full name (e.g. John Smith)...',
+                    extras: [cityInput, stateInput],
+                    showRow2: false
+                },
+                apollo: {
+                    label: 'Search Apollo:',
+                    placeholder: 'Enter name (e.g. Lewis Patterson)...',
+                    extras: [gId('search-company'), gId('search-industry'), gId('search-keyword')],
+                    showRow2: true
+                },
                 accounts: { label: 'Search Accounts:', placeholder: 'Type to search accounts...', showResults: true },
                 contacts: { label: 'Search Contacts:', placeholder: 'Type to search contacts...', showResults: true }
             };
@@ -3458,6 +3476,13 @@
             if (config) {
                 label.textContent = config.label;
                 input.placeholder = config.placeholder;
+                
+                // Show/hide row 2 for Apollo
+                const row2 = gId('search-row-2');
+                if (row2) {
+                    row2.style.display = config.showRow2 ? 'flex' : 'none';
+                }
+                
                 if (config.extras) {
                     config.extras.forEach(inp => {
                         if (inp) inp.style.display = 'block';
@@ -3583,85 +3608,101 @@
         }
 
         function performSearch() {
-            const query = gId('search-input').value.trim();
-            if (!query && currentSearchType !== 'apollo') return;
-            
-            if (currentSearchType === 'accounts' || currentSearchType === 'contacts') return;
-            
-            const searchUrls = {
+            try {
+                const searchInput = gId('search-input');
+                if (!searchInput) {
+                    showToast('Search input not found', 'error');
+                    return;
+                }
+
+                const query = searchInput.value.trim();
+                
+                if (!query) {
+                    showToast('Please enter a search query', 'warning');
+                    return;
+                }
+                
+                if (currentSearchType === 'accounts' || currentSearchType === 'contacts') return;
+                
+                const searchUrls = {
                 google: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
                 maps: `https://www.google.com/maps/search/${encodeURIComponent(query)}`,
+                
                 apollo: (() => {
                     const name = query;
                     const city = gId('search-city').value.trim();
                     const state = gId('search-state').value.trim();
                     const company = gId('search-company').value.trim();
-                    const title = gId('search-title').value.trim();
-                    const keywords = gId('search-keywords').value.trim();
-                    const location = gId('search-location').value.trim();
+                    const industry = gId('search-industry').value.trim();
+                    const keyword = gId('search-keyword').value.trim();
                     
-                    let url = 'https://app.apollo.io/#/';
+                    // Default to companies search as shown in your example
+                    let url = 'https://app.apollo.io/#/companies?';
                     let params = new URLSearchParams();
                     
-                    // Determine if searching for people or companies
-                    if (name || title || keywords) {
-                        url += 'people';
-                        params.append('page', '1');
-                        params.append('sortByField', '[none]');
-                        params.append('sortAscending', 'false');
-                        
-                        if (name) {
-                            params.append('qKeywords', name);
-                        }
-                        if (title) {
-                            params.append('personTitles[]', title);
-                        }
-                        if (keywords) {
-                            const existingKeywords = params.get('qKeywords') || '';
-                            params.set('qKeywords', existingKeywords ? `${existingKeywords} ${keywords}` : keywords);
-                        }
-                        if (location || (city && state)) {
-                            const loc = location || `${city}, ${state}`.replace(/^,\s*|,\s*$/g, '');
-                            if (loc) params.append('personLocations[]', loc);
-                        }
-                        if (company) {
-                            params.append('organizationNames[]', company);
-                        }
-                    } else if (company) {
-                        url += 'companies';
-                        params.append('page', '1');
-                        params.append('sortByField', '[none]');
-                        params.append('sortAscending', 'false');
-                        params.append('organizationNames[]', company);
-                        
-                        if (location || (city && state)) {
-                            const loc = location || `${city}, ${state}`.replace(/^,\s*|,\s*$/g, '');
-                            if (loc) params.append('organizationLocations[]', loc);
-                        }
-                    } else {
-                        // Default to people search
-                        url += 'people';
-                        params.append('page', '1');
-                        params.append('sortByField', '[none]');
-                        params.append('sortAscending', 'false');
+                    // Add standard parameters
+                    params.append('sortAscending', 'false');
+                    params.append('sortByField', '[none]');
+                    params.append('page', '1');
+                    
+                    // Add organization name if provided
+                    if (name || company) {
+                        params.append('qOrganizationName', name || company);
                     }
                     
-                    return `${url}?${params.toString()}`;
+                    // Add location (state, city format like "Texas, US")
+                    if (state) {
+                        const location = city ? `${city}, ${state}, US` : `${state}, US`;
+                        params.append('organizationLocations[]', location);
+                    }
+                    
+                    // Add industry keywords
+                    if (industry || keyword) {
+                        const keywords = [industry, keyword].filter(k => k).join(' ');
+                        params.append('qOrganizationKeywordTags[]', keywords);
+                    }
+                    
+                    return url + params.toString();
                 })(),
+                
                 beenverified: (() => {
+                    const fullName = query;
                     const city = gId('search-city').value.trim();
                     const state = gId('search-state').value.trim().toUpperCase();
-                    const nameParts = query.split(' ');
+                    
+                    // Parse name into first and last
+                    const nameParts = fullName.split(' ');
                     const firstName = nameParts[0] || '';
                     const lastName = nameParts.slice(1).join(' ') || '';
                     
+                    // Build URL exactly like your example
                     const params = new URLSearchParams();
                     params.append('age', '0');
-                    params.append('fullname', query);
+                    params.append('city', city);
+                    params.append('fullname', fullName);
                     params.append('fname', firstName);
                     params.append('ln', lastName);
-                    params.append('city', city);
+                    params.append('mn', ''); // middle name empty
                     params.append('state', state);
+                    params.append('title', '');
+                    params.append('company', '');
+                    params.append('industry', '');
+                    params.append('level', '');
+                    params.append('companySizeMin', '1');
+                    params.append('companSizeMax', '9');
+                    params.append('birthMonth', '');
+                    params.append('birthYear', '');
+                    params.append('deathMonth', '');
+                    params.append('deathYear', '');
+                    params.append('address', '');
+                    params.append('isDeceased', 'false');
+                    params.append('location', '');
+                    params.append('country', '');
+                    params.append('advancedSearch', 'true');
+                    params.append('eventType', 'none');
+                    params.append('eventMonth', '');
+                    params.append('eventYear', '');
+                    params.append('source', 'personSearch,familySearch,obituarySearch,deathIndexSearch,contactSearch');
                     
                     return `https://www.beenverified.com/rf/search/v2?${params.toString()}`;
                 })()
@@ -3669,8 +3710,20 @@
             
             const searchUrl = searchUrls[currentSearchType];
             if (searchUrl) {
-                window.open(searchUrl, '_blank');
-                closeSearch();
+                try {
+                    window.open(searchUrl, '_blank');
+                    showToast(`Opening ${currentSearchType} search in new tab`, 'info');
+                    closeSearch();
+                } catch (error) {
+                    console.error('Error opening search URL:', error);
+                    showToast('Error opening search. Please check your popup blocker settings.', 'error');
+                }
+            } else {
+                showToast('Search type not supported', 'error');
+            }
+            } catch (error) {
+                console.error('Error performing search:', error);
+                showToast('Error performing search', 'error');
             }
         }
 
@@ -3726,6 +3779,7 @@
                 if (element) {
                     element.addEventListener('click', (e) => {
                         e.preventDefault();
+                        e.stopPropagation();
                         openSearch(tool.type, e);
                     });
                 }
