@@ -1519,8 +1519,8 @@
             background: #2d3748;
             border-radius: 12px;
             margin-bottom: 20px;
-            min-height: 150px;
-            max-height: 300px;
+            min-height: 250px;
+            max-height: 400px;
             border-left: 4px solid #4a5568;
             flex-grow: 1;
             overflow-y: auto;
@@ -1570,7 +1570,11 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .responses-grid.single-button {
+            grid-template-columns: 1fr;
         }
 
         @media (max-width: 1200px) {
@@ -1647,6 +1651,7 @@
             display: flex;
             gap: 12px;
             justify-content: center;
+            margin-bottom: 30px;
         }
 
         .nav-btn {
@@ -1734,8 +1739,18 @@
             transform: scale(1.01);
         }
 
+        .input-group input.editable-locked {
+            background: #f8fafc;
+            color: #1a202c;
+            cursor: not-allowed;
+        }
+
         .input-group input.editable-locked:focus {
-            background: #374151;
+            background: #f8fafc;
+            color: #1a202c;
+            border-color: #cbd5e0;
+            box-shadow: none;
+            transform: none;
         }
 
         #call-notes {
@@ -2014,7 +2029,7 @@
         }
 
         .sidebar-item.active .sidebar-label {
-            color: #ff8c00;
+            color: #ffffff;
             font-weight: 600;
         }
 
@@ -2216,9 +2231,7 @@
                 <div class="sidebar-item" id="sidebar-contacts" data-view="contacts">
                     <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="m22 21-3-3"/>
-                        <circle cx="19" cy="17" r="3"/>
+                        <path d="M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>
                     </svg>
                     <span class="sidebar-label">Contacts</span>
                 </div>
@@ -2235,21 +2248,21 @@
                 <div class="sidebar-section-title">Search Tools</div>
                 <div class="sidebar-item" id="sidebar-search-accounts">
                     <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
                         <path d="M3 21h18"/>
                         <path d="M5 21V7l8-4v18"/>
                         <path d="M19 21V11l-6-4"/>
+                        <path d="M9 9v.01"/>
+                        <path d="M9 12v.01"/>
+                        <path d="M9 15v.01"/>
+                        <path d="M9 18v.01"/>
                     </svg>
                     <span class="sidebar-label">Search Accounts</span>
                 </div>
                 
                 <div class="sidebar-item" id="sidebar-search-contacts">
                     <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <path d="M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>
                     </svg>
                     <span class="sidebar-label">Search Contacts</span>
                 </div>
@@ -3082,6 +3095,7 @@
                         </button>
                     `;
                     responsesContainer.innerHTML = dialButtonHtml;
+                    responsesContainer.classList.add('single-button');
                 } else if (step.responses && step.responses.length > 0) {
                     step.responses.forEach(response => {
                         const button = document.createElement('button');
@@ -3164,7 +3178,9 @@
                     if (input) {
                         input.value = '';
                         input.disabled = false;
+                        input.classList.remove('editable-locked');
                         input.style.backgroundColor = '';
+                        input.style.color = '';
                         input.style.cursor = '';
                     }
                 });
