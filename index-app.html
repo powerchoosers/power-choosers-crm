@@ -441,11 +441,13 @@
         .main-container {
             margin-top: 80px;
             margin-left: 60px;
-            padding: 8px 15px;
+            padding: 4px 15px 0px 15px;
             flex-grow: 1;
             overflow: hidden;
             height: calc(100vh - 80px);
             transition: margin-left .3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #0f1419 !important;
+            min-height: calc(100vh - 80px);
         }
 
         .main-container.sidebar-expanded {
@@ -587,6 +589,7 @@
             gap: 30px;
             height: 100%;
             overflow: hidden;
+            background: #0f1419 !important;
         }
 
         .dashboard-main {
@@ -597,6 +600,8 @@
             padding-right: 8px;
             margin-right: -8px;
             height: 100%;
+            background: #0f1419 !important;
+            padding-bottom: 100px;
         }
 
         .dashboard-main::-webkit-scrollbar {width: 8px;}
@@ -611,6 +616,8 @@
             padding-right: 8px;
             margin-right: -8px;
             height: 100%;
+            background: #0f1419 !important;
+            padding-bottom: 100px;
         }
 
         .dashboard-sidebar::-webkit-scrollbar {width: 8px;}
@@ -2017,8 +2024,32 @@
         .account-detail-sidebar::after, .accounts-grid::after, .contacts-grid::after {
             content: '';
             display: block;
-            height: 50px;
-            background: #0f1419;
+            height: 300px;
+            background: #0f1419 !important;
+        }
+
+        /* Additional white background prevention */
+        body::after, html::after {
+            content: '';
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background: #0f1419 !important;
+            z-index: -1;
+        }
+
+        /* Ensure all possible containers have dark background */
+        .view-container, .dashboard-layout, .dashboard-main, .dashboard-sidebar,
+        .account-detail-layout, .account-detail-main, .account-detail-sidebar,
+        .container, .main-content, .sidebar, .accounts-grid, .contacts-grid {
+            background: #0f1419 !important;
+        }
+
+        /* Force minimum height on all scrollable containers */
+        .dashboard-main, .dashboard-sidebar, .account-detail-main, .account-detail-sidebar {
+            min-height: calc(100vh - 120px);
         }
 
         /* Override any potential white backgrounds in embedded content */
@@ -2030,6 +2061,21 @@
         body {
             background: #0f1419 !important;
             background-attachment: fixed;
+        }
+
+        /* Additional coverage for any remaining white areas */
+        .crm-card, .stat-card, .mini-stat-card, .chart-container {
+            background: #1a202c !important;
+        }
+
+        /* Ensure all containers have dark backgrounds */
+        .dashboard-layout, .view-container, .main-container {
+            background: #0f1419 !important;
+        }
+
+        /* Force scrollable areas to have extra padding and dark background */
+        .dashboard-main, .dashboard-sidebar {
+            background: linear-gradient(to bottom, #0f1419 0%, #0f1419 100%) !important;
         }
     </style>
     </head>
