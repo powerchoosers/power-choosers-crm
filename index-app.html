@@ -3,42 +3,558 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRM Dashboard</title>
-    <link rel="stylesheet" href="index-app.css">
-    <script src="index-app.js" defer></script>
+    <title>Power Choosers CRM</title>
+    <!-- Load Tailwind CSS for a modern, responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #1A438D;
+            --secondary-color: #2563EB;
+            --accent-color: #F7921F;
+            --bg-dark: #0f1419;
+            --bg-card: #1e2531;
+            --text-light: #e4e7eb;
+            --text-secondary: #a0a4a8;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .view-container {
+            display: none;
+        }
+
+        .view-container.active {
+            display: block;
+        }
+
+        /* Custom scrollbar styles */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: var(--bg-card);
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 4px;
+        }
+        
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: var(--text-secondary);
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        
+        .sidebar-item:hover {
+            background-color: #2c3545;
+            color: var(--text-light);
+        }
+
+        .sidebar-icon {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-label {
+            margin-left: 1rem;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .left-sidebar:hover .sidebar-label {
+            opacity: 1;
+        }
+
+        .left-sidebar {
+            width: 6rem;
+            transition: width 0.3s ease-in-out;
+        }
+
+        .left-sidebar:hover {
+            width: 16rem;
+        }
+
+        .left-sidebar:hover .search-input {
+            width: 100%;
+        }
+
+        .left-sidebar .search-input {
+            width: 0;
+            transition: width 0.3s ease-in-out;
+            opacity: 0;
+        }
+
+        .left-sidebar:hover .search-input {
+            opacity: 1;
+        }
+    </style>
 </head>
-<body>
-    <header>
-        <h1>CRM Dashboard</h1>
-        <nav>
-            <ul>
-                <li><a href="#dashboard">Dashboard</a></li>
-                <li><a href="#contacts">Contacts</a></li>
-                <li><a href="#interactions">Interactions</a></li>
-                <li><a href="#tasks">Tasks</a></li>
-            </ul>
-        </nav>
-    </header>
-    <main>
-        <section id="dashboard">
-            <h2>Dashboard Overview</h2>
-            <p>Summary of recent activities and metrics.</p>
-        </section>
-        <section id="contacts">
-            <h2>Contact Management</h2>
-            <p>Manage your contacts here.</p>
-        </section>
-        <section id="interactions">
-            <h2>Interaction Logs</h2>
-            <p>View and log interactions with contacts.</p>
-        </section>
-        <section id="tasks">
-            <h2>Task Scheduling</h2>
-            <p>Schedule and manage tasks.</p>
-        </section>
+<body class="flex bg-gray-900 text-gray-100">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Left Sidebar -->
+    <aside id="left-sidebar" class="group fixed h-full bg-gray-800 shadow-xl overflow-hidden hover:overflow-y-auto z-40 p-4 transition-all duration-300 ease-in-out custom-scrollbar">
+        <div class="flex flex-col h-full">
+            <!-- Logo -->
+            <div class="flex items-center justify-center h-20 mb-8 overflow-hidden">
+                <a href="https://www.powerchoosers.com/" target="_blank">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers Logo" class="h-12 transition-transform duration-300 ease-in-out group-hover:scale-110">
+                </a>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="flex items-center space-x-2 bg-gray-700 rounded-full px-4 py-2 mb-8 transition-all duration-300 ease-in-out group-hover:w-full">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input type="text" id="main-search-input" placeholder="Search..." class="search-input bg-transparent text-gray-100 focus:outline-none placeholder-gray-400 flex-grow" oninput="performGlobalSearch(this.value)">
+            </div>
+            <div id="search-results-dropdown" class="absolute left-0 top-32 w-full bg-gray-700 rounded-lg shadow-xl hidden"></div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-grow space-y-2">
+                <button onclick="showView('dashboard-view')" class="sidebar-item active">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span class="sidebar-label">Dashboard</span>
+                </button>
+                <button onclick="showView('contacts-view')" class="sidebar-item">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>
+                    <span class="sidebar-label">Contacts</span>
+                </button>
+                <button onclick="showView('accounts-view')" class="sidebar-item">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+                    <span class="sidebar-label">Accounts</span>
+                </button>
+                <button onclick="openCallsHub()" class="sidebar-item">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <span class="sidebar-label">Calls Hub</span>
+                </button>
+                <button onclick="showView('tasks-view')" class="sidebar-item">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    <span class="sidebar-label">Tasks</span>
+                </button>
+            </nav>
+
+            <!-- External Tools Section -->
+            <div class="mt-8">
+                <h3 class="sidebar-label text-sm font-semibold text-gray-500 uppercase mb-2 group-hover:opacity-100">External Tools</h3>
+                <div class="space-y-2">
+                    <button onclick="openExternalSearch('google')" class="sidebar-item">
+                        <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google" class="sidebar-icon">
+                        <span class="sidebar-label">Google Search</span>
+                    </button>
+                    <button onclick="openExternalSearch('maps')" class="sidebar-item">
+                        <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d3a0fa26096e1e359b89_google-map-icon.webp" alt="Google Maps" class="sidebar-icon">
+                        <span class="sidebar-label">Google Maps</span>
+                    </button>
+                    <button onclick="openExternalSearch('apollo')" class="sidebar-item">
+                        <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851d2771f4c6e42a09731_images.png" alt="Apollo" class="sidebar-icon">
+                        <span class="sidebar-label">Apollo.io</span>
+                    </button>
+                    <button onclick="openExternalSearch('beenverified')" class="sidebar-item">
+                        <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68885144c4bbad742f397a18_unnamed.png" alt="BeenVerified" class="sidebar-icon">
+                        <span class="sidebar-label">BeenVerified</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="ml-[6rem] p-8 flex-1 transition-all duration-300 ease-in-out overflow-hidden">
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view-container active h-full flex flex-col">
+            <header class="flex items-center justify-between mb-8">
+                <h1 class="text-4xl font-bold text-orange-500">Power Choosers CRM Dashboard</h1>
+            </header>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 overflow-y-auto custom-scrollbar pr-4">
+                <div class="lg:col-span-2 space-y-8">
+                    <!-- Dashboard Stats Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                            <h3 class="text-xl font-bold text-gray-100">Total Accounts</h3>
+                            <p class="text-4xl font-extrabold text-orange-500 mt-2" id="total-accounts-stat">0</p>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                            <h3 class="text-xl font-bold text-gray-100">Total Contacts</h3>
+                            <p class="text-4xl font-extrabold text-green-500 mt-2" id="total-contacts-stat">0</p>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                            <h3 class="text-xl font-bold text-gray-100">Recent Activities</h3>
+                            <p class="text-4xl font-extrabold text-blue-500 mt-2" id="recent-activities-stat">0</p>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                            <h3 class="text-xl font-bold text-gray-100">Hot Leads</h3>
+                            <p class="text-4xl font-extrabold text-red-500 mt-2" id="hot-leads-stat">0</p>
+                        </div>
+                    </div>
+                    <!-- Recent Activities Section -->
+                    <div id="recent-activities-list" class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                        <h3 class="text-2xl font-bold text-gray-100 mb-4">Recent Activities</h3>
+                        <p class="text-gray-400">No recent activities found.</p>
+                    </div>
+                </div>
+
+                <!-- Dashboard Right Sidebar -->
+                <div class="lg:col-span-1 space-y-8">
+                    <!-- Quick Actions -->
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                        <h3 class="text-2xl font-bold text-gray-100 mb-4">Quick Actions</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <button onclick="openCallsHub()" class="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition duration-200 ease-in-out">Go to Calls Hub</button>
+                            <button onclick="showView('contacts-view')" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition duration-200 ease-in-out">Add Contact</button>
+                        </div>
+                    </div>
+                    <!-- Today's Tasks -->
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                        <h3 class="text-2xl font-bold text-gray-100 mb-4">Today's Tasks</h3>
+                        <ul id="todays-tasks" class="space-y-4">
+                            <!-- Tasks will be dynamically populated here -->
+                            <li class="text-gray-400">No tasks for today.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contacts View -->
+        <div id="contacts-view" class="view-container h-full flex flex-col">
+            <header class="flex items-center justify-between mb-8">
+                <h1 class="text-4xl font-bold text-orange-500">Contact Management</h1>
+            </header>
+            <div id="contacts-list" class="flex-1 overflow-y-auto custom-scrollbar">
+                <p class="text-gray-400 p-4">No contacts found.</p>
+            </div>
+        </div>
+        
+        <!-- Accounts View -->
+        <div id="accounts-view" class="view-container h-full flex flex-col">
+            <header class="flex items-center justify-between mb-8">
+                <h1 class="text-4xl font-bold text-orange-500">Account Management</h1>
+            </header>
+            <div id="accounts-list" class="flex-1 overflow-y-auto custom-scrollbar">
+                <p class="text-gray-400 p-4">No accounts found.</p>
+            </div>
+        </div>
+
+        <!-- Calls Hub View -->
+        <div id="call-hub-view" class="view-container h-full flex flex-col">
+            <header class="flex items-center justify-between mb-8">
+                <h1 class="text-4xl font-bold text-orange-500">Calls Hub</h1>
+            </header>
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 overflow-y-auto custom-scrollbar pr-4">
+                <div class="lg:col-span-2 bg-gray-800 rounded-xl p-8 shadow-xl border border-gray-700 flex flex-col justify-between">
+                    <div id="script-display" class="bg-gray-900 rounded-lg p-6 text-xl leading-relaxed text-gray-200 min-h-[250px] mb-6 overflow-y-auto">
+                        Click 'Dial' to begin the call
+                    </div>
+                    <div id="responses-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Responses will be dynamically populated here -->
+                    </div>
+                    <div class="flex justify-center gap-4 mt-6">
+                        <button id="back-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-full shadow transition duration-200 ease-in-out">← Back</button>
+                        <button id="restart-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-full shadow transition duration-200 ease-in-out">🔄 Restart</button>
+                    </div>
+                </div>
+                <div class="lg:col-span-1 flex flex-col gap-8">
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                        <h3 class="text-2xl font-bold text-gray-100 mb-4">Prospect Info</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="input-company-name" class="block text-sm font-medium text-gray-400">Company Name:</label>
+                                <input type="text" id="input-company-name" placeholder="ABC Manufacturing" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500" oninput="updateScript()">
+                            </div>
+                            <div>
+                                <label for="input-name" class="block text-sm font-medium text-gray-400">Contact Name:</label>
+                                <input type="text" id="input-name" placeholder="John Smith" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500" oninput="updateScript()">
+                            </div>
+                            <div>
+                                <label for="input-title" class="block text-sm font-medium text-gray-400">Contact Title:</label>
+                                <input type="text" id="input-title" placeholder="Company Leader" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500" oninput="updateScript()">
+                            </div>
+                            <div>
+                                <label for="input-company-industry" class="block text-sm font-medium text-gray-400">Company Industry:</label>
+                                <input type="text" id="input-company-industry" placeholder="businesses" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500" oninput="updateScript()">
+                            </div>
+                            <div>
+                                <label for="input-benefit" class="block text-sm font-medium text-gray-400">Specific Benefit:</label>
+                                <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500" oninput="updateScript()">
+                            </div>
+                            <div>
+                                <label for="input-pain" class="block text-sm font-medium text-gray-400">Pain Point:</label>
+                                <input type="text" id="input-pain" placeholder="you're not stuck paying more" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500" oninput="updateScript()">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-md border border-gray-700">
+                        <h3 class="text-2xl font-bold text-gray-100 mb-4">Call Notes</h3>
+                        <textarea id="call-notes" placeholder="Type your call notes here..." class="mt-1 block w-full h-40 px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        <button onclick="saveProspectAndNotes()" class="w-full mt-4 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-full shadow-lg transition duration-200 ease-in-out">Add Notes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
-    <footer>
-        <p>© 2025 CRM Dashboard</p>
-    </footer>
+    
+    <script>
+        // CRM Application Logic
+        const CRMApp = {
+            currentView: 'dashboard-view',
+            accounts: [],
+            contacts: [],
+            activities: []
+        };
+        let currentProspect = {};
+        const gId = id => document.getElementById(id);
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
+            authDomain: "power-choosers-crm.firebaseapp.com",
+            projectId: "power-choosers-crm",
+            storageBucket: "power-choosers-crm.firebasestorage.app",
+            messagingSenderId: "792458658491",
+            appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
+            measurementId: "G-XEC3BFHJHW"
+        };
+        
+        // Initialize Firebase
+        let app, db;
+        let serverTimestamp;
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            db = app.firestore();
+            serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
+        } catch (e) {
+            console.error("Firebase initialization failed:", e);
+        }
+
+        // Placeholder map for dynamic text in the call script.
+        const placeholders = {
+            'N': '', 'YN': 'Lewis', 'CN': '', 'CI': '', 'SB': '', 'PP': '', 'CT': '', 'TIA': '',
+            'TE': '', 'DT': '', 'EAC': '', 'TF': '', 'OP': 'the responsible party', 'XX': '$XX.00/40%'
+        };
+        const inputMap = {
+            'input-name': 'N', 'input-title': 'CT', 'input-company-name': 'CN',
+            'input-company-industry': 'CI', 'input-benefit': 'SB', 'input-pain': 'PP'
+        };
+
+        // Script State and Data (simplified for this example)
+        let currentStep = 'start';
+        let history = [];
+        const scriptData = {
+            start: { you: "Click 'Dial' to begin the call", mood: "neutral", responses: [] },
+            dialing: { you: "Dialing... Ringing...", mood: "neutral", responses: [{ text: "📞 Call Connected", next: "main_script_start" }] },
+            main_script_start: { you: "Good afternoon, [N]! This is [YN] with Power Choosers. Is this a good time?", mood: "neutral", responses: [{ text: "✅ Yes, I have a minute", next: "pathA" }, { text: "❌ Not a good time", next: "callEnd" }] },
+            pathA: { you: "I'm calling about energy contracts for [CN]. Do you know when your contract expires?", mood: "neutral", responses: [{ text: "📅 Expires soon", next: "closeForAppointment" }, { text: "🤷 Not sure", next: "handleHesitation" }] },
+            closeForAppointment: { you: "Great! Our process is simple. We can do a quick energy health check. Would Friday or Monday work?", mood: "positive", responses: [{ text: "📅 Friday", next: "callSuccess" }, { text: "📅 Monday", next: "callSuccess" }] },
+            handleHesitation: { you: "No problem. I can send over a case study. What's the best email?", mood: "unsure", responses: [{ text: "📧 Send to my email", next: "callSuccess" }, { text: "❌ Not interested", next: "softClose" }] },
+            softClose: { you: "No problem at all. I'll add you to our market intelligence updates. Sound reasonable?", mood: "neutral", responses: [{ text: "✅ Yes, that works", next: "callSuccess" }, { text: "❌ No, thanks", next: "callEnd" }] },
+            callSuccess: { you: "🎉 Call Completed! Notes saved.", mood: "positive", responses: [{ text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }] },
+            callEnd: { you: "Thanks for your time. Have a great day!", mood: "neutral", responses: [{ text: "🔄 Start New Call", next: "start" }] }
+        };
+
+        function showLoading(show) {
+            const overlay = gId('loading-overlay');
+            if (overlay) overlay.classList.toggle('hidden', !show);
+        }
+
+        function showToast(message, type = 'success') {
+            // Placeholder for a toast notification function
+            console.log(message);
+        }
+
+        function updateScript() {
+            for (const inputId in inputMap) {
+                const placeholderKey = inputMap[inputId];
+                const inputElement = gId(inputId);
+                if (inputElement) {
+                    const inputValue = inputElement.value || inputElement.placeholder;
+                    placeholders[placeholderKey] = inputValue;
+                }
+            }
+            placeholders['TIA'] = placeholders['CI'];
+            displayCurrentStep();
+        }
+
+        function applyPlaceholders(text) {
+            let newText = text;
+            for (const key in placeholders) {
+                const regex = new RegExp('\\[' + key + '\\]', 'g');
+                let replacement = placeholders[key];
+                if (key === 'N' && replacement) {
+                    replacement = replacement.split(' ')[0];
+                }
+                newText = newText.replace(regex, replacement || '');
+            }
+            return newText;
+        }
+
+        function displayCurrentStep() {
+            const step = scriptData[currentStep];
+            if (!step) return;
+            const scriptDisplay = gId('script-display');
+            const responsesContainer = gId('responses-container');
+            const processedText = applyPlaceholders(step.you);
+            if (scriptDisplay) scriptDisplay.innerHTML = processedText;
+            if (responsesContainer) {
+                responsesContainer.innerHTML = '';
+                if (currentStep === 'start') {
+                    const dialButtonHtml = `<button class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition duration-200 ease-in-out w-full text-center" onclick="handleDialClick()">Dial</button>`;
+                    responsesContainer.innerHTML = dialButtonHtml;
+                } else if (step.responses && step.responses.length > 0) {
+                    step.responses.forEach(response => {
+                        const button = document.createElement('button');
+                        button.className = 'bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200 ease-in-out text-left';
+                        button.innerHTML = applyPlaceholders(response.text);
+                        button.onclick = () => selectResponse(response.next, response.action);
+                        responsesContainer.appendChild(button);
+                    });
+                }
+            }
+        }
+
+        function handleDialClick() {
+            if (currentProspect.phone) {
+                showToast(`Dialing ${currentProspect.phone}...`, 'info');
+            } else {
+                showToast('No phone number available. Manual dialing is required.', 'info');
+            }
+            selectResponse('dialing');
+        }
+
+        function selectResponse(nextStep, action) {
+            if (nextStep && scriptData[nextStep]) {
+                history.push(currentStep);
+                currentStep = nextStep;
+                displayCurrentStep();
+            }
+            if (action === 'saveProspectAndNotes') {
+                saveProspectAndNotes();
+            }
+        }
+
+        function saveProspectAndNotes() {
+            // This is a placeholder function as Firebase isn't fully set up in this context.
+            console.log("Saving prospect and notes to a database.");
+            showToast("Notes saved!", 'success');
+        }
+
+        function restart() {
+            currentStep = 'start';
+            history = [];
+            currentProspect = {};
+            displayCurrentStep();
+        }
+
+        function showView(viewName) {
+            document.querySelectorAll('.view-container').forEach(view => {
+                view.classList.remove('active');
+            });
+            const targetView = gId(viewName);
+            if (targetView) {
+                targetView.classList.add('active');
+            }
+        }
+        
+        function openCallsHub() {
+            showView('call-hub-view');
+            // This is a placeholder for loading specific prospect data if available.
+            currentProspect = {
+                name: 'John Smith', 
+                company: 'ABC Corp', 
+                phone: '555-123-4567',
+                title: 'Manager',
+                industry: 'Manufacturing',
+                painPoints: 'high energy costs',
+                benefits: 'rate optimization'
+            };
+            displayCurrentStep();
+        }
+        
+        function openExternalSearch(tool) {
+            let searchUrl = '';
+            const query = prompt(`Enter search query for ${tool}:`);
+            if (!query) return;
+
+            switch (tool) {
+                case 'google':
+                    searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+                    break;
+                case 'maps':
+                    searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+                    break;
+                case 'apollo':
+                    searchUrl = `https://app.apollo.io/#/people?qKeywords=${encodeURIComponent(query)}`;
+                    break;
+                case 'beenverified':
+                    searchUrl = `https://www.beenverified.com/lp/v1/search?q=${encodeURIComponent(query)}`;
+                    break;
+            }
+            if (searchUrl) window.open(searchUrl, '_blank');
+        }
+        
+        function performGlobalSearch(query) {
+            const resultsDropdown = gId('search-results-dropdown');
+            if (!query || query.length < 2) {
+                resultsDropdown.classList.add('hidden');
+                return;
+            }
+            resultsDropdown.classList.remove('hidden');
+            resultsDropdown.innerHTML = '<div class="p-4 text-gray-400">Searching...</div>';
+            
+            // Placeholder for search logic
+            setTimeout(() => {
+                const results = [
+                    { name: 'John Smith', type: 'Contact', info: 'Manager at ABC Corp' },
+                    { name: 'ABC Corp', type: 'Account', info: 'Manufacturing industry' }
+                ];
+                if (results.length > 0) {
+                    resultsDropdown.innerHTML = results.map(result => `
+                        <div class="p-4 hover:bg-gray-600 cursor-pointer border-b border-gray-700 last:border-b-0" onclick="showView('${result.type.toLowerCase()}-view')">
+                            <div class="font-bold">${result.name}</div>
+                            <div class="text-sm text-gray-400">${result.info}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    resultsDropdown.innerHTML = '<div class="p-4 text-gray-400">No results found.</div>';
+                }
+            }, 500);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            showView('dashboard-view');
+            displayCurrentStep();
+            gId('back-btn').addEventListener('click', () => {
+                if (history.length > 0) {
+                    currentStep = history.pop();
+                    displayCurrentStep();
+                }
+            });
+            gId('restart-btn').addEventListener('click', restart);
+        });
+    </script>
 </body>
 </html>
