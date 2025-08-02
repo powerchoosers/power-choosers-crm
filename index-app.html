@@ -84,7 +84,7 @@
             background: #1a202c;
             padding: 8px 0;
             box-shadow: 0 1px 3px rgba(0,0,0,.3);
-            border-bottom: 2px solid #1e40af;
+            border-bottom: 1px solid #1e40af;
             z-index: 1000;
             position: fixed;
             top: 7px;
@@ -319,7 +319,7 @@
             left: 0;
             right: 0;
             background: #1a202c;
-            border-bottom: 2px solid #1e40af;
+            border-bottom: 1px solid #1e40af;
             box-shadow: 0 8px 32px rgba(30,64,175,.15);
             padding: 0;
             height: 0;
@@ -1274,11 +1274,345 @@
         }
 
         /* Account Detail Specific */
+        .account-top-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .company-info-consolidated {
+            background: #1a202c;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2d3748;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .energy-calculator-widget {
+            background: #1a202c;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2d3748;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        #account-info-consolidated {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
         #account-info-display {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 24px;
             margin-bottom: 16px;
+        }
+
+        /* Consolidated Company Info Styles */
+        .info-item-compact {
+            background: #2d3748;
+            border: 1px solid #4a5568;
+            border-left: 3px solid #ff8c00;
+            padding: 12px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .info-item-compact:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            border-left-color: #ffa500;
+        }
+
+        .info-item-compact .info-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #ff8c00;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .info-item-compact .info-value {
+            font-size: 0.9rem;
+            color: #ffffff;
+            font-weight: 500;
+            line-height: 1.3;
+        }
+
+        .info-item-compact .info-value:empty::before {
+            content: 'N/A';
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        /* Company Summary Styles */
+        .card-header-with-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .summary-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .company-summary-container {
+            position: relative;
+        }
+
+        .summary-display {
+            background: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 80px;
+            color: #e4e7eb;
+            line-height: 1.6;
+        }
+
+        .summary-editor {
+            background: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .summary-editor textarea {
+            width: 100%;
+            min-height: 120px;
+            background: #1a202c;
+            border: 2px solid #4a5568;
+            border-radius: 6px;
+            color: #ffffff;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            resize: vertical;
+            margin-bottom: 12px;
+        }
+
+        .summary-editor textarea:focus {
+            outline: none;
+            border-color: #ff8c00;
+            box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1);
+        }
+
+        .editor-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        /* Energy Calculator Dark Theme Styles */
+        .calculator-container {
+            background: #1a202c;
+            color: #e4e7eb;
+        }
+
+        .calculator-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .calculator-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .calculator-subtitle {
+            font-size: 0.9rem;
+            color: #cbd5e0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #4a5568;
+            border-radius: 2px;
+            margin: 16px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff8c00, #ffa500);
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 2px;
+        }
+
+        .calc-input-group {
+            margin-bottom: 16px;
+        }
+
+        .calc-input-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #ffffff;
+            font-size: 0.85rem;
+        }
+
+        .calc-form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #4a5568;
+            border-radius: 6px;
+            background: #2d3748;
+            color: #ffffff;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .calc-form-input:focus {
+            outline: none;
+            border-color: #ff8c00;
+            box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1);
+        }
+
+        .calc-form-input:disabled {
+            background: #374151;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .calculate-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #ff8c00, #ffa500);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .calculate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
+        }
+
+        .calculate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results-display {
+            background: #2d3748;
+            border: 2px solid #4a5568;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .results-display.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        .result-main {
+            text-align: center;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .result-main.savings {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+            border: 2px solid #22c55e;
+        }
+
+        .result-main.increase {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+            border: 2px solid #ef4444;
+        }
+
+        .result-amount {
+            font-size: 2rem;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
+
+        .result-amount.positive {
+            color: #22c55e;
+        }
+
+        .result-amount.negative {
+            color: #ef4444;
+        }
+
+        .result-label {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .result-description {
+            font-size: 0.85rem;
+            color: #cbd5e0;
+        }
+
+        .loading-animation {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .loading-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            background: #ff8c00;
+            border-radius: 50%;
+            animation: loadingPulse 1.4s ease-in-out infinite both;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+        .loading-dot:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes loadingPulse {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            .account-top-section {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            #account-info-consolidated {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 12px;
+            }
         }
 
         .info-field {
@@ -2643,9 +2977,42 @@
                         <button class="primary-btn" id="edit-account-btn">Edit Account</button>
                     </div>
                     
+                    <!-- Top Section: Company Info + Energy Calculator -->
+                    <div class="account-top-section">
+                        <div class="company-info-consolidated">
+                            <h3 class="card-title">🏢 Company Information</h3>
+                            <div id="account-info-consolidated">
+                            </div>
+                        </div>
+                        
+                        <div class="energy-calculator-widget">
+                            <h3 class="card-title">⚡ Energy Cost Calculator</h3>
+                            <div id="energy-calculator-container">
+                                <!-- Calculator will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Company Summary Section -->
                     <div class="crm-card">
-                        <h3 class="card-title">🏢 Company Information</h3>
-                        <div id="account-info-display">
+                        <div class="card-header-with-actions">
+                            <h3 class="card-title">📋 Company Summary</h3>
+                            <div class="summary-actions">
+                                <button class="secondary-btn" id="import-summary-btn">📁 Import CSV</button>
+                                <button class="secondary-btn" id="edit-summary-btn">✏️ Edit</button>
+                            </div>
+                        </div>
+                        <div class="company-summary-container">
+                            <div id="company-summary-display" class="summary-display">
+                                <p class="empty-state">No company summary available. Click "Edit" to add one.</p>
+                            </div>
+                            <div id="company-summary-editor" class="summary-editor" style="display: none;">
+                                <textarea id="company-summary-input" placeholder="Enter a brief description of what this company does, their industry focus, key services, etc..."></textarea>
+                                <div class="editor-actions">
+                                    <button class="primary-btn" id="save-summary-btn">Save Summary</button>
+                                    <button class="secondary-btn" id="cancel-summary-btn">Cancel</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -2688,6 +3055,14 @@
                                     <option value="variable">Variable Rate</option>
                                     <option value="indexed">Indexed Rate</option>
                                 </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="annual-kwh">Annual kWh Usage:</label>
+                                <input type="number" id="annual-kwh" placeholder="e.g. 150000" step="1000">
+                            </div>
+                            <div class="input-group">
+                                <label for="monthly-bill">Monthly Bill ($):</label>
+                                <input type="number" id="monthly-bill" placeholder="e.g. 1450" step="0.01">
                             </div>
                             <button class="primary-btn" type="submit">Save Contract Info</button>
                         </form>
@@ -4288,36 +4663,232 @@
         }
 
         function renderAccountInfo(account) {
+            // Render consolidated company info
+            const consolidatedDisplay = gId('account-info-consolidated');
+            if (consolidatedDisplay) {
+                const compactFields = [
+                    { label: 'Industry', value: account.industry },
+                    { label: 'Phone', value: account.phone },
+                    { label: 'Website', value: account.website },
+                    { label: 'City', value: account.city },
+                    { label: 'State', value: account.state },
+                    { label: 'Address', value: account.address }
+                ];
+                
+                consolidatedDisplay.innerHTML = compactFields.map(field => `
+                    <div class="info-item-compact">
+                        <div class="info-label">${field.label}</div>
+                        <div class="info-value">${field.value || ''}</div>
+                    </div>
+                `).join('');
+            }
+
+            // Render legacy display if it exists
             const display = gId('account-info-display');
-            if (!display) return;
+            if (display) {
+                const fields = [
+                    { label: 'Industry', value: account.industry },
+                    { label: 'Phone', value: account.phone },
+                    { label: 'Website', value: account.website },
+                    { label: 'City', value: account.city },
+                    { label: 'State', value: account.state },
+                    { label: 'Address', value: account.address },
+                    { label: 'Pain Points', value: account.painPoints },
+                    { label: 'Benefits', value: account.benefits },
+                    { label: 'Created At', value: formatDate(account.createdAt) },
+                    { label: 'Last Updated', value: formatDate(account.updatedAt) }
+                ];
+                
+                display.innerHTML = fields.map(field => `
+                    <div class="info-field">
+                        <div class="info-field-label">${field.label}</div>
+                        <div class="info-field-value">${field.value || 'N/A'}</div>
+                    </div>
+                `).join('');
+            }
             
-            const fields = [
-                { label: 'Industry', value: account.industry },
-                { label: 'Phone', value: account.phone },
-                { label: 'Website', value: account.website },
-                { label: 'City', value: account.city },
-                { label: 'State', value: account.state },
-                { label: 'Address', value: account.address },
-                { label: 'Pain Points', value: account.painPoints },
-                { label: 'Benefits', value: account.benefits },
-                { label: 'Created At', value: formatDate(account.createdAt) },
-                { label: 'Last Updated', value: formatDate(account.updatedAt) }
+            // Populate contract form with new fields
+            const contractFields = [
+                'contract-provider', 'contract-rate', 'contract-expiration',
+                'contract-type', 'annual-kwh', 'monthly-bill'
             ];
             
-            display.innerHTML = fields.map(field => `
-                <div class="info-field">
-                    <div class="info-field-label">${field.label}</div>
-                    <div class="info-field-value">${field.value || 'N/A'}</div>
-                </div>
-            `).join('');
-            
-            // Populate contract form
-            ['contract-provider', 'contract-rate', 'contract-expiration', 'contract-type'].forEach(id => {
+            contractFields.forEach(id => {
                 const element = gId(id);
                 if (element) {
-                    element.value = account[id.replace('-', '')] || '';
+                    const key = id.replace('-', '').replace('kwh', 'kWh');
+                    element.value = account[key] || '';
                 }
             });
+
+            // Render company summary
+            renderCompanySummary(account);
+            
+            // Initialize energy calculator
+            initializeEnergyCalculator(account);
+        }
+
+        function renderCompanySummary(account) {
+            const summaryDisplay = gId('company-summary-display');
+            const summaryInput = gId('company-summary-input');
+            
+            if (summaryDisplay && summaryInput) {
+                if (account.companySummary) {
+                    summaryDisplay.innerHTML = `<p>${account.companySummary}</p>`;
+                    summaryInput.value = account.companySummary;
+                } else {
+                    summaryDisplay.innerHTML = '<p class="empty-state">No company summary available. Click "Edit" to add one.</p>';
+                    summaryInput.value = '';
+                }
+            }
+        }
+
+        function initializeEnergyCalculator(account) {
+            const calculatorContainer = gId('energy-calculator-container');
+            if (!calculatorContainer) return;
+
+            const hasData = account.contractrate && account.annualkWh && account.monthlybill;
+            
+            calculatorContainer.innerHTML = `
+                <div class="calculator-container">
+                    <div class="calculator-header">
+                        <h4 class="calculator-title">Energy Health Check</h4>
+                        <p class="calculator-subtitle">Calculate potential savings and cost analysis</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="calc-progress"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="calc-input-group">
+                        <label class="calc-input-label">Monthly Bill ($)</label>
+                        <input type="number" class="calc-form-input" id="calc-monthly-bill"
+                               placeholder="e.g., 1,450" step="0.01"
+                               value="${account.monthlybill || ''}"
+                               oninput="updateCalculator()">
+                    </div>
+                    
+                    <div class="calc-input-group">
+                        <label class="calc-input-label">Current Rate (¢/kWh)</label>
+                        <input type="number" class="calc-form-input" id="calc-current-rate"
+                               placeholder="e.g., 6.2" step="0.001"
+                               value="${account.contractrate ? parseFloat(account.contractrate) : ''}"
+                               oninput="updateCalculator()">
+                    </div>
+                    
+                    <div class="calc-input-group">
+                        <label class="calc-input-label">Annual kWh Usage</label>
+                        <input type="number" class="calc-form-input" id="calc-annual-kwh"
+                               placeholder="e.g., 150,000" step="1000"
+                               value="${account.annualkWh || ''}"
+                               oninput="updateCalculator()">
+                    </div>
+                    
+                    <button class="calculate-btn" id="calc-btn" onclick="performEnergyCalculation()"
+                            ${hasData ? '' : 'disabled'}>
+                        ${hasData ? 'Calculate Savings' : 'Enter Data Above'}
+                    </button>
+                    
+                    <div class="results-display" id="calc-results">
+                        <!-- Results will appear here -->
+                    </div>
+                </div>
+            `;
+
+            // Auto-calculate if we have data
+            if (hasData) {
+                setTimeout(() => {
+                    performEnergyCalculation();
+                }, 1000);
+            }
+        }
+
+        function updateCalculator() {
+            const monthlyBill = parseFloat(gId('calc-monthly-bill').value) || 0;
+            const currentRate = parseFloat(gId('calc-current-rate').value) || 0;
+            const annualKwh = parseFloat(gId('calc-annual-kwh').value) || 0;
+            const calcBtn = gId('calc-btn');
+            const progress = gId('calc-progress');
+            
+            let completedFields = 0;
+            if (monthlyBill > 0) completedFields++;
+            if (currentRate > 0) completedFields++;
+            if (annualKwh > 0) completedFields++;
+            
+            const progressPercent = (completedFields / 3) * 100;
+            progress.style.width = progressPercent + '%';
+            
+            if (completedFields === 3) {
+                calcBtn.disabled = false;
+                calcBtn.textContent = 'Calculate Savings';
+            } else {
+                calcBtn.disabled = true;
+                calcBtn.textContent = 'Enter Data Above';
+            }
+        }
+
+        function performEnergyCalculation() {
+            const monthlyBill = parseFloat(gId('calc-monthly-bill').value);
+            const currentRate = parseFloat(gId('calc-current-rate').value);
+            const annualKwh = parseFloat(gId('calc-annual-kwh').value);
+            const resultsDiv = gId('calc-results');
+            
+            if (!monthlyBill || !currentRate || !annualKwh) return;
+
+            // Show loading animation
+            resultsDiv.innerHTML = `
+                <div class="loading-animation">
+                    <div class="loading-dots">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
+                </div>
+            `;
+            resultsDiv.classList.add('show');
+
+            // Simulate calculation delay for animation
+            setTimeout(() => {
+                const ESTIMATED_DELIVERY_CHARGE = 5.0; // cents/kWh
+                const TARGET_ALL_IN_RATE = 12.8; // cents/kWh
+                
+                const currentAllInRate = currentRate + ESTIMATED_DELIVERY_CHARGE;
+                const annualCurrentCost = monthlyBill * 12;
+                const annualProjectedCost = (annualKwh * TARGET_ALL_IN_RATE) / 100;
+                const annualSavings = annualCurrentCost - annualProjectedCost;
+                const percentageChange = (annualSavings / annualCurrentCost) * 100;
+                
+                let resultClass = '';
+                let resultLabel = '';
+                let resultDescription = '';
+                
+                if (annualSavings > (annualCurrentCost * 0.005)) {
+                    resultClass = 'savings';
+                    resultLabel = 'Potential Annual Savings';
+                    resultDescription = `You could save ${Math.abs(percentageChange).toFixed(1)}% annually with optimized rates!`;
+                } else if (annualSavings < -(annualCurrentCost * 0.005)) {
+                    resultClass = 'increase';
+                    resultLabel = 'Projected Rate Increase Risk';
+                    resultDescription = `Your current rate is below market. Potential ${Math.abs(percentageChange).toFixed(1)}% increase at renewal.`;
+                } else {
+                    resultClass = 'neutral';
+                    resultLabel = 'Competitive Rate Position';
+                    resultDescription = 'Your current rate is competitive with market conditions.';
+                }
+                
+                resultsDiv.innerHTML = `
+                    <div class="result-main ${resultClass}">
+                        <div class="result-amount ${annualSavings > 0 ? 'positive' : 'negative'}">
+                            $${Math.abs(annualSavings).toLocaleString()}
+                        </div>
+                        <div class="result-label">${resultLabel}</div>
+                        <div class="result-description">${resultDescription}</div>
+                    </div>
+                    <div style="font-size: 0.8rem; color: #9ca3af; text-align: center; margin-top: 12px;">
+                        Based on current usage: ${annualKwh.toLocaleString()} kWh/year<br>
+                        Current all-in rate: ${currentAllInRate.toFixed(2)}¢/kWh
+                    </div>
+                `;
+            }, 2000);
         }
 
         function renderAccountContacts(accountId) {
@@ -4492,7 +5063,11 @@
                 { id: 'back-to-accounts', event: 'click', handler: () => showView('accounts') },
                 { id: 'energy-contract-form', event: 'submit', handler: handleEnergyContractSubmit },
                 { id: 'save-account-note', event: 'click', handler: handleSaveAccountNote },
-                { id: 'bulk-import-btn', event: 'click', handler: handleBulkImport }
+                { id: 'bulk-import-btn', event: 'click', handler: handleBulkImport },
+                { id: 'edit-summary-btn', event: 'click', handler: toggleSummaryEditor },
+                { id: 'save-summary-btn', event: 'click', handler: saveSummary },
+                { id: 'cancel-summary-btn', event: 'click', handler: cancelSummaryEdit },
+                { id: 'import-summary-btn', event: 'click', handler: importSummaryFromCSV }
             ];
 
             handlers.forEach(({ id, event, handler }) => {
@@ -4619,11 +5194,20 @@
                 contractRate: gId('contract-rate').value,
                 contractExpiration: gId('contract-expiration').value,
                 contractType: gId('contract-type').value,
+                annualkWh: gId('annual-kwh').value,
+                monthlybill: gId('monthly-bill').value,
                 updatedAt: serverTimestamp()
             };
             
             try {
                 await db.collection('accounts').doc(CRMApp.currentAccount.id).update(contractData);
+                
+                // Update current account object
+                Object.assign(CRMApp.currentAccount, contractData);
+                
+                // Re-initialize calculator with new data
+                initializeEnergyCalculator(CRMApp.currentAccount);
+                
                 showToast('Energy contract updated successfully!');
                 await logActivity({
                     type: 'contract_updated',
@@ -4783,6 +5367,140 @@
             displayCurrentStep();
         }
 
+        // Company Summary Functions
+        function toggleSummaryEditor() {
+            const summaryDisplay = gId('company-summary-display');
+            const summaryEditor = gId('company-summary-editor');
+            
+            if (summaryDisplay && summaryEditor) {
+                if (summaryEditor.style.display === 'none' || !summaryEditor.style.display) {
+                    summaryDisplay.style.display = 'none';
+                    summaryEditor.style.display = 'block';
+                    const textarea = gId('company-summary-input');
+                    if (textarea) textarea.focus();
+                } else {
+                    summaryDisplay.style.display = 'block';
+                    summaryEditor.style.display = 'none';
+                }
+            }
+        }
+
+        async function saveSummary() {
+            if (!CRMApp.currentAccount) return;
+            
+            const summaryInput = gId('company-summary-input');
+            if (!summaryInput) return;
+            
+            const summaryText = summaryInput.value.trim();
+            
+            showLoading(true);
+            try {
+                await db.collection('accounts').doc(CRMApp.currentAccount.id).update({
+                    companySummary: summaryText,
+                    updatedAt: serverTimestamp()
+                });
+                
+                // Update current account object
+                CRMApp.currentAccount.companySummary = summaryText;
+                
+                // Update display
+                renderCompanySummary(CRMApp.currentAccount);
+                
+                // Hide editor, show display
+                const summaryDisplay = gId('company-summary-display');
+                const summaryEditor = gId('company-summary-editor');
+                if (summaryDisplay && summaryEditor) {
+                    summaryDisplay.style.display = 'block';
+                    summaryEditor.style.display = 'none';
+                }
+                
+                showToast('Company summary saved successfully!');
+                
+                await logActivity({
+                    type: 'summary_updated',
+                    description: `Updated company summary for: ${CRMApp.currentAccount.name}`,
+                    accountId: CRMApp.currentAccount.id,
+                    accountName: CRMApp.currentAccount.name
+                });
+                
+            } catch (error) {
+                console.error('Error saving company summary:', error);
+                showToast('Error saving company summary.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function cancelSummaryEdit() {
+            const summaryDisplay = gId('company-summary-display');
+            const summaryEditor = gId('company-summary-editor');
+            const summaryInput = gId('company-summary-input');
+            
+            if (summaryDisplay && summaryEditor && summaryInput) {
+                // Reset textarea to original value
+                if (CRMApp.currentAccount && CRMApp.currentAccount.companySummary) {
+                    summaryInput.value = CRMApp.currentAccount.companySummary;
+                } else {
+                    summaryInput.value = '';
+                }
+                
+                // Show display, hide editor
+                summaryDisplay.style.display = 'block';
+                summaryEditor.style.display = 'none';
+            }
+        }
+
+        function importSummaryFromCSV() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.csv';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                showLoading(true);
+                try {
+                    const text = await file.text();
+                    const lines = text.split('\n');
+                    
+                    // Simple CSV parsing - assumes first column is company name, second is summary
+                    let foundSummary = '';
+                    const currentAccountName = CRMApp.currentAccount?.name?.toLowerCase();
+                    
+                    for (let i = 1; i < lines.length; i++) { // Skip header row
+                        const columns = lines[i].split(',');
+                        if (columns.length >= 2) {
+                            const companyName = columns[0].trim().toLowerCase().replace(/"/g, '');
+                            const summary = columns[1].trim().replace(/"/g, '');
+                            
+                            if (companyName === currentAccountName) {
+                                foundSummary = summary;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (foundSummary) {
+                        const summaryInput = gId('company-summary-input');
+                        if (summaryInput) {
+                            summaryInput.value = foundSummary;
+                            toggleSummaryEditor(); // Show editor with imported text
+                            showToast('Company summary imported from CSV!', 'success');
+                        }
+                    } else {
+                        showToast('No matching company summary found in CSV file.', 'warning');
+                    }
+                    
+                } catch (error) {
+                    console.error('Error importing CSV:', error);
+                    showToast('Error importing CSV file.', 'error');
+                } finally {
+                    showLoading(false);
+                }
+            };
+            input.click();
+        }
+
         // Application Initialization
         function initializeApp() {
             setupNavigation();
@@ -4815,6 +5533,12 @@
         window.handleSearchResultClick = handleSearchResultClick;
         window.handleViewAll = handleViewAll;
         window.openCallsHubWithData = openCallsHubWithData;
+        window.updateCalculator = updateCalculator;
+        window.performEnergyCalculation = performEnergyCalculation;
+        window.toggleSummaryEditor = toggleSummaryEditor;
+        window.saveSummary = saveSummary;
+        window.cancelSummaryEdit = cancelSummaryEdit;
+        window.importSummaryFromCSV = importSummaryFromCSV;
 
         // Initialize when DOM is loaded
         document.addEventListener('DOMContentLoaded', initializeApp);
