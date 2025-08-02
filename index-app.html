@@ -2386,7 +2386,7 @@
             padding: 12px 20px 12px 20px;
             cursor: pointer;
             transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 0 24px 24px 0;
+            border-radius: 0 8px 8px 0;
             margin: 1px 8px 1px 0;
             position: relative;
             overflow: hidden;
@@ -2400,13 +2400,13 @@
             top: 0;
             width: 3px;
             height: 100%;
-            background: #ff8c00;
+            background: rgba(255, 140, 0, 0.7);
             transform: scaleY(0);
             transition: transform .3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .sidebar-item:hover {
-            background: rgba(255, 140, 0, 0.1);
+            background: rgba(255, 140, 0, 0.08);
             transform: translateX(4px);
         }
 
@@ -2415,7 +2415,7 @@
         }
 
         .sidebar-item.active {
-            background: #ff8c00;
+            background: rgba(255, 140, 0, 0.15);
             color: #ffffff;
             transform: translateX(4px);
         }
@@ -2445,7 +2445,7 @@
         }
 
         .sidebar-item:hover .sidebar-icon {
-            color: #ff8c00;
+            color: rgba(255, 140, 0, 0.9);
             transform: scale(1.05);
         }
 
@@ -2661,7 +2661,7 @@
 
         .gmail-compose-btn {
             width: 100%;
-            background: linear-gradient(135deg, #ff8c00 0%, #ffa500 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
             color: white;
             border: none;
             border-radius: 24px;
@@ -2673,13 +2673,13 @@
             align-items: center;
             gap: 12px;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(255, 140, 0, 0.3);
+            box-shadow: 0 2px 8px rgba(30, 64, 175, 0.3);
         }
 
         .gmail-compose-btn:hover {
-            background: linear-gradient(135deg, #ff7700 0%, #ff9500 100%);
+            background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
+            box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
         }
 
         .gmail-nav-section {
@@ -2702,12 +2702,12 @@
         }
 
         .gmail-nav-item:hover {
-            background: rgba(255, 140, 0, 0.1);
-            color: #ff8c00;
+            background: rgba(255, 140, 0, 0.08);
+            color: rgba(255, 140, 0, 0.9);
         }
 
         .gmail-nav-item.active {
-            background: #ff8c00;
+            background: rgba(255, 140, 0, 0.15);
             color: white;
             font-weight: 600;
         }
@@ -2718,7 +2718,7 @@
 
         .gmail-count {
             margin-left: auto;
-            background: #4a5568;
+            background: rgba(74, 85, 104, 0.8);
             color: white;
             padding: 2px 8px;
             border-radius: 12px;
@@ -2727,7 +2727,7 @@
         }
 
         .gmail-nav-item.active .gmail-count {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.25);
         }
 
         .gmail-main {
@@ -2770,8 +2770,8 @@
         }
 
         .gmail-toolbar-btn:hover {
-            background: rgba(255, 140, 0, 0.1);
-            color: #ff8c00;
+            background: rgba(255, 140, 0, 0.08);
+            color: rgba(255, 140, 0, 0.9);
         }
 
         .gmail-select-all {
@@ -2875,8 +2875,8 @@
         }
 
         .gmail-back-btn:hover {
-            background: rgba(255, 140, 0, 0.1);
-            color: #ff8c00;
+            background: rgba(255, 140, 0, 0.08);
+            color: rgba(255, 140, 0, 0.9);
         }
 
         .gmail-email-actions {
@@ -3014,8 +3014,8 @@
         }
 
         .gmail-compose-btn-small:hover {
-            background: rgba(255, 140, 0, 0.1);
-            color: #ff8c00;
+            background: rgba(255, 140, 0, 0.08);
+            color: rgba(255, 140, 0, 0.9);
         }
 
         .gmail-compose-form {
@@ -3108,7 +3108,7 @@
         }
 
         .gmail-cc-toggle:hover {
-            color: #ff8c00;
+            color: rgba(255, 140, 0, 0.9);
         }
 
         /* Responsive Gmail Layout */
