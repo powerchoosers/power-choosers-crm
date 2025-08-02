@@ -88,65 +88,69 @@
             z-index: 1000;
             position: fixed;
             top: 7px;
-            left: 0;
+            left: 60px;
             right: 0;
             height: 80px;
             backdrop-filter: blur(10px);
             background: rgba(26, 32, 44, 0.95);
+            transition: left .3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .top-nav.sidebar-expanded {
+            left: 280px;
         }
 
         .nav-container {
             max-width: none;
             margin: 0;
-            padding: 0 16px 0 80px;
+            padding: 0 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 15px;
             height: 100%;
             width: 100%;
-            transition: padding-left .3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .nav-container.sidebar-expanded {
-            padding-left: 300px;
-        }
-
-        .nav-left-logo {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
+        /* Power Choosers Logo in Top Left */
+        .power-choosers-logo {
+            position: fixed;
+            left: 8px;
+            top: 15px;
             display: flex;
             align-items: center;
             gap: 12px;
             cursor: pointer;
             transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1001;
+            z-index: 1002;
+            padding: 8px;
+            border-radius: 8px;
+            background: rgba(26, 32, 44, 0.9);
         }
 
-        .nav-left-logo img {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
+        .power-choosers-logo:hover {
+            background: rgba(16, 185, 129, 0.1);
+            transform: scale(1.05);
+        }
+
+        .power-choosers-logo img {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
             transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .nav-left-logo:hover img {
-            transform: scale(1.1);
-        }
-
-        .nav-left-logo .logo-text {
+        .power-choosers-logo .logo-text {
             color: #10b981;
             font-weight: 600;
-            font-size: .9rem;
+            font-size: .85rem;
             opacity: 0;
             transform: translateX(-10px);
             transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
             white-space: nowrap;
         }
 
-        .nav-left-logo:hover .logo-text {
+        .power-choosers-logo:hover .logo-text {
             opacity: 1;
             transform: translateX(0);
         }
@@ -1828,32 +1832,31 @@
             }
         }
 
-        /* Left Sidebar Styles */
+        /* Expandable Left Sidebar Styles */
         .left-sidebar {
             position: fixed;
             left: 0;
             top: 0;
             width: 60px;
             height: 100vh;
-            background: #1a202c;
-            border-right: 1px solid #2d3748;
-            z-index: 1000;
+            background: linear-gradient(180deg, #1a202c 0%, #2d3748 100%);
+            border-right: 1px solid #4a5568;
+            z-index: 1001;
             transition: width .3s cubic-bezier(0.4, 0, 0.2, 1);
             overflow: hidden;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
         }
 
         .left-sidebar:hover {
             width: 280px;
-        }
-
-        .left-sidebar.docked {
-            width: 280px;
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
         }
 
         .sidebar-content {
-            padding: 20px 0;
-            height: calc(100% - 60px);
+            padding: 80px 0 20px 0;
+            height: 100%;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .sidebar-content::-webkit-scrollbar {
@@ -1870,41 +1873,80 @@
         }
 
         .sidebar-section {
-            margin-bottom: 24px;
+            margin-bottom: 32px;
+        }
+
+        .sidebar-section-title {
+            padding: 0 20px 12px 20px;
+            font-size: .75rem;
+            font-weight: 700;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .left-sidebar:hover .sidebar-section-title {
+            opacity: 1;
+            transform: translateX(0);
         }
 
         .sidebar-item {
             display: flex;
             align-items: center;
-            padding: 12px 20px;
+            padding: 14px 20px;
             cursor: pointer;
             transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 0 24px 24px 0;
-            margin-right: 12px;
+            border-radius: 0 28px 28px 0;
+            margin: 2px 12px 2px 0;
             position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: #10b981;
+            transform: scaleY(0);
+            transition: transform .3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .sidebar-item:hover {
             background: rgba(16, 185, 129, 0.1);
-            transform: translateX(4px);
+            transform: translateX(6px);
+        }
+
+        .sidebar-item:hover::before {
+            transform: scaleY(1);
         }
 
         .sidebar-item.active {
             background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
-            border-right: 3px solid #10b981;
+            transform: translateX(6px);
+        }
+
+        .sidebar-item.active::before {
+            transform: scaleY(1);
         }
 
         .sidebar-icon {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             color: #cbd5e0;
             flex-shrink: 0;
-            transition: color .3s ease;
+            transition: all .3s ease;
         }
 
         .sidebar-item:hover .sidebar-icon,
         .sidebar-item.active .sidebar-icon {
             color: #10b981;
+            transform: scale(1.1);
         }
 
         .sidebar-label {
@@ -1918,41 +1960,14 @@
             transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .left-sidebar:hover .sidebar-label,
-        .left-sidebar.docked .sidebar-label {
+        .left-sidebar:hover .sidebar-label {
             opacity: 1;
             transform: translateX(0);
         }
 
-        .sidebar-dock-toggle {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 32px;
-            height: 32px;
-            background: #2d3748;
-            border: 1px solid #4a5568;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .sidebar-dock-toggle:hover {
-            background: #4a5568;
-            transform: translateX(-50%) scale(1.1);
-        }
-
-        .sidebar-dock-toggle svg {
-            color: #cbd5e0;
-            transition: transform .3s ease;
-        }
-
-        .left-sidebar.docked .sidebar-dock-toggle svg {
-            transform: rotate(180deg);
+        .sidebar-item.active .sidebar-label {
+            color: #10b981;
+            font-weight: 600;
         }
 
         /* Navigation Search Results */
@@ -2108,63 +2123,110 @@
     </style>
     </head>
 <body>
-    <div class="top-nav">
-        <div class="nav-container">
-            <div class="nav-left-title">
-                <h1 id="page-title">Power Choosers CRM</h1>
-            </div>
-            <div class="nav-icons-center">
-                <button class="app-button active" id="dashboard-btn" data-view="dashboard">
-                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Power Choosers Logo -->
+    <div class="power-choosers-logo" onclick="window.open('https://powerchoosersenergy.com', '_blank')">
+        <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers">
+        <span class="logo-text">Visit Website</span>
+    </div>
+
+    <!-- Expandable Left Sidebar -->
+    <div class="left-sidebar" id="left-sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Navigation</div>
+                <div class="sidebar-item active" id="sidebar-dashboard" data-view="dashboard">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
-                    <span class="app-label">Dashboard</span>
-                </button>
+                    <span class="sidebar-label">Dashboard</span>
+                </div>
                 
-                <button class="app-button" id="accounts-btn" data-view="accounts">
-                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="sidebar-item" id="sidebar-accounts" data-view="accounts">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
                         <circle cx="9" cy="7" r="4"/>
                         <path d="m22 21-1.5-1.5"/>
                         <circle cx="19" cy="17" r="3"/>
                     </svg>
-                    <span class="app-label">Accounts</span>
-                </button>
+                    <span class="sidebar-label">Accounts</span>
+                </div>
                 
-                <button class="app-button" id="contacts-btn" data-view="contacts">
-                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="sidebar-item" id="sidebar-contacts" data-view="contacts">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                         <circle cx="9" cy="7" r="4"/>
                         <path d="m22 21-3-3"/>
                         <circle cx="19" cy="17" r="3"/>
                     </svg>
-                    <span class="app-label">Contacts</span>
-                </button>
+                    <span class="sidebar-label">Contacts</span>
+                </div>
 
-                <button class="app-button" id="calls-hub-btn" data-view="calls-hub">
-                    <svg class="app-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <div class="sidebar-item" id="sidebar-calls-hub" data-view="calls-hub">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                     </svg>
-                    <span class="app-label">Calls Hub</span>
-                </button>
+                    <span class="sidebar-label">Calls Hub</span>
+                </div>
+            </div>
 
-                <div class="app-button" id="google-button">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google" class="app-icon">
-                    <span class="app-label">Google</span>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Search Tools</div>
+                <div class="sidebar-item" id="sidebar-search-accounts">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                    </svg>
+                    <span class="sidebar-label">Search Accounts</span>
                 </div>
-                <div class="app-button" id="maps-button">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d37e95a4c0686b08c267_images.jpg" alt="Google Maps" class="app-icon">
-                    <span class="app-label">Maps</span>
+                
+                <div class="sidebar-item" id="sidebar-search-contacts">
+                    <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                    </svg>
+                    <span class="sidebar-label">Search Contacts</span>
                 </div>
-                <div class="app-button" id="apollo-button">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851d2771f4c6e42a09731_images.png" alt="Apollo" class="app-icon">
-                    <span class="app-label">Apollo</span>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">External Tools</div>
+                <div class="sidebar-item" id="sidebar-google">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google" class="sidebar-icon" style="border-radius: 4px; background: white; padding: 2px;">
+                    <span class="sidebar-label">Google Search</span>
                 </div>
-                <div class="app-button" id="beenverified-button">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68885144c4bbad742f397a18_unnamed.png" alt="BeenVerified" class="app-icon">
-                    <span class="app-label">BeenVerified</span>
+                <div class="sidebar-item" id="sidebar-maps">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d37e95a4c0686b08c267_images.jpg" alt="Google Maps" class="sidebar-icon" style="border-radius: 4px;">
+                    <span class="sidebar-label">Google Maps</span>
                 </div>
+                <div class="sidebar-item" id="sidebar-apollo">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851d2771f4c6e42a09731_images.png" alt="Apollo" class="sidebar-icon" style="border-radius: 4px;">
+                    <span class="sidebar-label">Apollo.io</span>
+                </div>
+                <div class="sidebar-item" id="sidebar-beenverified">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68885144c4bbad742f397a18_unnamed.png" alt="BeenVerified" class="sidebar-icon" style="border-radius: 4px;">
+                    <span class="sidebar-label">BeenVerified</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="top-nav" id="top-nav">
+        <div class="nav-container">
+            <div class="nav-search-container">
+                <svg class="nav-search-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input type="text" class="nav-search-input" id="nav-search-input" placeholder="Search accounts, contacts, or anything...">
+                <div class="nav-search-results" id="nav-search-results"></div>
+            </div>
+            <div class="nav-icons-center">
+                <h1 id="page-title" style="color: #ffffff; font-size: 1.2rem; font-weight: 600;">Power Choosers CRM</h1>
             </div>
         </div>
     </div>
@@ -3321,11 +3383,17 @@
 
         // Navigation Functions
         function setupNavigation() {
-            const navButtons = document.querySelectorAll('.app-button[data-view]');
-            navButtons.forEach(button => {
-                button.addEventListener('click', (e) => {
+            // Setup sidebar navigation
+            const sidebarItems = document.querySelectorAll('.sidebar-item[data-view]');
+            sidebarItems.forEach(item => {
+                item.addEventListener('click', (e) => {
                     e.preventDefault();
-                    const view = button.getAttribute('data-view');
+                    const view = item.getAttribute('data-view');
+                    
+                    // Update active state
+                    document.querySelectorAll('.sidebar-item').forEach(si => si.classList.remove('active'));
+                    item.classList.add('active');
+                    
                     if (view === 'calls-hub') {
                         openCallsHubWithData();
                     } else {
@@ -3334,10 +3402,151 @@
                 });
             });
 
+            // Setup search functions
+            const searchAccounts = gId('sidebar-search-accounts');
+            const searchContacts = gId('sidebar-search-contacts');
+            
+            if (searchAccounts) {
+                searchAccounts.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openSearch('accounts', e);
+                });
+            }
+            
+            if (searchContacts) {
+                searchContacts.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openSearch('contacts', e);
+                });
+            }
+
+            // Setup external tools
+            const externalTools = [
+                { id: 'sidebar-google', type: 'google' },
+                { id: 'sidebar-maps', type: 'maps' },
+                { id: 'sidebar-apollo', type: 'apollo' },
+                { id: 'sidebar-beenverified', type: 'beenverified' }
+            ];
+
+            externalTools.forEach(tool => {
+                const element = gId(tool.id);
+                if (element) {
+                    element.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        openSearch(tool.type, e);
+                    });
+                }
+            });
+
+            // Setup main search bar
+            const navSearchInput = gId('nav-search-input');
+            if (navSearchInput) {
+                navSearchInput.addEventListener('input', function(e) {
+                    performGlobalSearch(e.target.value);
+                });
+                navSearchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        performGlobalSearch(e.target.value);
+                    }
+                });
+            }
+
             gId('go-to-calls-hub-btn').addEventListener('click', (e) => {
                 e.preventDefault();
                 openCallsHubWithData();
             });
+        }
+
+        // Global search function for the main search bar
+        function performGlobalSearch(query) {
+            if (!query || query.length < 2) {
+                const resultsDiv = gId('nav-search-results');
+                if (resultsDiv) resultsDiv.innerHTML = '';
+                return;
+            }
+            
+            const searchQuery = query.toLowerCase();
+            let results = [];
+            
+            // Search accounts
+            const accountResults = CRMApp.accounts
+                .filter(account =>
+                    account.name?.toLowerCase().includes(searchQuery) ||
+                    account.industry?.toLowerCase().includes(searchQuery)
+                )
+                .slice(0, 3)
+                .map(account => ({
+                    id: account.id,
+                    name: account.name,
+                    info: account.industry || 'No Industry',
+                    type: 'Account'
+                }));
+            
+            // Search contacts
+            const contactResults = CRMApp.contacts
+                .filter(contact =>
+                    `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(searchQuery) ||
+                    contact.title?.toLowerCase().includes(searchQuery) ||
+                    contact.accountName?.toLowerCase().includes(searchQuery)
+                )
+                .slice(0, 3)
+                .map(contact => ({
+                    id: contact.id,
+                    name: `${contact.firstName} ${contact.lastName}`,
+                    info: `${contact.title || 'No Title'} at ${contact.accountName || 'No Account'}`,
+                    type: 'Contact'
+                }));
+            
+            results = [...accountResults, ...contactResults];
+            
+            const resultsDiv = gId('nav-search-results');
+            if (!resultsDiv) return;
+            
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="nav-search-result">No results found</div>';
+                resultsDiv.classList.add('active');
+                return;
+            }
+            
+            let html = '';
+            results.forEach(result => {
+                html += `
+                    <div class="nav-search-result" onclick="handleGlobalSearchClick('${result.id}', '${result.type.toLowerCase()}')">
+                        <div class="nav-search-result-info">
+                            <div class="nav-search-result-name">${result.name}</div>
+                            <div class="nav-search-result-details">${result.info} • ${result.type}</div>
+                        </div>
+                        <div class="nav-search-result-actions">
+                            ${result.type === 'Contact' ? `<button class="nav-search-call-btn" onclick="event.stopPropagation(); openCallsHubWithData('${result.id}')">Call</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+            resultsDiv.classList.add('active');
+        }
+
+        function handleGlobalSearchClick(id, type) {
+            if (type === 'account') {
+                showAccountDetail(id);
+            } else if (type === 'contact') {
+                const contact = CRMApp.contacts.find(c => c.id === id);
+                if (contact && contact.accountId) {
+                    showAccountDetail(contact.accountId);
+                } else {
+                    showToast('This contact is not linked to an account.', 'warning');
+                }
+            }
+            
+            // Clear search results
+            const resultsDiv = gId('nav-search-results');
+            if (resultsDiv) {
+                resultsDiv.classList.remove('active');
+                resultsDiv.innerHTML = '';
+            }
+            const searchInput = gId('nav-search-input');
+            if (searchInput) searchInput.value = '';
         }
 
         function showView(viewName) {
@@ -3348,17 +3557,18 @@
             if (targetView) {
                 targetView.classList.add('active');
                 CRMApp.currentView = viewName;
-                updateActiveNavButton(gId(viewName + '-btn'));
+                updateActiveNavButton(viewName);
                 updatePageTitle(viewName);
                 loadViewData(viewName);
             }
         }
         
-        function updateActiveNavButton(activeButton) {
-            document.querySelectorAll('.app-button[data-view]').forEach(btn => {
-                btn.classList.remove('active');
+        function updateActiveNavButton(viewName) {
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('active');
             });
-            if (activeButton) activeButton.classList.add('active');
+            const activeItem = gId(`sidebar-${viewName}`);
+            if (activeItem) activeItem.classList.add('active');
         }
 
         function updatePageTitle(viewName) {
