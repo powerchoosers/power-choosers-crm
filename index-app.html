@@ -108,6 +108,20 @@
         .left-sidebar:hover .search-input {
             opacity: 1;
         }
+        
+        /* Ensure navigation icons are always visible in collapsed state */
+        .sidebar-item {
+            justify-content: center;
+        }
+        .left-sidebar:hover .sidebar-item {
+            justify-content: flex-start;
+        }
+        .sidebar-item .sidebar-label {
+            opacity: 0;
+        }
+        .left-sidebar:hover .sidebar-item .sidebar-label {
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="flex bg-gray-900 text-gray-100">
