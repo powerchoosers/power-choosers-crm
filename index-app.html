@@ -1110,6 +1110,145 @@
                 </div>
             </div>
 
+            <!-- Accounts View (Hidden by default) -->
+            <div id="accounts-view" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%); z-index: 50; padding: 30px; overflow-y: auto;">
+                <!-- Main title and action bar for Accounts -->
+                <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-700">
+                    <h1 class="text-3xl font-bold text-white">All Accounts</h1>
+                    <div class="flex items-center space-x-4">
+                        <button class="flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"/>
+                                <path d="M14 2v6h6"/><path d="M8 15h6"/><path d="M8 19h6"/><path d="M12 11h2"/>
+                            </svg>
+                            <span>Export</span>
+                        </button>
+                        <button class="flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17l4 4 4-4"/></svg>
+                            <span>Import</span>
+                        </button>
+                        <button class="flex items-center px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="showView('dashboard')">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m19 12-7-7-7 7"/><path d="M12 19V5"/>
+                            </svg>
+                            <span>Back</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main content area for filters and accounts list -->
+                <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6">
+
+                    <!-- Filter Sidebar -->
+                    <div class="w-full md:w-1/4 p-4 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        
+                        <!-- Active Filters Section with collapsible functionality -->
+                        <div class="mb-4">
+                            <div class="flex justify-between items-center cursor-pointer p-2 rounded-lg hover:bg-gray-700 transition-colors" onclick="toggleAccountsCollapsible(this)">
+                                <h3 class="font-semibold text-lg text-white">Active Filters</h3>
+                                <svg class="collapsible-icon w-6 h-6 text-gray-400 transform transition-transform rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="m6 9 6 6 6-6"/>
+                                </svg>
+                            </div>
+                            <div class="collapsible-content expanded mt-2">
+                                <p class="text-sm text-gray-400 mb-2">Drag to reorder. Filters are locked in this view.</p>
+                                <div class="flex flex-wrap gap-2" id="accounts-active-filters-container">
+                                    <!-- Draggable filter pills will be dynamically added by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add New Filter Section with collapsible functionality -->
+                        <div class="mb-4">
+                            <div class="flex justify-between items-center cursor-pointer p-2 rounded-lg hover:bg-gray-700 transition-colors" onclick="toggleAccountsCollapsible(this)">
+                                <h3 class="font-semibold text-lg text-white">Add New Filter</h3>
+                                <svg class="collapsible-icon w-6 h-6 text-gray-400 transform transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="m6 9 6 6 6-6"/>
+                                </svg>
+                            </div>
+                            <div class="collapsible-content mt-2">
+                                <div class="space-y-2">
+                                    <!-- Filter options for 'Add New Filter' -->
+                                    <div class="flex items-center justify-between p-2 bg-gray-700 rounded-md">
+                                        <span class="text-sm text-gray-300">Industry & Keywords</span>
+                                        <button class="text-white bg-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-blue-700 transition-colors" onclick="addAccountsFilter('Industry & Keywords')">+</button>
+                                    </div>
+                                    <div class="flex items-center justify-between p-2 bg-gray-700 rounded-md">
+                                        <span class="text-sm text-gray-300">Account Location</span>
+                                        <button class="text-white bg-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-blue-700 transition-colors" onclick="addAccountsFilter('Account Location')">+</button>
+                                    </div>
+                                    <div class="flex items-center justify-between p-2 bg-gray-700 rounded-md">
+                                        <span class="text-sm text-gray-300"># of Employees</span>
+                                        <button class="text-white bg-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-blue-700 transition-colors" onclick="addAccountsFilter('# of Employees')">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accounts List -->
+                    <div class="w-full md:w-3/4 bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-700">
+                        <div class="p-4 bg-gray-700 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <h3 class="text-white font-semibold text-lg">Accounts</h3>
+                                <span class="text-gray-400 text-sm" id="accounts-count">(0 total)</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button class="text-gray-400 hover:text-white transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Accounts Table -->
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-700">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            Name
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            Location
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            Number of Employees
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-700" id="accounts-table-body">
+                                    <!-- Account rows will be dynamically populated -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination controls -->
+                        <div class="p-4 flex items-center justify-between border-t border-gray-700 bg-gray-700">
+                            <p class="text-sm text-gray-400" id="accounts-pagination-info">Showing 0-0 of 0 results</p>
+                            <div class="flex items-center space-x-2">
+                                <button class="p-2 rounded-md text-gray-400 bg-gray-600 hover:bg-gray-500 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="m15 18-6-6 6-6"/>
+                                    </svg>
+                                </button>
+                                <span class="text-white font-semibold">1</span>
+                                <button class="p-2 rounded-md text-gray-400 bg-gray-600 hover:bg-gray-500 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="m9 18 6-6-6-6"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Right Sidebar -->
             <div class="right-sidebar slide-in-right">
                 <!-- Quick Actions -->
