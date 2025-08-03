@@ -797,6 +797,8 @@
             padding: 30px;
             overflow-y: auto;
             transition: left 0.3s ease; /* Smooth transition when sidebar expands */
+            height: calc(100vh - 77px);
+            min-height: calc(100vh - 77px);
         }
 
         /* When sidebar is hovered, adjust page view position */
@@ -1698,8 +1700,8 @@
 
     <!-- Contact Detail View -->
     <div id="contact-detail-view" class="page-view" style="display: none;">
-        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6" style="height: calc(100vh - 77px);">
-            <div class="flex-1 overflow-y-auto pr-6" style="height: 100%; max-height: 100%;">
+        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6" style="height: calc(100vh - 77px); min-height: calc(100vh - 77px);">
+            <div class="flex-1 overflow-y-auto pr-6" style="height: 100%; max-height: calc(100vh - 77px);">
                 <div class="space-y-6">
                     <!-- Top Bar -->
                     <div class="flex items-center justify-between pb-4 border-b border-gray-700">
@@ -1839,8 +1841,8 @@
             </div>
             
             <!-- Right Scrolling Side Panel -->
-            <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700" style="height: 100%; max-height: calc(100vh - 77px);">
-                <div class="space-y-6" style="padding: 20px 0 40px 0;">
+            <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700" style="height: calc(100vh - 77px); max-height: calc(100vh - 77px);">
+                <div class="space-y-6" style="padding: 40px 0 40px 0;">
                     <!-- Add Notes Widget with proper margin -->
                     <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
                         <h3 class="text-lg font-semibold text-white mb-4">Add Notes</h3>
