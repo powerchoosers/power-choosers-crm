@@ -740,6 +740,57 @@
             from { opacity: 0; transform: translateY(-20px) scale(0.95); }
             to { opacity: 1; transform: translateY(0) scale(1); }
         }
+
+        /* Contacts Page Styles */
+        .view-container {
+            display: none;
+        }
+        
+        .view-container.active {
+            display: block;
+        }
+
+        /* Collapsible content styles for contacts */
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+
+        .collapsible-content.expanded {
+            max-height: 500px;
+            transition: max-height 0.5s ease-in-out;
+        }
+
+        .collapsible-icon {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .collapsible-icon.rotated {
+            transform: rotate(180deg);
+        }
+
+        /* Drag and drop filter item styling */
+        .draggable-item {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+        
+        .draggable-item:active {
+            cursor: grabbing;
+        }
+        
+        .draggable-item.dragging {
+            opacity: 0.5;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .drag-placeholder {
+            border: 2px dashed #64748b;
+            background-color: #1e293b;
+            height: 40px;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -947,6 +998,139 @@
                             <div class="activity-title">Call note for Lewis Patterson</div>
                             <div class="activity-description">In poll</div>
                             <div class="activity-time">Time: 8/1/2025 08:36 PM</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contacts View -->
+            <div id="contacts-view" class="view-container" style="display: none;">
+                <div class="main-content">
+                    <!-- Main title and action bar -->
+                    <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-700">
+                        <h1 class="text-3xl font-bold text-white">All Contacts</h1>
+                        <div class="flex items-center space-x-4">
+                            <button class="flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"/>
+                                    <path d="M14 2v6h6"/><path d="M8 15h6"/><path d="M8 19h6"/><path d="M12 11h2"/>
+                                </svg>
+                                <span>Export</span>
+                            </button>
+                            <button class="flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17l4 4 4-4"/>
+                                </svg>
+                                <span>Import</span>
+                            </button>
+                            <button class="flex items-center px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="m19 12-7-7-7 7"/><path d="M12 19V5"/>
+                                </svg>
+                                <span>Sort</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filter and Search Area -->
+                    <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6">
+                        <!-- Filter Sidebar -->
+                        <div class="w-full md:w-1/4 p-4 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                            <!-- Active Filters Section -->
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center cursor-pointer p-2 rounded-lg hover:bg-gray-700 transition-colors" onclick="toggleContactsCollapsible(this)">
+                                    <h3 class="font-semibold text-lg text-white">Active Filters</h3>
+                                    <svg class="collapsible-icon w-6 h-6 text-gray-400 transform transition-transform rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="m6 9 6 6 6-6"/>
+                                    </svg>
+                                </div>
+                                <div class="collapsible-content expanded mt-2">
+                                    <p class="text-sm text-gray-400 mb-2">Drag to reorder. Filters are locked in this view.</p>
+                                    <div class="flex flex-wrap gap-2" id="active-filters-container">
+                                        <!-- Filter pills will be dynamically added -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add New Filter Section -->
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center cursor-pointer p-2 rounded-lg hover:bg-gray-700 transition-colors" onclick="toggleContactsCollapsible(this)">
+                                    <h3 class="font-semibold text-lg text-white">Add New Filter</h3>
+                                    <svg class="collapsible-icon w-6 h-6 text-gray-400 transform transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="m6 9 6 6 6-6"/>
+                                    </svg>
+                                </div>
+                                <div class="collapsible-content mt-2">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between p-2 bg-gray-700 rounded-md">
+                                            <span class="text-sm text-gray-300">Company</span>
+                                            <button class="text-white bg-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-blue-700 transition-colors" onclick="addContactsFilter('Company')">+</button>
+                                        </div>
+                                        <div class="flex items-center justify-between p-2 bg-gray-700 rounded-md">
+                                            <span class="text-sm text-gray-300">Job Title</span>
+                                            <button class="text-white bg-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-blue-700 transition-colors" onclick="addContactsFilter('Job Title')">+</button>
+                                        </div>
+                                        <div class="flex items-center justify-between p-2 bg-gray-700 rounded-md">
+                                            <span class="text-sm text-gray-300">Location</span>
+                                            <button class="text-white bg-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-blue-700 transition-colors" onclick="addContactsFilter('Location')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contacts List -->
+                        <div class="w-full md:w-3/4 bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-700">
+                            <div class="p-4 bg-gray-700 flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <h3 class="text-white font-semibold text-lg">Contacts</h3>
+                                    <span class="text-gray-400 text-sm" id="contacts-count">(0 total)</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button class="text-gray-400 hover:text-white transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Contacts Table -->
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-700">
+                                    <thead class="bg-gray-700">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Job Title</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Company</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Email</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Phone</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-700" id="contacts-table-body">
+                                        <!-- Contact rows will be dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Pagination -->
+                            <div class="p-4 flex items-center justify-between border-t border-gray-700 bg-gray-700">
+                                <p class="text-sm text-gray-400" id="contacts-pagination-info">Showing 0-0 of 0 results</p>
+                                <div class="flex items-center space-x-2">
+                                    <button class="p-2 rounded-md text-gray-400 bg-gray-600 hover:bg-gray-500 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="m15 18-6-6 6-6"/>
+                                        </svg>
+                                    </button>
+                                    <span class="text-white font-semibold">1</span>
+                                    <button class="p-2 rounded-md text-gray-400 bg-gray-600 hover:bg-gray-500 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="m9 18 6-6-6-6"/>
+                                        </svg>
+                                    </button>
+                                    </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1341,7 +1525,45 @@
         }
 
         // Navigation and Action Functions
-        function showView(viewName) { console.log(`Navigating to ${viewName}`); }
+        function showView(viewName) {
+            console.log(`Navigating to ${viewName}`);
+            
+            // Hide all view containers
+            document.querySelectorAll('.view-container').forEach(view => {
+                view.classList.remove('active');
+                view.style.display = 'none';
+            });
+            
+            // Show the main dashboard content by default
+            const mainContent = document.querySelector('.main-content');
+            const rightSidebar = document.querySelector('.right-sidebar');
+            
+            if (viewName === 'contacts') {
+                // Hide main dashboard content
+                if (mainContent) mainContent.style.display = 'none';
+                if (rightSidebar) rightSidebar.style.display = 'none';
+                
+                // Show contacts view
+                const contactsView = document.getElementById('contacts-view');
+                if (contactsView) {
+                    contactsView.classList.add('active');
+                    contactsView.style.display = 'block';
+                    renderContactsPage();
+                }
+            } else {
+                // Show main dashboard content
+                if (mainContent) mainContent.style.display = 'flex';
+                if (rightSidebar) rightSidebar.style.display = 'block';
+                
+                // Hide contacts view
+                const contactsView = document.getElementById('contacts-view');
+                if (contactsView) {
+                    contactsView.classList.remove('active');
+                    contactsView.style.display = 'none';
+                }
+            }
+        }
+        
         function toggleNotifications() { console.log('Toggle notifications'); }
         function addAccount() { console.log('Opening Add Account modal'); }
         function addContact() { console.log('Opening Add Contact modal'); }
@@ -1349,6 +1571,208 @@
         function openRateCalculator() { console.log('Opening Rate Calculator'); }
         function openUsageAnalyzer() { console.log('Opening Usage Analyzer'); }
         function openContractManager() { console.log('Opening Contract Manager'); }
+
+        // Contacts Page Functions
+        function renderContactsPage() {
+            initializeContactsFilters();
+            renderContactsTable();
+            updateContactsCount();
+        }
+
+        function initializeContactsFilters() {
+            const activeFiltersContainer = document.getElementById('active-filters-container');
+            if (!activeFiltersContainer) return;
+
+            // Clear existing filters
+            activeFiltersContainer.innerHTML = '';
+
+            // Sample active filters
+            const initialFilters = [
+                { id: 'filter-job-title', text: 'Job Title' },
+                { id: 'filter-company', text: 'Company' },
+                { id: 'filter-location', text: 'Location' }
+            ];
+
+            initialFilters.forEach(filter => {
+                const pill = createContactsFilterPill(filter.text, filter.id);
+                activeFiltersContainer.appendChild(pill);
+            });
+
+            setupContactsFilterDragDrop();
+        }
+
+        function createContactsFilterPill(text, id) {
+            const pill = document.createElement('div');
+            pill.id = id;
+            pill.className = 'draggable-item flex items-center px-3 py-1 bg-blue-600 text-white rounded-full text-sm shadow-md transition-shadow hover:shadow-lg cursor-move';
+            pill.setAttribute('draggable', 'true');
+            pill.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-white-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 14v-2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><path d="M4 10v-2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/>
+                </svg>
+                <span>${text}</span>
+                <button class="ml-2 text-white opacity-75 hover:opacity-100" onclick="removeContactsFilter('${id}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            `;
+            return pill;
+        }
+
+        function setupContactsFilterDragDrop() {
+            const activeFiltersContainer = document.getElementById('active-filters-container');
+            if (!activeFiltersContainer) return;
+
+            let draggedItem = null;
+
+            activeFiltersContainer.addEventListener('dragstart', (e) => {
+                draggedItem = e.target.closest('.draggable-item');
+                if (!draggedItem) return;
+                draggedItem.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', null);
+            });
+
+            activeFiltersContainer.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const target = e.target.closest('.draggable-item');
+                const container = activeFiltersContainer;
+
+                if (!draggedItem || !target || target === draggedItem) return;
+
+                const boundingBox = target.getBoundingClientRect();
+                const offset = e.clientY - boundingBox.top;
+                const isAfter = offset > boundingBox.height / 2;
+
+                if (isAfter && target.nextElementSibling !== draggedItem) {
+                    container.insertBefore(draggedItem, target.nextElementSibling);
+                } else if (!isAfter && target.previousElementSibling !== draggedItem) {
+                    container.insertBefore(draggedItem, target);
+                }
+            });
+
+            activeFiltersContainer.addEventListener('dragend', () => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem = null;
+                }
+            });
+        }
+
+        function renderContactsTable() {
+            const tableBody = document.getElementById('contacts-table-body');
+            if (!tableBody) return;
+
+            // Clear existing content
+            tableBody.innerHTML = '';
+
+            // Render contacts from CRMApp.contacts
+            if (CRMApp.contacts && CRMApp.contacts.length > 0) {
+                CRMApp.contacts.forEach(contact => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-700 transition-colors';
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-white">${contact.firstName} ${contact.lastName}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-300">${contact.title || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-300">${contact.accountName || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-300">${contact.email || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-300">${contact.phone || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div class="flex items-center space-x-2">
+                                <button class="text-gray-400 hover:text-blue-500 transition-colors" onclick="openContactModal(CRMApp.contacts.find(c => c.id === '${contact.id}'))" title="Edit Contact">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                                    </svg>
+                                </button>
+                                <button class="text-gray-400 hover:text-green-500 transition-colors" onclick="openCallsHubWithData('${contact.id}')" title="Call Contact">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                                    </svg>
+                                </button>
+                                <button class="text-gray-400 hover:text-red-500 transition-colors" onclick="deleteContact('${contact.id}')" title="Delete Contact">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } else {
+                // Show empty state
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = `
+                    <td colspan="6" class="px-6 py-8 text-center text-gray-400">
+                        <div class="flex flex-col items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            <p class="text-lg font-medium">No contacts found</p>
+                            <p class="text-sm">Add your first contact to get started</p>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(emptyRow);
+            }
+        }
+
+        function updateContactsCount() {
+            const countElement = document.getElementById('contacts-count');
+            const paginationInfo = document.getElementById('contacts-pagination-info');
+            
+            if (countElement) {
+                const totalContacts = CRMApp.contacts ? CRMApp.contacts.length : 0;
+                countElement.textContent = `(${totalContacts} total)`;
+            }
+            
+            if (paginationInfo) {
+                const totalContacts = CRMApp.contacts ? CRMApp.contacts.length : 0;
+                const showing = Math.min(totalContacts, 25);
+                paginationInfo.textContent = `Showing 1-${showing} of ${totalContacts} results`;
+            }
+        }
+
+        function toggleContactsCollapsible(element) {
+            const content = element.nextElementSibling;
+            const icon = element.querySelector('.collapsible-icon');
+
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                icon.classList.remove('rotated');
+            } else {
+                content.classList.add('expanded');
+                icon.classList.add('rotated');
+            }
+        }
+
+        function addContactsFilter(filterName) {
+            const container = document.getElementById('active-filters-container');
+            if (!container) return;
+            
+            const newFilterId = `filter-${Date.now()}`;
+            const pill = createContactsFilterPill(filterName, newFilterId);
+            container.appendChild(pill);
+        }
+
+        function removeContactsFilter(id) {
+            const filter = document.getElementById(id);
+            if (filter) {
+                filter.remove();
+            }
+        }
 
         // Initialize app when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
