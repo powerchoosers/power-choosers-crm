@@ -1690,8 +1690,8 @@
 
     <!-- Contact Detail View -->
     <div id="contact-detail-view" class="page-view" style="display: none;">
-        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 h-screen overflow-hidden">
-            <div class="flex-1 overflow-y-auto pr-6">
+        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 h-full">
+            <div class="flex-1 overflow-y-auto pr-6" style="height: calc(100vh - 107px); max-height: calc(100vh - 107px);">
                 <div class="space-y-6">
                     <!-- Top Bar -->
                     <div class="flex items-center justify-between pb-4 border-b border-gray-700">
@@ -1806,29 +1806,24 @@
                         </div>
                     </div>
                     <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                        <h3 class="text-lg font-semibold text-white mb-4">Recent Activities</h3>
-                        <div class="space-y-4">
-                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
-                                <div class="flex-shrink-0">
-                                    <div class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-white">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                    </div>
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-sm font-medium text-white">Called Lewis Patterson about energy contract renewal</p>
-                                    <p class="text-xs text-gray-400">August 2, 2025 at 2:30 PM</p>
-                                </div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-white">Recent Activities</h3>
+                            <div class="flex items-center space-x-2" id="activities-navigation" style="display: none;">
+                                <button id="activities-prev" class="p-1 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors" onclick="scrollActivities('prev')">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+                                <button id="activities-next" class="p-1 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors" onclick="scrollActivities('next')">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
                             </div>
-                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
-                                <div class="flex-shrink-0">
-                                    <div class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-white">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                    </div>
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-sm font-medium text-white">Sent email with rate comparison analysis</p>
-                                    <p class="text-xs text-gray-400">August 1, 2025 at 10:15 AM</p>
-                                </div>
+                        </div>
+                        <div class="overflow-hidden">
+                            <div class="space-y-4 transition-transform duration-300" id="activities-container">
+                                <!-- Activities will be populated dynamically -->
                             </div>
                         </div>
                     </div>
@@ -1836,8 +1831,8 @@
             </div>
             
             <!-- Right Scrolling Side Panel -->
-            <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700">
-                <div class="space-y-6">
+            <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700" style="height: calc(100vh - 107px); max-height: calc(100vh - 107px);">
+                <div class="space-y-6 pt-6">
                     <!-- Add Notes Widget with proper margin -->
                     <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
                         <h3 class="text-lg font-semibold text-white mb-4">Add Notes</h3>
@@ -3219,7 +3214,11 @@
         // Enhanced Field Editing with Firebase Save
         const editField = async (field) => {
             const fieldElement = document.querySelector(`.detail-field[data-field="${field}"]`);
+            if (!fieldElement) return;
+            
             const currentValueElement = fieldElement.querySelector('p:last-child');
+            if (!currentValueElement) return;
+            
             const currentValue = currentValueElement.textContent === 'N/A' || currentValueElement.textContent === 'Contact summary will be loaded dynamically...' ? '' : currentValueElement.textContent;
             
             // Use textarea for summary field, input for others
@@ -3243,10 +3242,15 @@
         
         const saveField = async (field, newValue) => {
             const fieldElement = document.querySelector(`.detail-field[data-field="${field}"]`);
+            if (!fieldElement) return;
+            
+            const inputElement = fieldElement.querySelector('input, textarea');
+            if (!inputElement) return;
+            
             const p = document.createElement('p');
             p.className = 'text-white font-medium';
             p.textContent = newValue || 'N/A';
-            fieldElement.querySelector('input').replaceWith(p);
+            inputElement.replaceWith(p);
             
             // Save to Firebase and local contact object
             if (CRMApp.currentContact) {
@@ -3272,7 +3276,7 @@
                             [contactField]: newValue,
                             updatedAt: serverTimestamp()
                         });
-                        showToast(`${field} updated successfully!`, 'success');
+                        showToast(`${field.replace('-', ' ')} updated successfully!`, 'success');
                     }
                     
                     // Update contact name if first or last name changed
@@ -3300,10 +3304,15 @@
         
         const copyField = (field) => {
             const fieldElement = document.querySelector(`.detail-field[data-field="${field}"]`);
-            const value = fieldElement.querySelector('p:last-child').textContent;
-            if (value && value !== 'N/A') {
+            if (!fieldElement) return;
+            
+            const valueElement = fieldElement.querySelector('p:last-child');
+            if (!valueElement) return;
+            
+            const value = valueElement.textContent;
+            if (value && value !== 'N/A' && value !== 'Contact summary will be loaded dynamically...') {
                 navigator.clipboard.writeText(value).then(() => {
-                    showToast(`${field} copied to clipboard!`, 'success');
+                    showToast(`${field.replace('-', ' ')} copied: "${value}"`, 'success');
                 }).catch(() => {
                     // Fallback for older browsers
                     const tempInput = document.createElement('textarea');
@@ -3312,8 +3321,10 @@
                     tempInput.select();
                     document.execCommand('copy');
                     document.body.removeChild(tempInput);
-                    showToast(`${field} copied to clipboard!`, 'success');
+                    showToast(`${field.replace('-', ' ')} copied: "${value}"`, 'success');
                 });
+            } else {
+                showToast('No content to copy', 'error');
             }
         };
 
@@ -3401,9 +3412,14 @@
             }
         }
         
-        // Dynamic Recent Activities Function
+        // Activities carousel state
+        let activitiesCurrentIndex = 0;
+        const activitiesPerPage = 4;
+        
+        // Dynamic Recent Activities Function with Carousel
         function populateRecentActivities(contact) {
-            const activitiesContainer = document.querySelector('#contact-detail-view .space-y-4');
+            const activitiesContainer = document.getElementById('activities-container');
+            const navigationContainer = document.getElementById('activities-navigation');
             if (!activitiesContainer) return;
             
             // Filter activities for this contact and their company
@@ -3414,23 +3430,21 @@
                        (contact.accountName && activity.description.toLowerCase().includes(contact.accountName.toLowerCase()));
             });
             
+            // Show/hide navigation based on number of activities
+            if (contactActivities.length > activitiesPerPage) {
+                navigationContainer.style.display = 'flex';
+            } else {
+                navigationContainer.style.display = 'none';
+            }
+            
             if (contactActivities.length > 0) {
-                activitiesContainer.innerHTML = contactActivities.map(activity => `
-                    <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
-                        <div class="flex-shrink-0">
-                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-white font-medium">${activity.description}</p>
-                            <p class="text-gray-400 text-sm">${activity.noteContent || ''}</p>
-                            <p class="text-gray-500 text-xs mt-1">${new Date(activity.createdAt).toLocaleString()}</p>
-                        </div>
-                    </div>
-                `).join('');
+                // Reset index when repopulating
+                activitiesCurrentIndex = 0;
+                
+                // Store all activities for carousel
+                CRMApp.currentContactActivities = contactActivities;
+                
+                renderActivitiesPage();
             } else {
                 activitiesContainer.innerHTML = `
                     <div class="text-center py-8 text-gray-400">
@@ -3440,6 +3454,91 @@
                         <p>No recent activities found for ${contactName}</p>
                     </div>
                 `;
+            }
+        }
+        
+        // Render current page of activities
+        function renderActivitiesPage() {
+            const activitiesContainer = document.getElementById('activities-container');
+            const activities = CRMApp.currentContactActivities || [];
+            
+            const startIndex = activitiesCurrentIndex;
+            const endIndex = Math.min(startIndex + activitiesPerPage, activities.length);
+            const currentPageActivities = activities.slice(startIndex, endIndex);
+            
+            activitiesContainer.innerHTML = currentPageActivities.map(activity => {
+                const iconSvg = getActivityIcon(activity.type);
+                return `
+                    <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white">
+                                ${iconSvg}
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-white font-medium">${activity.description}</p>
+                            ${activity.noteContent ? `<p class="text-gray-400 text-sm">${activity.noteContent}</p>` : ''}
+                            <p class="text-gray-500 text-xs mt-1">${new Date(activity.createdAt).toLocaleString()}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Update navigation button states
+            updateActivitiesNavigation();
+        }
+        
+        // Scroll activities carousel
+        function scrollActivities(direction) {
+            const activities = CRMApp.currentContactActivities || [];
+            const maxIndex = Math.max(0, activities.length - activitiesPerPage);
+            
+            if (direction === 'next' && activitiesCurrentIndex < maxIndex) {
+                activitiesCurrentIndex += activitiesPerPage;
+            } else if (direction === 'prev' && activitiesCurrentIndex > 0) {
+                activitiesCurrentIndex -= activitiesPerPage;
+            }
+            
+            // Ensure index doesn't go out of bounds
+            activitiesCurrentIndex = Math.max(0, Math.min(activitiesCurrentIndex, maxIndex));
+            
+            renderActivitiesPage();
+        }
+        
+        // Update navigation button states
+        function updateActivitiesNavigation() {
+            const activities = CRMApp.currentContactActivities || [];
+            const prevBtn = document.getElementById('activities-prev');
+            const nextBtn = document.getElementById('activities-next');
+            
+            if (prevBtn && nextBtn) {
+                prevBtn.disabled = activitiesCurrentIndex === 0;
+                nextBtn.disabled = activitiesCurrentIndex >= activities.length - activitiesPerPage;
+                
+                prevBtn.className = activitiesCurrentIndex === 0
+                    ? 'p-1 rounded-full bg-gray-700 text-gray-600 cursor-not-allowed'
+                    : 'p-1 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors cursor-pointer';
+                    
+                nextBtn.className = activitiesCurrentIndex >= activities.length - activitiesPerPage
+                    ? 'p-1 rounded-full bg-gray-700 text-gray-600 cursor-not-allowed'
+                    : 'p-1 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors cursor-pointer';
+            }
+        }
+        
+        // Get appropriate icon for activity type
+        function getActivityIcon(type) {
+            switch (type) {
+                case 'call':
+                case 'call_note':
+                    return '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>';
+                case 'email':
+                    return '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>';
+                case 'note':
+                    return '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>';
+                case 'task':
+                    return '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>';
+                default:
+                    return '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
             }
         }
 
@@ -3646,7 +3745,7 @@
             }
         }
         
-        // Save contact note
+        // Save contact note and add to activities
         function saveContactNote() {
             const noteText = document.getElementById('contact-notes').value.trim();
             if (!noteText) {
@@ -3655,22 +3754,38 @@
             }
             
             if (CRMApp.currentContact) {
+                // Save note to contact
                 if (!CRMApp.currentContact.notes) CRMApp.currentContact.notes = [];
                 
                 const newNote = {
                     id: Date.now().toString(),
                     text: noteText,
                     createdAt: new Date(),
-                    createdBy: 'Current User' // In real app, this would be the logged-in user
+                    createdBy: 'Current User'
                 };
                 
                 CRMApp.currentContact.notes.push(newNote);
                 
+                // Add to activities
+                const newActivity = {
+                    id: Date.now().toString(),
+                    type: 'note',
+                    description: `Added note for ${CRMApp.currentContact.firstName || CRMApp.currentContact.name || 'contact'}`,
+                    noteContent: noteText,
+                    contactId: CRMApp.currentContact.id,
+                    createdAt: new Date()
+                };
+                
+                CRMApp.activities.unshift(newActivity); // Add to beginning of activities
+                
                 // Clear the textarea
                 document.getElementById('contact-notes').value = '';
                 
-                showToast('Note saved successfully!', 'success');
-                console.log('Note saved to contact:', newNote);
+                // Refresh activities display
+                populateRecentActivities(CRMApp.currentContact);
+                
+                showToast('Note saved and added to activities!', 'success');
+                console.log('Note saved to contact and activities:', newNote);
             }
         }
         
