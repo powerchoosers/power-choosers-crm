@@ -2662,39 +2662,6 @@
             
             // Populate recent activities
             populateRecentActivities(contact);
-            
-            // Populate recent activities
-            const activitiesContainer = document.getElementById('contact-activities');
-            const contactActivities = CRMApp.activities.filter(activity =>
-                activity.contactId === contact.id ||
-                activity.description.toLowerCase().includes(contact.firstName.toLowerCase())
-            );
-            
-            if (contactActivities.length > 0) {
-                activitiesContainer.innerHTML = contactActivities.map(activity => `
-                    <div class="flex items-start space-x-3 p-3 bg-gray-700 rounded-lg">
-                        <div class="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-white font-medium">${activity.description}</p>
-                            <p class="text-gray-400 text-sm">${activity.noteContent || ''}</p>
-                            <p class="text-gray-500 text-xs mt-1">${new Date(activity.createdAt).toLocaleString()}</p>
-                        </div>
-                    </div>
-                `).join('');
-            } else {
-                activitiesContainer.innerHTML = `
-                    <div class="text-center py-8 text-gray-400">
-                        <svg class="w-12 h-12 mx-auto mb-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <p>No recent activities</p>
-                    </div>
-                `;
-            }
         }
         
         function populateAccountDetail(account) {
@@ -3221,7 +3188,7 @@
             }
         }
         
-        // Enhanced Field Editing with Firebase Save
+        // Enhanced Field Editing with Save/Cancel buttons
         const editField = async (field) => {
             const fieldElement = document.querySelector(`.detail-field[data-field="${field}"]`);
             if (!fieldElement) return;
@@ -3231,36 +3198,81 @@
             
             const currentValue = currentValueElement.textContent === 'N/A' || currentValueElement.textContent === 'Contact summary will be loaded dynamically...' ? '' : currentValueElement.textContent;
             
+            // Create container for input and buttons
+            const editContainer = document.createElement('div');
+            editContainer.className = 'edit-field-container';
+            
             // Use textarea for summary field, input for others
             const inputElement = field === 'contact-summary' ? document.createElement('textarea') : document.createElement('input');
             
             if (field === 'contact-summary') {
                 inputElement.value = currentValue;
-                inputElement.className = 'form-input !p-2 !text-sm w-full text-white bg-gray-700 border border-gray-600 rounded focus:border-blue-500 min-h-20';
+                inputElement.className = 'form-input !p-2 !text-sm w-full text-white bg-gray-700 border border-gray-600 rounded focus:border-blue-500 min-h-20 mb-2';
                 inputElement.rows = 3;
             } else {
                 inputElement.type = getInputType(field);
                 inputElement.value = currentValue;
-                inputElement.className = 'form-input !p-2 !text-sm w-full text-white bg-gray-700 border border-gray-600 rounded focus:border-blue-500';
-                inputElement.onkeypress = (e) => { if (e.key === 'Enter') inputElement.blur(); };
+                inputElement.className = 'form-input !p-2 !text-sm w-full text-white bg-gray-700 border border-gray-600 rounded focus:border-blue-500 mb-2';
             }
             
-            inputElement.onblur = () => saveField(field, inputElement.value);
-            currentValueElement.replaceWith(inputElement);
+            // Create button container
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'flex items-center space-x-2';
+            
+            // Create Save button
+            const saveButton = document.createElement('button');
+            saveButton.className = 'px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-black font-medium rounded text-sm transition-colors';
+            saveButton.textContent = 'Save';
+            saveButton.onclick = () => saveField(field, inputElement.value, currentValue);
+            
+            // Create Cancel button
+            const cancelButton = document.createElement('button');
+            cancelButton.className = 'px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded text-sm transition-colors';
+            cancelButton.textContent = 'Cancel';
+            cancelButton.onclick = () => cancelEdit(field, currentValue);
+            
+            // Handle Enter key for save
+            inputElement.onkeypress = (e) => {
+                if (e.key === 'Enter' && field !== 'contact-summary') {
+                    e.preventDefault();
+                    saveField(field, inputElement.value, currentValue);
+                }
+            };
+            
+            // Handle Escape key for cancel
+            inputElement.onkeydown = (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelEdit(field, currentValue);
+                }
+            };
+            
+            // Assemble the edit container
+            buttonContainer.appendChild(saveButton);
+            buttonContainer.appendChild(cancelButton);
+            editContainer.appendChild(inputElement);
+            editContainer.appendChild(buttonContainer);
+            
+            // Replace the current value with edit container
+            currentValueElement.replaceWith(editContainer);
             inputElement.focus();
+            inputElement.select();
         };
         
-        const saveField = async (field, newValue) => {
+        const saveField = async (field, newValue, originalValue) => {
             const fieldElement = document.querySelector(`.detail-field[data-field="${field}"]`);
             if (!fieldElement) return;
             
-            const inputElement = fieldElement.querySelector('input, textarea');
-            if (!inputElement) return;
+            const editContainer = fieldElement.querySelector('.edit-field-container');
+            if (!editContainer) return;
             
+            // Create new paragraph element
             const p = document.createElement('p');
             p.className = 'text-white font-medium';
             p.textContent = newValue || 'N/A';
-            inputElement.replaceWith(p);
+            
+            // Replace edit container with paragraph
+            editContainer.replaceWith(p);
             
             // Save to Firebase and local contact object
             if (CRMApp.currentContact) {
@@ -3295,14 +3307,32 @@
                         document.getElementById('contact-profile-initials').textContent = getInitials(fullName);
                     }
                     
-                    showToast(`${field.replace('-', ' ')} updated successfully!`, 'success');
+                    showToast(`Contact saved`, 'success');
                     
                 } catch (error) {
                     console.error('Error saving to Firebase:', error);
                     // Still show success since local data was updated
-                    showToast(`${field.replace('-', ' ')} updated successfully!`, 'success');
+                    showToast(`Contact saved`, 'success');
                 }
             }
+        };
+        
+        const cancelEdit = (field, originalValue) => {
+            const fieldElement = document.querySelector(`.detail-field[data-field="${field}"]`);
+            if (!fieldElement) return;
+            
+            const editContainer = fieldElement.querySelector('.edit-field-container');
+            if (!editContainer) return;
+            
+            // Create paragraph element with original value
+            const p = document.createElement('p');
+            p.className = 'text-white font-medium';
+            p.textContent = originalValue || 'N/A';
+            
+            // Replace edit container with original paragraph
+            editContainer.replaceWith(p);
+            
+            showToast('Edit cancelled', 'success');
         };
         
         function getInputType(field) {
