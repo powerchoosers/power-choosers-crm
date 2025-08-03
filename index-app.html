@@ -1642,8 +1642,13 @@
             console.log(`Navigating to ${viewName}`);
             
             const contactsView = document.getElementById('contacts-view');
+            const accountsView = document.getElementById('accounts-view');
             const mainContent = document.querySelector('.main-content');
             const rightSidebar = document.querySelector('.right-sidebar');
+            
+            // Hide all views first
+            if (contactsView) contactsView.style.display = 'none';
+            if (accountsView) accountsView.style.display = 'none';
             
             if (viewName === 'contacts') {
                 // Show contacts view
@@ -1654,11 +1659,18 @@
                 // Hide main dashboard content
                 if (mainContent) mainContent.style.display = 'none';
                 if (rightSidebar) rightSidebar.style.display = 'none';
+            } else if (viewName === 'accounts') {
+                // Show accounts view
+                if (accountsView) {
+                    accountsView.style.display = 'block';
+                    renderAccountsPage();
+                }
+                // Hide main dashboard content
+                if (mainContent) mainContent.style.display = 'none';
+                if (rightSidebar) rightSidebar.style.display = 'none';
             } else {
-                // Hide contacts view
-                if (contactsView) contactsView.style.display = 'none';
-                // Show main dashboard content
-                if (mainContent) mainContent.style.display = 'flex';
+                // Show main dashboard content (default view)
+                if (mainContent) mainContent.style.display = 'block';
                 if (rightSidebar) rightSidebar.style.display = 'block';
             }
         }
@@ -1676,6 +1688,205 @@
             initializeContactsFilters();
             renderContactsTable();
             updateContactsCount();
+        }
+
+        // Accounts Page Functions
+        function renderAccountsPage() {
+            initializeAccountsFilters();
+            renderAccountsTable();
+            updateAccountsCount();
+        }
+
+        function initializeAccountsFilters() {
+            const activeFiltersContainer = document.getElementById('accounts-active-filters-container');
+            if (!activeFiltersContainer) return;
+
+            // Clear existing filters
+            activeFiltersContainer.innerHTML = '';
+
+            // Sample active filters for accounts
+            const initialFilters = [
+                { id: 'accounts-filter-industry', text: 'Industry & Keywords' },
+                { id: 'accounts-filter-location', text: 'Account Location' },
+                { id: 'accounts-filter-employees', text: '# of Employees' }
+            ];
+
+            initialFilters.forEach(filter => {
+                const pill = createAccountsFilterPill(filter.text, filter.id);
+                activeFiltersContainer.appendChild(pill);
+            });
+
+            setupAccountsFilterDragDrop();
+        }
+
+        function createAccountsFilterPill(text, id) {
+            const pill = document.createElement('div');
+            pill.id = id;
+            pill.className = 'draggable-item flex items-center px-3 py-1 bg-blue-600 text-white rounded-full text-sm shadow-md transition-shadow hover:shadow-lg cursor-move';
+            pill.setAttribute('draggable', 'true');
+            pill.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-white-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 14v-2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><path d="M4 10v-2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/>
+                </svg>
+                <span>${text}</span>
+                <button class="ml-2 text-white opacity-75 hover:opacity-100" onclick="removeAccountsFilter('${id}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            `;
+            return pill;
+        }
+
+        function setupAccountsFilterDragDrop() {
+            const activeFiltersContainer = document.getElementById('accounts-active-filters-container');
+            if (!activeFiltersContainer) return;
+
+            let draggedItem = null;
+
+            activeFiltersContainer.addEventListener('dragstart', (e) => {
+                draggedItem = e.target.closest('.draggable-item');
+                if (!draggedItem) return;
+                draggedItem.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', null);
+            });
+
+            activeFiltersContainer.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const target = e.target.closest('.draggable-item');
+                const container = activeFiltersContainer;
+
+                if (!draggedItem || !target || target === draggedItem) return;
+
+                const boundingBox = target.getBoundingClientRect();
+                const offset = e.clientY - boundingBox.top;
+                const isAfter = offset > boundingBox.height / 2;
+
+                if (isAfter && target.nextElementSibling !== draggedItem) {
+                    container.insertBefore(draggedItem, target.nextElementSibling);
+                } else if (!isAfter && target.previousElementSibling !== draggedItem) {
+                    container.insertBefore(draggedItem, target);
+                }
+            });
+
+            activeFiltersContainer.addEventListener('dragend', () => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem = null;
+                }
+            });
+        }
+
+        function renderAccountsTable() {
+            const tableBody = document.getElementById('accounts-table-body');
+            if (!tableBody) return;
+
+            // Clear existing content
+            tableBody.innerHTML = '';
+
+            // Render accounts from CRMApp.accounts
+            if (CRMApp.accounts && CRMApp.accounts.length > 0) {
+                CRMApp.accounts.forEach(account => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-700 transition-colors';
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-white">${account.name}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-300">${account.city || 'N/A'}, ${account.state || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-300">${account.employees || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div class="flex items-center space-x-2">
+                                <button class="text-gray-400 hover:text-blue-500 transition-colors" title="Edit Account">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                                    </svg>
+                                </button>
+                                <button class="text-gray-400 hover:text-green-500 transition-colors" title="View Details">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                                <button class="text-gray-400 hover:text-red-500 transition-colors" title="Delete Account">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } else {
+                // Show empty state
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = `
+                    <td colspan="4" class="px-6 py-8 text-center text-gray-400">
+                        <div class="flex flex-col items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            <p class="text-lg font-medium">No accounts found</p>
+                            <p class="text-sm">Add your first account to get started</p>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(emptyRow);
+            }
+        }
+
+        function updateAccountsCount() {
+            const countElement = document.getElementById('accounts-count');
+            const paginationInfo = document.getElementById('accounts-pagination-info');
+            
+            if (countElement) {
+                const totalAccounts = CRMApp.accounts ? CRMApp.accounts.length : 0;
+                countElement.textContent = `(${totalAccounts} total)`;
+            }
+            
+            if (paginationInfo) {
+                const totalAccounts = CRMApp.accounts ? CRMApp.accounts.length : 0;
+                const showing = Math.min(totalAccounts, 25);
+                paginationInfo.textContent = `Showing 1-${showing} of ${totalAccounts} results`;
+            }
+        }
+
+        function toggleAccountsCollapsible(element) {
+            const content = element.nextElementSibling;
+            const icon = element.querySelector('.collapsible-icon');
+
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                icon.classList.remove('rotated');
+            } else {
+                content.classList.add('expanded');
+                icon.classList.add('rotated');
+            }
+        }
+
+        function addAccountsFilter(filterName) {
+            const container = document.getElementById('accounts-active-filters-container');
+            if (!container) return;
+            
+            const newFilterId = `accounts-filter-${Date.now()}`;
+            const pill = createAccountsFilterPill(filterName, newFilterId);
+            container.appendChild(pill);
+        }
+
+        function removeAccountsFilter(id) {
+            const filter = document.getElementById(id);
+            if (filter) {
+                filter.remove();
+            }
         }
 
         function initializeContactsFilters() {
