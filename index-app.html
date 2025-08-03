@@ -800,12 +800,56 @@
             left: 250px; /* Expanded sidebar width */
         }
 
-        /* Account Detail Page Styles from accounts-page.html */
-        .detail-field { position: relative; cursor: pointer; padding: 5px 0; }
-        .detail-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(30,64,175,0.8); border-radius: 8px; display: flex; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease; }
-        .detail-field:hover .detail-overlay { opacity: 1; }
-        .overlay-button { background: none; border: none; color: white; padding: 8px; transition: all 0.2s ease; }
-        .overlay-button:hover { background: rgba(255,255,255,0.2); border-radius: 50%; }
+        /* Account Detail Page Styles - Enhanced for better hover functionality */
+        .detail-field {
+            position: relative;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            min-height: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .detail-field:hover {
+            background: rgba(30, 64, 175, 0.1);
+        }
+        .detail-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(30,64,175,0.9);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+        .detail-field:hover .detail-overlay {
+            opacity: 1;
+        }
+        .overlay-button {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 12px;
+            margin: 0 4px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .overlay-button:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+            transform: translateY(-1px);
+        }
         .calculator-wrapper { background: linear-gradient(135deg, var(--dark-blue), var(--header-blue)); border-radius: 15px; padding: 24px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); border: 1px solid var(--bg-hover); transition: all 0.3s ease; }
         .calculator-wrapper.is-calculating { animation: pulse-border 1.5s infinite; }
         @keyframes pulse-border { 0% { border-color: var(--bg-hover); } 50% { border-color: var(--professional-blue); } 100% { border-color: var(--bg-hover); } }
@@ -1574,6 +1618,72 @@
         </div>
     </div>
 
+    <!-- Edit Contact Modal -->
+    <div id="edit-contact-modal" class="profile-modal">
+        <div class="profile-modal-content" style="max-width: 600px; height: auto; max-height: 80vh; overflow-y: auto;">
+            <div class="profile-modal-title">Edit Contact</div>
+            
+            <form id="edit-contact-form" onsubmit="saveEditedContact(event)">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="mb-4">
+                        <label for="edit-contact-first-name" class="block text-sm font-medium text-gray-300 mb-2">First Name</label>
+                        <input type="text" id="edit-contact-first-name" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="edit-contact-last-name" class="block text-sm font-medium text-gray-300 mb-2">Last Name</label>
+                        <input type="text" id="edit-contact-last-name" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="edit-contact-title" class="block text-sm font-medium text-gray-300 mb-2">Job Title</label>
+                        <input type="text" id="edit-contact-title" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="edit-contact-company" class="block text-sm font-medium text-gray-300 mb-2">Company</label>
+                        <input type="text" id="edit-contact-company" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="edit-contact-email" class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                        <input type="email" id="edit-contact-email" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="edit-contact-phone" class="block text-sm font-medium text-gray-300 mb-2">Phone</label>
+                        <input type="tel" id="edit-contact-phone" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="edit-contact-location" class="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                        <input type="text" id="edit-contact-location" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="edit-contact-department" class="block text-sm font-medium text-gray-300 mb-2">Department</label>
+                        <input type="text" id="edit-contact-department" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4 md:col-span-2">
+                        <label for="edit-contact-linkedin" class="block text-sm font-medium text-gray-300 mb-2">LinkedIn Profile URL</label>
+                        <input type="url" id="edit-contact-linkedin" placeholder="https://www.linkedin.com/in/username" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="edit-contact-summary" class="block text-sm font-medium text-gray-300 mb-2">Contact Summary</label>
+                    <textarea id="edit-contact-summary" rows="4" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500" placeholder="Brief description of the contact..."></textarea>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn secondary" onclick="closeEditContactModal()">Cancel</button>
+                    <button type="submit" class="modal-btn primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Contact Detail View -->
     <div id="contact-detail-view" class="page-view" style="display: none;">
         <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 h-screen overflow-hidden">
@@ -1604,7 +1714,7 @@
                         <div class="flex-1">
                             <h1 class="text-3xl font-bold text-white" id="contact-detail-name">Lewis Patterson</h1>
                         </div>
-                        <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors" onclick="openEditContactModal()">
                             Edit Contact
                         </button>
                     </div>
@@ -1714,46 +1824,6 @@
                                 <div class="flex-1">
                                     <p class="text-sm font-medium text-white">Sent email with rate comparison analysis</p>
                                     <p class="text-xs text-gray-400">August 1, 2025 at 10:15 AM</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Recent Activities Section -->
-                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                        <h3 class="text-lg font-semibold text-white mb-4">Recent Activities</h3>
-                        <p class="text-sm text-gray-400 mb-4">Recent activities with John Smith and KHP Capital Partners</p>
-                        <div class="space-y-4">
-                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
-                                <div class="flex-shrink-0">
-                                    <div class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-white">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                    </div>
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-sm font-medium text-white">Called Lewis Patterson about energy contract renewal</p>
-                                    <p class="text-xs text-gray-400">August 2, 2025 at 2:30 PM</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
-                                <div class="flex-shrink-0">
-                                    <div class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-white">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                    </div>
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-sm font-medium text-white">Sent email with rate comparison analysis to KHP Capital Partners</p>
-                                    <p class="text-xs text-gray-400">August 1, 2025 at 10:15 AM</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
-                                <div class="flex-shrink-0">
-                                    <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-white">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                                    </div>
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-sm font-medium text-white">Completed energy audit for KHP Capital Partners</p>
-                                    <p class="text-xs text-gray-400">July 30, 2025 at 3:45 PM</p>
                                 </div>
                             </div>
                         </div>
@@ -2176,7 +2246,8 @@
                     phone: '',
                     location: '',
                     department: '',
-                    summary: ''
+                    summary: '',
+                    linkedinUrl: ''
                 },
                 {
                     id: '2',
@@ -2189,7 +2260,8 @@
                     phone: '(972) 834-2317',
                     location: 'Dallas, TX',
                     department: 'Energy Management',
-                    summary: 'Lewis Patterson is an experienced Energy Manager with expertise in commercial energy solutions.'
+                    summary: 'Lewis Patterson is an experienced Energy Manager with expertise in commercial energy solutions.',
+                    linkedinUrl: 'https://www.linkedin.com/in/lewispatterson'
                 }
             ];
             CRMApp.activities = [{ id: '1', type: 'call_note', description: 'Call note for Lewis Patterson', noteContent: 'In poll', createdAt: new Date('2025-08-01T20:36:00') }];
@@ -2245,19 +2317,68 @@
             if (query.length < 2) return;
 
             const results = [];
-            CRMApp.accounts.forEach(account => {
-                if (account.name.toLowerCase().includes(query) || account.industry.toLowerCase().includes(query)) {
-                    results.push({ type: 'account', name: account.name, details: account.industry });
-                }
-            });
-
+            
+            // Search through all contact fields
             CRMApp.contacts.forEach(contact => {
-                if (`${contact.firstName} ${contact.lastName}`.toLowerCase().includes(query) || contact.title.toLowerCase().includes(query)) {
-                    results.push({ type: 'contact', name: `${contact.firstName} ${contact.lastName}`, details: contact.title });
+                const searchableFields = [
+                    contact.firstName, contact.lastName, contact.name,
+                    contact.title, contact.email, contact.phone,
+                    contact.location, contact.department, contact.accountName,
+                    contact.summary
+                ].filter(field => field); // Remove null/undefined values
+                
+                const contactText = searchableFields.join(' ').toLowerCase();
+                if (contactText.includes(query)) {
+                    results.push({
+                        type: 'contact',
+                        id: contact.id,
+                        name: `${contact.firstName || contact.name || ''} ${contact.lastName || ''}`.trim(),
+                        details: contact.title || 'Contact',
+                        match: 'Contact'
+                    });
                 }
             });
 
-            console.log('Search results:', results);
+            // Search through all account fields
+            CRMApp.accounts.forEach(account => {
+                const searchableFields = [
+                    account.name, account.industry, account.city,
+                    account.state, account.phone, account.website
+                ].filter(field => field);
+                
+                const accountText = searchableFields.join(' ').toLowerCase();
+                if (accountText.includes(query)) {
+                    results.push({
+                        type: 'account',
+                        id: account.id,
+                        name: account.name,
+                        details: account.industry || 'Account',
+                        match: 'Account'
+                    });
+                }
+            });
+
+            // Search through activities
+            CRMApp.activities.forEach(activity => {
+                if (activity.description && activity.description.toLowerCase().includes(query)) {
+                    results.push({
+                        type: 'activity',
+                        id: activity.id,
+                        name: activity.description,
+                        details: 'Activity',
+                        match: 'Activity'
+                    });
+                }
+            });
+
+            console.log('Enhanced search results:', results);
+            
+            // Show results count
+            if (results.length > 0) {
+                showToast(`Found ${results.length} results`, 'success');
+            } else if (query.length >= 2) {
+                showToast('No results found', 'error');
+            }
         }
 
         function clearSearch() {
@@ -2529,6 +2650,9 @@
             if (notesTextarea) {
                 notesTextarea.placeholder = `Add a new note for ${fullName}...`;
             }
+            
+            // Populate recent activities
+            populateRecentActivities(contact);
             
             // Populate recent activities
             const activitiesContainer = document.getElementById('contact-activities');
@@ -3189,6 +3313,132 @@
             }
         };
 
+        // Edit Contact Modal Functions
+        function openEditContactModal() {
+            if (!CRMApp.currentContact) {
+                showToast('No contact selected', 'error');
+                return;
+            }
+            
+            const modal = document.getElementById('edit-contact-modal');
+            modal.classList.add('active');
+            
+            // Populate form with current contact data
+            document.getElementById('edit-contact-first-name').value = CRMApp.currentContact.firstName || CRMApp.currentContact.name || '';
+            document.getElementById('edit-contact-last-name').value = CRMApp.currentContact.lastName || '';
+            document.getElementById('edit-contact-title').value = CRMApp.currentContact.title || '';
+            document.getElementById('edit-contact-company').value = CRMApp.currentContact.accountName || '';
+            document.getElementById('edit-contact-email').value = CRMApp.currentContact.email || '';
+            document.getElementById('edit-contact-phone').value = CRMApp.currentContact.phone || '';
+            document.getElementById('edit-contact-location').value = CRMApp.currentContact.location || '';
+            document.getElementById('edit-contact-department').value = CRMApp.currentContact.department || '';
+            document.getElementById('edit-contact-linkedin').value = CRMApp.currentContact.linkedinUrl || '';
+            document.getElementById('edit-contact-summary').value = CRMApp.currentContact.summary || '';
+        }
+        
+        function closeEditContactModal() {
+            const modal = document.getElementById('edit-contact-modal');
+            modal.classList.remove('active');
+            document.getElementById('edit-contact-form').reset();
+        }
+        
+        async function saveEditedContact(event) {
+            event.preventDefault();
+            
+            if (!CRMApp.currentContact) {
+                showToast('No contact selected', 'error');
+                return;
+            }
+            
+            // Get form values
+            const formData = {
+                firstName: document.getElementById('edit-contact-first-name').value.trim(),
+                lastName: document.getElementById('edit-contact-last-name').value.trim(),
+                title: document.getElementById('edit-contact-title').value.trim(),
+                accountName: document.getElementById('edit-contact-company').value.trim(),
+                email: document.getElementById('edit-contact-email').value.trim(),
+                phone: document.getElementById('edit-contact-phone').value.trim(),
+                location: document.getElementById('edit-contact-location').value.trim(),
+                department: document.getElementById('edit-contact-department').value.trim(),
+                linkedinUrl: document.getElementById('edit-contact-linkedin').value.trim(),
+                summary: document.getElementById('edit-contact-summary').value.trim()
+            };
+            
+            try {
+                // Update local contact object
+                Object.assign(CRMApp.currentContact, formData);
+                
+                // Save to Firebase
+                if (db && CRMApp.currentContact.id) {
+                    await db.collection('contacts').doc(CRMApp.currentContact.id).update({
+                        ...formData,
+                        updatedAt: serverTimestamp()
+                    });
+                }
+                
+                // Refresh the contact detail view
+                populateContactDetail(CRMApp.currentContact);
+                
+                closeEditContactModal();
+                showToast('Contact updated successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error updating contact:', error);
+                showToast('Error updating contact', 'error');
+            }
+        }
+        
+        // LinkedIn Quick Action Function
+        function openLinkedInProfile() {
+            if (CRMApp.currentContact && CRMApp.currentContact.linkedinUrl) {
+                window.open(CRMApp.currentContact.linkedinUrl, '_blank');
+            } else {
+                showToast('No LinkedIn profile available for this contact', 'error');
+            }
+        }
+        
+        // Dynamic Recent Activities Function
+        function populateRecentActivities(contact) {
+            const activitiesContainer = document.querySelector('#contact-detail-view .space-y-4');
+            if (!activitiesContainer) return;
+            
+            // Filter activities for this contact and their company
+            const contactName = `${contact.firstName || contact.name || ''} ${contact.lastName || ''}`.trim();
+            const contactActivities = CRMApp.activities.filter(activity => {
+                return activity.contactId === contact.id ||
+                       activity.description.toLowerCase().includes(contactName.toLowerCase()) ||
+                       (contact.accountName && activity.description.toLowerCase().includes(contact.accountName.toLowerCase()));
+            });
+            
+            if (contactActivities.length > 0) {
+                activitiesContainer.innerHTML = contactActivities.map(activity => `
+                    <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-white font-medium">${activity.description}</p>
+                            <p class="text-gray-400 text-sm">${activity.noteContent || ''}</p>
+                            <p class="text-gray-500 text-xs mt-1">${new Date(activity.createdAt).toLocaleString()}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                activitiesContainer.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p>No recent activities found for ${contactName}</p>
+                    </div>
+                `;
+            }
+        }
+
         // Initialize app when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             initializeApp();
@@ -3205,6 +3455,10 @@
             
             document.getElementById('add-account-modal').addEventListener('click', function(e) {
                 if (e.target === this) closeAddAccountModal();
+            });
+            
+            document.getElementById('edit-contact-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeEditContactModal();
             });
 
             // Animate metric cards on load
