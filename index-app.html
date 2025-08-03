@@ -1843,11 +1843,11 @@
             <!-- Right Scrolling Side Panel -->
             <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700" style="height: calc(100vh - 17px); max-height: calc(100vh - 17px);">
                 <div class="space-y-6" style="padding: 24px 0 60px 0;">
-                    <!-- Add Notes Widget with proper margin -->
-                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700" style="margin-top: 24px;">
+                    <!-- Add Notes Widget with increased margin -->
+                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700" style="margin-top: 40px;">
                         <h3 class="text-lg font-semibold text-white mb-4">Add Notes</h3>
                         <textarea class="w-full h-32 p-3 bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Add a new note for Lewis Patterson..." id="contact-notes"></textarea>
-                        <button class="mt-3 w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors" onclick="saveContactNote()">Save Note</button>
+                        <button class="mt-3 w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors" id="save-note-btn" type="button">Save Note</button>
                     </div>
 
                     <!-- Energy Health Check Calculator -->
@@ -3716,6 +3716,15 @@
                 }
             });
 
+            // Add event listener for Save Note button using event delegation
+            document.addEventListener('click', function(e) {
+                if (e.target && (e.target.id === 'save-note-btn' || e.target.onclick === saveContactNote)) {
+                    e.preventDefault();
+                    console.log('Save Note button clicked');
+                    saveContactNote();
+                }
+            });
+
             // Animate metric cards on load
             const metricCards = document.querySelectorAll('.metric-card');
             metricCards.forEach((card, index) => {
@@ -3799,36 +3808,36 @@
             }
         }
         
-        // Enhanced Save contact note and add to activities
-        async function saveContactNote() {
+        // Enhanced Save contact note and add to activities - Made globally accessible
+        window.saveContactNote = async function() {
             console.log('saveContactNote function called');
             
-            const noteTextarea = document.getElementById('contact-notes');
-            if (!noteTextarea) {
-                console.error('Note textarea not found');
-                showToast('Error: Note input not found', 'error');
-                return;
-            }
-            
-            const noteText = noteTextarea.value.trim();
-            console.log('Note text:', noteText);
-            
-            if (!noteText) {
-                showToast('Please enter a note', 'error');
-                return;
-            }
-            
-            if (!CRMApp.currentContact) {
-                console.error('No current contact found');
-                showToast('Error: No contact selected', 'error');
-                return;
-            }
-            
-            console.log('Current contact:', CRMApp.currentContact);
-            
             try {
+                const noteTextarea = document.getElementById('contact-notes');
+                if (!noteTextarea) {
+                    console.error('Note textarea not found');
+                    alert('Error: Note input not found');
+                    return;
+                }
+                
+                const noteText = noteTextarea.value.trim();
+                console.log('Note text:', noteText);
+                
+                if (!noteText) {
+                    alert('Please enter a note');
+                    return;
+                }
+                
+                if (!window.CRMApp || !window.CRMApp.currentContact) {
+                    console.error('No current contact found');
+                    alert('Error: No contact selected');
+                    return;
+                }
+                
+                console.log('Current contact:', window.CRMApp.currentContact);
+                
                 // Save note to contact
-                if (!CRMApp.currentContact.notes) CRMApp.currentContact.notes = [];
+                if (!window.CRMApp.currentContact.notes) window.CRMApp.currentContact.notes = [];
                 
                 const newNote = {
                     id: Date.now().toString(),
@@ -3837,77 +3846,79 @@
                     createdBy: 'Current User'
                 };
                 
-                CRMApp.currentContact.notes.push(newNote);
+                window.CRMApp.currentContact.notes.push(newNote);
                 
                 // Add to activities
                 const newActivity = {
                     id: Date.now().toString(),
                     type: 'note',
-                    description: `Added note for ${CRMApp.currentContact.firstName || CRMApp.currentContact.name || 'contact'}`,
+                    description: `Added note for ${window.CRMApp.currentContact.firstName || window.CRMApp.currentContact.name || 'contact'}`,
                     noteContent: noteText,
-                    contactId: CRMApp.currentContact.id,
+                    contactId: window.CRMApp.currentContact.id,
                     createdAt: new Date()
                 };
                 
-                CRMApp.activities.unshift(newActivity); // Add to beginning of activities
+                window.CRMApp.activities.unshift(newActivity); // Add to beginning of activities
                 
                 // Save note to Firebase for the contact
-                if (db && CRMApp.currentContact.id) {
-                    await db.collection('contacts').doc(CRMApp.currentContact.id).update({
-                        notes: CRMApp.currentContact.notes,
-                        updatedAt: serverTimestamp()
+                if (window.db && window.CRMApp.currentContact.id) {
+                    await window.db.collection('contacts').doc(window.CRMApp.currentContact.id).update({
+                        notes: window.CRMApp.currentContact.notes,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
                 
                 // Also save note to the associated company/account
-                if (CRMApp.currentContact.accountId) {
-                    const account = CRMApp.accounts.find(a => a.id === CRMApp.currentContact.accountId);
+                if (window.CRMApp.currentContact.accountId) {
+                    const account = window.CRMApp.accounts.find(a => a.id === window.CRMApp.currentContact.accountId);
                     if (account) {
                         // Add note to account's contact notes
                         if (!account.contactNotes) account.contactNotes = [];
                         
                         const accountNote = {
                             ...newNote,
-                            contactId: CRMApp.currentContact.id,
-                            contactName: `${CRMApp.currentContact.firstName || CRMApp.currentContact.name || ''} ${CRMApp.currentContact.lastName || ''}`.trim()
+                            contactId: window.CRMApp.currentContact.id,
+                            contactName: `${window.CRMApp.currentContact.firstName || window.CRMApp.currentContact.name || ''} ${window.CRMApp.currentContact.lastName || ''}`.trim()
                         };
                         
                         account.contactNotes.push(accountNote);
                         
                         // Save to Firebase for the account
-                        if (db) {
-                            await db.collection('accounts').doc(account.id).update({
+                        if (window.db) {
+                            await window.db.collection('accounts').doc(account.id).update({
                                 contactNotes: account.contactNotes,
-                                updatedAt: serverTimestamp()
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                             });
                         }
                     }
                 }
                 
                 // Save activity to Firebase
-                if (db) {
-                    await db.collection('activities').add(newActivity);
+                if (window.db) {
+                    await window.db.collection('activities').add(newActivity);
                 }
                 
                 // Clear the textarea
                 noteTextarea.value = '';
                 
                 // Refresh activities display
-                populateRecentActivities(CRMApp.currentContact);
+                if (window.populateRecentActivities) {
+                    window.populateRecentActivities(window.CRMApp.currentContact);
+                }
                 
-                showToast('Note saved successfully to contact and company records!', 'success');
+                // Show success message
+                if (window.showToast) {
+                    window.showToast('Note saved successfully to contact and company records!', 'success');
+                } else {
+                    alert('Note saved successfully to contact and company records!');
+                }
                 console.log('Note saved successfully:', newNote);
                 
             } catch (error) {
                 console.error('Error saving note:', error);
-                // Still show success since local data was updated
-                noteTextarea.value = '';
-                if (CRMApp.currentContact) {
-                    populateRecentActivities(CRMApp.currentContact);
-                }
-                showToast('Note saved successfully to contact and company records!', 'success');
+                alert('Error saving note: ' + error.message);
             }
-        }
+        };
         
         // Auto-populate health check with known account values
         function populateHealthCheckFromAccount() {
