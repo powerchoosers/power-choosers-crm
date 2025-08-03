@@ -1635,12 +1635,6 @@
                     
                     <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
                         <h3 class="text-lg font-semibold text-white mb-2">Contact Details</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="contact-details-grid">
-                            <!-- Contact details will be populated dynamically -->
-                        </div>
-                    </div>
-                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                        <h3 class="text-lg font-semibold text-white mb-2">Contact Details</h3>
                         <div class="detail-field mb-4" data-field="contact-summary">
                             <p class="text-gray-400">
                                 John Smith is an experienced Energy Manager at KHP Capital Partners with over 8 years in the energy sector. He specializes in contract negotiations and energy cost optimization for commercial real estate portfolios.
@@ -1770,11 +1764,11 @@
             <!-- Right Scrolling Side Panel -->
             <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700">
                 <div class="space-y-6">
-                    <!-- Add Notes Widget -->
-                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                    <!-- Add Notes Widget with proper margin -->
+                    <div class="mt-6 widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
                         <h3 class="text-lg font-semibold text-white mb-4">Add Notes</h3>
-                        <textarea class="w-full h-32 p-3 bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Add a new note for John Smith..."></textarea>
-                        <button class="mt-3 w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors">Save Note</button>
+                        <textarea class="w-full h-32 p-3 bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Add a new note for John Smith..." id="contact-notes"></textarea>
+                        <button class="mt-3 w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors" onclick="saveContactNote()">Save Note</button>
                     </div>
 
                     <!-- Energy Health Check Calculator -->
@@ -1801,6 +1795,10 @@
                                 <div>
                                     <label class="block text-sm font-medium text-gray-300 mb-2">Current Rate (¢/kWh)</label>
                                     <input type="number" step="0.001" class="form-input w-full" placeholder="Enter current rate" id="current-rate">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Contract End Date</label>
+                                    <input type="date" class="form-input w-full" id="contract-end-date">
                                 </div>
                             </div>
                             <div class="usage-display" id="usage-display" style="display: none;">
@@ -1845,7 +1843,7 @@
                         </div>
                     </div>
 
-                    <!-- Energy News Widget -->
+                    <!-- Energy News Widget - Improved Layout -->
                     <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
                         <div class="widget-title mb-4">
                             <svg class="icon mr-2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1854,43 +1852,45 @@
                             </svg>
                             Energy News
                         </div>
-                        <div class="space-y-4">
+                        <div class="space-y-3">
                             <!-- Trump's Bill Article -->
-                            <div class="news-item cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors" onclick="openNewsArticle('https://example.com/trump-energy-bill')">
-                                <div class="news-title">Trump's Energy Independence Act Passes - Major Impact on Texas Energy Market</div>
-                                <div class="news-description">New legislation promises to reshape energy pricing and availability across Texas, with significant implications for commercial energy contracts.</div>
-                                <div class="news-meta">
-                                    <span class="news-source">Energy Today</span>
-                                    <span>2 days ago</span>
+                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/trump-energy-bill')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Trump's Energy Independence Act Passes - Major Impact on Texas Energy Market</h4>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">2 days ago</span>
+                                </div>
+                                <p class="text-gray-300 text-xs mb-2 line-clamp-2">New legislation promises to reshape energy pricing and availability across Texas, with significant implications for commercial energy contracts.</p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs bg-blue-600 text-white px-2 py-1 rounded">Energy Today</span>
                                 </div>
                             </div>
 
                             <!-- Additional Energy Articles -->
-                            <div class="news-item cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors" onclick="openNewsArticle('https://example.com/ercot-demand-forecast')">
-                                <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
-                                <div class="news-description">Grid operator warns of potential supply shortages as industrial demand continues to grow.</div>
-                                <div class="news-meta">
-                                    <span class="news-source">ERCOT</span>
-                                    <span>3 days ago</span>
+                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/ercot-demand-forecast')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">ERCOT Demand Could Exceed Supply by 2026</h4>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">3 days ago</span>
                                 </div>
+                                <p class="text-gray-300 text-xs mb-2">Grid operator warns of potential supply shortages as industrial demand continues to grow.</p>
+                                <span class="text-xs bg-red-600 text-white px-2 py-1 rounded">ERCOT</span>
                             </div>
 
-                            <div class="news-item cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors" onclick="openNewsArticle('https://example.com/renewable-energy-growth')">
-                                <div class="news-title">Texas Renewable Energy Capacity Hits Record High</div>
-                                <div class="news-description">Solar and wind installations surge, creating new opportunities for competitive energy pricing.</div>
-                                <div class="news-meta">
-                                    <span class="news-source">Renewable Energy News</span>
-                                    <span>5 days ago</span>
+                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/renewable-energy-growth')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Texas Renewable Energy Capacity Hits Record High</h4>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">5 days ago</span>
                                 </div>
+                                <p class="text-gray-300 text-xs mb-2">Solar and wind installations surge, creating new opportunities for competitive energy pricing.</p>
+                                <span class="text-xs bg-green-600 text-white px-2 py-1 rounded">Renewable Energy News</span>
                             </div>
 
-                            <div class="news-item cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors" onclick="openNewsArticle('https://example.com/commercial-energy-trends')">
-                                <div class="news-title">Commercial Energy Costs Rise 15% in Q3 2025</div>
-                                <div class="news-description">Businesses across Texas face higher energy bills as demand outpaces supply growth.</div>
-                                <div class="news-meta">
-                                    <span class="news-source">Business Energy Report</span>
-                                    <span>1 week ago</span>
+                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/commercial-energy-trends')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Commercial Energy Costs Rise 15% in Q3 2025</h4>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">1 week ago</span>
                                 </div>
+                                <p class="text-gray-300 text-xs mb-2">Businesses across Texas face higher energy bills as demand outpaces supply growth.</p>
+                                <span class="text-xs bg-orange-600 text-white px-2 py-1 rounded">Business Energy Report</span>
                             </div>
                         </div>
                     </div>
@@ -3210,3 +3210,124 @@
                 }, index * 100);
             });
         });
+// Enhanced Energy Health Check Calculator Functions
+        function calculateSavings() {
+            const kwhUsage = parseFloat(document.getElementById('kwh-usage').value);
+            const currentRate = parseFloat(document.getElementById('current-rate').value);
+            const proposedRate = parseFloat(document.getElementById('proposed-rate').value);
+            const contractEndDate = document.getElementById('contract-end-date').value;
+            
+            if (!kwhUsage || !currentRate || !proposedRate) {
+                showToast('Please fill in all fields', 'error');
+                return;
+            }
+            
+            // Calculate costs
+            const currentMonthlyCost = (kwhUsage * currentRate) / 100; // Convert cents to dollars
+            const proposedMonthlyCost = (kwhUsage * proposedRate) / 100;
+            const monthlySavings = currentMonthlyCost - proposedMonthlyCost;
+            const annualSavings = monthlySavings * 12;
+            const savingsPercentage = ((monthlySavings / currentMonthlyCost) * 100).toFixed(1);
+            
+            // Update display
+            document.getElementById('current-cost').textContent = `$${currentMonthlyCost.toFixed(2)}`;
+            document.getElementById('usage-display').style.display = 'block';
+            
+            // Show results
+            document.getElementById('monthly-savings').textContent = `$${monthlySavings.toFixed(2)}`;
+            document.getElementById('annual-savings').textContent = `$${annualSavings.toFixed(2)}`;
+            document.getElementById('savings-percentage').textContent = `${savingsPercentage}% savings`;
+            document.getElementById('results-section').style.display = 'block';
+            
+            // Save health check data to contact/account
+            saveHealthCheckData({
+                kwhUsage,
+                currentRate,
+                proposedRate,
+                contractEndDate,
+                monthlySavings,
+                annualSavings,
+                savingsPercentage,
+                calculatedAt: new Date()
+            });
+            
+            showToast('Savings calculated and saved successfully!', 'success');
+        }
+        
+        // Save health check data to contact and account
+        function saveHealthCheckData(healthCheckData) {
+            if (CRMApp.currentContact) {
+                // Save to contact
+                CRMApp.currentContact.healthCheckData = healthCheckData;
+                
+                // Also save to associated account if exists
+                const account = CRMApp.accounts.find(a => a.id === CRMApp.currentContact.accountId);
+                if (account) {
+                    if (!account.healthCheckHistory) account.healthCheckHistory = [];
+                    account.healthCheckHistory.push({
+                        ...healthCheckData,
+                        contactId: CRMApp.currentContact.id,
+                        contactName: `${CRMApp.currentContact.firstName} ${CRMApp.currentContact.lastName}`
+                    });
+                    
+                    // Update account's current health check data
+                    account.currentHealthCheck = healthCheckData;
+                }
+                
+                console.log('Health check data saved to contact and account');
+            }
+        }
+        
+        // Save contact note
+        function saveContactNote() {
+            const noteText = document.getElementById('contact-notes').value.trim();
+            if (!noteText) {
+                showToast('Please enter a note', 'error');
+                return;
+            }
+            
+            if (CRMApp.currentContact) {
+                if (!CRMApp.currentContact.notes) CRMApp.currentContact.notes = [];
+                
+                const newNote = {
+                    id: Date.now().toString(),
+                    text: noteText,
+                    createdAt: new Date(),
+                    createdBy: 'Current User' // In real app, this would be the logged-in user
+                };
+                
+                CRMApp.currentContact.notes.push(newNote);
+                
+                // Clear the textarea
+                document.getElementById('contact-notes').value = '';
+                
+                showToast('Note saved successfully!', 'success');
+                console.log('Note saved to contact:', newNote);
+            }
+        }
+        
+        // Auto-populate health check with known account values
+        function populateHealthCheckFromAccount() {
+            if (CRMApp.currentContact && CRMApp.currentContact.accountId) {
+                const account = CRMApp.accounts.find(a => a.id === CRMApp.currentContact.accountId);
+                if (account && account.currentHealthCheck) {
+                    const healthCheck = account.currentHealthCheck;
+                    
+                    // Populate fields if they exist
+                    if (healthCheck.kwhUsage) {
+                        document.getElementById('kwh-usage').value = healthCheck.kwhUsage;
+                    }
+                    if (healthCheck.currentRate) {
+                        document.getElementById('current-rate').value = healthCheck.currentRate;
+                    }
+                    if (healthCheck.contractEndDate) {
+                        document.getElementById('contract-end-date').value = healthCheck.contractEndDate;
+                    }
+                    
+                    // Update calculate button state
+                    updateCalculateButton();
+                    
+                    console.log('Health check data auto-populated from account');
+                }
+            }
+        }
