@@ -206,11 +206,13 @@
         }
 
         .sidebar-section {
-            padding: 25px 10px;
+            padding: 25px 8px;
             border-bottom: 1px solid #1e293b;
         }
 
-        .sidebar:hover .sidebar-section { padding: 25px 20px; }
+        .sidebar:hover .sidebar-section {
+            padding: 25px 20px;
+        }
 
         .sidebar-title {
             font-size: 12px;
@@ -229,7 +231,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 12px;
+            padding: 12px 8px;
             margin-bottom: 5px;
             border-radius: 10px;
             color: #94a3b8;
@@ -237,6 +239,7 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            min-height: 48px;
         }
 
         .sidebar:hover .sidebar-item {
@@ -263,9 +266,12 @@
             stroke-width: 2;
             flex-shrink: 0;
             transition: margin-right 0.3s ease;
+            display: block;
         }
 
-        .sidebar:hover .sidebar-item .icon { margin-right: 12px; }
+        .sidebar:hover .sidebar-item .icon {
+            margin-right: 12px;
+        }
 
         .sidebar-item .text {
             opacity: 0;
