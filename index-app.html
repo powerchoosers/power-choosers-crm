@@ -3,35 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Power Choosers CRM Dashboard - Energy Consultant Platform</title>
+    <title>Power Choosers CRM Dashboard</title>
     
-    <!-- Firebase SDK -->
+    <!-- External Dependencies -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Chart.js for visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
-        /* Custom CSS for enhanced styling */
         :root {
-            --primary-blue: #1e40af;
-            --secondary-blue: #3b82f6;
-            --dark-blue: #1e293b;
-            --darker-blue: #0f172a;
-            --accent-blue: #60a5fa;
-            --light-blue: #dbeafe;
+            --primary-blue: #1e3a8a;
+            --secondary-blue: #1e40af;
+            --dark-blue: #0f172a;
+            --darker-blue: #020617;
+            --header-blue: #1e293b;
+            --professional-blue: #1e40af;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -41,27 +32,15 @@
             overflow: hidden;
         }
 
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #334155; }
+        ::-webkit-scrollbar-thumb { background: #64748b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        ::-webkit-scrollbar-track {
-            background: #334155;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #64748b;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-
-        /* Header Styles */
+        /* Header */
         .header {
-            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+            background: linear-gradient(135deg, var(--header-blue) 0%, var(--dark-blue) 100%);
             height: 70px;
             display: flex;
             align-items: center;
@@ -71,8 +50,8 @@
             left: 0;
             right: 0;
             z-index: 1000;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            border-bottom: 2px solid var(--accent-blue);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            border-bottom: 2px solid var(--professional-blue);
         }
 
         .header-logo {
@@ -84,11 +63,7 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         }
 
-        .header-logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        .header-logo img { width: 100%; height: 100%; object-fit: cover; }
 
         .header-title {
             color: white;
@@ -106,7 +81,7 @@
             left: 0;
             width: 100%;
             height: 2px;
-            background: linear-gradient(90deg, var(--accent-blue), transparent);
+            background: linear-gradient(90deg, var(--professional-blue), transparent);
             border-radius: 1px;
         }
 
@@ -132,13 +107,11 @@
         .header-search input:focus {
             outline: none;
             background: rgba(255, 255, 255, 0.15);
-            border-color: var(--accent-blue);
-            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+            border-color: var(--professional-blue);
+            box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
         }
 
-        .header-search input::placeholder {
-            color: rgba(255, 255, 255, 0.7);
-        }
+        .header-search input::placeholder { color: rgba(255, 255, 255, 0.7); }
 
         .header-search-icon {
             position: absolute;
@@ -152,9 +125,11 @@
             display: flex;
             align-items: center;
             gap: 20px;
+            margin-left: auto;
         }
 
-        .notification-bell {
+        /* Notification & Profile */
+        .notification-bell, .profile-avatar {
             position: relative;
             background: rgba(255, 255, 255, 0.1);
             border: none;
@@ -169,11 +144,20 @@
             transition: all 0.3s ease;
         }
 
-        .notification-bell:hover {
+        .notification-bell:hover, .profile-avatar:hover {
             background: rgba(255, 255, 255, 0.2);
             transform: scale(1.05);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
+
+        .profile-avatar {
+            background: linear-gradient(135deg, var(--professional-blue), var(--secondary-blue));
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+
+        .profile-avatar:hover { border-color: var(--professional-blue); }
+        .profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
         .notification-badge {
             position: absolute;
@@ -198,43 +182,18 @@
             100% { transform: scale(1); }
         }
 
-        .profile-menu {
-            position: relative;
-        }
-
-        .profile-avatar {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent-blue), var(--secondary-blue));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .profile-avatar:hover {
-            transform: scale(1.05);
-            border-color: var(--accent-blue);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Main Layout */
+        /* Layout */
         .main-container {
             display: flex;
             margin-top: 70px;
             height: calc(100vh - 70px);
         }
 
-        /* Sidebar Styles */
+        /* Sidebar */
         .sidebar {
-            width: 80px;
+            width: 60px;
             background: linear-gradient(180deg, var(--dark-blue) 0%, var(--darker-blue) 100%);
-            border-right: 1px solid #334155;
+            border-right: 1px solid #1e293b;
             overflow: visible;
             transition: all 0.3s ease;
             position: relative;
@@ -243,13 +202,15 @@
 
         .sidebar:hover {
             width: 280px;
-            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
         }
 
         .sidebar-section {
-            padding: 25px 20px;
-            border-bottom: 1px solid #334155;
+            padding: 25px 10px;
+            border-bottom: 1px solid #1e293b;
         }
+
+        .sidebar:hover .sidebar-section { padding: 25px 20px; }
 
         .sidebar-title {
             font-size: 12px;
@@ -262,14 +223,13 @@
             transition: opacity 0.3s ease 0.1s;
         }
 
-        .sidebar:hover .sidebar-title {
-            opacity: 1;
-        }
+        .sidebar:hover .sidebar-title { opacity: 1; }
 
         .sidebar-item {
             display: flex;
             align-items: center;
-            padding: 12px 15px;
+            justify-content: center;
+            padding: 12px;
             margin-bottom: 5px;
             border-radius: 10px;
             color: #94a3b8;
@@ -279,25 +239,33 @@
             overflow: hidden;
         }
 
+        .sidebar:hover .sidebar-item {
+            justify-content: flex-start;
+            padding: 12px 15px;
+        }
+
         .sidebar-item:hover {
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--secondary-blue);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
             transform: translateX(5px);
         }
 
         .sidebar-item.active {
-            background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--primary-blue) 100%);
+            background: linear-gradient(135deg, var(--professional-blue) 0%, var(--primary-blue) 100%);
             color: white;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
         }
 
         .sidebar-item .icon {
             width: 24px;
             height: 24px;
-            margin-right: 12px;
+            margin-right: 0;
             stroke-width: 2;
             flex-shrink: 0;
+            transition: margin-right 0.3s ease;
         }
+
+        .sidebar:hover .sidebar-item .icon { margin-right: 12px; }
 
         .sidebar-item .text {
             opacity: 0;
@@ -305,9 +273,7 @@
             white-space: nowrap;
         }
 
-        .sidebar:hover .sidebar-item .text {
-            opacity: 1;
-        }
+        .sidebar:hover .sidebar-item .text { opacity: 1; }
 
         .sidebar-item .badge {
             margin-left: auto;
@@ -321,16 +287,10 @@
             transition: opacity 0.3s ease 0.1s;
         }
 
-        .sidebar:hover .sidebar-item .badge {
-            opacity: 1;
-        }
+        .sidebar:hover .sidebar-item .badge { opacity: 1; }
 
         /* Content Area */
-        .content-area {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
+        .content-area { flex: 1; display: flex; overflow: hidden; }
 
         .main-content {
             flex: 1;
@@ -347,17 +307,18 @@
             padding: 30px 20px;
         }
 
-        /* Dashboard Widgets */
+        /* Dashboard Grid */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 25px;
             margin-bottom: 30px;
         }
 
-        .metric-card {
-            background: linear-gradient(135deg, var(--dark-blue) 0%, #334155 100%);
-            border: 1px solid #475569;
+        /* Cards & Widgets */
+        .metric-card, .widget, .energy-trends-widget {
+            background: linear-gradient(135deg, var(--dark-blue) 0%, #1e293b 100%);
+            border: 1px solid #334155;
             border-radius: 15px;
             padding: 25px;
             position: relative;
@@ -365,10 +326,12 @@
             transition: all 0.3s ease;
         }
 
-        .metric-card:hover {
+        .metric-card:hover, .widget:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
+
+        .widget:hover { transform: translateY(-2px); }
 
         .metric-card::before {
             content: '';
@@ -377,13 +340,17 @@
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, var(--secondary-blue), #10b981, #f59e0b, #ef4444);
+            background: var(--professional-blue);
+        }
+
+        .metric-card {
+            text-align: center;
         }
 
         .metric-value {
             font-size: 36px;
             font-weight: 700;
-            color: var(--secondary-blue);
+            color: white;
             margin-bottom: 8px;
         }
 
@@ -403,103 +370,11 @@
             font-weight: 600;
         }
 
-        .metric-change.positive {
-            background: rgba(16, 185, 129, 0.2);
-            color: #10b981;
-        }
+        .metric-change.positive { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .metric-change.negative { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
-        .metric-change.negative {
-            background: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-        }
-
-        /* Energy Market Trends Widget */
-        .energy-trends-widget {
-            background: linear-gradient(135deg, var(--dark-blue) 0%, #334155 100%);
-            border: 1px solid #475569;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-
-        .widget-header {
-            display: flex;
-            align-items: center;
-            justify-content: between;
-            margin-bottom: 20px;
-        }
-
-        .widget-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #e2e8f0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .pricing-display {
-            display: flex;
-            justify-content: space-around;
-            margin: 20px 0;
-        }
-
-        .price-item {
-            text-align: center;
-        }
-
-        .price-value {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-
-        .price-value.historical {
-            color: #10b981;
-        }
-
-        .price-value.current {
-            color: var(--accent-blue);
-        }
-
-        .price-value.projected {
-            color: #ef4444;
-        }
-
-        .price-label {
-            font-size: 12px;
-            color: #94a3b8;
-            text-transform: uppercase;
-        }
-
-        .market-intelligence {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-        }
-
-        .market-intelligence-text {
-            color: #10b981;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        /* Right Sidebar Widgets */
-        .widget {
-            background: linear-gradient(135deg, var(--dark-blue) 0%, #334155 100%);
-            border: 1px solid #475569;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .widget:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-        }
+        /* Widget Styles */
+        .widget { padding: 20px; margin-bottom: 20px; }
 
         .widget-title {
             font-size: 16px;
@@ -511,10 +386,9 @@
             gap: 8px;
         }
 
-        .widget-title .icon {
-            color: var(--secondary-blue);
-        }
+        .widget-title .icon { color: white; }
 
+        /* Buttons */
         .quick-action-btn {
             width: 100%;
             padding: 12px;
@@ -529,20 +403,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-        }
-
-        .quick-action-btn.primary {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            color: white;
-        }
-
-        .quick-action-btn.secondary {
-            background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--primary-blue) 100%);
-            color: white;
-        }
-
-        .quick-action-btn.tertiary {
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, var(--professional-blue) 0%, var(--primary-blue) 100%);
             color: white;
         }
 
@@ -551,16 +412,15 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
-        .task-item {
+        /* Task & News Items */
+        .task-item, .news-item, .activity-item {
             display: flex;
             align-items: center;
             padding: 10px 0;
             border-bottom: 1px solid #334155;
         }
 
-        .task-item:last-child {
-            border-bottom: none;
-        }
+        .task-item:last-child, .news-item:last-child, .activity-item:last-child { border-bottom: none; }
 
         .task-priority {
             width: 8px;
@@ -569,42 +429,20 @@
             margin-right: 12px;
         }
 
-        .task-priority.high {
-            background: #ef4444;
-        }
+        .task-priority.high { background: #ef4444; }
+        .task-priority.medium { background: #f59e0b; }
+        .task-priority.low { background: #10b981; }
 
-        .task-priority.medium {
-            background: #f59e0b;
-        }
+        .task-content, .activity-content { flex: 1; }
 
-        .task-priority.low {
-            background: #10b981;
-        }
-
-        .task-content {
-            flex: 1;
-        }
-
-        .task-title {
+        .task-title, .activity-title {
             font-size: 14px;
             font-weight: 500;
             color: #e2e8f0;
             margin-bottom: 2px;
         }
 
-        .task-time {
-            font-size: 12px;
-            color: #64748b;
-        }
-
-        .news-item {
-            padding: 15px 0;
-            border-bottom: 1px solid #334155;
-        }
-
-        .news-item:last-child {
-            border-bottom: none;
-        }
+        .task-time, .activity-time { font-size: 12px; color: #64748b; }
 
         .news-title {
             font-size: 14px;
@@ -615,9 +453,7 @@
             transition: color 0.3s ease;
         }
 
-        .news-title:hover {
-            color: var(--secondary-blue);
-        }
+        .news-title:hover { color: white; }
 
         .news-meta {
             display: flex;
@@ -628,30 +464,189 @@
         }
 
         .news-source {
-            background: rgba(59, 130, 246, 0.2);
-            color: var(--secondary-blue);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
             padding: 2px 6px;
             border-radius: 4px;
             font-weight: 500;
         }
 
-        /* Recent Activities Widget */
-        .activity-item {
-            display: flex;
-            align-items: flex-start;
-            padding: 15px 0;
-            border-bottom: 1px solid #334155;
+        /* Profile Modal */
+        .profile-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
         }
 
-        .activity-item:last-child {
-            border-bottom: none;
+        .profile-modal.active { display: flex; animation: modalFadeIn 0.3s ease-out; }
+
+        .profile-modal-content {
+            background: linear-gradient(135deg, var(--dark-blue) 0%, #1e293b 100%);
+            border: 1px solid #334155;
+            border-radius: 15px;
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            animation: modalSlideIn 0.3s ease-out;
         }
+
+        .profile-modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        .profile-preview {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, var(--professional-blue), var(--secondary-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 48px;
+            font-weight: bold;
+            overflow: hidden;
+            border: 3px solid #334155;
+        }
+
+        .profile-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+        .upload-area {
+            border: 2px dashed #334155;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--professional-blue);
+            background: rgba(30, 64, 175, 0.05);
+        }
+
+        .upload-area.dragover { background: rgba(30, 64, 175, 0.1); }
+
+        .upload-text { color: #94a3b8; margin-bottom: 10px; }
+
+        .upload-button {
+            background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--primary-blue) 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .upload-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+
+        .modal-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn.primary {
+            background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--primary-blue) 100%);
+            color: white;
+        }
+
+        .modal-btn.secondary {
+            background: rgba(51, 65, 85, 0.8);
+            color: #e2e8f0;
+            border: 1px solid #475569;
+        }
+
+        .modal-btn:hover { transform: translateY(-2px); }
+
+        #profile-upload { display: none; }
+
+        /* Texas Electricity Market Trends - Layered Rectangle Structure */
+        .trends-inner-container {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid #475569;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .trends-subtitle {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #e2e8f0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .trends-description {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        /* Pricing Display */
+        .pricing-display {
+            display: flex;
+            justify-content: space-around;
+            margin: 25px 0;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .price-item { text-align: center; }
+        .price-value { font-size: 24px; font-weight: 700; margin-bottom: 5px; }
+        .price-value.historical { color: #10b981; }
+        .price-value.current { color: white; }
+        .price-value.projected { color: #ef4444; }
+        .price-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; }
+
+        .market-intelligence {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .market-intelligence-text { color: #10b981; font-size: 14px; font-weight: 500; }
 
         .activity-icon {
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--secondary-blue), var(--primary-blue));
+            background: linear-gradient(135deg, var(--professional-blue), var(--primary-blue));
             display: flex;
             align-items: center;
             justify-content: center;
@@ -659,75 +654,28 @@
             flex-shrink: 0;
         }
 
-        .activity-content {
-            flex: 1;
-        }
-
-        .activity-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #e2e8f0;
-            margin-bottom: 4px;
-        }
-
-        .activity-description {
-            font-size: 13px;
-            color: #94a3b8;
-            margin-bottom: 4px;
-        }
-
-        .activity-time {
-            font-size: 12px;
-            color: #64748b;
-        }
+        .activity-description { font-size: 13px; color: #94a3b8; margin-bottom: 4px; }
 
         /* Responsive Design */
-        @media (max-width: 1200px) {
-            .right-sidebar {
-                width: 300px;
-            }
-        }
-
+        @media (max-width: 1400px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 1200px) { .right-sidebar { width: 300px; } }
         @media (max-width: 768px) {
-            .main-container {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                height: auto;
-            }
-            
-            .sidebar:hover {
-                width: 100%;
-            }
-            
-            .right-sidebar {
-                width: 100%;
-                max-height: 400px;
-            }
-            
-            .header-search {
-                max-width: 200px;
-            }
-            
-            .header-title {
-                font-size: 18px;
-            }
+            .main-container { flex-direction: column; }
+            .sidebar, .sidebar:hover { width: 100%; height: auto; }
+            .right-sidebar { width: 100%; max-height: 400px; }
+            .header-search { max-width: 200px; }
+            .header-title { font-size: 18px; }
+            .dashboard-grid { grid-template-columns: 1fr; }
         }
 
-        /* Animation Classes */
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
+        /* Animations */
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        .slide-in-left { animation: slideInLeft 0.5s ease-out; }
+        .slide-in-right { animation: slideInRight 0.5s ease-out; }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
-        }
-
-        .slide-in-left {
-            animation: slideInLeft 0.5s ease-out;
         }
 
         @keyframes slideInLeft {
@@ -735,13 +683,19 @@
             to { opacity: 1; transform: translateX(0); }
         }
 
-        .slide-in-right {
-            animation: slideInRight 0.5s ease-out;
-        }
-
         @keyframes slideInRight {
             from { opacity: 0; transform: translateX(30px); }
             to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
     </style>
 </head>
@@ -751,7 +705,7 @@
         <div class="header-logo">
             <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers">
         </div>
-        <div class="header-title">Power Choosers CRM Dashboard</div>
+        <div class="header-title">CRM Dashboard</div>
         
         <div class="header-search">
             <svg class="header-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -771,8 +725,8 @@
             </button>
             
             <div class="profile-menu">
-                <div class="profile-avatar" onclick="toggleProfileMenu()">
-                    LC
+                <div class="profile-avatar" onclick="openProfileModal()" id="profile-avatar">
+                    <span id="profile-initials">LC</span>
                 </div>
             </div>
         </div>
@@ -780,9 +734,8 @@
 
     <!-- Main Container -->
     <div class="main-container">
-        <!-- Collapsible Sidebar -->
+        <!-- Sidebar -->
         <div class="sidebar">
-            <!-- Navigation Section -->
             <div class="sidebar-section">
                 <div class="sidebar-title">Navigation</div>
                 <div class="sidebar-item active" onclick="showView('dashboard')">
@@ -814,7 +767,6 @@
                 </div>
             </div>
 
-            <!-- Communication Section -->
             <div class="sidebar-section">
                 <div class="sidebar-title">Communication</div>
                 <div class="sidebar-item" onclick="showView('phone')">
@@ -841,503 +793,501 @@
                 </div>
             </div>
 
-            <!-- Settings Section -->
             <div class="sidebar-section" style="margin-top: auto;">
                 <div class="sidebar-item" onclick="showView('settings')">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                   </svg>
-                   <span class="text">Settings</span>
-               </div>
-               <div class="sidebar-item" onclick="showView('account-details')">
-                   <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                       <circle cx="12" cy="7" r="4"></circle>
-                   </svg>
-                   <span class="text">Account Details</span>
-               </div>
-           </div>
-       </div>
+                    </svg>
+                    <span class="text">Settings</span>
+                </div>
+                <div class="sidebar-item" onclick="showView('account-details')">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span class="text">Account Details</span>
+                </div>
+            </div>
+        </div>
 
-       <!-- Content Area -->
-       <div class="content-area">
-           <!-- Main Content -->
-           <div class="main-content">
-               <!-- Dashboard Overview -->
-               <div class="dashboard-grid fade-in">
-                   <div class="metric-card">
-                       <div class="metric-change positive">+12%</div>
-                       <div class="metric-value" id="total-accounts">1</div>
-                       <div class="metric-label">Total Accounts</div>
-                   </div>
-                   <div class="metric-card">
-                       <div class="metric-change positive">+8%</div>
-                       <div class="metric-value" id="total-contacts">1</div>
-                       <div class="metric-label">Total Contacts</div>
-                   </div>
-                   <div class="metric-card">
-                       <div class="metric-change positive">+15%</div>
-                       <div class="metric-value" id="recent-activities">6</div>
-                       <div class="metric-label">Recent Activities</div>
-                   </div>
-                   <div class="metric-card">
-                       <div class="metric-change negative">-3%</div>
-                       <div class="metric-value" id="hot-leads">0</div>
-                       <div class="metric-label">Hot Leads</div>
-                   </div>
-               </div>
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Dashboard Overview -->
+                <div class="dashboard-grid fade-in">
+                    <div class="metric-card">
+                        <div class="metric-change positive">+12%</div>
+                        <div class="metric-value" id="total-accounts">1</div>
+                        <div class="metric-label">Total Accounts</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change positive">+8%</div>
+                        <div class="metric-value" id="total-contacts">1</div>
+                        <div class="metric-label">Total Contacts</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change positive">+15%</div>
+                        <div class="metric-value" id="recent-activities">6</div>
+                        <div class="metric-label">Recent Activities</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change negative">-3%</div>
+                        <div class="metric-value" id="hot-leads">0</div>
+                        <div class="metric-label">Hot Leads</div>
+                    </div>
+                </div>
 
-               <!-- Texas Electricity Market Trends -->
-               <div class="energy-trends-widget fade-in">
-                   <div class="widget-header">
-                       <div class="widget-title">
-                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                               <line x1="18" y1="20" x2="18" y2="10"></line>
-                               <line x1="12" y1="20" x2="12" y2="4"></line>
-                               <line x1="6" y1="20" x2="6" y2="14"></line>
-                           </svg>
-                           Texas Electricity Market Trends
-                       </div>
-                   </div>
-                   
-                   <h3 style="text-align: center; margin-bottom: 20px; color: #e2e8f0;">Historical & Projected Pricing</h3>
-                   <p style="text-align: center; margin-bottom: 20px; color: #94a3b8;">Texas ERCOT Average Rates (¢/kWh)</p>
-                   
-                   <div class="pricing-display">
-                       <div class="price-item">
-                           <div class="price-value historical">8.2¢</div>
-                           <div class="price-label">2019-2021 Avg</div>
-                       </div>
-                       <div class="price-item">
-                           <div class="price-value current">13.1¢</div>
-                           <div class="price-label">Current 2025</div>
-                       </div>
-                       <div class="price-item">
-                           <div class="price-value projected">16.8¢</div>
-                           <div class="price-label">Projected 2026</div>
-                       </div>
-                   </div>
-                   
-                   <div class="market-intelligence">
-                       <div class="market-intelligence-text">
-                           📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026
-                       </div>
-                   </div>
-               </div>
+                <!-- Texas Electricity Market Trends -->
+                <div class="energy-trends-widget fade-in">
+                    <div class="widget-title">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        Texas Electricity Market Trends
+                    </div>
+                    
+                    <!-- Inner Rectangle Container -->
+                    <div class="trends-inner-container">
+                        <h3 class="trends-subtitle">Historical & Projected Pricing</h3>
+                        <p class="trends-description">Texas ERCOT Average Rates (¢/kWh)</p>
+                        
+                        <div class="pricing-display">
+                            <div class="price-item">
+                                <div class="price-value historical">8.2¢</div>
+                                <div class="price-label">2019-2021 Avg</div>
+                            </div>
+                            <div class="price-item">
+                                <div class="price-value current">13.1¢</div>
+                                <div class="price-label">Current 2025</div>
+                            </div>
+                            <div class="price-item">
+                                <div class="price-value projected">16.8¢</div>
+                                <div class="price-label">Projected 2026</div>
+                            </div>
+                        </div>
+                        
+                        <div class="market-intelligence">
+                            <div class="market-intelligence-text">
+                                📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-               <!-- Recent Activities -->
-               <div class="energy-trends-widget fade-in">
-                   <div class="widget-header">
-                       <div class="widget-title">
-                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                               <circle cx="12" cy="12" r="10"></circle>
-                               <polyline points="12,6 12,12 16,14"></polyline>
-                           </svg>
-                           Recent Activities
-                       </div>
-                   </div>
-                   
-                   <div class="activity-item">
-                       <div class="activity-icon">
-                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                           </svg>
-                       </div>
-                       <div class="activity-content">
-                           <div class="activity-title">Call note for Lewis Patterson</div>
-                           <div class="activity-description">In poll</div>
-                           <div class="activity-time">Time: 8/1/2025 08:36 PM</div>
-                       </div>
-                   </div>
-               </div>
-           </div>
+                <!-- Recent Activities -->
+                <div class="energy-trends-widget fade-in">
+                    <div class="widget-title">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12,6 12,12 16,14"></polyline>
+                        </svg>
+                        Recent Activities
+                    </div>
+                    
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                            </svg>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">Call note for Lewis Patterson</div>
+                            <div class="activity-description">In poll</div>
+                            <div class="activity-time">Time: 8/1/2025 08:36 PM</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-           <!-- Right Sidebar -->
-           <div class="right-sidebar slide-in-right">
-               <!-- Quick Actions -->
-               <div class="widget">
-                   <div class="widget-title">
-                       <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                       </svg>
-                       Quick Actions
-                   </div>
-                   <button class="quick-action-btn primary" onclick="goToCallsHub()">
-                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                       </svg>
-                       Go to Calls Hub
-                   </button>
-                   <button class="quick-action-btn secondary" onclick="addContact()">
-                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                           <circle cx="9" cy="7" r="4"></circle>
-                           <line x1="19" y1="8" x2="19" y2="14"></line>
-                           <line x1="22" y1="11" x2="16" y2="11"></line>
-                       </svg>
-                       Add Contact
-                   </button>
-                   <button class="quick-action-btn tertiary" onclick="bulkImport()">
-                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                           <polyline points="14,2 14,8 20,8"></polyline>
-                           <line x1="16" y1="13" x2="8" y2="13"></line>
-                           <line x1="16" y1="17" x2="8" y2="17"></line>
-                           <polyline points="10,9 9,9 8,9"></polyline>
-                       </svg>
-                       Bulk Import
-                   </button>
-               </div>
+            <!-- Right Sidebar -->
+            <div class="right-sidebar slide-in-right">
+                <!-- Quick Actions -->
+                <div class="widget">
+                    <div class="widget-title">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        Quick Actions
+                    </div>
+                    <button class="quick-action-btn" onclick="goToCallsHub()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                        Go to Calls Hub
+                    </button>
+                    <button class="quick-action-btn" onclick="addContact()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <line x1="19" y1="8" x2="19" y2="14"></line>
+                            <line x1="22" y1="11" x2="16" y2="11"></line>
+                        </svg>
+                        Add Contact
+                    </button>
+                    <button class="quick-action-btn" onclick="bulkImport()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10,9 9,9 8,9"></polyline>
+                        </svg>
+                        Bulk Import
+                    </button>
+                </div>
 
-               <!-- Today's Tasks -->
-               <div class="widget">
-                   <div class="widget-title">
-                       <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <path d="M9 11l3 3L22 4"></path>
-                           <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                       </svg>
-                       Today's Tasks
-                   </div>
-                   <div class="task-item">
-                       <div class="task-priority high"></div>
-                       <div class="task-content">
-                           <div class="task-title">Follow up with John Smith - Q1 Energy Contract</div>
-                           <div class="task-time">Due: 2:00 PM</div>
-                       </div>
-                   </div>
-                   <div class="task-item">
-                       <div class="task-priority medium"></div>
-                       <div class="task-content">
-                           <div class="task-title">Prepare energy analysis for Sarah Johnson</div>
-                           <div class="task-time">Due: 3:30 PM</div>
-                       </div>
-                   </div>
-                   <div class="task-item">
-                       <div class="task-priority low"></div>
-                       <div class="task-content">
-                           <div class="task-title">Review Mike Davis multi-site proposal</div>
-                           <div class="task-time">Due: Tomorrow 9:00 AM</div>
-                       </div>
-                   </div>
-               </div>
+                <!-- Today's Tasks -->
+                <div class="widget">
+                    <div class="widget-title">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 11l3 3L22 4"></path>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        Today's Tasks
+                    </div>
+                    <div class="task-item">
+                        <div class="task-priority high"></div>
+                        <div class="task-content">
+                            <div class="task-title">Follow up with John Smith - Q1 Energy Contract</div>
+                            <div class="task-time">Due: 2:00 PM</div>
+                        </div>
+                    </div>
+                    <div class="task-item">
+                        <div class="task-priority medium"></div>
+                        <div class="task-content">
+                            <div class="task-title">Prepare energy analysis for Sarah Johnson</div>
+                            <div class="task-time">Due: 3:30 PM</div>
+                        </div>
+                    </div>
+                    <div class="task-item">
+                        <div class="task-priority low"></div>
+                        <div class="task-content">
+                            <div class="task-title">Review Mike Davis multi-site proposal</div>
+                            <div class="task-time">Due: Tomorrow 9:00 AM</div>
+                        </div>
+                    </div>
+                </div>
 
-               <!-- Energy Market News -->
-               <div class="widget">
-                   <div class="widget-title">
-                       <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"></path>
-                           <path d="M6 12h8"></path>
-                           <path d="M6 8h8"></path>
-                           <path d="M6 16h5"></path>
-                       </svg>
-                       Energy Market News
-                   </div>
-                   <div class="news-item">
-                       <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
-                       <div class="news-meta">
-                           <span class="news-source">ERCOT</span>
-                           <span>12:30 PM</span>
-                           <span>8/2/2025</span>
-                       </div>
-                   </div>
-                   <div class="news-item">
-                       <div class="news-title">Grid operator warns electricity demand may surpass available supply as soon as summer 2026, driven by...</div>
-                       <div class="news-meta">
-                           <span class="news-source">Energy News</span>
-                           <span>11:45 AM</span>
-                           <span>8/2/2025</span>
-                       </div>
-                   </div>
-               </div>
+                <!-- Energy Market News -->
+                <div class="widget">
+                    <div class="widget-title">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"></path>
+                            <path d="M6 12h8"></path>
+                            <path d="M6 8h8"></path>
+                            <path d="M6 16h5"></path>
+                        </svg>
+                        Energy Market News
+                    </div>
+                    <div class="news-item">
+                        <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
+                        <div class="news-meta">
+                            <span class="news-source">ERCOT</span>
+                            <span>12:30 PM</span>
+                            <span>8/2/2025</span>
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-title">Grid operator warns electricity demand may surpass available supply as soon as summer 2026, driven by...</div>
+                        <div class="news-meta">
+                            <span class="news-source">Energy News</span>
+                            <span>11:45 AM</span>
+                            <span>8/2/2025</span>
+                        </div>
+                    </div>
+                </div>
 
-               <!-- Energy Consultant Tools -->
-               <div class="widget">
-                   <div class="widget-title">
-                       <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-                       </svg>
-                       Energy Tools
-                   </div>
-                   <button class="quick-action-btn secondary" onclick="openRateCalculator()">
-                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                           <line x1="9" y1="9" x2="9" y2="15"></line>
-                           <line x1="15" y1="9" x2="15" y2="15"></line>
-                           <line x1="9" y1="12" x2="15" y2="12"></line>
-                       </svg>
-                       Rate Calculator
-                   </button>
-                   <button class="quick-action-btn secondary" onclick="openUsageAnalyzer()">
-                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <line x1="18" y1="20" x2="18" y2="10"></line>
-                           <line x1="12" y1="20" x2="12" y2="4"></line>
-                           <line x1="6" y1="20" x2="6" y2="14"></line>
-                       </svg>
-                       Usage Analyzer
-                   </button>
-                   <button class="quick-action-btn secondary" onclick="openContractManager()">
-                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                           <polyline points="14,2 14,8 20,8"></polyline>
-                       </svg>
-                       Contract Manager
-                   </button>
-               </div>
-           </div>
-       </div>
-   </div>
+                <!-- Energy Consultant Tools -->
+                <div class="widget">
+                    <div class="widget-title">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                        </svg>
+                        Energy Tools
+                    </div>
+                    <button class="quick-action-btn" onclick="openRateCalculator()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="9" x2="9" y2="15"></line>
+                            <line x1="15" y1="9" x2="15" y2="15"></line>
+                            <line x1="9" y1="12" x2="15" y2="12"></line>
+                        </svg>
+                        Rate Calculator
+                    </button>
+                    <button class="quick-action-btn" onclick="openUsageAnalyzer()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        Usage Analyzer
+                    </button>
+                    <button class="quick-action-btn" onclick="openContractManager()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                        </svg>
+                        Contract Manager
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-   <script>
-       // Firebase Configuration
-       const firebaseConfig = {
-           apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
-           authDomain: "power-choosers-crm.firebaseapp.com",
-           projectId: "power-choosers-crm",
-           storageBucket: "power-choosers-crm.firebasestorage.app",
-           messagingSenderId: "792458658491",
-           appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
-           measurementId: "G-XEC3BFHJHW"
-       };
-       
-       // Initialize Firebase
-       const app = firebase.initializeApp(firebaseConfig);
-       const db = app.firestore();
-       const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
+    <!-- Profile Upload Modal -->
+    <div id="profile-modal" class="profile-modal">
+        <div class="profile-modal-content">
+            <div class="profile-modal-title">Update Profile Picture</div>
+            
+            <div class="profile-preview" id="profile-preview">
+                <span id="preview-initials">LC</span>
+            </div>
+            
+            <div class="upload-area" onclick="document.getElementById('profile-upload').click()"
+                 ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                <div class="upload-text">Drag & drop your image here</div>
+                <div class="upload-text">or</div>
+                <button class="upload-button" type="button">Choose File</button>
+            </div>
+            
+            <input type="file" id="profile-upload" accept="image/*" onchange="handleFileSelect(event)">
+            
+            <div class="modal-actions">
+                <button class="modal-btn secondary" onclick="closeProfileModal()">Cancel</button>
+                <button class="modal-btn primary" onclick="saveProfilePicture()" id="save-profile-btn" disabled>Save Picture</button>
+            </div>
+        </div>
+    </div>
 
-       // Application State
-       const CRMApp = {
-           currentView: 'dashboard',
-           accounts: [],
-           contacts: [],
-           activities: []
-       };
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
+            authDomain: "power-choosers-crm.firebaseapp.com",
+            projectId: "power-choosers-crm",
+            storageBucket: "power-choosers-crm.firebasestorage.app",
+            messagingSenderId: "792458658491",
+            appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
+            measurementId: "G-XEC3BFHJHW"
+        };
+        
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = app.firestore();
+        const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
 
-       // Initialize Application
-       async function initializeApp() {
-           try {
-               await loadInitialData();
-               updateDashboardMetrics();
-               setupEventListeners();
-               console.log('Power Choosers CRM Dashboard initialized successfully');
-           } catch (error) {
-               console.error('Error initializing app:', error);
-           }
-       }
+        // Application State
+        const CRMApp = { currentView: 'dashboard', accounts: [], contacts: [], activities: [] };
 
-       // Load data from Firestore
-       async function loadInitialData() {
-           try {
-               const [accountsSnapshot, contactsSnapshot, activitiesSnapshot] = await Promise.all([
-                   db.collection('accounts').get(),
-                   db.collection('contacts').get(),
-                   db.collection('activities').orderBy('createdAt', 'desc').limit(20).get()
-               ]);
-               
-               CRMApp.accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-               CRMApp.contacts = contactsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-               CRMApp.activities = activitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-               
-           } catch (error) {
-               console.error('Error loading data:', error);
-               // Initialize with sample data if Firestore fails
-               initializeSampleData();
-           }
-       }
+        // Profile picture functionality
+        let selectedProfileImage = null;
 
-       // Initialize with sample data
-       function initializeSampleData() {
-           CRMApp.accounts = [
-               {
-                   id: '1',
-                   name: 'ABC Manufacturing',
-                   industry: 'Manufacturing',
-                   phone: '(214) 555-0123',
-                   city: 'Dallas',
-                   state: 'TX',
-                   painPoints: 'High energy costs affecting profit margins',
-                   benefits: 'Reduce operational expenses and improve sustainability'
-               }
-           ];
-           
-           CRMApp.contacts = [
-               {
-                   id: '1',
-                   firstName: 'John',
-                   lastName: 'Smith',
-                   title: 'Energy Manager',
-                   accountId: '1',
-                   accountName: 'ABC Manufacturing',
-                   email: 'john.smith@abcmfg.com',
-                   phone: '(214) 555-0123'
-               }
-           ];
-           
-           CRMApp.activities = [
-               {
-                   id: '1',
-                   type: 'call_note',
-                   description: 'Call note for Lewis Patterson',
-                   noteContent: 'In poll',
-                   createdAt: new Date('2025-08-01T20:36:00')
-               }
-           ];
-       }
+        function openProfileModal() {
+            const modal = document.getElementById('profile-modal');
+            modal.classList.add('active');
+            
+            const currentAvatar = document.getElementById('profile-avatar');
+            const preview = document.getElementById('profile-preview');
+            
+            if (currentAvatar.querySelector('img')) {
+                const img = currentAvatar.querySelector('img').cloneNode();
+                preview.innerHTML = '';
+                preview.appendChild(img);
+            } else {
+                preview.innerHTML = '<span id="preview-initials">LC</span>';
+            }
+            
+            selectedProfileImage = null;
+            document.getElementById('save-profile-btn').disabled = true;
+        }
 
-       // Update dashboard metrics
-       function updateDashboardMetrics() {
-           document.getElementById('total-accounts').textContent = CRMApp.accounts.length;
-           document.getElementById('total-contacts').textContent = CRMApp.contacts.length;
-           document.getElementById('recent-activities').textContent = CRMApp.activities.length;
-           document.getElementById('hot-leads').textContent = '0';
-       }
+        function closeProfileModal() {
+            document.getElementById('profile-modal').classList.remove('active');
+            selectedProfileImage = null;
+        }
 
-       // Setup event listeners
-       function setupEventListeners() {
-           // Global search
-           const searchInput = document.getElementById('global-search');
-           if (searchInput) {
-               searchInput.addEventListener('input', handleGlobalSearch);
-           }
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) processImageFile(file);
+        }
 
-           // Add smooth scrolling and animations
-           document.querySelectorAll('.sidebar-item').forEach(item => {
-               item.addEventListener('click', function() {
-                   document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
-                   this.classList.add('active');
-               });
-           });
-       }
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('dragover');
+        }
 
-       // Global search functionality
-       function handleGlobalSearch(event) {
-           const query = event.target.value.toLowerCase();
-           if (query.length < 2) return;
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('dragover');
+        }
 
-           // Search through accounts and contacts
-           const results = [];
-           
-           CRMApp.accounts.forEach(account => {
-               if (account.name.toLowerCase().includes(query) ||
-                   account.industry.toLowerCase().includes(query)) {
-                   results.push({
-                       type: 'account',
-                       name: account.name,
-                       details: account.industry
-                   });
-               }
-           });
+        function handleDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('image/')) {
+                processImageFile(files[0]);
+            }
+        }
 
-           CRMApp.contacts.forEach(contact => {
-               if (`${contact.firstName} ${contact.lastName}`.toLowerCase().includes(query) ||
-                   contact.title.toLowerCase().includes(query)) {
-                   results.push({
-                       type: 'contact',
-                       name: `${contact.firstName} ${contact.lastName}`,
-                       details: contact.title
-                   });
-               }
-           });
+        function processImageFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('profile-preview').innerHTML = `<img src="${e.target.result}" alt="Profile Preview">`;
+                selectedProfileImage = e.target.result;
+                document.getElementById('save-profile-btn').disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
 
-           // Display results (simplified for demo)
-           console.log('Search results:', results);
-       }
+        function saveProfilePicture() {
+            if (selectedProfileImage) {
+                document.getElementById('profile-avatar').innerHTML = `<img src="${selectedProfileImage}" alt="Profile Picture">`;
+                localStorage.setItem('profilePicture', selectedProfileImage);
+                closeProfileModal();
+                showToast('Profile picture updated successfully!', 'success');
+            }
+        }
 
-       // Navigation functions
-       function showView(viewName) {
-           console.log(`Navigating to ${viewName}`);
-           // Add view switching logic here
-       }
+        function loadSavedProfilePicture() {
+            const savedPicture = localStorage.getItem('profilePicture');
+            if (savedPicture) {
+                document.getElementById('profile-avatar').innerHTML = `<img src="${savedPicture}" alt="Profile Picture">`;
+            }
+        }
 
-       function toggleNotifications() {
-           console.log('Toggle notifications');
-           // Add notification dropdown logic here
-       }
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed; top: 90px; right: 20px; z-index: 3000;
+                background: ${type === 'success' ? '#10b981' : '#ef4444'};
+                color: white; padding: 12px 20px; border-radius: 8px;
+                font-weight: 600; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+                animation: slideInRight 0.3s ease-out;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideOutRight 0.3s ease-in forwards';
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
 
-       function toggleProfileMenu() {
-           console.log('Toggle profile menu');
-           // Add profile menu logic here
-       }
+        // Initialize Application
+        async function initializeApp() {
+            try {
+                await loadInitialData();
+                updateDashboardMetrics();
+                setupEventListeners();
+                console.log('Power Choosers CRM Dashboard initialized successfully');
+            } catch (error) {
+                console.error('Error initializing app:', error);
+            }
+        }
 
-       // Quick action functions
-       function goToCallsHub() {
-           console.log('Opening Calls Hub');
-           // Navigate to calls hub
-       }
+        async function loadInitialData() {
+            try {
+                const [accountsSnapshot, contactsSnapshot, activitiesSnapshot] = await Promise.all([
+                    db.collection('accounts').get(),
+                    db.collection('contacts').get(),
+                    db.collection('activities').orderBy('createdAt', 'desc').limit(20).get()
+                ]);
+                
+                CRMApp.accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                CRMApp.contacts = contactsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                CRMApp.activities = activitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (error) {
+                console.error('Error loading data:', error);
+                initializeSampleData();
+            }
+        }
 
-       function addContact() {
-           console.log('Opening Add Contact modal');
-           // Open add contact modal
-       }
+        function initializeSampleData() {
+            CRMApp.accounts = [{ id: '1', name: 'ABC Manufacturing', industry: 'Manufacturing', phone: '(214) 555-0123', city: 'Dallas', state: 'TX' }];
+            CRMApp.contacts = [{ id: '1', firstName: 'John', lastName: 'Smith', title: 'Energy Manager', accountId: '1', email: 'john.smith@abcmfg.com', phone: '(214) 555-0123' }];
+            CRMApp.activities = [{ id: '1', type: 'call_note', description: 'Call note for Lewis Patterson', noteContent: 'In poll', createdAt: new Date('2025-08-01T20:36:00') }];
+        }
 
-       function bulkImport() {
-           console.log('Opening Bulk Import');
-           // Open bulk import functionality
-       }
+        function updateDashboardMetrics() {
+            document.getElementById('total-accounts').textContent = CRMApp.accounts.length;
+            document.getElementById('total-contacts').textContent = CRMApp.contacts.length;
+            document.getElementById('recent-activities').textContent = CRMApp.activities.length;
+            document.getElementById('hot-leads').textContent = '0';
+        }
 
-       function openRateCalculator() {
-           console.log('Opening Rate Calculator');
-           // Open rate calculator tool
-       }
+        function setupEventListeners() {
+            const searchInput = document.getElementById('global-search');
+            if (searchInput) searchInput.addEventListener('input', handleGlobalSearch);
 
-       function openUsageAnalyzer() {
-           console.log('Opening Usage Analyzer');
-           // Open usage analyzer tool
-       }
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+        }
 
-       function openContractManager() {
-           console.log('Opening Contract Manager');
-           // Open contract manager tool
-       }
+        function handleGlobalSearch(event) {
+            const query = event.target.value.toLowerCase();
+            if (query.length < 2) return;
 
-       // Initialize app when DOM is loaded
-       document.addEventListener('DOMContentLoaded', initializeApp);
+            const results = [];
+            CRMApp.accounts.forEach(account => {
+                if (account.name.toLowerCase().includes(query) || account.industry.toLowerCase().includes(query)) {
+                    results.push({ type: 'account', name: account.name, details: account.industry });
+                }
+            });
 
-       // Add some dynamic effects
-       document.addEventListener('DOMContentLoaded', function() {
-           // Animate metric cards on load
-           const metricCards = document.querySelectorAll('.metric-card');
-           metricCards.forEach((card, index) => {
-               setTimeout(() => {
-                   card.style.opacity = '0';
-                   card.style.transform = 'translateY(20px)';
-                   card.style.transition = 'all 0.5s ease';
-                   
-                   setTimeout(() => {
-                       card.style.opacity = '1';
-                       card.style.transform = 'translateY(0)';
-                   }, 100);
-               }, index * 100);
-           });
+            CRMApp.contacts.forEach(contact => {
+                if (`${contact.firstName} ${contact.lastName}`.toLowerCase().includes(query) || contact.title.toLowerCase().includes(query)) {
+                    results.push({ type: 'contact', name: `${contact.firstName} ${contact.lastName}`, details: contact.title });
+                }
+            });
 
-           // Add hover effects to sidebar items
-           const sidebarItems = document.querySelectorAll('.sidebar-item');
-           sidebarItems.forEach(item => {
-               item.addEventListener('mouseenter', function() {
-                   this.style.transform = 'translateX(5px)';
-               });
-               
-               item.addEventListener('mouseleave', function() {
-                   if (!this.classList.contains('active')) {
-                       this.style.transform = 'translateX(0)';
-                   }
-               });
-           });
+            console.log('Search results:', results);
+        }
 
-           // Add dynamic shadow effects to header
-           let lastScrollTop = 0;
-           window.addEventListener('scroll', function() {
-               const header = document.querySelector('.header');
-               const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-               
-               if (scrollTop > lastScrollTop) {
-                   header.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.4)';
-               } else {
-                   header.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
-               }
-               lastScrollTop = scrollTop;
-           });
-       });
-   </script>
+        // Navigation and Action Functions
+        function showView(viewName) { console.log(`Navigating to ${viewName}`); }
+        function toggleNotifications() { console.log('Toggle notifications'); }
+        function goToCallsHub() { console.log('Opening Calls Hub'); }
+        function addContact() { console.log('Opening Add Contact modal'); }
+        function bulkImport() { console.log('Opening Bulk Import'); }
+        function openRateCalculator() { console.log('Opening Rate Calculator'); }
+        function openUsageAnalyzer() { console.log('Opening Usage Analyzer'); }
+        function openContractManager() { console.log('Opening Contract Manager'); }
+
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            loadSavedProfilePicture();
+
+            // Close profile modal when clicking outside
+            document.getElementById('profile-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeProfileModal();
+            });
+
+            // Animate metric cards on load
+            const metricCards = document.querySelectorAll('.metric-card');
+            metricCards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateY(20px)';
+                    card.style.transition = 'all 0.5s ease';
+                    
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, 100);
+                }, index * 100);
+            });
+        });
+    </script>
 </body>
 </html>
+                        
