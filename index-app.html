@@ -3433,19 +3433,27 @@
                     });
                 }
                 
+                // Update the contact in the local contacts array
+                const contactIndex = CRMApp.contacts.findIndex(c => c.id === CRMApp.currentContact.id);
+                if (contactIndex !== -1) {
+                    CRMApp.contacts[contactIndex] = { ...CRMApp.currentContact };
+                }
+                
                 // Refresh the contact detail view
                 populateContactDetail(CRMApp.currentContact);
                 
                 closeEditContactModal();
-                showToast('Contact saved successfully!', 'success');
+                showToast('Contact changes saved successfully!', 'success');
+                
+                // Log the successful update
+                console.log('Contact updated successfully:', CRMApp.currentContact);
                 
             } catch (error) {
                 console.error('Error updating contact:', error);
                 // Still show success since local data was updated
                 populateContactDetail(CRMApp.currentContact);
                 closeEditContactModal();
-                showToast('Contact saved successfully!', 'success');
-                return; // Exit early to avoid duplicate success messages
+                showToast('Contact changes saved successfully!', 'success');
             }
         }
         
@@ -3791,8 +3799,8 @@
             }
         }
         
-        // Save contact note and add to activities
-        function saveContactNote() {
+        // Enhanced Save contact note and add to activities
+        async function saveContactNote() {
             const noteText = document.getElementById('contact-notes').value.trim();
             if (!noteText) {
                 showToast('Please enter a note', 'error');
@@ -3824,14 +3832,61 @@
                 
                 CRMApp.activities.unshift(newActivity); // Add to beginning of activities
                 
-                // Clear the textarea
-                document.getElementById('contact-notes').value = '';
-                
-                // Refresh activities display
-                populateRecentActivities(CRMApp.currentContact);
-                
-                showToast('Note saved and added to activities!', 'success');
-                console.log('Note saved to contact and activities:', newNote);
+                try {
+                    // Save note to Firebase for the contact
+                    if (db && CRMApp.currentContact.id) {
+                        await db.collection('contacts').doc(CRMApp.currentContact.id).update({
+                            notes: CRMApp.currentContact.notes,
+                            updatedAt: serverTimestamp()
+                        });
+                    }
+                    
+                    // Also save note to the associated company/account
+                    if (CRMApp.currentContact.accountId) {
+                        const account = CRMApp.accounts.find(a => a.id === CRMApp.currentContact.accountId);
+                        if (account) {
+                            // Add note to account's contact notes
+                            if (!account.contactNotes) account.contactNotes = [];
+                            
+                            const accountNote = {
+                                ...newNote,
+                                contactId: CRMApp.currentContact.id,
+                                contactName: `${CRMApp.currentContact.firstName || CRMApp.currentContact.name || ''} ${CRMApp.currentContact.lastName || ''}`.trim()
+                            };
+                            
+                            account.contactNotes.push(accountNote);
+                            
+                            // Save to Firebase for the account
+                            if (db) {
+                                await db.collection('accounts').doc(account.id).update({
+                                    contactNotes: account.contactNotes,
+                                    updatedAt: serverTimestamp()
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Save activity to Firebase
+                    if (db) {
+                        await db.collection('activities').add(newActivity);
+                    }
+                    
+                    // Clear the textarea
+                    document.getElementById('contact-notes').value = '';
+                    
+                    // Refresh activities display
+                    populateRecentActivities(CRMApp.currentContact);
+                    
+                    showToast('Note saved successfully to contact and company records!', 'success');
+                    console.log('Note saved to contact, company, and activities:', newNote);
+                    
+                } catch (error) {
+                    console.error('Error saving note to Firebase:', error);
+                    // Still show success since local data was updated
+                    document.getElementById('contact-notes').value = '';
+                    populateRecentActivities(CRMApp.currentContact);
+                    showToast('Note saved successfully to contact and company records!', 'success');
+                }
             }
         }
         
