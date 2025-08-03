@@ -774,6 +774,25 @@
             opacity: 0.5;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
+
+        /* Page View Styles - Responsive to sidebar */
+        .page-view {
+            position: absolute;
+            top: 0;
+            left: 70px; /* Start at collapsed sidebar width */
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
+            z-index: 50;
+            padding: 30px;
+            overflow-y: auto;
+            transition: left 0.3s ease; /* Smooth transition when sidebar expands */
+        }
+
+        /* When sidebar is hovered, adjust page view position */
+        .sidebar:hover ~ .content-area .page-view {
+            left: 250px; /* Expanded sidebar width */
+        }
     </style>
 </head>
 <body>
@@ -896,98 +915,8 @@
 
         <!-- Content Area -->
         <div class="content-area">
-            <!-- Main Content -->
-            <div class="main-content">
-                <!-- Dashboard Overview -->
-                <div class="dashboard-grid fade-in">
-                    <div class="metric-card">
-                        <div class="metric-change positive">+12%</div>
-                        <div class="metric-value" id="total-accounts">1</div>
-                        <div class="metric-label">Total Accounts</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-change positive">+8%</div>
-                        <div class="metric-value" id="total-contacts">1</div>
-                        <div class="metric-label">Total Contacts</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-change positive">+15%</div>
-                        <div class="metric-value" id="recent-activities">6</div>
-                        <div class="metric-label">Recent Activities</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-change negative">-3%</div>
-                        <div class="metric-value" id="hot-leads">0</div>
-                        <div class="metric-label">Hot Leads</div>
-                    </div>
-                </div>
-
-                <!-- Texas Electricity Market Trends -->
-                <div class="energy-trends-widget fade-in">
-                    <div class="widget-title">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="20" x2="18" y2="10"></line>
-                            <line x1="12" y1="20" x2="12" y2="4"></line>
-                            <line x1="6" y1="20" x2="6" y2="14"></line>
-                        </svg>
-                        Texas Electricity Market Trends
-                    </div>
-                    
-                    <!-- Inner Rectangle Container -->
-                    <div class="trends-inner-container">
-                        <h3 class="trends-subtitle">Historical & Projected Pricing</h3>
-                        <p class="trends-description">Texas ERCOT Average Rates (¢/kWh)</p>
-                        
-                        <div class="pricing-display">
-                            <div class="price-item">
-                                <div class="price-value historical">8.2¢</div>
-                                <div class="price-label">2019-2021 Avg</div>
-                            </div>
-                            <div class="price-item">
-                                <div class="price-value current">13.1¢</div>
-                                <div class="price-label">Current 2025</div>
-                            </div>
-                            <div class="price-item">
-                                <div class="price-value projected">16.8¢</div>
-                                <div class="price-label">Projected 2026</div>
-                            </div>
-                        </div>
-                        
-                        <div class="market-intelligence">
-                            <div class="market-intelligence-text">
-                                📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Activities -->
-                <div class="energy-trends-widget fade-in" style="margin-top: 30px;">
-                    <div class="widget-title">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12,6 12,12 16,14"></polyline>
-                        </svg>
-                        Recent Activities
-                    </div>
-                    
-                    <div class="activity-item">
-                        <div class="activity-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                            </svg>
-                        </div>
-                        <div class="activity-content">
-                            <div class="activity-title">Call note for Lewis Patterson</div>
-                            <div class="activity-description">In poll</div>
-                            <div class="activity-time">Time: 8/1/2025 08:36 PM</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Contacts View (Hidden by default) -->
-            <div id="contacts-view" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%); z-index: 50; padding: 30px; overflow-y: auto;">
+            <div id="contacts-view" class="page-view" style="display: none;">
                 <!-- Main title and action bar -->
                 <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-700">
                     <h1 class="text-3xl font-bold text-white">All Contacts</h1>
@@ -1111,7 +1040,7 @@
             </div>
 
             <!-- Accounts View (Hidden by default) -->
-            <div id="accounts-view" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%); z-index: 50; padding: 30px; overflow-y: auto;">
+            <div id="accounts-view" class="page-view" style="display: none;">
                 <!-- Main title and action bar for Accounts -->
                 <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-700">
                     <h1 class="text-3xl font-bold text-white">All Accounts</h1>
@@ -1244,6 +1173,96 @@
                                     </svg>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Dashboard Overview -->
+                <div class="dashboard-grid fade-in">
+                    <div class="metric-card">
+                        <div class="metric-change positive">+12%</div>
+                        <div class="metric-value" id="total-accounts">1</div>
+                        <div class="metric-label">Total Accounts</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change positive">+8%</div>
+                        <div class="metric-value" id="total-contacts">1</div>
+                        <div class="metric-label">Total Contacts</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change positive">+15%</div>
+                        <div class="metric-value" id="recent-activities">6</div>
+                        <div class="metric-label">Recent Activities</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change negative">-3%</div>
+                        <div class="metric-value" id="hot-leads">0</div>
+                        <div class="metric-label">Hot Leads</div>
+                    </div>
+                </div>
+
+                <!-- Texas Electricity Market Trends -->
+                <div class="energy-trends-widget fade-in">
+                    <div class="widget-title">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        Texas Electricity Market Trends
+                    </div>
+                    
+                    <!-- Inner Rectangle Container -->
+                    <div class="trends-inner-container">
+                        <h3 class="trends-subtitle">Historical & Projected Pricing</h3>
+                        <p class="trends-description">Texas ERCOT Average Rates (¢/kWh)</p>
+                        
+                        <div class="pricing-display">
+                            <div class="price-item">
+                                <div class="price-value historical">8.2¢</div>
+                                <div class="price-label">2019-2021 Avg</div>
+                            </div>
+                            <div class="price-item">
+                                <div class="price-value current">13.1¢</div>
+                                <div class="price-label">Current 2025</div>
+                            </div>
+                            <div class="price-item">
+                                <div class="price-value projected">16.8¢</div>
+                                <div class="price-label">Projected 2026</div>
+                            </div>
+                        </div>
+                        
+                        <div class="market-intelligence">
+                            <div class="market-intelligence-text">
+                                📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activities -->
+                <div class="energy-trends-widget fade-in" style="margin-top: 30px;">
+                    <div class="widget-title">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12,6 12,12 16,14"></polyline>
+                        </svg>
+                        Recent Activities
+                    </div>
+                    
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                            </svg>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">Call note for Lewis Patterson</div>
+                            <div class="activity-description">In poll</div>
+                            <div class="activity-time">Time: 8/1/2025 08:36 PM</div>
                         </div>
                     </div>
                 </div>
@@ -1409,6 +1428,206 @@
             <div class="modal-actions">
                 <button class="modal-btn secondary" onclick="closeProfileModal()">Cancel</button>
                 <button class="modal-btn primary" onclick="saveProfilePicture()" id="save-profile-btn" disabled>Save Picture</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Contact Modal -->
+    <div id="add-contact-modal" class="profile-modal">
+        <div class="profile-modal-content">
+            <div class="profile-modal-title">Add New Contact</div>
+            
+            <form id="add-contact-form" onsubmit="saveNewContact(event)">
+                <div class="mb-4">
+                    <label for="contact-first-name" class="block text-sm font-medium text-gray-300 mb-2">First Name *</label>
+                    <input type="text" id="contact-first-name" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="contact-last-name" class="block text-sm font-medium text-gray-300 mb-2">Last Name</label>
+                    <input type="text" id="contact-last-name" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="contact-title" class="block text-sm font-medium text-gray-300 mb-2">Job Title</label>
+                    <input type="text" id="contact-title" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="contact-company" class="block text-sm font-medium text-gray-300 mb-2">Company</label>
+                    <select id="contact-company" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                        <option value="">Select Company</option>
+                        <!-- Companies will be populated dynamically -->
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="contact-email" class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                    <input type="email" id="contact-email" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="contact-phone" class="block text-sm font-medium text-gray-300 mb-2">Phone</label>
+                    <input type="tel" id="contact-phone" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="contact-location" class="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                    <input type="text" id="contact-location" placeholder="City, State" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn secondary" onclick="closeAddContactModal()">Cancel</button>
+                    <button type="submit" class="modal-btn primary">Add Contact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Account Modal -->
+    <div id="add-account-modal" class="profile-modal">
+        <div class="profile-modal-content">
+            <div class="profile-modal-title">Add New Account</div>
+            
+            <form id="add-account-form" onsubmit="saveNewAccount(event)">
+                <div class="mb-4">
+                    <label for="account-company-name" class="block text-sm font-medium text-gray-300 mb-2">Company Name *</label>
+                    <input type="text" id="account-company-name" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="account-phone" class="block text-sm font-medium text-gray-300 mb-2">Company Phone</label>
+                    <input type="tel" id="account-phone" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="account-website" class="block text-sm font-medium text-gray-300 mb-2">Website</label>
+                    <input type="url" id="account-website" placeholder="https://example.com" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="account-city" class="block text-sm font-medium text-gray-300 mb-2">City</label>
+                    <input type="text" id="account-city" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="account-state" class="block text-sm font-medium text-gray-300 mb-2">State</label>
+                    <input type="text" id="account-state" maxlength="2" placeholder="TX" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="account-address" class="block text-sm font-medium text-gray-300 mb-2">Service Address</label>
+                    <input type="text" id="account-address" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="account-employees" class="block text-sm font-medium text-gray-300 mb-2">Number of Employees</label>
+                    <input type="number" id="account-employees" min="1" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn secondary" onclick="closeAddAccountModal()">Cancel</button>
+                    <button type="submit" class="modal-btn primary">Add Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Contact Detail View -->
+    <div id="contact-detail-view" class="page-view" style="display: none;">
+        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 h-full overflow-hidden">
+            <div class="flex-1 overflow-y-auto pr-6">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between pb-4 border-b border-gray-700">
+                        <div class="flex items-center space-x-2">
+                            <button class="text-gray-400 hover:text-green-500 transition-colors" onclick="callContact()">
+                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            </button>
+                            <h1 class="text-3xl font-bold text-white" id="contact-detail-name">Contact Name</h1>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="showView('contacts')">
+                                <span class="font-medium">← Back to Contacts</span>
+                            </button>
+                            <button class="px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <span class="font-medium">Save Contact</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-4">Quick Access</h3>
+                        <div class="flex flex-wrap gap-4">
+                            <button class="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors" onclick="callContact()">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                Call
+                            </button>
+                            <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="emailContact()">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                Email
+                            </button>
+                            <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="openTaskModal()">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                Task
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-2">Contact Details</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="contact-details-grid">
+                            <!-- Contact details will be populated dynamically -->
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-4">Recent Activities</h3>
+                        <div class="space-y-4" id="contact-activities">
+                            <!-- Activities will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700">
+                <div class="space-y-6">
+                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-4">Add Notes</h3>
+                        <textarea class="w-full h-32 p-3 bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Add a new note for this contact..."></textarea>
+                        <button class="mt-3 w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors">Save Note</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Detail View -->
+    <div id="account-detail-view" class="page-view" style="display: none;">
+        <!-- This will contain the full account detail design from accounts-page.html -->
+        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 h-full overflow-hidden">
+            <div class="flex-1 overflow-y-auto pr-6">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between pb-4 border-b border-gray-700">
+                        <div class="flex items-center space-x-2">
+                            <button class="text-gray-400 hover:text-green-500 transition-colors" onclick="callCompany()">
+                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            </button>
+                            <h1 class="text-3xl font-bold text-white" id="account-detail-name">Account Name</h1>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="showView('accounts')">
+                                <span class="font-medium">← Back to Accounts</span>
+                            </button>
+                            <button class="px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <span class="font-medium">Save Account</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Account detail content will be populated here -->
+                    <div id="account-detail-content">
+                        <!-- Content from accounts-page.html will be inserted here -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1638,17 +1857,24 @@
         }
 
         // Navigation and Action Functions
-        function showView(viewName) {
-            console.log(`Navigating to ${viewName}`);
+        function showView(viewName, itemId = null) {
+            console.log(`Navigating to ${viewName}`, itemId ? `with ID: ${itemId}` : '');
             
             const contactsView = document.getElementById('contacts-view');
             const accountsView = document.getElementById('accounts-view');
+            const contactDetailView = document.getElementById('contact-detail-view');
+            const accountDetailView = document.getElementById('account-detail-view');
             const mainContent = document.querySelector('.main-content');
             const rightSidebar = document.querySelector('.right-sidebar');
             
             // Hide all views first
             if (contactsView) contactsView.style.display = 'none';
             if (accountsView) accountsView.style.display = 'none';
+            if (contactDetailView) contactDetailView.style.display = 'none';
+            if (accountDetailView) accountDetailView.style.display = 'none';
+            
+            // Update current view state
+            CRMApp.currentView = viewName;
             
             if (viewName === 'contacts') {
                 // Show contacts view
@@ -1668,16 +1894,375 @@
                 // Hide main dashboard content
                 if (mainContent) mainContent.style.display = 'none';
                 if (rightSidebar) rightSidebar.style.display = 'none';
+            } else if (viewName === 'contact-detail' && itemId) {
+                // Show contact detail view
+                showContactDetail(itemId);
+            } else if (viewName === 'account-detail' && itemId) {
+                // Show account detail view
+                showAccountDetail(itemId);
             } else {
                 // Show main dashboard content (default view)
                 if (mainContent) mainContent.style.display = 'block';
                 if (rightSidebar) rightSidebar.style.display = 'block';
+                CRMApp.currentView = 'dashboard';
             }
         }
         
         function toggleNotifications() { console.log('Toggle notifications'); }
-        function addAccount() { console.log('Opening Add Account modal'); }
-        function addContact() { console.log('Opening Add Contact modal'); }
+        
+        // Modal Functions
+        function addAccount() {
+            const modal = document.getElementById('add-account-modal');
+            modal.classList.add('active');
+            populateCompanyDropdown();
+        }
+        
+        function addContact() {
+            const modal = document.getElementById('add-contact-modal');
+            modal.classList.add('active');
+        }
+        
+        function closeAddContactModal() {
+            const modal = document.getElementById('add-contact-modal');
+            modal.classList.remove('active');
+            document.getElementById('add-contact-form').reset();
+        }
+        
+        function closeAddAccountModal() {
+            const modal = document.getElementById('add-account-modal');
+            modal.classList.remove('active');
+            document.getElementById('add-account-form').reset();
+        }
+        
+        function populateCompanyDropdown() {
+            const select = document.getElementById('contact-company');
+            if (!select) return;
+            
+            // Clear existing options except the first one
+            select.innerHTML = '<option value="">Select Company</option>';
+            
+            // Add companies from CRMApp.accounts
+            CRMApp.accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = account.name;
+                select.appendChild(option);
+            });
+        }
+        
+        async function saveNewContact(event) {
+            event.preventDefault();
+            
+            const firstName = document.getElementById('contact-first-name').value.trim();
+            const lastName = document.getElementById('contact-last-name').value.trim();
+            const title = document.getElementById('contact-title').value.trim();
+            const companyId = document.getElementById('contact-company').value;
+            const email = document.getElementById('contact-email').value.trim();
+            const phone = document.getElementById('contact-phone').value.trim();
+            const location = document.getElementById('contact-location').value.trim();
+            
+            if (!firstName) {
+                showToast('First name is required', 'error');
+                return;
+            }
+            
+            const newContact = {
+                id: Date.now().toString(),
+                firstName,
+                lastName,
+                title,
+                accountId: companyId,
+                accountName: companyId ? CRMApp.accounts.find(a => a.id === companyId)?.name : '',
+                email,
+                phone,
+                location,
+                createdAt: new Date()
+            };
+            
+            try {
+                // Add to Firebase if available, otherwise add to local array
+                if (db) {
+                    await db.collection('contacts').add(newContact);
+                }
+                CRMApp.contacts.push(newContact);
+                
+                closeAddContactModal();
+                updateDashboardMetrics();
+                showToast('Contact added successfully!', 'success');
+                
+                // Refresh contacts view if currently visible
+                if (CRMApp.currentView === 'contacts') {
+                    renderContactsPage();
+                }
+            } catch (error) {
+                console.error('Error adding contact:', error);
+                showToast('Error adding contact', 'error');
+            }
+        }
+        
+        async function saveNewAccount(event) {
+            event.preventDefault();
+            
+            const companyName = document.getElementById('account-company-name').value.trim();
+            const phone = document.getElementById('account-phone').value.trim();
+            const website = document.getElementById('account-website').value.trim();
+            const city = document.getElementById('account-city').value.trim();
+            const state = document.getElementById('account-state').value.trim();
+            const address = document.getElementById('account-address').value.trim();
+            const employees = document.getElementById('account-employees').value;
+            
+            if (!companyName) {
+                showToast('Company name is required', 'error');
+                return;
+            }
+            
+            const newAccount = {
+                id: Date.now().toString(),
+                name: companyName,
+                phone,
+                website,
+                city,
+                state,
+                address,
+                employees: employees ? parseInt(employees) : null,
+                createdAt: new Date()
+            };
+            
+            try {
+                // Add to Firebase if available, otherwise add to local array
+                if (db) {
+                    await db.collection('accounts').add(newAccount);
+                }
+                CRMApp.accounts.push(newAccount);
+                
+                closeAddAccountModal();
+                updateDashboardMetrics();
+                showToast('Account added successfully!', 'success');
+                
+                // Refresh accounts view if currently visible
+                if (CRMApp.currentView === 'accounts') {
+                    renderAccountsPage();
+                }
+            } catch (error) {
+                console.error('Error adding account:', error);
+                showToast('Error adding account', 'error');
+            }
+        }
+        
+        // Detail View Functions
+        function showContactDetail(contactId) {
+            const contact = CRMApp.contacts.find(c => c.id === contactId);
+            if (!contact) return;
+            
+            CRMApp.currentContact = contact;
+            
+            // Hide other views
+            document.getElementById('contacts-view').style.display = 'none';
+            document.querySelector('.main-content').style.display = 'none';
+            document.querySelector('.right-sidebar').style.display = 'none';
+            
+            // Show contact detail view
+            const detailView = document.getElementById('contact-detail-view');
+            detailView.style.display = 'block';
+            
+            // Populate contact details
+            populateContactDetail(contact);
+        }
+        
+        function showAccountDetail(accountId) {
+            const account = CRMApp.accounts.find(a => a.id === accountId);
+            if (!account) return;
+            
+            CRMApp.currentAccount = account;
+            
+            // Hide other views
+            document.getElementById('accounts-view').style.display = 'none';
+            document.querySelector('.main-content').style.display = 'none';
+            document.querySelector('.right-sidebar').style.display = 'none';
+            
+            // Show account detail view
+            const detailView = document.getElementById('account-detail-view');
+            detailView.style.display = 'block';
+            
+            // Populate account details
+            populateAccountDetail(account);
+        }
+        
+        function populateContactDetail(contact) {
+            // Update contact name
+            document.getElementById('contact-detail-name').textContent = `${contact.firstName} ${contact.lastName}`;
+            
+            // Populate contact details grid
+            const detailsGrid = document.getElementById('contact-details-grid');
+            detailsGrid.innerHTML = `
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-400">First Name</label>
+                    <input type="text" value="${contact.firstName}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-400">Last Name</label>
+                    <input type="text" value="${contact.lastName || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-400">Job Title</label>
+                    <input type="text" value="${contact.title || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-400">Company</label>
+                    <input type="text" value="${contact.accountName || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-400">Email</label>
+                    <input type="email" value="${contact.email || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-400">Phone</label>
+                    <input type="tel" value="${contact.phone || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-400">Location</label>
+                    <input type="text" value="${contact.location || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+            `;
+            
+            // Populate recent activities
+            const activitiesContainer = document.getElementById('contact-activities');
+            const contactActivities = CRMApp.activities.filter(activity =>
+                activity.contactId === contact.id ||
+                activity.description.toLowerCase().includes(contact.firstName.toLowerCase())
+            );
+            
+            if (contactActivities.length > 0) {
+                activitiesContainer.innerHTML = contactActivities.map(activity => `
+                    <div class="flex items-start space-x-3 p-3 bg-gray-700 rounded-lg">
+                        <div class="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-white font-medium">${activity.description}</p>
+                            <p class="text-gray-400 text-sm">${activity.noteContent || ''}</p>
+                            <p class="text-gray-500 text-xs mt-1">${new Date(activity.createdAt).toLocaleString()}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                activitiesContainer.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p>No recent activities</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function populateAccountDetail(account) {
+            // Update account name
+            document.getElementById('account-detail-name').textContent = account.name;
+            
+            // For now, show basic account info - we'll integrate the full design later
+            const contentDiv = document.getElementById('account-detail-content');
+            contentDiv.innerHTML = `
+                <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                    <h3 class="text-lg font-semibold text-white mb-4">Account Details</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-400">Company Name</label>
+                            <input type="text" value="${account.name}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-400">Phone</label>
+                            <input type="tel" value="${account.phone || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-400">Website</label>
+                            <input type="url" value="${account.website || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-400">City</label>
+                            <input type="text" value="${account.city || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-400">State</label>
+                            <input type="text" value="${account.state || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-400">Employees</label>
+                            <input type="number" value="${account.employees || ''}" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Contact Detail Action Functions
+        function callContact() {
+            if (CRMApp.currentContact && CRMApp.currentContact.phone) {
+                showToast(`Calling ${CRMApp.currentContact.firstName} ${CRMApp.currentContact.lastName} at ${CRMApp.currentContact.phone}`, 'success');
+            } else {
+                showToast('No phone number available', 'error');
+            }
+        }
+        
+        function emailContact() {
+            if (CRMApp.currentContact && CRMApp.currentContact.email) {
+                window.open(`mailto:${CRMApp.currentContact.email}`, '_blank');
+            } else {
+                showToast('No email address available', 'error');
+            }
+        }
+        
+        function openTaskModal() {
+            showToast('Task modal functionality coming soon', 'success');
+        }
+        
+        function callCompany() {
+            if (CRMApp.currentAccount && CRMApp.currentAccount.phone) {
+                showToast(`Calling ${CRMApp.currentAccount.name} at ${CRMApp.currentAccount.phone}`, 'success');
+            } else {
+                showToast('No phone number available', 'error');
+            }
+        }
+        
+        // Helper functions for table actions
+        function editContact(contactId) {
+            showToast('Edit contact functionality coming soon', 'success');
+        }
+        
+        function callContactFromList(contactId) {
+            const contact = CRMApp.contacts.find(c => c.id === contactId);
+            if (contact && contact.phone) {
+                showToast(`Calling ${contact.firstName} ${contact.lastName} at ${contact.phone}`, 'success');
+            } else {
+                showToast('No phone number available', 'error');
+            }
+        }
+        
+        function deleteContact(contactId) {
+            if (confirm('Are you sure you want to delete this contact?')) {
+                CRMApp.contacts = CRMApp.contacts.filter(c => c.id !== contactId);
+                renderContactsPage();
+                updateDashboardMetrics();
+                showToast('Contact deleted successfully', 'success');
+            }
+        }
+        
+        function editAccount(accountId) {
+            showToast('Edit account functionality coming soon', 'success');
+        }
+        
+        function deleteAccount(accountId) {
+            if (confirm('Are you sure you want to delete this account?')) {
+                CRMApp.accounts = CRMApp.accounts.filter(a => a.id !== accountId);
+                renderAccountsPage();
+                updateDashboardMetrics();
+                showToast('Account deleted successfully', 'success');
+            }
+        }
+        
         function bulkImport() { console.log('Opening Bulk Import'); }
         function openRateCalculator() { console.log('Opening Rate Calculator'); }
         function openUsageAnalyzer() { console.log('Opening Usage Analyzer'); }
@@ -1789,7 +2374,8 @@
             if (CRMApp.accounts && CRMApp.accounts.length > 0) {
                 CRMApp.accounts.forEach(account => {
                     const row = document.createElement('tr');
-                    row.className = 'hover:bg-gray-700 transition-colors';
+                    row.className = 'hover:bg-gray-700 transition-colors cursor-pointer';
+                    row.onclick = () => showView('account-detail', account.id);
                     row.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-medium text-white">${account.name}</div>
@@ -1802,18 +2388,18 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div class="flex items-center space-x-2">
-                                <button class="text-gray-400 hover:text-blue-500 transition-colors" title="Edit Account">
+                                <button class="text-gray-400 hover:text-blue-500 transition-colors" title="Edit Account" onclick="event.stopPropagation(); editAccount('${account.id}')">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                                     </svg>
                                 </button>
-                                <button class="text-gray-400 hover:text-green-500 transition-colors" title="View Details">
+                                <button class="text-gray-400 hover:text-green-500 transition-colors" title="View Details" onclick="event.stopPropagation(); showView('account-detail', '${account.id}')">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                         <circle cx="12" cy="12" r="3"/>
                                     </svg>
                                 </button>
-                                <button class="text-gray-400 hover:text-red-500 transition-colors" title="Delete Account">
+                                <button class="text-gray-400 hover:text-red-500 transition-colors" title="Delete Account" onclick="event.stopPropagation(); deleteAccount('${account.id}')">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                     </svg>
@@ -1981,7 +2567,8 @@
             if (CRMApp.contacts && CRMApp.contacts.length > 0) {
                 CRMApp.contacts.forEach(contact => {
                     const row = document.createElement('tr');
-                    row.className = 'hover:bg-gray-700 transition-colors';
+                    row.className = 'hover:bg-gray-700 transition-colors cursor-pointer';
+                    row.onclick = () => showView('contact-detail', contact.id);
                     row.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-medium text-white">${contact.firstName} ${contact.lastName}</div>
@@ -2000,17 +2587,17 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div class="flex items-center space-x-2">
-                                <button class="text-gray-400 hover:text-blue-500 transition-colors" title="Edit Contact">
+                                <button class="text-gray-400 hover:text-blue-500 transition-colors" title="Edit Contact" onclick="event.stopPropagation(); editContact('${contact.id}')">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                                     </svg>
                                 </button>
-                                <button class="text-gray-400 hover:text-green-500 transition-colors" title="Call Contact">
+                                <button class="text-gray-400 hover:text-green-500 transition-colors" title="Call Contact" onclick="event.stopPropagation(); callContactFromList('${contact.id}')">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                                     </svg>
                                 </button>
-                                <button class="text-gray-400 hover:text-red-500 transition-colors" title="Delete Contact">
+                                <button class="text-gray-400 hover:text-red-500 transition-colors" title="Delete Contact" onclick="event.stopPropagation(); deleteContact('${contact.id}')">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                     </svg>
@@ -2089,9 +2676,17 @@
             initializeApp();
             loadSavedProfilePicture();
 
-            // Close profile modal when clicking outside
+            // Close modals when clicking outside
             document.getElementById('profile-modal').addEventListener('click', function(e) {
                 if (e.target === this) closeProfileModal();
+            });
+            
+            document.getElementById('add-contact-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeAddContactModal();
+            });
+            
+            document.getElementById('add-account-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeAddAccountModal();
             });
 
             // Animate metric cards on load
