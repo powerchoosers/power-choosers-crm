@@ -4,16 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Choosers CRM Dashboard</title>
-
+    
     <!-- External Dependencies -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         :root {
             --primary-blue: #1e3a8a;
@@ -27,12 +25,11 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
             color: #e2e8f0;
             height: 100vh;
             overflow: hidden;
-            display: flex;
         }
 
         /* Scrollbar */
@@ -50,7 +47,7 @@
             padding: 0 30px;
             position: fixed;
             top: 0;
-            left: 70px;
+            left: 0;
             right: 0;
             z-index: 1000;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -199,14 +196,10 @@
             border-right: 1px solid #1e293b;
             overflow: visible;
             transition: width 0.3s ease;
-            position: fixed;
-            left: 0;
-            top: 0;
-            height: 100%;
+            position: relative;
             z-index: 100;
             display: flex;
             flex-direction: column;
-            padding-top: 20px;
         }
 
         .sidebar:hover {
@@ -292,24 +285,6 @@
 
         .sidebar:hover .nav-text {
             opacity: 1;
-        }
-        
-        .nav-item-icon-only {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .nav-item-icon-only .nav-text {
-            position: absolute;
-            left: 70px; /* Aligned with the expanded sidebar's text */
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        .sidebar:hover .nav-item-icon-only .nav-text {
-             opacity: 1;
-             pointer-events: auto;
         }
 
         .nav-badge {
@@ -842,28 +817,7 @@
                 </div>
             </div>
 
-            <!-- External Tools Section -->
-            <div class="nav-section">
-                <div class="nav-section-title">External Tools</div>
-                <div class="nav-item" onclick="openExternalSearch('google')">
-                    <img class="nav-icon" src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851441ed944ec9f407f68_Google__G__logo.svg.png" alt="Google">
-                    <span class="nav-text">Google Search</span>
-                </div>
-                <div class="nav-item" onclick="openExternalSearch('maps')">
-                    <img class="nav-icon" src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/6888d3a0fa26096e1e359b89_google-map-icon.webp" alt="Google Maps">
-                    <span class="nav-text">Google Maps</span>
-                </div>
-                <div class="nav-item" onclick="openExternalSearch('apollo')">
-                    <img class="nav-icon" src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/688851d2771f4c6e42a09731_images.png" alt="Apollo">
-                    <span class="nav-text">Apollo.io</span>
-                </div>
-                <div class="nav-item" onclick="openExternalSearch('beenverified')">
-                    <img class="nav-icon" src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68885144c4bbad742f397a18_unnamed.png" alt="BeenVerified">
-                    <span class="nav-text">BeenVerified</span>
-                </div>
-            </div>
-
-            <!-- Settings section at bottom -->
+            <!-- Settings Section -->
             <div class="nav-section settings">
                 <div class="nav-item" onclick="showView('settings')">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -872,13 +826,21 @@
                     </svg>
                     <span class="nav-text">Settings</span>
                 </div>
+                <div class="nav-item" onclick="showView('account-details')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span class="nav-text">Account Details</span>
+                </div>
             </div>
         </div>
 
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Dashboard Overview -->
-            <div id="dashboard-view" class="view-container active">
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Dashboard Overview -->
                 <div class="dashboard-grid fade-in">
                     <div class="metric-card">
                         <div class="metric-change positive">+12%</div>
@@ -905,7 +867,7 @@
                 <!-- Texas Electricity Market Trends -->
                 <div class="energy-trends-widget fade-in">
                     <div class="widget-title">
-                        <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="20" x2="18" y2="10"></line>
                             <line x1="12" y1="20" x2="12" y2="4"></line>
                             <line x1="6" y1="20" x2="6" y2="14"></line>
@@ -916,26 +878,26 @@
                     <!-- Inner Rectangle Container -->
                     <div class="trends-inner-container">
                         <h3 class="trends-subtitle">Historical & Projected Pricing</h3>
-                        <p class="trends-description">Texas ERCOT Average Rates (垄/kWh)</p>
+                        <p class="trends-description">Texas ERCOT Average Rates (¢/kWh)</p>
                         
                         <div class="pricing-display">
                             <div class="price-item">
-                                <div class="price-value historical">8.2垄</div>
+                                <div class="price-value historical">8.2¢</div>
                                 <div class="price-label">2019-2021 Avg</div>
                             </div>
                             <div class="price-item">
-                                <div class="price-value current">13.1垄</div>
+                                <div class="price-value current">13.1¢</div>
                                 <div class="price-label">Current 2025</div>
                             </div>
                             <div class="price-item">
-                                <div class="price-value projected">16.8垄</div>
+                                <div class="price-value projected">16.8¢</div>
                                 <div class="price-label">Projected 2026</div>
                             </div>
                         </div>
                         
                         <div class="market-intelligence">
                             <div class="market-intelligence-text">
-                                馃搳 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026
+                                📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026
                             </div>
                         </div>
                     </div>
@@ -944,7 +906,7 @@
                 <!-- Recent Activities -->
                 <div class="energy-trends-widget fade-in">
                     <div class="widget-title">
-                        <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12,6 12,12 16,14"></polyline>
                         </svg>
@@ -1324,8 +1286,6 @@
         function openRateCalculator() { console.log('Opening Rate Calculator'); }
         function openUsageAnalyzer() { console.log('Opening Usage Analyzer'); }
         function openContractManager() { console.log('Opening Contract Manager'); }
-        function openExternalSearch(tool) { console.log(`Opening external tool: ${tool}`); }
-        function openProfileModal() { console.log('Opening profile modal'); }
 
         // Initialize app when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
@@ -1333,12 +1293,9 @@
             loadSavedProfilePicture();
 
             // Close profile modal when clicking outside
-            const profileModal = document.getElementById('profile-modal');
-            if (profileModal) {
-                profileModal.addEventListener('click', function(e) {
-                    if (e.target === this) closeProfileModal();
-                });
-            }
+            document.getElementById('profile-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeProfileModal();
+            });
 
             // Animate metric cards on load
             const metricCards = document.querySelectorAll('.metric-card');
@@ -1358,3 +1315,4 @@
     </script>
 </body>
 </html>
+                        
