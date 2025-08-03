@@ -1576,15 +1576,15 @@
 
     <!-- Contact Detail View -->
     <div id="contact-detail-view" class="page-view" style="display: none;">
-        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 h-full overflow-hidden">
+        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 h-screen overflow-hidden">
             <div class="flex-1 overflow-y-auto pr-6">
                 <div class="space-y-6">
+                    <!-- Top Bar -->
                     <div class="flex items-center justify-between pb-4 border-b border-gray-700">
                         <div class="flex items-center space-x-2">
                             <button class="text-gray-400 hover:text-green-500 transition-colors" onclick="callContact()">
                                 <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                             </button>
-                            <h1 class="text-3xl font-bold text-white" id="contact-detail-name">Contact Name</h1>
                         </div>
                         <div class="flex items-center space-x-2">
                             <button class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="showView('contacts')">
@@ -1595,22 +1595,41 @@
                             </button>
                         </div>
                     </div>
-                    
+
+                    <!-- Contact Name Section with Profile Picture -->
+                    <div class="flex items-center space-x-4 pb-4">
+                        <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                            <span id="contact-profile-initials">JS</span>
+                        </div>
+                        <div class="flex-1">
+                            <h1 class="text-3xl font-bold text-white" id="contact-detail-name">John Smith</h1>
+                        </div>
+                        <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            Edit Contact
+                        </button>
+                    </div>
+
+                    <!-- Grey Dividing Line -->
+                    <hr class="border-gray-600">
                     <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
                         <h3 class="text-lg font-semibold text-white mb-4">Quick Access</h3>
                         <div class="flex flex-wrap gap-4">
                             <button class="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors" onclick="callContact()">
-                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                                 Call
                             </button>
                             <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="emailContact()">
-                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                                 Email
                             </button>
                             <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="openTaskModal()">
-                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                                 Task
                             </button>
+                            <a href="https://www.linkedin.com/in/johnsmith" target="_blank" class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.766s.784-1.767 1.75-1.767 1.75.79 1.75 1.767c0 .976-.784 1.766-1.75 1.766zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                                LinkedIn
+                            </a>
                         </div>
                     </div>
                     
@@ -1620,22 +1639,260 @@
                             <!-- Contact details will be populated dynamically -->
                         </div>
                     </div>
-                    
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-2">Contact Details</h3>
+                        <div class="detail-field mb-4" data-field="contact-summary">
+                            <p class="text-gray-400">
+                                John Smith is an experienced Energy Manager at KHP Capital Partners with over 8 years in the energy sector. He specializes in contract negotiations and energy cost optimization for commercial real estate portfolios.
+                            </p>
+                            <div class="detail-overlay">
+                                <button class="overlay-button" onclick="editField('contact-summary')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg>
+                                </button>
+                                <button class="overlay-button" onclick="copyField('contact-summary')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="detail-field" data-field="first-name">
+                                <p class="text-gray-400 text-sm">First Name</p>
+                                <p class="text-white font-medium">John</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('first-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('first-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="last-name">
+                                <p class="text-gray-400 text-sm">Last Name</p>
+                                <p class="text-white font-medium">Smith</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('last-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('last-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="job-title">
+                                <p class="text-gray-400 text-sm">Job Title</p>
+                                <p class="text-white font-medium">Energy Manager</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('job-title')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('job-title')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="company-name">
+                                <p class="text-gray-400 text-sm">Company</p>
+                                <p class="text-white font-medium">KHP Capital Partners</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="email">
+                                <p class="text-gray-400 text-sm">Email</p>
+                                <p class="text-white font-medium">john.smith@khp.com</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('email')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('email')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="phone">
+                                <p class="text-gray-400 text-sm">Phone</p>
+                                <p class="text-white font-medium">(415) 555-1234</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('phone')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('phone')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="location">
+                                <p class="text-gray-400 text-sm">Location</p>
+                                <p class="text-white font-medium">San Francisco, CA</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('location')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('location')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="department">
+                                <p class="text-gray-400 text-sm">Department</p>
+                                <p class="text-white font-medium">Energy Management</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('department')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('department')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
                         <h3 class="text-lg font-semibold text-white mb-4">Recent Activities</h3>
-                        <div class="space-y-4" id="contact-activities">
-                            <!-- Activities will be populated dynamically -->
+                        <div class="space-y-4">
+                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
+                                <div class="flex-shrink-0">
+                                    <div class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-white">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">Called John Smith about energy contract renewal</p>
+                                    <p class="text-xs text-gray-400">August 2, 2025 at 2:30 PM</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
+                                <div class="flex-shrink-0">
+                                    <div class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-white">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">Sent email with rate comparison analysis</p>
+                                    <p class="text-xs text-gray-400">August 1, 2025 at 10:15 AM</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Recent Activities Section -->
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-4">Recent Activities</h3>
+                        <p class="text-sm text-gray-400 mb-4">Recent activities with John Smith and KHP Capital Partners</p>
+                        <div class="space-y-4">
+                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
+                                <div class="flex-shrink-0">
+                                    <div class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-white">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">Called John Smith about energy contract renewal</p>
+                                    <p class="text-xs text-gray-400">August 2, 2025 at 2:30 PM</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
+                                <div class="flex-shrink-0">
+                                    <div class="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-white">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">Sent email with rate comparison analysis to KHP Capital Partners</p>
+                                    <p class="text-xs text-gray-400">August 1, 2025 at 10:15 AM</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4 p-3 bg-gray-700 rounded-lg">
+                                <div class="flex-shrink-0">
+                                    <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-white">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">Completed energy audit for KHP Capital Partners</p>
+                                    <p class="text-xs text-gray-400">July 30, 2025 at 3:45 PM</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
+            <!-- Right Scrolling Side Panel -->
             <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700">
                 <div class="space-y-6">
+                    <!-- Add Notes Widget -->
                     <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
                         <h3 class="text-lg font-semibold text-white mb-4">Add Notes</h3>
-                        <textarea class="w-full h-32 p-3 bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Add a new note for this contact..."></textarea>
+                        <textarea class="w-full h-32 p-3 bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Add a new note for John Smith..."></textarea>
                         <button class="mt-3 w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors">Save Note</button>
+                    </div>
+
+                    <!-- Energy Health Check Calculator -->
+                    <div class="calculator-wrapper">
+                        <div class="widget-title mb-4">
+                            <svg class="icon mr-2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Energy Health Check
+                        </div>
+                        <p class="text-sm text-gray-400 mb-6">Calculate a potential savings analysis based on key account details.</p>
+                        
+                        <!-- Current Bill Section -->
+                        <div class="form-section mb-6">
+                            <div class="section-header-pill">
+                                <div class="section-icon">1</div>
+                                Current Bill
+                            </div>
+                            <div class="grid grid-cols-1 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Monthly kWh Usage</label>
+                                    <input type="number" class="form-input w-full" placeholder="Enter kWh usage" id="kwh-usage">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Current Rate (¢/kWh)</label>
+                                    <input type="number" step="0.001" class="form-input w-full" placeholder="Enter current rate" id="current-rate">
+                                </div>
+                            </div>
+                            <div class="usage-display" id="usage-display" style="display: none;">
+                                <div class="usage-title">Current Monthly Cost</div>
+                                <div class="usage-details" id="current-cost">$0.00</div>
+                            </div>
+                        </div>
+
+                        <!-- Proposed Rate Section -->
+                        <div class="form-section mb-6">
+                            <div class="section-header-pill">
+                                <div class="section-icon">2</div>
+                                Proposed Rate
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">New Rate (¢/kWh)</label>
+                                <input type="number" step="0.001" class="form-input w-full" placeholder="Enter proposed rate" id="proposed-rate">
+                            </div>
+                        </div>
+
+                        <!-- Calculate Button -->
+                        <button class="calculate-button w-full" id="calculate-btn" onclick="calculateSavings()">
+                            Calculate Savings
+                        </button>
+
+                        <!-- Results Section -->
+                        <div class="results-section" id="results-section" style="display: none;">
+                            <h4 class="text-lg font-semibold text-white mb-4">Savings Analysis</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-green-500" id="monthly-savings">$0</div>
+                                    <div class="text-sm text-gray-400">Monthly Savings</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-green-500" id="annual-savings">$0</div>
+                                    <div class="text-sm text-gray-400">Annual Savings</div>
+                                </div>
+                            </div>
+                            <div class="mt-4 p-3 bg-green-900 bg-opacity-30 border border-green-500 rounded-lg">
+                                <div class="text-sm text-green-400 font-medium" id="savings-percentage">0% savings</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Energy News Widget -->
+                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <div class="widget-title mb-4">
+                            <svg class="icon mr-2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"/>
+                                <path d="M6 12h8"/><path d="M6 8h8"/><path d="M6 16h5"/>
+                            </svg>
+                            Energy News
+                        </div>
+                        <div class="space-y-4">
+                            <!-- Trump's Bill Article -->
+                            <div class="news-item cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors" onclick="openNewsArticle('https://example.com/trump-energy-bill')">
+                                <div class="news-title">Trump's Energy Independence Act Passes - Major Impact on Texas Energy Market</div>
+                                <div class="news-description">New legislation promises to reshape energy pricing and availability across Texas, with significant implications for commercial energy contracts.</div>
+                                <div class="news-meta">
+                                    <span class="news-source">Energy Today</span>
+                                    <span>2 days ago</span>
+                                </div>
+                            </div>
+
+                            <!-- Additional Energy Articles -->
+                            <div class="news-item cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors" onclick="openNewsArticle('https://example.com/ercot-demand-forecast')">
+                                <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
+                                <div class="news-description">Grid operator warns of potential supply shortages as industrial demand continues to grow.</div>
+                                <div class="news-meta">
+                                    <span class="news-source">ERCOT</span>
+                                    <span>3 days ago</span>
+                                </div>
+                            </div>
+
+                            <div class="news-item cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors" onclick="openNewsArticle('https://example.com/renewable-energy-growth')">
+                                <div class="news-title">Texas Renewable Energy Capacity Hits Record High</div>
+                                <div class="news-description">Solar and wind installations surge, creating new opportunities for competitive energy pricing.</div>
+                                <div class="news-meta">
+                                    <span class="news-source">Renewable Energy News</span>
+                                    <span>5 days ago</span>
+                                </div>
+                            </div>
+
+                            <div class="news-item cursor-pointer hover:bg-gray-700 p-3 rounded-lg transition-colors" onclick="openNewsArticle('https://example.com/commercial-energy-trends')">
+                                <div class="news-title">Commercial Energy Costs Rise 15% in Q3 2025</div>
+                                <div class="news-description">Businesses across Texas face higher energy bills as demand outpaces supply growth.</div>
+                                <div class="news-meta">
+                                    <span class="news-source">Business Energy Report</span>
+                                    <span>1 week ago</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2859,3 +3116,97 @@
 </body>
 </html>
                         
+// Energy Health Check Calculator Functions
+        function calculateSavings() {
+            const kwhUsage = parseFloat(document.getElementById('kwh-usage').value);
+            const currentRate = parseFloat(document.getElementById('current-rate').value);
+            const proposedRate = parseFloat(document.getElementById('proposed-rate').value);
+            
+            if (!kwhUsage || !currentRate || !proposedRate) {
+                showToast('Please fill in all fields', 'error');
+                return;
+            }
+            
+            // Calculate costs
+            const currentMonthlyCost = (kwhUsage * currentRate) / 100; // Convert cents to dollars
+            const proposedMonthlyCost = (kwhUsage * proposedRate) / 100;
+            const monthlySavings = currentMonthlyCost - proposedMonthlyCost;
+            const annualSavings = monthlySavings * 12;
+            const savingsPercentage = ((monthlySavings / currentMonthlyCost) * 100).toFixed(1);
+            
+            // Update display
+            document.getElementById('current-cost').textContent = `$${currentMonthlyCost.toFixed(2)}`;
+            document.getElementById('usage-display').style.display = 'block';
+            
+            // Show results
+            document.getElementById('monthly-savings').textContent = `$${monthlySavings.toFixed(2)}`;
+            document.getElementById('annual-savings').textContent = `$${annualSavings.toFixed(2)}`;
+            document.getElementById('savings-percentage').textContent = `${savingsPercentage}% savings`;
+            document.getElementById('results-section').style.display = 'block';
+            
+            showToast('Savings calculated successfully!', 'success');
+        }
+        
+        // News Article Function
+        function openNewsArticle(url) {
+            window.open(url, '_blank');
+        }
+        
+        // Update calculate button state based on input
+        function updateCalculateButton() {
+            const kwhUsage = document.getElementById('kwh-usage')?.value;
+            const currentRate = document.getElementById('current-rate')?.value;
+            const proposedRate = document.getElementById('proposed-rate')?.value;
+            const calculateBtn = document.getElementById('calculate-btn');
+            
+            if (calculateBtn) {
+                if (kwhUsage && currentRate && proposedRate) {
+                    calculateBtn.classList.add('ready');
+                    calculateBtn.disabled = false;
+                } else {
+                    calculateBtn.classList.remove('ready');
+                    calculateBtn.disabled = true;
+                }
+            }
+        }
+
+        // Enhanced DOMContentLoaded with calculator event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            loadSavedProfilePicture();
+
+            // Close modals when clicking outside
+            document.getElementById('profile-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeProfileModal();
+            });
+            
+            document.getElementById('add-contact-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeAddContactModal();
+            });
+            
+            document.getElementById('add-account-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeAddAccountModal();
+            });
+
+            // Add event listeners for calculator inputs
+            document.addEventListener('input', function(e) {
+                if (e.target.matches('#kwh-usage, #current-rate, #proposed-rate')) {
+                    updateCalculateButton();
+                }
+            });
+
+            // Animate metric cards on load
+            const metricCards = document.querySelectorAll('.metric-card');
+            metricCards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateY(20px)';
+                    card.style.transition = 'all 0.5s ease';
+                    
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, 100);
+                }, index * 100);
+            });
+        });
