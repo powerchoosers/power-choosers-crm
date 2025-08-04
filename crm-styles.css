@@ -1,7 +1,7 @@
 /*
  * crm-styles.css
  * This is the master stylesheet for the Power Choosers CRM.
- * It has been refined to correct layout issues and add visual improvements.
+ * It combines all project styles into a single, cohesive file.
  */
 
 /* --- 1. CSS Variables & Global Styles --- */
@@ -284,14 +284,12 @@ body {
 .page-view {
     display: none;
     width: 100%;
-    overflow-y: auto;
+    overflow-y: hidden;
 }
 .page-view.active {
     display: flex;
-}
-.page-view.dashboard-view {
-    display: flex;
     flex-direction: row;
+    height: 100%;
 }
 
 /* --- 4. Dashboard Specific Styles --- */
@@ -301,12 +299,16 @@ body {
     gap: 25px;
     width: 100%;
     padding: 24px;
+    height: 100%;
 }
 
 .main-content {
     display: flex;
     flex-direction: column;
     gap: 25px;
+    flex: 2;
+    height: 100%;
+    overflow-y: auto;
 }
 
 .stat-cards-grid {
