@@ -44,14 +44,14 @@
         #phone-view {
             height: calc(100vh - 77px);
             overflow-y: auto;
-            padding: 100px 24px 60px 24px;
+            padding: 100px 24px 120px 24px;
             background: #111827;
         }
 
         .phone-page-container {
             min-height: calc(100vh - 77px);
             padding-top: 0px;
-            padding-bottom: 60px;
+            padding-bottom: 120px;
             display: flex;
             flex-direction: column;
             gap: 24px;
@@ -3138,12 +3138,89 @@ function loadCallsData() {
     // Render the calls table
     renderCallsTable();
 }
+
+// Load Cold Calling Hub function
+async function loadColdCallingHub() {
+    try {
+        const response = await fetch('./cold-calling-hub.html');
+        const htmlContent = await response.text();
         
-        function toggleNotifications() { console.log('Toggle notifications'); }
+        // Extract the body content from the cold calling hub
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+        const bodyContent = doc.body.innerHTML;
         
-        // Modal Functions
-        function addAccount() {
-            const modal = document.getElementById('add-account-modal');
+        // Update the phone view with cold calling hub content
+        const phoneView = document.getElementById('phone-view');
+        if (phoneView) {
+            // Add the head content (styles and scripts) to current document
+            const existingStyles = document.querySelectorAll('style[data-cold-calling]');
+            existingStyles.forEach(style => style.remove());
+            
+            const styleElements = doc.querySelectorAll('style');
+            styleElements.forEach(style => {
+                const newStyle = document.createElement('style');
+                newStyle.setAttribute('data-cold-calling', 'true');
+                newStyle.textContent = style.textContent;
+                document.head.appendChild(newStyle);
+            });
+            
+            // Add scripts
+            const scriptElements = doc.querySelectorAll('script[src]');
+            scriptElements.forEach(script => {
+                if (!document.querySelector(`script[src="${script.src}"]`)) {
+                    const newScript = document.createElement('script');
+                    newScript.src = script.src;
+                    document.head.appendChild(newScript);
+                }
+            });
+            
+            // Set the phone view content
+            phoneView.innerHTML = bodyContent;
+            
+            // Execute any inline scripts
+            const inlineScripts = doc.querySelectorAll('script:not([src])');
+            inlineScripts.forEach(script => {
+                const newScript = document.createElement('script');
+                newScript.textContent = script.textContent;
+                document.body.appendChild(newScript);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading cold calling hub:', error);
+        alert('Error loading Cold Calling Hub. Please try again.');
+    }
+}
+
+// Add event listener for Cold Calling button
+document.addEventListener('DOMContentLoaded', function() {
+    // Cold Calling button event listener
+    document.addEventListener('click', function(e) {
+        if (e.target && (e.target.id === 'cold-calling-btn' || e.target.closest('#cold-calling-btn'))) {
+            e.preventDefault();
+            loadColdCallingHub();
+        }
+    });
+});
+
+// Load Cold Calling Hub function
+async function loadColdCallingHub() {
+    try {
+        const response = await fetch('./cold-calling-hub.html');
+        const htmlContent = await response.text();
+        
+        // Extract the body content from the cold calling hub
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+        const bodyContent = doc.body.innerHTML;
+        const headContent = doc.head.innerHTML;
+        
+        // Update the phone view with cold calling hub content
+        const phoneView = document.getElementById('phone-view');
+        if (phoneView) {
+            // Add the head content (styles and scripts) to current document
+            const existingStyles = document.querySelectorAll('style[data-cold-calling]');
+            existingStyles.forEach(style => style.remove());
             modal.classList.add('active');
             populateCompanyDropdown();
         }
