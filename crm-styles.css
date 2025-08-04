@@ -1,16 +1,3 @@
-Based on your request and the provided images, here is the corrected CSS file that addresses the alignment, color, and design issues you've pointed out.
-
-I've made the following changes to achieve the look you want:
-
-  * **Fixed Sidebar Icons:** The CSS for the `.nav-item` and its child elements has been adjusted to ensure the icons are perfectly centered when the sidebar is collapsed and correctly aligned when it's expanded.
-  * **Brighter Color Theme:** The CSS variables have been updated to a slightly brighter dark theme, closer to the colors in your new screenshot.
-  * **Added Borders:** A light grey border has been added to all the dashboard widgets and the search bar to match the desired style.
-  * **Removed Header Glow:** The `box-shadow` and `::after` pseudo-element that created the glow effect on the header have been removed.
-  * **Consistent Styling:** I've reviewed and adjusted all the relevant styles to ensure the overall theme is cohesive and professional.
-
-Here is the complete, fixed `crm-styles.css` file:
-
-```css
 /*
  * Power Choosers CRM Dashboard - Complete CSS Stylesheet (FINAL FIXED)
  * This provides a cohesive, responsive design for the CRM dashboard application.
@@ -103,8 +90,7 @@ body {
     border-bottom: 3px solid var(--professional-blue);
     position: relative;
     z-index: 1000;
-    /* Removed the shadow glow here */
-    box-shadow: none;
+    box-shadow: none; /* Removed the glow effect */
 }
 
 /* Removed the header::after pseudo-element to take away the glow */
@@ -276,10 +262,10 @@ body {
 .nav-item {
     display: flex;
     align-items: center;
-    justify-content: center; /* Center the icons when collapsed */
-    padding: 16px 0; /* Removed horizontal padding for perfect centering */
+    justify-content: center; /* Correctly centers the icons when collapsed */
+    padding: 16px 0; /* Ensures no horizontal padding for perfect centering */
     text-decoration: none;
-    color: var(--text-secondary);
+    color: white; /* All icons are white now */
     white-space: nowrap;
     transition: all 0.2s ease;
     border-radius: 12px;
@@ -318,14 +304,15 @@ body {
 }
 
 .nav-item svg {
-    margin-right: 0; /* Removed margin when centered */
+    margin-right: 0; /* Ensures no margin when centered */
     width: 24px;
     height: 24px;
     flex-shrink: 0;
     transition: margin-right 0.2s ease;
+    stroke: currentColor; /* Inherits the white color */
 }
 
-/* Added margin back when sidebar is hovered */
+/* Adds margin back when sidebar is hovered */
 .app-sidebar:hover .nav-item svg {
     margin-right: 16px;
 }
@@ -430,11 +417,11 @@ body {
 
 .widget-card {
     background: var(--bg-card) !important;
-    border: 1px solid var(--border-color); /* Added border */
+    border: 1px solid var(--border-color); /* Added thin dark grey border */
     border-radius: 16px;
     padding: 24px;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-md); /* Added a subtle shadow */
     min-height: 200px;
     margin: 0;
     width: 100%;
@@ -455,14 +442,14 @@ body {
 
 .stat-card {
     background: var(--bg-card);
-    border: 1px solid var(--border-color); /* Added border */
+    border: 1px solid var(--border-color); /* Added thin dark grey border */
     border-radius: 16px;
     padding: 24px;
     text-align: center;
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-md); /* Added a subtle shadow */
 }
 
 .stat-card::before {
@@ -500,11 +487,11 @@ body {
 /* Dashboard Cards */
 .dashboard-card {
     background: var(--bg-card);
-    border: 1px solid var(--border-color); /* Added border */
+    border: 1px solid var(--border-color); /* Added thin dark grey border */
     border-radius: 16px;
     padding: 24px;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-md); /* Added a subtle shadow */
 }
 
 .dashboard-card:hover {
@@ -586,9 +573,9 @@ body {
     gap: 12px;
     padding: 16px;
     background: var(--bg-hover);
-    border: 1px solid var(--border-color); /* Added border */
+    border: 1px solid var(--border-color); /* Added thin dark grey border */
     border-radius: 12px;
-    color: var(--text-primary);
+    color: white; /* Changed icon color to white */
     text-decoration: none;
     font-weight: 500;
     transition: all 0.2s ease;
@@ -607,6 +594,7 @@ body {
     width: 18px;
     height: 18px;
     flex-shrink: 0;
+    stroke: currentColor; /* Inherits the white color */
 }
 
 /* Activity List */
@@ -643,6 +631,7 @@ body {
     justify-content: center;
     background: var(--professional-blue);
     border-radius: 8px;
+    color: white; /* Ensured icons are white */
 }
 
 .activity-content {
@@ -709,11 +698,12 @@ body {
 }
 
 .news-item {
-    padding: 16px;
+    padding: 20px; /* Increased padding */
     background: var(--bg-hover);
     border-radius: 12px;
     transition: all 0.2s ease;
     border-left: 4px solid var(--accent-green);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); /* Added shadow */
 }
 
 .news-item:hover {
@@ -800,7 +790,7 @@ body {
     width: 400px;
     max-height: 500px;
     background: var(--bg-card);
-    border: 1px solid var(--border-color); /* Added border */
+    border: 1px solid var(--border-color); /* Added thin dark grey border */
     border-radius: 16px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
     z-index: 10000;
@@ -879,6 +869,7 @@ body {
     justify-content: center;
     flex-shrink: 0;
     font-size: 1rem;
+    color: white; /* Ensured icons are white */
 }
 
 .notification-icon.contact { background: var(--professional-blue); }
@@ -1100,4 +1091,3 @@ body {
         padding: 24px;
     }
 }
-```
