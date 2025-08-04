@@ -1142,6 +1142,166 @@
             padding: 0 12px;
         }
 
+        /* Cold Calling Hub Styles */
+        .calls-hub-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+            height: calc(100vh - 180px);
+            padding: 0;
+        }
+
+        .calls-hub-main {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: linear-gradient(135deg, var(--dark-blue) 0%, #1e293b 100%);
+            border: 1px solid #334155;
+            border-radius: 15px;
+            padding: 30px;
+            position: relative;
+            overflow-y: hidden;
+        }
+
+        .calls-hub-main-inner {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .script-display {
+            background: #0f1419;
+            padding: 24px;
+            border-radius: 12px;
+            font-size: 1.25rem;
+            line-height: 1.6;
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: left;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            flex-grow: 1;
+            overflow-y: auto;
+            white-space: pre-line;
+        }
+
+        .script-display.start {
+            text-align: center;
+        }
+
+        .script-display.mood-neutral { border-left: 4px solid var(--text-secondary); }
+        .script-display.mood-positive { border-left: 4px solid #10b981; }
+        .script-display.mood-challenging { border-left: 4px solid #f59e0b; }
+        .script-display.mood-unsure { border-left: 4px solid #8b5cf6; }
+
+        .response-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 25px;
+            margin-bottom: 20px;
+        }
+
+        .response-buttons.full-width {
+            grid-template-columns: 1fr;
+        }
+
+        .response-btn, .dial-button {
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .response-btn.positive {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .response-btn.neutral {
+            background: linear-gradient(135deg, var(--bg-hover) 0%, #475569 100%);
+            color: var(--text-primary);
+        }
+
+        .response-btn.challenging {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .dial-button {
+            background: linear-gradient(135deg, var(--professional-blue) 0%, var(--secondary-blue) 100%);
+            color: white;
+            width: 100%;
+        }
+
+        .calls-hub-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            min-width: 350px;
+            padding: 0 8px;
+        }
+
+        .sidebar-card {
+            background: linear-gradient(135deg, var(--dark-blue) 0%, #1e293b 100%);
+            border: 1px solid #334155;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .sidebar-card-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-input-group {
+            margin-bottom: 15px;
+        }
+
+        .sidebar-input-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .sidebar-input-group input,
+        .sidebar-input-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .sidebar-input-group input:focus,
+        .sidebar-input-group textarea:focus {
+            outline: none;
+            border-color: var(--professional-blue);
+        }
+
+        .sidebar-input-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
         /* Responsive design for phone page */
         @media (max-width: 1200px) {
             .table-header,
@@ -3089,16 +3249,8 @@
     const coldCallingBtn = document.getElementById('cold-calling-btn');
     if (coldCallingBtn) {
         coldCallingBtn.addEventListener('click', () => {
-            // Store current CRM data in localStorage
-            const crmData = {
-                contacts: CRMApp.contacts || [],
-                accounts: CRMApp.accounts || [],
-                activities: CRMApp.activities || []
-            };
-            localStorage.setItem('crmData', JSON.stringify(crmData));
-            
-            // Open cold calling hub in new window
-            window.open('cold-calling-hub.html', '_blank');
+            // Load embedded cold calling hub
+            loadColdCallingHub();
         });
     }
 
@@ -3139,57 +3291,247 @@ function loadCallsData() {
     renderCallsTable();
 }
 
-// Load Cold Calling Hub function
-async function loadColdCallingHub() {
-    try {
-        const response = await fetch('./cold-calling-hub.html');
-        const htmlContent = await response.text();
-        
-        // Extract the body content from the cold calling hub
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlContent, 'text/html');
-        const bodyContent = doc.body.innerHTML;
-        
-        // Update the phone view with cold calling hub content
-        const phoneView = document.getElementById('phone-view');
-        if (phoneView) {
-            // Add the head content (styles and scripts) to current document
-            const existingStyles = document.querySelectorAll('style[data-cold-calling]');
-            existingStyles.forEach(style => style.remove());
+// Load Cold Calling Hub function - Embedded content
+function loadColdCallingHub() {
+    const phoneView = document.getElementById('phone-view');
+    if (!phoneView) return;
+
+    // Store current CRM data in localStorage for cold calling hub
+    const crmData = {
+        contacts: CRMApp.contacts || [],
+        accounts: CRMApp.accounts || [],
+        activities: CRMApp.activities || []
+    };
+    localStorage.setItem('crmData', JSON.stringify(crmData));
+
+    // Set the phone view content to cold calling hub
+    phoneView.innerHTML = `
+        <div class="calls-hub-layout">
+            <!-- Main Script Area -->
+            <div class="calls-hub-main">
+                <div class="calls-hub-main-inner">
+                    <div class="script-display start" id="script-display">
+                        <h2 style="color: var(--text-primary); margin-bottom: 20px; font-size: 2rem;">🎯 Cold Calling Hub</h2>
+                        <p style="color: var(--text-secondary); text-align: center; font-size: 1.1rem; line-height: 1.6;">
+                            Ready to make impactful calls? Click "Start Cold Calling" to begin with AI-powered scripts and real-time guidance.
+                        </p>
+                    </div>
+                    
+                    <div class="response-buttons full-width" id="response-buttons">
+                        <button class="dial-button" onclick="startColdCalling()">
+                            🚀 Start Cold Calling
+                        </button>
+                    </div>
+                </div>
+            </div>
             
-            const styleElements = doc.querySelectorAll('style');
-            styleElements.forEach(style => {
-                const newStyle = document.createElement('style');
-                newStyle.setAttribute('data-cold-calling', 'true');
-                newStyle.textContent = style.textContent;
-                document.head.appendChild(newStyle);
-            });
-            
-            // Add scripts
-            const scriptElements = doc.querySelectorAll('script[src]');
-            scriptElements.forEach(script => {
-                if (!document.querySelector(`script[src="${script.src}"]`)) {
-                    const newScript = document.createElement('script');
-                    newScript.src = script.src;
-                    document.head.appendChild(newScript);
-                }
-            });
-            
-            // Set the phone view content
-            phoneView.innerHTML = bodyContent;
-            
-            // Execute any inline scripts
-            const inlineScripts = doc.querySelectorAll('script:not([src])');
-            inlineScripts.forEach(script => {
-                const newScript = document.createElement('script');
-                newScript.textContent = script.textContent;
-                document.body.appendChild(newScript);
-            });
-        }
-    } catch (error) {
-        console.error('Error loading cold calling hub:', error);
-        alert('Error loading Cold Calling Hub. Please try again.');
+            <!-- Sidebar -->
+            <div class="calls-hub-sidebar">
+                <!-- Contact Information Card -->
+                <div class="sidebar-card">
+                    <div class="sidebar-card-title">
+                        👤 Contact Information
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label>Contact Name</label>
+                        <input type="text" id="contact-name" placeholder="Enter contact name...">
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label>Company</label>
+                        <input type="text" id="contact-company" placeholder="Enter company name...">
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label>Phone Number</label>
+                        <input type="tel" id="contact-phone" placeholder="Enter phone number...">
+                    </div>
+                </div>
+                
+                <!-- Call Notes Card -->
+                <div class="sidebar-card">
+                    <div class="sidebar-card-title">
+                        📝 Call Notes
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label>Notes</label>
+                        <textarea id="call-notes" placeholder="Add your call notes here..."></textarea>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions Card -->
+                <div class="sidebar-card">
+                    <div class="sidebar-card-title">
+                        ⚡ Quick Actions
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button class="response-btn neutral" onclick="loadPhoneView()" style="width: 100%;">
+                            ← Back to Calls
+                        </button>
+                        <button class="response-btn positive" onclick="saveCallNotes()" style="width: 100%;">
+                            💾 Save Notes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Initialize cold calling hub functionality
+    initializeColdCallingHub();
+}
+
+// Initialize Cold Calling Hub functionality
+function initializeColdCallingHub() {
+    // Load any existing contact data from CRM
+    const contacts = CRMApp.contacts || [];
+    if (contacts.length > 0) {
+        // Populate contact dropdown or suggestions
+        console.log('Available contacts for cold calling:', contacts.length);
     }
+}
+
+// Start Cold Calling function
+function startColdCalling() {
+    const scriptDisplay = document.getElementById('script-display');
+    const responseButtons = document.getElementById('response-buttons');
+    
+    if (scriptDisplay && responseButtons) {
+        scriptDisplay.className = 'script-display mood-neutral';
+        scriptDisplay.innerHTML = `
+            <h3 style="color: var(--text-primary); margin-bottom: 15px;">📞 Cold Calling Script</h3>
+            <p style="color: var(--text-primary); line-height: 1.6;">
+                "Hi, this is [Your Name] from Power Choosers. I hope I'm not catching you at a bad time. 
+                I'm reaching out because we help businesses like yours reduce their energy costs by up to 30%. 
+                Do you have just 2 minutes to hear how we might be able to help you save money on your energy bills?"
+            </p>
+        `;
+        
+        responseButtons.innerHTML = `
+            <button class="response-btn positive" onclick="handlePositiveResponse()">
+                👍 They're Interested
+            </button>
+            <button class="response-btn challenging" onclick="handleObjection()">
+                ❌ They Have Objections
+            </button>
+            <button class="response-btn neutral" onclick="handleNeutralResponse()">
+                🤔 They're Unsure
+            </button>
+            <button class="response-btn neutral" onclick="endCall()">
+                📞 End Call
+            </button>
+        `;
+    }
+}
+
+// Handle positive response
+function handlePositiveResponse() {
+    const scriptDisplay = document.getElementById('script-display');
+    if (scriptDisplay) {
+        scriptDisplay.className = 'script-display mood-positive';
+        scriptDisplay.innerHTML = `
+            <h3 style="color: #10b981; margin-bottom: 15px;">✅ Great! They're Interested</h3>
+            <p style="color: var(--text-primary); line-height: 1.6;">
+                "Excellent! Let me tell you briefly about what we do. Power Choosers specializes in energy procurement and management. 
+                We work with businesses to analyze their current energy usage and find better rates with reliable suppliers. 
+                Most of our clients see savings of 15-30% on their energy bills. 
+                Can you tell me a bit about your current energy setup and monthly costs?"
+            </p>
+        `;
+    }
+}
+
+// Handle objections
+function handleObjection() {
+    const scriptDisplay = document.getElementById('script-display');
+    if (scriptDisplay) {
+        scriptDisplay.className = 'script-display mood-challenging';
+        scriptDisplay.innerHTML = `
+            <h3 style="color: #f59e0b; margin-bottom: 15px;">⚠️ Handling Objections</h3>
+            <p style="color: var(--text-primary); line-height: 1.6;">
+                "I completely understand your concern. Many of our best clients said the same thing initially. 
+                The great news is that there's no upfront cost or commitment to get a free energy audit. 
+                We simply analyze your current bills and show you exactly how much you could save. 
+                If we can't save you money, you don't pay us anything. Would it be worth 15 minutes to potentially save thousands per year?"
+            </p>
+        `;
+    }
+}
+
+// Handle neutral response
+function handleNeutralResponse() {
+    const scriptDisplay = document.getElementById('script-display');
+    if (scriptDisplay) {
+        scriptDisplay.className = 'script-display mood-unsure';
+        scriptDisplay.innerHTML = `
+            <h3 style="color: #8b5cf6; margin-bottom: 15px;">🤔 They Need More Information</h3>
+            <p style="color: var(--text-primary); line-height: 1.6;">
+                "I understand you might need more details. Let me give you a quick example: 
+                One of our recent clients, a manufacturing company similar to yours, was paying $8,000 per month for electricity. 
+                After our analysis, we found them a better rate and they now save $2,400 per month - that's $28,800 per year! 
+                Would you like me to send you some information, or do you have 5 minutes now for me to explain how this works?"
+            </p>
+        `;
+    }
+}
+
+// End call function
+function endCall() {
+    const scriptDisplay = document.getElementById('script-display');
+    const responseButtons = document.getElementById('response-buttons');
+    
+    if (scriptDisplay && responseButtons) {
+        scriptDisplay.className = 'script-display start';
+        scriptDisplay.innerHTML = `
+            <h2 style="color: var(--text-primary); margin-bottom: 20px; font-size: 2rem;">📋 Call Complete</h2>
+            <p style="color: var(--text-secondary); text-align: center; font-size: 1.1rem; line-height: 1.6;">
+                Great job! Don't forget to save your call notes and update the contact information.
+                Ready for your next call?
+            </p>
+        `;
+        
+        responseButtons.innerHTML = `
+            <button class="dial-button" onclick="startColdCalling()">
+                🚀 Start Next Call
+            </button>
+        `;
+    }
+}
+
+// Save call notes function
+function saveCallNotes() {
+    const contactName = document.getElementById('contact-name')?.value || '';
+    const contactCompany = document.getElementById('contact-company')?.value || '';
+    const contactPhone = document.getElementById('contact-phone')?.value || '';
+    const callNotes = document.getElementById('call-notes')?.value || '';
+    
+    if (!contactName && !contactCompany && !callNotes) {
+        showToast('Please add some contact information or notes before saving.', 'warning');
+        return;
+    }
+    
+    // Create a new activity record
+    const newActivity = {
+        id: Date.now().toString(),
+        type: 'call',
+        description: `Cold call with ${contactName || 'Unknown'} at ${contactCompany || 'Unknown Company'}`,
+        notes: callNotes,
+        contactName: contactName,
+        company: contactCompany,
+        phone: contactPhone,
+        date: new Date().toISOString(),
+        status: 'completed'
+    };
+    
+    // Add to activities
+    if (!CRMApp.activities) CRMApp.activities = [];
+    CRMApp.activities.push(newActivity);
+    
+    // Clear the form
+    if (document.getElementById('contact-name')) document.getElementById('contact-name').value = '';
+    if (document.getElementById('contact-company')) document.getElementById('contact-company').value = '';
+    if (document.getElementById('contact-phone')) document.getElementById('contact-phone').value = '';
+    if (document.getElementById('call-notes')) document.getElementById('call-notes').value = '';
+    
+    showToast('Call notes saved successfully!', 'success');
 }
 
 // Add event listener for Cold Calling button
