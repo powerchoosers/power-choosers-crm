@@ -261,8 +261,8 @@ body {
 .nav-item {
     display: flex;
     align-items: center;
-    justify-content: center; /* Correctly centers the icons */
-    padding: 16px 8px; /* Adds consistent padding on both sides */
+    justify-content: center;
+    padding: 16px 8px;
     text-decoration: none;
     color: white;
     white-space: nowrap;
@@ -287,6 +287,7 @@ body {
     color: white;
     background-color: var(--professional-blue);
     box-shadow: 0 4px 15px rgba(30, 64, 175, 0.4);
+    /* Corrected: The active state for the icon itself is handled by the nav-item's background color */
 }
 
 .nav-item.active::before {
@@ -302,7 +303,7 @@ body {
 }
 
 .nav-item svg {
-    margin-right: 0; /* Ensures no margin when centered */
+    margin-right: 0;
     width: 24px;
     height: 24px;
     flex-shrink: 0;
@@ -419,7 +420,7 @@ body {
     padding: 24px;
     transition: all 0.3s ease;
     box-shadow: var(--shadow-md);
-    min-height: auto; /* Removed fixed minimum height */
+    min-height: auto;
     margin: 0;
     width: 100%;
 }
