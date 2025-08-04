@@ -217,8 +217,8 @@
         /* Layout */
         .main-container {
             display: flex;
-            margin-top: 77px;
-            height: calc(100vh - 77px);
+            margin-top: 70px;
+            height: calc(100vh - 70px);
             overflow: hidden;
         }
 
@@ -333,11 +333,18 @@
         }
 
         /* Content Area */
-        .content-area { flex: 1; display: flex; overflow: hidden; }
+        .content-area { 
+            flex: 1; 
+            display: flex; 
+            overflow: hidden; 
+            padding: 20px 30px 30px; 
+            overflow-y: auto;
+            position: relative;
+        }
 
         .main-content {
             flex: 1;
-            padding: 30px;
+            padding: 0;
             overflow-y: auto;
             background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
         }
@@ -800,6 +807,8 @@
             height: calc(100vh - 17px);
             min-height: calc(100vh - 17px);
         }
+
+
 
         /* When sidebar is hovered, adjust page view position */
         .sidebar:hover ~ .content-area .page-view {
