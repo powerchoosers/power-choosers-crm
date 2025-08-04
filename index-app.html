@@ -2976,72 +2976,95 @@
     const phoneView = document.getElementById('phone-view');
     if (!phoneView) return;
 
-    // Set the main HTML structure from calls-page.html
+    // Set the main HTML structure with new design
     phoneView.innerHTML = `
-        <!-- Header Section -->
-        <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-700">
-            <h1 class="text-3xl font-bold text-white">Recent Calls</h1>
-            <div class="flex items-center space-x-4">
-                <button id="cold-calling-btn" class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-colors">
-                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                    </svg>
-                    <span>Cold Calling</span>
-                </button>
-                <button id="dial-pad-btn" class="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors">
-                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                    </svg>
-                    <span>Dial Pad</span>
-                </button>
+        <div class="phone-page-container">
+            <!-- Header Section with Recent Calls title and action buttons -->
+            <div class="phone-header">
+                <h1 class="phone-title">Recent Calls</h1>
+                <div class="phone-actions">
+                    <button id="cold-calling-btn" class="phone-btn phone-btn-blue">
+                        <svg class="phone-btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                        Cold Calling
+                    </button>
+                    <button id="dial-pad-btn" class="phone-btn phone-btn-green">
+                        <svg class="phone-btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                        </svg>
+                        Dial Pad
+                    </button>
+                </div>
             </div>
-        </div>
 
-        <!-- Search and Filters -->
-        <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-8">
-            <div class="flex-1">
-                <label for="call-search" class="sr-only">Search Calls</label>
-                <div class="relative">
-                    <input type="text" id="call-search" placeholder="Search recent calls..." class="w-full p-3 pl-10 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500">
-                    <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- Search and Filter Controls -->
+            <div class="phone-controls">
+                <div class="phone-search-container">
+                    <svg class="phone-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8"></circle>
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
+                    <input type="text" id="call-search" placeholder="Search recent calls..." class="phone-search-input">
+                </div>
+                
+                <div class="phone-filters">
+                    <span class="filter-label">Filter by Status:</span>
+                    <select id="call-filter-status" class="phone-select">
+                        <option value="all">All</option>
+                        <option value="completed">Completed Calls</option>
+                        <option value="missed">Missed Calls</option>
+                    </select>
+                    
+                    <span class="filter-label">Sort by:</span>
+                    <select id="call-sort" class="phone-select" onchange="sortCalls(this.value)">
+                        <option value="recent">Most Recent</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="duration">Duration</option>
+                        <option value="contact">Contact Name</option>
+                    </select>
                 </div>
             </div>
-            <div class="flex items-center space-x-2">
-                <label for="call-filter-status" class="text-gray-400 whitespace-nowrap">Filter by Status:</label>
-                <select id="call-filter-status" class="p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
-                    <option value="all">All</option>
-                    <option value="call_note">Completed Calls</option>
-                    <option value="missed">Missed Calls</option>
-                </select>
-            </div>
-        </div>
 
-        <!-- Calls Table -->
-        <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-700">
-            <div class="overflow-x-auto">
-                <table id="calls-table" class="min-w-full divide-y divide-gray-700">
-                    <thead class="bg-gray-700">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Contact</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Company</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody id="calls-table-body" class="divide-y divide-gray-700">
+            <!-- Call History Table -->
+            <div class="call-history-container">
+                <div class="call-history-header">
+                    <h2 class="call-history-title">Call History <span class="call-count">(3 total)</span></h2>
+                </div>
+                
+                <div class="call-history-table">
+                    <div class="table-header">
+                        <div class="table-col contact-col">CONTACT</div>
+                        <div class="table-col company-col">COMPANY</div>
+                        <div class="table-col date-col">DATE</div>
+                        <div class="table-col status-col">STATUS</div>
+                        <div class="table-col duration-col">DURATION</div>
+                        <div class="table-col notes-col">NOTES</div>
+                    </div>
+                    
+                    <div class="table-body" id="calls-table-body">
                         <!-- Call rows will be populated dynamically -->
-                    </tbody>
-                </table>
+                    </div>
+                </div>
+                
+                <!-- Pagination with navigation arrows -->
+                <div class="pagination-container">
+                    <span class="pagination-info">Showing 1-3 of 3 results</span>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" id="prev-page" disabled onclick="changePage(-1)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m15 18-6-6 6-6"/>
+                            </svg>
+                        </button>
+                        <span class="pagination-current" id="current-page">1</span>
+                        <button class="pagination-btn" id="next-page" disabled onclick="changePage(1)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m9 18 6-6-6-6"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
-
-        <!-- Dialer Container -->
-        <div id="dialer-container" class="fixed inset-x-0 bottom-0 z-50 flex justify-center items-end pointer-events-none transition-transform duration-500 transform translate-y-full">
-            <!-- Dialer content will be added dynamically -->
         </div>
     `;
 
@@ -3081,6 +3104,22 @@ function initializePhoneView() {
 
     // Load initial calls data
     loadCallsData();
+}
+
+// Load calls data function
+function loadCallsData() {
+    // Initialize with sample data if not already loaded
+    if (callsData.length === 0) {
+        callsData = [
+            { contact: 'Lewis Patterson', company: 'Power Choosers', date: '8/3/2025, 10:00:00 AM', status: 'Completed', duration: '02:00', notes: 'Discussed energy solutions' },
+            { contact: 'John Doe', company: 'Tech Solutions', date: '8/2/2025, 3:30:00 PM', status: 'Completed', duration: '05:00', notes: 'Initial consultation call' },
+            { contact: 'Lewis Patterson', company: 'Power Choosers', date: '8/1/2025, 9:00:00 AM', status: 'Completed', duration: '01:00', notes: 'Short call follow-up' }
+        ];
+        filteredCallsData = [...callsData];
+    }
+    
+    // Render the calls table
+    renderCallsTable();
 }
         
         function toggleNotifications() { console.log('Toggle notifications'); }
