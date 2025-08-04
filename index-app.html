@@ -1944,6 +1944,7 @@
             </div>
 
             <!-- Main Content -->
+            <div id="tasks-page-container" class="page-view" style="display: none;"></div>
             <div class="main-content">
                 <!-- Dashboard Overview -->
                 <div class="dashboard-grid fade-in">
@@ -2767,8 +2768,1153 @@
         </div>
     </div>
 
-    <script>
-        // Firebase Configuration
+<script>
+    // Firebase Configuration (already provided in the prompt)
+    const firebaseConfig = {
+        apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
+        authDomain: "power-choosers-crm.firebaseapp.com",
+        projectId: "power-choosers-crm",
+        storageBucket: "power-choosers-crm.firebasestorage.app",
+        messagingSenderId: "792458658491",
+        appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
+        measurementId: "G-XEC3BFHJHW"
+    };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = app.firestore();
+    const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
+
+    // --- Global Application State and Data ---
+    const CRMApp = { currentView: 'dashboard', accounts: [], contacts: [], activities: [], tasks: [], sequences: [] };
+
+    // Phone page data and functionality
+    let currentCallsPage = 1;
+    let callsData = [
+        { contact: 'Lewis Patterson', company: 'Power Choosers', date: '8/3/2025, 10:00:00 AM', status: 'Completed', duration: '02:00', notes: 'Discussed energy solutions' },
+        { contact: 'John Doe', company: 'Tech Solutions', date: '8/2/2025, 3:30:00 PM', status: 'Completed', duration: '05:00', notes: 'Initial consultation call' },
+        { contact: 'Lewis Patterson', company: 'Power Choosers', date: '8/1/2025, 9:00:00 AM', status: 'Completed', duration: '01:00', notes: 'Short call follow-up' }
+    ];
+    let filteredCallsData = [...callsData];
+
+    // --- Utility Functions ---
+    function getInitials(name) {
+        if (!name) return '';
+        const parts = name.split(' ');
+        if (parts.length > 1) {
+            return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+        return parts[0][0].toUpperCase();
+    }
+
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed; top: 90px; right: 20px; z-index: 3000;
+            background: ${type === 'success' ? '#10b981' : (type === 'error' ? '#ef4444' : '#3b82f6')};
+            color: white; padding: 12px 20px; border-radius: 8px;
+            font-weight: 600; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            animation: slideInRight 0.3s ease-out;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.animation = 'slideOutRight 0.3s ease-in forwards';
+            setTimeout(() => document.body.removeChild(toast), 300);
+        }, 3000);
+    }
+
+    // --- Core Application Logic ---
+
+    // Initialize Application
+    async function initializeApp() {
+        try {
+            await loadInitialData();
+            updateDashboardMetrics();
+            console.log('Power Choosers CRM Dashboard initialized successfully');
+        } catch (error) {
+            console.error('Error initializing app:', error);
+        }
+    }
+
+    async function loadInitialData() {
+        try {
+            const [accountsSnapshot, contactsSnapshot, activitiesSnapshot] = await Promise.all([
+                db.collection('accounts').get(),
+                db.collection('contacts').get(),
+                db.collection('activities').orderBy('createdAt', 'desc').get()
+            ]);
+
+            CRMApp.accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            CRMApp.contacts = contactsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            CRMApp.activities = activitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        } catch (error) {
+            console.error('Error loading data from Firebase, using sample data:', error);
+            initializeSampleData();
+        }
+    }
+
+    function initializeSampleData() {
+        // Placeholder for sample data initialization if Firebase fails
+        CRMApp.accounts = [
+            { id: '1', name: 'ABC Manufacturing', industry: 'Manufacturing', phone: '(214) 555-0123', city: 'Dallas', state: 'TX', notes: [], contactNotes: [] },
+            { id: '2', name: 'Power Choosers', industry: 'Energy', phone: '(972) 834-2317', city: 'Dallas', state: 'TX', notes: [], contactNotes: [] }
+        ];
+        CRMApp.contacts = [
+            { id: '1', firstName: 'potter', lastName: '', name: 'potter', title: '', accountId: '2', accountName: 'Power Choosers', email: '', phone: '', location: '', department: '', summary: '', linkedinUrl: '', notes: [] },
+            { id: '2', firstName: 'Lewis', lastName: 'Patterson', title: 'Energy Manager', accountId: '2', accountName: 'Power Choosers', email: 'l.patterson@powerchooser.com', phone: '(972) 834-2317', location: 'Dallas, TX', department: 'Energy Management', summary: 'Lewis Patterson is an experienced Energy Manager with expertise in commercial energy solutions.', linkedinUrl: 'https://www.linkedin.com/in/lewispatterson', notes: [] }
+        ];
+        CRMApp.activities = [{ id: '1', type: 'call_note', description: 'Call note for Lewis Patterson', noteContent: 'In poll', createdAt: new Date('2025-08-01T20:36:00') }];
+    }
+
+    function updateDashboardMetrics() {
+        document.getElementById('total-accounts').textContent = CRMApp.accounts.length;
+        document.getElementById('total-contacts').textContent = CRMApp.contacts.length;
+        document.getElementById('recent-activities').textContent = CRMApp.activities.length;
+        document.getElementById('hot-leads').textContent = '0';
+    }
+
+    // --- View Navigation & Routing ---
+    function showView(viewName, itemId = null) {
+        console.log(`Navigating to ${viewName}`, itemId ? `with ID: ${itemId}` : '');
+
+        // 1. Update active navigation item
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        const activeNavItem = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+        if (activeNavItem) {
+            activeNavItem.classList.add('active');
+        }
+
+        // 2. Hide all view containers
+        const views = ['main-content', 'right-sidebar', 'phone-view', 'contacts-view', 'accounts-view', 'contact-detail-view', 'account-detail-view', 'tasks-page-container'];
+        views.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+
+        CRMApp.currentView = viewName;
+
+        // 3. Show the selected view
+        switch (viewName) {
+            case 'dashboard':
+                document.getElementById('main-content').style.display = 'block';
+                document.getElementById('right-sidebar').style.display = 'block';
+                break;
+            case 'phone':
+                document.getElementById('phone-view').style.display = 'block';
+                loadPhoneView();
+                break;
+            case 'contacts':
+                document.getElementById('contacts-view').style.display = 'block';
+                renderContactsPage();
+                break;
+            case 'accounts':
+                document.getElementById('accounts-view').style.display = 'block';
+                renderAccountsPage();
+                break;
+            case 'tasks':
+                // Load the new tasks-page.html content into a dedicated container
+                const tasksViewContainer = document.getElementById('tasks-page-container');
+                if (tasksViewContainer) {
+                    fetch('tasks-page.html')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Failed to load tasks-page.html');
+                            }
+                            return response.text();
+                        })
+                        .then(html => {
+                            tasksViewContainer.innerHTML = html;
+                            tasksViewContainer.style.display = 'block';
+                            document.querySelector('.main-content').style.display = 'none';
+                            document.querySelector('.right-sidebar').style.display = 'none';
+                            // Manually re-run the JavaScript from the loaded file
+                            const scriptTag = tasksViewContainer.querySelector('script');
+                            if (scriptTag) {
+                                const newScript = document.createElement('script');
+                                newScript.textContent = scriptTag.textContent;
+                                document.body.appendChild(newScript).parentNode.removeChild(newScript);
+                                scriptTag.remove();
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error loading tasks page:", error);
+                            showToast('Failed to load tasks page.', 'error');
+                        });
+                }
+                break;
+            case 'contact-detail':
+                if (itemId) showContactDetail(itemId);
+                break;
+            case 'account-detail':
+                if (itemId) showAccountDetail(itemId);
+                break;
+            default:
+                document.getElementById('main-content').style.display = 'block';
+                document.getElementById('right-sidebar').style.display = 'block';
+                showToast(`View for '${viewName}' is not yet implemented.`, 'info');
+        }
+    }
+
+    // --- Phone View Functions ---
+    function loadPhoneView() {
+        const phoneView = document.getElementById('phone-view');
+        if (!phoneView) return;
+
+        // Render the phone view with its content
+        phoneView.innerHTML = `
+            <div class="phone-page-container">
+                <div class="phone-header">
+                    <h1 class="phone-title">Recent Calls</h1>
+                    <div class="phone-actions">
+                        <button id="cold-calling-btn" class="phone-btn phone-btn-blue">
+                            <svg class="phone-btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            Cold Calling
+                        </button>
+                        <button id="dial-pad-btn" class="phone-btn phone-btn-green">
+                            <svg class="phone-btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                            </svg>
+                            Dial Pad
+                        </button>
+                    </div>
+                </div>
+                <div class="phone-controls">
+                    <div class="phone-search-container">
+                        <svg class="phone-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="call-search" placeholder="Search recent calls..." class="phone-search-input">
+                    </div>
+                    <div class="phone-filters">
+                        <span class="filter-label">Filter by Status:</span>
+                        <select id="call-filter-status" class="phone-select">
+                            <option value="all">All</option>
+                            <option value="completed">Completed Calls</option>
+                            <option value="missed">Missed Calls</option>
+                        </select>
+                        <span class="filter-label">Sort by:</span>
+                        <select id="call-sort" class="phone-select">
+                            <option value="recent">Most Recent</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="duration">Duration</option>
+                            <option value="contact">Contact Name</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="call-history-container">
+                    <div class="call-history-header">
+                        <h2 class="call-history-title">Call History <span class="call-count">(0 total)</span></h2>
+                    </div>
+                    <div class="call-history-table">
+                        <div class="table-header">
+                            <div class="table-col contact-col">CONTACT</div>
+                            <div class="table-col company-col">COMPANY</div>
+                            <div class="table-col date-col">DATE</div>
+                            <div class="table-col status-col">STATUS</div>
+                            <div class="table-col duration-col">DURATION</div>
+                            <div class="table-col notes-col">NOTES</div>
+                        </div>
+                        <div class="table-body" id="calls-table-body"></div>
+                    </div>
+                    <div class="pagination-container">
+                        <span class="pagination-info">Showing 0-0 of 0 results</span>
+                        <div class="pagination-controls">
+                            <button class="pagination-btn" id="prev-page" disabled>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="m15 18-6-6 6-6"/>
+                                </svg>
+                            </button>
+                            <span class="pagination-current" id="current-page">1</span>
+                            <button class="pagination-btn" id="next-page" disabled>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="m9 18 6-6-6-6"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+        // Setup event listeners after the new content is in the DOM
+        document.getElementById('cold-calling-btn').addEventListener('click', loadColdCallingHub);
+        document.getElementById('call-search').addEventListener('input', filterCalls);
+        document.getElementById('call-filter-status').addEventListener('change', filterCalls);
+        document.getElementById('call-sort').addEventListener('change', (e) => sortCalls(e.target.value));
+        document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
+        document.getElementById('next-page').addEventListener('click', () => changePage(1));
+
+        loadCallsData();
+    }
+
+    function loadCallsData() {
+        if (callsData.length === 0) {
+            callsData = [
+                { contact: 'Lewis Patterson', company: 'Power Choosers', date: '8/3/2025, 10:00:00 AM', status: 'Completed', duration: '02:00', notes: 'Discussed energy solutions' },
+                { contact: 'John Doe', company: 'Tech Solutions', date: '8/2/2025, 3:30:00 PM', status: 'Completed', duration: '05:00', notes: 'Initial consultation call' },
+                { contact: 'Lewis Patterson', company: 'Power Choosers', date: '8/1/2025, 9:00:00 AM', status: 'Completed', duration: '01:00', notes: 'Short call follow-up' }
+            ];
+            filteredCallsData = [...callsData];
+        }
+        renderCallsTable();
+    }
+
+    function renderCallsTable() {
+        const tableBody = document.getElementById('calls-table-body');
+        if (!tableBody) return;
+
+        const startIndex = (currentCallsPage - 1) * 10;
+        const endIndex = startIndex + 10;
+        const pageData = filteredCallsData.slice(startIndex, endIndex);
+
+        tableBody.innerHTML = pageData.map(call => `
+            <div class="table-row">
+                <div class="table-cell contact-cell" data-label="Contact">${call.contact}</div>
+                <div class="table-cell company-cell" data-label="Company">${call.company}</div>
+                <div class="table-cell date-cell" data-label="Date">${call.date}</div>
+                <div class="table-cell status-cell" data-label="Status">
+                    <span class="status-badge status-${call.status.toLowerCase()}">${call.status}</span>
+                </div>
+                <div class="table-cell duration-cell" data-label="Duration">${call.duration}</div>
+                <div class="table-cell notes-cell" data-label="Notes">${call.notes}</div>
+            </div>
+        `).join('');
+
+        const callCount = document.querySelector('.call-count');
+        if (callCount) { callCount.textContent = `(${filteredCallsData.length} total)`; }
+        updatePaginationControls();
+    }
+
+    function updatePaginationControls() {
+        const totalPages = Math.ceil(filteredCallsData.length / 10);
+        const prevBtn = document.getElementById('prev-page');
+        const nextBtn = document.getElementById('next-page');
+        const currentPageSpan = document.getElementById('current-page');
+        const paginationInfo = document.querySelector('.pagination-info');
+
+        if (prevBtn) prevBtn.disabled = currentCallsPage === 1;
+        if (nextBtn) nextBtn.disabled = currentCallsPage === totalPages || totalPages === 0;
+        if (currentPageSpan) currentPageSpan.textContent = currentCallsPage;
+
+        if (paginationInfo) {
+            const startIndex = (currentCallsPage - 1) * 10 + 1;
+            const endIndex = Math.min(currentCallsPage * 10, filteredCallsData.length);
+            paginationInfo.textContent = `Showing ${startIndex}-${endIndex} of ${filteredCallsData.length} results`;
+        }
+    }
+
+    function sortCalls(sortBy) {
+        switch(sortBy) {
+            case 'recent': filteredCallsData.sort((a, b) => new Date(b.date) - new Date(a.date)); break;
+            case 'oldest': filteredCallsData.sort((a, b) => new Date(a.date) - new Date(b.date)); break;
+            case 'duration': filteredCallsData.sort((a, b) => {
+                const aDuration = parseInt(a.duration.split(':')[0]) * 60 + parseInt(a.duration.split(':')[1]);
+                const bDuration = parseInt(b.duration.split(':')[0]) * 60 + parseInt(b.duration.split(':')[1]);
+                return bDuration - aDuration;
+            }); break;
+            case 'contact': filteredCallsData.sort((a, b) => a.contact.localeCompare(b.contact)); break;
+        }
+        renderCallsTable();
+    }
+
+    function changePage(direction) {
+        const totalPages = Math.ceil(filteredCallsData.length / 10);
+        const newPage = currentCallsPage + direction;
+
+        if (newPage >= 1 && newPage <= totalPages) {
+            currentCallsPage = newPage;
+            renderCallsTable();
+            updatePaginationControls();
+        }
+    }
+
+    function filterCalls() {
+        const searchTerm = document.getElementById('call-search')?.value.toLowerCase() || '';
+        const statusFilter = document.getElementById('call-filter-status')?.value || 'all';
+
+        filteredCallsData = callsData.filter(call => {
+            const matchesSearch = !searchTerm || 
+                call.contact.toLowerCase().includes(searchTerm) ||
+                call.company.toLowerCase().includes(searchTerm) ||
+                call.notes.toLowerCase().includes(searchTerm);
+
+            const matchesStatus = statusFilter === 'all' || 
+                call.status.toLowerCase() === statusFilter.toLowerCase();
+
+            return matchesSearch && matchesStatus;
+        });
+
+        currentCallsPage = 1;
+        renderCallsTable();
+    }
+
+    function loadColdCallingHub() {
+        const phoneView = document.getElementById('phone-view');
+        if (!phoneView) return;
+
+        phoneView.innerHTML = `
+            <div class="calls-hub-layout">
+                <div class="calls-hub-main">
+                    <div class="calls-hub-main-inner">
+                        <div class="script-display start" id="script-display">
+                            <h2 style="color: var(--text-primary); margin-bottom: 20px; font-size: 2rem;">🎯 Cold Calling Hub</h2>
+                            <p style="color: var(--text-secondary); text-align: center; font-size: 1.1rem; line-height: 1.6;">
+                                Ready to make impactful calls? Click "Start Cold Calling" to begin with AI-powered scripts and real-time guidance.
+                            </p>
+                        </div>
+                        <div class="response-buttons full-width" id="response-buttons">
+                            <button class="dial-button" onclick="startColdCalling()">
+                                🚀 Start Cold Calling
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="calls-hub-sidebar">
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-title">👤 Contact Information</div>
+                        <div class="sidebar-input-group">
+                            <label>Contact Name</label>
+                            <input type="text" id="contact-name" placeholder="Enter contact name...">
+                        </div>
+                        <div class="sidebar-input-group">
+                            <label>Company</label>
+                            <input type="text" id="contact-company" placeholder="Enter company name...">
+                        </div>
+                        <div class="sidebar-input-group">
+                            <label>Phone Number</label>
+                            <input type="tel" id="contact-phone" placeholder="Enter phone number...">
+                        </div>
+                    </div>
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-title">📝 Call Notes</div>
+                        <div class="sidebar-input-group">
+                            <label>Notes</label>
+                            <textarea id="call-notes" placeholder="Add your call notes here..."></textarea>
+                        </div>
+                    </div>
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-title">⚡ Quick Actions</div>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <button class="response-btn neutral" onclick="showView('phone')" style="width: 100%;">
+                                ← Back to Calls
+                            </button>
+                            <button class="response-btn positive" onclick="saveCallNotes()" style="width: 100%;">
+                                💾 Save Notes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function startColdCalling() {
+        const scriptDisplay = document.getElementById('script-display');
+        const responseButtons = document.getElementById('response-buttons');
+
+        if (scriptDisplay && responseButtons) {
+            scriptDisplay.className = 'script-display mood-neutral';
+            scriptDisplay.innerHTML = `
+                <h3 style="color: var(--text-primary); margin-bottom: 15px;">📞 Cold Calling Script</h3>
+                <p style="color: var(--text-primary); line-height: 1.6;">
+                    "Hi, this is [Your Name] from Power Choosers. I hope I'm not catching you at a bad time. 
+                    I'm reaching out because we help businesses like yours reduce their energy costs by up to 30%. 
+                    Do you have just 2 minutes to hear how we might be able to help you save money on your energy bills?"
+                </p>
+            `;
+
+            responseButtons.innerHTML = `
+                <button class="response-btn positive" onclick="handlePositiveResponse()">
+                    👍 They're Interested
+                </button>
+                <button class="response-btn challenging" onclick="handleObjection()">
+                    ❌ They Have Objections
+                </button>
+                <button class="response-btn neutral" onclick="handleNeutralResponse()">
+                    🤔 They're Unsure
+                </button>
+                <button class="response-btn neutral" onclick="endCall()">
+                    📞 End Call
+                </button>
+            `;
+        }
+    }
+
+    function handlePositiveResponse() {
+        const scriptDisplay = document.getElementById('script-display');
+        if (scriptDisplay) {
+            scriptDisplay.className = 'script-display mood-positive';
+            scriptDisplay.innerHTML = `
+                <h3 style="color: #10b981; margin-bottom: 15px;">✅ Great! They're Interested</h3>
+                <p style="color: var(--text-primary); line-height: 1.6;">
+                    "Excellent! Let me tell you briefly about what we do. Power Choosers specializes in energy procurement and management. 
+                    We work with businesses to analyze their current energy usage and find better rates with reliable suppliers. 
+                    Most of our clients see savings of 15-30% on their energy bills. 
+                    Can you tell me a bit about your current energy setup and monthly costs?"
+                </p>
+            `;
+        }
+    }
+
+    function handleObjection() {
+        const scriptDisplay = document.getElementById('script-display');
+        if (scriptDisplay) {
+            scriptDisplay.className = 'script-display mood-challenging';
+            scriptDisplay.innerHTML = `
+                <h3 style="color: #f59e0b; margin-bottom: 15px;">⚠️ Handling Objections</h3>
+                <p style="color: var(--text-primary); line-height: 1.6;">
+                    "I completely understand your concern. Many of our best clients said the same thing initially. 
+                    The great news is that there's no upfront cost or commitment to get a free energy audit. 
+                    We simply analyze your current bills and show you exactly how much you could save. 
+                    If we can't save you money, you don't pay us anything. Would it be worth 15 minutes to potentially save thousands per year?"
+                </p>
+            `;
+        }
+    }
+
+    function handleNeutralResponse() {
+        const scriptDisplay = document.getElementById('script-display');
+        if (scriptDisplay) {
+            scriptDisplay.className = 'script-display mood-unsure';
+            scriptDisplay.innerHTML = `
+                <h3 style="color: #8b5cf6; margin-bottom: 15px;">🤔 They Need More Information</h3>
+                <p style="color: var(--text-primary); line-height: 1.6;">
+                    "I understand you might need more details. Let me give you a quick example: 
+                    One of our recent clients, a manufacturing company similar to yours, was paying $8,000 per month for electricity. 
+                    After our analysis, we found them a better rate and they now save $2,400 per month - that's $28,800 per year! 
+                    Would you like me to send you some information, or do you have 5 minutes now for me to explain how this works?"
+                </p>
+            `;
+        }
+    }
+
+    function endCall() {
+        const scriptDisplay = document.getElementById('script-display');
+        const responseButtons = document.getElementById('response-buttons');
+
+        if (scriptDisplay && responseButtons) {
+            scriptDisplay.className = 'script-display start';
+            scriptDisplay.innerHTML = `
+                <h2 style="color: var(--text-primary); margin-bottom: 20px; font-size: 2rem;">📋 Call Complete</h2>
+                <p style="color: var(--text-secondary); text-align: center; font-size: 1.1rem; line-height: 1.6;">
+                    Great job! Don't forget to save your call notes and update the contact information.
+                    Ready for your next call?
+                </p>
+            `;
+
+            responseButtons.innerHTML = `
+                <button class="dial-button" onclick="startColdCalling()">
+                    🚀 Start Next Call
+                </button>
+            `;
+        }
+    }
+
+    function saveCallNotes() {
+        const contactName = document.getElementById('contact-name')?.value || '';
+        const contactCompany = document.getElementById('contact-company')?.value || '';
+        const contactPhone = document.getElementById('contact-phone')?.value || '';
+        const callNotes = document.getElementById('call-notes')?.value || '';
+
+        if (!contactName && !contactCompany && !callNotes) {
+            showToast('Please add some contact information or notes before saving.', 'warning');
+            return;
+        }
+
+        const newActivity = {
+            id: Date.now().toString(),
+            type: 'call',
+            description: `Cold call with ${contactName || 'Unknown'} at ${contactCompany || 'Unknown Company'}`,
+            notes: callNotes,
+            contactName: contactName,
+            company: contactCompany,
+            phone: contactPhone,
+            date: new Date().toISOString(),
+            status: 'completed'
+        };
+
+        if (!CRMApp.activities) CRMApp.activities = [];
+        CRMApp.activities.push(newActivity);
+
+        if (document.getElementById('contact-name')) document.getElementById('contact-name').value = '';
+        if (document.getElementById('contact-company')) document.getElementById('contact-company').value = '';
+        if (document.getElementById('contact-phone')) document.getElementById('contact-phone').value = '';
+        if (document.getElementById('call-notes')) document.getElementById('call-notes').value = '';
+
+        showToast('Call notes saved successfully!', 'success');
+    }
+
+    // --- Data Management Functions ---
+
+    function addAccount() {
+        const modal = document.getElementById('add-account-modal');
+        modal.classList.add('active');
+    }
+
+    function addContact() {
+        const modal = document.getElementById('add-contact-modal');
+        modal.classList.add('active');
+        populateCompanyDropdown();
+    }
+
+    function closeAddContactModal() {
+        const modal = document.getElementById('add-contact-modal');
+        modal.classList.remove('active');
+        document.getElementById('add-contact-form').reset();
+    }
+
+    function closeAddAccountModal() {
+        const modal = document.getElementById('add-account-modal');
+        modal.classList.remove('active');
+        document.getElementById('add-account-form').reset();
+    }
+
+    function populateCompanyDropdown() {
+        const select = document.getElementById('contact-company');
+        if (!select) return;
+        select.innerHTML = '<option value="">Select Company</option>';
+        CRMApp.accounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = account.name;
+            select.appendChild(option);
+        });
+    }
+
+    async function saveNewContact(event) {
+        event.preventDefault();
+        const firstName = document.getElementById('contact-first-name').value.trim();
+        const lastName = document.getElementById('contact-last-name').value.trim();
+        const title = document.getElementById('contact-title').value.trim();
+        const companyId = document.getElementById('contact-company').value;
+        const email = document.getElementById('contact-email').value.trim();
+        const phone = document.getElementById('contact-phone').value.trim();
+        const location = document.getElementById('contact-location').value.trim();
+
+        if (!firstName) {
+            showToast('First name is required', 'error');
+            return;
+        }
+
+        const newContact = {
+            id: Date.now().toString(),
+            firstName,
+            lastName,
+            title,
+            accountId: companyId,
+            accountName: companyId ? CRMApp.accounts.find(a => a.id === companyId)?.name : '',
+            email,
+            phone,
+            location,
+            createdAt: new Date()
+        };
+
+        try {
+            if (db) await db.collection('contacts').add(newContact);
+            CRMApp.contacts.push(newContact);
+            closeAddContactModal();
+            updateDashboardMetrics();
+            showToast('Contact added successfully!', 'success');
+            if (CRMApp.currentView === 'contacts') renderContactsPage();
+        } catch (error) {
+            console.error('Error adding contact:', error);
+            showToast('Error adding contact', 'error');
+        }
+    }
+
+    async function saveNewAccount(event) {
+        event.preventDefault();
+        const companyName = document.getElementById('account-company-name').value.trim();
+        const phone = document.getElementById('account-phone').value.trim();
+        const website = document.getElementById('account-website').value.trim();
+        const city = document.getElementById('account-city').value.trim();
+        const state = document.getElementById('account-state').value.trim();
+        const address = document.getElementById('account-address').value.trim();
+        const employees = document.getElementById('account-employees').value;
+
+        if (!companyName) {
+            showToast('Company name is required', 'error');
+            return;
+        }
+
+        const newAccount = {
+            id: Date.now().toString(),
+            name: companyName,
+            phone,
+            website,
+            city,
+            state,
+            address,
+            employees: employees ? parseInt(employees) : null,
+            createdAt: new Date()
+        };
+
+        try {
+            if (db) await db.collection('accounts').add(newAccount);
+            CRMApp.accounts.push(newAccount);
+            closeAddAccountModal();
+            updateDashboardMetrics();
+            showToast('Account added successfully!', 'success');
+            if (CRMApp.currentView === 'accounts') renderAccountsPage();
+        } catch (error) {
+            console.error('Error adding account:', error);
+            showToast('Error adding account', 'error');
+        }
+    }
+
+    // --- Contacts and Accounts Page Functions ---
+
+    function renderContactsPage() {
+        // Placeholder for rendering contacts
+        const tableBody = document.getElementById('contacts-table-body');
+        if (!tableBody) return;
+        tableBody.innerHTML = '';
+        if (CRMApp.contacts && CRMApp.contacts.length > 0) {
+            CRMApp.contacts.forEach(contact => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-700 transition-colors cursor-pointer';
+                row.onclick = () => showView('contact-detail', contact.id);
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-white">${contact.firstName} ${contact.lastName}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-300">${contact.title || 'N/A'}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-300">${contact.accountName || 'N/A'}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-300">${contact.email || 'N/A'}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-300">${contact.phone || 'N/A'}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div class="flex items-center space-x-2">
+                            <button class="text-gray-400 hover:text-blue-500 transition-colors" title="Edit Contact" onclick="event.stopPropagation(); showView('edit-contact', '${contact.id}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                                </svg>
+                            </button>
+                            <button class="text-gray-400 hover:text-green-500 transition-colors" title="Call Contact" onclick="event.stopPropagation(); callContactFromList('${contact.id}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                                </svg>
+                            </button>
+                            <button class="text-gray-400 hover:text-red-500 transition-colors" title="Delete Contact" onclick="event.stopPropagation(); deleteContact('${contact.id}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } else {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `<td colspan="6" class="px-6 py-8 text-center text-gray-400"><div class="flex flex-col items-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><p class="text-lg font-medium">No contacts found</p><p class="text-sm">Add your first contact to get started</p></div></td>`;
+            tableBody.appendChild(emptyRow);
+        }
+        updateContactsCount();
+    }
+
+    function renderAccountsPage() {
+        // Placeholder for rendering accounts
+        const tableBody = document.getElementById('accounts-table-body');
+        if (!tableBody) return;
+        tableBody.innerHTML = '';
+        if (CRMApp.accounts && CRMApp.accounts.length > 0) {
+            CRMApp.accounts.forEach(account => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-700 transition-colors cursor-pointer';
+                row.onclick = () => showView('account-detail', account.id);
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-white">${account.name}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-300">${account.city || 'N/A'}, ${account.state || 'N/A'}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-300">${account.employees || 'N/A'}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div class="flex items-center space-x-2">
+                            <button class="text-gray-400 hover:text-blue-500 transition-colors" title="Edit Account" onclick="event.stopPropagation(); editAccount('${account.id}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                                </svg>
+                            </button>
+                            <button class="text-gray-400 hover:text-green-500 transition-colors" title="View Details" onclick="event.stopPropagation(); showView('account-detail', '${account.id}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                            <button class="text-gray-400 hover:text-red-500 transition-colors" title="Delete Account" onclick="event.stopPropagation(); deleteAccount('${account.id}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } else {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `<td colspan="4" class="px-6 py-8 text-center text-gray-400"><div class="flex flex-col items-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><p class="text-lg font-medium">No accounts found</p><p class="text-sm">Add your first account to get started</p></div></td>`;
+            tableBody.appendChild(emptyRow);
+        }
+        updateAccountsCount();
+    }
+
+    function updateContactsCount() {
+        const countElement = document.getElementById('contacts-count');
+        const paginationInfo = document.getElementById('contacts-pagination-info');
+
+        if (countElement) {
+            const totalContacts = CRMApp.contacts ? CRMApp.contacts.length : 0;
+            countElement.textContent = `(${totalContacts} total)`;
+        }
+
+        if (paginationInfo) {
+            const totalContacts = CRMApp.contacts ? CRMApp.contacts.length : 0;
+            const showing = Math.min(totalContacts, 25);
+            paginationInfo.textContent = `Showing 1-${showing} of ${totalContacts} results`;
+        }
+    }
+
+    function updateAccountsCount() {
+        const countElement = document.getElementById('accounts-count');
+        const paginationInfo = document.getElementById('accounts-pagination-info');
+
+        if (countElement) {
+            const totalAccounts = CRMApp.accounts ? CRMApp.accounts.length : 0;
+            countElement.textContent = `(${totalAccounts} total)`;
+        }
+
+        if (paginationInfo) {
+            const totalAccounts = CRMApp.accounts ? CRMApp.accounts.length : 0;
+            const showing = Math.min(totalAccounts, 25);
+            paginationInfo.textContent = `Showing 1-${showing} of ${totalAccounts} results`;
+        }
+    }
+
+    // --- Bulk Import and Modals ---
+
+    function bulkImport() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.csv';
+        fileInput.style.display = 'none';
+
+        fileInput.onchange = function(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'text/csv') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const csv = e.target.result;
+                    processCsvData(csv, file.name);
+                };
+                reader.readAsText(file);
+            } else {
+                showToast('Please select a valid CSV file', 'error');
+            }
+        };
+
+        document.body.appendChild(fileInput);
+        fileInput.click();
+        document.body.removeChild(fileInput);
+    }
+
+    function processCsvData(csvText, fileName) {
+        try {
+            const lines = csvText.split('\n').filter(line => line.trim());
+            if (lines.length < 2) {
+                showToast('CSV file must have at least a header row and one data row', 'error');
+                return;
+            }
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+                if (values.length === headers.length) {
+                    const record = {};
+                    headers.forEach((header, index) => {
+                        record[header.toLowerCase().replace(/\s+/g, '')] = values[index];
+                    });
+                    data.push(record);
+                }
+            }
+            showImportPreview(data, headers, fileName);
+        } catch (error) {
+            console.error('Error processing CSV:', error);
+            showToast('Error processing CSV file. Please check the format.', 'error');
+        }
+    }
+
+    function showImportPreview(data, headers, fileName) {
+        const modal = document.createElement('div');
+        modal.className = 'profile-modal active';
+        modal.innerHTML = `
+            <div class="profile-modal-content" style="max-width: 800px;">
+                <div class="modal-header">
+                    <h2 class="text-2xl font-bold text-white mb-4">Import Preview - ${fileName}</h2>
+                    <p class="text-gray-400">Found ${data.length} records with ${headers.length} columns.</p>
+                </div>
+                <div class="modal-body my-4">
+                    <div class="mb-4">
+                        <p class="font-semibold text-white mb-2">Select Import Type:</p>
+                        <div class="flex space-x-4">
+                            <label class="text-white"><input type="radio" name="importType" value="contacts" checked class="mr-2"> Contacts</label>
+                            <label class="text-white"><input type="radio" name="importType" value="accounts" class="mr-2"> Accounts</label>
+                            <label class="text-white"><input type="radio" name="importType" value="activities" class="mr-2"> Activities</label>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto bg-gray-700 rounded-lg p-2" style="max-height: 300px;">
+                        <table class="min-w-full text-white text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-600">${headers.map(h => `<th class="p-2 text-left text-xs text-gray-400">${h}</th>`).join('')}</tr>
+                            </thead>
+                            <tbody>
+                                ${data.slice(0, 5).map(row => 
+                                    `<tr class="border-b border-gray-600">${headers.map(h => `<td class="p-2">${row[h.toLowerCase().replace(/\s+/g, '')] || ''}</td>`).join('')}</tr>`
+                                ).join('')}
+                                ${data.length > 5 ? `<tr><td colspan="${headers.length}" class="p-2 text-center text-gray-400">... and ${data.length - 5} more rows</td></tr>` : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn secondary" onclick="document.body.removeChild(this.closest('.profile-modal'))">Cancel</button>
+                    <button class="modal-btn primary" onclick="processImport(${JSON.stringify(data).replace(/"/g, '&quot;')}, this.closest('.profile-modal'))">Import Data</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    function processImport(data, modal) {
+        const importType = modal.querySelector('input[name="importType"]:checked').value;
+
+        if (importType === 'contacts') {
+            importContacts(data);
+        } else if (importType === 'accounts') {
+            importAccounts(data);
+        } else if (importType === 'activities') {
+            importActivities(data);
+        }
+        modal.remove();
+    }
+
+    function importContacts(contactData) {
+        let imported = 0;
+        contactData.forEach(record => {
+            const newContact = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                firstName: record.firstname || record.name || record.contactname || '',
+                lastName: record.lastname || '',
+                title: record.title || record.jobtitle || '',
+                email: record.email || record.emailaddress || '',
+                phone: record.phone || record.phonenumber || '',
+                accountName: record.company || record.accountname || '',
+                location: record.location || record.city || '',
+                createdAt: new Date()
+            };
+            if (newContact.firstName || newContact.email) {
+                CRMApp.contacts.push(newContact);
+                imported++;
+            }
+        });
+        updateDashboardMetrics();
+        showToast(`Successfully imported ${imported} contacts!`, 'success');
+        if (CRMApp.currentView === 'contacts') renderContactsPage();
+    }
+
+    function importAccounts(accountData) {
+        let imported = 0;
+        accountData.forEach(record => {
+            const newAccount = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                name: record.name || record.company || record.accountname || '',
+                industry: record.industry || record.sector || '',
+                location: record.location || record.city || record.address || '',
+                employees: record.employees || record.size || '',
+                revenue: record.revenue || record.annualrevenue || '',
+                createdAt: new Date()
+            };
+            if (newAccount.name) {
+                CRMApp.accounts.push(newAccount);
+                imported++;
+            }
+        });
+        updateDashboardMetrics();
+        showToast(`Successfully imported ${imported} accounts!`, 'success');
+        if (CRMApp.currentView === 'accounts') renderAccountsPage();
+    }
+
+    function importActivities(activityData) {
+        let imported = 0;
+        activityData.forEach(record => {
+            const newActivity = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                type: record.type || 'general',
+                description: record.description || record.activity || record.subject || '',
+                notes: record.notes || record.details || '',
+                createdAt: record.date ? new Date(record.date) : new Date(),
+                status: record.status || 'completed',
+                contactName: record.contact || record.contactname || '',
+                company: record.company || record.account || ''
+            };
+            if (newActivity.description) {
+                if (!CRMApp.activities) CRMApp.activities = [];
+                CRMApp.activities.push(newActivity);
+                imported++;
+            }
+        });
+        updateDashboardMetrics();
+        showToast(`Successfully imported ${imported} activities!`, 'success');
+    }
+
+    // --- Event Handlers & Initialization ---
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeApp();
+        loadSavedProfilePicture();
+
+        // Close modals when clicking outside
+        document.getElementById('profile-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeProfileModal();
+        });
+        document.getElementById('add-contact-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeAddContactModal();
+        });
+        document.getElementById('add-account-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeAddAccountModal();
+        });
+        document.getElementById('edit-contact-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditContactModal();
+        });
+
+        // Set up main navigation
+        document.querySelectorAll('a.nav-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const view = this.getAttribute('data-view');
+                if (view) {
+                    showView(view);
+                }
+            });
+        });
+
+        // Set up global search
+        const searchInput = document.getElementById('global-search');
+        const clearBtn = document.getElementById('search-clear-btn');
+        if (searchInput) {
+            searchInput.addEventListener('input', handleGlobalSearch);
+            searchInput.addEventListener('focus', () => { if (searchInput.value.length > 0) clearBtn.classList.add('show'); });
+            searchInput.addEventListener('blur', () => { setTimeout(() => clearBtn.classList.remove('show'), 100); });
+        }
+        if (clearBtn) clearBtn.addEventListener('click', clearSearch);
+
+        // Add event listeners for calculator inputs (if on a detail page)
+        document.addEventListener('input', function(e) {
+            if (e.target.matches('#kwh-usage, #current-rate, #proposed-rate, #contract-end-date')) {
+                updateCalculateButton();
+            }
+        });
+
+        // Set up note saving button
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'save-note-btn') {
+                handleSaveNote();
+            }
+        });
+
+        // Animate metric cards on load
+        const metricCards = document.querySelectorAll('.metric-card');
+        metricCards.forEach((card, index) => {
+            setTimeout(() => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                card.style.transition = 'all 0.5s ease';
+
+                setTimeout(() => {
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, 100);
+            }, index * 100);
+        });
+    });
+
+    // --- Other Global Functions ---
+
+    // Make functions globally accessible (important for inline onclick handlers)
+    window.showView = showView;
+    window.addAccount = addAccount;
+    window.addContact = addContact;
+    window.bulkImport = bulkImport;
+    window.openProfileModal = openProfileModal;
+    window.closeProfileModal = closeProfileModal;
+    window.saveProfilePicture = saveProfilePicture;
+    window.handleFileSelect = handleFileSelect;
+    window.handleDragOver = handleDragOver;
+    window.handleDragLeave = handleDragLeave;
+    window.handleDrop = handleDrop;
+    window.clearSearch = clearSearch;
+    window.showContactDetail = showContactDetail;
+    window.showAccountDetail = showAccountDetail;
+    window.editContact = editContact;
+    window.callContactFromList = callContactFromList;
+    window.deleteContact = deleteContact;
+    window.editAccount = editAccount;
+    window.deleteAccount = deleteAccount;
+    window.openRateCalculator = () => showToast('Opening Rate Calculator', 'info');
+    window.openUsageAnalyzer = () => showToast('Opening Usage Analyzer', 'info');
+    window.openContractManager = () => showToast('Opening Contract Manager', 'info');
+    window.renderContactsPage = renderContactsPage;
+    window.renderAccountsPage = renderAccountsPage;
+    window.toggleContactsCollapsible = (el) => {
+        const content = el.nextElementSibling;
+        const icon = el.querySelector('.collapsible-icon');
+        if (content.classList.contains('expanded')) {
+            content.classList.remove('expanded');
+            icon.classList.remove('rotated');
+        } else {
+            content.classList.add('expanded');
+            icon.classList.add('rotated');
+        }
+    };
+    window.addContactsFilter = (name) => showToast(`Added contacts filter: ${name}`, 'info');
+    window.removeContactsFilter = (id) => { document.getElementById(id)?.remove(); showToast('Filter removed', 'info'); };
+    window.toggleAccountsCollapsible = (el) => {
+        const content = el.nextElementSibling;
+        const icon = el.querySelector('.collapsible-icon');
+        if (content.classList.contains('expanded')) {
+            content.classList.remove('expanded');
+            icon.classList.remove('rotated');
+        } else {
+            content.classList.add('expanded');
+            icon.classList.add('rotated');
+        }
+    };
+    window.addAccountsFilter = (name) => showToast(`Added accounts filter: ${name}`, 'info');
+    window.removeAccountsFilter = (id) => { document.getElementById(id)?.remove(); showToast('Filter removed', 'info'); };
+    window.handleSaveNote = handleSaveNote;
+
+    // Health Check Calculator functions
+    window.calculateSavings = () => showToast('Calculating savings...', 'success');
+    window.updateCalculateButton = () => {
+        const kwhUsage = document.getElementById('kwh-usage')?.value;
+        const currentRate = document.getElementById('current-rate')?.value;
+        const proposedRate = document.getElementById('proposed-rate')?.value;
+        const calculateBtn = document.getElementById('calculate-btn');
+
+        if (calculateBtn) {
+            if (kwhUsage && currentRate && proposedRate) {
+                calculateBtn.classList.add('ready');
+                calculateBtn.disabled = false;
+            } else {
+                calculateBtn.classList.remove('ready');
+                calculateBtn.disabled = true;
+            }
+        }
+    };
+
+</script>        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
             authDomain: "power-choosers-crm.firebaseapp.com",
@@ -3988,16 +5134,6 @@ function importActivities(activityData) {
     
     showToast(`Successfully imported ${imported} activities!`, 'success');
 }
-
-// Add event listener for Cold Calling button
-document.addEventListener('DOMContentLoaded', function() {
-    // Cold Calling button event listener
-    document.addEventListener('click', function(e) {
-        if (e.target && (e.target.id === 'cold-calling-btn' || e.target.closest('#cold-calling-btn'))) {
-            e.preventDefault();
-        }
-    });
-});
 
 // Modal and form functions
 function addContact() {
@@ -5584,4 +6720,163 @@ function showContactDetail(contactId) {
                 const endIndex = Math.min(currentCallsPage * 10, filteredCallsData.length);
                 paginationInfo.textContent = `Showing ${startIndex}-${endIndex} of ${filteredCallsData.length} results`;
             }
+        }
+
+        // Filter calls function
+        function filterCalls() {
+            const searchTerm = document.getElementById('call-search')?.value.toLowerCase() || '';
+            const statusFilter = document.getElementById('call-filter-status')?.value || 'all';
+            
+            filteredCallsData = callsData.filter(call => {
+                const matchesSearch = !searchTerm || 
+                    call.contact.toLowerCase().includes(searchTerm) ||
+                    call.company.toLowerCase().includes(searchTerm) ||
+                    call.notes.toLowerCase().includes(searchTerm);
+                    
+                const matchesStatus = statusFilter === 'all' || 
+                    call.status.toLowerCase() === statusFilter.toLowerCase();
+                    
+                return matchesSearch && matchesStatus;
+            });
+            
+            // Reset to first page when filtering
+            currentCallsPage = 1;
+            renderCallsTable();
+        }
+
+        // Cold Calling Hub Functions
+        function startColdCalling() {
+            const scriptDisplay = document.getElementById('script-display');
+            const responseButtons = document.getElementById('response-buttons');
+            
+            if (scriptDisplay && responseButtons) {
+                scriptDisplay.className = 'script-display mood-neutral';
+                scriptDisplay.innerHTML = `
+                    <h3 style="color: var(--text-primary); margin-bottom: 15px;">📞 Cold Calling Script</h3>
+                    <p style="color: var(--text-primary); line-height: 1.6;">
+                        "Hi, this is [Your Name] from Power Choosers. I hope I'm not catching you at a bad time. 
+                        I'm reaching out because we help businesses like yours reduce their energy costs by up to 30%. 
+                        Do you have just 2 minutes to hear how we might be able to help you save money on your energy bills?"
+                    </p>
+                `;
+                
+                responseButtons.innerHTML = `
+                    <button class="response-btn positive" onclick="handlePositiveResponse()">
+                        👍 They're Interested
+                    </button>
+                    <button class="response-btn challenging" onclick="handleObjection()">
+                        ❌ They Have Objections
+                    </button>
+                    <button class="response-btn neutral" onclick="handleNeutralResponse()">
+                        🤔 They're Unsure
+                    </button>
+                    <button class="response-btn neutral" onclick="endCall()">
+                        📞 End Call
+                    </button>
+                `;
+            }
+        }
+
+        function handlePositiveResponse() {
+            const scriptDisplay = document.getElementById('script-display');
+            if (scriptDisplay) {
+                scriptDisplay.className = 'script-display mood-positive';
+                scriptDisplay.innerHTML = `
+                    <h3 style="color: #10b981; margin-bottom: 15px;">✅ Great! They're Interested</h3>
+                    <p style="color: var(--text-primary); line-height: 1.6;">
+                        "Excellent! Let me tell you briefly about what we do. Power Choosers specializes in energy procurement and management. 
+                        We work with businesses to analyze their current energy usage and find better rates with reliable suppliers. 
+                        Most of our clients see savings of 15-30% on their energy bills. 
+                        Can you tell me a bit about your current energy setup and monthly costs?"
+                    </p>
+                `;
+            }
+        }
+
+        function handleObjection() {
+            const scriptDisplay = document.getElementById('script-display');
+            if (scriptDisplay) {
+                scriptDisplay.className = 'script-display mood-challenging';
+                scriptDisplay.innerHTML = `
+                    <h3 style="color: #f59e0b; margin-bottom: 15px;">⚠️ Handling Objections</h3>
+                    <p style="color: var(--text-primary); line-height: 1.6;">
+                        "I completely understand your concern. Many of our best clients said the same thing initially. 
+                        The great news is that there's no upfront cost or commitment to get a free energy audit. 
+                        We simply analyze your current bills and show you exactly how much you could save. 
+                        If we can't save you money, you don't pay us anything. Would it be worth 15 minutes to potentially save thousands per year?"
+                    </p>
+                `;
+            }
+        }
+
+        function handleNeutralResponse() {
+            const scriptDisplay = document.getElementById('script-display');
+            if (scriptDisplay) {
+                scriptDisplay.className = 'script-display mood-unsure';
+                scriptDisplay.innerHTML = `
+                    <h3 style="color: #8b5cf6; margin-bottom: 15px;">🤔 They Need More Information</h3>
+                    <p style="color: var(--text-primary); line-height: 1.6;">
+                        "I understand you might need more details. Let me give you a quick example: 
+                        One of our recent clients, a manufacturing company similar to yours, was paying $8,000 per month for electricity. 
+                        After our analysis, we found them a better rate and they now save $2,400 per month - that's $28,800 per year! 
+                        Would you like me to send you some information, or do you have 5 minutes now for me to explain how this works?"
+                    </p>
+                `;
+            }
+        }
+
+        function endCall() {
+            const scriptDisplay = document.getElementById('script-display');
+            const responseButtons = document.getElementById('response-buttons');
+            
+            if (scriptDisplay && responseButtons) {
+                scriptDisplay.className = 'script-display start';
+                scriptDisplay.innerHTML = `
+                    <h2 style="color: var(--text-primary); margin-bottom: 20px; font-size: 2rem;">📋 Call Complete</h2>
+                    <p style="color: var(--text-secondary); text-align: center; font-size: 1.1rem; line-height: 1.6;">
+                        Great job! Don't forget to save your call notes and update the contact information.
+                        Ready for your next call?
+                    </p>
+                `;
+                
+                responseButtons.innerHTML = `
+                    <button class="dial-button" onclick="startColdCalling()">
+                        🚀 Start Next Call
+                    </button>
+                `;
+            }
+        }
+
+        function saveCallNotes() {
+            const contactName = document.getElementById('contact-name')?.value || '';
+            const contactCompany = document.getElementById('contact-company')?.value || '';
+            const contactPhone = document.getElementById('contact-phone')?.value || '';
+            const callNotes = document.getElementById('call-notes')?.value || '';
+            
+            if (!contactName && !contactCompany && !callNotes) {
+                showToast('Please add some contact information or notes before saving.', 'warning');
+                return;
+            }
+            
+            const newActivity = {
+                id: Date.now().toString(),
+                type: 'call',
+                description: `Cold call with ${contactName || 'Unknown'} at ${contactCompany || 'Unknown Company'}`,
+                notes: callNotes,
+                contactName: contactName,
+                company: contactCompany,
+                phone: contactPhone,
+                date: new Date().toISOString(),
+                status: 'completed'
+            };
+            
+            if (!CRMApp.activities) CRMApp.activities = [];
+            CRMApp.activities.push(newActivity);
+            
+            if (document.getElementById('contact-name')) document.getElementById('contact-name').value = '';
+            if (document.getElementById('contact-company')) document.getElementById('contact-company').value = '';
+            if (document.getElementById('contact-phone')) document.getElementById('contact-phone').value = '';
+            if (document.getElementById('call-notes')) document.getElementById('call-notes').value = '';
+            
+            showToast('Call notes saved successfully!', 'success');
         }
