@@ -359,7 +359,7 @@
             height: 100%;
             padding: 24px;
         }
-
+        
         /* Cold Calling Hub styles */
         .calls-hub-main {
             display: flex;
@@ -380,22 +380,19 @@
         }
         .script-display {
             background: #0f1419;
-            padding: 24px;
+            padding: 20px 30px;
             border-radius: 12px;
             font-size: 1.25rem;
             line-height: 1.6;
             min-height: 250px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             text-align: left;
             border: 1px solid var(--border-color);
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             flex-grow: 1;
             overflow-y: auto;
-            white-space: pre-line;
+            white-space: normal;
+            color: #e2e8f0;
         }
         .script-display.start {
             text-align: center;
@@ -864,7 +861,8 @@
                 mood: "neutral",
                 responses: [
                     { text: "📞 Call Connected", next: "hook" },
-                    { text: "🚫 No Answer", next: "voicemail_or_hangup" }
+                    { text: "� Transferred - Decision Maker Answers", next: "main_script_start" },
+                    { text: "�🚫 No Answer", next: "voicemail_or_hangup" }
                 ]
             },
             voicemail_or_hangup: {
@@ -880,47 +878,120 @@
                 mood: "neutral",
                 responses: [
                     { text: "✅ Yes, this is [N]", next: "main_script_start" },
-                    { text: "👥 Gatekeeper / Not the right person", next: "gatekeeper_intro" }
+                    { text: "�️ Speaking", next: "main_script_start" },
+                    { text: "❓ Who's calling?", next: "main_script_start" },
+                    { text: "�👥 Gatekeeper / Not the right person", next: "gatekeeper_intro" }
                 ]
             },
             main_script_start: {
-                you: "Good mornin'/afternoon, <span class='emphasis'>[N]</span> <span class='pause'>--</span> I'm Lewis with PowerChoosers and I'm needin' to speak with someone over electricity agreements and contracts for <span class='emphasis'>[CN]</span><span class='highlight-yellow'> would that be yourself?</span>",
+                you: "Good mornin'/afternoon, <span class='emphasis'>[N]</span> — I'm Lewis with PowerChoosers and I'm needin' to speak with someone over electricity agreements and contracts for <span class='emphasis'>[CN]</span> would that be yourself?",
                 mood: "neutral",
                 responses: [
                     { text: "✅ Yes, that's me / I handle that", next: "pathA" },
-                    { text: "👥 That would be [OP] / Not the right person", next: "gatekeeper_intro" }
+                    { text: "🤝 We both handle it / Team decision", next: "pathA" },
+                    { text: "👥 That would be [OP] / Not the right person", next: "gatekeeper_intro" },
+                    { text: "🤔 Unsure or hesitant", next: "pathD" }
                 ]
             },
             gatekeeper_intro: {
-                you: "Good afternoon/morning. I'm needin' to speak with someone over electricity agreements and contracts for <span class='emphasis'>[CN]</span><span class='highlight-yellow'> do you know who would be responsible for that?</span>",
+                you: "Good afternoon/morning. I'm needin' to speak with someone over electricity agreements and contracts for <span class='emphasis'>[CN]</span> do you know who would be responsible for that?",
+                mood: "neutral",
+                responses: [
+                    { text: "❓ What's this about?", next: "gatekeeper_whats_about" },
+                    { text: "🔗 I'll connect you", next: "transfer_dialing" },
+                    { text: "🚫 They're not available / Take a message", next: "voicemail" }
+                ]
+            },
+            gatekeeper_whats_about: {
+                you: "My name is Lewis with PowerChoosers.com and I'm needin' to speak with someone about the future electricity agreements for <span class='emphasis'>[CN]</span>. Do you know who might be the best person for that?",
                 mood: "neutral",
                 responses: [
                     { text: "🔗 I'll connect you", next: "transfer_dialing" },
-                    { text: "🚫 Take a message", next: "voicemail" }
+                    { text: "🚫 They're not available / Take a message", next: "voicemail" },
+                    { text: "✅ I can help you", next: "pathA" }
+                ]
+            },
+            transfer_dialing: {
+                you: "Great, I'll hold while you connect me. Thank you!",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Connected to Decision Maker", next: "main_script_start" },
+                    { text: "🚫 No answer / Went to voicemail", next: "voicemail" }
                 ]
             },
             voicemail: {
-                you: "Good afternoon/morning <span class='emphasis'>[N]</span>, this is <span class='emphasis'>Lewis</span> and I was told to speak with you. You can give me a call at <span class='emphasis'>817-409-4215</span>. Also, I shot you over a short email kinda explaining why I'm reaching out to you today. The email should be coming from <span class='emphasis'>Lewis Patterson</span> that's <span class='emphasis'>(L.E.W.I.S)</span> Thank you so much and you have a great day.",
+                you: "Good afternoon/morning <span class='emphasis'>[N]</span>, this is Lewis with PowerChoosers. I was hoping to speak with you about an opportunity to potentially reduce your electricity costs. You can reach me at 817-409-4215. I'll also send you an email with more details. Thank you for your time, and have a great day!",
                 mood: "neutral",
                 responses: [
                     { text: "🔄 End Call / Start New Call", next: "start" }
                 ]
             },
             pathA: {
-                you: "Perfect <span class='pause'>--</span> So <span class='emphasis'>[N]</span> I've been working closely with <span class='emphasis'>[CI]</span> across Texas with electricity agreements <span class='pause'>--</span> and we're about to see an <span class='emphasis'>unprecedented dip in the market in the next few months</span> <span class='pause'>--</span><br><br><span class='highlight-yellow'>Is getting the best price for your next renewal a priority for you and [CN]?</span>",
+                you: "Perfect — So <span class='emphasis'>[N]</span> I've been working closely with <span class='emphasis'>[CI]</span> across Texas with electricity agreements — and we're about to see an <span class='emphasis'>unprecedented dip in the market in the next few months</span> — Is getting the best price for your next renewal a priority for you and <span class='emphasis'>[CN]</span>? Do you know when your contract expires?",
                 mood: "neutral",
                 responses: [
-                    { text: "✅ Yes, worth discussing", next: "closeForAppointment" },
+                    { text: "😰 Struggling with high rates", next: "discovery" },
+                    { text: "📅 Haven't renewed yet", next: "discovery" },
+                    { text: "⏳ Contract ending soon", next: "discovery" },
+                    { text: "💰 Looking for better rates", next: "discovery" },
+                    { text: "🤔 Not sure about contract", next: "discovery" },
                     { text: "❌ Not interested", next: "softClose" }
                 ]
             },
+            discovery: {
+                you: "Gotcha! So <span class='emphasis'>[N]</span>, just so I understand your situation a little better — What's your current approach to renewing your electricity agreements? Do you handle it internally or work with a consultant?",
+                mood: "neutral",
+                responses: [
+                    { text: "💚 Prospect is engaged / ready for appointment", next: "closeForAppointment" },
+                    { text: "🟡 Prospect is hesitant / needs more info", next: "handleHesitation" },
+                    { text: "❌ Objection: Happy with current provider", next: "objHappy" },
+                    { text: "❌ Objection: No time", next: "objNoTime" }
+                ]
+            },
             closeForAppointment: {
-                you: "Awesome! So, <span class='emphasis'>[N]</span><span class='pause'>--</span> I really believe you'll be able to benefit from <span class='emphasis'>[SB]</span> that way you won't have to <span class='emphasis'>[PP]</span>. Our process is super simple! We start with an <span class='emphasis'>energy health check</span> where I look at your usage, contract terms, and then we can talk about what options might look like for <span class='emphasis'>[CN]</span> moving forward.",
+                you: "Awesome! So, <span class='emphasis'>[N]</span> — I really believe you'll be able to benefit from <span class='emphasis'>[SB]</span> that way you won't have to <span class='emphasis'>[PP]</span>. Our process is super simple! We start with an <span class='emphasis'>energy health check</span> where I look at your usage, contract terms, and then we can talk about what options might look like for <span class='emphasis'>[CN]</span> moving forward. When would be a good time for a quick 10-15 minute chat?",
                 mood: "positive",
-                responses: [{ text: "📅 Schedule an Appointment", next: "callSuccess" }]
+                responses: [
+                    { text: "📅 Schedule Friday 11 AM", next: "callSuccess" },
+                    { text: "📅 Schedule Monday 2 PM", next: "callSuccess" },
+                    { text: "🤔 Still hesitant", next: "handleHesitation" }
+                ]
+            },
+            handleHesitation: {
+                you: "I get it — And I called you out of the blue, so now is probably not the best time... Let me put together a quick case study specific to <span class='emphasis'>[CI]</span> in your area. Would you be open to me sending that over?",
+                mood: "understanding",
+                responses: [
+                    { text: "✅ Yes, send analysis", next: "callSuccess" },
+                    { text: "❌ No, not interested", next: "softClose" }
+                ]
+            },
+            objHappy: {
+                you: "That's actually great to hear... Is it the customer service that you're happy with or are you just getting a rate that you can't find anywhere else?",
+                mood: "neutral",
+                responses: [
+                    { text: "✅ Yes, worth understanding", next: "closeForAppointment" },
+                    { text: "❌ No, not interested", next: "softClose" }
+                ]
+            },
+            objNoTime: {
+                you: "I completely get it — that's exactly why most businesses end up overpaying for electricity. They wait until the last minute when they're under pressure to renew. I'm happy to take just 10 minutes to show you what we're seeing in the market for businesses like yours. Would that be okay?",
+                mood: "understanding",
+                responses: [
+                    { text: "✅ Yes, schedule 10-minute assessment", next: "callSuccess" },
+                    { text: "❌ Still no time", next: "softClose" }
+                ]
+            },
+            pathD: {
+                you: "I understand this might be new information. Many of our clients felt the same way before they saw how we could help. Would you be open to a quick 10-minute conversation where I can explain how we're helping similar <span class='emphasis'>[CI]</span> in your area?",
+                mood: "understanding",
+                responses: [
+                    { text: "✅ Yes, let's talk", next: "closeForAppointment" },
+                    { text: "🔄 Let me think about it", next: "handleHesitation" },
+                    { text: "❌ Not interested", next: "softClose" }
+                ]
             },
             softClose: {
-                you: "No problem at all <span class='pause'>--</span> I know energy strategy isn't urgent until it becomes critical. Here's what I'll do: I'm going to add you to my quarterly market intelligence updates.",
+                you: "No problem at all — I know energy strategy isn't urgent until it becomes critical. Here's what I'll do: I'm going to add you to my quarterly market intelligence updates. That way, when the market does dip, you'll be among the first to know. Would that be okay?",
                 mood: "neutral",
                 responses: [
                     { text: "✅ That sounds reasonable", next: "callSuccess" },
@@ -928,7 +999,7 @@
                 ]
             },
             callSuccess: {
-                you: "🎉 <span class='emphasis'>Call Completed Successfully!</span><br><br>Remember to track:<br>• Decision maker level<br>• Current contract status<br>• Pain points identified<br>• Interest level<br>• Next action committed",
+                you: "🎉 Call Completed Successfully!\n\nRemember to track:\n• Decision maker level\n• Current contract status\n• Pain points identified\n• Interest level\n• Next action committed\n• Follow-up date and time",
                 mood: "positive",
                 responses: [{ text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }]
             },
@@ -1018,7 +1089,7 @@
                 }
                 newText = newText.replace(regex, replacement);
             }
-            return newText;
+            return newText.replace(/--/g, '&mdash;');
         };
 
         const updateScript = () => {
@@ -1078,6 +1149,7 @@
                 if (input) input.value = '';
             }
             getEl('call-notes').value = '';
+            resetHealthCheckForm(); // Reset health check form on restart
             updateScript();
         };
         
@@ -1093,7 +1165,6 @@
             };
 
             try {
-                // Save the new activity to Firebase
                 await db.collection("activities").add(log);
                 showToast('Call notes saved successfully!', 'success');
             } catch (error) {
@@ -1108,7 +1179,7 @@
             getEl('call-notes').value = '';
         };
 
-        // --- Energy Health Check Widget Logic (Adapted from energy-health-check.html) ---
+        // --- Energy Health Check Widget Logic ---
         const supplierData = {
           "NRG": { bbbRating: "A+", popularity: 4, customerService: 3 },
           "TXU": { bbbRating: "A+", popularity: 5, customerService: 4 },
@@ -1238,13 +1309,11 @@
         
         const calculateResults = async () => {
             try {
-                // Calculation logic
                 const effectiveSellRateAllIn = sellRate + ESTIMATED_DELIVERY_CHARGE_CENTS;
                 const annualCurrentCost = currentMonthlyBill * 12;
                 const annualProjectedCost = (currentAnnualUsage * effectiveSellRateAllIn);
                 const annualSavingsOrIncrease = annualCurrentCost - annualProjectedCost;
                 
-                // Construct a new activity log
                 const newActivity = {
                     type: 'energy_health_check',
                     description: `Ran energy health check for ${appState.placeholders.CN || 'a prospect'}`,
@@ -1254,7 +1323,6 @@
                     createdAt: serverTimestamp()
                 };
 
-                // Save the new activity to Firebase
                 await db.collection("activities").add(newActivity);
                 showToast("Calculation complete! Saved as activity log.", "success");
 
@@ -1262,14 +1330,13 @@
                 console.error("An error occurred during calculation:", error);
                 showToast("An error occurred during calculation.", "error");
             } finally {
-                // Ensure the loading state is always reset
                 getEl('loadingAnimation').classList.remove('show');
                 getEl('calculateBtn').style.display = 'block';
                 getEl('calculator-wrapper').classList.remove('is-calculating');
             }
-        }
+        };
         
-        const resetForm = () => {
+        const resetHealthCheckForm = () => {
             if(getEl('currentSupplier')) getEl('currentSupplier').value = '';
             if(getEl('monthlyBill')) getEl('monthlyBill').value = '';
             if(getEl('currentRate')) getEl('currentRate').value = '';
@@ -1290,10 +1357,8 @@
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Setup Cold Calling Hub
             updateScript();
             
-            // Setup Energy Health Check
             activateSection(1);
             updateButton(); 
             const datalist = getEl('supplierList');
