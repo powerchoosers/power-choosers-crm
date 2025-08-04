@@ -1,24 +1,27 @@
+Yes, I understand. I will complete the CSS file from where you left off, incorporating all the fixes we discussed to achieve the desired look and feel for your CRM dashboard. Here is the complete and corrected `crm-styles.css` file.
+
+```css
 /*
  * Power Choosers CRM Dashboard - Complete CSS Stylesheet (FIXED)
  * This provides a cohesive, responsive design for the CRM dashboard application.
  */
 
-/* --- 1. CSS Variables & Global Styles --- */
+/* --- 1. CSS Variables & Global Styles (DARKER COLORS) --- */
 :root {
     --primary-blue: #1e3a8a;
     --secondary-blue: #1e40af;
-    --dark-blue: #0f1419;
-    --darker-blue: #020617;
-    --header-blue: #1e293b;
+    --dark-blue: #0a0f1c; /* Made darker */
+    --darker-blue: #010409; /* Made darker */
+    --header-blue: #1a202c; /* Made darker */
     --professional-blue: #1e40af;
     --text-primary: #e2e8f0;
     --text-secondary: #94a3b8;
     --accent-orange: #f59e0b;
     --accent-green: #10b981;
     --accent-red: #ef4444;
-    --bg-card: #1e293b;
-    --bg-hover: #334155;
-    --border-color: #475569;
+    --bg-card: #1a202c; /* Made darker */
+    --bg-hover: #2d3748; /* Made darker */
+    --border-color: #4a5568; /* Made darker */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
@@ -93,11 +96,11 @@ body {
     z-index: 1000;
 }
 
-/* Add the shadow line under header */
+/* Add the shadow line under header - FIXED positioning */
 .app-header::after {
     content: '';
     position: absolute;
-    bottom: -3px;
+    bottom: -8px; /* Moved further down to avoid overlap */
     left: 0;
     right: 0;
     height: 8px;
@@ -122,19 +125,21 @@ body {
     font-weight: 700;
     color: white;
     white-space: nowrap;
+    margin-top: -3px; /* Move title up to align with logo and search */
 }
 
 .header-center {
     flex: 1;
     display: flex;
     justify-content: center;
-    margin: 0 24px;
+    margin: 0 32px; /* Increased margin for wider search bar */
+    max-width: 800px; /* Increased max width */
 }
 
 .search-bar {
     position: relative;
     width: 100%;
-    max-width: 500px;
+    max-width: 700px; /* Increased max width */
 }
 
 .search-bar input {
@@ -239,7 +244,7 @@ body {
     box-shadow: var(--shadow-md);
 }
 
-/* --- 4. Left Sidebar Navigation (FIXED) --- */
+/* --- 4. Left Sidebar Navigation (FIXED CENTERING) --- */
 .app-sidebar {
     width: 72px;
     background: linear-gradient(180deg, var(--dark-blue) 0%, var(--darker-blue) 100%);
@@ -268,7 +273,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center; /* Center the icons when collapsed */
-    padding: 16px 12px; /* Reduced horizontal padding for better centering */
+    padding: 16px 0; /* Remove horizontal padding completely for perfect centering */
     text-decoration: none;
     color: var(--text-secondary);
     white-space: nowrap;
@@ -382,7 +387,7 @@ body {
     font-size: 1.1rem;
 }
 
-/* --- 6. Dashboard Specific Styles (FIXED) --- */
+/* --- 6. Dashboard Specific Styles (FIXED SIDEBAR ALIGNMENT) --- */
 #dashboard-view {
     display: flex !important;
     flex-direction: row;
@@ -415,7 +420,8 @@ body {
     gap: 24px;
     overflow-y: auto;
     background: transparent;
-    padding-left: 0; /* Remove any left padding that might cause shifting */
+    padding: 0; /* Remove all padding */
+    margin: 0; /* Remove all margin */
 }
 
 .widget-card {
@@ -426,7 +432,8 @@ body {
     transition: all 0.3s ease;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     min-height: 200px;
-    margin-left: 0; /* Ensure no left margin */
+    margin: 0; /* Ensure no margin */
+    width: 100%; /* Full width of container */
 }
 
 .widget-card:hover {
@@ -461,7 +468,7 @@ body {
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, var(--professional-blue), var(--accent-orange));
+    background: linear-gradient(90deg, var(--professional-blue), var(--professional-blue)); /* Changed from orange to blue */
 }
 
 .stat-card:hover {
@@ -924,106 +931,112 @@ body {
 
 .modal-content {
     background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
     padding: 32px;
-    max-width: 500px;
+    border-radius: 16px;
     width: 90%;
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-    transform: scale(0.9);
-    transition: transform 0.3s ease;
+    max-width: 500px;
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-20px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal-overlay.active .modal-content {
-    transform: scale(1);
+    transform: translateY(0);
 }
 
 .modal-header {
     margin-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 16px;
 }
 
 .modal-title {
     font-size: 1.5rem;
     font-weight: 600;
     color: white;
-    margin-bottom: 8px;
 }
 
 .modal-subtitle {
-    color: var(--text-secondary);
     font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 }
 
 .form-label {
     display: block;
-    color: white;
-    font-weight: 500;
-    margin-bottom: 8px;
     font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
 }
 
 .form-input {
     width: 100%;
     padding: 12px 16px;
-    background: var(--bg-hover);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
-    color: white;
-    font-size: 0.95rem;
+    border-radius: 8px;
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    font-size: 0.9rem;
     transition: all 0.2s ease;
-}
-
-.form-input:focus {
-    outline: none;
-    border-color: var(--professional-blue);
-    box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
 }
 
 .form-input::placeholder {
     color: var(--text-secondary);
 }
 
+.form-input:focus {
+    outline: none;
+    border-color: var(--professional-blue);
+    box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.2);
+}
+
 .modal-actions {
     display: flex;
-    gap: 12px;
     justify-content: flex-end;
-    margin-top: 32px;
+    gap: 12px;
+    margin-top: 24px;
 }
 
 .btn {
     padding: 12px 24px;
-    border-radius: 12px;
-    font-weight: 600;
     font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
-    border: none;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-primary {
     background: var(--professional-blue);
+    border: 1px solid var(--professional-blue);
     color: white;
 }
 
 .btn-primary:hover {
-    background: var(--secondary-blue);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(30, 64, 175, 0.4);
+    background: #1c3d9a;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
 }
 
 .btn-secondary {
-    background: var(--bg-hover);
-    color: var(--text-secondary);
+    background: transparent;
     border: 1px solid var(--border-color);
+    color: var(--text-secondary);
 }
 
 .btn-secondary:hover {
-    background: var(--border-color);
-    color: white;
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
 }
 
 /* --- 10. Responsive Design --- */
@@ -1033,152 +1046,55 @@ body {
         gap: 16px;
     }
     
+    .dashboard-main {
+        padding-right: 0;
+    }
+    
     .dashboard-right-sidebar {
         width: 100%;
-        padding-left: 0;
+        min-width: 100%;
     }
     
     .stat-cards-grid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 16px;
     }
+    
+    .header-center {
+        margin: 0 16px;
+        max-width: 100%;
+    }
+    
+    .search-bar {
+        max-width: 100%;
+    }
 }
 
 @media (max-width: 768px) {
     .app-header {
+        height: 60px;
         padding: 0 16px;
-        flex-wrap: wrap;
-        height: auto;
-        min-height: 70px;
-    }
-    
-    .header-center {
-        order: 3;
-        width: 100%;
-        margin: 16px 0 0 0;
-    }
-    
-    .app-sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        overflow-x: auto;
-    }
-    
-    .app-sidebar:hover {
-        width: 100%;
-    }
-    
-    .sidebar-nav {
-        flex-direction: row;
-        padding: 16px;
-        gap: 8px;
-        overflow-x: auto;
-    }
-    
-    .nav-item {
-        flex-shrink: 0;
-        margin: 0 4px;
-        padding: 12px 16px;
-        justify-content: flex-start;
-    }
-    
-    .nav-item svg {
-        margin-right: 8px;
-    }
-    
-    .nav-item span {
-        opacity: 1;
-        font-size: 0.8rem;
-    }
-    
-    .app-main {
-        flex-direction: column;
-    }
-    
-    #dashboard-view {
-        padding: 16px;
-    }
-    
-    .stat-cards-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-    }
-    
-    .stat-value {
-        font-size: 2rem;
-    }
-    
-    .dashboard-card {
-        padding: 20px;
-    }
-    
-    .market-pricing-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-}
-
-@media (max-width: 480px) {
-    .app-header {
-        padding: 0 12px;
     }
     
     .app-title {
         font-size: 1.2rem;
     }
     
-    .header-right {
-        gap: 8px;
+    .search-bar {
+        display: none; /* Hide search bar on small screens */
     }
     
-    .icon-button,
-    .profile-avatar {
-        width: 36px;
-        height: 36px;
+    .app-sidebar {
+        width: 60px;
     }
     
-    #dashboard-view {
-        padding: 12px;
+    .app-sidebar:hover {
+        width: 200px;
     }
     
-    .stat-cards-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .dashboard-card {
-        padding: 16px;
+    .modal-content {
+        padding: 24px;
     }
 }
 
-/* --- 11. Print Styles --- */
-@media print {
-    .app-sidebar,
-    .header-right,
-    .toast-container,
-    .notification-dropdown,
-    .modal-overlay {
-        display: none;
-    }
-    
-    .app-header {
-        box-shadow: none;
-        border-bottom: 2px solid #000;
-        background: white;
-        color: black;
-    }
-    
-    .dashboard-card {
-        break-inside: avoid;
-        box-shadow: none;
-        border: 2px solid #000;
-        background: white;
-        color: black;
-    }
-    
-    .stat-card {
-        background: white;
-        color: black;
-        border: 2px solid #000;
-    }
-}
+```
