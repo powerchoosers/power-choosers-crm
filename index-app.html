@@ -337,14 +337,11 @@
             flex: 1; 
             display: flex; 
             overflow: hidden; 
-            padding: 20px 30px 30px; 
-            overflow-y: auto;
-            position: relative;
         }
 
         .main-content {
             flex: 1;
-            padding: 0;
+            padding: 20px 30px 30px;
             overflow-y: auto;
             background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
         }
@@ -796,24 +793,19 @@
         .page-view {
             position: absolute;
             top: 0;
-            left: 70px; /* Start at collapsed sidebar width */
+            left: 0; /* Aligns with the content area */
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
-            z-index: 50;
             padding: 30px;
             overflow-y: auto;
-            transition: left 0.3s ease; /* Smooth transition when sidebar expands */
-            height: calc(100vh - 17px);
+            transition: all 0.3s ease;
+            display: none;
+            width: 100%;
             min-height: calc(100vh - 17px);
         }
 
 
 
-        /* When sidebar is hovered, adjust page view position */
-        .sidebar:hover ~ .content-area .page-view {
-            left: 250px; /* Expanded sidebar width */
-        }
 
         /* Account Detail Page Styles - Enhanced for better hover functionality */
         .detail-field {
