@@ -90,10 +90,9 @@ body {
     border-bottom: 3px solid var(--professional-blue);
     position: relative;
     z-index: 1000;
-    box-shadow: none; /* Removed the glow effect */
+    box-shadow: none;
 }
 
-/* Removed the header::after pseudo-element to take away the glow */
 .app-header::after {
     content: none;
 }
@@ -136,7 +135,7 @@ body {
     width: 100%;
     padding: 12px 16px;
     padding-left: 48px;
-    border: 1px solid var(--border-color); /* Added border */
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     background-color: var(--bg-hover);
     color: var(--text-primary);
@@ -234,7 +233,7 @@ body {
     box-shadow: var(--shadow-md);
 }
 
-/* --- 4. Left Sidebar Navigation (FIXED CENTERING) --- */
+/* --- 4. Left Sidebar Navigation (FINAL FIX FOR CENTERING) --- */
 .app-sidebar {
     width: 72px;
     background: linear-gradient(180deg, var(--dark-blue) 0%, var(--darker-blue) 100%);
@@ -262,15 +261,14 @@ body {
 .nav-item {
     display: flex;
     align-items: center;
-    justify-content: center; /* Correctly centers the icons when collapsed */
-    padding: 16px 0; /* Ensures no horizontal padding for perfect centering */
+    justify-content: center; /* Correctly centers the icons */
+    padding: 16px 8px; /* Adds consistent padding on both sides */
     text-decoration: none;
-    color: white; /* All icons are white now */
+    color: white;
     white-space: nowrap;
     transition: all 0.2s ease;
     border-radius: 12px;
     position: relative;
-    margin: 0 8px;
 }
 
 /* When sidebar is hovered, align items to the left */
@@ -309,10 +307,9 @@ body {
     height: 24px;
     flex-shrink: 0;
     transition: margin-right 0.2s ease;
-    stroke: currentColor; /* Inherits the white color */
+    stroke: currentColor;
 }
 
-/* Adds margin back when sidebar is hovered */
 .app-sidebar:hover .nav-item svg {
     margin-right: 16px;
 }
@@ -417,12 +414,12 @@ body {
 
 .widget-card {
     background: var(--bg-card) !important;
-    border: 1px solid var(--border-color); /* Added thin dark grey border */
+    border: 1px solid var(--border-color);
     border-radius: 16px;
     padding: 24px;
     transition: all 0.3s ease;
-    box-shadow: var(--shadow-md); /* Added a subtle shadow */
-    min-height: 200px;
+    box-shadow: var(--shadow-md);
+    min-height: auto; /* Removed fixed minimum height */
     margin: 0;
     width: 100%;
 }
@@ -442,14 +439,14 @@ body {
 
 .stat-card {
     background: var(--bg-card);
-    border: 1px solid var(--border-color); /* Added thin dark grey border */
+    border: 1px solid var(--border-color);
     border-radius: 16px;
     padding: 24px;
     text-align: center;
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
-    box-shadow: var(--shadow-md); /* Added a subtle shadow */
+    box-shadow: var(--shadow-md);
 }
 
 .stat-card::before {
@@ -487,11 +484,11 @@ body {
 /* Dashboard Cards */
 .dashboard-card {
     background: var(--bg-card);
-    border: 1px solid var(--border-color); /* Added thin dark grey border */
+    border: 1px solid var(--border-color);
     border-radius: 16px;
     padding: 24px;
     transition: all 0.3s ease;
-    box-shadow: var(--shadow-md); /* Added a subtle shadow */
+    box-shadow: var(--shadow-md);
 }
 
 .dashboard-card:hover {
@@ -573,9 +570,9 @@ body {
     gap: 12px;
     padding: 16px;
     background: var(--bg-hover);
-    border: 1px solid var(--border-color); /* Added thin dark grey border */
+    border: 1px solid var(--border-color);
     border-radius: 12px;
-    color: white; /* Changed icon color to white */
+    color: white;
     text-decoration: none;
     font-weight: 500;
     transition: all 0.2s ease;
@@ -594,7 +591,7 @@ body {
     width: 18px;
     height: 18px;
     flex-shrink: 0;
-    stroke: currentColor; /* Inherits the white color */
+    stroke: currentColor;
 }
 
 /* Activity List */
@@ -631,7 +628,7 @@ body {
     justify-content: center;
     background: var(--professional-blue);
     border-radius: 8px;
-    color: white; /* Ensured icons are white */
+    color: white;
 }
 
 .activity-content {
@@ -698,12 +695,12 @@ body {
 }
 
 .news-item {
-    padding: 20px; /* Increased padding */
+    padding: 20px;
     background: var(--bg-hover);
     border-radius: 12px;
     transition: all 0.2s ease;
     border-left: 4px solid var(--accent-green);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); /* Added shadow */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .news-item:hover {
@@ -790,7 +787,7 @@ body {
     width: 400px;
     max-height: 500px;
     background: var(--bg-card);
-    border: 1px solid var(--border-color); /* Added thin dark grey border */
+    border: 1px solid var(--border-color);
     border-radius: 16px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
     z-index: 10000;
@@ -869,7 +866,7 @@ body {
     justify-content: center;
     flex-shrink: 0;
     font-size: 1rem;
-    color: white; /* Ensured icons are white */
+    color: white;
 }
 
 .notification-icon.contact { background: var(--professional-blue); }
