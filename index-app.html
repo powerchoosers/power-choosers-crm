@@ -801,6 +801,19 @@
             min-height: calc(100vh - 17px);
         }
 
+        /* Phone Page Specific Styles - Fix bottom gap issue */
+        #phone-view {
+            min-height: calc(100vh - 77px); /* Full viewport height minus header */
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 80px; /* Extra padding to prevent content from being hidden behind fixed elements */
+        }
+
+        #phone-view > div:last-child {
+            flex-grow: 1; /* Make the last container expand to fill remaining space */
+            min-height: 400px; /* Ensure minimum height for content */
+        }
+
         /* When sidebar is hovered, adjust page view position */
         .sidebar:hover ~ .content-area .page-view {
             left: 250px; /* Expanded sidebar width */
