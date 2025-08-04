@@ -1,8 +1,6 @@
-// This file contains the complete application logic for the Power Choosers CRM.
-// It manages all data fetching, view rendering, and user interactions.
+// This file contains the complete application logic for the redesigned Power Choosers CRM.
 
 // --- 1. Firebase Configuration & Initialization ---
-// Note: The Firebase SDKs are loaded in index.html before this script.
 const firebaseConfig = {
     apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
     authDomain: "power-choosers-crm.firebaseapp.com",
@@ -23,7 +21,7 @@ const CRMApp = {
     accounts: [],
     contacts: [],
     activities: [],
-    tasks: [],
+    tasks: [], // We will load tasks from a hypothetical 'tasks' collection or generate them
     currentView: 'dashboard-view',
     currentContact: null,
     currentAccount: null,
@@ -122,7 +120,6 @@ function showToast(message, type = 'info') {
     toast.textContent = message;
     document.body.appendChild(toast);
     
-    // Use requestAnimationFrame for smooth transitions
     requestAnimationFrame(() => {
         toast.style.transform = 'translateX(0)';
         toast.style.opacity = '1';
@@ -144,6 +141,7 @@ function renderDashboard() {
     renderDashboardStats();
     renderTodayTasks();
     renderRecentActivities();
+    renderEnergyMarketNews();
 }
 
 /**
@@ -170,24 +168,23 @@ function renderTodayTasks() {
     
     // Filter tasks for today. Using sample data for now.
     const todayTasks = [
-        { id: 't1', title: 'Follow up with John Smith', account: 'Energy Contract', time: '3:00 PM' },
-        { id: 't2', title: 'Prepare energy analysis for Sarah Johnson', account: 'Johnson', time: '3:30 PM' },
+        { id: 't1', title: 'Follow up with John Smith - Q1 Energy Contract', time: '3:00 PM' },
+        { id: 't2', title: 'Prepare energy analysis for Sarah Johnson', time: '3:30 PM' },
+        { id: 't3', title: 'Review Mike Davis multi-site proposal', time: '9:00 AM' },
     ];
     
     if (todayTasks.length > 0) {
         todayTasks.forEach(task => {
             const li = document.createElement('li');
+            li.className = 'task-item';
             li.innerHTML = `
-                <div class="task-item">
-                    <p class="task-title">Follow up with John Smith</p>
-                    <p class="task-details">Q1 - Energy Contract</p>
-                    <p class="task-due-time">Due: 3:00 PM</p>
-                </div>
+                <p class="task-title">${task.title}</p>
+                <p class="task-due-time">Due: ${task.time}</p>
             `;
             tasksList.appendChild(li);
         });
     } else {
-        tasksList.innerHTML = '<li class="text-sm text-gray-400">No tasks for today!</li>';
+        tasksList.innerHTML = '<li class="text-sm text-gray-400 p-4">No tasks for today!</li>';
     }
 }
 
@@ -205,7 +202,7 @@ function renderRecentActivities() {
             const li = document.createElement('li');
             li.className = 'activity-item';
             li.innerHTML = `
-                <div class="activity-icon">${activity.type === 'call' ? '📞' : '📝'}</div>
+                <div class="activity-icon">${activity.type === 'call_note' ? '📞' : '📝'}</div>
                 <div class="activity-content">
                     <p class="activity-text">${activity.description}</p>
                     <span class="activity-timestamp">${new Date(activity.createdAt).toLocaleString()}</span>
@@ -215,6 +212,33 @@ function renderRecentActivities() {
         });
     } else {
         activityList.innerHTML = '<li class="text-sm text-gray-400 p-4">No recent activity.</li>';
+    }
+}
+
+/**
+ * Renders the energy market news feed.
+ */
+function renderEnergyMarketNews() {
+    const newsFeed = getEl('news-feed');
+    newsFeed.innerHTML = '';
+    
+    const newsItems = [
+        { title: 'ERCOT Demand Rises', content: 'ERCOT demand is increasing due to summer heat, putting pressure on grid reliability.' },
+        { title: 'Natural Gas Prices Fluctuate', content: 'Recent geopolitical events have caused volatility in natural gas prices, impacting futures.' },
+    ];
+    
+    if (newsItems.length > 0) {
+        newsItems.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'news-item';
+            div.innerHTML = `
+                <h4 class="news-title">${item.title}</h4>
+                <p class="news-content">${item.content}</p>
+            `;
+            newsFeed.appendChild(div);
+        });
+    } else {
+        newsFeed.innerHTML = '<p class="text-sm text-gray-400">No news to display.</p>';
     }
 }
 
@@ -253,17 +277,12 @@ CRMApp.loadInitialData = async () => {
  * Saves all prospect information, call notes, and energy health check data to Firestore.
  */
 async function saveProspectAndNotes() {
-    // This is the same function from the previous corrected crm-app.js
-    // It is a placeholder for the actual data-saving logic.
     showToast('Saving notes and data...', 'info');
     
-    // Simulate save logic
     try {
-        // Find or create account and contact
         const accountId = CRMApp.currentAccount ? CRMApp.currentAccount.id : 'temp-account-' + Date.now();
         const contactId = CRMApp.currentContact ? CRMApp.currentContact.id : 'temp-contact-' + Date.now();
         
-        // Save an activity
         await db.collection('activities').add({
             type: 'call_note',
             description: `Call with ${getEl('input-name').value}`,
@@ -275,8 +294,7 @@ async function saveProspectAndNotes() {
             createdAt: serverTimestamp()
         });
 
-        // Update the UI
-        CRMApp.loadInitialData(); // Re-fetch and re-render dashboard data
+        CRMApp.loadInitialData();
         showToast('Call notes saved successfully!', 'success');
         
     } catch (error) {
@@ -298,15 +316,6 @@ CRMApp.setupEventListeners = () => {
         });
     });
 
-    // Sidebar button for Cold Calling Hub (if it's a separate view)
-    const callButton = getEl('[data-view="calls-hub-view"]');
-    if (callButton) {
-        callButton.addEventListener('click', () => {
-            // When switching to the calls hub, clear and initialize the script
-            CRMApp.restart();
-        });
-    }
-
     // Event listeners for Cold Calling Hub inputs
     const hubInputs = [
         'input-phone', 'input-name', 'input-company-name', 'input-title',
@@ -316,17 +325,15 @@ CRMApp.setupEventListeners = () => {
         const input = getEl(id);
         if (input) input.addEventListener('input', CRMApp.updateScript);
     });
-
-    // ... other event listeners (search, save, restart, etc.)
 };
 
 /**
  * The main initialization function.
  */
 document.addEventListener('DOMContentLoaded', () => {
-    CRMApp.init();
+    CRMApp.loadInitialData();
     CRMApp.setupEventListeners();
 });
 
-// Other functions from the Cold Calling Hub logic (e.g., updateScript, handleDialClick, etc.)
-// would also be included here. They are omitted for brevity but should be part of this file.
+// Other functions for Cold Calling Hub (e.g., updateScript, handleDialClick, restart, etc.)
+// would also be part of this file. They are omitted for brevity.
