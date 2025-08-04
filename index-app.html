@@ -2781,7 +2781,6 @@
 
         // Profile picture functionality
         let selectedProfileImage = null;
-
         function openProfileModal() {
             const modal = document.getElementById('profile-modal');
             modal.classList.add('active');
@@ -2860,7 +2859,7 @@
             const toast = document.createElement('div');
             toast.style.cssText = `
                 position: fixed; top: 90px; right: 20px; z-index: 3000;
-                background: ${type === 'success' ? '#10b981' : '#ef4444'};
+                background: ${type === 'success' ? '#10b981' : (type === 'error' ? '#ef4444' : '#3b82f6')};
                 color: white; padding: 12px 20px; border-radius: 8px;
                 font-weight: 600; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
                 animation: slideInRight 0.3s ease-out;
@@ -2989,13 +2988,6 @@
                 });
             }
 
-            document.querySelectorAll('a.nav-item').forEach(item => {
-                item.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    document.querySelectorAll('a.nav-item').forEach(i => i.classList.remove('active'));
-                    this.classList.add('active');
-                });
-            });
         }
 
         function handleGlobalSearch(event) {
@@ -3013,14 +3005,13 @@
 
             const results = [];
             
-            // Search through all contact fields
             CRMApp.contacts.forEach(contact => {
                 const searchableFields = [
                     contact.firstName, contact.lastName, contact.name,
                     contact.title, contact.email, contact.phone,
                     contact.location, contact.department, contact.accountName,
                     contact.summary
-                ].filter(field => field); // Remove null/undefined values
+                ].filter(field => field);
                 
                 const contactText = searchableFields.join(' ').toLowerCase();
                 if (contactText.includes(query)) {
@@ -3034,7 +3025,6 @@
                 }
             });
 
-            // Search through all account fields
             CRMApp.accounts.forEach(account => {
                 const searchableFields = [
                     account.name, account.industry, account.city,
@@ -3053,7 +3043,6 @@
                 }
             });
 
-            // Search through activities
             CRMApp.activities.forEach(activity => {
                 if (activity.description && activity.description.toLowerCase().includes(query)) {
                     results.push({
@@ -3068,13 +3057,323 @@
 
             console.log('Enhanced search results:', results);
             
-            // Show results count
             if (results.length > 0) {
                 showToast(`Found ${results.length} results`, 'success');
             } else if (query.length >= 2) {
                 showToast('No results found', 'error');
             }
         }
+
+        function showView(viewName, itemId = null) {
+            console.log(`Navigating to ${viewName}`, itemId ? `with ID: ${itemId}` : '');
+            
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            const navItems = {
+                'dashboard': 'Home',
+                'contacts': 'Contacts', 
+                'accounts': 'Accounts',
+                'phone': 'Calls',
+                'emails': 'Emails',
+                'tasks': 'Tasks'
+            };
+            
+            if (navItems[viewName]) {
+                const activeNavItem = Array.from(document.querySelectorAll('.nav-item')).find(item => 
+                    item.querySelector('span') && item.querySelector('span').textContent.trim() === navItems[viewName]
+                );
+                if (activeNavItem) {
+                    activeNavItem.classList.add('active');
+                }
+            }
+            
+            const phoneView = document.getElementById('phone-view');
+            const contactsView = document.getElementById('contacts-view');
+            const accountsView = document.getElementById('accounts-view');
+            const contactDetailView = document.getElementById('contact-detail-view');
+            const accountDetailView = document.getElementById('account-detail-view');
+            const mainContent = document.querySelector('.main-content');
+            const rightSidebar = document.querySelector('.right-sidebar');
+            
+            if (phoneView) phoneView.style.display = 'none';
+            if (contactsView) contactsView.style.display = 'none';
+            if (accountsView) accountsView.style.display = 'none';
+            if (contactDetailView) contactDetailView.style.display = 'none';
+            if (accountDetailView) accountDetailView.style.display = 'none';
+            
+            CRMApp.currentView = viewName;
+            
+            if (viewName === 'phone') {
+                if (phoneView) {
+                    phoneView.style.display = 'block';
+                    loadPhoneView();
+                }
+                if (mainContent) mainContent.style.display = 'none';
+                if (rightSidebar) rightSidebar.style.display = 'none';
+            } else if (viewName === 'contacts') {
+                if (contactsView) {
+                    contactsView.style.display = 'block';
+                    renderContactsPage();
+                }
+                if (mainContent) mainContent.style.display = 'none';
+                if (rightSidebar) rightSidebar.style.display = 'none';
+            } else if (viewName === 'accounts') {
+                if (accountsView) {
+                    accountsView.style.display = 'block';
+                    renderAccountsPage();
+                }
+                if (mainContent) mainContent.style.display = 'none';
+                if (rightSidebar) rightSidebar.style.display = 'none';
+            } else if (viewName === 'contact-detail' && itemId) {
+                showContactDetail(itemId);
+            } else if (viewName === 'account-detail' && itemId) {
+                showAccountDetail(itemId);
+            } else {
+                if (mainContent) mainContent.style.display = 'block';
+                if (rightSidebar) rightSidebar.style.display = 'block';
+                CRMApp.currentView = 'dashboard';
+            }
+        }
+
+        function addAccount() {
+            const modal = document.getElementById('add-account-modal');
+            modal.classList.add('active');
+        }
+
+        function addContact() {
+            const modal = document.getElementById('add-contact-modal');
+            modal.classList.add('active');
+            populateCompanyDropdown();
+        }
+
+        function bulkImport() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.csv';
+            fileInput.style.display = 'none';
+            
+            fileInput.onchange = function(event) {
+                const file = event.target.files[0];
+                if (file && file.type === 'text/csv') {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const csv = e.target.result;
+                        processCsvData(csv, file.name);
+                    };
+                    reader.readAsText(file);
+                } else {
+                    showToast('Please select a valid CSV file', 'error');
+                }
+            };
+            
+            document.body.appendChild(fileInput);
+            fileInput.click();
+            document.body.removeChild(fileInput);
+        }
+        
+        function processCsvData(csvText, fileName) {
+            try {
+                const lines = csvText.split('\n').filter(line => line.trim());
+                if (lines.length < 2) {
+                    showToast('CSV file must have at least a header row and one data row', 'error');
+                    return;
+                }
+                
+                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                const data = [];
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+                    if (values.length === headers.length) {
+                        const record = {};
+                        headers.forEach((header, index) => {
+                            record[header.toLowerCase().replace(/\s+/g, '')] = values[index];
+                        });
+                        data.push(record);
+                    }
+                }
+                
+                showImportPreview(data, headers, fileName);
+                
+            } catch (error) {
+                console.error('Error processing CSV:', error);
+                showToast('Error processing CSV file. Please check the format.', 'error');
+            }
+        }
+        
+        function showImportPreview(data, headers, fileName) {
+            const modal = document.createElement('div');
+            modal.className = 'profile-modal active';
+            modal.innerHTML = `
+                <div class="profile-modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h2 class="text-2xl font-bold text-white mb-4">Import Preview - ${fileName}</h2>
+                        <p class="text-gray-400">Found ${data.length} records with ${headers.length} columns.</p>
+                    </div>
+                    <div class="modal-body my-4">
+                        <div class="mb-4">
+                            <p class="font-semibold text-white mb-2">Select Import Type:</p>
+                            <div class="flex space-x-4">
+                                <label class="text-white"><input type="radio" name="importType" value="contacts" checked class="mr-2"> Contacts</label>
+                                <label class="text-white"><input type="radio" name="importType" value="accounts" class="mr-2"> Accounts</label>
+                                <label class="text-white"><input type="radio" name="importType" value="activities" class="mr-2"> Activities</label>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto bg-gray-700 rounded-lg p-2" style="max-height: 300px;">
+                            <table class="min-w-full text-white text-sm">
+                                <thead>
+                                    <tr class="border-b border-gray-600">${headers.map(h => `<th class="p-2 text-left text-xs text-gray-400">${h}</th>`).join('')}</tr>
+                                </thead>
+                                <tbody>
+                                    ${data.slice(0, 5).map(row => 
+                                        `<tr class="border-b border-gray-600">${headers.map(h => `<td class="p-2">${row[h.toLowerCase().replace(/\s+/g, '')] || ''}</td>`).join('')}</tr>`
+                                    ).join('')}
+                                    ${data.length > 5 ? `<tr><td colspan="${headers.length}" class="p-2 text-center text-gray-400">... and ${data.length - 5} more rows</td></tr>` : ''}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="modal-btn secondary" onclick="document.body.removeChild(this.closest('.profile-modal'))">Cancel</button>
+                        <button class="modal-btn primary" onclick="processImport(${JSON.stringify(data).replace(/"/g, '&quot;')}, this.closest('.profile-modal'))">Import Data</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+        
+        function processImport(data, modal) {
+            const importType = modal.querySelector('input[name="importType"]:checked').value;
+            
+            if (importType === 'contacts') {
+                importContacts(data);
+            } else if (importType === 'accounts') {
+                importAccounts(data);
+            } else if (importType === 'activities') {
+                importActivities(data);
+            }
+            
+            modal.remove();
+        }
+
+        function importContacts(contactData) {
+            let imported = 0;
+            contactData.forEach(record => {
+                const newContact = {
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                    firstName: record.firstname || record.name || record.contactname || '',
+                    lastName: record.lastname || '',
+                    title: record.title || record.jobtitle || '',
+                    email: record.email || record.emailaddress || '',
+                    phone: record.phone || record.phonenumber || '',
+                    accountName: record.company || record.accountname || '',
+                    location: record.location || record.city || '',
+                    createdAt: new Date()
+                };
+                if (newContact.firstName || newContact.email) {
+                    CRMApp.contacts.push(newContact);
+                    imported++;
+                }
+            });
+            updateDashboardMetrics();
+            showToast(`Successfully imported ${imported} contacts!`, 'success');
+            if (CRMApp.currentView === 'contacts') renderContactsPage();
+        }
+
+        function importAccounts(accountData) {
+            let imported = 0;
+            accountData.forEach(record => {
+                const newAccount = {
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                    name: record.name || record.company || record.accountname || '',
+                    industry: record.industry || record.sector || '',
+                    location: record.location || record.city || record.address || '',
+                    employees: record.employees || record.size || '',
+                    revenue: record.revenue || record.annualrevenue || '',
+                    createdAt: new Date()
+                };
+                if (newAccount.name) {
+                    CRMApp.accounts.push(newAccount);
+                    imported++;
+                }
+            });
+            updateDashboardMetrics();
+            showToast(`Successfully imported ${imported} accounts!`, 'success');
+            if (CRMApp.currentView === 'accounts') renderAccountsPage();
+        }
+
+        function importActivities(activityData) {
+            let imported = 0;
+            activityData.forEach(record => {
+                const newActivity = {
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                    type: record.type || 'general',
+                    description: record.description || record.activity || record.subject || '',
+                    notes: record.notes || record.details || '',
+                    createdAt: record.date ? new Date(record.date) : new Date(),
+                    status: record.status || 'completed',
+                    contactName: record.contact || record.contactname || '',
+                    company: record.company || record.account || ''
+                };
+                if (newActivity.description) {
+                    if (!CRMApp.activities) CRMApp.activities = [];
+                    CRMApp.activities.push(newActivity);
+                    imported++;
+                }
+            });
+            updateDashboardMetrics();
+            showToast(`Successfully imported ${imported} activities!`, 'success');
+        }
+
+        // Global function assignments for onclick handlers
+        window.showView = showView;
+        window.addAccount = addAccount;
+        window.addContact = addContact;
+        window.bulkImport = bulkImport;
+        window.clearSearch = clearSearch;
+        window.processImport = processImport;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            loadSavedProfilePicture();
+
+            document.getElementById('profile-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeProfileModal();
+            });
+            
+            document.getElementById('add-contact-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeAddContactModal();
+            });
+            
+            document.getElementById('add-account-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeAddAccountModal();
+            });
+
+            document.querySelectorAll('a.nav-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const view = this.getAttribute('onclick').match(/'(.*?)'/)[1];
+                    showView(view);
+                });
+            });
+
+            const metricCards = document.querySelectorAll('.metric-card');
+            metricCards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateY(20px)';
+                    card.style.transition = 'all 0.5s ease';
+                    
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, 100);
+                }, index * 100);
+            });
+        });
 
         function clearSearch() {
             const searchInput = document.getElementById('global-search');
@@ -4116,7 +4415,7 @@ async function loadColdCallingHub() {
             }
         }
         
-        function bulkImport() { console.log('Opening Bulk Import'); }
+
         function openRateCalculator() { console.log('Opening Rate Calculator'); }
         function openUsageAnalyzer() { console.log('Opening Usage Analyzer'); }
         function openContractManager() { console.log('Opening Contract Manager'); }
