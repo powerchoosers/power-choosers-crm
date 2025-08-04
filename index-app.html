@@ -217,8 +217,8 @@
         /* Layout */
         .main-container {
             display: flex;
-            margin-top: 70px;
-            height: calc(100vh - 70px);
+            margin-top: 77px;
+            height: calc(100vh - 77px);
             overflow: hidden;
         }
 
@@ -333,15 +333,11 @@
         }
 
         /* Content Area */
-        .content-area { 
-            flex: 1; 
-            display: flex; 
-            overflow: hidden; 
-        }
+        .content-area { flex: 1; display: flex; overflow: hidden; }
 
         .main-content {
             flex: 1;
-            padding: 20px 30px 30px;
+            padding: 30px;
             overflow-y: auto;
             background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
         }
@@ -793,19 +789,22 @@
         .page-view {
             position: absolute;
             top: 0;
-            left: 0; /* Aligns with the content area */
+            left: 70px; /* Start at collapsed sidebar width */
             right: 0;
             bottom: 0;
+            background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
+            z-index: 50;
             padding: 30px;
             overflow-y: auto;
-            transition: all 0.3s ease;
-            display: none;
-            width: 100%;
+            transition: left 0.3s ease; /* Smooth transition when sidebar expands */
+            height: calc(100vh - 17px);
             min-height: calc(100vh - 17px);
         }
 
-
-
+        /* When sidebar is hovered, adjust page view position */
+        .sidebar:hover ~ .content-area .page-view {
+            left: 250px; /* Expanded sidebar width */
+        }
 
         /* Account Detail Page Styles - Enhanced for better hover functionality */
         .detail-field {
