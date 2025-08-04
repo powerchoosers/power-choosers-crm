@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Choosers CRM</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/crm-styles.css">
+    <script src="https://powerchoosers.github.io/power-choosers-crm/firebase-config.js"></script>
+    <script src="https://powerchoosers.github.io/power-choosers-crm/crm-app.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="header-logo">
+            🏭
+        </div>
+        <div class="header-title">Cold Calling Hub</div>
+        
+        <div class="header-search">
+            <span class="header-search-icon">🔍</span>
+            <input type="text" id="global-search" placeholder="Search accounts, contacts, and more...">
+            <button class="search-clear-btn" id="clear-search">×</button>
+            <div class="search-results" id="search-results"></div>
+        </div>
+        
+        <div class="header-actions">
+            <button class="notification-bell">
+                🔔
+                <span class="notification-badge">3</span>
+            </button>
+            <div class="profile-avatar">
+                <span>PC</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <nav class="sidebar-menu">
+                <div class="nav-section-title">Navigation</div>
+                <a href="#" class="nav-item">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span>Home</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>Contacts</span>
+                    <span class="nav-badge">12</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Accounts</span>
+                    <span class="nav-badge">8</span>
+                </a>
+
+                <div class="nav-section-title">Communication</div>
+                <a href="#" class="nav-item active">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                    <span>Calls</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <span>Emails</span>
+                    <span class="nav-badge">5</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    <span>Tasks</span>
+                    <span class="nav-badge">7</span>
+                </a>
+
+                <div class="nav-section-title" style="margin-top: auto;">Settings</div>
+                <a href="#" class="nav-item">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>Account Details</span>
+                </a>
+            </nav>
+        </div>
+
+        <div class="content-area">
+            <div class="main-content flex-1 flex">
+                 <div class="calls-hub-layout flex-1">
+                    <div class="calls-hub-main">
+                        <h2 class="text-2xl font-bold mb-6 text-white text-center">Cold Calling Script</h2>
+                        
+                        <div class="calls-hub-main-inner">
+                            <div class="script-display p-6" id="script-display">
+                                Click 'Dial' to begin the call
+                            </div>
+
+                            <div class="response-buttons mt-6" id="responses-container">
+                                <button class="dial-button" onclick="handleDialClick()">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                    Dial
+                                </button>
+                            </div>
+
+                            <div class="calls-hub-footer">
+                                <button id="back-btn" class="action-btn" onclick="goBack()" disabled>← Back</button>
+                                <button id="restart-btn" class="restart-btn-icon" onclick="restart()">
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path d="M21.5 13a9.5 9.5 0 1 1-9.5-9.5V3a.5.5 0 0 0-1 0v.5A9.5 9.5 0 1 1 21.5 13zM12 2v4M12 18v4M22 12h-4M6 12H2M18 18l-3-3M18 6l-3 3M6 18l3-3M6 6l3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-sidebar">
+                <div class="sidebar-card">
+                    <h3 class="sidebar-card-title">📋 Prospect Info</h3>
+                    <div class="sidebar-input-group">
+                        <label for="input-phone">Phone Number:</label>
+                        <input type="text" id="input-phone" placeholder="(555) 555-5555" oninput="updateScript()">
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label for="input-name">Contact Name:</label>
+                        <input type="text" id="input-name" placeholder="John Smith" oninput="updateScript()">
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label for="input-company-name">Company Name:</label>
+                        <input type="text" id="input-company-name" placeholder="ABC Manufacturing" oninput="updateScript()">
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label for="input-title">Contact Title:</label>
+                        <input type="text" id="input-title" placeholder="Company Leader" oninput="updateScript()">
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label for="input-company-industry">Company Industry:</label>
+                        <input type="text" id="input-company-industry" placeholder="businesses" oninput="updateScript()">
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label for="input-benefit">Specific Benefit:</label>
+                        <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" oninput="updateScript()">
+                    </div>
+                    <div class="sidebar-input-group">
+                        <label for="input-pain">Pain Point:</label>
+                        <input type="text" id="input-pain" placeholder="you're not stuck paying more" oninput="updateScript()">
+                    </div>
+                </div>
+
+                <div class="sidebar-card">
+                    <h3 class="sidebar-card-title">💡 Energy Health Check</h3>
+                    <div class="calculator-wrapper">
+                        <div class="form-sections">
+                            <div class="form-section active" id="section1">
+                                <div class="section-header-pill">
+                                    <span class="section-icon">1</span> Current Bill
+                                </div>
+                                <div class="grid grid-cols-1 gap-4">
+                                    <div class="input-group">
+                                        <label for="currentSupplier" class="input-label text-xs">Current Supplier</label>
+                                        <input type="text" class="form-input !p-2 !text-sm" id="currentSupplier" placeholder="e.g., TXU" list="supplierList" oninput="validateSection1()">
+                                        <datalist id="supplierList"></datalist>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="monthlyBill" class="input-label text-xs">Monthly Bill ($)</label>
+                                        <input type="number" class="form-input !p-2 !text-sm" id="monthlyBill" placeholder="e.g., 1,450.00" step="0.01" oninput="validateSection1()">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="currentRate" class="input-label text-xs">Current Rate ($/kWh)</label>
+                                        <input type="number" class="form-input !p-2 !text-sm" id="currentRate" placeholder="e.g., 0.062" step="0.001" oninput="validateSection1()">
+                                        <div id="rateFeedback" class="input-feedback text-xs"></div>
+                                    </div>
+                                </div>
+                                <div id="usageDisplay" class="usage-display !p-3 mt-3 hidden">
+                                    <div class="usage-title text-sm">📊 Client's Usage Analysis</div>
+                                    <div class="usage-details text-xs" id="usageDetails"></div>
+                                </div>
+                            </div>
+                            <div class="mt-6"></div>
+                            <div class="form-section" id="section2">
+                                <div class="section-header-pill">
+                                    <span class="section-icon">2</span> Contract & Sell Rate
+                                </div>
+                                <div class="grid grid-cols-1 gap-4">
+                                    <div class="input-group">
+                                        <label for="contractEndDate" class="input-label text-xs">Contract End Date</label>
+                                        <input type="date" class="form-input !p-2 !text-sm" id="contractEndDate" oninput="validateSection2()">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="sellRate" class="input-label text-xs">Sell Rate ($/kWh)</label>
+                                        <input type="number" class="form-input !p-2 !text-sm" id="sellRate" placeholder="e.g., 0.088" step="0.001" oninput="validateSection2()">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-6"></div>
+                            <div class="form-section" id="section3">
+                                <div class="section-header-pill">
+                                    <span class="section-icon">3</span> Get Results
+                                </div>
+                                <p class="text-sm text-gray-400 text-center">Ready to see the analysis!</p>
+                            </div>
+                        </div>
+                        <button class="calculate-button w-full !p-3 !text-sm !font-bold mt-4" id="calculateBtn" onclick="runCalculation()">
+                            Complete All Sections Above
+                        </button>
+                        <button class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors mt-2 text-sm" id="resetBtn" onclick="resetForm()">
+                          Reset Form
+                        </button>
+                        <div id="loadingAnimation" class="loading-animation">
+                            <div class="spinner"></div>
+                            <div class="text-gray-400 mt-4 text-sm" id="loadingMessage">Running analysis...</div>
+                        </div>
+                    </div>
+                    <div id="results-container"></div>
+                </div>
+
+                <div class="sidebar-card">
+                    <h3 class="sidebar-card-title">📝 Call Notes</h3>
+                    <div class="sidebar-input-group">
+                        <textarea id="call-notes" placeholder="Type your call notes here..."></textarea>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="flex-1 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors" onclick="saveProspectAndNotes()">Save Notes</button>
+                        <button class="flex-1 px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="clearNotes()">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Firebase configuration - replace with your actual config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
+            authDomain: "power-choosers-crm.firebaseapp.com",
+            projectId: "power-choosers-crm",
+            storageBucket: "power-choosers-crm.firebasestorage.app",
+            messagingSenderId: "792458658491",
+            appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
+            measurementId: "G-XEC3BFHJHW"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
+        const fieldValue = firebase.firestore.FieldValue;
+
+        // Global CRM Application Object
+        const CRMApp = {
+            // Data storage
+            accounts: [],
+            contacts: [],
+            activities: [],
+            currentContact: null,
+            currentAccount: null,
+            currentProspect: null,
+            notesSaveTimeout: null,
+            
+            // Initialize the application
+            async init() {
+                try {
+                    await this.loadInitialData();
+                    this.setupEventListeners();
+                    console.log('CRM App initialized successfully');
+                } catch (error) {
+                    console.error('Error initializing CRM App:', error);
+                    showToast('Failed to initialize application', 'error');
+                }
+            },
+            
+            // Load initial data from Firestore
+            async loadInitialData() {
+                try {
+                    // Load accounts
+                    const accountsSnapshot = await db.collection('accounts').get();
+                    this.accounts = accountsSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    // Load contacts
+                    const contactsSnapshot = await db.collection('contacts').get();
+                    this.contacts = contactsSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    // Load activities
+                    const activitiesSnapshot = await db.collection('activities')
+                        .orderBy('createdAt', 'desc')
+                        .limit(50)
+                        .get();
+                    this.activities = activitiesSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    console.log('Initial data loaded:', {
+                        accounts: this.accounts.length,
+                        contacts: this.contacts.length,
+                        activities: this.activities.length
+                    });
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error loading initial data:', error);
+                    showToast('Failed to load data. Using sample data.', 'warning');
+                    return this.loadSampleData();
+                }
+            },
+            
+            // Load sample data if Firebase fails
+            loadSampleData() {
+                console.log('Loading sample data...');
+                // Sample data structure
+                this.accounts = [];
+                this.contacts = [];
+                this.activities = [];
+                return true;
+            },
+            
+            // Load and populate widgets with data from current contact/account
+            async loadAndPopulateWidgets() {
+                try {
+                    // Load current contact/account data
+                    const currentContact = await db.collection('contacts').doc(this.currentContact).get();
+                    const currentAccount = await db.collection('accounts').doc(this.currentAccount).get();
+                    
+                    // Populate widgets with data
+                    document.getElementById('input-name').value = currentContact.data().name;
+                    document.getElementById('input-phone').value = currentContact.data().phone;
+                    document.getElementById('input-email').value = currentContact.data().email;
+                    document.getElementById('input-title').value = currentContact.data().title;
+                    document.getElementById('input-company').value = currentAccount.data().name;
+                    document.getElementById('input-industry').value = currentAccount.data().industry;
+                    
+                    // Update the script display with current data
+                    updateScript();
+                    
+                    console.log('Widgets populated with data');
+                } catch (error) {
+                    console.error('Error loading and populating widgets:', error);
+                    showToast('Error loading contact/account data', 'error');
+                }
+            },
+            
+            // Run the energy health check with current form values
+            runEnergyHealthCheck() {
+                // Get current form values
+                const currentSupplier = document.getElementById('currentSupplier').value;
+                const monthlyBill = document.getElementById('monthlyBill').value;
+                const currentRate = document.getElementById('currentRate').value;
+                const contractEndDate = document.getElementById('contractEndDate').value;
+                const sellRate = document.getElementById('sellRate').value;
+                
+                // Run the energy health check calculation
+                const calculationResult = calculateEnergyHealthCheck(currentSupplier, monthlyBill, currentRate, contractEndDate, sellRate);
+                
+                // Display the result
+                document.getElementById('result').innerHTML = `Your energy health check result is: ${calculationResult}`;
+            },
+            
+            // Update the cold calling script with current values
+            updateColdCallingScript() {
+                // Get current form values
+                const contactName = document.getElementById('input-name').value;
+                const companyName = document.getElementById('input-company').value;
+                const contactTitle = document.getElementById('input-title').value;
+                const companyIndustry = document.getElementById('input-industry').value;
+                const specificBenefit = document.getElementById('input-benefit').value;
+                const painPoint = document.getElementById('input-pain').value;
+                
+                // Update the script display with current data
+                const scriptDisplay = document.getElementById('script-display');
+                scriptDisplay.innerHTML = `
+                    <p>Hello, my name is ${contactName} and I'm reaching out from ${companyName}.</p>
+                    <p>I understand that you're currently using ${currentSupplier} as your energy supplier.</p>
+                    <p>We've helped many ${companyIndustry} businesses like yours save money on their energy bills.</p>
+                    <p>Our solution can provide you with ${specificBenefit}, which can help you ${painPoint}.</p>
+                `;
+            },
+            
+            // Save notes and data to Firestore
+            async saveNotesAndData() {
+                try {
+                    // Get current notes and data
+                    const notes = document.getElementById('call-notes').value;
+                    const contactName = document.getElementById('input-name').value;
+                    const companyName = document.getElementById('input-company').value;
+                    const contactTitle = document.getElementById('input-title').value;
+                    const companyIndustry = document.getElementById('input-industry').value;
+                    const specificBenefit = document.getElementById('input-benefit').value;
+                    const painPoint = document.getElementById('input-pain').value;
+                    
+                    // Save notes and data to Firestore
+                    await db.collection('activities').add({
+                        type: 'call',
+                        contact: this.currentContact,
+                        account: this.currentAccount,
+                        notes: notes,
+                        timestamp: serverTimestamp()
+                    });
+                    
+                    await db.collection('contacts').doc(this.currentContact).update({
+                        name: contactName,
+                        title: contactTitle,
+                        company: companyName,
+                        industry: companyIndustry,
+                        benefit: specificBenefit,
+                        painPoint: painPoint
+                    });
+                    
+                    console.log('Notes and data saved successfully');
+                    showToast('Notes and data saved successfully', 'success');
+                } catch (error) {
+                    console.error('Error saving notes and data:', error);
+                    showToast('Error saving notes and data', 'error');
+                }
+            },
+            
+            // Setup event listeners
+            setupEventListeners() {
+                // Add event listeners to form inputs
+                document.getElementById('input-name').addEventListener('input', updateScript);
+                document.getElementById('input-phone').addEventListener('input', updateScript);
+                document.getElementById('input-email').addEventListener('input', updateScript);
+                document.getElementById('input-title').addEventListener('input', updateScript);
+                document.getElementById('input-company').addEventListener('input', updateScript);
+                document.getElementById('input-industry').addEventListener('input', updateScript);
+                document.getElementById('input-benefit').addEventListener('input', updateScript);
+                document.getElementById('input-pain').addEventListener('input', updateScript);
+                
+                // Add event listener to save button
+                document.getElementById('save-btn').addEventListener('click', saveNotesAndData);
+            },
+            
+            // Reset the energy health check form
+            resetHealthCheckForm() {
+                // Reset form values
+                document.getElementById('currentSupplier').value = '';
+                document.getElementById('monthlyBill').value = '';
+                document.getElementById('currentRate').value = '';
+                document.getElementById('contractEndDate').value = '';
+                document.getElementById('sellRate').value = '';
+                
+                // Reset result display
+                document.getElementById('result').innerHTML = '';
+            },
+            
+            // Show a specific section
+            showSection(sectionId) {
+                // Hide all sections
+                document.querySelectorAll('.form-section').forEach(section => section.classList.remove('active'));
+                
+                // Show the specified section
+                document.getElementById(sectionId).classList.add('active');
+            },
+            
+            // Show a toast notification
+            showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = `fixed bottom-4 right-4 px-4 py-2 rounded-md shadow-lg ${
+                    type === 'error' ? 'bg-red-600' : 
+                    type === 'success' ? 'bg-green-600' : 
+                    'bg-blue-600'
+                } text-white`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                
+                // Remove toast after 3 seconds
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            }
+        };
+
+        // Initialize the app when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize authentication
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    console.log('User is signed in:', user.email);
+                    // User is signed in, initialize the app
+                    CRMApp.init();
+                } else {
+                    console.log('No user is signed in');
+                    // Redirect to login or show login UI
+                }
+            });
+        });
+
+        // Make CRMApp available globally for debugging
+        window.CRMApp = CRMApp;
+    </script>
+    
+    <script>
+        // Helper function to show toast notifications
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 px-4 py-2 rounded-md shadow-lg ${
+                type === 'error' ? 'bg-red-600' : 
+                type === 'success' ? 'bg-green-600' : 
+                'bg-blue-600'
+            } text-white`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // Remove toast after 3 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        // Make showToast available globally
+        window.showToast = showToast;
+        
+        // Enhanced Search Functionality with Firestore Integration
+        const searchInput = document.getElementById('global-search');
+        const clearSearchBtn = document.getElementById('clear-search');
+        const searchResults = document.getElementById('search-results');
+        let searchDebounce;
+
+        // Toggle clear button visibility
+        searchInput.addEventListener('input', () => {
+            if (searchInput.value.trim()) {
+                clearSearchBtn.classList.add('show');
+                // Debounce search to avoid too many requests
+                clearTimeout(searchDebounce);
+                searchDebounce = setTimeout(performSearch, 300);
+            } else {
+                clearSearchBtn.classList.remove('show');
+                hideSearchResults();
+            }
+        });
+
+        // Clear search input and results
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearSearchBtn.classList.remove('show');
+            hideSearchResults();
+            searchInput.focus();
+        });
+
+        // Hide results when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.header-search')) {
+                hideSearchResults();
+            }
+        });
+
+        // Show search results
+        function showSearchResults(results) {
+            if (!results || results.length === 0) {
+                searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
+                searchResults.style.display = 'block';
+                return;
+            }
+
+            const resultsHtml = results.map(result => `
+                <div class="search-result-item" data-id="${result.id}" data-type="${result.type}">
+                    <div class="search-result-name">
+                        ${result.type === 'account' ? '🏢 ' : '👤 '}
+                        ${result.name || 'Unnamed ' + result.type}
+                    </div>
+                    <div class="search-result-details">
+                        ${result.company ? result.company + ' • ' : ''}
+                        ${result.phone || ''}
+                        ${result.email ? '• ' + result.email : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            searchResults.innerHTML = resultsHtml;
+            searchResults.style.display = 'block';
+
+            // Add click handlers to search results
+            document.querySelectorAll('.search-result-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const id = item.getAttribute('data-id');
+                    const type = item.getAttribute('data-type');
+                    handleSearchResultClick(id, type);
+                });
+            });
+        }
+
+        function hideSearchResults() {
+            searchResults.style.display = 'none';
+        }
+
+        async function performSearch() {
+            const query = searchInput.value.trim().toLowerCase();
+            if (!query || query.length < 2) return; // Don't search for very short queries
+
+            try {
+                // Search in accounts collection using a composite index
+                const accountsSnapshot = await db.collection('accounts')
+                    .orderBy('name')
+                    .startAt(query)
+                    .endAt(query + '\uf8ff')
+                    .limit(5)
+                    .get();
+
+                const accountResults = accountsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    type: 'account',
+                    name: doc.data().name || 'Unnamed Account',
+                    company: doc.data().company,
+                    phone: doc.data().phone,
+                    email: doc.data().email
+                }));
+
+                // Search in contacts collection using a composite index
+                const contactsSnapshot = await db.collection('contacts')
+                    .orderBy('name')
+                    .startAt(query)
+                    .endAt(query + '\uf8ff')
+                    .limit(5)
+                    .get();
+
+                const contactResults = contactsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    type: 'contact',
+                    name: doc.data().name || 'Unnamed Contact',
+                    company: doc.data().company,
+                    phone: doc.data().phone,
+                    email: doc.data().email
+                }));
+
+                // Combine and sort results by relevance
+                const allResults = [...accountResults, ...contactResults]
+                    .sort((a, b) => {
+                        // Simple relevance scoring - exact matches first
+                        const aScore = a.name.toLowerCase().startsWith(query) ? 1 : 0;
+                        const bScore = b.name.toLowerCase().startsWith(query) ? 1 : 0;
+                        return bScore - aScore;
+                    });
+
+                showSearchResults(allResults);
+            } catch (error) {
+                console.error('Error performing search:', error);
+                // Fallback to client-side filtering if Firestore query fails
+                fallbackSearch(query);
+            }
+        }
+
+        // Fallback search function if Firestore queries fail
+        async function fallbackSearch(query) {
+            try {
+                // Get all accounts and contacts (not recommended for large collections)
+                const [accountsSnapshot, contactsSnapshot] = await Promise.all([
+                    db.collection('accounts').limit(50).get(),
+                    db.collection('contacts').limit(50).get()
+                ]);
+
+                const allResults = [
+                    ...accountsSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        type: 'account',
+                        ...doc.data()
+                    })),
+                    ...contactsSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        type: 'contact',
+                        ...doc.data()
+                    }))
+                ];
+
+                // Simple client-side filtering
+                const filteredResults = allResults.filter(item => {
+                    const searchableText = [
+                        item.name,
+                        item.company,
+                        item.email,
+                        item.phone
+                    ].join(' ').toLowerCase();
+                    return searchableText.includes(query);
+                });
+
+                showSearchResults(filteredResults.slice(0, 10)); // Limit to 10 results
+            } catch (error) {
+                console.error('Fallback search failed:', error);
+                showToast('Error performing search. Please try again.', 'error');
+            }
+        }
+
+        function handleSearchResultClick(id, type) {
+            // Handle the click on a search result
+            console.log(`Selected ${type}:`, id);
+            
+            // Hide search results
+            hideSearchResults();
+            searchInput.value = '';
+            clearSearchBtn.classList.remove('show');
+            
+            // Load the selected item
+            if (type === 'account') {
+                // Load account details
+                loadAccountDetails(id);
+            } else if (type === 'contact') {
+                // Load contact details
+                loadContactDetails(id);
+            }
+        }
+
+        async function loadAccountDetails(accountId) {
+            try {
+                const doc = await db.collection('accounts').doc(accountId).get();
+                if (doc.exists) {
+                    const accountData = doc.data();
+                    // Update the UI with the account details
+                    console.log('Loading account:', accountData);
+                    // You can implement the UI update logic here
+                    // For example, update the prospect info form
+                    if (accountData.name) document.getElementById('input-name').value = accountData.name;
+                    if (accountData.company) document.getElementById('input-company').value = accountData.company;
+                    if (accountData.phone) document.getElementById('input-phone').value = accountData.phone;
+                    // Add more fields as needed
+                    
+                    showToast('Account loaded successfully', 'success');
+                } else {
+                    showToast('Account not found', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading account:', error);
+                showToast('Error loading account details', 'error');
+            }
+        }
+
+        async function loadContactDetails(contactId) {
+            try {
+                const doc = await db.collection('contacts').doc(contactId).get();
+                if (doc.exists) {
+                    const contactData = doc.data();
+                    // Update the UI with the contact details
+                    console.log('Loading contact:', contactData);
+                    // You can implement the UI update logic here
+                    // For example, update the prospect info form
+                    if (contactData.name) document.getElementById('input-name').value = contactData.name;
+                    if (contactData.company) document.getElementById('input-company').value = contactData.company;
+                    if (contactData.phone) document.getElementById('input-phone').value = contactData.phone;
+                    // Add more fields as needed
+                    
+                    showToast('Contact loaded successfully', 'success');
+                } else {
+                    showToast('Contact not found', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading contact:', error);
+                showToast('Error loading contact details', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
