@@ -574,7 +574,7 @@
             border: 3px solid #334155;
         }
 
-        .profile-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+        .profile-preview img { width: 100%; height: 100%; object-fit: cover; }
 
         .upload-area {
             border: 2px dashed #334155;
@@ -786,13 +786,23 @@
 
         /* Page View Styles - Responsive to sidebar */
         .page-view {
-            flex: 1;
+            position: absolute;
+            top: 0;
+            left: 70px; /* Start at collapsed sidebar width */
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
+            z-index: 50;
             padding: 30px;
             overflow-y: auto;
-            background: linear-gradient(135deg, var(--darker-blue) 0%, var(--dark-blue) 100%);
-            display: none;
-            flex-direction: column;
-            gap: 24px;
+            transition: left 0.3s ease; /* Smooth transition when sidebar expands */
+            height: calc(100vh - 17px);
+            min-height: calc(100vh - 17px);
+        }
+
+        /* When sidebar is hovered, adjust page view position */
+        .sidebar:hover ~ .content-area .page-view {
+            left: 250px; /* Expanded sidebar width */
         }
 
         /* Account Detail Page Styles - Enhanced for better hover functionality */
@@ -881,27 +891,6 @@
         .loading-animation.show { display: flex; }
         .spinner { width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--professional-blue); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* New styles from energy-health-check.html */
-        .calculator-wrapper .widget-title .icon { color: white; }
-        .calculator-title, .section-title, .input-label { color: var(--text-primary); }
-        .calculator-subtitle { color: var(--text-secondary); }
-        .progress-bar { background: var(--bg-hover); border-radius: 9999px; height: 6px; }
-        .progress-fill { background: linear-gradient(90deg, var(--professional-blue), var(--secondary-blue)); border-radius: 9999px; }
-        .form-section .section-header-pill { background-color: var(--bg-hover); border: 1px solid var(--border-color); }
-        .form-section .section-header-pill.active { background-color: var(--professional-blue); border-color: var(--secondary-blue); }
-        .form-section .section-header-pill.completed { background-color: #10b981; border-color: #16a34a; }
-        .form-section .section-icon { background-color: var(--darker-blue); }
-        .form-input.new { background: var(--bg-hover); border: 2px solid var(--border-color); color: var(--text-primary); border-radius: 12px; padding: 8px; font-size: 14px; width: 100%; }
-        .form-input.new:focus { outline: none; border-color: var(--professional-blue); box-shadow: 0 0 0 4px rgba(30, 64, 175, 0.2); }
-        .main-result.savings { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.2)); border-color: #10b981; }
-        .main-result.increase { background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.2)); border-color: #ef4444; }
-        .main-result.neutral { background: linear-gradient(135deg, rgba(30,64,175,0.1), rgba(30,64,175,0.2)); border-color: var(--professional-blue); }
-        .result-amount.positive { color: #10b981; }
-        .result-amount.negative { color: #ef4444; }
-        .result-amount.neutral { color: var(--text-primary); }
-        .result-label { color: var(--text-primary); }
-        .result-description, .analysis-text { color: var(--text-secondary); }
     </style>
 </head>
 <body>
@@ -1010,92 +999,7 @@
         </div>
 
         <div class="content-area">
-            <div class="main-content" id="dashboard-view">
-                <div class="dashboard-grid fade-in">
-                    <div class="metric-card">
-                        <div class="metric-change positive">+12%</div>
-                        <div class="metric-value" id="total-accounts">1</div>
-                        <div class="metric-label">Total Accounts</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-change positive">+8%</div>
-                        <div class="metric-value" id="total-contacts">1</div>
-                        <div class="metric-label">Total Contacts</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-change positive">+15%</div>
-                        <div class="metric-value" id="recent-activities">6</div>
-                        <div class="metric-label">Recent Activities</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-change negative">-3%</div>
-                        <div class="metric-value" id="hot-leads">0</div>
-                        <div class="metric-label">Hot Leads</div>
-                    </div>
-                </div>
-
-                <div class="energy-trends-widget fade-in">
-                    <div class="widget-title">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="20" x2="18" y2="10"></line>
-                            <line x1="12" y1="20" x2="12" y2="4"></line>
-                            <line x1="6" y1="20" x2="6" y2="14"></line>
-                        </svg>
-                        Texas Electricity Market Trends
-                    </div>
-                    
-                    <div class="trends-inner-container">
-                        <h3 class="trends-subtitle">Historical & Projected Pricing</h3>
-                        <p class="trends-description">Texas ERCOT Average Rates (¢/kWh)</p>
-                        
-                        <div class="pricing-display">
-                            <div class="price-item">
-                                <div class="price-value historical">8.2¢</div>
-                                <div class="price-label">2019-2021 Avg</div>
-                            </div>
-                            <div class="price-item">
-                                <div class="price-value current">13.1¢</div>
-                                <div class="price-label">Current 2025</div>
-                            </div>
-                            <div class="price-item">
-                                <div class="price-value projected">16.8¢</div>
-                                <div class="price-label">Projected 2026</div>
-                            </div>
-                        </div>
-                        
-                        <div class="market-intelligence">
-                            <div class="market-intelligence-text">
-                                📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="energy-trends-widget fade-in" style="margin-top: 30px;">
-                    <div class="widget-title">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12,6 12,12 16,14"></polyline>
-                        </svg>
-                        Recent Activities
-                    </div>
-                    
-                    <div class="activity-item">
-                        <div class="activity-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                            </svg>
-                        </div>
-                        <div class="activity-content">
-                            <div class="activity-title">Call note for Lewis Patterson</div>
-                            <div class="activity-description">In poll</div>
-                            <div class="activity-time">Time: 8/1/2025 08:36 PM</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="contacts-view" class="page-view">
+            <div id="contacts-view" class="page-view" style="display: none;">
                 <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-700">
                     <h1 class="text-3xl font-bold text-white">All Contacts</h1>
                     <div class="flex items-center space-x-4">
@@ -1208,7 +1112,7 @@
                 </div>
             </div>
 
-            <div id="accounts-view" class="page-view">
+            <div id="accounts-view" class="page-view" style="display: none;">
                 <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-700">
                     <h1 class="text-3xl font-bold text-white">All Accounts</h1>
                     <div class="flex items-center space-x-4">
@@ -1335,400 +1239,220 @@
                 </div>
             </div>
 
-            <div id="contact-detail-view" class="page-view">
-                <div class="flex-1 overflow-y-auto pr-6">
-                    <div class="space-y-6">
-                        <div class="flex items-center justify-between pb-4 border-b border-gray-700">
-                            <div class="flex items-center space-x-2">
-                                <button class="text-gray-400 hover:text-green-500 transition-colors" onclick="callContact()">
-                                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                </button>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <button class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="showView('contacts')">
-                                    <span class="font-medium">← Back to Contacts</span>
-                                </button>
-                                <button class="px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
-                                    <span class="font-medium">Save Contact</span>
-                                </button>
-                            </div>
-                        </div>
+            <div class="main-content">
+                <div class="dashboard-grid fade-in">
+                    <div class="metric-card">
+                        <div class="metric-change positive">+12%</div>
+                        <div class="metric-value" id="total-accounts">1</div>
+                        <div class="metric-label">Total Accounts</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change positive">+8%</div>
+                        <div class="metric-value" id="total-contacts">1</div>
+                        <div class="metric-label">Total Contacts</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change positive">+15%</div>
+                        <div class="metric-value" id="recent-activities">6</div>
+                        <div class="metric-label">Recent Activities</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-change negative">-3%</div>
+                        <div class="metric-value" id="hot-leads">0</div>
+                        <div class="metric-label">Hot Leads</div>
+                    </div>
+                </div>
 
-                        <div class="flex items-center space-x-4 pb-4">
-                            <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
-                                <span id="contact-profile-initials">LP</span>
+                <div class="energy-trends-widget fade-in">
+                    <div class="widget-title">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        Texas Electricity Market Trends
+                    </div>
+                    
+                    <div class="trends-inner-container">
+                        <h3 class="trends-subtitle">Historical & Projected Pricing</h3>
+                        <p class="trends-description">Texas ERCOT Average Rates (¢/kWh)</p>
+                        
+                        <div class="pricing-display">
+                            <div class="price-item">
+                                <div class="price-value historical">8.2¢</div>
+                                <div class="price-label">2019-2021 Avg</div>
                             </div>
-                            <div class="flex-1">
-                                <h1 class="text-3xl font-bold text-white" id="contact-detail-name">Lewis Patterson</h1>
+                            <div class="price-item">
+                                <div class="price-value current">13.1¢</div>
+                                <div class="price-label">Current 2025</div>
                             </div>
-                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors" onclick="openEditContactModal()">
-                                Edit Contact
-                            </button>
-                        </div>
-
-                        <hr class="border-gray-600">
-                        <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                            <h3 class="text-lg font-semibold text-white mb-4">Quick Access</h3>
-                            <div class="flex flex-wrap gap-4">
-                                <button class="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors" onclick="callContact()">
-                                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                    Call
-                                </button>
-                                <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="emailContact()">
-                                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                    Email
-                                </button>
-                                <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="openTaskModal()">
-                                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                                    Task
-                                </button>
-                                <a href="https://www.linkedin.com/in/lewispatterson" target="_blank" class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
-                                    <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.766s.784-1.767 1.75-1.767 1.75.79 1.75 1.767c0 .976-.784 1.766-1.75 1.766zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-                                    LinkedIn
-                                </a>
+                            <div class="price-item">
+                                <div class="price-value projected">16.8¢</div>
+                                <div class="price-label">Projected 2026</div>
                             </div>
                         </div>
                         
-                        <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                            <h3 class="text-lg font-semibold text-white mb-2">Contact Details</h3>
-                            <div class="detail-field mb-4" data-field="contact-summary">
-                                <p class="text-gray-400">
-                                    Contact summary will be loaded dynamically...
-                                </p>
-                                <div class="detail-overlay">
-                                    <button class="overlay-button" onclick="editField('contact-summary')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg>
-                                    </button>
-                                    <button class="overlay-button" onclick="copyField('contact-summary')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div class="detail-field" data-field="first-name">
-                                    <p class="text-gray-400 text-sm">First Name</p>
-                                    <p class="text-white font-medium">N/A</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('first-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('first-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="last-name">
-                                    <p class="text-gray-400 text-sm">Last Name</p>
-                                    <p class="text-white font-medium">N/A</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('last-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('last-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="job-title">
-                                    <p class="text-gray-400 text-sm">Job Title</p>
-                                    <p class="text-white font-medium">N/A</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('job-title')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('job-title')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="company-name">
-                                    <p class="text-gray-400 text-sm">Company</p>
-                                    <p class="text-white font-medium">N/A</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="email">
-                                    <p class="text-gray-400 text-sm">Email</p>
-                                    <p class="text-white font-medium">N/A</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('email')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('email')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="phone">
-                                    <p class="text-gray-400 text-sm">Phone</p>
-                                    <p class="text-white font-medium">N/A</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('phone')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('phone')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="location">
-                                    <p class="text-gray-400 text-sm">Location</p>
-                                    <p class="text-white font-medium">N/A</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('location')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('location')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="department">
-                                    <p class="text-gray-400 text-sm">Department</p>
-                                    <p class="text-white font-medium">N/A</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('department')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('department')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-white">Recent Activities</h3>
-                                <div class="flex items-center space-x-2" id="activities-navigation" style="display: none;">
-                                    <button id="activities-prev" class="p-1 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors" onclick="scrollActivities('prev')">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                                        </svg>
-                                    </button>
-                                    <button id="activities-next" class="p-1 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors" onclick="scrollActivities('next')">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="overflow-hidden">
-                                <div class="space-y-4 transition-transform duration-300" id="activities-container">
-                                    </div>
+                        <div class="market-intelligence">
+                            <div class="market-intelligence-text">
+                                📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <div class="right-sidebar slide-in-right space-y-6" style="padding-top: 0; padding-bottom: 60px;">
-                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700" id="associated-account-widget" style="margin-top: 24px;">
-                        <h3 class="text-lg font-semibold text-white mb-4">Associated Account</h3>
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h4 class="text-white font-medium text-lg" id="associated-account-name"></h4>
-                                <p class="text-sm text-gray-400" id="associated-account-location"></p>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <button class="p-2 rounded-lg bg-blue-700 text-white hover:bg-blue-800 transition-colors" onclick="showView('account-detail', CRMApp.currentContact.accountId)">
-                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                </button>
-                                <button class="p-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors" onclick="callCompany()">
-                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                
-                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                        <h3 class="text-lg font-semibold text-white mb-4">Add Notes</h3>
-                        <textarea class="w-full h-32 p-3 bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Add a new note..." id="contact-notes"></textarea>
-                        <button class="mt-3 w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors" id="save-note-btn" type="button">Save Note</button>
-                    </div>
 
-                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                        <h3 class="text-lg font-semibold text-white mb-4">Energy Health Check</h3>
-                        <p class="text-sm text-gray-400 mb-6">Calculate a potential savings analysis based on key account details.</p>
-                        <div class="calculator-wrapper !p-6" id="calculator-wrapper">
-                            <div class="form-sections">
-                                <div class="form-section active" id="section1">
-                                    <div class="section-header">
-                                        <span class="section-header-pill">
-                                            <span class="section-icon">1</span> Current Bill
-                                        </span>
-                                    </div>
-                                    <div class="grid grid-cols-1 gap-4">
-                                        <div class="input-group">
-                                            <label for="currentSupplier" class="input-label text-xs">Current Supplier</label>
-                                            <input type="text" class="form-input new !p-2 !text-sm" id="currentSupplier" placeholder="e.g., TXU" list="supplierList" oninput="validateSection1()">
-                                            <datalist id="supplierList"></datalist>
-                                        </div>
-                                        <div class="input-group">
-                                            <label for="monthlyBill" class="input-label text-xs">Monthly Bill ($)</label>
-                                            <input type="number" class="form-input new !p-2 !text-sm" id="monthlyBill" placeholder="e.g., 1,450.00" step="0.01" oninput="validateSection1()">
-                                        </div>
-                                        <div class="input-group">
-                                            <label for="currentRate" class="input-label text-xs">Current Rate ($/kWh)</label>
-                                            <input type="number" class="form-input new !p-2 !text-sm" id="currentRate" placeholder="e.g., 0.062" step="0.001" oninput="validateSection1()">
-                                            <div id="rateFeedback" class="input-feedback text-xs"></div>
-                                        </div>
-                                    </div>
-                                    <div id="usageDisplay" class="usage-display !p-3 mt-3 hidden">
-                                        <div class="usage-title text-sm">📊 Client's Usage Analysis</div>
-                                        <div class="usage-details text-xs" id="usageDetails"></div>
-                                    </div>
-                                </div>
-                                <div class="mt-6"></div>
-                                <div class="form-section" id="section2">
-                                    <div class="section-header">
-                                        <span class="section-header-pill">
-                                            <span class="section-icon">2</span> Contract & Sell Rate
-                                        </span>
-                                    </div>
-                                    <div class="grid grid-cols-1 gap-4">
-                                        <div class="input-group">
-                                            <label for="contractEndDate" class="input-label text-xs">Contract End Date</label>
-                                            <input type="text" class="form-input new !p-2 !text-sm" id="contractEndDate" placeholder="YYYY-MM-DD" onfocus="openDatePicker()">
-                                        </div>
-                                        <div class="input-group">
-                                            <label for="sellRate" class="input-label text-xs">Sell Rate ($/kWh)</label>
-                                            <input type="number" class="form-input new !p-2 !text-sm" id="sellRate" placeholder="e.g., 0.088" step="0.001" oninput="validateSection2()">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="mt-6"></div>
-                                <div class="form-section" id="section3">
-                                    <div class="section-header">
-                                        <span class="section-header-pill">
-                                            <span class="section-icon">3</span> Get Results
-                                        </span>
-                                    </div>
-                                    <p class="text-sm text-gray-400 text-center">Ready to see the analysis!</p>
-                                </div>
-                            </div>
-                            <button class="calculate-button w-full !p-3 !text-sm !font-bold mt-4" id="calculateBtn" onclick="runCalculation()">
-                                Complete All Sections Above
-                            </button>
-                            <button class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors mt-2 text-sm" id="resetBtn" onclick="resetForm()">
-                              Reset Form
-                            </button>
-                            <div id="loadingAnimation" class="loading-animation">
-                                <div class="spinner"></div>
-                                <div class="text-gray-400 mt-4 text-sm" id="loadingMessage">Running analysis...</div>
-                            </div>
-                        </div>
+                <div class="energy-trends-widget fade-in" style="margin-top: 30px;">
+                    <div class="widget-title">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12,6 12,12 16,14"></polyline>
+                        </svg>
+                        Recent Activities
                     </div>
-
-                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                        <div class="widget-title mb-4">
-                            <svg class="icon mr-2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"/>
-                                <path d="M6 12h8"/><path d="M6 8h8"/><path d="M6 16h5"/>
+                    
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                             </svg>
-                            Energy News
                         </div>
-                        <div class="space-y-3">
-                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/trump-energy-bill')">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Trump's Energy Independence Act Passes - Major Impact on Texas Energy Market</h4>
-                                    <span class="text-xs text-gray-400 whitespace-nowrap">2 days ago</span>
-                                </div>
-                                <p class="text-gray-300 text-xs mb-2 line-clamp-2">New legislation promises to reshape energy pricing and availability across Texas, with significant implications for commercial energy contracts.</p>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-xs bg-blue-600 text-white px-2 py-1 rounded">Energy Today</span>
-                                </div>
-                            </div>
-
-                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/ercot-demand-forecast')">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">ERCOT Demand Could Exceed Supply by 2026</h4>
-                                    <span class="text-xs text-gray-400 whitespace-nowrap">3 days ago</span>
-                                </div>
-                                <p class="text-gray-300 text-xs mb-2">Grid operator warns of potential supply shortages as industrial demand continues to grow.</p>
-                                <span class="text-xs bg-red-600 text-white px-2 py-1 rounded">ERCOT</span>
-                            </div>
-
-                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/renewable-energy-growth')">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Texas Renewable Energy Capacity Hits Record High</h4>
-                                    <span class="text-xs text-gray-400 whitespace-nowrap">5 days ago</span>
-                                </div>
-                                <p class="text-gray-300 text-xs mb-2">Solar and wind installations surge, creating new opportunities for competitive energy pricing.</p>
-                                <span class="text-xs bg-green-600 text-white px-2 py-1 rounded">Renewable Energy News</span>
-                            </div>
-
-                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/commercial-energy-trends')">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Commercial Energy Costs Rise 15% in Q3 2025</h4>
-                                    <span class="text-xs text-gray-400 whitespace-nowrap">1 week ago</span>
-                                </div>
-                                <p class="text-gray-300 text-xs mb-2">Businesses across Texas face higher energy bills as demand outpaces supply growth.</p>
-                                <span class="text-xs bg-orange-600 text-white px-2 py-1 rounded">Business Energy Report</span>
-                            </div>
+                        <div class="activity-content">
+                            <div class="activity-title">Call note for Lewis Patterson</div>
+                            <div class="activity-description">In poll</div>
+                            <div class="activity-time">Time: 8/1/2025 08:36 PM</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div id="account-detail-view" class="page-view">
-                <div class="flex-1 overflow-y-auto pr-6">
-                    <div class="space-y-6">
-                        <div class="flex items-center justify-between pb-4 border-b border-gray-700">
-                            <div class="flex items-center space-x-2">
-                                <button class="text-gray-400 hover:text-green-500 transition-colors" onclick="callCompany()">
-                                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                </button>
-                                <h1 class="text-3xl font-bold text-white" id="account-detail-name">KHP Capital Partners</h1>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <button class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="showView('accounts')">
-                                    <span class="font-medium">← Back to Accounts</span>
-                                </button>
-                                <button class="px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
-                                    <span class="font-medium">Save Account</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                            <h3 class="text-lg font-semibold text-white mb-4">Quick Access</h3>
-                            <div class="flex flex-wrap gap-4">
-                                <button class="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors" onclick="callCompany()">
-                                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                    Call
-                                </button>
-                                <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="openTaskModal()">
-                                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                                    Task
-                                </button>
-                                <a href="https://www.linkedin.com/company/khp-capital-partners" target="_blank" class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
-                                    <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.766s.784-1.767 1.75-1.767 1.75.79 1.75 1.767c0 .976-.784 1.766-1.75 1.766zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-                                    LinkedIn
-                                </a>
-                                <a href="https://www.khpcapitalpartners.com" target="_blank" class="flex items-center justify-center px-4 py-2 bg-gray-700 text-gray-300 rounded-lg shadow-lg hover:bg-gray-600 transition-colors">
-                                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M2 12a10 10 0 0 1 10 10"/><path d="M2.5 12h19"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z"/></svg>
-                                    Website
-                                </a>
-                            </div>
-                        </div>
-                        <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-                            <h3 class="text-lg font-semibold text-white mb-2">Company Details</h3>
-                            <div class="detail-field mb-4" data-field="company-summary">
-                                <p class="text-gray-400">
-                                    KHP Capital Partners is a leading real estate private equity firm focused on investments in the hospitality sector. They specialize in acquiring and developing high-quality hotel properties across major markets.
-                                </p>
-                                <div class="detail-overlay">
-                                    <button class="overlay-button" onclick="editField('company-summary')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg>
-                                    </button>
-                                    <button class="overlay-button" onclick="copyField('company-summary')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div class="detail-field" data-field="company-name">
-                                    <p class="text-gray-400 text-sm">Company Name</p>
-                                    <p class="text-white font-medium">KHP Capital Partners</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="company-number">
-                                    <p class="text-gray-400 text-sm">Company Number</p>
-                                    <p class="text-white font-medium">(415) 555-1234</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-number')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-number')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="company-website">
-                                    <p class="text-gray-400 text-sm">Company Website</p>
-                                    <p class="text-white font-medium">khpcapitalpartners.com</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-website')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-website')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="company-state">
-                                    <p class="text-gray-400 text-sm">Company State</p>
-                                    <p class="text-white font-medium">CA</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-state')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-state')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="city">
-                                    <p class="text-gray-400 text-sm">City</p>
-                                    <p class="text-white font-medium">San Francisco</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('city')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('city')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="service-address">
-                                    <p class="text-gray-400 text-sm">Service Address</p>
-                                    <p class="text-white font-medium">123 Market St, San Francisco, CA</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('service-address')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('service-address')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="esid-number">
-                                    <p class="text-gray-400 text-sm">ESID Number</p>
-                                    <p class="text-white font-medium">10089052023456</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('esid-number')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('esid-number')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="contract-end-date">
-                                    <p class="text-gray-400 text-sm">Contract End Date</p>
-                                    <p class="text-white font-medium">12/31/2026</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('contract-end-date')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('contract-end-date')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="current-rate">
-                                    <p class="text-gray-400 text-sm">Current Rate ($/kWh)</p>
-                                    <p class="text-white font-medium">.062</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('current-rate')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('current-rate')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                                <div class="detail-field" data-field="sell-rate">
-                                    <p class="text-gray-400 text-sm">Sell Rate ($/kWh)</p>
-                                    <p class="text-white font-medium">.088</p>
-                                    <div class="detail-overlay"><button class="overlay-button" onclick="editField('sell-rate')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('sell-rate')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
-                                </div>
-                            </div>
+            <div class="right-sidebar slide-in-right">
+                <div class="widget">
+                    <div class="widget-title">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        Quick Actions
+                    </div>
+                    <button class="quick-action-btn" onclick="addAccount()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <line x1="19" y1="8" x2="19" y2="14"></line>
+                            <line x1="22" y1="11" x2="16" y2="11"></line>
+                        </svg>
+                        Add Account
+                    </button>
+                    <button class="quick-action-btn" onclick="addContact()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <line x1="19" y1="8" x2="19" y2="14"></line>
+                            <line x1="22" y1="11" x2="16" y2="11"></line>
+                        </svg>
+                        Add Contact
+                    </button>
+                    <button class="quick-action-btn" onclick="bulkImport()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10,9 9,9 8,9"></polyline>
+                        </svg>
+                        Bulk Import
+                    </button>
+                </div>
+
+                <div class="widget">
+                    <div class="widget-title">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 11l3 3L22 4"></path>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        Today's Tasks
+                    </div>
+                    <div class="task-item">
+                        <div class="task-priority high"></div>
+                        <div class="task-content">
+                            <div class="task-title">Follow up with John Smith - Q1 Energy Contract</div>
+                            <div class="task-time">Due: 2:00 PM</div>
                         </div>
                     </div>
+                    <div class="task-item">
+                        <div class="task-priority medium"></div>
+                        <div class="task-content">
+                            <div class="task-title">Prepare energy analysis for Sarah Johnson</div>
+                            <div class="task-time">Due: 3:30 PM</div>
+                        </div>
+                    </div>
+                    <div class="task-item">
+                        <div class="task-priority low"></div>
+                        <div class="task-content">
+                            <div class="task-title">Review Mike Davis multi-site proposal</div>
+                            <div class="task-time">Due: Tomorrow 9:00 AM</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <div class="widget-title">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"></path>
+                            <path d="M6 12h8"></path>
+                            <path d="M6 8h8"></path>
+                            <path d="M6 16h5"></path>
+                        </svg>
+                        Energy Market News
+                    </div>
+                    <div class="news-item">
+                        <div class="news-title">ERCOT Demand Could Exceed Supply by 2026</div>
+                        <div class="news-meta">
+                            <span class="news-source">ERCOT</span>
+                            <span>12:30 PM</span>
+                            <span>8/2/2025</span>
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-title">Grid Operator Warns of Supply Shortage</div>
+                        <div class="news-description">Electricity demand may surpass available supply as soon as summer 2026, driven by increased industrial activity.</div>
+                        <div class="news-meta">
+                            <span class="news-source">Energy News</span>
+                            <span>11:45 AM</span>
+                            <span>8/2/2025</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <div class="widget-title">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                        </svg>
+                        Energy Tools
+                    </div>
+                    <button class="quick-action-btn" onclick="openRateCalculator()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="9" x2="9" y2="15"></line>
+                            <line x1="15" y1="9" x2="15" y2="15"></line>
+                            <line x1="9" y1="12" x2="15" y2="12"></line>
+                        </svg>
+                        Rate Calculator
+                    </button>
+                    <button class="quick-action-btn" onclick="openUsageAnalyzer()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        Usage Analyzer
+                    </button>
+                    <button class="quick-action-btn" onclick="openContractManager()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                        </svg>
+                        Contract Manager
+                    </button>
                 </div>
             </div>
         </div>
@@ -1921,27 +1645,405 @@
         </div>
     </div>
 
-    <script>
-        // Supplier data from energy-health-check.html
-        const supplierData = {
-          "NRG": { bbbRating: "A+", popularity: 4, customerService: 3 },
-          "TXU": { bbbRating: "A+", popularity: 5, customerService: 4 },
-          "APG & E": { bbbRating: "Unaccredited", popularity: 2, customerService: 3 },
-          "Reliant": { bbbRating: "A+", popularity: 5, customerService: 3 },
-          "Hudson": { bbbRating: "Unaccredited", popularity: 2, customerService: 2 },
-          "Green Mountain": { bbbRating: "Unaccredited", popularity: 3, customerService: 2 },
-          "Constellation": { bbbRating: "A+", popularity: 4, customerService: 4 },
-          "Tara Energy": { bbbRating: "Unaccredited", popularity: 2, customerService: 3 },
-          "Cirro": { bbbRating: "A+", popularity: 3, customerService: 4 },
-          "Engie": { bbbRating: "A+", popularity: 3, customerService: 1 },
-          "Gexa": { bbbRating: "Unaccredited", popularity: 4, customerService: 2 },
-          "Freepoint": { bbbRating: "A+", popularity: 1, customerService: 3 },
-          "Shell Energy": { bbbRating: "Unaccredited", popularity: 3, customerService: 2 },
-          "Ironhorse": { bbbRating: "4.0 stars", popularity: 1, customerService: 3 },
-          "Ammper Power": { bbbRating: "Unaccredited", popularity: 1, customerService: 1 }
-        };
-        const supplierNames = Object.keys(supplierData);
+    <div id="contact-detail-view" class="page-view" style="display: none;">
+        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6" style="height: calc(100vh - 17px); min-height: calc(100vh - 17px);">
+            <div class="flex-1 overflow-y-auto pr-6" style="height: 100%; max-height: calc(100vh - 17px);">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between pb-4 border-b border-gray-700">
+                        <div class="flex items-center space-x-2">
+                            <button class="text-gray-400 hover:text-green-500 transition-colors" onclick="callContact()">
+                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            </button>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="showView('contacts')">
+                                <span class="font-medium">← Back to Contacts</span>
+                            </button>
+                            <button class="px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <span class="font-medium">Save Contact</span>
+                            </button>
+                        </div>
+                    </div>
 
+                    <div class="flex items-center space-x-4 pb-4">
+                        <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                            <span id="contact-profile-initials">LP</span>
+                        </div>
+                        <div class="flex-1">
+                            <h1 class="text-3xl font-bold text-white" id="contact-detail-name">Lewis Patterson</h1>
+                        </div>
+                        <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors" onclick="openEditContactModal()">
+                            Edit Contact
+                        </button>
+                    </div>
+
+                    <hr class="border-gray-600">
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-4">Quick Access</h3>
+                        <div class="flex flex-wrap gap-4">
+                            <button class="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors" onclick="callContact()">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                Call
+                            </button>
+                            <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="emailContact()">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                Email
+                            </button>
+                            <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="openTaskModal()">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                Task
+                            </button>
+                            <a href="https://www.linkedin.com/in/lewispatterson" target="_blank" class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.766s.784-1.767 1.75-1.767 1.75.79 1.75 1.767c0 .976-.784 1.766-1.75 1.766zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                                LinkedIn
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-2">Contact Details</h3>
+                        <div class="detail-field mb-4" data-field="contact-summary">
+                            <p class="text-gray-400">
+                                Contact summary will be loaded dynamically...
+                            </p>
+                            <div class="detail-overlay">
+                                <button class="overlay-button" onclick="editField('contact-summary')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg>
+                                </button>
+                                <button class="overlay-button" onclick="copyField('contact-summary')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="detail-field" data-field="first-name">
+                                <p class="text-gray-400 text-sm">First Name</p>
+                                <p class="text-white font-medium">N/A</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('first-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('first-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="last-name">
+                                <p class="text-gray-400 text-sm">Last Name</p>
+                                <p class="text-white font-medium">N/A</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('last-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('last-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="job-title">
+                                <p class="text-gray-400 text-sm">Job Title</p>
+                                <p class="text-white font-medium">N/A</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('job-title')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('job-title')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="company-name">
+                                <p class="text-gray-400 text-sm">Company</p>
+                                <p class="text-white font-medium">N/A</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="email">
+                                <p class="text-gray-400 text-sm">Email</p>
+                                <p class="text-white font-medium">N/A</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('email')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('email')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="phone">
+                                <p class="text-gray-400 text-sm">Phone</p>
+                                <p class="text-white font-medium">N/A</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('phone')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('phone')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="location">
+                                <p class="text-gray-400 text-sm">Location</p>
+                                <p class="text-white font-medium">N/A</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('location')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('location')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="department">
+                                <p class="text-gray-400 text-sm">Department</p>
+                                <p class="text-white font-medium">N/A</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('department')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('department')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-white">Recent Activities</h3>
+                            <div class="flex items-center space-x-2" id="activities-navigation" style="display: none;">
+                                <button id="activities-prev" class="p-1 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors" onclick="scrollActivities('prev')">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+                                <button id="activities-next" class="p-1 rounded-full bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 transition-colors" onclick="scrollActivities('next')">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-hidden">
+                            <div class="space-y-4 transition-transform duration-300" id="activities-container">
+                                </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="w-full md:w-1/3 max-w-sm flex-shrink-0 overflow-y-auto pl-6 border-l border-gray-700" style="height: calc(100vh - 17px); max-height: calc(100vh - 17px);">
+                <div class="space-y-6" style="padding: 24px 0 60px 0;">
+                    
+                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700" id="associated-account-widget" style="display: none;">
+                        <h3 class="text-lg font-semibold text-white mb-4">Associated Account</h3>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-white font-medium text-lg" id="associated-account-name"></h4>
+                                <p class="text-sm text-gray-400" id="associated-account-location"></p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button class="p-2 rounded-lg bg-blue-700 text-white hover:bg-blue-800 transition-colors" onclick="showView('account-detail', CRMApp.currentContact.accountId)">
+                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                                <button class="p-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors" onclick="callCompany()">
+                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700" style="margin-top: 40px;">
+                        <h3 class="text-lg font-semibold text-white mb-4">Add Notes</h3>
+                        <textarea class="w-full h-32 p-3 bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Add a new note..." id="contact-notes"></textarea>
+                        <button class="mt-3 w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors" id="save-note-btn" type="button" onclick="handleSaveNote()">Save Note</button>
+                    </div>
+
+                    <div class="calculator-wrapper" style="margin-top: 24px;">
+                        <div class="widget-title mb-4">
+                            <svg class="icon mr-2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Energy Health Check
+                        </div>
+                        <p class="text-sm text-gray-400 mb-6">Calculate a potential savings analysis based on key account details.</p>
+                        
+                        <div class="form-section mb-6">
+                            <div class="section-header-pill">
+                                <div class="section-icon">1</div>
+                                Current Bill
+                            </div>
+                            <div class="grid grid-cols-1 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Monthly kWh Usage</label>
+                                    <input type="number" class="form-input w-full" placeholder="Enter kWh usage" id="kwh-usage">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Current Rate (¢/kWh)</label>
+                                    <input type="number" step="0.001" class="form-input w-full" placeholder="Enter current rate" id="current-rate">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Contract End Date</label>
+                                    <input type="date" class="form-input w-full" id="contract-end-date">
+                                </div>
+                            </div>
+                            <div class="usage-display" id="usage-display" style="display: none;">
+                                <div class="usage-title">Current Monthly Cost</div>
+                                <div class="usage-details" id="current-cost">$0.00</div>
+                            </div>
+                        </div>
+
+                        <div class="form-section mb-6">
+                            <div class="section-header-pill">
+                                <div class="section-icon">2</div>
+                                Proposed Rate
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">New Rate (¢/kWh)</label>
+                                <input type="number" step="0.001" class="form-input w-full" placeholder="Enter proposed rate" id="proposed-rate">
+                            </div>
+                        </div>
+
+                        <button class="calculate-button w-full" id="calculate-btn" onclick="calculateSavings()">
+                            Calculate Savings
+                        </button>
+
+                        <div class="results-section" id="results-section" style="display: none;">
+                            <h4 class="text-lg font-semibold text-white mb-4">Savings Analysis</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-green-500" id="monthly-savings">$0</div>
+                                    <div class="text-sm text-gray-400">Monthly Savings</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-green-500" id="annual-savings">$0</div>
+                                    <div class="text-sm text-gray-400">Annual Savings</div>
+                                </div>
+                            </div>
+                            <div class="mt-4 p-3 bg-green-900 bg-opacity-30 border border-green-500 rounded-lg">
+                                <div class="text-sm text-green-400 font-medium" id="savings-percentage">0% savings</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="widget p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700" style="margin-top: 24px;">
+                        <div class="widget-title mb-4">
+                            <svg class="icon mr-2" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"/>
+                                <path d="M6 12h8"/><path d="M6 8h8"/><path d="M6 16h5"/>
+                            </svg>
+                            Energy News
+                        </div>
+                        <div class="space-y-3">
+                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/trump-energy-bill')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Trump's Energy Independence Act Passes - Major Impact on Texas Energy Market</h4>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">2 days ago</span>
+                                </div>
+                                <p class="text-gray-300 text-xs mb-2 line-clamp-2">New legislation promises to reshape energy pricing and availability across Texas, with significant implications for commercial energy contracts.</p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs bg-blue-600 text-white px-2 py-1 rounded">Energy Today</span>
+                                </div>
+                            </div>
+
+                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/ercot-demand-forecast')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">ERCOT Demand Could Exceed Supply by 2026</h4>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">3 days ago</span>
+                                </div>
+                                <p class="text-gray-300 text-xs mb-2">Grid operator warns of potential supply shortages as industrial demand continues to grow.</p>
+                                <span class="text-xs bg-red-600 text-white px-2 py-1 rounded">ERCOT</span>
+                            </div>
+
+                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/renewable-energy-growth')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Texas Renewable Energy Capacity Hits Record High</h4>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">5 days ago</span>
+                                </div>
+                                <p class="text-gray-300 text-xs mb-2">Solar and wind installations surge, creating new opportunities for competitive energy pricing.</p>
+                                <span class="text-xs bg-green-600 text-white px-2 py-1 rounded">Renewable Energy News</span>
+                            </div>
+
+                            <div class="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors" onclick="openNewsArticle('https://example.com/commercial-energy-trends')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-white font-semibold text-sm leading-tight flex-1 pr-2">Commercial Energy Costs Rise 15% in Q3 2025</h4>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">1 week ago</span>
+                                </div>
+                                <p class="text-gray-300 text-xs mb-2">Businesses across Texas face higher energy bills as demand outpaces supply growth.</p>
+                                <span class="text-xs bg-orange-600 text-white px-2 py-1 rounded">Business Energy Report</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="account-detail-view" class="page-view" style="display: none;">
+        <div class="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 h-screen overflow-hidden">
+            <div class="flex-1 overflow-y-auto pr-6">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between pb-4 border-b border-gray-700">
+                        <div class="flex items-center space-x-2">
+                             <button class="text-gray-400 hover:text-green-500 transition-colors" onclick="callCompany()">
+                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            </button>
+                            <h1 class="text-3xl font-bold text-white" id="account-detail-name">KHP Capital Partners</h1>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors" onclick="showView('accounts')">
+                                <span class="font-medium">← Back to Accounts</span>
+                            </button>
+                            <button class="px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <span class="font-medium">Save Account</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-4">Quick Access</h3>
+                        <div class="flex flex-wrap gap-4">
+                            <button class="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors" onclick="callCompany()">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                Call
+                            </button>
+                            <button class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors" onclick="openTaskModal()">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                Task
+                            </button>
+                            <a href="https://www.linkedin.com/company/khp-capital-partners" target="_blank" class="flex items-center justify-center px-4 py-2 bg-blue-700 text-white rounded-lg shadow-lg hover:bg-blue-800 transition-colors">
+                                <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.766s.784-1.767 1.75-1.767 1.75.79 1.75 1.767c0 .976-.784 1.766-1.75 1.766zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                                LinkedIn
+                            </a>
+                            <a href="https://www.khpcapitalpartners.com" target="_blank" class="flex items-center justify-center px-4 py-2 bg-gray-700 text-gray-300 rounded-lg shadow-lg hover:bg-gray-600 transition-colors">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M2 12a10 10 0 0 1 10 10"/><path d="M2.5 12h19"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z"/></svg>
+                                Website
+                            </a>
+                        </div>
+                    </div>
+                    <div class="p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-semibold text-white mb-2">Company Details</h3>
+                        <div class="detail-field mb-4" data-field="company-summary">
+                            <p class="text-gray-400">
+                                KHP Capital Partners is a leading real estate private equity firm focused on investments in the hospitality sector. They specialize in acquiring and developing high-quality hotel properties across major markets.
+                            </p>
+                            <div class="detail-overlay">
+                                <button class="overlay-button" onclick="editField('company-summary')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg>
+                                </button>
+                                <button class="overlay-button" onclick="copyField('company-summary')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="detail-field" data-field="company-name">
+                                <p class="text-gray-400 text-sm">Company Name</p>
+                                <p class="text-white font-medium">KHP Capital Partners</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-name')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="company-number">
+                                <p class="text-gray-400 text-sm">Company Number</p>
+                                <p class="text-white font-medium">(415) 555-1234</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-number')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-number')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="company-website">
+                                <p class="text-gray-400 text-sm">Company Website</p>
+                                <p class="text-white font-medium">khpcapitalpartners.com</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-website')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-website')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="company-state">
+                                <p class="text-gray-400 text-sm">Company State</p>
+                                <p class="text-white font-medium">CA</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('company-state')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('company-state')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="city">
+                                <p class="text-gray-400 text-sm">City</p>
+                                <p class="text-white font-medium">San Francisco</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('city')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('city')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="service-address">
+                                <p class="text-gray-400 text-sm">Service Address</p>
+                                <p class="text-white font-medium">123 Market St, San Francisco, CA</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('service-address')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('service-address')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="esid-number">
+                                <p class="text-gray-400 text-sm">ESID Number</p>
+                                <p class="text-white font-medium">10089052023456</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('esid-number')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('esid-number')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="contract-end-date">
+                                <p class="text-gray-400 text-sm">Contract End Date</p>
+                                <p class="text-white font-medium">12/31/2026</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('contract-end-date')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('contract-end-date')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="current-rate">
+                                <p class="text-gray-400 text-sm">Current Rate ($/kWh)</p>
+                                <p class="text-white font-medium">.062</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('current-rate')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('current-rate')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                            <div class="detail-field" data-field="sell-rate">
+                                <p class="text-gray-400 text-sm">Sell Rate ($/kWh)</p>
+                                <p class="text-white font-medium">.088</p>
+                                <div class="detail-overlay"><button class="overlay-button" onclick="editField('sell-rate')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036l3.536 3.536L12.364 22H7.364l-1 1H4.364v-3h-3v-3l12.87-12.87z"/></svg></button><button class="overlay-button" onclick="copyField('sell-rate')"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/><path d="M16 14V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2z"/></svg></button></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
         // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
@@ -1972,9 +2074,6 @@
         let selectedProfileImage = null;
         let activitiesCurrentIndex = 0;
         const activitiesPerPage = 4;
-        let section1Complete = false, section2Complete = false;
-        let currentAnnualUsage = 0, currentMonthlyBill = 0, currentRate = 0, sellRate = 0, currentSupplier = '';
-        const ESTIMATED_DELIVERY_CHARGE_CENTS = 0.05;
 
         // --- Core Application Functions ---
         async function initializeApp() {
@@ -1983,7 +2082,7 @@
                 updateDashboardMetrics();
                 setupEventListeners();
                 loadSavedProfilePicture();
-                
+                // Check and show tasks as notifications on load
                 const tasks = document.querySelectorAll('.task-item');
                 tasks.forEach(task => {
                     const title = task.querySelector('.task-title').textContent;
@@ -1992,7 +2091,7 @@
                 });
                 console.log('Power Choosers CRM Dashboard initialized successfully');
             } catch (error) {
-                console.error('Error initializing app, using sample data:', error);
+                console.error('Error initializing app:', error);
                 initializeSampleData();
                 updateDashboardMetrics();
                 setupEventListeners();
@@ -2026,8 +2125,6 @@
                     phone: '(214) 555-0123',
                     city: 'Dallas',
                     state: 'TX',
-                    address: '123 Industrial Rd, Dallas, TX',
-                    esid: '10089052023456',
                     notes: [],
                     contactNotes: [],
                     currentHealthCheck: {
@@ -2037,11 +2134,7 @@
                         monthlySavings: 0,
                         annualSavings: 0,
                         savingsPercentage: 0
-                    },
-                    monthlyBill: 1725,
-                    currentSupplier: 'TXU',
-                    contractEndDate: '2026-12-31',
-                    sellRate: 0.088
+                    }
                 },
                 {
                     id: '2',
@@ -2050,15 +2143,9 @@
                     phone: '(972) 834-2317',
                     city: 'Dallas',
                     state: 'TX',
-                    address: '456 Main St, Dallas, TX',
-                    esid: '10089052023457',
                     notes: [],
                     contactNotes: [],
-                    currentHealthCheck: null,
-                    monthlyBill: 0,
-                    currentSupplier: '',
-                    contractEndDate: '',
-                    sellRate: 0
+                    currentHealthCheck: null
                 }
             ];
             CRMApp.contacts = [
@@ -2138,8 +2225,13 @@
             document.getElementById('add-account-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAddAccountModal(); });
             document.getElementById('edit-contact-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeEditContactModal(); });
             
+            document.addEventListener('input', e => {
+                if (e.target.matches('#kwh-usage, #current-rate, #proposed-rate')) updateCalculateButton();
+            });
+
             document.getElementById('save-note-btn').addEventListener('click', handleSaveNote);
 
+            // Animate metric cards on load
             const metricCards = document.querySelectorAll('.metric-card');
             metricCards.forEach((card, index) => {
                 setTimeout(() => {
@@ -2152,19 +2244,7 @@
                     }, 100);
                 }, index * 100);
             });
-            
-            // Set up datalist for suppliers
-            const datalist = document.getElementById('supplierList');
-            if (datalist) {
-                supplierNames.forEach(supplier => {
-                    const option = document.createElement('option');
-                    option.value = supplier;
-                    datalist.appendChild(option);
-                });
-            }
         }
-        
-        const getEl = id => document.getElementById(id);
 
         // --- Navigation and Views ---
         function showView(viewName, itemId = null) {
@@ -2174,18 +2254,19 @@
                 const el = document.getElementById(`${view}-view`);
                 if (el) el.style.display = 'none';
             });
-            const mainContent = document.getElementById('dashboard-view');
+
+            const mainContent = document.querySelector('.main-content');
             const rightSidebar = document.querySelector('.right-sidebar');
 
             CRMApp.currentView = viewName;
             
             if (viewName === 'contacts') {
-                document.getElementById('contacts-view').style.display = 'flex';
+                document.getElementById('contacts-view').style.display = 'block';
                 mainContent.style.display = 'none';
                 rightSidebar.style.display = 'none';
                 renderContactsPage();
             } else if (viewName === 'accounts') {
-                document.getElementById('accounts-view').style.display = 'flex';
+                document.getElementById('accounts-view').style.display = 'block';
                 mainContent.style.display = 'none';
                 rightSidebar.style.display = 'none';
                 renderAccountsPage();
@@ -2200,7 +2281,7 @@
                 document.getElementById('account-detail-view').style.display = 'flex';
                 showAccountDetail(itemId);
             } else {
-                mainContent.style.display = 'flex';
+                mainContent.style.display = 'block';
                 rightSidebar.style.display = 'block';
                 CRMApp.currentView = 'dashboard';
             }
@@ -2251,14 +2332,14 @@
             event.preventDefault();
             const formData = {
                 id: Date.now().toString(),
-                firstName: getEl('contact-first-name').value.trim(),
-                lastName: getEl('contact-last-name').value.trim(),
-                title: getEl('contact-title').value.trim(),
-                accountId: getEl('contact-company').value,
-                accountName: getEl('contact-company').selectedOptions[0]?.text || '',
-                email: getEl('contact-email').value.trim(),
-                phone: getEl('contact-phone').value.trim(),
-                location: getEl('contact-location').value.trim(),
+                firstName: document.getElementById('contact-first-name').value.trim(),
+                lastName: document.getElementById('contact-last-name').value.trim(),
+                title: document.getElementById('contact-title').value.trim(),
+                accountId: document.getElementById('contact-company').value,
+                accountName: document.getElementById('contact-company').selectedOptions[0]?.text || '',
+                email: document.getElementById('contact-email').value.trim(),
+                phone: document.getElementById('contact-phone').value.trim(),
+                location: document.getElementById('contact-location').value.trim(),
                 createdAt: new Date(),
                 notes: []
             };
@@ -2281,22 +2362,17 @@
             event.preventDefault();
             const formData = {
                 id: Date.now().toString(),
-                name: getEl('account-company-name').value.trim(),
-                phone: getEl('account-phone').value.trim(),
-                website: getEl('account-website').value.trim(),
-                city: getEl('account-city').value.trim(),
-                state: getEl('account-state').value.trim(),
-                address: getEl('account-address').value.trim(),
-                employees: getEl('account-employees').value,
+                name: document.getElementById('account-company-name').value.trim(),
+                phone: document.getElementById('account-phone').value.trim(),
+                website: document.getElementById('account-website').value.trim(),
+                city: document.getElementById('account-city').value.trim(),
+                state: document.getElementById('account-state').value.trim(),
+                address: document.getElementById('account-address').value.trim(),
+                employees: document.getElementById('account-employees').value,
                 createdAt: new Date(),
                 notes: [],
                 contactNotes: [],
-                currentHealthCheck: null,
-                monthlyBill: 0,
-                currentSupplier: '',
-                contractEndDate: '',
-                sellRate: 0,
-                esid: ''
+                currentHealthCheck: null
             };
             if (!formData.name) { showToast('Company name is required', 'error'); return; }
             
@@ -2317,16 +2393,16 @@
             event.preventDefault();
             if (!CRMApp.currentContact) { showToast('No contact selected', 'error'); return; }
             const formData = {
-                firstName: getEl('edit-contact-first-name').value.trim(),
-                lastName: getEl('edit-contact-last-name').value.trim(),
-                title: getEl('edit-contact-title').value.trim(),
-                accountName: getEl('edit-contact-company').value.trim(),
-                email: getEl('edit-contact-email').value.trim(),
-                phone: getEl('edit-contact-phone').value.trim(),
-                location: getEl('edit-contact-location').value.trim(),
-                department: getEl('edit-contact-department').value.trim(),
-                linkedinUrl: getEl('edit-contact-linkedin').value.trim(),
-                summary: getEl('edit-contact-summary').value.trim()
+                firstName: document.getElementById('edit-contact-first-name').value.trim(),
+                lastName: document.getElementById('edit-contact-last-name').value.trim(),
+                title: document.getElementById('edit-contact-title').value.trim(),
+                accountName: document.getElementById('edit-contact-company').value.trim(),
+                email: document.getElementById('edit-contact-email').value.trim(),
+                phone: document.getElementById('edit-contact-phone').value.trim(),
+                location: document.getElementById('edit-contact-location').value.trim(),
+                department: document.getElementById('edit-contact-department').value.trim(),
+                linkedinUrl: document.getElementById('edit-contact-linkedin').value.trim(),
+                summary: document.getElementById('edit-contact-summary').value.trim()
             };
             try {
                 Object.assign(CRMApp.currentContact, formData);
@@ -2349,7 +2425,7 @@
             const contact = CRMApp.contacts.find(c => c.id === contactId);
             if (!contact) return;
             CRMApp.currentContact = contact;
-            getEl('contact-detail-view').style.display = 'flex';
+            document.getElementById('contact-detail-view').style.display = 'flex';
             populateContactDetail(contact);
         }
 
@@ -2357,17 +2433,16 @@
             const account = CRMApp.accounts.find(a => a.id === accountId);
             if (!account) return;
             CRMApp.currentAccount = account;
-            getEl('account-detail-view').style.display = 'flex';
+            document.getElementById('account-detail-view').style.display = 'flex';
             populateAccountDetail(account);
         }
 
         function populateContactDetail(contact) {
             const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-            getEl('contact-detail-name').textContent = fullName;
-            getEl('contact-profile-initials').textContent = getInitials(fullName);
-            getEl('contact-notes').placeholder = `Add a new note for ${fullName}...`;
+            document.getElementById('contact-detail-name').textContent = fullName;
+            document.getElementById('contact-profile-initials').textContent = getInitials(fullName);
+            document.querySelector('[data-field="contact-summary"] p').textContent = contact.summary || 'Contact summary will be loaded dynamically...';
             
-            updateDetailField('contact-summary', contact.summary);
             updateDetailField('first-name', contact.firstName);
             updateDetailField('last-name', contact.lastName);
             updateDetailField('job-title', contact.title);
@@ -2376,33 +2451,36 @@
             updateDetailField('phone', contact.phone);
             updateDetailField('location', contact.location);
             updateDetailField('department', contact.department);
+
+            document.getElementById('contact-notes').placeholder = `Add a new note for ${fullName}...`;
             
+            // Populate widgets
             populateAssociatedAccountWidget(contact);
             populateRecentActivities(contact);
             populateHealthCheckFromAccount();
         }
 
         function populateAccountDetail(account) {
-            getEl('account-detail-name').textContent = account.name;
-            
+            document.getElementById('account-detail-name').textContent = account.name;
             updateDetailField('company-name', account.name);
             updateDetailField('company-number', account.phone);
             updateDetailField('company-website', account.website);
             updateDetailField('company-state', account.state);
             updateDetailField('city', account.city);
             updateDetailField('service-address', account.address);
-            updateDetailField('esid-number', account.esid);
-            updateDetailField('contract-end-date', account.contractEndDate);
-            updateDetailField('current-rate', account.currentRate);
-            updateDetailField('sell-rate', account.sellRate);
+            // Example of populating other fields, assuming they exist in the account object
+            updateDetailField('esid-number', account.esid || 'N/A');
+            updateDetailField('contract-end-date', account.contractEndDate || 'N/A');
+            updateDetailField('current-rate', account.currentRate || 'N/A');
+            updateDetailField('sell-rate', account.sellRate || 'N/A');
         }
 
         function populateAssociatedAccountWidget(contact) {
-            const widget = getEl('associated-account-widget');
+            const widget = document.getElementById('associated-account-widget');
             const account = CRMApp.accounts.find(a => a.id === contact.accountId);
             if (account) {
-                getEl('associated-account-name').textContent = account.name;
-                getEl('associated-account-location').textContent = `${account.city || ''}, ${account.state || ''}`.trim();
+                document.getElementById('associated-account-name').textContent = account.name;
+                document.getElementById('associated-account-location').textContent = `${account.city || ''}, ${account.state || ''}`.trim();
                 widget.style.display = 'block';
             } else {
                 widget.style.display = 'none';
@@ -2410,8 +2488,8 @@
         }
         
         function populateRecentActivities(contact) {
-            const activitiesContainer = getEl('activities-container');
-            const navigationContainer = getEl('activities-navigation');
+            const activitiesContainer = document.getElementById('activities-container');
+            const navigationContainer = document.getElementById('activities-navigation');
             const contactName = `${contact.firstName || contact.name || ''} ${contact.lastName || ''}`.trim();
             const contactActivities = CRMApp.activities.filter(a => a.contactId === contact.id || a.accountId === contact.accountId);
             
@@ -2427,7 +2505,7 @@
         }
 
         function renderActivitiesPage() {
-            const activitiesContainer = getEl('activities-container');
+            const activitiesContainer = document.getElementById('activities-container');
             const activities = CRMApp.currentContactActivities || [];
             const startIndex = activitiesCurrentIndex;
             const endIndex = Math.min(startIndex + activitiesPerPage, activities.length);
@@ -2450,15 +2528,15 @@
         }
 
         // --- Inline Editing Functions ---
-        const editField = async (field) => {
+        const editField = (field) => {
             const fieldElement = document.querySelector(`.detail-field[data-field="${field}"]`);
             if (!fieldElement) return;
             const currentValueElement = fieldElement.querySelector('p:last-child');
             if (!currentValueElement) return;
-            const currentValue = currentValueElement.textContent === 'N/A' || currentValueElement.textContent.startsWith('Contact summary') ? '' : currentValueElement.textContent;
+            const currentValue = currentValueElement.textContent === 'N/A' ? '' : currentValueElement.textContent;
             
-            const inputType = (field === 'email' ? 'email' : field.includes('phone') ? 'tel' : 'text');
-            const isTextArea = field.includes('summary');
+            const inputType = (field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text');
+            const isTextArea = field === 'contact-summary';
             
             const editContainer = document.createElement('div');
             editContainer.className = 'edit-field-container';
@@ -2502,35 +2580,26 @@
             p.textContent = newValue || 'N/A';
             editContainer.replaceWith(p);
             
-            let dataObject = CRMApp.currentContact || CRMApp.currentAccount;
-            if (!dataObject) return;
-            
-            let dataKey = '';
-            if (CRMApp.currentView.includes('contact')) {
+            // Logic to update the contact object and Firebase
+            if (CRMApp.currentContact) {
                 const fieldMapping = { 'first-name': 'firstName', 'last-name': 'lastName', 'job-title': 'title', 'company-name': 'accountName', 'email': 'email', 'phone': 'phone', 'location': 'location', 'department': 'department', 'contact-summary': 'summary' };
-                dataKey = fieldMapping[field] || field;
-            } else if (CRMApp.currentView.includes('account')) {
-                const fieldMapping = { 'company-name': 'name', 'company-number': 'phone', 'company-website': 'website', 'company-state': 'state', 'city': 'city', 'service-address': 'address', 'esid-number': 'esid', 'contract-end-date': 'contractEndDate', 'current-rate': 'currentRate', 'sell-rate': 'sellRate', 'company-summary': 'summary' };
-                dataKey = fieldMapping[field] || field;
-            }
-            
-            if (dataKey) {
-                dataObject[dataKey] = newValue;
-                if (CRMApp.currentView.includes('contact')) {
-                    if (db && dataObject.id) {
-                        try { await db.collection('contacts').doc(dataObject.id).update({ [dataKey]: newValue, updatedAt: serverTimestamp() }); } catch (error) { console.error('Firebase update failed:', error); }
+                const contactField = fieldMapping[field] || field;
+                CRMApp.currentContact[contactField] = newValue;
+
+                try {
+                    if (db && CRMApp.currentContact.id) {
+                        await db.collection('contacts').doc(CRMApp.currentContact.id).update({ [contactField]: newValue, updatedAt: serverTimestamp() });
                     }
                     if (field === 'first-name' || field === 'last-name') {
-                        const fullName = `${dataObject.firstName || ''} ${dataObject.lastName || ''}`.trim();
-                        getEl('contact-detail-name').textContent = fullName;
-                        getEl('contact-profile-initials').textContent = getInitials(fullName);
+                        const fullName = `${CRMApp.currentContact.firstName || ''} ${CRMApp.currentContact.lastName || ''}`.trim();
+                        document.getElementById('contact-detail-name').textContent = fullName;
+                        document.getElementById('contact-profile-initials').textContent = getInitials(fullName);
                     }
-                } else if (CRMApp.currentView.includes('account')) {
-                    if (db && dataObject.id) {
-                         try { await db.collection('accounts').doc(dataObject.id).update({ [dataKey]: newValue, updatedAt: serverTimestamp() }); } catch (error) { console.error('Firebase update failed:', error); }
-                    }
+                    showToast('Contact saved', 'success');
+                } catch (error) {
+                    console.error('Error saving to Firebase:', error);
+                    showToast('Contact saved', 'success');
                 }
-                showToast(`${field.replace('-', ' ')} saved successfully`, 'success');
             }
         };
 
@@ -2552,7 +2621,7 @@
             const valueElement = fieldElement.querySelector('p:last-child');
             if (!valueElement) return;
             const value = valueElement.textContent;
-            if (value && value !== 'N/A' && !value.startsWith('Contact summary')) {
+            if (value && value !== 'N/A' && value !== 'Contact summary will be loaded dynamically...') {
                 navigator.clipboard.writeText(value).then(() => {
                     showToast(`${field.replace('-', ' ')} copied to clipboard`, 'success');
                 }).catch(err => {
@@ -2573,7 +2642,7 @@
         
         // --- Notes Widget Functionality ---
         async function handleSaveNote() {
-            const noteTextarea = getEl('contact-notes');
+            const noteTextarea = document.getElementById('contact-notes');
             const noteText = noteTextarea.value.trim();
             if (!noteText) { showToast('Please enter a note', 'error'); return; }
             if (!CRMApp.currentContact) { showToast('No contact selected', 'error'); return; }
@@ -2582,7 +2651,7 @@
                 const newNote = {
                     id: Date.now().toString(),
                     text: noteText,
-                    createdAt: new Date(),
+                    createdAt: new Date().toISOString(),
                     createdBy: 'Current User'
                 };
                 
@@ -2633,320 +2702,101 @@
 
         // --- Energy Health Check Widget Functionality ---
         function populateHealthCheckFromAccount() {
-            const account = CRMApp.accounts.find(a => a.id === CRMApp.currentContact?.accountId);
-            if (!account) {
-                resetForm();
-                return;
-            }
-            
-            getEl('monthlyBill').value = account.monthlyBill || '';
-            getEl('currentRate').value = account.currentRate || '';
-            getEl('contractEndDate').value = account.contractEndDate || '';
-            getEl('sellRate').value = account.sellRate || '';
-            getEl('currentSupplier').value = account.currentSupplier || '';
+            const kwhInput = document.getElementById('kwh-usage');
+            const rateInput = document.getElementById('current-rate');
+            const dateInput = document.getElementById('contract-end-date');
 
-            validateSection1();
-            validateSection2();
-
-            if (section1Complete && section2Complete) {
-                runCalculation();
+            if (CRMApp.currentContact && CRMApp.currentContact.accountId) {
+                const account = CRMApp.accounts.find(a => a.id === CRMApp.currentContact.accountId);
+                if (account && account.currentHealthCheck) {
+                    const healthCheck = account.currentHealthCheck;
+                    kwhInput.value = healthCheck.kwhUsage || '';
+                    rateInput.value = healthCheck.currentRate || '';
+                    dateInput.value = healthCheck.contractEndDate || '';
+                    if (healthCheck.monthlySavings && healthCheck.annualSavings) {
+                        document.getElementById('current-cost').textContent = `$${((healthCheck.kwhUsage * healthCheck.currentRate) / 100).toFixed(2)}`;
+                        document.getElementById('monthly-savings').textContent = `$${healthCheck.monthlySavings.toFixed(2)}`;
+                        document.getElementById('annual-savings').textContent = `$${healthCheck.annualSavings.toFixed(2)}`;
+                        document.getElementById('savings-percentage').textContent = `${healthCheck.savingsPercentage}% savings`;
+                        document.getElementById('usage-display').style.display = 'block';
+                        document.getElementById('results-section').style.display = 'block';
+                    }
+                }
             } else {
-                const results = getEl('results');
-                if(results) results.remove();
+                kwhInput.value = '';
+                rateInput.value = '';
+                dateInput.value = '';
+                document.getElementById('usage-display').style.display = 'none';
+                document.getElementById('results-section').style.display = 'none';
             }
+            updateCalculateButton();
         }
 
-        async function runCalculation() {
-            if (!section1Complete || !section2Complete || !isFinite(currentMonthlyBill) || !isFinite(currentRate) || !isFinite(sellRate) || !supplierNames.includes(currentSupplier)) {
+        async function calculateSavings() {
+            const kwhUsage = parseFloat(document.getElementById('kwh-usage').value);
+            const currentRate = parseFloat(document.getElementById('current-rate').value);
+            const proposedRate = parseFloat(document.getElementById('proposed-rate').value);
+            const contractEndDate = document.getElementById('contract-end-date').value;
+            
+            if (!kwhUsage || !currentRate || !proposedRate) {
+                showToast('Please fill in all fields', 'error');
                 return;
             }
             
-            getEl('calculateBtn').style.display = 'none';
-            getEl('loadingAnimation').classList.add('show');
-            getEl('loadingMessage').textContent = 'Running analysis...';
-            getEl('calculator-wrapper').classList.add('is-calculating');
+            const currentMonthlyCost = (kwhUsage * currentRate) / 100;
+            const proposedMonthlyCost = (kwhUsage * proposedRate) / 100;
+            const monthlySavings = currentMonthlyCost - proposedMonthlyCost;
+            const annualSavings = monthlySavings * 12;
+            const savingsPercentage = ((monthlySavings / currentMonthlyCost) * 100).toFixed(1);
             
-            setTimeout(async () => {
-                try {
-                    const contractEndDateStr = getEl('contractEndDate').value;
-                    const effectiveSellRateAllIn = sellRate + ESTIMATED_DELIVERY_CHARGE_CENTS;
-                    const annualCurrentCost = currentMonthlyBill * 12;
-                    const annualProjectedCost = (currentAnnualUsage * effectiveSellRateAllIn);
-                    const annualSavingsOrIncrease = annualCurrentCost - annualProjectedCost;
-                    const monthlySavingsOrIncrease = annualSavingsOrIncrease / 12;
-                    const percentageChange = ((annualSavingsOrIncrease / annualCurrentCost) * 100).toFixed(1);
-                    
-                    const currentSupplierData = supplierData[currentSupplier] || { bbbRating: 'N/A', popularity: 1, customerService: 1 };
-                    
-                    const savingsFactor = Math.min(Math.max((parseFloat(percentageChange) + 100), 0), 200) / 2;
-                    const supplierFactor = ((currentSupplierData.popularity || 1) + (currentSupplierData.customerService || 1)) / 10 * 100;
-                    const energyHealthScore = Math.round((savingsFactor * 0.7) + (supplierFactor * 0.3));
-
-                    const today = new Date();
-                    const contractEndDate = new Date(contractEndDateStr);
-                    const monthsUntilExpiration = (contractEndDate.getFullYear() - today.getFullYear()) * 12 + (contractEndDate.getMonth() - today.getMonth());
-                    
-                    const formatTips = (title, tips) => `<h4 class="text-green-500 text-sm font-bold mb-2">${title}</h4><ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">${tips.map(t => `<li><strong>${t.bold}:</strong> ${t.text}</li>`).join('')}</ul>`;
-                    
-                    let actionableTips = '';
-                    const isSummer = today.getMonth() >= 5 && today.getMonth() <= 7;
-                    const tolerancePercentage = 0.5;
-
-                    if (monthsUntilExpiration > 36) {
-                        if (percentageChange > 40) {
-                            actionableTips = formatTips('Consider Cancelling for Major Savings:', [{ bold: 'Significant Savings', text: 'With savings over 40%, it may be worth cancelling your current agreement. Review the terms for any penalties.' }]);
-                        } else {
-                            actionableTips = formatTips('No Action Needed:', [{ bold: 'Stable Contract', text: 'Your contract expires far in the future. Monitor the market, but no immediate action is necessary.' }]);
-                        }
-                    } else if (monthsUntilExpiration >= 6 && monthsUntilExpiration <= 12) {
-                        if (isSummer && percentageChange > 15) {
-                            actionableTips = formatTips('Optimal Renewal Time (Summer Savings):', [{ bold: 'Summer Opportunity', text: 'This is a high-rate season, but your potential savings of over 15% make it an ideal time to renew and lock in a good rate.' }]);
-                        } else if (!isSummer && annualSavingsOrIncrease > 0) {
-                            actionableTips = formatTips('Optimal Renewal Time:', [{ bold: 'Proactive Renewal', text: 'Your contract is approaching its renewal window. Secure a new plan now to lock in savings and avoid market fluctuations.' }]);
-                        } else {
-                            actionableTips = formatTips('Monitor Market Closely:', [{ bold: 'Strategic Planning', text: 'Your contract is nearing its end. Keep an eye on market trends to find the best rate before your renewal date.' }]);
-                        }
-                    } else {
-                        actionableTips = formatTips('General Advice:', [{ bold: 'Strategic Planning is Key', text: 'Based on your contract end date, it\'s important to have a plan in place. Start monitoring rates to be ready when the time comes to renew.' }]);
-                    }
-
-                    const resultsSection = document.createElement('div');
-                    resultsSection.id = 'results';
-                    resultsSection.className = 'results-section show p-6 mt-6 rounded-xl border';
-
-                    let resultAmountClass = '', resultLabelText = '', mainResultClass = '';
-                    if (annualSavingsOrIncrease > (annualCurrentCost * (tolerancePercentage / 100))) {
-                        resultAmountClass = 'text-green-500'; mainResultClass = 'savings'; resultLabelText = 'Potential Annual Client Savings';
-                    } else if (annualSavingsOrIncrease < -(annualCurrentCost * (tolerancePercentage / 100))) {
-                        resultAmountClass = 'text-red-500'; mainResultClass = 'increase'; resultLabelText = 'Projected Annual Increase Risk';
-                    } else {
-                        resultAmountClass = 'text-white'; mainResultClass = 'neutral'; resultLabelText = 'No Significant Change Projected';
-                    }
-                    
-                    resultsSection.innerHTML = `
-                        <div class="main-result ${mainResultClass} p-4 rounded-xl border-2 mb-4">
-                            <div class="text-3xl font-bold ${resultAmountClass}">$${formatNumber(Math.abs(annualSavingsOrIncrease))}</div>
-                            <div class="text-sm font-semibold text-white mt-1">${resultLabelText}</div>
-                        </div>
-                        <div class="details-grid grid grid-cols-2 gap-4 text-center text-sm mb-4">
-                            <div class="detail-item p-3 rounded-lg bg-gray-700">
-                                <div class="text-white font-bold">${energyHealthScore}%</div>
-                                <div class="text-gray-400 text-xs">Energy Health Score</div>
-                            </div>
-                            <div class="detail-item p-3 rounded-lg bg-gray-700">
-                                <div class="text-white font-bold">${currentSupplierData.bbbRating}</div>
-                                <div class="text-gray-400 text-xs">Supplier BBB Rating</div>
-                            </div>
-                            <div class="detail-item p-3 rounded-lg bg-gray-700 col-span-2">
-                                <div class="text-white font-bold">$${formatNumber(Math.abs(monthlySavingsOrIncrease))}</div>
-                                <div class="text-gray-400 text-xs">${resultLabelText.replace('Annual', 'Monthly')}</div>
-                            </div>
-                        </div>
-                        <div class="analysis-box p-4 rounded-xl border-l-4 border-blue-500 bg-gray-700">
-                            <div class="analysis-title flex items-center text-blue-500 text-sm font-semibold mb-2">
-                                <span class="mr-2">💡</span> Recommended Next Steps
-                            </div>
-                            <div class="analysis-text text-xs text-gray-400">${actionableTips}</div>
-                        </div>`;
-                    
-                    const existingResults = getEl('results');
-                    if (existingResults) existingResults.remove();
-                    getEl('calculator-wrapper').appendChild(resultsSection);
-                    
-                    const account = CRMApp.accounts.find(a => a.id === CRMApp.currentContact.accountId);
-                    if (account) {
-                        account.currentHealthCheck = {
-                            monthlyBill: currentMonthlyBill,
-                            currentRate: currentRate,
-                            currentSupplier: currentSupplier,
-                            contractEndDate: contractEndDateStr,
-                            sellRate: sellRate,
-                            annualSavingsOrIncrease: annualSavingsOrIncrease,
-                            monthlySavingsOrIncrease: monthlySavingsOrIncrease,
-                            energyHealthScore: energyHealthScore,
-                            calculatedAt: new Date()
-                        };
-                        account.monthlyBill = currentMonthlyBill;
-                        account.currentRate = currentRate;
-                        account.currentSupplier = currentSupplier;
-                        account.contractEndDate = contractEndDateStr;
-                        account.sellRate = sellRate;
-
-                        if (db) {
-                            try {
-                                await db.collection('accounts').doc(account.id).update({
-                                    currentHealthCheck: account.currentHealthCheck,
-                                    monthlyBill: account.monthlyBill,
-                                    currentRate: account.currentRate,
-                                    currentSupplier: account.currentSupplier,
-                                    contractEndDate: account.contractEndDate,
-                                    sellRate: account.sellRate,
-                                    updatedAt: serverTimestamp()
-                                });
-                                showToast('Savings calculated and saved to account!', 'success');
-                            } catch (error) {
-                                console.error('Error saving health check data to Firebase:', error);
-                                showToast('Error saving data to account', 'error');
-                            }
+            document.getElementById('current-cost').textContent = `$${currentMonthlyCost.toFixed(2)}`;
+            document.getElementById('usage-display').style.display = 'block';
+            document.getElementById('monthly-savings').textContent = `$${monthlySavings.toFixed(2)}`;
+            document.getElementById('annual-savings').textContent = `$${annualSavings.toFixed(2)}`;
+            document.getElementById('savings-percentage').textContent = `${savingsPercentage}% savings`;
+            document.getElementById('results-section').style.display = 'block';
+            
+            const healthCheckData = { kwhUsage, currentRate, proposedRate, contractEndDate, monthlySavings, annualSavings, savingsPercentage, calculatedAt: new Date() };
+            
+            if (CRMApp.currentContact && CRMApp.currentContact.accountId) {
+                const account = CRMApp.accounts.find(a => a.id === CRMApp.currentContact.accountId);
+                if (account) {
+                    account.currentHealthCheck = healthCheckData;
+                    if (db) {
+                        try {
+                            await db.collection('accounts').doc(account.id).update({
+                                currentHealthCheck: healthCheckData,
+                                updatedAt: serverTimestamp()
+                            });
+                            showToast('Savings calculated and saved to account!', 'success');
+                        } catch (error) {
+                            console.error('Error saving health check data to Firebase:', error);
+                            showToast('Error saving data to account', 'error');
                         }
                     }
-                    getEl('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-                } catch (error) {
-                    console.error("An error occurred during calculation:", error);
-                } finally {
-                    getEl('loadingAnimation').classList.remove('show');
-                    getEl('calculateBtn').style.display = 'block';
-                    getEl('calculator-wrapper').classList.remove('is-calculating');
                 }
-            }, 1500);
+            } else {
+                showToast('Savings calculated!', 'success');
+            }
         }
         
-        function validateSection1() {
-            const supplierInput = getEl('currentSupplier');
-            const monthlyBillInput = getEl('monthlyBill');
-            const currentRateInput = getEl('currentRate');
+        function updateCalculateButton() {
+            const kwhUsage = document.getElementById('kwh-usage')?.value;
+            const currentRate = document.getElementById('current-rate')?.value;
+            const proposedRate = document.getElementById('proposed-rate')?.value;
+            const calculateBtn = document.getElementById('calculate-btn');
             
-            const supplierValue = supplierInput.value.trim();
-            currentMonthlyBill = parseFloat(monthlyBillInput.value);
-            currentRate = parseFloat(currentRateInput.value);
-            
-            const rateFeedback = getEl('rateFeedback');
-            const usageDisplay = getEl('usageDisplay');
-            const usageDetails = getEl('usageDetails');
-
-            if (!rateFeedback || !usageDisplay) return;
-
-            rateFeedback.classList.remove('show', 'feedback-danger', 'feedback-warning', 'feedback-success', 'feedback-info');
-            usageDisplay.classList.add('hidden');
-            
-            if (supplierValue && supplierNames.includes(supplierValue) && currentMonthlyBill > 0 && currentRate > 0) {
-                currentSupplier = supplierValue;
-                const effectiveCurrentRateAllIn = currentRate + ESTIMATED_DELIVERY_CHARGE_CENTS;
-                rateFeedback.classList.add('show');
-                if (effectiveCurrentRateAllIn <= 0.10) { rateFeedback.className = 'input-feedback show feedback-danger'; rateFeedback.textContent = '🚨 Very old rate - significant increase expected at renewal'; }
-                else if (effectiveCurrentRateAllIn <= 0.12) { rateFeedback.className = 'input-feedback show feedback-warning'; rateFeedback.textContent = '⚠️ Below market rate - likely increase ahead'; }
-                else if (effectiveCurrentRateAllIn <= 0.145) { rateFeedback.className = 'input-feedback show feedback-success'; rateFeedback.textContent = '✅ Current market range - competitive rate'; }
-                else { rateFeedback.className = 'input-feedback show feedback-info'; rateFeedback.textContent = '💰 Above market - savings opportunity available'; }
-                
-                const monthlyUsage = (currentMonthlyBill / effectiveCurrentRateAllIn);
-                currentAnnualUsage = monthlyUsage * 12;
-                usageDisplay.classList.remove('hidden');
-                let businessSize = (currentAnnualUsage < 50000) ? 'Small Business' : (currentAnnualUsage < 200000) ? 'Medium Business' : 'Large Business';
-                usageDetails.innerHTML = `<strong>Monthly Usage:</strong> ${formatNumber(monthlyUsage)} kWh<br><strong>Annual Usage:</strong> ${formatNumber(currentAnnualUsage)} kWh<br><strong>Business Size:</strong> ${businessSize}`;
-                
-                section1Complete = true;
-                getEl('section1').classList.add('completed');
-                getEl('section1').querySelector('.section-header-pill').classList.add('completed');
-                getEl('section1').querySelector('.section-icon').innerHTML = '✓';
-                activateSection(2);
-            } else {
-                section1Complete = false;
-                getEl('section1').classList.remove('completed');
-                getEl('section1').querySelector('.section-header-pill').classList.remove('completed');
-                getEl('section1').querySelector('.section-icon').innerHTML = '1';
-                getEl('section2').classList.remove('active', 'completed');
-                getEl('section2').querySelector('.section-header-pill').classList.remove('active', 'completed');
-                getEl('section2').querySelector('.section-icon').innerHTML = '2';
-                getEl('section3').classList.remove('active', 'completed');
-                getEl('section3').querySelector('.section-header-pill').classList.remove('active', 'completed');
-                getEl('section3').querySelector('.section-icon').innerHTML = '3';
-                section2Complete = false;
-            }
-            updateProgress();
-            updateButton();
-        }
-
-        function validateSection2() {
-            const contractEndDateInput = getEl('contractEndDate');
-            const sellRateInput = getEl('sellRate');
-            const contractEndDate = contractEndDateInput.value;
-            sellRate = parseFloat(sellRateInput.value);
-            
-            if (contractEndDate && sellRate > 0) {
-                section2Complete = true;
-                getEl('section2').classList.add('completed');
-                getEl('section2').querySelector('.section-header-pill').classList.add('completed');
-                getEl('section2').querySelector('.section-icon').innerHTML = '✓';
-                activateSection(3);
-            } else {
-                section2Complete = false;
-                getEl('section2').classList.remove('completed');
-                getEl('section2').querySelector('.section-header-pill').classList.remove('completed');
-                getEl('section2').querySelector('.section-header-pill').classList.add('active');
-                getEl('section2').querySelector('.section-icon').innerHTML = '2';
-                getEl('section3').classList.remove('active', 'completed');
-                getEl('section3').querySelector('.section-header-pill').classList.remove('active', 'completed');
-                getEl('section3').querySelector('.section-icon').innerHTML = '3';
-            }
-            updateProgress();
-            updateButton();
-        }
-
-        function activateSection(sectionNumber) {
-            for (let i = 1; i <= 3; i++) {
-                const section = getEl(`section${i}`);
-                if (!section) continue;
-                const pill = section.querySelector('.section-header-pill');
-                const icon = pill.querySelector('.section-icon');
-                if (i < sectionNumber) {
-                    section.classList.remove('active');
-                    section.classList.add('completed');
-                    pill.classList.remove('active');
-                    pill.classList.add('completed');
-                    icon.innerHTML = '✓';
-                } else if (i === sectionNumber) {
-                    section.classList.add('active');
-                    section.classList.remove('completed');
-                    pill.classList.add('active');
-                    pill.classList.remove('completed');
-                    icon.innerHTML = i;
+            if (calculateBtn) {
+                if (kwhUsage && currentRate && proposedRate) {
+                    calculateBtn.classList.add('ready');
+                    calculateBtn.disabled = false;
                 } else {
-                    section.classList.remove('active', 'completed');
-                    pill.classList.remove('active', 'completed');
-                    icon.innerHTML = i;
+                    calculateBtn.classList.remove('ready');
+                    calculateBtn.disabled = true;
                 }
             }
         }
-        
-        const updateProgress = () => {
-            const progress = getEl('progressFill');
-            if (!progress) return;
-            let percentage = 0;
-            if (section1Complete) percentage += 50;
-            if (section2Complete) percentage += 50;
-            progress.style.width = percentage + '%';
-        };
 
-        const updateButton = () => {
-            const button = getEl('calculateBtn');
-            const isReady = section1Complete && section2Complete;
-            button.classList.toggle('ready', isReady);
-            button.textContent = isReady ? 'Calculate Savings Potential' : 'Complete All Sections Above';
-            if (isReady && CRMApp.currentView.includes('contact')) {
-                // Pre-run calculation logic on page load
-                // The main populateHealthCheckFromAccount handles this
-            }
-        };
-
-        const resetForm = () => {
-            getEl('currentSupplier').value = '';
-            getEl('monthlyBill').value = '';
-            getEl('currentRate').value = '';
-            getEl('sellRate').value = '';
-            getEl('contractEndDate').value = '';
-            const results = getEl('results');
-            if(results) results.remove();
-            section1Complete = false;
-            section2Complete = false;
-            activateSection(1);
-            updateButton();
-            if (getEl('usageDisplay')) getEl('usageDisplay').classList.add('hidden');
-            if (getEl('rateFeedback')) getEl('rateFeedback').classList.remove('show');
-        };
-
-        const formatNumber = num => Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        
         // --- Notifications and Toasts ---
         function showNotification(message) {
             const newNotification = { id: Date.now().toString(), message, read: false };
@@ -2955,6 +2805,7 @@
         }
 
         function toggleNotifications() {
+            // Placeholder for a notification dropdown/modal
             alert(`You have ${CRMApp.notifications.filter(n => !n.read).length} unread notifications.`);
             CRMApp.notifications.forEach(n => n.read = true);
             updateNotificationBadge();
@@ -3001,7 +2852,7 @@
             return pill;
         }
         function addFilter(containerId, filterName) {
-            const container = getEl(containerId);
+            const container = document.getElementById(containerId);
             if (!container) return;
             const newFilterId = `filter-${Date.now()}`;
             const pill = createFilterPill(filterName, newFilterId);
@@ -3009,11 +2860,11 @@
             setupFilterDragDrop(containerId);
         }
         function removeFilter(id) {
-            const filter = getEl(id);
+            const filter = document.getElementById(id);
             if (filter) filter.remove();
         }
         function setupFilterDragDrop(containerId) {
-            const container = getEl(containerId);
+            const container = document.getElementById(containerId);
             if (!container) return;
             let draggedItem = null;
             container.addEventListener('dragstart', e => { draggedItem = e.target.closest('.draggable-item'); if (draggedItem) { draggedItem.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', null); } });
@@ -3037,14 +2888,15 @@
         function callCompany() { if (CRMApp.currentAccount?.phone) showToast(`Calling ${CRMApp.currentAccount.name} at ${CRMApp.currentAccount.phone}`, 'success'); else showToast('No phone number available', 'error'); }
         function emailContact() { if (CRMApp.currentContact?.email) window.open(`mailto:${CRMApp.currentContact.email}`, '_blank'); else showToast('No email address available', 'error'); }
         function openTaskModal() { showToast('Task modal functionality coming soon', 'success'); }
-        function clearSearch() { getEl('global-search').value = ''; getEl('search-clear-btn').classList.remove('show'); getEl('global-search').focus(); }
+        function clearSearch() { document.getElementById('global-search').value = ''; document.getElementById('search-clear-btn').classList.remove('show'); document.getElementById('global-search').focus(); }
         function bulkImport() { console.log('Opening Bulk Import'); }
         function loadSavedProfilePicture() {
             const savedPicture = localStorage.getItem('profilePicture');
-            if (savedPicture) getEl('profile-avatar').innerHTML = `<img src="${savedPicture}" alt="Profile Picture">`;
+            if (savedPicture) document.getElementById('profile-avatar').innerHTML = `<img src="${savedPicture}" alt="Profile Picture">`;
         }
+
+        document.addEventListener('DOMContentLoaded', initializeApp);
         
-        // Expose functions to the global scope for event handlers in HTML
         window.showView = showView;
         window.openProfileModal = openProfileModal;
         window.closeProfileModal = closeProfileModal;
@@ -3052,7 +2904,7 @@
         window.handleDragOver = (e) => { e.preventDefault(); e.currentTarget.classList.add('dragover'); };
         window.handleDragLeave = (e) => { e.currentTarget.classList.remove('dragover'); };
         window.handleFileSelect = (e) => { const file = e.target.files[0]; if (file && file.type.startsWith('image/')) processImageFile(file); };
-        window.saveProfilePicture = () => { if (selectedProfileImage) { getEl('profile-avatar').innerHTML = `<img src="${selectedProfileImage}" alt="Profile Picture">`; localStorage.setItem('profilePicture', selectedProfileImage); closeProfileModal(); showToast('Profile picture updated successfully!', 'success'); } };
+        window.saveProfilePicture = () => { if (selectedProfileImage) { document.getElementById('profile-avatar').innerHTML = `<img src="${selectedProfileImage}" alt="Profile Picture">`; localStorage.setItem('profilePicture', selectedProfileImage); closeProfileModal(); showToast('Profile picture updated successfully!', 'success'); } };
         window.addAccount = openAddAccountModal;
         window.addContact = openAddContactModal;
         window.closeAddContactModal = closeAddContactModal;
@@ -3063,7 +2915,7 @@
         window.addFilter = addFilter;
         window.removeFilter = removeFilter;
         window.renderContactsPage = () => {
-            const tableBody = getEl('contacts-table-body');
+            const tableBody = document.getElementById('contacts-table-body');
             if (!tableBody) return;
             tableBody.innerHTML = '';
             if (CRMApp.contacts.length > 0) {
@@ -3080,7 +2932,7 @@
             updateContactsCount();
         };
         window.renderAccountsPage = () => {
-            const tableBody = getEl('accounts-table-body');
+            const tableBody = document.getElementById('accounts-table-body');
             if (!tableBody) return;
             tableBody.innerHTML = '';
             if (CRMApp.accounts.length > 0) {
@@ -3102,72 +2954,13 @@
         window.editField = editField;
         window.copyField = copyField;
         window.handleSaveNote = handleSaveNote;
+        window.calculateSavings = calculateSavings;
         window.openNewsArticle = openNewsArticle;
         window.toggleNotifications = toggleNotifications;
         window.scrollActivities = (direction) => { const activities = CRMApp.currentContactActivities || []; const maxIndex = Math.max(0, activities.length - activitiesPerPage); if (direction === 'next' && activitiesCurrentIndex < maxIndex) activitiesCurrentIndex += activitiesPerPage; else if (direction === 'prev' && activitiesCurrentIndex > 0) activitiesCurrentIndex -= activitiesPerPage; activitiesCurrentIndex = Math.max(0, Math.min(activitiesCurrentIndex, maxIndex)); renderActivitiesPage(); };
         window.callCompany = callCompany;
         window.openEditContactModal = openEditContactModal;
         window.closeEditContactModal = closeEditContactModal;
-        
-        // Energy Health Check functions exposed to global scope
-        window.validateSection1 = () => { validateSection1(); };
-        window.validateSection2 = () => { validateSection2(); };
-        window.runCalculation = runCalculation;
-        window.resetForm = resetForm;
-        
-        // Date picker functions (simplified and moved here for consolidation)
-        let currentDate = new Date(), selectedDate = null;
-        const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-        
-        const renderCalendar = () => {
-            const [monthYearSpan, calendarGrid] = [getEl('monthYear'), getEl('calendarGrid')];
-            if (!monthYearSpan || !calendarGrid) return;
-            calendarGrid.innerHTML = '';
-            const [year, month] = [currentDate.getFullYear(), currentDate.getMonth()];
-            monthYearSpan.textContent = `${monthNames[month]} ${year}`;
-            const firstDay = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            daysOfWeek.forEach(day => { const dayHeader = document.createElement('div'); dayHeader.className = 'calendar-day'; dayHeader.textContent = day; calendarGrid.appendChild(dayHeader); });
-            for (let i = 0; i < firstDay; i++) calendarGrid.innerHTML += '<div></div>';
-            for (let i = 1; i <= daysInMonth; i++) {
-                const dateElement = document.createElement('div');
-                dateElement.className = 'calendar-date';
-                dateElement.textContent = i;
-                const fullDate = new Date(year, month, i);
-                if (fullDate.toDateString() === new Date().toDateString()) dateElement.classList.add('today');
-                dateElement.onclick = () => {
-                    document.querySelectorAll('.calendar-date').forEach(d => d.classList.remove('selected'));
-                    dateElement.classList.add('selected');
-                    selectedDate = fullDate;
-                    getEl('contractEndDate').value = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    getEl('taskModal').classList.remove('open');
-                    validateSection2();
-                };
-                calendarGrid.appendChild(dateElement);
-            }
-        };
-
-        const prevMonth = () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); };
-        const nextMonth = () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); };
-        const openDatePicker = () => {
-            const modal = getEl('taskModal');
-            if(modal) {
-                modal.classList.add('open');
-                renderCalendar();
-            }
-        };
-        const closeModal = (event) => {
-            const modal = getEl('taskModal');
-            if (event.target === modal) {
-                modal.classList.remove('open');
-            }
-        };
-
-        window.prevMonth = prevMonth;
-        window.nextMonth = nextMonth;
-        window.openDatePicker = openDatePicker;
-        window.closeModal = closeModal;
     </script>
 </body>
 </html>
