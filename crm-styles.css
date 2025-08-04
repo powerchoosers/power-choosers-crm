@@ -87,8 +87,8 @@ body {
     height: 70px;
     padding: 0 24px;
     background: linear-gradient(135deg, var(--header-blue) 0%, var(--dark-blue) 100%);
-    box-shadow: var(--shadow-lg);
-    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border-bottom: 3px solid var(--professional-blue);
     position: relative;
     z-index: 1000;
 }
@@ -237,11 +237,12 @@ body {
     position: relative;
     z-index: 900;
     border-right: 1px solid var(--border-color);
+    box-shadow: inset -3px 0 10px rgba(0, 0, 0, 0.2);
 }
 
 .app-sidebar:hover {
     width: 240px;
-    box-shadow: var(--shadow-xl);
+    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.4);
 }
 
 .sidebar-nav {
@@ -254,6 +255,7 @@ body {
 .nav-item {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     padding: 16px 24px;
     text-decoration: none;
     color: var(--text-secondary);
@@ -266,7 +268,7 @@ body {
 }
 
 .nav-item:hover {
-    color: var(--text-primary);
+    color: white;
     background-color: var(--bg-hover);
     transform: translateX(4px);
 }
@@ -274,7 +276,7 @@ body {
 .nav-item.active {
     color: white;
     background-color: var(--professional-blue);
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 15px rgba(30, 64, 175, 0.4);
 }
 
 .nav-item.active::before {
@@ -300,9 +302,31 @@ body {
     opacity: 0;
     transition: opacity 0.2s ease 0.1s;
     font-weight: 500;
+    color: white;
 }
 
 .app-sidebar:hover .nav-item span {
+    opacity: 1;
+}
+
+/* Navigation Badges */
+.nav-badge {
+    margin-left: auto;
+    background: var(--accent-red);
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease 0.1s;
+}
+
+.app-sidebar:hover .nav-badge {
     opacity: 1;
 }
 
@@ -356,7 +380,7 @@ body {
     gap: 24px;
     overflow-y: auto;
     padding-right: 8px;
-    min-width: 0; /* Prevents flex item from overflowing */
+    min-width: 0;
 }
 
 .dashboard-right-sidebar {
@@ -367,7 +391,6 @@ body {
     flex-direction: column;
     gap: 24px;
     overflow-y: auto;
-    padding-left: 8px;
     background: transparent;
 }
 
@@ -377,8 +400,13 @@ body {
     border-radius: 16px;
     padding: 24px;
     transition: all 0.3s ease;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     min-height: 200px;
+}
+
+.widget-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
 /* Stats Cards Grid */
@@ -398,6 +426,7 @@ body {
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .stat-card::before {
@@ -412,14 +441,14 @@ body {
 
 .stat-card:hover {
     transform: translateY(-8px);
-    box-shadow: var(--shadow-xl);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
     border-color: var(--professional-blue);
 }
 
 .stat-value {
     font-size: 2.5rem;
     font-weight: 700;
-    color: var(--professional-blue);
+    color: white;
     margin-bottom: 8px;
     line-height: 1;
 }
@@ -439,19 +468,19 @@ body {
     border-radius: 16px;
     padding: 24px;
     transition: all 0.3s ease;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .dashboard-card:hover {
     transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     border-color: var(--border-color);
 }
 
 .card-title {
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: white;
     margin-bottom: 20px;
     display: flex;
     align-items: center;
@@ -560,6 +589,7 @@ body {
     background: var(--bg-hover);
     border-radius: 12px;
     transition: all 0.2s ease;
+    border-left: 4px solid var(--professional-blue);
 }
 
 .activity-item:hover {
@@ -584,7 +614,7 @@ body {
 }
 
 .activity-text {
-    color: var(--text-primary);
+    color: white;
     font-weight: 500;
     margin-bottom: 4px;
     font-size: 0.9rem;
@@ -624,7 +654,7 @@ body {
 }
 
 .task-title {
-    color: var(--text-primary);
+    color: white;
     font-weight: 500;
     font-size: 0.9rem;
     line-height: 1.4;
@@ -647,6 +677,7 @@ body {
     background: var(--bg-hover);
     border-radius: 12px;
     transition: all 0.2s ease;
+    border-left: 4px solid var(--accent-green);
 }
 
 .news-item:hover {
@@ -655,7 +686,7 @@ body {
 }
 
 .news-title {
-    color: var(--text-primary);
+    color: white;
     font-weight: 600;
     font-size: 0.95rem;
     margin-bottom: 8px;
@@ -845,22 +876,279 @@ body {
     }
 }
 
-/* --- 9. Print Styles --- */
+/* --- 9. Notification Dropdown --- */
+.notification-dropdown {
+    position: absolute;
+    top: 55px;
+    right: 80px;
+    width: 400px;
+    max-height: 500px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    visibility: hidden;
+}
+
+.notification-dropdown.active {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+
+.notification-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notification-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: white;
+}
+
+.notification-count {
+    background: var(--accent-red);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.notification-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.notification-item {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--bg-hover);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.notification-item:hover {
+    background: var(--bg-hover);
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.notification-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1rem;
+}
+
+.notification-icon.contact { background: var(--professional-blue); }
+.notification-icon.account { background: var(--accent-green); }
+.notification-icon.email { background: var(--accent-orange); }
+.notification-icon.task { background: var(--accent-red); }
+
+.notification-text {
+    flex: 1;
+}
+
+.notification-message {
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.notification-time {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.notification-empty {
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* --- 10. Modal Styles --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.modal-overlay.active .modal-content {
+    transform: scale(1);
+}
+
+.modal-header {
+    margin-bottom: 24px;
+}
+
+.modal-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 8px;
+}
+
+.modal-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    color: white;
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: white;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--professional-blue);
+    box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
+}
+
+.form-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 32px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-primary {
+    background: var(--professional-blue);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--secondary-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(30, 64, 175, 0.4);
+}
+
+.btn-secondary {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: var(--border-color);
+    color: white;
+}
+
+/* --- 11. Print Styles --- */
 @media print {
     .app-sidebar,
     .header-right,
-    .toast-container {
+    .toast-container,
+    .notification-dropdown,
+    .modal-overlay {
         display: none;
     }
     
     .app-header {
         box-shadow: none;
         border-bottom: 2px solid #000;
+        background: white;
+        color: black;
     }
     
     .dashboard-card {
         break-inside: avoid;
         box-shadow: none;
+        border: 2px solid #000;
+        background: white;
+        color: black;
+    }
+    
+    .stat-card {
+        background: white;
+        color: black;
         border: 2px solid #000;
     }
 }

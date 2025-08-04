@@ -1,274 +1,401 @@
-<!DOCTYPE html>
+<div class="header-right">
+    <button class="icon-button" id="notification-btn">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M18 8A6 6 0 0 0 6<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Power Choosers CRM Dashboard</title>
-    
-    <!-- Firebase Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    
-    <!-- CSS Styles -->
-    <link rel="stylesheet" href="crm-styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Power Choosers CRM Dashboard</title>
+
+<!-- Firebase Scripts -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<!-- CSS Styles -->
+<link rel="stylesheet" href="crm-styles.css">
 </head>
 <body>
-    <!-- App Wrapper -->
-    <div class="app-wrapper">
-        <!-- Top Header -->
-        <header class="app-header">
-            <div class="header-left">
-                <div class="app-logo">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers Logo">
-                </div>
-                <h1 class="app-title">CRM Dashboard</h1>
-            </div>
-            
-            <div class="header-center">
-                <div class="search-bar">
-                    <button class="search-icon">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <path d="M21 21l-4.35-4.35"></path>
-                        </svg>
-                    </button>
-                    <input type="text" id="global-search" placeholder="Search accounts, contacts, and more...">
-                </div>
-            </div>
-            
-            <div class="header-right">
-                <button class="icon-button">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                    </svg>
-                    <span class="notification-badge">3</span>
-                </button>
-                <div class="user-profile">
-                    <div class="profile-avatar">LC</div>
-                </div>
-            </div>
-        </header>
+<!-- App Wrapper -->
+<div class="app-wrapper">
+<!-- Top Header -->
+<header class="app-header">
+<div class="header-left">
+    <div class="app-logo">
+        <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers Logo">
+    </div>
+    <h1 class="app-title">CRM Dashboard</h1>
+</div>
 
-        <!-- Main App Content -->
-        <div class="app-main">
-            <!-- Left Sidebar -->
-            <nav class="app-sidebar">
-                <div class="sidebar-nav">
-                    <a href="#" class="nav-item active" data-view="dashboard-view">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                        </svg>
-                        <span>Dashboard</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="accounts-view">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<div class="header-center">
+    <div class="search-bar">
+        <button class="search-icon">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+            </svg>
+        </button>
+        <input type="text" id="global-search" placeholder="Search accounts, contacts, and more...">
+    </div>
+</div>
+
+<div class="header-right">
+    <button class="icon-button" id="notification-btn">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span class="notification-badge" id="notification-badge">0</span>
+    </button>
+    
+    <!-- Notification Dropdown -->
+    <div class="notification-dropdown" id="notification-dropdown">
+        <div class="notification-header">
+            <h3 class="notification-title">Notifications</h3>
+            <span class="notification-count" id="notification-count">0</span>
+        </div>
+        <div class="notification-list" id="notification-list">
+            <div class="notification-empty">No new notifications</div>
+        </div>
+    </div>
+    
+    <div class="user-profile">
+        <div class="profile-avatar">LC</div>
+    </div>
+</div>
+</header>
+
+<!-- Main App Content -->
+<div class="app-main">
+<!-- Left Sidebar -->
+<nav class="app-sidebar">
+    <div class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="dashboard-view">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" data-view="accounts-view">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span>Accounts</span>
+            <span class="nav-badge" id="accounts-badge">0</span>
+        </a>
+        <a href="#" class="nav-item" data-view="contacts-view">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>Contacts</span>
+            <span class="nav-badge" id="contacts-badge">0</span>
+        </a>
+        <a href="#" class="nav-item" data-view="calls-view">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+            </svg>
+            <span>Calls</span>
+        </a>
+        <a href="#" class="nav-item" data-view="emails-view">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            <span>Emails</span>
+            <span class="nav-badge" id="emails-badge">0</span>
+        </a>
+        <a href="#" class="nav-item" data-view="tasks-view">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span>Tasks</span>
+            <span class="nav-badge" id="tasks-badge">0</span>
+        </a>
+        <a href="#" class="nav-item" data-view="settings-view">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span>Settings</span>
+        </a>
+    </div>
+</nav>
+
+<!-- Main Content Container -->
+<div class="app-content-container">
+    <!-- Dashboard View -->
+    <div id="dashboard-view" class="page-view active">
+        <!-- Main Dashboard Content -->
+        <div class="dashboard-main">
+            <!-- Stats Cards Grid -->
+            <div class="stat-cards-grid">
+                <div class="stat-card">
+                    <h3 class="stat-value" id="total-accounts-value">2</h3>
+                    <p class="stat-label">Total Accounts</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-value" id="total-contacts-value">3</h3>
+                    <p class="stat-label">Total Contacts</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-value" id="recent-activities-value">7</h3>
+                    <p class="stat-label">Recent Activities</p>
+                </div>
+                <div class="stat-card">
+                    <h3 class="stat-value" id="hot-leads-value">0</h3>
+                    <p class="stat-label">Hot Leads</p>
+                </div>
+            </div>
+
+            <!-- Market Trends Card -->
+            <div class="dashboard-card market-trends-card">
+                <h3 class="card-title">📊 Texas Electricity Market Trends</h3>
+                <div class="market-pricing-grid">
+                    <div class="pricing-card">
+                        <p class="pricing-label">2014-2021 AVG</p>
+                        <h4 class="pricing-value">8.24¢</h4>
+                    </div>
+                    <div class="pricing-card">
+                        <p class="pricing-label">CURRENT 2025</p>
+                        <h4 class="pricing-value">13.1¢</h4>
+                    </div>
+                    <div class="pricing-card">
+                        <p class="pricing-label">PROJECTED 2026</p>
+                        <h4 class="pricing-value">16.8¢</h4>
+                    </div>
+                </div>
+                <div class="market-insights">
+                    <p>💡 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026</p>
+                </div>
+            </div>
+
+            <!-- Recent Activities Card -->
+            <div class="dashboard-card">
+                <h3 class="card-title">🕒 Recent Activities</h3>
+                <ul id="activity-list" class="activity-list">
+                    <!-- Activities will be populated by JavaScript -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Right Sidebar with Widgets -->
+        <div class="dashboard-right-sidebar">
+            <!-- Quick Actions Widget -->
+            <div class="dashboard-card widget-card">
+                <h3 class="card-title">⚡ Quick Actions</h3>
+                <div class="quick-actions-grid">
+                    <button class="action-button" onclick="addAccount()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
                             <circle cx="9" cy="7" r="4"></circle>
                             <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
                             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                         </svg>
-                        <span>Accounts</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="contacts-view">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        Add Account
+                    </button>
+                    <button class="action-button" onclick="addContact()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        <span>Contacts</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="calls-view">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        Add Contact
+                    </button>
+                    <button class="action-button" onclick="bulkImport()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7,10 12,15 17,10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
-                        <span>Calls</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="emails-view">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                            <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                        <span>Emails</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="tasks-view">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 11l3 3L22 4"></path>
-                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                        </svg>
-                        <span>Tasks</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="settings-view">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                        </svg>
-                        <span>Settings</span>
-                    </a>
+                        Bulk Import
+                    </button>
                 </div>
-            </nav>
+            </div>
 
-            <!-- Main Content Container -->
-            <div class="app-content-container">
-                <!-- Dashboard View -->
-                <div id="dashboard-view" class="page-view active">
-                    <!-- Main Dashboard Content -->
-                    <div class="dashboard-main">
-                        <!-- Stats Cards Grid -->
-                        <div class="stat-cards-grid">
-                            <div class="stat-card">
-                                <h3 class="stat-value" id="total-accounts-value">2</h3>
-                                <p class="stat-label">Total Accounts</p>
-                            </div>
-                            <div class="stat-card">
-                                <h3 class="stat-value" id="total-contacts-value">3</h3>
-                                <p class="stat-label">Total Contacts</p>
-                            </div>
-                            <div class="stat-card">
-                                <h3 class="stat-value" id="recent-activities-value">7</h3>
-                                <p class="stat-label">Recent Activities</p>
-                            </div>
-                            <div class="stat-card">
-                                <h3 class="stat-value" id="hot-leads-value">0</h3>
-                                <p class="stat-label">Hot Leads</p>
-                            </div>
-                        </div>
+            <!-- Today's Tasks Widget -->
+            <div class="dashboard-card widget-card">
+                <h3 class="card-title">📅 Today's Tasks</h3>
+                <ul id="tasks-list" class="tasks-list">
+                    <!-- Tasks will be populated by JavaScript -->
+                </ul>
+            </div>
 
-                        <!-- Market Trends Card -->
-                        <div class="dashboard-card market-trends-card">
-                            <h3 class="card-title">📊 Texas Electricity Market Trends</h3>
-                            <div class="market-pricing-grid">
-                                <div class="pricing-card">
-                                    <p class="pricing-label">2014-2021 AVG</p>
-                                    <h4 class="pricing-value">8.24¢</h4>
-                                </div>
-                                <div class="pricing-card">
-                                    <p class="pricing-label">CURRENT 2025</p>
-                                    <h4 class="pricing-value">13.1¢</h4>
-                                </div>
-                                <div class="pricing-card">
-                                    <p class="pricing-label">PROJECTED 2026</p>
-                                    <h4 class="pricing-value">16.8¢</h4>
-                                </div>
-                            </div>
-                            <div class="market-insights">
-                                <p>💡 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026</p>
-                            </div>
-                        </div>
-
-                        <!-- Recent Activities Card -->
-                        <div class="dashboard-card">
-                            <h3 class="card-title">🕒 Recent Activities</h3>
-                            <ul id="activity-list" class="activity-list">
-                                <!-- Activities will be populated by JavaScript -->
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Right Sidebar with Widgets -->
-                    <div class="dashboard-right-sidebar">
-                        <!-- Quick Actions Widget -->
-                        <div class="dashboard-card widget-card">
-                            <h3 class="card-title">⚡ Quick Actions</h3>
-                            <div class="quick-actions-grid">
-                                <button class="action-button" onclick="addAccount()">
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                                        <circle cx="9" cy="7" r="4"></circle>
-                                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                    </svg>
-                                    Add Account
-                                </button>
-                                <button class="action-button" onclick="addContact()">
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                        <circle cx="12" cy="7" r="4"></circle>
-                                    </svg>
-                                    Add Contact
-                                </button>
-                                <button class="action-button" onclick="bulkImport()">
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                        <polyline points="7,10 12,15 17,10"></polyline>
-                                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                                    </svg>
-                                    Bulk Import
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Today's Tasks Widget -->
-                        <div class="dashboard-card widget-card">
-                            <h3 class="card-title">📅 Today's Tasks</h3>
-                            <ul id="tasks-list" class="tasks-list">
-                                <!-- Tasks will be populated by JavaScript -->
-                            </ul>
-                        </div>
-
-                        <!-- Energy Market News Widget -->
-                        <div class="dashboard-card widget-card">
-                            <h3 class="card-title">📰 Energy Market News</h3>
-                            <div id="news-feed" class="news-feed">
-                                <!-- News will be populated by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Other Views (placeholder for future development) -->
-                <div id="accounts-view" class="page-view">
-                    <div class="page-content">
-                        <h2>Accounts View</h2>
-                        <p>Accounts management interface coming soon...</p>
-                    </div>
-                </div>
-
-                <div id="contacts-view" class="page-view">
-                    <div class="page-content">
-                        <h2>Contacts View</h2>
-                        <p>Contacts management interface coming soon...</p>
-                    </div>
-                </div>
-
-                <div id="calls-view" class="page-view">
-                    <div class="page-content">
-                        <h2>Calls View</h2>
-                        <p>Call management interface coming soon...</p>
-                    </div>
-                </div>
-
-                <div id="emails-view" class="page-view">
-                    <div class="page-content">
-                        <h2>Emails View</h2>
-                        <p>Email management interface coming soon...</p>
-                    </div>
-                </div>
-
-                <div id="tasks-view" class="page-view">
-                    <div class="page-content">
-                        <h2>Tasks View</h2>
-                        <p>Task management interface coming soon...</p>
-                    </div>
-                </div>
-
-                <div id="settings-view" class="page-view">
-                    <div class="page-content">
-                        <h2>Settings View</h2>
-                        <p>Settings interface coming soon...</p>
-                    </div>
+            <!-- Energy Market News Widget -->
+            <div class="dashboard-card widget-card">
+                <h3 class="card-title">📰 Energy Market News</h3>
+                <div id="news-feed" class="news-feed">
+                    <!-- News will be populated by JavaScript -->
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Toast Notification Container -->
-    <div id="toast-container" class="toast-container"></div>
+    <!-- Other Views (placeholder for future development) -->
+    <div id="accounts-view" class="page-view">
+        <div class="page-content">
+            <h2>Accounts View</h2>
+            <p>Accounts management interface coming soon...</p>
+        </div>
+    </div>
 
-    <!-- JavaScript -->
-    <script src="firebase-config.js"></script>
-    <script src="crm-app.js"></script>
+    <div id="contacts-view" class="page-view">
+        <div class="page-content">
+            <h2>Contacts View</h2>
+            <p>Contacts management interface coming soon...</p>
+        </div>
+    </div>
+
+    <div id="calls-view" class="page-view">
+        <div class="page-content">
+            <h2>Calls View</h2>
+            <p>Call management interface coming soon...</p>
+        </div>
+    </div>
+
+    <div id="emails-view" class="page-view">
+        <div class="page-content">
+            <h2>Emails View</h2>
+            <p>Email management interface coming soon...</p>
+        </div>
+    </div>
+
+    <div id="tasks-view" class="page-view">
+        <div class="page-content">
+            <h2>Tasks View</h2>
+            <p>Task management interface coming soon...</p>
+        </div>
+    </div>
+
+    <div id="settings-view" class="page-view">
+        <div class="page-content">
+            <h2>Settings View</h2>
+            <p>Settings interface coming soon...</p>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- Add Account Modal -->
+<div class="modal-overlay" id="add-account-modal">
+<div class="modal-content">
+<div class="modal-header">
+    <h2 class="modal-title">Add New Account</h2>
+    <p class="modal-subtitle">Create a new business account in your CRM</p>
+</div>
+<form id="add-account-form">
+    <div class="form-group">
+        <label class="form-label">Company Name *</label>
+        <input type="text" class="form-input" id="account-name" placeholder="Enter company name" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Industry</label>
+        <input type="text" class="form-input" id="account-industry" placeholder="e.g., Manufacturing, Technology">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input type="tel" class="form-input" id="account-phone" placeholder="(555) 123-4567">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Website</label>
+        <input type="url" class="form-input" id="account-website" placeholder="https://example.com">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Address</label>
+        <input type="text" class="form-input" id="account-address" placeholder="123 Main St, City, State">
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('add-account-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Account</button>
+    </div>
+</form>
+</div>
+</div>
+
+<!-- Add Contact Modal -->
+<div class="modal-overlay" id="add-contact-modal">
+<div class="modal-content">
+<div class="modal-header">
+    <h2 class="modal-title">Add New Contact</h2>
+    <p class="modal-subtitle">Add a new contact to your CRM</p>
+</div>
+<form id="add-contact-form">
+    <div class="form-group">
+        <label class="form-label">First Name *</label>
+        <input type="text" class="form-input" id="contact-first-name" placeholder="Enter first name" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Last Name *</label>
+        <input type="text" class="form-input" id="contact-last-name" placeholder="Enter last name" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input type="email" class="form-input" id="contact-email" placeholder="contact@company.com" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input type="tel" class="form-input" id="contact-phone" placeholder="(555) 123-4567">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Job Title</label>
+        <input type="text" class="form-input" id="contact-title" placeholder="e.g., CEO, Manager">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Account</label>
+        <select class="form-input" id="contact-account">
+            <option value="">Select an account</option>
+        </select>
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('add-contact-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Contact</button>
+    </div>
+</form>
+</div>
+</div>
+
+<!-- Bulk Import Modal -->
+<div class="modal-overlay" id="bulk-import-modal">
+<div class="modal-content">
+<div class="modal-header">
+    <h2 class="modal-title">Bulk Import</h2>
+    <p class="modal-subtitle">Import contacts and accounts from CSV file</p>
+</div>
+<form id="bulk-import-form">
+    <div class="form-group">
+        <label class="form-label">Import Type</label>
+        <select class="form-input" id="import-type">
+            <option value="contacts">Contacts</option>
+            <option value="accounts">Accounts</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">CSV File *</label>
+        <input type="file" class="form-input" id="csv-file" accept=".csv" required>
+        <div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-secondary);">
+            Expected columns: First Name, Last Name, Email, Phone, Company, Title
+        </div>
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('bulk-import-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Import Data</button>
+    </div>
+</form>
+</div>
+</div>
+
+<!-- JavaScript -->
+<script src="firebase-config.js"></script>
+<script src="crm-app.js"></script>
 </body>
 </html>
