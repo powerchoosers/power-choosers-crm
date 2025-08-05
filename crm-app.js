@@ -204,343 +204,72 @@ const CRMApp = {
 
     // Show/hide views in the single-page application
     showView(viewName) {
-        this.currentView = viewName;
-        
-        // Hide all main containers
-        const mainContent = document.querySelector('.main-content');
-        const widgetPanel = document.querySelector('.widget-panel');
-        const callScriptsView = document.getElementById('call-scripts-view');
-        
-        if (mainContent) mainContent.style.display = 'none';
-        if (widgetPanel) widgetPanel.style.display = 'none';
-        if (callScriptsView) callScriptsView.style.display = 'none';
-
-        // Show the appropriate container based on the view
-        if (viewName === 'call-scripts-view') {
-            if (callScriptsView) callScriptsView.style.display = 'flex';
-        } else {
-            if (mainContent) mainContent.style.display = 'flex';
-            if (widgetPanel) widgetPanel.style.display = 'flex';
-            
-            const activeView = document.getElementById(viewName);
-            if (activeView) {
-                activeView.style.display = 'flex';
-            }
-            
-            if (viewName === 'dashboard-view') {
-                this.renderDashboard();
-            }
-        }
-
-        // Update active navigation button state
-        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-        const activeNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
-        if (activeNav) {
-            activeNav.classList.add('active');
-        } else if (viewName === 'call-scripts-view') {
-            // Keep the dashboard icon active when on the call scripts page
-            const dashboardNav = document.querySelector('.nav-item[data-view="dashboard-view"]');
-            if (dashboardNav) dashboardNav.classList.add('active');
-        }
-    },
-
-    // Update the active state of navigation buttons
-    updateActiveNavButton(activeNav) {
-        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-        // If the clicked item is the Call Scripts button (which is not a nav-item in the sidebar)
-        // ensure the dashboard nav item remains active if we're just switching content within the main area
-        if (activeNav.id === 'call-scripts-btn') {
-            document.querySelector('.nav-item[data-view="dashboard-view"]').classList.add('active');
-        } else {
-            activeNav.classList.add('active');
-        }
-    },
-
-    // Main dashboard rendering function
-    renderDashboard() {
-        this.renderDashboardStats();
-        this.renderTodayTasks();
-        this.renderActivityCarousel();
-        this.renderEnergyMarketNews();
-    },
-
-    // Render dashboard statistics cards
-    renderDashboardStats() {
-        const totalAccounts = this.accounts.length;
-        const totalContacts = this.contacts.length;
-        const recentActivities = this.activities.length;
-        const hotLeads = this.contacts.filter(c => c.isHotLead).length;
-
-        this.updateElement('total-accounts-value', totalAccounts);
-        this.updateElement('total-contacts-value', totalContacts);
-        this.updateElement('recent-activities-value', recentActivities);
-        this.updateElement('hot-leads-value', hotLeads);
-    },
-
-    // Render today's tasks in the sidebar
-    renderTodayTasks() {
-        const tasksList = document.getElementById('tasks-list');
-        if (!tasksList) return;
-        
-        tasksList.innerHTML = '';
-        
-        const today = new Date();
-        const todaysTasks = this.tasks.filter(task => !task.completed && new Date(task.dueDate).toDateString() === today.toDateString());
-        
-        if (todaysTasks.length > 0) {
-            todaysTasks.forEach(task => {
-                const li = document.createElement('li');
-                li.className = 'task-item';
-                li.innerHTML = `
-                    <div class="task-content">
-                        <p class="task-title">${task.title}</p>
-                        <p class="task-due-time">Due: ${task.time}</p>
-                    </div>
-                `;
-                tasksList.appendChild(li);
-            });
-        } else {
-            tasksList.innerHTML = '<li class="no-items">No tasks for today!</li>';
-        }
-    },
-
-    // Renders the recent activities carousel
-    renderActivityCarousel() {
-        const carouselWrapper = document.getElementById('activity-list-wrapper');
-        const prevBtn = document.getElementById('activity-prev-btn');
-        const nextBtn = document.getElementById('activity-next-btn');
-
-        if (!carouselWrapper) return;
-        
-        // Sort activities by date (most recent first)
-        const sortedActivities = this.activities.sort((a, b) => b.createdAt - a.createdAt);
-        const totalPages = Math.ceil(sortedActivities.length / this.activitiesPerPage);
-
-        // Clear existing content
-        carouselWrapper.innerHTML = '';
-
-        if (sortedActivities.length === 0) {
-            carouselWrapper.innerHTML = '<div class="no-items">No recent activity.</div>';
-            prevBtn.style.display = 'none';
-            nextBtn.style.display = 'none';
-            return;
-        } else {
-            prevBtn.style.display = 'block';
-            nextBtn.style.display = 'block';
-        }
-        
-        // Render each page of activities
-        for (let i = 0; i < totalPages; i++) {
-            const page = document.createElement('div');
-            page.className = 'activity-page';
-            
-            const startIndex = i * this.activitiesPerPage;
-            const endIndex = startIndex + this.activitiesPerPage;
-            const pageActivities = sortedActivities.slice(startIndex, endIndex);
-
-            pageActivities.forEach(activity => {
-                const item = document.createElement('div');
-                item.className = 'activity-item';
-                item.innerHTML = `
-                    <div class="activity-icon">${this.getActivityIcon(activity.type)}</div>
-                    <div class="activity-content">
-                        <p class="activity-text">${activity.description}</p>
-                        <span class="activity-timestamp">${this.formatDate(activity.createdAt)}</span>
-                    </div>
-                `;
-                page.appendChild(item);
-            });
-            carouselWrapper.appendChild(page);
-        }
-        
-        // Set the carousel to the current page and update buttons
-        carouselWrapper.style.width = `${totalPages * 100}%`;
-        carouselWrapper.style.transform = `translateX(-${this.activitiesPageIndex * (100 / totalPages)}%)`;
-        this.updateActivityCarouselButtons(totalPages);
-    },
     
-    // Scrolls the activity carousel
-    scrollActivityCarousel(direction) {
-        const totalPages = Math.ceil(this.activities.length / this.activitiesPerPage);
-        if (direction === 'next' && this.activitiesPageIndex < totalPages - 1) {
-            this.activitiesPageIndex++;
-        } else if (direction === 'prev' && this.activitiesPageIndex > 0) {
-            this.activitiesPageIndex--;
+    // Get references to main containers
+    const mainContent = document.querySelector('.main-content');
+    const widgetPanel = document.querySelector('.widget-panel');
+    const callScriptsView = document.getElementById('call-scripts-view');
+    
+    // Hide all main containers
+    mainContent.style.display = 'none';
+    widgetPanel.style.display = 'none';
+    callScriptsView.style.display = 'none';
+    
+    // Hide all individual page views
+    document.querySelectorAll('.main-content .page-view').forEach(view => {
+        view.style.display = 'none';
+    });
+
+    // Show the appropriate container based on the view
+    if (viewName === 'call-scripts-view') {
+        callScriptsView.style.display = 'flex';
+    } else {
+        mainContent.style.display = 'flex';
+        widgetPanel.style.display = 'flex';
+        const activeView = document.getElementById(viewName);
+        if (activeView) {
+            activeView.style.display = 'flex';
         }
-        this.renderActivityCarousel();
-    },
-
-    // Updates the state of the carousel navigation buttons
-    updateActivityCarouselButtons(totalPages) {
-        const prevBtn = document.getElementById('activity-prev-btn');
-        const nextBtn = document.getElementById('activity-next-btn');
-        if (prevBtn) prevBtn.disabled = this.activitiesPageIndex === 0;
-        if (nextBtn) nextBtn.disabled = this.activitiesPageIndex >= totalPages - 1;
-    },
-
-    // Get activity icon based on type - Updated with white SVG icons
-    getActivityIcon(type) {
-        const icons = {
-            'call_note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-            </svg>`,
-            'email': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                <polyline points="22,6 12,13 2,6"></polyline>
-            </svg>`,
-            'note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <line x1="10" y1="9" x2="8" y2="9"></line>
-            </svg>`,
-            'task_completed': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 11l3 3L22 4"></path>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>`,
-            'contact_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>`,
-            'account_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 21h18"></path>
-                <path d="M5 21V7l8-4v18"></path>
-                <path d="M19 21V11l-6-4"></path>
-            </svg>`,
-            'bulk_import': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>`,
-            'health_check_updated': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-            </svg>`,
-            'call_log_saved': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>`
-        };
-        return icons[type] || `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <line x1="10" y1="9" x2="8" y2="9"></line>
-        </svg>`;
-    },
-
-    // Render energy market news feed
-    renderEnergyMarketNews() {
-        const newsFeed = document.getElementById('news-feed');
-        if (!newsFeed) return;
         
-        newsFeed.innerHTML = '';
-        
-        const newsItems = [
-            { 
-                title: 'ERCOT Demand Rises', 
-                content: 'ERCOT demand is increasing due to summer heat, putting pressure on grid reliability.',
-                time: '2 hours ago'
-            },
-            { 
-                title: 'Natural Gas Prices Fluctuate', 
-                content: 'Recent geopolitical events have caused volatility in natural gas prices, impacting futures.',
-                time: '4 hours ago'
-            },
-            { 
-                title: 'Renewable Energy Growth', 
-                content: 'Texas continues to lead in renewable energy adoption with new wind and solar projects.',
-                time: '6 hours ago'
-            }
-        ];
-        
-        if (newsItems.length > 0) {
-            newsItems.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'news-item';
-                div.innerHTML = `
-                    <h4 class="news-title">${item.title}</h4>
-                    <p class="news-content">${item.content}</p>
-                    <span class="news-time">${item.time}</span>
-                `;
-                newsFeed.appendChild(div);
-            });
-        } else {
-            newsFeed.innerHTML = '<p class="no-items">No news to display.</p>';
+        // Re-render dashboard content if returning to it
+        if (viewName === 'dashboard-view') {
+            this.renderDashboard();
         }
-    },
+    }
 
-    // Handle search functionality
-    handleSearch(query) {
-        if (query.length < 2) return;
+    // Update active navigation button state
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    const activeNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+    if (activeNav) {
+        activeNav.classList.add('active');
+    } else if (viewName === 'call-scripts-view') {
+        const dashboardNav = document.querySelector('.nav-item[data-view="dashboard-view"]');
+        if (dashboardNav) dashboardNav.classList.add('active');
+    }
+},
+
+// Function to load and display the Call Scripts view
+async showCallScriptsView() {
+    const callScriptsView = document.getElementById('call-scripts-view');
+    if (!callScriptsView) {
+        console.error('Call scripts view element not found.');
+        this.showToast('Call scripts view not available.', 'error');
+        return;
+    }
+
+    try {
+        // Show loading state
+        callScriptsView.innerHTML = `
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading Cold Calling Hub...</p>
+            </div>
+        `;
         
-        const results = [];
-        
-        this.accounts.forEach(account => {
-            if (account.name.toLowerCase().includes(query.toLowerCase())) {
-                results.push({
-                    type: 'account',
-                    id: account.id,
-                    name: account.name,
-                    subtitle: account.industry || 'Account'
-                });
-            }
-        });
-        
-        this.contacts.forEach(contact => {
-            const fullName = `${contact.firstName} ${contact.lastName}`;
-            if (fullName.toLowerCase().includes(query.toLowerCase()) || 
-                (contact.email && contact.email.toLowerCase().includes(query.toLowerCase()))) {
-                results.push({
-                    type: 'contact',
-                    id: contact.id,
-                    name: fullName,
-                    subtitle: contact.accountName || 'Contact'
-                });
-            }
-        });
-        
-        console.log('Search results:', results);
-    },
-
-    // Quick action functions
-    addAccount() {
-        this.openModal('add-account-modal');
-    },
-
-    addContact() {
-        const accountSelect = document.getElementById('contact-account');
-        if (accountSelect) {
-            accountSelect.innerHTML = '<option value="">Select an account</option>';
-            this.accounts.forEach(account => {
-                const option = document.createElement('option');
-                option.value = account.id;
-                option.textContent = account.name;
-                accountSelect.appendChild(option);
-            });
-        }
-        this.openModal('add-contact-modal');
-    },
-
-    bulkImport() {
-        this.openModal('bulk-import-modal');
-    },
-
-    // Function to load and display the Call Scripts view
-    async showCallScriptsView() {
-        const callScriptsView = document.getElementById('call-scripts-view');
-        if (!callScriptsView) {
-            console.error('Call scripts view element not found.');
-            
-        // Show the view before loading content
+        // Show the view immediately to prevent layout shifts
         this.showView('call-scripts-view');
         
-        // Fetch the HTML content
+        // Load the HTML content
         const response = await fetch('call-scripts-content.html');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -549,32 +278,32 @@ const CRMApp = {
         const htmlContent = await response.text();
         callScriptsView.innerHTML = htmlContent;
 
-        // The JavaScript is now loaded via call-scripts-content.js in the HTML
+        // Initialize the call scripts functionality
         if (typeof window.initializeCallScriptsPage === 'function') {
             try {
                 window.initializeCallScriptsPage();
-                
-                // Auto-populate if the function exists
-                if (typeof this.autoPopulateCallScripts === 'function') {
-                    this.autoPopulateCallScripts();
-        // Find a contact and their associated account to pre-populate
-        let contactToPopulate = null;
-        let accountToPopulate = null;
-
-        // Try to find a contact with an associated account
-        if (this.contacts.length > 0) {
-            contactToPopulate = this.contacts[0]; // Take the first contact
-            if (contactToPopulate.accountId) {
-                accountToPopulate = this.accounts.find(acc => acc.id === contactToPopulate.accountId);
+                this.autoPopulateCallScripts();
+                console.log('Call scripts content loaded and initialized.');
+                this.showToast('Cold Calling Hub loaded successfully!', 'success');
+            } catch (initError) {
+                console.error('Error initializing call scripts:', initError);
+                throw new Error(`Initialization failed: ${initError.message}`);
             }
+        } else {
+            throw new Error('Initialization function not found');
         }
-        // If no contact with account, just try to find any account
-        if (!accountToPopulate && this.accounts.length > 0) {
-            accountToPopulate = this.accounts[0];
-        }
-
-        // Populate Prospect Info fields
-        const inputPhone = document.getElementById('input-phone');
+    } catch (error) {
+        console.error('Error in showCallScriptsView:', error);
+        callScriptsView.innerHTML = `
+            <div class="error-state">
+                <h3>Failed to load call scripts</h3>
+                <p>${error.message}</p>
+                <button class="retry-button" onclick="window.crmApp.showCallScriptsView()">Retry</button>
+            </div>
+        `;
+        this.showToast('Failed to load call scripts. Please try again.', 'error');
+    }
+},
         const inputCompanyName = document.getElementById('input-company-name');
         const inputName = document.getElementById('input-name');
         const inputTitle = document.getElementById('input-title');

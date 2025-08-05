@@ -1416,6 +1416,7 @@ html, body {
     overflow-y: hidden;
     height: 100%; /* Ensure it takes full height of its container */
 }
+
 .calls-hub-main-inner {
     display: flex;
     flex-direction: column;

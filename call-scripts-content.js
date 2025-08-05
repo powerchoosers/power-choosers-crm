@@ -845,46 +845,47 @@ supplierNames.forEach(supplier => {
     datalist.appendChild(option);
 });
 
-// Initialize the call script when the page loads
-document.addEventListener('DOMContentLoaded', function() {
+// Initialize call scripts functionality
+window.initializeCallScriptsPage = function() {
     // Check if we're on the call scripts page
-    if (document.getElementById('call-scripts-view')) {
-        // Initialize the call script with the first step
-        displayCurrentStep();
-        
-        // Set up event listeners for the dialpad
-        document.querySelectorAll('.dial-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const digit = this.getAttribute('data-digit');
-                dialpadInput(digit);
-            });
+    if (!document.getElementById('call-scripts-view')) return;
+    
+    console.log('Initializing call scripts...');
+    
+    // Initialize the call script with the first step
+    displayCurrentStep();
+    
+    // Set up event listeners for the dialpad
+    document.querySelectorAll('.dial-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const digit = this.getAttribute('data-digit');
+            dialpadInput(digit);
         });
-        
-        // Set up event listeners for form inputs with data-update-script attribute
-        document.querySelectorAll('[data-update-script]').forEach(input => {
-            input.addEventListener('input', updateScript);
-        });
-        
-        // Set up event listeners for action buttons
-        document.getElementById('dialButton')?.addEventListener('click', handleDialClick);
-        document.getElementById('backButton')?.addEventListener('click', goBack);
-        document.getElementById('restartButton')?.addEventListener('click', restart);
-        document.getElementById('saveButton')?.addEventListener('click', saveProspectAndNotes);
-        document.getElementById('clearNotes')?.addEventListener('click', clearNotes);
-        
-        // Set up event delegation for the modal close functionality
-        document.addEventListener('click', function(event) {
-            // Handle modal close
-            if (event.target.closest('[data-close-modal]')) {
-                closeModal(event);
-            }
-        });
-        
-        // Initialize the energy health check widget
-        activateSection(1);
-        updateButton();
-        
-        // Log that the call scripts have been initialized
-        console.log('Call scripts initialized');
-    }
-});
+    });
+    
+    // Set up event listeners for form inputs with data-update-script attribute
+    document.querySelectorAll('[data-update-script]').forEach(input => {
+        input.addEventListener('input', updateScript);
+    });
+    
+    // Set up event listeners for action buttons
+    document.getElementById('dialButton')?.addEventListener('click', handleDialClick);
+    document.getElementById('backButton')?.addEventListener('click', goBack);
+    document.getElementById('restartButton')?.addEventListener('click', restart);
+    document.getElementById('saveButton')?.addEventListener('click', saveProspectAndNotes);
+    document.getElementById('clearNotes')?.addEventListener('click', clearNotes);
+    
+    // Set up event delegation for the modal close functionality
+    document.addEventListener('click', function(event) {
+        // Handle modal close
+        if (event.target.closest('[data-close-modal]')) {
+            closeModal(event);
+        }
+    });
+    
+    // Initialize the energy health check widget
+    activateSection(1);
+    updateButton();
+    
+    console.log('Call scripts initialized successfully');
+};
