@@ -1,5 +1,5 @@
 /*
- * Power Choosers CRM Dashboard - Complete CSS Stylesheet (FINAL)
+ * Power Choosers CRM Dashboard - Complete CSS Stylesheet (REDESIGNED)
  * This provides a cohesive, responsive design for the CRM dashboard application.
  */
 
@@ -233,137 +233,315 @@ body {
     box-shadow: var(--shadow-md);
 }
 
-/* --- 4. Left Sidebar Navigation (FINAL CENTERING FIX) --- */
-/* Fixed Navigation Icon Centering - Add this to your crm-styles.css */
-
-/* --- 4. Left Sidebar Navigation (FIXED ICON CENTERING) --- */
+/* --- 4. Left Sidebar Navigation (REDESIGNED) --- */
 .app-sidebar {
-    width: 72px;
-    background: linear-gradient(180deg, var(--dark-blue) 0%, var(--darker-blue) 100%);
+    width: 80px;
+    background: linear-gradient(180deg, 
+        rgba(35, 64, 142, 0.95) 0%, 
+        rgba(28, 51, 107, 0.95) 50%, 
+        rgba(18, 24, 32, 0.95) 100%);
+    backdrop-filter: blur(10px);
     overflow: hidden;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
     flex-shrink: 0;
     position: relative;
     z-index: 900;
-    border-right: 1px solid var(--border-color);
-    box-shadow: inset -3px 0 10px rgba(0, 0, 0, 0.2);
+    border-right: 2px solid rgba(35, 64, 142, 0.3);
+    box-shadow: 
+        4px 0 20px rgba(0, 0, 0, 0.3),
+        inset -1px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+.app-sidebar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, 
+        rgba(245, 158, 11, 0.05) 0%, 
+        transparent 20%, 
+        transparent 80%, 
+        rgba(16, 185, 129, 0.05) 100%);
+    pointer-events: none;
 }
 
 .app-sidebar:hover {
-    width: 240px;
-    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.4);
+    width: 280px;
+    background: linear-gradient(180deg, 
+        rgba(35, 64, 142, 0.98) 0%, 
+        rgba(28, 51, 107, 0.98) 50%, 
+        rgba(18, 24, 32, 0.98) 100%);
+    box-shadow: 
+        8px 0 40px rgba(0, 0, 0, 0.5),
+        inset -1px 0 0 rgba(255, 255, 255, 0.15);
 }
 
 .sidebar-nav {
     display: flex;
     flex-direction: column;
-    padding: 16px 0;
-    gap: 4px;
+    padding: 24px 0;
+    gap: 8px;
+    position: relative;
+}
+
+/* Sidebar Header when expanded */
+.sidebar-nav::before {
+    content: 'Navigation';
+    position: absolute;
+    top: 8px;
+    left: 24px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(226, 232, 240, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0;
+    transition: opacity 0.3s ease 0.2s;
+}
+
+.app-sidebar:hover .sidebar-nav::before {
+    opacity: 1;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    justify-content: center; /* Perfect centering when collapsed */
-    padding: 16px 12px; /* Equal padding for centering */
+    justify-content: center;
+    padding: 16px;
     text-decoration: none;
-    color: white;
+    color: rgba(226, 232, 240, 0.9);
     white-space: nowrap;
-    transition: all 0.2s ease;
-    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
+    border-radius: 16px;
     position: relative;
-    margin: 0 8px; /* Small margin for rounded corners */
-    min-height: 56px; /* Ensure consistent height */
+    margin: 0 12px;
+    min-height: 56px;
     box-sizing: border-box;
+    overflow: hidden;
+    backdrop-filter: blur(5px);
+}
+
+/* Hover glow effect */
+.nav-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, 
+        rgba(35, 64, 142, 0.3) 0%, 
+        rgba(245, 158, 11, 0.1) 100%);
+    border-radius: 16px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
 }
 
 /* When sidebar is hovered, align items to the left */
 .app-sidebar:hover .nav-item {
     justify-content: flex-start;
     padding: 16px 24px;
+    margin: 0 16px;
 }
 
 .nav-item:hover {
     color: white;
-    background-color: var(--bg-hover);
-    transform: translateX(4px);
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateX(8px) scale(1.02);
+    box-shadow: 
+        0 8px 32px rgba(35, 64, 142, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.nav-item:hover::before {
+    opacity: 1;
 }
 
 .nav-item.active {
     color: white;
-    background-color: var(--professional-blue);
-    box-shadow: 0 4px 15px rgba(30, 64, 175, 0.4);
+    background: linear-gradient(135deg, 
+        rgba(35, 64, 142, 0.8) 0%, 
+        rgba(245, 158, 11, 0.2) 100%);
+    box-shadow: 
+        0 8px 32px rgba(35, 64, 142, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 0 0 1px rgba(245, 158, 11, 0.4);
 }
 
-.nav-item.active::before {
+.nav-item.active::after {
     content: '';
     position: absolute;
-    left: -8px;
+    left: -12px;
     top: 50%;
     transform: translateY(-50%);
     width: 4px;
-    height: 24px;
-    background-color: var(--accent-orange);
+    height: 32px;
+    background: linear-gradient(180deg, 
+        var(--accent-orange) 0%, 
+        rgba(245, 158, 11, 0.6) 100%);
     border-radius: 2px;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+/* Icon container for better centering */
+.nav-item .nav-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.app-sidebar:hover .nav-item .nav-icon {
+    margin-right: 20px;
 }
 
 .nav-item svg {
-    margin-right: 0; /* No margin when centered */
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
-    transition: margin-right 0.2s ease;
+    width: 22px;
+    height: 22px;
     stroke: currentColor;
-    display: block; /* Ensure proper display */
+    stroke-width: 2;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    transition: all 0.3s ease;
 }
 
-.app-sidebar:hover .nav-item svg {
-    margin-right: 16px; /* Add margin when expanded */
+.nav-item:hover svg {
+    transform: scale(1.1);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+}
+
+.nav-item.active svg {
+    filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.4));
 }
 
 .nav-item span {
     opacity: 0;
-    transition: opacity 0.2s ease 0.1s;
+    transform: translateX(-20px);
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
     font-weight: 500;
     color: white;
     white-space: nowrap;
+    font-size: 0.95rem;
 }
 
 .app-sidebar:hover .nav-item span {
     opacity: 1;
+    transform: translateX(0);
+    transition-delay: 0.1s;
 }
 
-/* Navigation Badges */
+/* Navigation Badges - Redesigned */
 .nav-badge {
-    margin-left: auto;
-    background: var(--accent-red);
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: linear-gradient(135deg, var(--accent-red) 0%, #dc2626 100%);
     color: white;
-    border-radius: 50%;
-    width: 20px;
+    border-radius: 12px;
+    min-width: 20px;
     height: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s ease 0.1s;
-    position: absolute;
-    right: 8px;
+    padding: 0 6px;
+    opacity: 1;
+    transform: scale(0.9);
+    transition: all 0.3s ease;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 
+        0 2px 8px rgba(239, 68, 68, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    z-index: 10;
 }
 
 .app-sidebar:hover .nav-badge {
+    top: 12px;
+    right: 16px;
+    transform: scale(1);
+}
+
+.nav-badge:empty {
+    display: none !important;
+}
+
+/* Sidebar Footer */
+.sidebar-nav::after {
+    content: '';
+    margin-top: auto;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.2) 50%, 
+        transparent 100%);
+    margin-left: 16px;
+    margin-right: 16px;
+}
+
+/* Special styling for settings item */
+.nav-item[data-view="settings-view"] {
+    margin-top: auto;
+    margin-bottom: 8px;
+}
+
+.nav-item[data-view="settings-view"]::before {
+    background: linear-gradient(135deg, 
+        rgba(100, 116, 139, 0.3) 0%, 
+        rgba(148, 163, 184, 0.1) 100%);
+}
+
+/* Tooltip for collapsed state */
+.nav-item[data-tooltip] {
+    position: relative;
+}
+
+.nav-item[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 90px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-sidebar:not(:hover) .nav-item[data-tooltip]:hover::after {
     opacity: 1;
-    position: static;
+    transition-delay: 0.5s;
 }
 
-/* Additional fix for perfect centering */
-.nav-item {
-    text-align: center;
+/* Animations for expand/collapse */
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
-.app-sidebar:hover .nav-item {
-    text-align: left;
+.app-sidebar:hover .nav-item span {
+    animation: slideInLeft 0.3s ease forwards;
 }
 
 /* --- 5. Page Views --- */
@@ -1114,11 +1292,22 @@ body {
     }
     
     .app-sidebar {
-        width: 60px;
+        width: 64px;
     }
     
     .app-sidebar:hover {
-        width: 200px;
+        width: 240px;
+    }
+    
+    .nav-item {
+        margin: 0 8px;
+        min-height: 48px;
+        padding: 12px;
+    }
+    
+    .app-sidebar:hover .nav-item {
+        padding: 12px 20px;
+        margin: 0 12px;
     }
     
     .modal-content {
