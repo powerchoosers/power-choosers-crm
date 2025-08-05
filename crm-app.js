@@ -210,7 +210,8 @@ const CRMApp = {
         });
         const activeView = document.getElementById(viewName);
         if (activeView) {
-            activeView.style.display = 'block';
+            // Use 'flex' for call-scripts-view to ensure its internal grid layout works
+            activeView.style.display = (viewName === 'call-scripts-view') ? 'flex' : 'block';
         }
         
         if (viewName === 'dashboard-view') {
@@ -529,6 +530,8 @@ const CRMApp = {
             // Fetch the content of call-scripts-content.html
             const response = await fetch('call-scripts-content.html');
             if (!response.ok) {
+                // Log the full response to help debug network issues
+                console.error(`Failed to fetch call-scripts-content.html: ${response.status} ${response.statusText}`);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const htmlContent = await response.text();
@@ -546,7 +549,7 @@ const CRMApp = {
             }
         } catch (error) {
             console.error('Error loading call scripts content:', error);
-            this.showToast('Failed to load call scripts. Please check the file path.', 'error');
+            this.showToast('Failed to load call scripts. Please check the file path or network.', 'error');
         }
     },
 
@@ -1003,7 +1006,7 @@ const CRMApp = {
         const notificationBadge = document.getElementById('notification-badge');
         const notificationCount = document.getElementById('notification-count');
         
-        const totalCount = this.notifications.reduce((sum, n => sum + n.count, 0);
+        const totalCount = this.notifications.reduce((sum, n) => sum + n.count, 0); 
         
         if (notificationBadge) {
             notificationBadge.textContent = totalCount;
