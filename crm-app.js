@@ -1,6 +1,7 @@
 // Power Choosers CRM Dashboard - Main JavaScript File (UPDATED)
 // This file contains the complete application logic for the redesigned Power Choosers CRM.
 // Updated with white SVG activity icons for better theme consistency
+// Added Call Scripts button functionality
 
 // --- 1. Firebase Configuration & Initialization ---
 const firebaseConfig = {
@@ -143,6 +144,15 @@ const CRMApp = {
                 if (!notificationDropdown.contains(e.target) && notificationDropdown.classList.contains('active')) {
                     notificationDropdown.classList.remove('active');
                 }
+            });
+        }
+
+        // Call Scripts button
+        const callScriptsBtn = document.getElementById('call-scripts-btn');
+        if (callScriptsBtn) {
+            callScriptsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openCallScriptsModal();
             });
         }
         
@@ -479,6 +489,17 @@ const CRMApp = {
 
     bulkImport() {
         this.openModal('bulk-import-modal');
+    },
+
+    // Open call scripts modal/panel
+    openCallScriptsModal() {
+        // For now, show a toast - replace this with your call scripts functionality later
+        this.showToast('Call Scripts feature coming soon!', 'info');
+        
+        // Later you can replace this with:
+        // this.showView('call-scripts-view');
+        // or
+        // this.openModal('call-scripts-modal');
     },
 
     // Modal functions
