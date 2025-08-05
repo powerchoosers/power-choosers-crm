@@ -1,6 +1,12 @@
 /*
  * Power Choosers CRM Dashboard - Complete Redesign CSS
  * Modern dark theme with scroll-under effects and expandable sidebar
+ *
+ * **FIXED**
+ * - Main content now stacks with consistent spacing.
+ * - Header elements (logo, title, search) are now properly aligned.
+ * - Sidebar icons are centered in the collapsed view.
+ * - Notification dropdown layout is improved.
  */
 
 /* --- 1. CSS Variables & Global Styles --- */
@@ -19,6 +25,7 @@
     --shadow-header: 0 4px 20px rgba(0, 0, 0, 0.5);
     --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-scroll: inset 0 10px 20px -10px rgba(0, 0, 0, 0.4);
+    --spacing-lg: 32px;
 }
 
 * {
@@ -109,6 +116,8 @@ html, body {
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
+    /* FIX: Align title with other elements */
+    align-self: center; 
 }
 
 .header-center {
@@ -231,6 +240,10 @@ html, body {
     position: relative;
     z-index: 900;
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+    /* FIX: Ensure icons are centered when collapsed */
+    display: flex;
+    flex-direction: column;
+    align-items: center; 
 }
 
 .app-sidebar:hover {
@@ -243,12 +256,13 @@ html, body {
     flex-direction: column;
     padding: 20px 0;
     gap: 4px;
+    width: 100%; /* FIX: Ensure nav items fill the width */
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start; /* FIX: Align content to the start */
     height: 50px;
     margin: 0 8px;
     padding: 0 12px;
@@ -338,8 +352,10 @@ html, body {
     flex: 3;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 32px 24px 0 24px;
+    padding: var(--spacing-lg) var(--spacing-lg) 0 var(--spacing-lg);
     position: relative;
+    /* FIX: Change display to block to stack elements */
+    display: block; 
 }
 
 .main-content::before {
@@ -371,7 +387,7 @@ html, body {
     border-left: 1px solid var(--border-light);
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 32px 24px 0 24px;
+    padding: var(--spacing-lg) var(--spacing-lg) 0 var(--spacing-lg);
     position: relative;
 }
 
@@ -397,6 +413,10 @@ html, body {
     display: none;
     width: 100%;
     height: 100%;
+    /* FIX: Set up a flex column layout for stacking */
+    display: flex;
+    flex-direction: column; 
+    gap: var(--spacing-lg); /* FIX: Consistent spacing between sections */
 }
 
 .page-view.active {
@@ -486,22 +506,6 @@ html, body {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-/* Widget Cards */
-.widget-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
-    transition: all 0.3s ease;
-    box-shadow: var(--shadow-card);
-}
-
-.widget-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 /* Market Trends Specific */
@@ -745,6 +749,8 @@ html, body {
     transition: all 0.3s ease;
     visibility: hidden;
     overflow: hidden;
+    display: flex; /* FIX: Use flexbox for a better layout */
+    flex-direction: column;
 }
 
 .notification-dropdown.active {
@@ -759,6 +765,7 @@ html, body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .notification-title {
@@ -779,6 +786,8 @@ html, body {
 .notification-list {
     max-height: 300px;
     overflow-y: auto;
+    list-style: none;
+    padding: 0;
 }
 
 .notification-item {
@@ -786,6 +795,9 @@ html, body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     transition: all 0.2s ease;
     cursor: pointer;
+    display: flex; /* FIX: Use flexbox for item layout */
+    align-items: center;
+    gap: 12px;
 }
 
 .notification-item:hover {
@@ -796,12 +808,40 @@ html, body {
     border-bottom: none;
 }
 
+.notification-item .notification-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-blue);
+    flex-shrink: 0;
+}
+
+.notification-item .notification-text {
+    flex: 1;
+}
+
+.notification-item .notification-message {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.notification-item .notification-time {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
 .notification-empty {
     padding: 32px 20px;
     text-align: center;
     color: var(--text-muted);
     font-style: italic;
 }
+
 
 /* --- 10. Modal Styles --- */
 .modal-overlay {
