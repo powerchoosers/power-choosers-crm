@@ -9,6 +9,8 @@
  * - Updated activity icons to white theme-consistent icons
  * - Fixed notification bell positioning
  * - Improved overall visual consistency
+ * - Fixed stat cards to maintain single row when sidebar expands
+ * - Removed grey separator lines from sidebar
  */
 
 /* --- 1. CSS Variables & Global Styles --- */
@@ -241,7 +243,7 @@ html, body {
     box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
 }
 
-/* --- 4. Expandable Left Sidebar (SIMPLIFIED EVEN SPACING) --- */
+/* --- 4. Expandable Left Sidebar (REMOVED SEPARATORS) --- */
 .app-sidebar {
     width: 60px;
     min-width: 60px;
@@ -271,7 +273,7 @@ html, body {
     justify-content: center;
 }
 
-/* Navigation sections with adjusted margins */
+/* Navigation sections with adjusted margins - REMOVED SEPARATORS */
 .nav-section {
     display: flex;
     flex-direction: column;
@@ -285,7 +287,7 @@ html, body {
 }
 
 /* Second section - normal spacing */
-.nav-section:nth-child(3) {
+.nav-section:nth-child(2) {
     margin-bottom: 20px; /* Reduced from 30px to 20px after tasks */
 }
 
@@ -294,15 +296,7 @@ html, body {
     /* No additional margin needed - container padding handles bottom space */
 }
 
-.nav-separator {
-    width: 60%;
-    height: 1px;
-    background-color: #444444;
-    margin: 20px 0; /* Reduced from 30px to 20px above and below separator */
-    align-self: center;
-    opacity: 0.6;
-    flex-shrink: 0;
-}
+/* REMOVED: .nav-separator styles completely */
 
 .nav-item {
     display: flex;
@@ -412,7 +406,7 @@ html, body {
     right: 12px;
 }
 
-/* --- 5. Main Content Area (3/4 width) --- */
+/* --- 5. Main Content Area (3/4 width) - FIXED STAT CARDS --- */
 .main-content {
     flex: 3;
     overflow-y: auto;
@@ -423,6 +417,7 @@ html, body {
     flex-direction: column;
     gap: var(--spacing-lg);
     padding-bottom: 60px;
+    min-width: 0; /* Allow flex shrinking */
 }
 
 .main-content::before {
@@ -460,6 +455,7 @@ html, body {
     flex-direction: column;
     gap: 24px;
     padding-bottom: 60px;
+    min-width: 0; /* Allow flex shrinking */
 }
 
 .widget-panel::before {
@@ -517,23 +513,25 @@ html, body {
     display: flex !important;
 }
 
-/* --- 8. Dashboard Components (Improved Spacing) --- */
+/* --- 8. Dashboard Components (FIXED STAT CARDS) --- */
 .stat-cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(4, 1fr); /* Force 4 equal columns */
+    gap: 20px; /* Reduced gap to help maintain layout */
     margin-bottom: 32px;
+    min-width: 0; /* Allow grid to shrink */
 }
 
 .stat-card {
     background: var(--bg-card);
     border: 1px solid var(--border-light);
     border-radius: 12px;
-    padding: 28px 24px;
+    padding: 24px 20px; /* Reduced horizontal padding */
     text-align: center;
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
+    min-width: 0; /* Allow card to shrink */
 }
 
 .stat-card::before {
@@ -553,7 +551,7 @@ html, body {
 }
 
 .stat-value {
-    font-size: 2.2rem;
+    font-size: 2rem; /* Reduced from 2.2rem */
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 8px;
@@ -561,7 +559,7 @@ html, body {
 }
 
 .stat-label {
-    font-size: 0.85rem;
+    font-size: 0.8rem; /* Reduced from 0.85rem */
     color: var(--text-secondary);
     font-weight: 500;
     text-transform: uppercase;
@@ -1147,6 +1145,32 @@ html, body {
     .widget-panel {
         flex: 1;
     }
+    
+    /* Ensure stat cards stay in one row even on smaller screens */
+    .stat-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+    }
+    
+    .stat-card {
+        padding: 20px 16px;
+    }
+    
+    .stat-value {
+        font-size: 1.8rem;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 968px) {
+    /* Only on very small screens allow stat cards to wrap */
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
 }
 
 @media (max-width: 768px) {
@@ -1195,5 +1219,9 @@ html, body {
         height: 40%;
         border-left: none;
         border-top: 1px solid var(--border-light);
+    }
+    
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
