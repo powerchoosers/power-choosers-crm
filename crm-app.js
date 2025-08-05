@@ -205,39 +205,35 @@ const CRMApp = {
     // Show/hide views in the single-page application
     showView(viewName) {
         this.currentView = viewName;
-
-        const mainContent = document.querySelector('.main-content');
-        const widgetPanel = document.querySelector('.widget-panel');
-        const callScriptsView = document.getElementById('call-scripts-view');
-
-        // Hide all page views inside the main content area
-        document.querySelectorAll('.main-content .page-view').forEach(view => {
-            view.style.display = 'none';
+        
+        // Hide all main page containers first
+        document.querySelectorAll('.app-content-container > *').forEach(el => {
+            el.style.display = 'none';
         });
 
+        // Handle the special case for the cold calling view
         if (viewName === 'call-scripts-view') {
-            // When call scripts view is active, hide dashboard main content and widget panel
-            if (mainContent) mainContent.style.display = 'none';
-            if (widgetPanel) widgetPanel.style.display = 'none';
+            const callScriptsView = document.getElementById('call-scripts-view');
             if (callScriptsView) {
-                callScriptsView.style.display = 'block'; // Show the call scripts container
+                callScriptsView.style.display = 'flex';
             }
         } else {
-            // For all other views, show the dashboard main content and widget panel
-            if (mainContent) mainContent.style.display = 'block';
-            if (widgetPanel) widgetPanel.style.display = 'flex'; // Widget panel is flex
-            if (callScriptsView) callScriptsView.style.display = 'none'; // Hide call scripts container
-
-            // Show the specific page view within main-content
+            // For all other views, show the main dashboard layout
+            const mainContent = document.querySelector('.main-content');
+            const widgetPanel = document.querySelector('.widget-panel');
+            if (mainContent) mainContent.style.display = 'flex';
+            if (widgetPanel) widgetPanel.style.display = 'flex';
+            
+            // Then, show the specific view within the main content
             const activeView = document.getElementById(viewName);
             if (activeView) {
-                activeView.style.display = 'flex'; // Dashboard is flex, others are block by default
+                activeView.style.display = 'flex';
             }
-
-            // Handle dashboard specific rendering
-            if (viewName === 'dashboard-view') {
-                this.renderDashboard();
-            }
+        }
+        
+        // Re-render dashboard content if returning to it
+        if (viewName === 'dashboard-view') {
+            this.renderDashboard();
         }
     },
 
