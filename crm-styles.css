@@ -88,9 +88,15 @@ html, body {
     display: flex;
 }
 
-/* Recent Activities icon spacing */
+/* Card title icon spacing */
 .card-title svg {
-    margin-right: 8px; /* Match the spacing of other icons in card titles */
+    margin-right: 12px; /* Increased from 8px to 12px for better spacing */
+}
+
+/* Ensure navigation buttons remain centered */
+.activity-navigation {
+    display: flex;
+    gap: 8px;
 }
 
 /* --- 3. Header Styles (Fixed) --- */
@@ -288,14 +294,14 @@ html, body {
     width: 100%;
 }
 
-/* First section - reduced margin after accounts */
-.nav-section:first-child {
-    margin-bottom: 20px; /* Reduced from 30px to 20px */
+/* Navigation section spacing */
+.nav-section {
+    margin-bottom: 30px; /* Consistent margin for all sections */
 }
 
-/* Second section - normal spacing */
-.nav-section:nth-child(2) {
-    margin-bottom: 30px; /* Increased margin after tasks as requested */
+/* Remove extra bottom margin from the last section */
+.nav-section:last-child {
+    margin-bottom: 0;
 }
 
 /* Last section */
