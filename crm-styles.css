@@ -18,7 +18,7 @@
     --text-primary: #ffffff;
     --text-secondary: #b0b0b0;
     --text-muted: #808080;
-    --accent-blue: #2196f3;
+    --accent-blue: #1a237e;
     --border-light: #2a2a2a;
     --bg-card: #1a1a1a;
     --bg-hover: #242424;
@@ -116,7 +116,11 @@ html, body {
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
+    margin: 0;
+    line-height: 1;
     align-self: center;
+    position: relative;
+    top: -2px;
 }
 
 .header-center {
@@ -153,7 +157,7 @@ html, body {
     outline: none;
     border-color: var(--accent-blue);
     background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+    box-shadow: 0 0 0 2px rgba(26, 35, 126, 0.2);
 }
 
 .search-icon {
@@ -173,6 +177,8 @@ html, body {
     gap: 12px;
     min-width: 120px;
     justify-content: flex-end;
+    position: relative;
+    right: -4px; /* Slight adjustment to align with edge */
 }
 
 .icon-button {
@@ -212,6 +218,12 @@ html, body {
     border: 2px solid var(--dark-blue);
 }
 
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .user-profile .profile-avatar {
     width: 40px;
     height: 40px;
@@ -224,6 +236,24 @@ html, body {
     color: white;
     cursor: pointer;
     transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+}
+
+.profile-avatar.has-image .initials {
+    display: none;
+}
+
+.profile-avatar.has-image img {
+    display: block;
 }
 
 .user-profile .profile-avatar:hover {
@@ -319,9 +349,9 @@ html, body {
 }
 
 .nav-item.active {
-    background: rgba(33, 150, 243, 0.2);
+    background: rgba(26, 35, 126, 0.2);
     color: var(--text-primary);
-    border: 1px solid rgba(33, 150, 243, 0.3);
+    border: 1px solid rgba(26, 35, 126, 0.3);
 }
 
 .nav-item.active::before {
@@ -333,17 +363,59 @@ html, body {
     width: 3px;
     height: 24px;
     background: var(--accent-blue);
-    border-radius: 0 2px 2px 0;
+    border-radius: 0 2px
 }
 
 .nav-item svg {
     width: 20px;
     height: 20px;
-    fill: none;
-    stroke: currentColor;
+    stroke: white;
     stroke-width: 2;
-    flex-shrink: 0;
-    transition: margin-right 0.3s ease;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+}
+
+/* Dashboard icon */
+.nav-item[data-view="dashboard-view"] svg {
+    stroke: white;
+}
+
+/* Contacts icon */
+.nav-item[data-view="contacts-view"] svg {
+    stroke: white;
+}
+
+/* Accounts icon - Updated to building */
+.nav-item[data-view="accounts-view"] svg {
+    stroke: white;
+    fill: white;
+}
+
+/* Calls icon */
+.nav-item[data-view="calls-view"] svg {
+    stroke: white;
+}
+
+/* Emails icon */
+.nav-item[data-view="emails-view"] svg {
+    stroke: white;
+    fill: white;
+}
+
+/* Tasks icon */
+.nav-item[data-view="tasks-view"] svg {
+    stroke: white;
+}
+
+/* Account Details icon */
+.nav-item[data-view="account-details-view"] svg {
+    stroke: white;
+}
+
+/* Settings icon */
+.nav-item[data-view="settings-view"] svg {
+    stroke: white;
 }
 
 .app-sidebar:hover .nav-item svg {
@@ -627,15 +699,20 @@ html, body {
     fill: none;
 }
 
-/* Activity Lists */
+/* Activity List Container */
 .activity-list-container {
     position: relative;
     overflow: hidden;
+    margin: 0 -15px 30px;
+    padding: 10px 0;
 }
 
+/* Activity List Wrapper */
 .activity-list-wrapper {
     display: flex;
     transition: transform 0.3s ease-in-out;
+    will-change: transform;
+    min-height: 200px; /* Ensure consistent height */
 }
 
 .activity-page {

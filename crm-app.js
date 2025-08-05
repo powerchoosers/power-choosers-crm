@@ -111,6 +111,47 @@ const CRMApp = {
 
     // Setup event listeners
     setupEventListeners() {
+        // Profile picture upload
+        const profileAvatar = document.getElementById('profile-avatar');
+        const profileUpload = document.getElementById('profile-upload');
+        const profileImage = document.getElementById('profile-image');
+
+        profileAvatar.addEventListener('click', (e) => {
+            // Only trigger file input if not clicking on the file input itself
+            if (e.target !== profileUpload) {
+                profileUpload.click();
+            }
+        });
+
+        profileUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    // Update the image source
+                    profileImage.src = event.target.result;
+                    profileImage.style.display = 'block';
+                    
+                    // Add has-image class to show image instead of initials
+                    profileAvatar.classList.add('has-image');
+                    
+                    // Save to localStorage for persistence
+                    localStorage.setItem('profileImage', event.target.result);
+                    
+                    this.showToast('Profile picture updated successfully', 'success');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Load saved profile picture if exists
+        const savedImage = localStorage.getItem('profileImage');
+        if (savedImage) {
+            profileImage.src = savedImage;
+            profileImage.style.display = 'block';
+            profileAvatar.classList.add('has-image');
+        }
+
         // Navigation links
         document.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', (e) => {
