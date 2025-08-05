@@ -210,8 +210,8 @@ const CRMApp = {
         const widgetPanel = document.querySelector('.widget-panel');
         const callScriptsView = document.getElementById('call-scripts-view');
 
-        // Hide all page views
-        document.querySelectorAll('.page-view').forEach(view => {
+        // Hide all page views inside the main content area
+        document.querySelectorAll('.main-content .page-view').forEach(view => {
             view.style.display = 'none';
         });
 
