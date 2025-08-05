@@ -94,6 +94,7 @@ html, body {
     padding: 24px;
     background: var(--cch-darker-blue);
     z-index: 10;
+    box-sizing: border-box;
 }
 
 /* Loading and error states */
@@ -1398,12 +1399,11 @@ html, body {
 /* Main Layout */
 .calls-hub-layout {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 3fr 1fr;
     gap: 25px;
-    height: calc(100vh - 70px - 48px); /* Full height minus header and body padding */
-    padding: 24px 0; /* Add vertical padding to match main content */
-    overflow-y: auto; /* Allow scrolling for the entire layout */
-    box-sizing: border-box; /* Include padding in height calculation */
+    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 /* Main Script Area */
@@ -1622,8 +1622,9 @@ html, body {
     flex-direction: column;
     gap: 20px;
     overflow-y: auto;
-    min-width: 350px;
-    padding: 0 8px; /* For scrollbar padding */
+    padding: 0 8px;
+    height: 100%;
+    box-sizing: border-box;
 }
 
 .sidebar-card {

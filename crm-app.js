@@ -537,13 +537,6 @@ const CRMApp = {
             return;
         }
 
-        // If content is already loaded, just show the view
-        if (callScriptsView.hasChildNodes()) {
-            this.showView('call-scripts-view');
-            this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
-            return;
-        }
-
         try {
             // Show loading state
             callScriptsView.innerHTML = '<div class="loading-state">Loading Call Scripts...</div>';
