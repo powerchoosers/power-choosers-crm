@@ -509,47 +509,36 @@ const CRMApp = {
     },
 
     // Function to load and display the Call Scripts view
-    async showCallScriptsView() {
-        const callScriptsView = document.getElementById('call-scripts-view');
-        if (!callScriptsView) {
-            console.error('Call scripts view element not found.');
-            this.showToast('Call scripts view not available.', 'error');
+    showCallScriptsView() {
+        // First, ensure we're on the dashboard view where the call scripts container exists
+        this.showView('dashboard-view');
+        
+        // Get the call scripts container that's already in the DOM
+        const callScriptsContainer = document.querySelector('.calls-hub-layout');
+        
+        if (!callScriptsContainer) {
+            console.error('Call scripts container not found in the DOM.');
+            this.showToast('Call scripts feature not available.', 'error');
             return;
         }
 
-        // Ensure the call scripts view is visible and other views are hidden
-        this.showView('call-scripts-view'); 
-        // Update the active navigation button to reflect the current view (if applicable)
-        // Since Call Scripts is a button in the header, we might want to keep 'Dashboard' active
-        // or add a dedicated 'Call Scripts' nav item if it's a primary view.
-        // For now, let's keep the Dashboard nav item active.
+        // Show the call scripts container and hide other dashboard content
+        document.querySelectorAll('.dashboard-card, .stat-cards-grid').forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        callScriptsContainer.style.display = 'grid';
+        
+        // Update the active navigation button to show dashboard is active
         this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
-
-
-        try {
-            // Fetch the content of call-scripts-content.html
-            const response = await fetch('call-scripts-content.html');
-            if (!response.ok) {
-                // Log the full response to help debug network issues
-                console.error(`Failed to fetch call-scripts-content.html: ${response.status} ${response.statusText}`);
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const htmlContent = await response.text();
-            callScriptsView.innerHTML = htmlContent;
-
-            // Initialize the script within the loaded content
-            // The script in call-scripts-content.html is wrapped in initializeCallScriptsPage()
-            if (typeof window.initializeCallScriptsPage === 'function') {
-                window.initializeCallScriptsPage();
-                this.autoPopulateCallScripts();
-                console.log('Call scripts content loaded and initialized.');
-            } else {
-                console.error('initializeCallScriptsPage function not found in loaded script.');
-                this.showToast('Failed to initialize call scripts functionality.', 'error');
-            }
-        } catch (error) {
-            console.error('Error loading call scripts content:', error);
-            this.showToast('Failed to load call scripts. Please check the file path or network.', 'error');
+        
+        // Initialize the call scripts if the function exists
+        if (typeof window.initializeCallScriptsPage === 'function') {
+            window.initializeCallScriptsPage();
+            this.autoPopulateCallScripts();
+            console.log('Call scripts initialized.');
+        } else {
+            console.warn('initializeCallScriptsPage function not found.');
         }
     },
 
