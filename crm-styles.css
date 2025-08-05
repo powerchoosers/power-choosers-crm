@@ -234,6 +234,9 @@ body {
 }
 
 /* --- 4. Left Sidebar Navigation (FINAL CENTERING FIX) --- */
+/* Fixed Navigation Icon Centering - Add this to your crm-styles.css */
+
+/* --- 4. Left Sidebar Navigation (FIXED ICON CENTERING) --- */
 .app-sidebar {
     width: 72px;
     background: linear-gradient(180deg, var(--dark-blue) 0%, var(--darker-blue) 100%);
@@ -262,7 +265,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center; /* Perfect centering when collapsed */
-    padding: 16px 0; /* No horizontal padding for perfect centering */
+    padding: 16px 12px; /* Equal padding for centering */
     text-decoration: none;
     color: white;
     white-space: nowrap;
@@ -270,6 +273,8 @@ body {
     border-radius: 12px;
     position: relative;
     margin: 0 8px; /* Small margin for rounded corners */
+    min-height: 56px; /* Ensure consistent height */
+    box-sizing: border-box;
 }
 
 /* When sidebar is hovered, align items to the left */
@@ -309,6 +314,7 @@ body {
     flex-shrink: 0;
     transition: margin-right 0.2s ease;
     stroke: currentColor;
+    display: block; /* Ensure proper display */
 }
 
 .app-sidebar:hover .nav-item svg {
@@ -320,6 +326,7 @@ body {
     transition: opacity 0.2s ease 0.1s;
     font-weight: 500;
     color: white;
+    white-space: nowrap;
 }
 
 .app-sidebar:hover .nav-item span {
@@ -341,10 +348,22 @@ body {
     justify-content: center;
     opacity: 0;
     transition: opacity 0.2s ease 0.1s;
+    position: absolute;
+    right: 8px;
 }
 
 .app-sidebar:hover .nav-badge {
     opacity: 1;
+    position: static;
+}
+
+/* Additional fix for perfect centering */
+.nav-item {
+    text-align: center;
+}
+
+.app-sidebar:hover .nav-item {
+    text-align: left;
 }
 
 /* --- 5. Page Views --- */
