@@ -233,23 +233,23 @@ body {
     box-shadow: var(--shadow-md);
 }
 
-/* --- 4. Left Sidebar Navigation (REDESIGNED) --- */
+/* --- 4. Left Sidebar Navigation (REDESIGNED & FIXED) --- */
 .app-sidebar {
     width: 80px;
     background: linear-gradient(180deg, 
-        rgba(35, 64, 142, 0.95) 0%, 
-        rgba(28, 51, 107, 0.95) 50%, 
-        rgba(18, 24, 32, 0.95) 100%);
+        rgba(18, 24, 32, 0.95) 0%, 
+        rgba(11, 16, 22, 0.98) 50%, 
+        rgba(8, 12, 18, 0.98) 100%);
     backdrop-filter: blur(10px);
     overflow: hidden;
     transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
     flex-shrink: 0;
     position: relative;
     z-index: 900;
-    border-right: 2px solid rgba(35, 64, 142, 0.3);
+    border-right: 1px solid rgba(59, 66, 81, 0.4);
     box-shadow: 
-        4px 0 20px rgba(0, 0, 0, 0.3),
-        inset -1px 0 0 rgba(255, 255, 255, 0.1);
+        4px 0 20px rgba(0, 0, 0, 0.4),
+        inset -1px 0 0 rgba(255, 255, 255, 0.05);
 }
 
 .app-sidebar::before {
@@ -260,29 +260,29 @@ body {
     right: 0;
     bottom: 0;
     background: linear-gradient(180deg, 
-        rgba(245, 158, 11, 0.05) 0%, 
-        transparent 20%, 
-        transparent 80%, 
-        rgba(16, 185, 129, 0.05) 100%);
+        rgba(35, 64, 142, 0.03) 0%, 
+        transparent 30%, 
+        transparent 70%, 
+        rgba(35, 64, 142, 0.03) 100%);
     pointer-events: none;
 }
 
 .app-sidebar:hover {
     width: 280px;
     background: linear-gradient(180deg, 
-        rgba(35, 64, 142, 0.98) 0%, 
-        rgba(28, 51, 107, 0.98) 50%, 
-        rgba(18, 24, 32, 0.98) 100%);
+        rgba(18, 24, 32, 0.98) 0%, 
+        rgba(11, 16, 22, 0.99) 50%, 
+        rgba(8, 12, 18, 0.99) 100%);
     box-shadow: 
-        8px 0 40px rgba(0, 0, 0, 0.5),
-        inset -1px 0 0 rgba(255, 255, 255, 0.15);
+        8px 0 40px rgba(0, 0, 0, 0.6),
+        inset -1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-nav {
     display: flex;
     flex-direction: column;
     padding: 24px 0;
-    gap: 8px;
+    gap: 6px;
     position: relative;
 }
 
@@ -294,7 +294,7 @@ body {
     left: 24px;
     font-size: 0.75rem;
     font-weight: 600;
-    color: rgba(226, 232, 240, 0.6);
+    color: rgba(163, 178, 198, 0.5);
     text-transform: uppercase;
     letter-spacing: 1px;
     opacity: 0;
@@ -309,87 +309,65 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 16px;
+    padding: 14px;
     text-decoration: none;
-    color: rgba(226, 232, 240, 0.9);
+    color: rgba(226, 232, 240, 0.8);
     white-space: nowrap;
     transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
-    border-radius: 16px;
+    border-radius: 12px;
     position: relative;
-    margin: 0 12px;
-    min-height: 56px;
+    margin: 0 10px;
+    min-height: 52px;
     box-sizing: border-box;
     overflow: hidden;
-    backdrop-filter: blur(5px);
-}
-
-/* Hover glow effect */
-.nav-item::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, 
-        rgba(35, 64, 142, 0.3) 0%, 
-        rgba(245, 158, 11, 0.1) 100%);
-    border-radius: 16px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: -1;
 }
 
 /* When sidebar is hovered, align items to the left */
 .app-sidebar:hover .nav-item {
     justify-content: flex-start;
-    padding: 16px 24px;
-    margin: 0 16px;
+    padding: 14px 20px;
+    margin: 0 14px;
 }
 
 .nav-item:hover {
     color: white;
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateX(8px) scale(1.02);
+    background: rgba(46, 53, 66, 0.6);
+    transform: translateX(4px);
     box-shadow: 
-        0 8px 32px rgba(35, 64, 142, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.nav-item:hover::before {
-    opacity: 1;
+        0 4px 12px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .nav-item.active {
     color: white;
     background: linear-gradient(135deg, 
-        rgba(35, 64, 142, 0.8) 0%, 
-        rgba(245, 158, 11, 0.2) 100%);
+        rgba(35, 64, 142, 0.6) 0%, 
+        rgba(28, 51, 107, 0.4) 100%);
     box-shadow: 
-        0 8px 32px rgba(35, 64, 142, 0.6),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3),
-        0 0 0 1px rgba(245, 158, 11, 0.4);
+        0 4px 15px rgba(35, 64, 142, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        0 0 0 1px rgba(35, 64, 142, 0.3);
 }
 
 .nav-item.active::after {
     content: '';
     position: absolute;
-    left: -12px;
+    left: -10px;
     top: 50%;
     transform: translateY(-50%);
-    width: 4px;
-    height: 32px;
+    width: 3px;
+    height: 24px;
     background: linear-gradient(180deg, 
         var(--accent-orange) 0%, 
-        rgba(245, 158, 11, 0.6) 100%);
+        rgba(245, 158, 11, 0.7) 100%);
     border-radius: 2px;
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
 }
 
-/* Icon container for better centering */
+/* FIXED: Icon container for proper centering */
 .nav-item .nav-icon {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -399,35 +377,34 @@ body {
 }
 
 .app-sidebar:hover .nav-item .nav-icon {
-    margin-right: 20px;
+    margin-right: 16px;
 }
 
 .nav-item svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     stroke: currentColor;
     stroke-width: 2;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
     transition: all 0.3s ease;
+    display: block;
 }
 
 .nav-item:hover svg {
-    transform: scale(1.1);
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+    transform: scale(1.05);
 }
 
 .nav-item.active svg {
-    filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.4));
+    filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.3));
 }
 
 .nav-item span {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateX(-16px);
     transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
     font-weight: 500;
     color: white;
     white-space: nowrap;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
 }
 
 .app-sidebar:hover .nav-item span {
