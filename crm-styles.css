@@ -258,18 +258,19 @@ html, body {
     display: flex;
     flex-direction: column;
     padding: 20px 0;
-    gap: 4px;
+    gap: 8px;
     width: 100%;
-    /* FIX: Adjust top padding to align with main content */
-    padding-top: 50px; 
+    /* Adjusted top padding to move content higher */
+    padding-top: 20px; 
 }
 
 .nav-separator {
-    width: 80%;
-    height: 1px;
-    background-color: var(--border-light);
-    margin: 16px 0;
+    width: 70%;
+    height: 0.5px;
+    background-color: #444;
+    margin: 24px 0;
     align-self: center;
+    border: none;
 }
 
 .nav-item {
