@@ -91,7 +91,7 @@ html, body {
 /* Card title and icon spacing */
 .card-title {
     position: relative;
-    padding-left: 12px; /* Increased from 10px to match arrow adjustment */
+    padding-left: 14px; /* Increased from 12px for additional right shift */
 }
 
 .card-title svg {
@@ -798,7 +798,7 @@ html, body {
     justify-content: center;
     position: relative;
     top: 0;
-    padding-left: 2px; /* Push arrow to the right slightly */
+    padding-left: 3px; /* Increased from 2px for additional right shift */
     left: 0;
     z-index: 10;
 }
