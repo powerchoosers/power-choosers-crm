@@ -11,6 +11,8 @@
  * - Improved overall visual consistency
  * - Fixed stat cards to maintain single row when sidebar expands
  * - Removed grey separator lines from sidebar
+ * - Adjusted activity carousel navigation arrows to prevent content overlap
+ * - Increased margin between Tasks and Account Details in the sidebar
  */
 
 /* --- 1. CSS Variables & Global Styles --- */
@@ -288,7 +290,7 @@ html, body {
 
 /* Second section - normal spacing */
 .nav-section:nth-child(2) {
-    margin-bottom: 20px; /* Reduced from 30px to 20px after tasks */
+    margin-bottom: 30px; /* Increased margin after tasks as requested */
 }
 
 /* Last section */
@@ -741,6 +743,7 @@ html, body {
     font-size: 0.8rem;
 }
 
+/* UPDATED: Activity carousel navigation buttons positioning */
 .activity-navigation {
     position: absolute;
     top: 50%;
@@ -763,6 +766,11 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Move arrows to be in the corners of the activity section, not overlaying content */
+    position: relative;
+    top: 0;
+    left: 0;
+    z-index: 10;
 }
 
 .nav-btn:hover {
