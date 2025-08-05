@@ -91,13 +91,13 @@ html, body {
 /* Card title and icon spacing */
 .card-title {
     position: relative;
-    padding-left: 14px; /* Increased from 12px for additional right shift */
+    padding-left: 10px; /* Shift the entire title right to match arrow centering */
 }
 
 .card-title svg {
     margin-right: 12px;
     position: relative;
-    left: 0; /* Reset left position */
+    left: -2px; /* Fine-tune icon position if needed */
 }
 
 /* Navigation buttons and arrow centering */
@@ -287,8 +287,6 @@ html, body {
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* Align content to top */
-    padding-top: 20px; /* Add padding to top */
 }
 
 .app-sidebar:hover {
@@ -310,19 +308,23 @@ html, body {
 .nav-section {
     display: flex;
     flex-direction: column;
-    gap: 6px; /* Slightly increased gap for better spacing */
+    gap: 4px;
     width: 100%;
 }
 
 /* Navigation section spacing */
 .nav-section {
-    margin-bottom: 20px; /* Reduced from 30px for better balance */
+    margin-bottom: 30px; /* Consistent margin for all sections */
 }
 
-/* Account Details and Settings section - adjusted spacing */
+/* Remove extra bottom margin from the last section */
 .nav-section:last-child {
-    margin-top: 10px; /* Pull up the last section */
     margin-bottom: 0;
+}
+
+/* Last section */
+.nav-section:last-child {
+    /* No additional margin needed - container padding handles bottom space */
 }
 
 /* REMOVED: .nav-separator styles completely */
@@ -331,17 +333,15 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    height: 52px; /* Slightly increased height */
+    height: 50px;
     margin: 0 8px;
-    padding: 0 16px; /* Increased padding for better spacing */
+    padding: 0 12px;
     color: var(--text-secondary);
     text-decoration: none;
     border-radius: 8px;
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
-    font-size: 1.05rem; /* Increased font size */
-    font-weight: 500; /* Slightly bolder text */
 }
 
 .app-sidebar:not(:hover) .nav-item {
@@ -393,8 +393,8 @@ html, body {
 }
 
 .nav-item svg {
-    width: 22px; /* Slightly larger icons */
-    height: 22px; /* Slightly larger icons */
+    width: 20px;
+    height: 20px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -798,7 +798,6 @@ html, body {
     justify-content: center;
     position: relative;
     top: 0;
-    padding-left: 3px; /* Increased from 2px for additional right shift */
     left: 0;
     z-index: 10;
 }
