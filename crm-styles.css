@@ -241,7 +241,7 @@ html, body {
     box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
 }
 
-/* --- 4. Expandable Left Sidebar (FIXED SPACING) --- */
+/* --- 4. Expandable Left Sidebar (PROPERLY CENTERED SPACING) --- */
 .app-sidebar {
     width: 60px;
     min-width: 60px;
@@ -264,42 +264,46 @@ html, body {
 .sidebar-nav {
     display: flex;
     flex-direction: column;
-    padding: 20px 0; /* Start with 20px top padding */
+    padding: 20px 0;
     width: 100%;
     height: 100%;
+    justify-content: space-between; /* Distribute sections evenly */
 }
 
-/* Navigation sections with proper 20px spacing */
+/* Navigation sections - each section gets equal space */
 .nav-section {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    flex: 1; /* Each section takes equal vertical space */
+    justify-content: center; /* Center items within each section */
 }
 
-/* First section (Dashboard, Contacts, Accounts) - starts immediately after 20px top padding */
+/* First section - align items to start of its space */
 .nav-section:first-child {
-    margin-bottom: 20px; /* 20px margin after first section */
+    justify-content: flex-start;
+    padding-top: 0;
 }
 
-/* Second section (Calls, Emails, Tasks) - centered in available space */
-.nav-section:nth-child(3) { /* Skip the separator, so this is actually the second content section */
-    margin-bottom: 20px; /* 20px margin after second section */
+/* Middle section - center items in its space */
+.nav-section:nth-child(3) {
+    justify-content: center;
 }
 
-/* Third section (Account Details, Settings) - 20px from second section, 20px from bottom */
+/* Last section - align items to end of its space */
 .nav-section:last-child {
-    margin-top: auto; /* Push to bottom */
-    margin-bottom: 20px; /* 20px from bottom */
+    justify-content: flex-end;
+    padding-bottom: 0;
 }
 
 .nav-separator {
     width: 60%;
     height: 1px;
     background-color: #444444;
-    margin: 0; /* Remove margin as sections handle spacing */
+    margin: 0;
     align-self: center;
     opacity: 0.6;
-    flex-shrink: 0; /* Prevent separator from shrinking */
+    flex-shrink: 0;
 }
 
 .nav-item {
