@@ -271,6 +271,7 @@ body {
     position: relative;
 }
 
+/* When sidebar is hovered, align items to the left */
 .app-sidebar:hover .nav-item {
     justify-content: flex-start;
     padding: 16px 24px;
