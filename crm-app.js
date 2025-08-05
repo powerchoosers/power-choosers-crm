@@ -2,6 +2,7 @@
 // This file contains the complete application logic for the redesigned Power Choosers CRM.
 // Updated with white SVG activity icons for better theme consistency
 // Added Call Scripts button functionality
+// Integrated Cold Calling Hub with auto-population and Firebase updates
 
 // --- 1. Firebase Configuration & Initialization ---
 const firebaseConfig = {
@@ -152,7 +153,7 @@ const CRMApp = {
         if (callScriptsBtn) {
             callScriptsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.openCallScriptsModal();
+                this.showCallScriptsView(); // Directly call the function to show the view
             });
         }
         
@@ -222,7 +223,13 @@ const CRMApp = {
     // Update the active state of navigation buttons
     updateActiveNavButton(activeNav) {
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-        activeNav.classList.add('active');
+        // If the clicked item is the Call Scripts button (which is not a nav-item in the sidebar)
+        // ensure the dashboard nav item remains active if we're just switching content within the main area
+        if (activeNav.id === 'call-scripts-btn') {
+            document.querySelector('.nav-item[data-view="dashboard-view"]').classList.add('active');
+        } else {
+            activeNav.classList.add('active');
+        }
     },
 
     // Main dashboard rendering function
@@ -384,6 +391,15 @@ const CRMApp = {
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>`,
+            'health_check_updated': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+            </svg>`,
+            'call_log_saved': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>`
         };
         return icons[type] || `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -491,15 +507,216 @@ const CRMApp = {
         this.openModal('bulk-import-modal');
     },
 
-    // Open call scripts modal/panel
-    openCallScriptsModal() {
-        // For now, show a toast - replace this with your call scripts functionality later
-        this.showToast('Call Scripts feature coming soon!', 'info');
-        
-        // Later you can replace this with:
-        // this.showView('call-scripts-view');
-        // or
-        // this.openModal('call-scripts-modal');
+    // Function to load and display the Call Scripts view
+    async showCallScriptsView() {
+        const callScriptsView = document.getElementById('call-scripts-view');
+        if (!callScriptsView) {
+            console.error('Call scripts view element not found.');
+            this.showToast('Call scripts view not available.', 'error');
+            return;
+        }
+
+        // Ensure the call scripts view is visible and other views are hidden
+        this.showView('call-scripts-view'); 
+        // Update the active navigation button to reflect the current view (if applicable)
+        // Since Call Scripts is a button in the header, we might want to keep 'Dashboard' active
+        // or add a dedicated 'Call Scripts' nav item if it's a primary view.
+        // For now, let's keep the Dashboard nav item active.
+        this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
+
+
+        try {
+            // Fetch the content of call-scripts-content.html
+            const response = await fetch('call-scripts-content.html');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const htmlContent = await response.text();
+            callScriptsView.innerHTML = htmlContent;
+
+            // Initialize the script within the loaded content
+            // The script in call-scripts-content.html is wrapped in initializeCallScriptsPage()
+            if (typeof window.initializeCallScriptsPage === 'function') {
+                window.initializeCallScriptsPage();
+                this.autoPopulateCallScripts();
+                console.log('Call scripts content loaded and initialized.');
+            } else {
+                console.error('initializeCallScriptsPage function not found in loaded script.');
+                this.showToast('Failed to initialize call scripts functionality.', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading call scripts content:', error);
+            this.showToast('Failed to load call scripts. Please check the file path.', 'error');
+        }
+    },
+
+    // Auto-populate fields in the Call Scripts page
+    autoPopulateCallScripts() {
+        // Find a contact and their associated account to pre-populate
+        let contactToPopulate = null;
+        let accountToPopulate = null;
+
+        // Try to find a contact with an associated account
+        if (this.contacts.length > 0) {
+            contactToPopulate = this.contacts[0]; // Take the first contact
+            if (contactToPopulate.accountId) {
+                accountToPopulate = this.accounts.find(acc => acc.id === contactToPopulate.accountId);
+            }
+        }
+        // If no contact with account, just try to find any account
+        if (!accountToPopulate && this.accounts.length > 0) {
+            accountToPopulate = this.accounts[0];
+        }
+
+        // Populate Prospect Info fields
+        const inputPhone = document.getElementById('input-phone');
+        const inputCompanyName = document.getElementById('input-company-name');
+        const inputName = document.getElementById('input-name');
+        const inputTitle = document.getElementById('input-title');
+        const inputCompanyIndustry = document.getElementById('input-company-industry');
+
+        if (inputPhone && contactToPopulate) inputPhone.value = contactToPopulate.phone || '';
+        if (inputCompanyName && accountToPopulate) inputCompanyName.value = accountToPopulate.name || '';
+        if (inputName && contactToPopulate) inputName.value = `${contactToPopulate.firstName || ''} ${contactToPopulate.lastName || ''}`.trim();
+        if (inputTitle && contactToPopulate) inputTitle.value = contactToPopulate.title || '';
+        if (inputCompanyIndustry && accountToPopulate) inputCompanyIndustry.value = accountToPopulate.industry || '';
+
+        // Populate Energy Health Check fields
+        const currentSupplierInput = document.getElementById('currentSupplier');
+        const monthlyBillInput = document.getElementById('monthlyBill');
+        const currentRateInput = document.getElementById('currentRate');
+        const contractEndDateInput = document.getElementById('contractEndDate');
+        const sellRateInput = document.getElementById('sellRate');
+
+        if (currentSupplierInput && accountToPopulate) currentSupplierInput.value = accountToPopulate.currentSupplier || '';
+        if (monthlyBillInput && accountToPopulate) monthlyBillInput.value = accountToPopulate.monthlyBill || '';
+        if (currentRateInput && accountToPopulate) currentRateInput.value = accountToPopulate.currentRate || '';
+        if (contractEndDateInput && accountToPopulate) contractEndDateInput.value = accountToPopulate.contractEndDate || '';
+        if (sellRateInput && accountToPopulate) sellRateInput.value = accountToPopulate.sellRate || '';
+
+        // Trigger updateScript in the call scripts page to update placeholders
+        if (typeof window.updateScript === 'function') {
+            window.updateScript();
+        }
+
+        // If all Energy Health Check fields are known, run the report automatically
+        const allHealthCheckFieldsKnown = 
+            (currentSupplierInput && currentSupplierInput.value) &&
+            (monthlyBillInput && monthlyBillInput.value) &&
+            (currentRateInput && currentRateInput.value) &&
+            (contractEndDateInput && contractEndDateInput.value) &&
+            (sellRateInput && sellRateInput.value);
+
+        if (allHealthCheckFieldsKnown && typeof window.runCalculation === 'function') {
+            console.log("All health check fields populated, running calculation automatically.");
+            window.validateSection1(); // Re-validate section 1 to ensure internal state is correct
+            window.validateSection2(); // Re-validate section 2
+            window.runCalculation();
+        }
+    },
+
+    // Save call log to Firebase and update notifications
+    async saveCallLog(logData, disposition) {
+        try {
+            const docRef = await db.collection('call_logs').add({
+                ...logData,
+                createdAt: serverTimestamp()
+            });
+
+            // Find or create contact based on prospect info
+            let contactId = null;
+            let contactFound = this.contacts.find(c => 
+                c.firstName === logData.prospect.name.split(' ')[0] && 
+                c.lastName === logData.prospect.name.split(' ')[1]
+            );
+
+            if (contactFound) {
+                contactId = contactFound.id;
+                // Update existing contact details if provided
+                await db.collection('contacts').doc(contactId).update({
+                    phone: logData.prospect.phone || contactFound.phone,
+                    title: logData.prospect.title || contactFound.title,
+                    // Potentially update accountName if it changed or was newly provided
+                    accountName: logData.prospect.company || contactFound.accountName,
+                    updatedAt: serverTimestamp()
+                });
+                // Update local contacts array
+                const index = this.contacts.findIndex(c => c.id === contactId);
+                if (index !== -1) {
+                    this.contacts[index] = { 
+                        ...this.contacts[index], 
+                        phone: logData.prospect.phone || this.contacts[index].phone,
+                        title: logData.prospect.title || this.contacts[index].title,
+                        accountName: logData.prospect.company || this.contacts[index].accountName,
+                        updatedAt: new Date()
+                    };
+                }
+            } else {
+                // Create new contact if not found
+                const newContactData = {
+                    firstName: logData.prospect.name.split(' ')[0] || '',
+                    lastName: logData.prospect.name.split(' ')[1] || '',
+                    phone: logData.prospect.phone || '',
+                    title: logData.prospect.title || '',
+                    accountName: logData.prospect.company || '', // Link to company name
+                    createdAt: serverTimestamp()
+                };
+                const newContactRef = await db.collection('contacts').add(newContactData);
+                contactId = newContactRef.id;
+                this.contacts.push({ id: contactId, ...newContactData, createdAt: new Date() });
+            }
+
+            // Save activity for the call log
+            await this.saveActivity({
+                type: 'call_log_saved',
+                description: `Call Log saved for ${logData.prospect.company || 'Unknown Company'} (${disposition})`,
+                contactId: contactId,
+                contactName: logData.prospect.name,
+                accountId: this.accounts.find(acc => acc.name === logData.prospect.company)?.id || null, // Link to account if exists
+                accountName: logData.prospect.company
+            });
+
+            this.showToast(`Note added and prospect contact details updated for ${logData.prospect.name}!`, 'success');
+            this.updateNotifications();
+            this.renderDashboardStats(); // Update stats if new contacts/accounts were added
+        } catch (error) {
+            console.error('Error saving call log or updating contact:', error);
+            this.showToast('Failed to save call notes or update contact details.', 'error');
+        }
+    },
+
+    // Update account details from Energy Health Check results
+    async updateAccountDetailsFromHealthCheck(companyName, healthCheckData) {
+        try {
+            const account = this.accounts.find(acc => acc.name === companyName);
+            if (account) {
+                const accountRef = db.collection('accounts').doc(account.id);
+                await accountRef.update({
+                    ...healthCheckData,
+                    updatedAt: serverTimestamp()
+                });
+
+                // Update local accounts array
+                const index = this.accounts.findIndex(acc => acc.id === account.id);
+                if (index !== -1) {
+                    this.accounts[index] = { ...this.accounts[index], ...healthCheckData, updatedAt: new Date() };
+                }
+
+                this.showToast(`Account details for ${companyName} updated from Health Check!`, 'success');
+                await this.saveActivity({
+                    type: 'health_check_updated',
+                    description: `Energy Health Check updated for ${companyName}`,
+                    accountId: account.id,
+                    accountName: companyName
+                });
+                this.updateNotifications();
+            } else {
+                this.showToast(`Account "${companyName}" not found. Cannot update health check details.`, 'warning');
+            }
+        } catch (error) {
+            console.error('Error updating account details from health check:', error);
+            this.showToast('Failed to update account details from health check.', 'error');
+        }
     },
 
     // Modal functions
@@ -786,7 +1003,7 @@ const CRMApp = {
         const notificationBadge = document.getElementById('notification-badge');
         const notificationCount = document.getElementById('notification-count');
         
-        const totalCount = this.notifications.reduce((sum, n) => sum + n.count, 0);
+        const totalCount = this.notifications.reduce((sum, n => sum + n.count, 0);
         
         if (notificationBadge) {
             notificationBadge.textContent = totalCount;
@@ -845,7 +1062,9 @@ const CRMApp = {
             contact: '👤',
             account: '🏢',
             email: '📧',
-            task: '✅'
+            task: '✅',
+            health_check_updated: '📈',
+            call_log_saved: '📞'
         };
         return icons[type] || '📋';
     },
