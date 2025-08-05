@@ -206,34 +206,41 @@ const CRMApp = {
     showView(viewName) {
         this.currentView = viewName;
         
-        // Hide all main page containers first
-        document.querySelectorAll('.app-content-container > *').forEach(el => {
-            el.style.display = 'none';
-        });
+        // Hide all main containers
+        const mainContent = document.querySelector('.main-content');
+        const widgetPanel = document.querySelector('.widget-panel');
+        const callScriptsView = document.getElementById('call-scripts-view');
+        
+        if (mainContent) mainContent.style.display = 'none';
+        if (widgetPanel) widgetPanel.style.display = 'none';
+        if (callScriptsView) callScriptsView.style.display = 'none';
 
-        // Handle the special case for the cold calling view
+        // Show the appropriate container based on the view
         if (viewName === 'call-scripts-view') {
-            const callScriptsView = document.getElementById('call-scripts-view');
-            if (callScriptsView) {
-                callScriptsView.style.display = 'flex';
-            }
+            if (callScriptsView) callScriptsView.style.display = 'flex';
         } else {
-            // For all other views, show the main dashboard layout
-            const mainContent = document.querySelector('.main-content');
-            const widgetPanel = document.querySelector('.widget-panel');
             if (mainContent) mainContent.style.display = 'flex';
             if (widgetPanel) widgetPanel.style.display = 'flex';
             
-            // Then, show the specific view within the main content
             const activeView = document.getElementById(viewName);
             if (activeView) {
                 activeView.style.display = 'flex';
             }
+            
+            if (viewName === 'dashboard-view') {
+                this.renderDashboard();
+            }
         }
-        
-        // Re-render dashboard content if returning to it
-        if (viewName === 'dashboard-view') {
-            this.renderDashboard();
+
+        // Update active navigation button state
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        const activeNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+        if (activeNav) {
+            activeNav.classList.add('active');
+        } else if (viewName === 'call-scripts-view') {
+            // Keep the dashboard icon active when on the call scripts page
+            const dashboardNav = document.querySelector('.nav-item[data-view="dashboard-view"]');
+            if (dashboardNav) dashboardNav.classList.add('active');
         }
     },
 
@@ -529,61 +536,27 @@ const CRMApp = {
         const callScriptsView = document.getElementById('call-scripts-view');
         if (!callScriptsView) {
             console.error('Call scripts view element not found.');
-            this.showToast('Call scripts view not available.', 'error');
-            return;
-        }
-
-        try {
-            // Show loading state
-            callScriptsView.innerHTML = '<div class="loading-state">Loading Call Scripts...</div>';
-            this.showView('call-scripts-view');
             
-            // Fetch the content of call-scripts-content.html
-            const response = await fetch('call-scripts-content.html');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const htmlContent = await response.text();
-            callScriptsView.innerHTML = htmlContent;
-
-            // Update the active navigation button
-            this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
-
-            // Initialize the script within the loaded content
-            // The script in call-scripts-content.html is wrapped in initializeCallScriptsPage()
-            if (typeof window.initializeCallScriptsPage === 'function') {
-                // Use setTimeout to ensure the DOM is fully updated before initialization
-                setTimeout(() => {
-                    try {
-                        window.initializeCallScriptsPage();
-                        if (typeof this.autoPopulateCallScripts === 'function') {
-                            this.autoPopulateCallScripts();
-                        }
-                        console.log('Call scripts content loaded and initialized.');
-                    } catch (e) {
-                        console.error('Error initializing call scripts:', e);
-                        this.showToast('Error initializing call scripts. Please check the console for details.', 'error');
-                    }
-                }, 100);
-            } else {
-                console.error('initializeCallScriptsPage function not found in loaded script.');
-                this.showToast('Failed to initialize call scripts functionality. Missing initialization function.', 'error');
-            }
-        } catch (error) {
-            console.error('Error loading call scripts content:', error);
-            callScriptsView.innerHTML = `
-                <div class="error-state">
-                    <h3>Failed to load call scripts</h3>
-                    <p>${error.message}</p>
-                    <button class="retry-button" onclick="window.crmApp.showCallScriptsView()">Retry</button>
-                </div>
-            `;
-            this.showToast('Failed to load call scripts. Please check your connection and try again.', 'error');
+        // Show the view before loading content
+        this.showView('call-scripts-view');
+        
+        // Fetch the HTML content
+        const response = await fetch('call-scripts-content.html');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-    },
+        
+        const htmlContent = await response.text();
+        callScriptsView.innerHTML = htmlContent;
 
-    // Auto-populate fields in the Call Scripts page
-    autoPopulateCallScripts() {
+        // The JavaScript is now loaded via call-scripts-content.js in the HTML
+        if (typeof window.initializeCallScriptsPage === 'function') {
+            try {
+                window.initializeCallScriptsPage();
+                
+                // Auto-populate if the function exists
+                if (typeof this.autoPopulateCallScripts === 'function') {
+                    this.autoPopulateCallScripts();
         // Find a contact and their associated account to pre-populate
         let contactToPopulate = null;
         let accountToPopulate = null;
