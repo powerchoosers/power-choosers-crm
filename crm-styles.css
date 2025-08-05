@@ -264,7 +264,7 @@ html, body {
 .sidebar-nav {
     display: flex;
     flex-direction: column;
-    padding: 30px 0;
+    padding: 40px 0 30px 0; /* Increased top padding to push first section down */
     width: 100%;
     height: 100%;
     align-items: center;
@@ -279,7 +279,7 @@ html, body {
     width: 100%;
 }
 
-/* First section - 30px from top */
+/* First section - moved down with increased container padding */
 .nav-section:first-child {
     margin-bottom: 30px;
 }
