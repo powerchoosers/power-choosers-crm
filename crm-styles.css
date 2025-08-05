@@ -88,6 +88,11 @@ html, body {
     display: flex;
 }
 
+/* Recent Activities icon spacing */
+.card-title svg {
+    margin-right: 8px; /* Match the spacing of other icons in card titles */
+}
+
 /* --- 3. Header Styles (Fixed) --- */
 .app-header {
     position: fixed;
