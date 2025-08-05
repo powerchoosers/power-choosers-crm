@@ -88,15 +88,33 @@ html, body {
     display: flex;
 }
 
-/* Card title icon spacing */
-.card-title svg {
-    margin-right: 12px; /* Increased from 8px to 12px for better spacing */
+/* Card title and icon spacing */
+.card-title {
+    position: relative;
+    padding-left: 10px; /* Shift the entire title right to match arrow centering */
 }
 
-/* Ensure navigation buttons remain centered */
+.card-title svg {
+    margin-right: 12px;
+    position: relative;
+    left: -2px; /* Fine-tune icon position if needed */
+}
+
+/* Navigation buttons and arrow centering */
 .activity-navigation {
     display: flex;
     gap: 8px;
+}
+
+.nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-btn svg {
+    position: relative;
+    left: 1px; /* Adjust this value to center the arrow in the button */
 }
 
 /* --- 3. Header Styles (Fixed) --- */
@@ -269,6 +287,8 @@ html, body {
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
+    justify-content: flex-start; /* Align content to top */
+    padding-top: 20px; /* Add padding to top */
 }
 
 .app-sidebar:hover {
@@ -290,23 +310,19 @@ html, body {
 .nav-section {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px; /* Slightly increased gap for better spacing */
     width: 100%;
 }
 
 /* Navigation section spacing */
 .nav-section {
-    margin-bottom: 30px; /* Consistent margin for all sections */
+    margin-bottom: 20px; /* Reduced from 30px for better balance */
 }
 
-/* Remove extra bottom margin from the last section */
+/* Account Details and Settings section - adjusted spacing */
 .nav-section:last-child {
+    margin-top: 10px; /* Pull up the last section */
     margin-bottom: 0;
-}
-
-/* Last section */
-.nav-section:last-child {
-    /* No additional margin needed - container padding handles bottom space */
 }
 
 /* REMOVED: .nav-separator styles completely */
@@ -315,15 +331,17 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    height: 50px;
+    height: 52px; /* Slightly increased height */
     margin: 0 8px;
-    padding: 0 12px;
+    padding: 0 16px; /* Increased padding for better spacing */
     color: var(--text-secondary);
     text-decoration: none;
     border-radius: 8px;
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
+    font-size: 1.05rem; /* Increased font size */
+    font-weight: 500; /* Slightly bolder text */
 }
 
 .app-sidebar:not(:hover) .nav-item {
@@ -375,8 +393,8 @@ html, body {
 }
 
 .nav-item svg {
-    width: 20px;
-    height: 20px;
+    width: 22px; /* Slightly larger icons */
+    height: 22px; /* Slightly larger icons */
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
