@@ -205,19 +205,40 @@ const CRMApp = {
     // Show/hide views in the single-page application
     showView(viewName) {
         this.currentView = viewName;
+        
+        // Hide all page views
         document.querySelectorAll('.page-view').forEach(view => {
             view.style.display = 'none';
         });
-        const activeView = document.getElementById(viewName);
-        if (activeView) {
-            // Use 'flex' for call-scripts-view to ensure its internal grid layout works
-            activeView.style.display = (viewName === 'call-scripts-view') ? 'flex' : 'block';
+        
+        // Special handling for call scripts view
+        if (viewName === 'call-scripts-view') {
+            // Don't automatically load the call scripts view - it should only be loaded via the button
+            this.showView('dashboard-view');
+            return;
         }
         
+        // Show the requested view
+        const activeView = document.getElementById(viewName);
+        if (activeView) {
+            activeView.style.display = 'block';
+        }
+        
+        // Handle view-specific logic
         if (viewName === 'dashboard-view') {
+            // Make sure to show dashboard content and hide any call scripts view that might be showing
+            const callScriptsContainer = document.querySelector('.calls-hub-layout');
+            if (callScriptsContainer) {
+                callScriptsContainer.style.display = 'none';
+            }
+            
+            // Show all dashboard content
+            document.querySelectorAll('.dashboard-card, .stat-cards-grid').forEach(el => {
+                el.style.display = '';
+            });
+            
+            // Render dashboard content
             this.renderDashboard();
-        } else {
-            console.log(`Mapped to: ${viewName}`);
         }
     },
 
@@ -509,36 +530,51 @@ const CRMApp = {
     },
 
     // Function to load and display the Call Scripts view
-    showCallScriptsView() {
+    async showCallScriptsView() {
         // First, ensure we're on the dashboard view where the call scripts container exists
         this.showView('dashboard-view');
         
-        // Get the call scripts container that's already in the DOM
-        const callScriptsContainer = document.querySelector('.calls-hub-layout');
-        
-        if (!callScriptsContainer) {
-            console.error('Call scripts container not found in the DOM.');
-            this.showToast('Call scripts feature not available.', 'error');
-            return;
-        }
-
-        // Show the call scripts container and hide other dashboard content
+        // Hide all dashboard content initially
         document.querySelectorAll('.dashboard-card, .stat-cards-grid').forEach(el => {
             el.style.display = 'none';
         });
         
+        // Get or create the call scripts container
+        let callScriptsContainer = document.querySelector('.calls-hub-layout');
+        
+        if (!callScriptsContainer) {
+            // Create container if it doesn't exist
+            callScriptsContainer = document.createElement('div');
+            callScriptsContainer.className = 'calls-hub-layout';
+            document.getElementById('dashboard-view').appendChild(callScriptsContainer);
+        }
+        
+        // Show the call scripts container
         callScriptsContainer.style.display = 'grid';
         
-        // Update the active navigation button to show dashboard is active
-        this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
-        
-        // Initialize the call scripts if the function exists
-        if (typeof window.initializeCallScriptsPage === 'function') {
-            window.initializeCallScriptsPage();
-            this.autoPopulateCallScripts();
-            console.log('Call scripts initialized.');
-        } else {
-            console.warn('initializeCallScriptsPage function not found.');
+        // Load the call scripts content if not already loaded
+        if (!callScriptsContainer.hasAttribute('data-loaded')) {
+            try {
+                const response = await fetch('call-scripts-content.html');
+                const html = await response.text();
+                callScriptsContainer.innerHTML = html;
+                callScriptsContainer.setAttribute('data-loaded', 'true');
+                
+                // Initialize the call scripts after loading the content
+                if (typeof window.initializeCallScriptsPage === 'function') {
+                    window.initializeCallScriptsPage();
+                    this.autoPopulateCallScripts();
+                    console.log('Call scripts initialized.');
+                } else {
+                    console.warn('initializeCallScriptsPage function not found.');
+                }
+            } catch (error) {
+                console.error('Error loading call scripts:', error);
+                this.showToast('Failed to load call scripts.', 'error');
+                // Show dashboard content if call scripts fail to load
+                this.showView('dashboard-view');
+                return;
+            }
         }
     },
 
