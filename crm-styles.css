@@ -236,8 +236,6 @@ html, body {
     width: 60px;
     min-width: 60px;
     background: var(--darker-blue);
-    display: flex;
-    flex-direction: column;
     border-right: 1px solid var(--border-light);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
@@ -259,50 +257,34 @@ html, body {
 .sidebar-nav {
     display: flex;
     flex-direction: column;
-    padding: 10px 0;
-    height: 100%;
-    justify-content: space-between;
-}
-
-.nav-section {
-    display: flex;
-    flex-direction: column;
+    padding: 20px 0;
+    gap: 4px;
     width: 100%;
-}
-
-/* Top section */
-.nav-section:first-child {
-    margin-bottom: auto; /* Pushes to the top */
-}
-
-/* Middle section */
-.nav-section:nth-child(2) {
-    margin: 20px 0; /* Centers this section */
-    justify-content: center;
-}
-
-/* Bottom section */
-.nav-section:last-child {
-    margin-top: auto; /* Pushes to the bottom */
-    padding-bottom: 20px; /* Add some space at the bottom */
+    /* FIX: Adjust top padding to align with main content */
+    padding-top: 50px; 
 }
 
 .nav-separator {
-    border: none;
-    border-top: 1px solid #333; /* Darker, more subtle line */
-    margin: 0;
-    width: 100%;
-    opacity: 0.6;
+    width: 80%;
+    height: 1px;
+    background-color: var(--border-light);
+    margin: 16px 0;
+    align-self: center;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    padding: 12px 15px;
+    justify-content: flex-start;
+    height: 50px;
+    margin: 0 8px;
+    padding: 0 12px;
     color: var(--text-secondary);
     text-decoration: none;
+    border-radius: 8px;
     transition: all 0.2s ease;
     position: relative;
+    overflow: hidden;
 }
 
 .app-sidebar:not(:hover) .nav-item {
