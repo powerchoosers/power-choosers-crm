@@ -145,25 +145,20 @@
 
             <div class="app-content-container">
                 <div class="main-content">
-                    <div id="dashboard-view" class="page-view active" style="display: flex;">
+                    <div id="dashboard-view" class="page-view active" style="display: flex; flex-direction: column;">
                         <section class="stat-cards-grid">
                             <div class="stat-card">
                                 <h2 class="stat-value" id="total-accounts-value">0</h2>
                                 <p class="stat-label">Total Accounts</p>
                             </div>
-                        <div class="stat-card">
-                            <h2 class="stat-value" id="total-contacts-value">0</h2>
-                            <p class="stat-label">Total Contacts</p>
-                        </div>
-                        <div class="stat-card">
-                            <h2 class="stat-value" id="recent-activities-value">0</h2>
-                            <p class="stat-label">Recent Activities</p>
-                        </div>
-                        <div class="stat-card">
-                            <h2 class="stat-value" id="hot-leads-value">0</h2>
-                            <p class="stat-label">Hot Leads</p>
-                        </div>
-                        </section>
+                            <div class="stat-card">
+                                <h2 class="stat-value" id="total-contacts-value">0</h2>
+                                <p class="stat-label">Total Contacts</p>
+                            </div>
+                            <div class="stat-card">
+                                <h2 class="stat-value" id="recent-activities-value">0</h2>
+                                <p class="stat-label">Recent Activities</p>
+                            </div>
                             <div class="stat-card">
                                 <h2 class="stat-value" id="hot-leads-value">0</h2>
                                 <p class="stat-label">Hot Leads</p>
@@ -420,7 +415,7 @@
     
     <!-- Your Firebase configuration file -->
     <script src="firebase-config.js"></script>
-    <!-- Your main CRM application logic -->
+    <script src="call-scripts-content.js"></script>
     <script src="crm-app.js"></script>
 </body>
 </html>
