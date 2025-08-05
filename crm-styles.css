@@ -82,6 +82,60 @@ html, body {
     background: rgba(255, 255, 255, 0.3);
 }
 
+/* Call Scripts View */
+#call-scripts-view {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--cch-darker-blue);
+    border-radius: 12px;
+    margin: 16px;
+    height: calc(100% - 32px);
+}
+
+#call-scripts-view .calls-hub-layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#call-scripts-view .script-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#call-scripts-view .script-display {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    margin: 0;
+    border-radius: 12px 12px 0 0;
+}
+
+#call-scripts-view .sidebar-widgets {
+    width: 320px;
+    background: var(--cch-bg-card);
+    border-left: 1px solid var(--cch-border-color);
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Ensure the call scripts view takes full height when active */
+.app-content-container:has(#call-scripts-view[style*="display: block"]) {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Hide main content and widget panel when call scripts view is active */
+#call-scripts-view[style*="display: block"] ~ .main-content,
+#call-scripts-view[style*="display: block"] ~ .widget-panel {
+    display: none !important;
+}
+
 /* --- 2. Main Application Layout --- */
 .app-wrapper {
     display: flex;

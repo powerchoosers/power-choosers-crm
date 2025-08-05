@@ -205,40 +205,39 @@ const CRMApp = {
     // Show/hide views in the single-page application
     showView(viewName) {
         this.currentView = viewName;
-        
+
+        const mainContent = document.querySelector('.main-content');
+        const widgetPanel = document.querySelector('.widget-panel');
+        const callScriptsView = document.getElementById('call-scripts-view');
+
         // Hide all page views
         document.querySelectorAll('.page-view').forEach(view => {
             view.style.display = 'none';
         });
-        
-        // Special handling for call scripts view
+
         if (viewName === 'call-scripts-view') {
-            // Don't automatically load the call scripts view - it should only be loaded via the button
-            this.showView('dashboard-view');
-            return;
-        }
-        
-        // Show the requested view
-        const activeView = document.getElementById(viewName);
-        if (activeView) {
-            activeView.style.display = 'block';
-        }
-        
-        // Handle view-specific logic
-        if (viewName === 'dashboard-view') {
-            // Make sure to show dashboard content and hide any call scripts view that might be showing
-            const callScriptsContainer = document.querySelector('.calls-hub-layout');
-            if (callScriptsContainer) {
-                callScriptsContainer.style.display = 'none';
+            // When call scripts view is active, hide dashboard main content and widget panel
+            if (mainContent) mainContent.style.display = 'none';
+            if (widgetPanel) widgetPanel.style.display = 'none';
+            if (callScriptsView) {
+                callScriptsView.style.display = 'block'; // Show the call scripts container
             }
-            
-            // Show all dashboard content
-            document.querySelectorAll('.dashboard-card, .stat-cards-grid').forEach(el => {
-                el.style.display = '';
-            });
-            
-            // Render dashboard content
-            this.renderDashboard();
+        } else {
+            // For all other views, show the dashboard main content and widget panel
+            if (mainContent) mainContent.style.display = 'block';
+            if (widgetPanel) widgetPanel.style.display = 'flex'; // Widget panel is flex
+            if (callScriptsView) callScriptsView.style.display = 'none'; // Hide call scripts container
+
+            // Show the specific page view within main-content
+            const activeView = document.getElementById(viewName);
+            if (activeView) {
+                activeView.style.display = 'flex'; // Dashboard is flex, others are block by default
+            }
+
+            // Handle dashboard specific rendering
+            if (viewName === 'dashboard-view') {
+                this.renderDashboard();
+            }
         }
     },
 
@@ -538,14 +537,6 @@ const CRMApp = {
             return;
         }
 
-        // Ensure the call scripts view is visible and other views are hidden
-        this.showView('call-scripts-view'); 
-        // Update the active navigation button to reflect the current view (if applicable)
-        // Since Call Scripts is a button in the header, we might want to keep 'Dashboard' active
-        // or add a dedicated 'Call Scripts' nav item if it's a primary view.
-        // For now, let's keep the Dashboard nav item active.
-        this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
-
         try {
             // Fetch the content of call-scripts-content.html
             const response = await fetch('call-scripts-content.html');
@@ -554,6 +545,11 @@ const CRMApp = {
             }
             const htmlContent = await response.text();
             callScriptsView.innerHTML = htmlContent;
+
+            // Ensure the call scripts view is visible and other views are hidden
+            this.showView('call-scripts-view');
+            // Update the active navigation button to reflect the current view (if applicable)
+            this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
 
             // Initialize the script within the loaded content
             // The script in call-scripts-content.html is wrapped in initializeCallScriptsPage()
