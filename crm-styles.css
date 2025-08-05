@@ -3,6 +3,7 @@
  * Modern dark theme with scroll-under effects and expandable sidebar
  *
  * **UPDATED**
+ * - Fixed sidebar navigation spacing to maintain consistent 20px margins
  * - Improved sidebar spacing and visual hierarchy
  * - Enhanced widget panel with background containers
  * - Updated activity icons to white theme-consistent icons
@@ -240,7 +241,7 @@ html, body {
     box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
 }
 
-/* --- 4. Expandable Left Sidebar (Improved) --- */
+/* --- 4. Expandable Left Sidebar (FIXED SPACING) --- */
 .app-sidebar {
     width: 60px;
     min-width: 60px;
@@ -263,40 +264,42 @@ html, body {
 .sidebar-nav {
     display: flex;
     flex-direction: column;
-    padding: 32px 0 24px 0;
-    gap: 4px;
+    padding: 20px 0; /* Start with 20px top padding */
     width: 100%;
     height: 100%;
-    justify-content: space-between;
 }
 
-/* Navigation sections with improved spacing */
+/* Navigation sections with proper 20px spacing */
 .nav-section {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
+/* First section (Dashboard, Contacts, Accounts) - starts immediately after 20px top padding */
 .nav-section:first-child {
-    margin-top: 20px;
+    margin-bottom: 20px; /* 20px margin after first section */
 }
 
-.nav-section:nth-child(2) {
-    flex: 1;
-    justify-content: center;
+/* Second section (Calls, Emails, Tasks) - centered in available space */
+.nav-section:nth-child(3) { /* Skip the separator, so this is actually the second content section */
+    margin-bottom: 20px; /* 20px margin after second section */
 }
 
+/* Third section (Account Details, Settings) - 20px from second section, 20px from bottom */
 .nav-section:last-child {
-    margin-bottom: 20px;
+    margin-top: auto; /* Push to bottom */
+    margin-bottom: 20px; /* 20px from bottom */
 }
 
 .nav-separator {
     width: 60%;
     height: 1px;
     background-color: #444444;
-    margin: 24px 0;
+    margin: 0; /* Remove margin as sections handle spacing */
     align-self: center;
     opacity: 0.6;
+    flex-shrink: 0; /* Prevent separator from shrinking */
 }
 
 .nav-item {
