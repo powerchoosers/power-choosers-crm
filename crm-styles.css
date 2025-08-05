@@ -116,14 +116,17 @@ html, body {
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
-    /* FIX: Align title with other elements */
-    align-self: center; 
+    align-self: center;
 }
 
 .header-center {
     flex: 1;
     max-width: 600px;
     margin: 0 32px;
+    /* FIX: Align search bar vertically with other elements */
+    display: flex;
+    align-items: center;
+    height: 100%;
 }
 
 .search-bar {
@@ -240,7 +243,6 @@ html, body {
     position: relative;
     z-index: 900;
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
-    /* FIX: Ensure icons are centered when collapsed */
     display: flex;
     flex-direction: column;
     align-items: center; 
@@ -256,13 +258,21 @@ html, body {
     flex-direction: column;
     padding: 20px 0;
     gap: 4px;
-    width: 100%; /* FIX: Ensure nav items fill the width */
+    width: 100%;
+}
+
+.nav-separator {
+    width: 80%;
+    height: 1px;
+    background-color: var(--border-light);
+    margin: 16px 0;
+    align-self: center;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    justify-content: flex-start; /* FIX: Align content to the start */
+    justify-content: flex-start;
     height: 50px;
     margin: 0 8px;
     padding: 0 12px;
@@ -272,6 +282,26 @@ html, body {
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
+}
+
+.app-sidebar:not(:hover) .nav-item {
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+}
+
+.app-sidebar:not(:hover) .nav-item span {
+    display: none;
+}
+
+.app-sidebar:not(:hover) .nav-item svg {
+    margin: 0;
+}
+
+.app-sidebar:not(:hover) .nav-badge {
+    opacity: 1;
+    right: 4px;
+    top: 4px;
 }
 
 .app-sidebar:hover .nav-item {
@@ -352,10 +382,11 @@ html, body {
     flex: 3;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--spacing-lg) var(--spacing-lg) 0 var(--spacing-lg);
+    padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
     position: relative;
-    /* FIX: Change display to block to stack elements */
-    display: block; 
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg); /* FIX: Set up a flex column layout with consistent spacing */
 }
 
 .main-content::before {
@@ -387,8 +418,11 @@ html, body {
     border-left: 1px solid var(--border-light);
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--spacing-lg) var(--spacing-lg) 0 var(--spacing-lg);
+    padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
     position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
 }
 
 .widget-panel::before {
@@ -413,18 +447,16 @@ html, body {
     display: none;
     width: 100%;
     height: 100%;
-    /* FIX: Set up a flex column layout for stacking */
-    display: flex;
-    flex-direction: column; 
-    gap: var(--spacing-lg); /* FIX: Consistent spacing between sections */
 }
 
 .page-view.active {
-    display: flex;
+    display: block;
 }
 
 #dashboard-view {
     display: flex !important;
+    flex-direction: column;
+    gap: var(--spacing-lg);
 }
 
 #dashboard-view.active {
@@ -436,7 +468,6 @@ html, body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
-    margin-bottom: 32px;
 }
 
 .stat-card {
@@ -488,7 +519,6 @@ html, body {
     border: 1px solid var(--border-light);
     border-radius: 12px;
     padding: 24px;
-    margin-bottom: 24px;
     transition: all 0.3s ease;
     box-shadow: var(--shadow-card);
 }
@@ -592,10 +622,21 @@ html, body {
 }
 
 /* Activity Lists */
-.activity-list {
-    list-style: none;
+.activity-list-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.activity-list-wrapper {
     display: flex;
-    flex-direction: column;
+    transition: transform 0.3s ease-in-out;
+}
+
+.activity-page {
+    flex-shrink: 0;
+    width: 100%;
+    display: grid;
+    grid-template-rows: repeat(4, 1fr);
     gap: 12px;
 }
 
@@ -643,6 +684,39 @@ html, body {
 .activity-timestamp {
     color: var(--text-secondary);
     font-size: 0.8rem;
+}
+
+.activity-navigation {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+}
+
+.nav-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
 }
 
 /* Tasks */
@@ -730,6 +804,12 @@ html, body {
     background: rgba(255, 255, 255, 0.02);
     border: 1px dashed var(--border-light);
     border-radius: 8px;
+    /* FIX: Center the text vertically and horizontally */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
 }
 
 /* --- 9. Notification Dropdown --- */
@@ -749,7 +829,7 @@ html, body {
     transition: all 0.3s ease;
     visibility: hidden;
     overflow: hidden;
-    display: flex; /* FIX: Use flexbox for a better layout */
+    display: flex;
     flex-direction: column;
 }
 
@@ -795,7 +875,7 @@ html, body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     transition: all 0.2s ease;
     cursor: pointer;
-    display: flex; /* FIX: Use flexbox for item layout */
+    display: flex;
     align-items: center;
     gap: 12px;
 }
