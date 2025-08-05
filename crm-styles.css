@@ -91,13 +91,13 @@ html, body {
 /* Card title and icon spacing */
 .card-title {
     position: relative;
-    padding-left: 10px; /* Shift the entire title right to match arrow centering */
+    padding-left: 14px; /* Increased from 12px for additional right shift */
 }
 
 .card-title svg {
     margin-right: 12px;
     position: relative;
-    left: -2px; /* Fine-tune icon position if needed */
+    left: 0; /* Reset left position */
 }
 
 /* Navigation buttons and arrow centering */
@@ -188,9 +188,9 @@ html, body {
 
 .search-bar input:focus {
     outline: none;
-    border-color: var(--accent-blue);
+    border-color: var(--primary-blue); /* Changed from accent-blue to primary-blue */
     background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+    box-shadow: 0 0 0 2px rgba(26, 35, 126, 0.3); /* Updated to match primary-blue */
 }
 
 .search-icon {
@@ -287,6 +287,8 @@ html, body {
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
+    justify-content: flex-start; /* Align content to top */
+    padding-top: 20px; /* Add padding to top */
 }
 
 .app-sidebar:hover {
@@ -308,23 +310,19 @@ html, body {
 .nav-section {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px; /* Slightly increased gap for better spacing */
     width: 100%;
 }
 
 /* Navigation section spacing */
 .nav-section {
-    margin-bottom: 30px; /* Consistent margin for all sections */
+    margin-bottom: 20px; /* Reduced from 30px for better balance */
 }
 
-/* Remove extra bottom margin from the last section */
+/* Account Details and Settings section - adjusted spacing */
 .nav-section:last-child {
+    margin-top: 10px; /* Pull up the last section */
     margin-bottom: 0;
-}
-
-/* Last section */
-.nav-section:last-child {
-    /* No additional margin needed - container padding handles bottom space */
 }
 
 /* REMOVED: .nav-separator styles completely */
@@ -333,15 +331,17 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    height: 50px;
+    height: 52px; /* Slightly increased height */
     margin: 0 8px;
-    padding: 0 12px;
+    padding: 0 16px; /* Increased padding for better spacing */
     color: var(--text-secondary);
     text-decoration: none;
     border-radius: 8px;
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
+    font-size: 1.05rem; /* Increased font size */
+    font-weight: 500; /* Slightly bolder text */
 }
 
 .app-sidebar:not(:hover) .nav-item {
@@ -393,8 +393,8 @@ html, body {
 }
 
 .nav-item svg {
-    width: 20px;
-    height: 20px;
+    width: 22px; /* Slightly larger icons */
+    height: 22px; /* Slightly larger icons */
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -447,7 +447,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
-    padding-bottom: 60px;
+    padding-bottom: 80px; /* Increased from 60px for more bottom spacing */
     min-width: 0; /* Allow flex shrinking */
 }
 
@@ -485,7 +485,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 19px;
-    padding-bottom: 60px;
+    padding-bottom: 80px; /* Increased from 60px to match main content */
     min-width: 0; /* Allow flex shrinking */
 }
 
@@ -798,6 +798,7 @@ html, body {
     justify-content: center;
     position: relative;
     top: 0;
+    padding-left: 3px; /* Increased from 2px for additional right shift */
     left: 0;
     z-index: 10;
 }
@@ -889,10 +890,16 @@ html, body {
 
 /* No Items State - Better centered for widgets */
 .no-items {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     color: var(--text-muted);
     font-style: italic;
-    padding: 32px 20px; /* Added horizontal padding for better centering */
+    padding: 32px;
+    width: 100%;
+    box-sizing: border-box;
     background: rgba(255, 255, 255, 0.02);
     border: 1px dashed var(--border-light);
     border-radius: 8px;
