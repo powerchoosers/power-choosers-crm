@@ -204,52 +204,51 @@ const CRMApp = {
 
     // Show/hide views in the single-page application
     showView(viewName) {
-    
-    // Get references to main containers
-    const mainContent = document.querySelector('.main-content');
-    const widgetPanel = document.querySelector('.widget-panel');
-    const callScriptsView = document.getElementById('call-scripts-view');
-    
-    // Hide all main containers
-    mainContent.style.display = 'none';
-    widgetPanel.style.display = 'none';
-    callScriptsView.style.display = 'none';
-    
-    // Hide all individual page views
-    document.querySelectorAll('.main-content .page-view').forEach(view => {
-        view.style.display = 'none';
-    });
-
-    // Show the appropriate container based on the view
-    if (viewName === 'call-scripts-view') {
-        callScriptsView.style.display = 'flex';
-    } else {
-        mainContent.style.display = 'flex';
-        widgetPanel.style.display = 'flex';
-        const activeView = document.getElementById(viewName);
-        if (activeView) {
-            activeView.style.display = 'flex';
-        }
+        // Get references to main containers
+        const mainContent = document.querySelector('.main-content');
+        const widgetPanel = document.querySelector('.widget-panel');
+        const callScriptsView = document.getElementById('call-scripts-view');
         
-        // Re-render dashboard content if returning to it
-        if (viewName === 'dashboard-view') {
-            this.renderDashboard();
-        }
-    }
+        // Hide all main containers
+        if (mainContent) mainContent.style.display = 'none';
+        if (widgetPanel) widgetPanel.style.display = 'none';
+        if (callScriptsView) callScriptsView.style.display = 'none';
+        
+        // Hide all individual page views
+        document.querySelectorAll('.main-content .page-view').forEach(view => {
+            view.style.display = 'none';
+        });
 
-    // Update active navigation button state
-    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    const activeNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
-    if (activeNav) {
-        activeNav.classList.add('active');
-    } else if (viewName === 'call-scripts-view') {
-        const dashboardNav = document.querySelector('.nav-item[data-view="dashboard-view"]');
-        if (dashboardNav) dashboardNav.classList.add('active');
-    }
-},
+        // Show the appropriate container based on the view
+        if (viewName === 'call-scripts-view') {
+            if (callScriptsView) callScriptsView.style.display = 'flex';
+        } else {
+            if (mainContent) mainContent.style.display = 'flex';
+            if (widgetPanel) widgetPanel.style.display = 'flex';
+            const activeView = document.getElementById(viewName);
+            if (activeView) {
+                activeView.style.display = 'flex';
+            }
+            
+            // Re-render dashboard content if returning to it
+            if (viewName === 'dashboard-view') {
+                this.renderDashboard();
+            }
+        }
+
+        // Update active navigation button state
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        const activeNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+        if (activeNav) {
+            activeNav.classList.add('active');
+        } else if (viewName === 'call-scripts-view') {
+            const dashboardNav = document.querySelector('.nav-item[data-view="dashboard-view"]');
+            if (dashboardNav) dashboardNav.classList.add('active');
+        }
+    },
 
 // Function to load and display the Call Scripts view
-async showCallScriptsView() {
+showCallScriptsView() {
     const callScriptsView = document.getElementById('call-scripts-view');
     if (!callScriptsView) {
         console.error('Call scripts view element not found.');
@@ -257,63 +256,44 @@ async showCallScriptsView() {
         return;
     }
 
-    try {
-        // Show loading state
-        callScriptsView.innerHTML = `
-            <div class="loading-state">
-                <div class="spinner"></div>
-                <p>Loading Cold Calling Hub...</p>
-            </div>
-        `;
-        
-        // Show the view immediately to prevent layout shifts
-        this.showView('call-scripts-view');
-        
-        // Load the HTML content
-        const response = await fetch('call-scripts-content.html');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const htmlContent = await response.text();
-        callScriptsView.innerHTML = htmlContent;
-
-        // Initialize the call scripts functionality
-        if (typeof window.initializeCallScriptsPage === 'function') {
-            try {
+    // Show loading state
+    callScriptsView.innerHTML = '<div class="loading-state">Loading Cold Calling Hub...</div>';
+    this.showView('call-scripts-view');
+    
+    // Fetch the content of call-scripts-content.html
+    fetch('call-scripts-content.html')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+        })
+        .then(htmlContent => {
+            callScriptsView.innerHTML = htmlContent;
+            
+            // Now, call the initialization function which is globally available
+            if (typeof window.initializeCallScriptsPage === 'function') {
                 window.initializeCallScriptsPage();
                 this.autoPopulateCallScripts();
                 console.log('Call scripts content loaded and initialized.');
                 this.showToast('Cold Calling Hub loaded successfully!', 'success');
-            } catch (initError) {
-                console.error('Error initializing call scripts:', initError);
-                throw new Error(`Initialization failed: ${initError.message}`);
-            }
-        } else {
-            throw new Error('Initialization function not found');
-        }
-    } catch (error) {
-        console.error('Error in showCallScriptsView:', error);
-        callScriptsView.innerHTML = `
-            <div class="error-state">
-                <h3>Failed to load call scripts</h3>
-                <p>${error.message}</p>
-                <button class="retry-button" onclick="window.crmApp.showCallScriptsView()">Retry</button>
-            </div>
-        `;
-        this.showToast('Failed to load call scripts. Please try again.', 'error');
-    }
-},
-        const inputCompanyName = document.getElementById('input-company-name');
-        const inputName = document.getElementById('input-name');
-        const inputTitle = document.getElementById('input-title');
-        const inputCompanyIndustry = document.getElementById('input-company-industry');
-
-        if (inputPhone && contactToPopulate) inputPhone.value = contactToPopulate.phone || '';
-        if (inputCompanyName && accountToPopulate) inputCompanyName.value = accountToPopulate.name || '';
-        if (inputName && contactToPopulate) inputName.value = `${contactToPopulate.firstName || ''} ${contactToPopulate.lastName || ''}`.trim();
-        if (inputTitle && contactToPopulate) inputTitle.value = contactToPopulate.title || '';
-        if (inputCompanyIndustry && accountToPopulate) inputCompanyIndustry.value = accountToPopulate.industry || '';
+                
+                // Auto-populate fields if data is available
+                const inputPhone = document.getElementById('input-phone');
+                const contactToPopulate = this.contacts && this.contacts.length > 0 ? this.contacts[0] : null;
+                const accountToPopulate = this.accounts && this.accounts.length > 0 ? this.accounts[0] : null;
+                
+                        if (inputPhone && contactToPopulate) inputPhone.value = contactToPopulate.phone || '';
+                
+                const inputCompanyName = document.getElementById('input-company-name');
+                const inputName = document.getElementById('input-name');
+                const inputTitle = document.getElementById('input-title');
+                const inputCompanyIndustry = document.getElementById('input-company-industry');
+                
+                if (inputCompanyName && accountToPopulate) inputCompanyName.value = accountToPopulate.name || '';
+                if (inputName && contactToPopulate) inputName.value = `${contactToPopulate.firstName || ''} ${contactToPopulate.lastName || ''}`.trim();
+                if (inputTitle && contactToPopulate) inputTitle.value = contactToPopulate.title || '';
+                if (inputCompanyIndustry && accountToPopulate) inputCompanyIndustry.value = accountToPopulate.industry || '';
 
         // Populate Energy Health Check fields
         const currentSupplierInput = document.getElementById('currentSupplier');
@@ -508,11 +488,12 @@ async showCallScriptsView() {
                 accountId: docRef.id,
                 accountName: accountData.name
             });
-            
+
         } catch (error) {
             this.accounts = this.accounts.filter(a => a.id !== tempId);
             console.error('Error saving account:', error);
             this.showToast('Failed to create account', 'error');
+            throw error;
         }
     },
 
