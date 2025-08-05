@@ -123,7 +123,6 @@ html, body {
     flex: 1;
     max-width: 600px;
     margin: 0 32px;
-    /* FIX: Align search bar vertically with other elements */
     display: flex;
     align-items: center;
     height: 100%;
@@ -232,7 +231,7 @@ html, body {
     box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
 }
 
-/* --- 4. Expandable Left Sidebar --- */
+/* --- 4. Expandable Left Sidebar (Fixed) --- */
 .app-sidebar {
     width: 60px;
     min-width: 60px;
@@ -243,8 +242,10 @@ html, body {
     position: relative;
     z-index: 900;
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+    /* FIX: Vertically center sidebar nav content */
     display: flex;
     flex-direction: column;
+    justify-content: center; 
     align-items: center; 
 }
 
@@ -259,6 +260,8 @@ html, body {
     padding: 20px 0;
     gap: 4px;
     width: 100%;
+    /* FIX: Adjust top padding to align with main content */
+    padding-top: 50px; 
 }
 
 .nav-separator {
@@ -382,11 +385,12 @@ html, body {
     flex: 3;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+    padding: var(--spacing-lg);
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-lg); /* FIX: Set up a flex column layout with consistent spacing */
+    gap: var(--spacing-lg);
+    padding-bottom: 60px; /* Adjust bottom padding to match top */
 }
 
 .main-content::before {
@@ -418,11 +422,12 @@ html, body {
     border-left: 1px solid var(--border-light);
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+    padding: var(--spacing-lg);
     position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
+    padding-bottom: 60px;
 }
 
 .widget-panel::before {
@@ -804,7 +809,6 @@ html, body {
     background: rgba(255, 255, 255, 0.02);
     border: 1px dashed var(--border-light);
     border-radius: 8px;
-    /* FIX: Center the text vertically and horizontally */
     display: flex;
     flex-direction: column;
     justify-content: center;
