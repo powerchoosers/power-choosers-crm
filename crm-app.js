@@ -537,7 +537,18 @@ const CRMApp = {
             return;
         }
 
+        // If content is already loaded, just show the view
+        if (callScriptsView.hasChildNodes()) {
+            this.showView('call-scripts-view');
+            this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
+            return;
+        }
+
         try {
+            // Show loading state
+            callScriptsView.innerHTML = '<div class="loading-state">Loading Call Scripts...</div>';
+            this.showView('call-scripts-view');
+            
             // Fetch the content of call-scripts-content.html
             const response = await fetch('call-scripts-content.html');
             if (!response.ok) {
@@ -546,24 +557,39 @@ const CRMApp = {
             const htmlContent = await response.text();
             callScriptsView.innerHTML = htmlContent;
 
-            // Ensure the call scripts view is visible and other views are hidden
-            this.showView('call-scripts-view');
-            // Update the active navigation button to reflect the current view (if applicable)
+            // Update the active navigation button
             this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
 
             // Initialize the script within the loaded content
             // The script in call-scripts-content.html is wrapped in initializeCallScriptsPage()
             if (typeof window.initializeCallScriptsPage === 'function') {
-                window.initializeCallScriptsPage();
-                this.autoPopulateCallScripts();
-                console.log('Call scripts content loaded and initialized.');
+                // Use setTimeout to ensure the DOM is fully updated before initialization
+                setTimeout(() => {
+                    try {
+                        window.initializeCallScriptsPage();
+                        if (typeof this.autoPopulateCallScripts === 'function') {
+                            this.autoPopulateCallScripts();
+                        }
+                        console.log('Call scripts content loaded and initialized.');
+                    } catch (e) {
+                        console.error('Error initializing call scripts:', e);
+                        this.showToast('Error initializing call scripts. Please check the console for details.', 'error');
+                    }
+                }, 100);
             } else {
                 console.error('initializeCallScriptsPage function not found in loaded script.');
-                this.showToast('Failed to initialize call scripts functionality.', 'error');
+                this.showToast('Failed to initialize call scripts functionality. Missing initialization function.', 'error');
             }
         } catch (error) {
             console.error('Error loading call scripts content:', error);
-            this.showToast('Failed to load call scripts. Please check the file path.', 'error');
+            callScriptsView.innerHTML = `
+                <div class="error-state">
+                    <h3>Failed to load call scripts</h3>
+                    <p>${error.message}</p>
+                    <button class="retry-button" onclick="window.crmApp.showCallScriptsView()">Retry</button>
+                </div>
+            `;
+            this.showToast('Failed to load call scripts. Please check your connection and try again.', 'error');
         }
     },
 
