@@ -1,24 +1,24 @@
 /*
- * Power Choosers CRM Dashboard - Complete CSS Stylesheet (FINAL FIXED)
+ * Power Choosers CRM Dashboard - Complete CSS Stylesheet (FINAL)
  * This provides a cohesive, responsive design for the CRM dashboard application.
  */
 
-/* --- 1. CSS Variables & Global Styles (BRIGHTER DARK COLORS) --- */
+/* --- 1. CSS Variables & Global Styles --- */
 :root {
-    --primary-blue: #1c336b; /* Slightly brighter blue */
-    --secondary-blue: #23408e; /* Slightly brighter blue */
-    --dark-blue: #121820; /* Slightly brighter dark blue */
-    --darker-blue: #0b1016; /* Slightly brighter darker blue */
+    --primary-blue: #1c336b;
+    --secondary-blue: #23408e;
+    --dark-blue: #121820;
+    --darker-blue: #0b1016;
     --header-blue: #1a202c;
     --professional-blue: #23408e;
     --text-primary: #e2e8f0;
-    --text-secondary: #a3b2c6; /* Slightly brighter secondary text */
+    --text-secondary: #a3b2c6;
     --accent-orange: #f59e0b;
     --accent-green: #10b981;
     --accent-red: #ef4444;
-    --bg-card: #1c222e; /* Slightly brighter card background */
-    --bg-hover: #2e3542; /* Slightly brighter hover background */
-    --border-color: #3b4251; /* Lighter border color for visibility */
+    --bg-card: #1c222e;
+    --bg-hover: #2e3542;
+    --border-color: #3b4251;
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
@@ -72,6 +72,7 @@ body {
     display: flex;
     flex: 1;
     overflow: hidden;
+    margin-top: 70px; /* Account for fixed header */
 }
 
 .app-content-container {
@@ -88,13 +89,12 @@ body {
     padding: 0 24px;
     background: linear-gradient(135deg, var(--header-blue) 0%, var(--dark-blue) 100%);
     border-bottom: 3px solid var(--professional-blue);
-    position: relative;
+    position: fixed; /* Make header fixed for scroll-under effect */
+    top: 0;
+    left: 0;
+    right: 0;
     z-index: 1000;
-    box-shadow: none;
-}
-
-.app-header::after {
-    content: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .header-left {
@@ -233,7 +233,7 @@ body {
     box-shadow: var(--shadow-md);
 }
 
-/* --- 4. Left Sidebar Navigation (FINAL FIX FOR CENTERING) --- */
+/* --- 4. Left Sidebar Navigation (FINAL CENTERING FIX) --- */
 .app-sidebar {
     width: 72px;
     background: linear-gradient(180deg, var(--dark-blue) 0%, var(--darker-blue) 100%);
@@ -261,14 +261,15 @@ body {
 .nav-item {
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 16px 8px;
+    justify-content: center; /* Perfect centering when collapsed */
+    padding: 16px 0; /* No horizontal padding for perfect centering */
     text-decoration: none;
     color: white;
     white-space: nowrap;
     transition: all 0.2s ease;
     border-radius: 12px;
     position: relative;
+    margin: 0 8px; /* Small margin for rounded corners */
 }
 
 /* When sidebar is hovered, align items to the left */
@@ -302,7 +303,7 @@ body {
 }
 
 .nav-item svg {
-    margin-right: 0;
+    margin-right: 0; /* No margin when centered */
     width: 24px;
     height: 24px;
     flex-shrink: 0;
@@ -311,7 +312,7 @@ body {
 }
 
 .app-sidebar:hover .nav-item svg {
-    margin-right: 16px;
+    margin-right: 16px; /* Add margin when expanded */
 }
 
 .nav-item span {
@@ -380,7 +381,7 @@ body {
     display: flex !important;
     flex-direction: row;
     gap: 24px;
-    padding: 24px;
+    padding: 24px 24px 0 24px; /* Remove bottom padding */
     height: 100%;
     overflow: hidden;
 }
@@ -396,7 +397,10 @@ body {
     gap: 24px;
     overflow-y: auto;
     padding-right: 8px;
+    padding-bottom: 0; /* Remove bottom padding */
     min-width: 0;
+    /* Add scroll shadow effect */
+    box-shadow: inset 0 10px 10px -10px rgba(0, 0, 0, 0.3);
 }
 
 .dashboard-right-sidebar {
@@ -409,24 +413,10 @@ body {
     overflow-y: auto;
     background: transparent;
     padding: 0;
-    margin: 0;
-}
-
-.widget-card {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 24px;
-    transition: all 0.3s ease;
-    box-shadow: var(--shadow-md);
-    min-height: auto;
-    margin: 0;
-    width: 100%;
-}
-
-.widget-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    padding-bottom: 0; /* Remove bottom padding */
+    margin: 0 auto; /* Center the sidebar */
+    /* Add scroll shadow effect */
+    box-shadow: inset 0 10px 10px -10px rgba(0, 0, 0, 0.3);
 }
 
 /* Stats Cards Grid */
@@ -434,7 +424,7 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 24px;
-    margin-bottom: 8px;
+    margin-bottom: 24px; /* Ensure proper spacing */
 }
 
 .stat-card {
@@ -489,12 +479,31 @@ body {
     padding: 24px;
     transition: all 0.3s ease;
     box-shadow: var(--shadow-md);
+    margin-bottom: 24px; /* Add bottom margin for last card to fall off screen */
 }
 
 .dashboard-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     border-color: var(--border-color);
+}
+
+.widget-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-md);
+    min-height: auto;
+    margin: 0;
+    margin-bottom: 24px; /* Add bottom margin for widgets to fall off screen */
+    width: 100%;
+}
+
+.widget-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
 .card-title {
@@ -506,48 +515,6 @@ body {
     align-items: center;
     gap: 8px;
 }
-
-/* Recent Activities Header */
-.activities-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.activities-header .card-title {
-    margin-bottom: 0;
-}
-
-.activities-header-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.pagination-button {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.pagination-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.pagination-button:not(:disabled):hover {
-    background: var(--professional-blue);
-    border-color: var(--professional-blue);
-}
-
 
 /* Market Trends Card */
 .market-trends-card {
@@ -781,6 +748,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 120px; /* Ensure minimum height for proper centering */
 }
 
 /* --- 7. Toast Notifications --- */
@@ -1090,6 +1058,7 @@ body {
     .dashboard-right-sidebar {
         width: 100%;
         min-width: 100%;
+        margin: 0; /* Remove centering on smaller screens */
     }
     
     .stat-cards-grid {
@@ -1113,6 +1082,10 @@ body {
         padding: 0 16px;
     }
     
+    .app-main {
+        margin-top: 60px; /* Adjust for smaller header */
+    }
+    
     .app-title {
         font-size: 1.2rem;
     }
@@ -1131,5 +1104,66 @@ body {
     
     .modal-content {
         padding: 24px;
+    }
+    
+    .notification-dropdown {
+        width: 300px;
+        right: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    #dashboard-view {
+        padding: 16px 16px 0 16px;
+    }
+    
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    
+    .dashboard-card {
+        padding: 20px;
+    }
+    
+    .widget-card {
+        padding: 20px;
+    }
+}
+
+/* --- 11. Print Styles --- */
+@media print {
+    .app-sidebar,
+    .header-right,
+    .toast-container,
+    .notification-dropdown,
+    .modal-overlay {
+        display: none;
+    }
+    
+    .app-header {
+        box-shadow: none;
+        border-bottom: 2px solid #000;
+        background: white;
+        color: black;
+        position: relative;
+    }
+    
+    .app-main {
+        margin-top: 0;
+    }
+    
+    .dashboard-card {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 2px solid #000;
+        background: white;
+        color: black;
+    }
+    
+    .stat-card {
+        background: white;
+        color: black;
+        border: 2px solid #000;
     }
 }
