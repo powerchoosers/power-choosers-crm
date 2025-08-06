@@ -102,7 +102,6 @@ html, body {
     display: flex;
     height: calc(100vh - 70px);
     position: relative;
-    margin-top: 70px;
 }
 
 /* Special handling for call scripts view to enable scroll-under effect */
@@ -116,6 +115,12 @@ html, body {
     overflow: hidden;
     display: flex;
     height: calc(100vh - 70px); /* Full height minus header */
+}
+
+.main-content {
+    padding-top: 24px; /* Creates the margin below the header */
+    padding-left: 24px;
+    padding-right: 24px;
 }
 
 /* Card title and icon spacing */
