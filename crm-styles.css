@@ -468,11 +468,17 @@ html, body {
     width: 100%;
     overflow-y: auto;
     max-height: calc(100vh - 70px);
-    padding: var(--spacing-lg);
-    padding-left: var(--spacing-lg); /* Match widget panel padding exactly */
-    padding-bottom: 0; /* REMOVED bottom padding */
+    padding: 0 var(--spacing-lg); /* Vertical padding removed */
     position: relative;
     box-shadow: var(--shadow-scroll);
+}
+
+.calls-hub-sidebar > *:first-child {
+    padding-top: var(--spacing-lg);
+}
+
+.calls-hub-sidebar > *:last-child {
+    padding-bottom: var(--spacing-lg);
 }
 
 /* Add gradient shadow for cold calling sidebar to match widget panel */
@@ -519,11 +525,18 @@ html, body {
     flex-direction: column;
     position: relative !important;
     background: var(--darker-blue);
-    padding: var(--spacing-lg);
-    padding-bottom: 0; /* REMOVED bottom padding */
+    padding: 0 var(--spacing-lg); /* Vertical padding removed */
     z-index: auto !important;
     overflow-y: auto;
     box-shadow: var(--shadow-scroll);
+}
+
+.calls-hub-main > *:first-child {
+    padding-top: var(--spacing-lg);
+}
+
+.calls-hub-main > *:last-child {
+    padding-bottom: var(--spacing-lg);
 }
 
 /* Add gradient shadow for call scripts main content */
@@ -569,13 +582,20 @@ html, body {
     flex: 3;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--spacing-lg);
+    padding: 0 var(--spacing-lg); /* Vertical padding removed */
     position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
-    padding-bottom: 0; /* REMOVED bottom padding */
     min-width: 0; /* Allow flex shrinking */
+}
+
+.main-content > *:first-child {
+    padding-top: var(--spacing-lg);
+}
+
+.main-content > *:last-child {
+    padding-bottom: var(--spacing-lg);
 }
 
 .main-content::before {
@@ -607,14 +627,21 @@ html, body {
     border-left: 1px solid var(--border-light);
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--spacing-lg);
-    padding-bottom: 0; /* REMOVED bottom padding */
+    padding: 0 var(--spacing-lg); /* Vertical padding removed */
     position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
     min-width: 0; /* Allow flex shrinking */
     box-shadow: var(--shadow-scroll);
+}
+
+.widget-panel > *:first-child {
+    padding-top: var(--spacing-lg);
+}
+
+.widget-panel > *:last-child {
+    padding-bottom: var(--spacing-lg);
 }
 
 /* Add gradient shadows for scroll-under effect */
@@ -656,7 +683,6 @@ html, body {
 .widget-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* --- 7. Page Views --- */
