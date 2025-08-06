@@ -101,6 +101,7 @@ html, body {
     flex: 1;
     overflow: hidden;
     display: flex;
+    height: calc(100vh - 70px); /* Full height minus header */
 }
 
 /* Card title and icon spacing */
@@ -467,6 +468,24 @@ html, body {
     width: 100%;
     overflow-y: auto;
     max-height: calc(100vh - 70px);
+    padding: var(--spacing-lg);
+    padding-left: 0; /* Remove left padding to align with home screen */
+    padding-bottom: 80px; /* Match main content bottom padding */
+    position: relative;
+    box-shadow: var(--shadow-scroll);
+}
+
+/* Add gradient shadow for cold calling sidebar to match widget panel */
+.calls-hub-sidebar::before {
+    content: '';
+    position: fixed;
+    top: 70px;
+    right: 0;
+    width: 25%;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--dark-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
 }
 
 /* Call Scripts Layout Main Content */
@@ -474,7 +493,63 @@ html, body {
     display: flex;
     flex-direction: column;
     width: 100%;
+    height: calc(100vh - 70px); /* Full viewport height minus header */
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+}
+
+/* Ensure call scripts main content fills the space properly */
+.calls-hub-main {
+    width: 100%;
+    height: calc(100vh - 70px); /* Full height minus header */
+    display: flex;
+    flex-direction: column;
+    position: relative !important;
+    background: var(--darker-blue);
+    padding: var(--spacing-lg);
+    padding-bottom: 80px; /* Match main content bottom padding */
+    z-index: auto !important;
+    overflow-y: auto;
+    box-shadow: var(--shadow-scroll);
+}
+
+/* Add gradient shadow for call scripts main content */
+.calls-hub-main::before {
+    content: '';
+    position: fixed;
+    top: 70px;
+    left: 60px;
+    right: 25%;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--darker-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+/* Fix calls-hub-layout positioning */
+.calls-hub-layout {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    z-index: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+}
+
+/* Page view management - ensure only one view shows at a time */
+.page-view {
+    position: relative;
+    width: 100%;
     height: 100%;
+}
+
+.page-view:not([style*="display: flex"]):not([style*="display: block"]) {
+    display: none !important;
 }
 
 /* --- 6. Main Content Area (3/4 width) - FIXED STAT CARDS --- */
