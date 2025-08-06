@@ -96,7 +96,6 @@ html, body {
     display: flex;
     flex: 1;
     overflow: hidden;
-    margin-top: 70px;
 }
 
 .app-content-container {
@@ -470,7 +469,7 @@ html, body {
     width: 100%;
     overflow-y: auto;
     max-height: calc(100vh - 70px);
-    padding: var(--spacing-lg); /* Consistent padding */
+    padding: calc(70px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg); /* Added top padding for header */
     position: relative;
 }
 
@@ -526,7 +525,7 @@ html, body {
     flex-direction: column;
     position: relative !important;
     background: var(--darker-blue);
-    padding: var(--spacing-lg); /* Consistent padding */
+    padding: calc(70px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg); /* Added top padding for header */
     z-index: auto !important;
     overflow-y: auto;
     box-shadow: var(--shadow-scroll);
