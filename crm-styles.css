@@ -1874,3 +1874,79 @@ html, body {
         font-size: 1.1rem;
     }
 }
+
+/* Call Center Hub Specific Styles */
+/* Ensure the main view and sidebar scroll independently and have consistent padding. */
+#call-scripts-view, #cold-calling-widgets-container {
+    padding: 1.5rem;
+    height: calc(100vh - 70px); /* Full height minus header */
+    overflow-y: auto;
+}
+
+/* Custom scrollbar for a cleaner look in the call hub */
+#call-scripts-view::-webkit-scrollbar, 
+#cold-calling-widgets-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#call-scripts-view::-webkit-scrollbar-track, 
+#cold-calling-widgets-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#call-scripts-view::-webkit-scrollbar-thumb, 
+#cold-calling-widgets-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+#call-scripts-view::-webkit-scrollbar-thumb:hover, 
+#cold-calling-widgets-container::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.calls-hub-layout {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.calls-hub-main {
+    flex: 3;
+    /* Padding is now handled by the parent #call-scripts-view */
+}
+
+.calls-hub-sidebar {
+    flex: 1;
+    /* Padding is now handled by the parent #cold-calling-widgets-container */
+}
+
+.call-script-container {
+    margin-bottom: 1.5rem;
+}
+
+.script-section {
+    margin-bottom: 1.5rem;
+}
+
+/* Ensure no conflicting global styles exist for these classes */
+/* The old conflicting rules at the end of the file should already be removed. */
+
+/* --- 10. Responsive Design --- */
+@media (max-width: 1200px) {
+    .app-main {
+        flex-direction: column;
+    }
+    .main-content {
+        flex: none;
+        height: 60%;
+    }
+    .widget-panel {
+        flex: none;
+        height: 40%;
+        border-left: none;
+        border-top: 1px solid var(--border-light);
+    }
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
