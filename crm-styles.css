@@ -96,6 +96,7 @@ html, body {
     display: flex;
     height: calc(100vh - 70px);
     position: relative;
+    margin-top: 70px;
 }
 
 /* Special handling for call scripts view to enable scroll-under effect */
