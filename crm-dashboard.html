@@ -3,16 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Power Choosers CRM</title>
-
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    
+    <title>Power Choosers CRM Dashboard</title>
+    <!-- Link to your main CRM stylesheet -->
+    <link rel="stylesheet" href="crm-styles.css">
+    <!-- Tailwind CSS CDN (if not already part of crm-styles.css or main index.html) -->
+    <!-- Assuming crm-styles.css handles all styling including Tailwind imports/directives -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <link rel="stylesheet" href="https://powerchoosers.github.io/power-choosers-crm/crm-styles.css">
+    <!-- Tone.js for sound effects in Cold Calling Hub -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
-    </head>
+    <!-- Favicon and Apple Touch Icon -->
+    <link rel="icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" type="image/png">
+    <link rel="apple-touch-icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png">
+</head>
 <body>
     <div class="app-wrapper">
         <header class="app-header">
@@ -34,6 +37,7 @@
                 </div>
             </div>
             <div class="header-right">
+                <!-- Call Scripts button will open the new call scripts view -->
                 <button class="icon-button" id="call-scripts-btn" title="Call Scripts">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -131,7 +135,7 @@
                         <a href="#" class="nav-item" data-view="settings-view">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="3"></circle>
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                             </svg>
                             <span>Settings</span>
                         </a>
@@ -160,7 +164,7 @@
                                 <p class="stat-label">Hot Leads</p>
                             </div>
                         </section>
-    
+
                         <section class="dashboard-card">
                             <h3 class="card-title">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -185,21 +189,20 @@
                                 </div>
                             </div>
                             <div class="market-insights">
-                                <p>💡 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026</p>
+                                <p>📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026</p>
                             </div>
                         </section>
-    
+
                         <section class="dashboard-card">
-                            <h3 class="card-title">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path>
-                                    <path d="M12 6v6l4 2"></path>
-                                </svg>
-                                Recent Activities
-                            </h3>
-                            <div class="activity-list-container">
-                                <div class="activity-list-wrapper" id="activity-list-wrapper"></div>
-                                <div class="activity-navigation">
+                            <h3 class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="display: flex; align-items: center;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path>
+                                        <path d="M12 6v6l4 2"></path>
+                                    </svg>
+                                    Recent Activities
+                                </span>
+                                <div class="activity-navigation" style="position: relative; top: auto; right: auto; transform: translateY(0); width: auto; padding: 0; display: flex; justify-content: flex-end;">
                                     <button class="nav-btn" id="activity-prev-btn">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <polyline points="15 18 9 12 15 6"></polyline>
@@ -211,6 +214,9 @@
                                         </svg>
                                     </button>
                                 </div>
+                            </h3>
+                            <div class="activity-list-container">
+                                <div class="activity-list-wrapper" id="activity-list-wrapper"></div>
                             </div>
                         </section>
                     </div>
@@ -222,11 +228,13 @@
                     <div id="tasks-view" class="page-view" style="display: none;"></div>
                     <div id="account-details-view" class="page-view" style="display: none;"></div>
                     <div id="settings-view" class="page-view" style="display: none;"></div>
-
-                    <div id="calls-hub-view" class="page-view" style="display: none;"></div>
+                    <!-- New view for the Call Scripts content -->
+                    <div id="call-scripts-view" class="page-view" style="display: none;">
+                        <!-- Content will be loaded here dynamically -->
+                    </div>
                 </div>
-    
-                <aside class="widget-panel">
+
+                <aside class="widget-panel" style="gap: 19px;">
                     <section class="widget-card">
                         <h3 class="card-title">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -235,7 +243,7 @@
                             Quick Actions
                         </h3>
                         <div class="quick-actions-grid">
-                            <a href="#" class="action-button" onclick="CRMApp.addAccount()">
+                            <a href="#" class="action-button" onclick="addAccount()">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M3 21h18"></path>
                                     <path d="M5 21V7l8-4v18"></path>
@@ -246,7 +254,7 @@
                                 </svg>
                                 Add Account
                             </a>
-                            <a href="#" class="action-button" onclick="CRMApp.addContact()">
+                            <a href="#" class="action-button" onclick="addContact()">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                     <circle cx="8.5" cy="7" r="4"></circle>
@@ -255,7 +263,7 @@
                                 </svg>
                                 Add Contact
                             </a>
-                            <a href="#" class="action-button" onclick="CRMApp.bulkImport()">
+                            <a href="#" class="action-button" onclick="bulkImport()">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                     <polyline points="7 10 12 15 17 10"></polyline>
@@ -265,37 +273,21 @@
                             </a>
                         </div>
                     </section>
-    
+
                     <section class="widget-card">
-                        <div class="card-header-with-arrows">
-                            <h3 class="card-title">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                    <polyline points="14 2 14 8 20 8"></polyline>
-                                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                                    <line x1="10" y1="9" x2="8" y2="9"></line>
-                                </svg>
-                                Today's Tasks
-                            </h3>
-                            <div class="task-navigation-top">
-                                <button class="nav-btn" id="task-prev-btn">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="15 18 9 12 15 6"></polyline>
-                                    </svg>
-                                </button>
-                                <button class="nav-btn" id="task-next-btn">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="tasks-list-container">
-                            <ul class="tasks-list" id="tasks-list"></ul>
-                        </div>
+                        <h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <line x1="10" y1="9" x2="8" y2="9"></line>
+                            </svg>
+                            Today's Tasks
+                        </h3>
+                        <ul class="tasks-list" id="tasks-list"></ul>
                     </section>
-    
+
                     <section class="widget-card">
                         <h3 class="card-title">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -311,7 +303,7 @@
                 </aside>
             </div>
         </main>
-    
+
         <div id="add-account-modal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
@@ -340,13 +332,13 @@
                         <input type="text" id="account-address" class="form-input">
                     </div>
                     <div class="modal-actions">
-                        <button type="button" class="btn btn-secondary" onclick="CRMApp.closeModal('add-account-modal')">Cancel</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('add-account-modal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Add Account</button>
                     </div>
                 </form>
             </div>
         </div>
-    
+
         <div id="add-contact-modal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
@@ -381,7 +373,7 @@
                         </select>
                     </div>
                     <div class="modal-actions">
-                        <button type="button" class="btn btn-secondary" onclick="CRMApp.closeModal('add-contact-modal')">Cancel</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('add-contact-modal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Add Contact</button>
                     </div>
                 </form>
@@ -407,13 +399,13 @@
                         <input type="file" id="csv-file" class="form-input" accept=".csv" required>
                     </div>
                     <div class="modal-actions">
-                        <button type="button" class="btn btn-secondary" onclick="CRMApp.closeModal('bulk-import-modal')">Cancel</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('bulk-import-modal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Import</button>
                     </div>
                 </form>
             </div>
         </div>
-    
+
         <div class="notification-dropdown" id="notification-dropdown">
             <div class="notification-header">
                 <h3 class="notification-title">Notifications</h3>
@@ -422,10 +414,17 @@
             <ul class="notification-list" id="notification-list"></ul>
         </div>
     </div>
-    
+
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="https://powerchoosers.github.io/power-choosers-crm/crm-app.js"></script>
-
+    <!-- Firebase App (required for Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <!-- Firebase Firestore (required for database operations) -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    
+    <!-- Your Firebase configuration file -->
+    <script src="firebase-config.js"></script>
+    <!-- Your main CRM application logic -->
+    <script src="crm-app.js"></script>
 </body>
 </html>
