@@ -204,11 +204,15 @@ const CRMApp = {
 
     // Show/hide views in the single-page application
     showView(viewName) {
+        console.log(`Switching to view: ${viewName}`);
         this.currentView = viewName;
         
-        // Hide all main content views
+        // Hide all main content views with explicit display none
         document.querySelectorAll('.page-view').forEach(view => {
             view.style.display = 'none';
+            view.style.visibility = 'hidden';
+            view.style.position = 'absolute';
+            view.style.left = '-9999px';
         });
         
         // Hide both widget containers
@@ -227,16 +231,29 @@ const CRMApp = {
         // Show the requested view
         const activeView = document.getElementById(viewName);
         if (activeView) {
+            // Reset positioning for active view
+            activeView.style.position = 'relative';
+            activeView.style.left = 'auto';
+            activeView.style.visibility = 'visible';
+            
             if (viewName === 'call-scripts-view') {
                 // Call Scripts View - Special Layout
+                console.log('Activating call scripts view');
                 activeView.style.display = 'flex';
-                if (coldCallingWidgetsContainer) coldCallingWidgetsContainer.style.display = 'flex';
+                if (coldCallingWidgetsContainer) {
+                    coldCallingWidgetsContainer.style.display = 'flex';
+                    console.log('Showing cold calling widgets');
+                }
                 // Make the main content area wider for call scripts
                 if (mainContentWrapper) mainContentWrapper.style.flex = '4';
             } else {
                 // All other CRM views - Standard Layout
+                console.log('Activating standard CRM view');
                 activeView.style.display = (viewName === 'dashboard-view') ? 'flex' : 'block';
-                if (crmWidgetsContainer) crmWidgetsContainer.style.display = 'flex';
+                if (crmWidgetsContainer) {
+                    crmWidgetsContainer.style.display = 'flex';
+                    console.log('Showing CRM widgets');
+                }
             }
         }
         
@@ -543,6 +560,12 @@ const CRMApp = {
             console.error('Call scripts view element not found.');
             this.showToast('Call scripts view not available.', 'error');
             return;
+        }
+
+        // Clear any existing content first
+        callScriptsView.innerHTML = '';
+        if (coldCallingWidgetsContainer) {
+            coldCallingWidgetsContainer.innerHTML = '';
         }
 
         // Ensure the call scripts view is visible and other views are hidden
