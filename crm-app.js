@@ -1,25 +1,32 @@
-// Power Choosers CRM Dashboard - Main JavaScript File (FIXED VERSION)
+// Power Choosers CRM Dashboard - Main JavaScript File (UPDATED)
 // This file contains the complete application logic for the redesigned Power Choosers CRM.
+// Updated with white SVG activity icons for better theme consistency
+// Added Call Scripts button functionality
 
-// Wait for Firebase to be available
-function waitForFirebase() {
-    return new Promise((resolve) => {
-        if (typeof firebase !== 'undefined') {
-            resolve();
-        } else {
-            setTimeout(() => waitForFirebase().then(resolve), 100);
-        }
-    });
-}
+// --- 1. Firebase Configuration & Initialization ---
+const firebaseConfig = {
+    apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
+    authDomain: "power-choosers-crm.firebaseapp.com",
+    projectId: "power-choosers-crm",
+    storageBucket: "power-choosers-crm.firebasestorage.app",
+    messagingSenderId: "792458658491",
+    appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
+    measurementId: "G-XEC3BFHJHW"
+};
 
-// --- Global Application State and Data ---
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
+const fieldValue = firebase.firestore.FieldValue;
+
+// --- 2. Global Application State and Data ---
 const CRMApp = {
     accounts: [],
     contacts: [],
     activities: [],
     tasks: [],
     notifications: [],
-    callLogs: [],
     currentView: 'dashboard-view',
     currentContact: null,
     currentAccount: null,
@@ -31,51 +38,24 @@ const CRMApp = {
     // Application initialization
     async init() {
         try {
-            console.log('Initializing CRM App...');
-            
-            // Wait for Firebase to be available
-            await waitForFirebase();
-            
-            // Load initial data (will use sample data if Firebase fails)
             await this.loadInitialData();
-            
-            // Setup event listeners
             this.setupEventListeners();
-            
-            // Show initial view
             this.showView('dashboard-view');
-            
-            // Update notifications
             this.updateNotifications();
-            
             console.log('CRM App initialized successfully');
         } catch (error) {
             console.error('Error initializing CRM App:', error);
-            this.showToast('Application loaded with sample data', 'info');
-            
-            // Load sample data and continue
-            this.loadSampleData();
-            this.setupEventListeners();
-            this.showView('dashboard-view');
-            this.updateNotifications();
+            this.showToast('Failed to initialize application', 'error');
         }
     },
 
-    // Load initial data from Firestore or use sample data
+    // Load initial data from Firestore
     async loadInitialData() {
         try {
-            // Check if Firebase is available
-            if (typeof firebase === 'undefined' || !window.db) {
-                console.log('Firebase not available, using sample data');
-                return this.loadSampleData();
-            }
-
-            console.log('Loading data from Firebase...');
-            
             const [accountsSnapshot, contactsSnapshot, activitiesSnapshot] = await Promise.all([
-                window.db.collection('accounts').get(),
-                window.db.collection('contacts').get(),
-                window.db.collection('activities').orderBy('createdAt', 'desc').limit(50).get()
+                db.collection('accounts').get(),
+                db.collection('contacts').get(),
+                db.collection('activities').orderBy('createdAt', 'desc').limit(50).get()
             ]);
             
             this.accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -86,7 +66,7 @@ const CRMApp = {
                 createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date() 
             }));
             
-            console.log('Firebase data loaded:', {
+            console.log('Initial data loaded:', {
                 accounts: this.accounts.length,
                 contacts: this.contacts.length,
                 activities: this.activities.length
@@ -94,8 +74,8 @@ const CRMApp = {
             
             return true;
         } catch (error) {
-            console.error('Error loading from Firebase:', error);
-            console.log('Falling back to sample data');
+            console.error('Error loading initial data:', error);
+            this.showToast('Failed to load data. Using sample data.', 'warning');
             return this.loadSampleData();
         }
     },
@@ -115,20 +95,24 @@ const CRMApp = {
         this.activities = [
             { id: 'act1', type: 'call_note', description: 'Call with John Smith - Q1 Energy Contract', noteContent: 'Discussed renewal options', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
             { id: 'act2', type: 'email', description: 'Sent energy analysis to Sarah Johnson', contactId: 'con2', contactName: 'Sarah Johnson', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
-            { id: 'act3', type: 'call_note', description: 'Follow-up with Mike Davis - Multi-site proposal', noteContent: 'Reviewing proposal details', contactId: 'con3', contactName: 'Mike Davis', accountId: 'acc2', accountName: 'XYZ Energy Solutions', createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }
+            { id: 'act3', type: 'call_note', description: 'Follow-up with Mike Davis - Multi-site proposal', noteContent: 'Reviewing proposal details', contactId: 'con3', contactName: 'Mike Davis', accountId: 'acc2', accountName: 'XYZ Energy Solutions', createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
+            { id: 'act4', type: 'note', description: 'Added a note for John Smith', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000) },
+            { id: 'act5', type: 'email', description: 'Sent follow up email to Mike Davis', contactId: 'con3', contactName: 'Mike Davis', accountId: 'acc2', accountName: 'XYZ Energy Solutions', createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
+            { id: 'act6', type: 'call_note', description: 'Call with new prospect', noteContent: 'No answer', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000) },
+            { id: 'act7', type: 'note', description: 'Reviewed account status for ABC Manufacturing', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+            { id: 'act8', type: 'call_note', description: 'Final call with Sarah Johnson', noteContent: 'Call ended with a successful contract', contactId: 'con2', contactName: 'Sarah Johnson', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
+            { id: 'act9', type: 'call_note', description: 'Intro call with XYZ Energy', noteContent: 'Introduced services to Mike Davis', contactId: 'con3', contactName: 'Mike Davis', accountId: 'acc2', accountName: 'XYZ Energy Solutions', createdAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000) },
         ];
         this.tasks = [
             { id: 't1', title: 'Follow up with John Smith - Q1 Energy Contract', time: '3:00 PM', contactId: 'con1', dueDate: new Date(Date.now() - 1000), completed: false },
-            { id: 't2', title: 'Prepare energy analysis for Sarah Johnson', time: '3:30 PM', contactId: 'con2', dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), completed: false }
+            { id: 't2', title: 'Prepare energy analysis for Sarah Johnson', time: '3:30 PM', contactId: 'con2', dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), completed: false },
+            { id: 't3', title: 'Review Mike Davis multi-site proposal', time: '9:00 AM', contactId: 'con3', dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), completed: false }
         ];
-        this.callLogs = [];
         return true;
     },
 
     // Setup event listeners
     setupEventListeners() {
-        console.log('Setting up event listeners...');
-        
         // Navigation links
         document.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', (e) => {
@@ -142,7 +126,7 @@ const CRMApp = {
         // Search functionality
         const searchInput = document.getElementById('global-search');
         if (searchInput) {
-            searchInput.addEventListener('input', this.debounce((e) => {
+            searchInput.addEventListener('input', debounce((e) => {
                 this.handleSearch(e.target.value);
             }, 300));
         }
@@ -167,13 +151,9 @@ const CRMApp = {
         const callScriptsBtn = document.getElementById('call-scripts-btn');
         if (callScriptsBtn) {
             callScriptsBtn.addEventListener('click', (e) => {
-                e.preventDefault();
                 e.stopPropagation();
-                console.log('Call Scripts button clicked!');
-                this.loadCallScriptsView();
+                this.openCallScriptsModal();
             });
-        } else {
-            console.error('Call Scripts button not found!');
         }
         
         // Activity carousel navigation buttons
@@ -188,13 +168,10 @@ const CRMApp = {
 
         this.setupModalHandlers();
 
-        // Global functions
         window.addAccount = () => this.addAccount();
         window.addContact = () => this.addContact();
         window.bulkImport = () => this.bulkImport();
         window.closeModal = (modalId) => this.closeModal(modalId);
-        
-        console.log('Event listeners setup complete');
     },
 
     // Setup modal event handlers
@@ -237,10 +214,8 @@ const CRMApp = {
         
         if (viewName === 'dashboard-view') {
             this.renderDashboard();
-        } else if (viewName === 'call-scripts-view') {
-            this.renderCallScriptsView();
         } else {
-            console.log(`Switched to: ${viewName}`);
+            console.log(`Mapped to: ${viewName}`);
         }
     },
 
@@ -248,142 +223,6 @@ const CRMApp = {
     updateActiveNavButton(activeNav) {
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
         activeNav.classList.add('active');
-    },
-
-    // Load and render Call Scripts view
-    async loadCallScriptsView() {
-        console.log('Loading Call Scripts view...');
-        
-        try {
-            this.showView('call-scripts-view');
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            await this.renderCallScriptsView();
-            this.showToast('Call Scripts loaded successfully!', 'success');
-        } catch (error) {
-            console.error('Error loading Call Scripts:', error);
-            this.showToast('Failed to load Call Scripts', 'error');
-        }
-    },
-
-    // Render Call Scripts view with the cold calling hub
-    async renderCallScriptsView() {
-        const callScriptsView = document.getElementById('call-scripts-view');
-        if (!callScriptsView) {
-            console.error('Call scripts view element not found');
-            return;
-        }
-
-        // Insert the cold calling hub HTML content
-        callScriptsView.innerHTML = `
-            <div class="calls-hub-layout">
-                <div class="calls-hub-main">
-                    <h2 class="text-2xl font-bold mb-6 text-white text-center">Cold Calling Script</h2>
-                    
-                    <div class="calls-hub-main-inner">
-                        <div class="script-display p-6" id="script-display">
-                            Click 'Dial' to begin the call
-                        </div>
-
-                        <div class="response-buttons mt-6" id="responses-container">
-                            <button class="dial-button" onclick="handleDialClick()">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                                </svg>
-                                Dial
-                            </button>
-                        </div>
-
-                        <div class="calls-hub-footer">
-                            <button id="back-btn" class="action-btn" onclick="goBack()" disabled>← Back</button>
-                            <button id="restart-btn" class="restart-btn-icon" onclick="restart()">
-                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path d="M21.5 13a9.5 9.5 0 1 1-9.5-9.5V3a.5.5 0 0 0-1 0v.5A9.5 9.5 0 1 1 21.5 13zM12 2v4M12 18v4M22 12h-4M6 12H2M18 18l-3-3M18 6l-3 3M6 18l3-3M6 6l3 3"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="calls-hub-sidebar">
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-card-title">📋 Prospect Info</h3>
-                        <div class="sidebar-input-group">
-                            <label for="input-phone">Phone Number:</label>
-                            <input type="text" id="input-phone" placeholder="(555) 555-5555" oninput="updateScript()">
-                        </div>
-                        <div class="sidebar-input-group">
-                            <label for="input-company-name">Company Name:</label>
-                            <input type="text" id="input-company-name" placeholder="ABC Manufacturing" oninput="updateScript()">
-                        </div>
-                        <div class="sidebar-input-group">
-                            <label for="input-name">Contact Name:</label>
-                            <input type="text" id="input-name" placeholder="John Smith" oninput="updateScript()">
-                        </div>
-                    </div>
-
-                    <div class="sidebar-card">
-                        <h3 class="sidebar-card-title">📝 Call Notes</h3>
-                        <div class="sidebar-input-group">
-                            <textarea id="call-notes" placeholder="Type your call notes here..."></textarea>
-                        </div>
-                        <div class="sidebar-actions">
-                            <button class="add-notes-btn" onclick="saveProspectAndNotes()">Save Notes</button>
-                            <button class="clear-btn" onclick="clearNotes()">Clear</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Initialize the call scripts functionality
-        this.initializeCallScriptsPage();
-    },
-
-    // Initialize Call Scripts functionality
-    initializeCallScriptsPage() {
-        // Simple script functionality for now
-        window.handleDialClick = () => {
-            const phoneNumber = document.getElementById('input-phone').value;
-            if (!phoneNumber) {
-                this.showToast('Please enter a phone number to dial.', 'error');
-                return;
-            }
-            this.showToast('Call initiated!', 'success');
-        };
-
-        window.updateScript = () => {
-            // Update script based on input
-            console.log('Script updated');
-        };
-
-        window.saveProspectAndNotes = () => {
-            const notes = document.getElementById('call-notes').value;
-            const company = document.getElementById('input-company-name').value;
-            const name = document.getElementById('input-name').value;
-            
-            if (notes || company || name) {
-                this.showToast('Notes saved successfully!', 'success');
-            } else {
-                this.showToast('Please enter some information to save.', 'warning');
-            }
-        };
-
-        window.clearNotes = () => {
-            document.getElementById('call-notes').value = '';
-            this.showToast('Notes cleared', 'info');
-        };
-
-        window.goBack = () => {
-            this.showToast('Back functionality not implemented yet', 'info');
-        };
-
-        window.restart = () => {
-            document.getElementById('input-phone').value = '';
-            document.getElementById('input-company-name').value = '';
-            document.getElementById('input-name').value = '';
-            document.getElementById('call-notes').value = '';
-            this.showToast('Form reset', 'info');
-        };
     },
 
     // Main dashboard rendering function
@@ -442,21 +281,24 @@ const CRMApp = {
 
         if (!carouselWrapper) return;
         
+        // Sort activities by date (most recent first)
         const sortedActivities = this.activities.sort((a, b) => b.createdAt - a.createdAt);
         const totalPages = Math.ceil(sortedActivities.length / this.activitiesPerPage);
 
+        // Clear existing content
         carouselWrapper.innerHTML = '';
 
         if (sortedActivities.length === 0) {
             carouselWrapper.innerHTML = '<div class="no-items">No recent activity.</div>';
-            if (prevBtn) prevBtn.style.display = 'none';
-            if (nextBtn) nextBtn.style.display = 'none';
+            prevBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
             return;
         } else {
-            if (prevBtn) prevBtn.style.display = 'block';
-            if (nextBtn) nextBtn.style.display = 'block';
+            prevBtn.style.display = 'block';
+            nextBtn.style.display = 'block';
         }
         
+        // Render each page of activities
         for (let i = 0; i < totalPages; i++) {
             const page = document.createElement('div');
             page.className = 'activity-page';
@@ -480,6 +322,7 @@ const CRMApp = {
             carouselWrapper.appendChild(page);
         }
         
+        // Set the carousel to the current page and update buttons
         carouselWrapper.style.width = `${totalPages * 100}%`;
         carouselWrapper.style.transform = `translateX(-${this.activitiesPageIndex * (100 / totalPages)}%)`;
         this.updateActivityCarouselButtons(totalPages);
@@ -504,18 +347,51 @@ const CRMApp = {
         if (nextBtn) nextBtn.disabled = this.activitiesPageIndex >= totalPages - 1;
     },
 
-    // Get activity icon based on type
+    // Get activity icon based on type - Updated with white SVG icons
     getActivityIcon(type) {
         const icons = {
-            'call_note': '📞',
-            'email': '📧',
-            'note': '📝',
-            'task_completed': '✅',
-            'contact_added': '👤',
-            'account_added': '🏢',
-            'bulk_import': '📥'
+            'call_note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+            </svg>`,
+            'email': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>`,
+            'note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <line x1="10" y1="9" x2="8" y2="9"></line>
+            </svg>`,
+            'task_completed': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>`,
+            'contact_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>`,
+            'account_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 21h18"></path>
+                <path d="M5 21V7l8-4v18"></path>
+                <path d="M19 21V11l-6-4"></path>
+            </svg>`,
+            'bulk_import': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>`,
         };
-        return icons[type] || '📋';
+        return icons[type] || `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+        </svg>`;
     },
 
     // Render energy market news feed
@@ -562,8 +438,34 @@ const CRMApp = {
     // Handle search functionality
     handleSearch(query) {
         if (query.length < 2) return;
-        console.log('Searching for:', query);
-        // Search implementation would go here
+        
+        const results = [];
+        
+        this.accounts.forEach(account => {
+            if (account.name.toLowerCase().includes(query.toLowerCase())) {
+                results.push({
+                    type: 'account',
+                    id: account.id,
+                    name: account.name,
+                    subtitle: account.industry || 'Account'
+                });
+            }
+        });
+        
+        this.contacts.forEach(contact => {
+            const fullName = `${contact.firstName} ${contact.lastName}`;
+            if (fullName.toLowerCase().includes(query.toLowerCase()) || 
+                (contact.email && contact.email.toLowerCase().includes(query.toLowerCase()))) {
+                results.push({
+                    type: 'contact',
+                    id: contact.id,
+                    name: fullName,
+                    subtitle: contact.accountName || 'Contact'
+                });
+            }
+        });
+        
+        console.log('Search results:', results);
     },
 
     // Quick action functions
@@ -587,6 +489,17 @@ const CRMApp = {
 
     bulkImport() {
         this.openModal('bulk-import-modal');
+    },
+
+    // Open call scripts modal/panel
+    openCallScriptsModal() {
+        // For now, show a toast - replace this with your call scripts functionality later
+        this.showToast('Call Scripts feature coming soon!', 'info');
+        
+        // Later you can replace this with:
+        // this.showView('call-scripts-view');
+        // or
+        // this.openModal('call-scripts-modal');
     },
 
     // Modal functions
@@ -618,10 +531,38 @@ const CRMApp = {
             createdAt: new Date()
         };
         
-        this.accounts.push({ id: 'acc' + Date.now(), ...accountData });
-        this.showToast('Account created successfully!', 'success');
-        this.closeModal('add-account-modal');
-        this.renderDashboardStats();
+        try {
+            const tempId = 'temp_' + Date.now();
+            this.accounts.push({ id: tempId, ...accountData });
+            
+            const docRef = await db.collection('accounts').add({
+                ...accountData,
+                createdAt: serverTimestamp()
+            });
+            
+            const accountIndex = this.accounts.findIndex(a => a.id === tempId);
+            if (accountIndex !== -1) {
+                this.accounts[accountIndex].id = docRef.id;
+            }
+            
+            console.log('Account saved successfully with ID:', docRef.id);
+            this.showToast('Account created successfully!', 'success');
+            this.closeModal('add-account-modal');
+            this.renderDashboardStats();
+            this.updateNotifications();
+            
+            await this.saveActivity({
+                type: 'account_added',
+                description: `New account created: ${accountData.name}`,
+                accountId: docRef.id,
+                accountName: accountData.name
+            });
+            
+        } catch (error) {
+            this.accounts = this.accounts.filter(a => a.id !== tempId);
+            console.error('Error saving account:', error);
+            this.showToast('Failed to create account', 'error');
+        }
     },
 
     async handleAddContact(e) {
@@ -632,38 +573,207 @@ const CRMApp = {
             phone: document.getElementById('contact-phone').value,
             title: document.getElementById('contact-title').value,
             accountId: document.getElementById('contact-account').value,
+            accountName: document.getElementById('contact-account').selectedOptions[0]?.textContent || '',
             createdAt: new Date()
         };
         
-        this.contacts.push({ id: 'con' + Date.now(), ...contactData });
-        this.showToast('Contact created successfully!', 'success');
-        this.closeModal('add-contact-modal');
-        this.renderDashboardStats();
+        try {
+            const tempId = 'temp_' + Date.now();
+            this.contacts.push({ id: tempId, ...contactData });
+            
+            const docRef = await db.collection('contacts').add({
+                ...contactData,
+                createdAt: serverTimestamp()
+            });
+            
+            const contactIndex = this.contacts.findIndex(c => c.id === tempId);
+            if (contactIndex !== -1) {
+                this.contacts[contactIndex].id = docRef.id;
+            }
+            
+            console.log('Contact saved successfully with ID:', docRef.id);
+            this.showToast('Contact created successfully!', 'success');
+            this.closeModal('add-contact-modal');
+            this.renderDashboardStats();
+            this.updateNotifications();
+            
+            await this.saveActivity({
+                type: 'contact_added',
+                description: `New contact added: ${contactData.firstName} ${contactData.lastName}`,
+                contactId: docRef.id,
+                contactName: `${contactData.firstName} ${contactData.lastName}`,
+                accountId: contactData.accountId,
+                accountName: contactData.accountName
+            });
+            
+        } catch (error) {
+            this.contacts = this.contacts.filter(c => c.id !== tempId);
+            console.error('Error saving contact:', error);
+            this.showToast('Failed to create contact', 'error');
+        }
     },
 
     async handleBulkImport(e) {
-        this.showToast('Bulk import functionality will be implemented soon', 'info');
-        this.closeModal('bulk-import-modal');
+        const importType = document.getElementById('import-type').value;
+        const fileInput = document.getElementById('csv-file');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            this.showToast('Please select a CSV file', 'error');
+            return;
+        }
+        
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            this.showToast('Please select a valid CSV file', 'error');
+            return;
+        }
+        
+        try {
+            this.showToast('Processing CSV file...', 'info');
+            
+            const text = await file.text();
+            const rows = text.split('\n').map(row => 
+                row.split(',').map(cell => cell.trim().replace(/"/g, ''))
+            );
+            const headers = rows[0].map(h => h.trim().toLowerCase());
+            const data = rows.slice(1).filter(row => row.length > 1 && row.some(cell => cell.trim()));
+            
+            let imported = 0;
+            let errors = 0;
+            
+            for (const row of data) {
+                try {
+                    if (importType === 'contacts') {
+                        const contactData = {
+                            firstName: this.getColumnValue(row, headers, ['first name', 'firstname', 'first']),
+                            lastName: this.getColumnValue(row, headers, ['last name', 'lastname', 'last']),
+                            email: this.getColumnValue(row, headers, ['email', 'email address']),
+                            phone: this.getColumnValue(row, headers, ['phone', 'phone number', 'telephone']),
+                            title: this.getColumnValue(row, headers, ['title', 'job title', 'position']),
+                            accountName: this.getColumnValue(row, headers, ['company', 'account', 'organization']),
+                            createdAt: new Date()
+                        };
+                        
+                        if (contactData.firstName && contactData.lastName && contactData.email) {
+                            const tempId = 'temp_' + Date.now() + '_' + imported;
+                            this.contacts.push({ id: tempId, ...contactData });
+                            
+                            const docRef = await db.collection('contacts').add({
+                                ...contactData,
+                                createdAt: serverTimestamp()
+                            });
+                            
+                            const contactIndex = this.contacts.findIndex(c => c.id === tempId);
+                            if (contactIndex !== -1) {
+                                this.contacts[contactIndex].id = docRef.id;
+                            }
+                            
+                            imported++;
+                        } else {
+                            errors++;
+                        }
+                    } else if (importType === 'accounts') {
+                        const accountData = {
+                            name: this.getColumnValue(row, headers, ['company', 'name', 'company name']),
+                            industry: this.getColumnValue(row, headers, ['industry', 'sector']),
+                            phone: this.getColumnValue(row, headers, ['phone', 'phone number', 'telephone']),
+                            website: this.getColumnValue(row, headers, ['website', 'url', 'web']),
+                            address: this.getColumnValue(row, headers, ['address', 'location']),
+                            createdAt: new Date()
+                        };
+                        
+                        if (accountData.name) {
+                            const tempId = 'temp_' + Date.now() + '_' + imported;
+                            this.accounts.push({ id: tempId, ...accountData });
+                            
+                            const docRef = await db.collection('accounts').add({
+                                ...accountData,
+                                createdAt: serverTimestamp()
+                            });
+                            
+                            const accountIndex = this.accounts.findIndex(a => a.id === tempId);
+                            if (accountIndex !== -1) {
+                                this.accounts[accountIndex].id = docRef.id;
+                            }
+                            
+                            imported++;
+                        } else {
+                            errors++;
+                        }
+                    }
+                } catch (rowError) {
+                    console.error('Error processing row:', rowError);
+                    errors++;
+                }
+            }
+            
+            let message = `Successfully imported ${imported} ${importType}`;
+            if (errors > 0) {
+                message += ` (${errors} rows had errors and were skipped)`;
+            }
+            
+            this.showToast(message, imported > 0 ? 'success' : 'warning');
+            this.closeModal('bulk-import-modal');
+            
+            this.renderDashboardStats();
+            this.updateNotifications();
+            
+            if (imported > 0) {
+                await this.saveActivity({
+                    type: 'bulk_import',
+                    description: `Bulk imported ${imported} ${importType} from CSV`,
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error importing CSV:', error);
+            this.showToast('Error processing CSV file. Please check the format.', 'error');
+        }
+    },
+
+    getColumnValue(row, headers, columnNames) {
+        for (const name of columnNames) {
+            const index = headers.indexOf(name);
+            if (index !== -1 && row[index]) {
+                return row[index].trim();
+            }
+        }
+        return '';
     },
 
     updateNotifications() {
         this.notifications = [];
         
-        if (this.contacts.length > 0) {
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const newContacts = this.contacts.filter(c => new Date(c.createdAt) > yesterday);
+        const newAccounts = this.accounts.filter(a => new Date(a.createdAt) > yesterday);
+        const today = new Date();
+        const pendingTasks = this.tasks.filter(t => !t.completed && new Date(t.dueDate) <= today);
+        
+        if (newContacts.length > 0) {
             this.notifications.push({
                 type: 'contact',
-                message: `${this.contacts.length} contact(s) in system`,
-                count: this.contacts.length,
-                time: 'Active'
+                message: `${newContacts.length} new contact(s) added`,
+                count: newContacts.length,
+                time: 'Recently'
             });
         }
         
-        if (this.accounts.length > 0) {
+        if (newAccounts.length > 0) {
             this.notifications.push({
                 type: 'account',
-                message: `${this.accounts.length} account(s) in system`,
-                count: this.accounts.length,
-                time: 'Active'
+                message: `${newAccounts.length} new account(s) added`,
+                count: newAccounts.length,
+                time: 'Recently'
+            });
+        }
+        
+        if (pendingTasks.length > 0) {
+            this.notifications.push({
+                type: 'task',
+                message: `${pendingTasks.length} pending task(s) for today`,
+                count: pendingTasks.length,
+                time: 'Due today'
             });
         }
         
@@ -707,9 +817,18 @@ const CRMApp = {
     },
 
     updateNavigationBadges() {
-        this.updateBadge('contacts-badge', this.contacts.length);
-        this.updateBadge('accounts-badge', this.accounts.length);
-        this.updateBadge('tasks-badge', this.tasks.length);
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        
+        const newContacts = this.contacts.filter(c => new Date(c.createdAt) > yesterday).length;
+        this.updateBadge('contacts-badge', newContacts);
+        
+        const newAccounts = this.accounts.filter(a => new Date(a.createdAt) > yesterday).length;
+        this.updateBadge('accounts-badge', newAccounts);
+        
+        const today = new Date();
+        const pendingTasks = this.tasks.filter(t => !t.completed && new Date(t.dueDate) <= today).length;
+        this.updateBadge('tasks-badge', pendingTasks);
+        
         this.updateBadge('emails-badge', 0);
     },
 
@@ -786,25 +905,88 @@ const CRMApp = {
         }, 4000);
     },
 
-    // Utility function for debouncing
-    debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
+    async saveActivity(activityData) {
+        try {
+            const docRef = await db.collection('activities').add({
+                ...activityData,
+                createdAt: serverTimestamp()
+            });
+            
+            this.activities.unshift({
+                id: docRef.id,
+                ...activityData,
+                createdAt: new Date()
+            });
+            
+            console.log('Activity saved successfully with ID:', docRef.id);
+            this.renderActivityCarousel();
+            return docRef.id;
+        } catch (error) {
+            console.error('Error saving activity:', error);
+            return null;
+        }
+    },
+
+    async saveAccount(accountData) {
+        try {
+            const docRef = await db.collection('accounts').add({
+                ...accountData,
+                createdAt: serverTimestamp()
+            });
+            
+            console.log('Account saved successfully with ID:', docRef.id);
+            return docRef.id;
+        } catch (error) {
+            console.error('Error saving account:', error);
+            throw error;
+        }
+    },
+
+    async saveContact(contactData) {
+        try {
+            const docRef = await db.collection('contacts').add({
+                ...contactData,
+                createdAt: serverTimestamp()
+            });
+            
+            console.log('Contact saved successfully with ID:', docRef.id);
+            return docRef.id;
+        } catch (error) {
+            console.error('Error saving contact:', error);
+            throw error;
+        }
     }
 };
 
-// Initialize the application when DOM is loaded
+// --- 3. Initialize the application when DOM is loaded ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing CRM App...');
     CRMApp.init();
 });
 
-// Make CRMApp globally available
+// --- 4. Make CRMApp globally available for debugging ---
 window.CRMApp = CRMApp;
+
+// --- 5. Additional utility functions ---
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+}
+
+function formatNumber(num) {
+    return new Intl.NumberFormat('en-US').format(num);
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
