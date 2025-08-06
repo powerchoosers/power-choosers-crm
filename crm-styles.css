@@ -1879,8 +1879,16 @@ html, body {
 /* Ensure the main view and sidebar scroll independently and have consistent padding. */
 #call-scripts-view, #cold-calling-widgets-container {
     padding: 1.5rem;
-    height: calc(100vh - 70px); /* Full height minus header */
+    height: calc(100vh - 70px - 3rem); /* Full height minus header and top/bottom padding */
     overflow-y: auto;
+}
+
+#call-scripts-view {
+    flex: 3;
+}
+
+#cold-calling-widgets-container {
+    flex: 1;
 }
 
 /* Custom scrollbar for a cleaner look in the call hub */
