@@ -96,6 +96,7 @@ html, body {
     display: flex;
     flex: 1;
     overflow: hidden;
+    margin-top: 70px;
 }
 
 .app-content-container {
@@ -469,8 +470,26 @@ html, body {
     width: 100%;
     overflow-y: auto;
     max-height: calc(100vh - 70px);
-    padding: calc(70px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg); /* Added top padding for header */
+    padding: 0 var(--spacing-lg); /* Reverted to original padding */
     position: relative;
+}
+
+.calls-hub-sidebar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.calls-hub-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.calls-hub-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.calls-hub-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .calls-hub-sidebar > *:first-child {
@@ -525,7 +544,7 @@ html, body {
     flex-direction: column;
     position: relative !important;
     background: var(--darker-blue);
-    padding: calc(70px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg); /* Added top padding for header */
+    padding: 0 var(--spacing-lg); /* Reverted to original padding */
     z-index: auto !important;
     overflow-y: auto;
     box-shadow: var(--shadow-scroll);
@@ -1836,4 +1855,10 @@ html, body {
     .sidebar-card-title {
         font-size: 1.1rem;
     }
+}
+
+#call-scripts-view .calls-hub-main,
+#call-scripts-view .calls-hub-sidebar {
+    padding-top: var(--spacing-lg);
+    padding-bottom: var(--spacing-lg);
 }
