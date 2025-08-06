@@ -237,11 +237,15 @@ const CRMApp = {
             activeView.style.visibility = 'visible';
             
             if (viewName === 'call-scripts-view') {
-                // Call Scripts View - Now uses the same flexbox layout as the dashboard
+                // Call Scripts View - Use same layout as dashboard
                 console.log('Activating call scripts view');
                 activeView.style.display = 'flex';
-                // The call scripts view now uses the same flexbox layout as the dashboard
-                this.renderCallScripts();
+                if (coldCallingWidgetsContainer) {
+                    coldCallingWidgetsContainer.style.display = 'flex';
+                    console.log('Showing cold calling widgets');
+                }
+                // Keep the same flex ratio as dashboard for consistent layout
+                if (mainContentWrapper) mainContentWrapper.style.flex = '3';
             } else {
                 // All other CRM views - Standard Layout
                 console.log('Activating standard CRM view');
@@ -278,12 +282,6 @@ const CRMApp = {
         this.renderTodayTasks();
         this.renderActivityCarousel();
         this.renderEnergyMarketNews();
-        console.log('Dashboard rendered successfully');
-    },
-
-    // Call scripts rendering function
-    renderCallScripts() {
-        console.log('Call scripts view rendered with unified layout');
     },
 
     // Render dashboard statistics cards
@@ -556,29 +554,52 @@ const CRMApp = {
     // Function to load and display the Call Scripts view
     async showCallScriptsView() {
         const callScriptsView = document.getElementById('call-scripts-view');
-
+        const coldCallingWidgetsContainer = document.getElementById('cold-calling-widgets-container');
+        
         if (!callScriptsView) {
+            console.error('Call scripts view element not found.');
             this.showToast('Call scripts view not available.', 'error');
             return;
         }
 
+        // Clear any existing content first
+        callScriptsView.innerHTML = '';
+        if (coldCallingWidgetsContainer) {
+            coldCallingWidgetsContainer.innerHTML = '';
+        }
+
         // Ensure the call scripts view is visible and other views are hidden
-        this.showView('call-scripts-view');
+        this.showView('call-scripts-view'); 
         this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
 
         try {
+            // Fetch the content of call-scripts-content.html
             const response = await fetch('call-scripts-content.html');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const htmlContent = await response.text();
-
-            // Inject the entire HTML content
-            callScriptsView.innerHTML = htmlContent;
+            
+            // Parse the HTML to separate main content from sidebar widgets
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+            
+            // Extract main call scripts content (everything except the sidebar)
+            const mainContent = doc.querySelector('.calls-hub-main');
+            if (mainContent) {
+                callScriptsView.innerHTML = mainContent.outerHTML;
+            }
+            
+            // Extract sidebar widgets and inject into the cold calling widgets container
+            const sidebarContent = doc.querySelector('.calls-hub-sidebar');
+            if (sidebarContent && coldCallingWidgetsContainer) {
+                coldCallingWidgetsContainer.innerHTML = sidebarContent.innerHTML;
+            }
 
             // Initialize call scripts functionality
             this.initializeCallScripts();
             this.autoPopulateCallScripts();
+            console.log('Call scripts content loaded and initialized.');
         } catch (error) {
             console.error('Error loading call scripts content:', error);
             this.showToast('Failed to load call scripts. Please check the file path or network.', 'error');
