@@ -11,10 +11,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Tone.js for sound effects in Cold Calling Hub -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-
-    <!-- Favicon and Apple Touch Icon -->
-    <link rel="icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" type="image/png">
-    <link rel="apple-touch-icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png">
 </head>
 <body>
     <div class="app-wrapper">
@@ -145,7 +141,7 @@
 
             <div class="app-content-container">
                 <div class="main-content">
-                    <div id="dashboard-view" class="page-view active" style="display: flex; flex-direction: column;">
+                    <div id="dashboard-view" class="page-view" style="display: flex;">
                         <section class="stat-cards-grid">
                             <div class="stat-card">
                                 <h2 class="stat-value" id="total-accounts-value">0</h2>
@@ -177,15 +173,15 @@
                             <div class="market-pricing-grid">
                                 <div class="pricing-card">
                                     <p class="pricing-label">Historical Avg</p>
-                                    <p class="pricing-value">8.2¢</p>
+                                    <p class="pricing-value">8.2垄</p>
                                 </div>
                                 <div class="pricing-card">
                                     <p class="pricing-label">Current Avg</p>
-                                    <p class="pricing-value">13.1¢</p>
+                                    <p class="pricing-value">13.1垄</p>
                                 </div>
                                 <div class="pricing-card">
                                     <p class="pricing-label">Projected 2026</p>
-                                    <p class="pricing-value">16.8¢</p>
+                                    <p class="pricing-value">16.8垄</p>
                                 </div>
                             </div>
                             <div class="market-insights">
@@ -221,6 +217,20 @@
                         </section>
                     </div>
 
+                    <div id="contacts-view" class="page-view" style="display: none;"></div>
+                    <div id="accounts-view" class="page-view" style="display: none;"></div>
+                    <div id="calls-view" class="page-view" style="display: none;"></div>
+                    <div id="emails-view" class="page-view" style="display: none;"></div>
+                    <div id="tasks-view" class="page-view" style="display: none;"></div>
+                    <div id="account-details-view" class="page-view" style="display: none;"></div>
+                    <div id="settings-view" class="page-view" style="display: none;"></div>
+                    <!-- New view for the Call Scripts content -->
+                    <div id="call-scripts-view" class="page-view" style="display: none;">
+                        <!-- Content will be loaded here dynamically -->
+                    </div>
+                </div>
+
+                <aside class="widget-panel" style="gap: 19px;">
                     <section class="widget-card">
                         <h3 class="card-title">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -287,11 +297,6 @@
                         <div class="news-feed" id="news-feed"></div>
                     </section>
                 </aside>
-
-                <!-- Call Scripts View - Moved outside main-content and widget-panel -->
-                <div id="call-scripts-view" class="page-view" style="display: none;">
-                    <!-- Content will be loaded here dynamically -->
-                </div>
             </div>
         </main>
 
@@ -408,17 +413,14 @@
 
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Core Libraries -->
+    <!-- Firebase App (required for Firestore) -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <!-- Firebase Firestore (required for database operations) -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
     
-    <!-- Application Scripts -->
+    <!-- Your Firebase configuration file -->
     <script src="firebase-config.js"></script>
-    <script src="call-scripts-content.js"></script>
+    <!-- Your main CRM application logic -->
     <script src="crm-app.js"></script>
 </body>
 </html>
