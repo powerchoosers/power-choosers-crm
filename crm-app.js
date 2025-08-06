@@ -161,8 +161,11 @@ const CRMApp = {
             callScriptsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                console.log('Call Scripts button clicked!'); // Debug log
                 this.loadCallScriptsView();
             });
+        } else {
+            console.error('Call Scripts button not found!');
         }
         
         // Activity carousel navigation buttons
@@ -245,7 +248,7 @@ const CRMApp = {
             // Show the call scripts view
             this.showView('call-scripts-view');
             
-            // Update nav to show Call Scripts as active (if it has a nav item)
+            // Update nav to show no active item (since call scripts isn't in nav)
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
             
             // Load the call scripts content

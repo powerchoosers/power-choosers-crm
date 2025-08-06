@@ -219,7 +219,7 @@ html, body {
     position: absolute;
     top: -6px;
     right: -6px;
-    background: #ff4444;
+    background: var(--primary-blue);
     color: white;
     border-radius: 50%;
     width: 18px;
@@ -397,7 +397,7 @@ html, body {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: #ff4444;
+    background: var(--primary-blue);
     color: white;
     border-radius: 8px;
     padding: 2px 6px;
@@ -933,7 +933,7 @@ html, body {
 }
 
 .notification-count {
-    background: #ff4444;
+    background: var(--primary-blue);
     color: white;
     border-radius: 10px;
     padding: 2px 8px;
