@@ -1,1736 +1,1500 @@
-/*
- * Power Choosers CRM Dashboard - Complete Redesign CSS
- * Modern dark theme with scroll-under effects and expandable sidebar
- *
- * **UPDATED**
- * - Fixed sidebar navigation spacing to maintain consistent 20px margins
- * - Improved sidebar spacing and visual hierarchy
- * - Enhanced widget panel with background containers
- * - Updated activity icons to white theme-consistent icons
- * - Fixed notification bell positioning
- * - Improved overall visual consistency
- * - Fixed stat cards to maintain single row when sidebar expands
- * - Removed grey separator lines from sidebar
- * - Adjusted activity carousel navigation arrows to prevent content overlap
- * - Increased margin between Tasks and Account Details in the sidebar
- * - Added styles for Cold Calling Hub integration
- * - Implemented dynamic layout for Cold Calling Script view to expand main content and swap widgets
- */
-
-/* --- 1. CSS Variables & Global Styles --- */
-:root {
-    --primary-blue: #1a237e;
-    --dark-blue: #0d1421;
-    --darker-blue: #0a0f1a;
-    --header-blue: #1a237e;
-    --text-primary: #ffffff;
-    --text-secondary: #b0b0b0;
-    --text-muted: #808080;
-    --accent-blue: #2196f3;
-    --border-light: #2a2a2a;
-    --bg-card: #1a1a1a;
-    --bg-hover: #242424;
-    --shadow-header: 0 4px 20px rgba(0, 0, 0, 0.5);
-    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-scroll: inset 0 10px 20px -10px rgba(0, 0, 0, 0.4);
-    --spacing-lg: 32px;
-    --widget-bg: #1f1f1f;
-    --widget-border: #333333;
-
-    /* Cold Calling Hub specific variables, adapted to CRM theme */
-    --cch-primary-blue: #1a237e; /* Matches CRM primary-blue */
-    --cch-secondary-blue: #2196f3; /* Matches CRM accent-blue */
-    --cch-dark-blue: #0d1421; /* Matches CRM dark-blue */
-    --cch-darker-blue: #0a0f1a; /* Matches CRM darker-blue */
-    --cch-header-blue: #1a237e; /* Matches CRM header-blue */
-    --cch-professional-blue: #2196f3; /* Matches CRM accent-blue */
-    --cch-text-primary: #ffffff; /* Matches CRM text-primary */
-    --cch-text-secondary: #b0b0b0; /* Matches CRM text-secondary */
-    --cch-accent-orange: #f59e0b; /* Existing orange from cold-calling-hub */
-    --cch-bg-card: #1a1a1a; /* Matches CRM bg-card */
-    --cch-bg-hover: #242424; /* Matches CRM bg-hover */
-    --cch-border-color: #2a2a2a; /* Matches CRM border-light */
-}
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-html, body {
-    height: 100vh;
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: var(--darker-blue);
-    color: var(--text-primary);
-    line-height: 1.5;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* --- 2. Main Application Layout --- */
-.app-wrapper {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
-}
-
-.app-main {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    margin-top: 70px;
-}
-
-.app-content-container {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-}
-
-/* Card title and icon spacing */
-.card-title {
-    position: relative;
-    padding-left: 14px; /* Increased from 12px for additional right shift */
-}
-
-.card-title svg {
-    margin-right: 12px;
-    position: relative;
-    left: 0; /* Reset left position */
-}
-
-/* Navigation buttons and arrow centering */
-.activity-navigation {
-    display: flex;
-    gap: 8px;
-}
-
-.nav-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.nav-btn svg {
-    position: relative;
-    left: 1px; /* Adjust this value to center the arrow in the button */
-}
-
-/* --- 3. Header Styles (Fixed) --- */
-.app-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 70px;
-    background: var(--dark-blue);
-    border-bottom: 2px solid var(--primary-blue);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    z-index: 1000;
-    box-shadow: var(--shadow-header);
-    backdrop-filter: blur(10px);
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    min-width: 200px;
-}
-
-.app-logo img {
-    height: 36px;
-    width: auto;
-    border-radius: 4px;
-}
-
-.app-title {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    white-space: nowrap;
-    margin-top: 3px; /* Align with logo and search bar */
-}
-
-.header-center {
-    flex: 1;
-    max-width: 600px;
-    margin: 0 32px;
-    display: flex;
-    align-items: center;
-    height: 100%;
-}
-
-.search-bar {
-    position: relative;
-    width: 100%;
-}
-
-.search-bar input {
-    width: 100%;
-    height: 42px;
-    padding: 0 16px 0 48px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid var(--border-light);
-    border-radius: 21px;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    transition: all 0.3s ease;
-}
-
-.search-bar input::placeholder {
-    color: var(--text-muted);
-}
-
-.search-bar input:focus {
-    outline: none;
-    border-color: var(--primary-blue); /* Changed from accent-blue to primary-blue */
-    background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 2px rgba(26, 35, 126, 0.3); /* Updated to match primary-blue */
-}
-
-.search-icon {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    min-width: 120px;
-    justify-content: flex-end;
-}
-
-.icon-button {
-    width: 40px;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid var(--border-light);
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-primary);
-    cursor: pointer;
-    position: relative;
-    transition: all 0.2s ease;
-}
-
-.icon-button:hover {
-    background: rgba(255, 255, 255, 0.12);
-    transform: translateY(-1px);
-}
-
-.notification-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: #ff4444;
-    color: white;
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--dark-blue);
-}
-
-.user-profile {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.user-profile .profile-avatar {
-    width: 40px;
-    height: 40px;
-    background: var(--primary-blue);
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    color: white;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.user-profile .profile-avatar:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
-}
-
-/* --- 4. Expandable Left Sidebar (REMOVED SEPARATORS) --- */
-.app-sidebar {
-    width: 60px;
-    min-width: 60px;
-    background: var(--darker-blue);
-    border-right: 1px solid var(--border-light);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-    position: relative;
-    z-index: 900;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start; /* Align content to top */
-    padding-top: 20px; /* Add padding to top */
-}
-
-.app-sidebar:hover {
-    width: 240px;
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
-}
-
-.sidebar-nav {
-    display: flex;
-    flex-direction: column;
-    padding: 40px 0 30px 0; /* Increased top padding to push first section down */
-    width: 100%;
-    height: 100%;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Navigation sections with adjusted margins - REMOVED SEPARATORS */
-.nav-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px; /* Slightly increased gap for better spacing */
-    width: 100%;
-}
-
-/* Navigation section spacing */
-.nav-section {
-    margin-bottom: 20px; /* Reduced from 30px for better balance */
-}
-
-/* Account Details and Settings section - adjusted spacing */
-.nav-section:last-child {
-    margin-top: 10px; /* Pull up the last section */
-    margin-bottom: 0;
-}
-
-/* REMOVED: .nav-separator styles completely */
-
-.nav-item {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    height: 52px; /* Slightly increased height */
-    margin: 0 8px;
-    padding: 0 16px; /* Increased padding for better spacing */
-    color: var(--text-secondary);
-    text-decoration: none;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    position: relative;
-    overflow: hidden;
-    font-size: 1.05rem; /* Increased font size */
-    font-weight: 500; /* Slightly bolder text */
-}
-
-.app-sidebar:not(:hover) .nav-item {
-    justify-content: center;
-    padding: 0;
-    margin: 0;
-}
-
-.app-sidebar:not(:hover) .nav-item span {
-    display: none;
-}
-
-.app-sidebar:not(:hover) .nav-item svg {
-    margin: 0;
-}
-
-.app-sidebar:not(:hover) .nav-badge {
-    opacity: 1;
-    right: 4px;
-    top: 4px;
-}
-
-.app-sidebar:hover .nav-item {
-    justify-content: flex-start;
-    padding: 0 16px;
-}
-
-.nav-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-primary);
-}
-
-.nav-item.active {
-    background: rgba(33, 150, 243, 0.2);
-    color: var(--text-primary);
-    border: 1px solid rgba(33, 150, 243, 0.3);
-}
-
-.nav-item.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 24px;
-    background: var(--accent-blue);
-    border-radius: 0 2px 2px 0;
-}
-
-.nav-item svg {
-    width: 22px; /* Slightly larger icons */
-    height: 22px; /* Slightly larger icons */
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    flex-shrink: 0;
-    transition: margin-right 0.3s ease;
-}
-
-.app-sidebar:hover .nav-item svg {
-    margin-right: 12px;
-}
-
-.nav-item span {
-    opacity: 0;
-    font-weight: 500;
-    font-size: 1rem; /* Increased from 0.9rem to 1rem */
-    white-space: nowrap;
-    transition: opacity 0.3s ease;
-}
-
-.app-sidebar:hover .nav-item span {
-    opacity: 1;
-}
-
-.nav-badge {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: #ff4444;
-    color: white;
-    border-radius: 8px;
-    padding: 2px 6px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.app-sidebar:hover .nav-badge {
-    opacity: 1;
-    right: 12px;
-}
-
-/* --- 5. Main Content Area (3/4 width) - FIXED STAT CARDS --- */
-.main-content {
-    flex: 3;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: var(--spacing-lg);
-    position: relative;
-    display: flex; /* Changed to flex to allow internal column layout */
-    flex-direction: column;
-    gap: var(--spacing-lg);
-    padding-bottom: 80px; /* Increased from 60px for more bottom spacing */
-    min-width: 0; /* Allow flex shrinking */
-}
-
-.main-content::before {
-    content: '';
-    position: fixed;
-    top: 70px;
-    left: 60px;
-    right: 25%;
-    height: 20px;
-    background: linear-gradient(to bottom, var(--darker-blue), transparent);
-    pointer-events: none;
-    z-index: 100;
-    transition: all 0.3s ease;
-}
-
-.app-sidebar:hover + .app-content-container .main-content::before {
-    left: 240px;
-}
-
-/* Scroll shadow effect */
-.main-content {
-    box-shadow: var(--shadow-scroll);
-}
-
-/* --- 6. Right Widget Panel (Enhanced) --- */
-.widget-panel {
-    flex: 1;
-    background: var(--dark-blue);
-    border-left: 1px solid var(--border-light);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: var(--spacing-lg);
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 19px;
-    padding-bottom: 80px; /* Increased from 60px to match main content */
-    min-width: 0; /* Allow flex shrinking */
-}
-
-.widget-panel::before {
-    content: '';
-    position: fixed;
-    top: 70px;
-    right: 0;
-    width: 25%;
-    height: 20px;
-    background: linear-gradient(to bottom, var(--dark-blue), transparent);
-    pointer-events: none;
-    z-index: 100;
-}
-
-/* Widget panel scroll shadow */
-.widget-panel {
-    box-shadow: var(--shadow-scroll);
-}
-
-/* Enhanced widget cards with better margins */
-.widget-card {
-    background: var(--widget-bg);
-    border: 1px solid var(--widget-border);
-    border-radius: 12px;
-    padding: 24px;
-    margin: 0 4px 0 0; /* Adjusted right margin */
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.widget-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    border-color: rgba(255, 255, 255, 0.1);
-}
-
-/* --- 7. Page Views --- */
-.page-view {
-    display: none; /* All page views are hidden by default */
-    width: 100%;
-    height: 100%; /* Ensure views take full height of their container */
-    flex-direction: column; /* Default to column for dashboard items */
-    gap: var(--spacing-lg); /* Apply general spacing */
-}
-
-.page-view.active {
-    display: flex; /* Active views are displayed as flex */
-}
-
-#dashboard-view {
-    /* This view is explicitly set to flex by CRMApp.showView */
-}
-
-/* --- 8. Dashboard Components (FIXED STAT CARDS) --- */
-.stat-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr); /* Force 4 equal columns */
-    gap: 20px; /* Reduced gap to help maintain layout */
-    margin-bottom: 32px;
-    min-width: 0; /* Allow grid to shrink */
-}
-
-.stat-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    padding: 24px 20px; /* Reduced horizontal padding */
-    text-align: center;
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-    min-width: 0; /* Allow card to shrink */
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--primary-blue); /* Changed from accent-blue to match theme */
-}
-
-.stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-    border-color: var(--primary-blue);
-}
-
-.stat-value {
-    font-size: 2rem; /* Reduced from 2.2rem */
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-    line-height: 1;
-}
-
-.stat-label {
-    font-size: 0.8rem; /* Reduced from 0.85rem */
-    color: var(--text-secondary);
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* Dashboard Cards (Better Spacing) */
-.dashboard-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    padding: 28px;
-    margin-bottom: 19px;
-    transition: all 0.3s ease;
-    box-shadow: var(--shadow-card);
-}
-
-.dashboard-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
-}
-
-.card-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-/* Market Trends Specific */
-.market-pricing-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-.pricing-card {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 16px;
-    border-radius: 8px;
-    text-align: center;
-    border: 1px solid var(--border-light);
-    transition: all 0.2s ease;
-}
-
-.pricing-card:hover {
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateY(-2px);
-}
-
-.pricing-label {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-}
-
-.pricing-value {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1;
-}
-
-.market-insights {
-    background: rgba(33, 150, 243, 0.1);
-    border: 1px solid rgba(33, 150, 243, 0.2);
-    border-radius: 8px;
-    padding: 16px;
-    font-size: 0.9rem;
-    color: var(--text-primary);
-}
-
-/* Quick Actions */
-.quick-actions-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.action-button {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
-    color: var(--text-primary);
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.action-button:hover {
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateY(-1px);
-    border-color: var(--accent-blue);
-}
-
-.action-button svg {
-    width: 16px;
-    height: 16px;
-    stroke: currentColor;
-    fill: none;
-}
-
-/* Activity Lists (Enhanced with white icons) */
-.activity-list-container {
-    position: relative;
-    overflow: hidden;
-}
-
-.activity-list-wrapper {
-    display: flex;
-    transition: transform 0.3s ease-in-out;
-}
-
-.activity-page {
-    flex-shrink: 0;
-    width: 100%;
-    display: grid;
-    grid-template-rows: repeat(4, 1fr);
-    gap: 12px;
-}
-
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
-    transition: all 0.2s ease;
-}
-
-.activity-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    transform: translateX(4px);
-}
-
-.activity-icon {
-    width: 32px;
-    height: 32px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    flex-shrink: 0;
-    font-size: 14px;
-}
-
-.activity-content {
-    flex: 1;
-}
-
-.activity-text {
-    color: var(--text-primary);
-    font-weight: 500;
-    font-size: 0.9rem;
-    margin-bottom: 4px;
-    line-height: 1.4;
-}
-
-.activity-timestamp {
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-}
-
-/* UPDATED: Activity carousel navigation buttons positioning */
-.activity-navigation {
-    position: relative;
-    top: auto;
-    right: auto;
-    transform: translateY(0);
-    width: auto;
-    display: flex;
-    justify-content: flex-end;
-    padding: 0;
-}
-
-.nav-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    color: white;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    top: 0;
-    padding-left: 3px; /* Increased from 2px for additional right shift */
-    left: 0;
-    z-index: 10;
-}
-
-.nav-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.nav-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-/* Tasks */
-.tasks-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.task-item {
-    padding: 14px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-light);
-    border-left: 3px solid #ffa726;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-}
-
-.task-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    transform: translateX(4px);
-}
-
-.task-title {
-    color: var(--text-primary);
-    font-weight: 500;
-    font-size: 0.9rem;
-    margin-bottom: 4px;
-    line-height: 1.4;
-}
-
-.task-due-time {
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-}
-
-/* News Feed */
-.news-feed {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.news-item {
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-light);
-    border-left: 3px solid #4caf50;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-}
-
-.news-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    transform: translateY(-2px);
-}
-
-.news-title {
-    color: var(--text-primary);
-    font-weight: 600;
-    font-size: 0.9rem;
-    margin-bottom: 8px;
-}
-
-.news-content {
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-    line-height: 1.4;
-    margin-bottom: 8px;
-}
-
-.news-time {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    font-style: italic;
-}
-
-/* No Items State - Better centered for widgets */
-.no-items {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: var(--text-muted);
-    font-style: italic;
-    padding: 32px;
-    width: 100%;
-    box-sizing: border-box;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px dashed var(--border-light);
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    margin: 0 4px 0 0; /* Match widget card margins */
-}
-
-/* --- 9. Notification Dropdown --- */
-.notification-dropdown {
-    position: absolute;
-    top: 60px;
-    right: 24px;
-    width: 320px;
-    max-height: 400px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    z-index: 10000;
-    opacity: 0;
-    transform: translateY(-10px);
-    transition: all 0.3s ease;
-    visibility: hidden;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.notification-dropdown.active {
-    opacity: 1;
-    transform: translateY(0);
-    visibility: visible;
-}
-
-.notification-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border-light);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.notification-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.notification-count {
-    background: #ff4444;
-    color: white;
-    border-radius: 10px;
-    padding: 2px 8px;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.notification-list {
-    max-height: 300px;
-    overflow-y: auto;
-    list-style: none;
-    padding: 0;
-}
-
-.notification-item {
-    padding: 12px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    transition: all 0.2s ease;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.notification-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.notification-item:last-child {
-    border-bottom: none;
-}
-
-.notification-item .notification-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--accent-blue);
-    flex-shrink: 0;
-}
-
-.notification-item .notification-text {
-    flex: 1;
-}
-
-.notification-item .notification-message {
-    font-weight: 500;
-    font-size: 0.9rem;
-    color: var(--text-primary);
-    margin-bottom: 2px;
-}
-
-.notification-item .notification-time {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-}
-
-.notification-empty {
-    padding: 32px 20px;
-    text-align: center;
-    color: var(--text-muted);
-    font-style: italic;
-}
-
-/* --- 10. Modal Styles --- */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease;
-}
-
-.modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.modal-content {
-    background: var(--bg-card);
-    padding: 32px;
-    border-radius: 16px;
-    width: 90%;
-    max-width: 480px;
-    border: 1px solid var(--border-light);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    transform: translateY(-20px);
-    transition: all 0.3s ease;
-}
-
-.modal-overlay.active .modal-content {
-    transform: translateY(0);
-}
-
-.modal-header {
-    margin-bottom: 24px;
-    border-bottom: 1px solid var(--border-light);
-    padding-bottom: 16px;
-}
-
-.modal-title {
-    font-size: 1.3rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.modal-subtitle {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    margin-top: 4px;
-}
-
-.form-group {
-    margin-bottom: 16px;
-}
-
-.form-label {
-    display: block;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin-bottom: 6px;
-}
-
-.form-input {
-    width: 100%;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-}
-
-.form-input::placeholder {
-    color: var(--text-muted);
-}
-
-.form-input:focus {
-    outline: none;
-    border-color: var(--accent-blue);
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
-}
-
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 24px;
-}
-
-.btn {
-    padding: 12px 20px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    text-decoration: none;
-}
-
-.btn-primary {
-    background: var(--accent-blue);
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #1976d2;
-    transform: translateY(-1px);
-}
-
-.btn-secondary {
-    background: transparent;
-    border: 1px solid var(--border-light);
-    color: var(--text-secondary);
-}
-
-.btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-primary);
-}
-
-/* --- 11. Toast Notifications --- */
-.toast-container {
-    position: fixed;
-    top: 90px;
-    right: 24px;
-    z-index: 10000;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.toast {
-    padding: 16px 20px;
-    border-radius: 8px;
-    color: white;
-    font-weight: 500;
-    font-size: 0.9rem;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    transform: translateX(100%);
-    opacity: 0;
-    transition: all 0.3s ease;
-    max-width: 350px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.toast-success { background: #4caf50; }
-.toast-error { background: #f44336; }
-.toast-warning { background: #ff9800; }
-.toast-info { background: var(--accent-blue); }
-
-/* --- 12. Responsive Design --- */
-@media (max-width: 1200px) {
-    .main-content {
-        flex: 2;
-    }
-    .widget-panel {
-        flex: 1;
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Choosers CRM Dashboard</title>
+    <!-- Link to your main CRM stylesheet -->
+    <link rel="stylesheet" href="crm-styles.css">
+    <!-- Tailwind CSS CDN (if not already part of crm-styles.css or main index.html) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for sound effects in Cold Calling Hub -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <!-- Favicon and Apple Touch Icon -->
+    <link rel="icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" type="image/png">
+    <link rel="apple-touch-icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png">
+</head>
+<body>
+    <div class="app-wrapper">
+        <header class="app-header">
+            <div class="header-left">
+                <div class="app-logo">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers Logo">
+                </div>
+                <h1 class="app-title">CRM Dashboard</h1>
+            </div>
+            <div class="header-center">
+                <div class="search-bar">
+                    <input type="text" id="global-search" placeholder="Search accounts, contacts, or anything...">
+                    <button class="search-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="header-right">
+                <!-- Call Scripts button will open the new call scripts view -->
+                <button class="icon-button" id="call-scripts-btn" title="Call Scripts">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <line x1="10" y1="9" x2="8" y2="9"></line>
+                    </svg>
+                </button>
+                
+                <button class="icon-button" id="notification-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="notification-badge" id="notification-badge">0</span>
+                </button>
+                
+                <div class="user-profile">
+                    <div class="profile-avatar" id="profile-avatar">LC</div>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="app-sidebar">
+                <nav class="sidebar-nav">
+                    <div class="nav-section">
+                        <a href="#" class="nav-item active" data-view="dashboard-view">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            <span>Dashboard</span>
+                        </a>
+                        <a href="#" class="nav-item" data-view="contacts-view">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            <span>Contacts</span>
+                            <span class="nav-badge" id="contacts-badge">0</span>
+                        </a>
+                        <a href="#" class="nav-item" data-view="accounts-view">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 21h18"></path>
+                                <path d="M5 21V7l8-4v18"></path>
+                                <path d="M19 21V11l-6-4"></path>
+                                <path d="M9 9v1"></path>
+                                <path d="M9 12v1"></path>
+                                <path d="M9 15v1"></path>
+                            </svg>
+                            <span>Accounts</span>
+                            <span class="nav-badge" id="accounts-badge">0</span>
+                        </a>
+                    </div>
+
+                    <div class="nav-section">
+                        <a href="#" class="nav-item" data-view="calls-view">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                            </svg>
+                            <span>Calls</span>
+                        </a>
+                        <a href="#" class="nav-item" data-view="emails-view">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                <polyline points="22,6 12,13 2,6"></polyline>
+                            </svg>
+                            <span>Emails</span>
+                            <span class="nav-badge" id="emails-badge">0</span>
+                        </a>
+                        <a href="#" class="nav-item" data-view="tasks-view">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 11l3 3L22 4"></path>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                            </svg>
+                            <span>Tasks</span>
+                            <span class="nav-badge" id="tasks-badge">0</span>
+                        </a>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <a href="#" class="nav-item" data-view="account-details-view">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            <span>Account Details</span>
+                        </a>
+                        <a href="#" class="nav-item" data-view="settings-view">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                            <span>Settings</span>
+                        </a>
+                    </div>
+                </nav>
+            </aside>
+
+            <div class="app-content-container">
+                <!-- Wrapper for main content area to control flex basis -->
+                <div id="main-content-wrapper" class="main-content">
+                    <!-- Default Dashboard View -->
+                    <div id="dashboard-view" class="page-view">
+                        <section class="stat-cards-grid">
+                            <div class="stat-card">
+                                <h2 class="stat-value" id="total-accounts-value">0</h2>
+                                <p class="stat-label">Total Accounts</p>
+                            </div>
+                            <div class="stat-card">
+                                <h2 class="stat-value" id="total-contacts-value">0</h2>
+                                <p class="stat-label">Total Contacts</p>
+                            </div>
+                            <div class="stat-card">
+                                <h2 class="stat-value" id="recent-activities-value">0</h2>
+                                <p class="stat-label">Recent Activities</p>
+                            </div>
+                            <div class="stat-card">
+                                <h2 class="stat-value" id="hot-leads-value">0</h2>
+                                <p class="stat-label">Hot Leads</p>
+                            </div>
+                        </section>
+
+                        <section class="dashboard-card">
+                            <h3 class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                                </svg>
+                                Texas Electricity Market Trends
+                            </h3>
+                            <div class="market-pricing-grid">
+                                <div class="pricing-card">
+                                    <p class="pricing-label">Historical Avg</p>
+                                    <p class="pricing-value">8.2¢</p>
+                                </div>
+                                <div class="pricing-card">
+                                    <p class="pricing-label">Current Avg</p>
+                                    <p class="pricing-value">13.1¢</p>
+                                </div>
+                                <div class="pricing-card">
+                                    <p class="pricing-label">Projected 2026</p>
+                                    <p class="pricing-value">16.8¢</p>
+                                </div>
+                            </div>
+                            <div class="market-insights">
+                                <p>📊 Market Intelligence: Supply constraints expected to drive 28% price increase by 2026</p>
+                            </div>
+                        </section>
+
+                        <section class="dashboard-card">
+                            <h3 class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="display: flex; align-items: center;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path>
+                                        <path d="M12 6v6l4 2"></path>
+                                    </svg>
+                                    Recent Activities
+                                </span>
+                                <div class="activity-navigation" style="position: relative; top: auto; right: auto; transform: translateY(0); width: auto; padding: 0; display: flex; justify-content: flex-end;">
+                                    <button class="nav-btn" id="activity-prev-btn">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="15 18 9 12 15 6"></polyline>
+                                        </svg>
+                                    </button>
+                                    <button class="nav-btn" id="activity-next-btn">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="9 18 15 12 9 6"></polyline>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </h3>
+                            <div class="activity-list-container">
+                                <div class="activity-list-wrapper" id="activity-list-wrapper"></div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Other CRM Views (Contacts, Accounts, etc.) -->
+                    <div id="contacts-view" class="page-view"></div>
+                    <div id="accounts-view" class="page-view"></div>
+                    <div id="calls-view" class="page-view"></div>
+                    <div id="emails-view" class="page-view"></div>
+                    <div id="tasks-view" class="page-view"></div>
+                    <div id="account-details-view" class="page-view"></div>
+                    <div id="settings-view" class="page-view"></div>
+                    
+                    <!-- Cold Calling Script View (main content part) -->
+                    <div id="call-scripts-main-view" class="page-view call-scripts-layout-main">
+                        <h2 class="text-2xl font-bold mb-6 text-white text-center">Cold Calling Script</h2>
+                        <div class="calls-hub-main-inner">
+                            <div class="script-display p-6" id="script-display">
+                                Click 'Dial' to begin the call
+                            </div>
+                            <div class="response-buttons mt-6" id="responses-container">
+                                <button class="dial-button" onclick="handleDialClick()">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                    Dial
+                                </button>
+                            </div>
+                            <div class="calls-hub-footer">
+                                <button id="back-btn" class="action-btn" onclick="goBack()" disabled>← Back</button>
+                                <button id="restart-btn" class="restart-btn-icon" onclick="restart()">
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path d="M21.5 13a9.5 9.5 0 1 1-9.5-9.5V3a.5.5 0 0 0-1 0v.5A9.5 9.5 0 1 1 21.5 13zM12 2v4M12 18v4M22 12h-4M6 12H2M18 18l-3-3M18 6l-3 3M6 18l3-3M6 6l3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Widget Panel -->
+                <aside id="widget-panel" class="widget-panel">
+                    <!-- Default CRM Widgets Container (initially visible) -->
+                    <div id="crm-widgets-container" class="crm-widgets-container">
+                        <section class="widget-card">
+                            <h3 class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                                Quick Actions
+                            </h3>
+                            <div class="quick-actions-grid">
+                                <a href="#" class="action-button" onclick="addAccount()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 21h18"></path>
+                                        <path d="M5 21V7l8-4v18"></path>
+                                        <path d="M19 21V11l-6-4"></path>
+                                        <path d="M9 9v1"></path>
+                                        <path d="M9 12v1"></path>
+                                        <path d="M9 15v1"></path>
+                                    </svg>
+                                    Add Account
+                                </a>
+                                <a href="#" class="action-button" onclick="addContact()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="8.5" cy="7" r="4"></circle>
+                                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                                    </svg>
+                                    Add Contact
+                                </a>
+                                <a href="#" class="action-button" onclick="bulkImport()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                    Bulk Import
+                                </a>
+                            </div>
+                        </section>
+
+                        <section class="widget-card">
+                            <h3 class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <line x1="10" y1="9" x2="8" y2="9"></line>
+                                </svg>
+                                Today's Tasks
+                            </h3>
+                            <ul class="tasks-list" id="tasks-list"></ul>
+                        </section>
+
+                        <section class="widget-card">
+                            <h3 class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2z"></path>
+                                    <path d="M14 2v6h6"></path>
+                                    <path d="M6 12h8"></path>
+                                    <path d="M6 16h8"></path>
+                                </svg>
+                                Energy News
+                            </h3>
+                            <div class="news-feed" id="news-feed"></div>
+                        </section>
+                    </div>
+
+                    <!-- Cold Calling Widgets Container (initially hidden) -->
+                    <div id="cold-calling-widgets-container" class="calls-hub-sidebar">
+                        <!-- Prospect Information Widget -->
+                        <div class="sidebar-card">
+                            <h3 class="sidebar-card-title">📋 Prospect Info</h3>
+                            <div class="sidebar-input-group">
+                                <label for="input-phone">Phone Number:</label>
+                                <input type="text" id="input-phone" placeholder="(555) 555-5555" oninput="updateScript()">
+                            </div>
+                            <div class="sidebar-input-group">
+                                <label for="input-company-name">Company Name:</label>
+                                <input type="text" id="input-company-name" placeholder="ABC Manufacturing" oninput="updateScript()">
+                            </div>
+                            <div class="sidebar-input-group">
+                                <label for="input-name">Contact Name:</label>
+                                <input type="text" id="input-name" placeholder="John Smith" oninput="updateScript()">
+                            </div>
+                            <div class="sidebar-input-group">
+                                <label for="input-title">Contact Title:</label>
+                                <input type="text" id="input-title" placeholder="Company Leader" oninput="updateScript()">
+                            </div>
+                            <div class="sidebar-input-group">
+                                <label for="input-company-industry">Company Industry:</label>
+                                <input type="text" id="input-company-industry" placeholder="businesses" oninput="updateScript()">
+                            </div>
+                            <div class="sidebar-input-group">
+                                <label for="input-benefit">Specific Benefit:</label>
+                                <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" oninput="updateScript()">
+                            </div>
+                            <div class="sidebar-input-group">
+                                <label for="input-pain">Pain Point:</label>
+                                <input type="text" id="input-pain" placeholder="you're not stuck paying more" oninput="updateScript()">
+                            </div>
+                        </div>
+
+                        <!-- Energy Health Check Widget -->
+                        <div class="sidebar-card !p-4" style="height: max-content;">
+                            <h3 class="sidebar-card-title">📉 Energy Health Check</h3>
+                            <div class="calculator-wrapper !p-6" id="calculator-wrapper">
+                                <div class="form-sections">
+                                    <div class="form-section active" id="section1">
+                                        <div class="section-header">
+                                            <span class="section-header-pill">
+                                                <span class="section-icon">1</span> Current Bill
+                                            </span>
+                                        </div>
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <div class="input-group">
+                                                <label for="currentSupplier" class="input-label text-xs">Current Supplier</label>
+                                                <input type="text" class="form-input !p-2 !text-sm" id="currentSupplier" placeholder="e.g., TXU" list="supplierList" oninput="validateSection1()">
+                                                <datalist id="supplierList"></datalist>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="monthlyBill" class="input-label text-xs">Monthly Bill ($)</label>
+                                                <input type="number" class="form-input !p-2 !text-sm" id="monthlyBill" placeholder="e.g., 1,450.00" step="0.01" oninput="validateSection1()">
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="currentRate" class="input-label text-xs">Current Rate ($/kWh)</label>
+                                                <input type="number" class="form-input !p-2 !text-sm" id="currentRate" placeholder="e.g., 0.062" step="0.001" oninput="validateSection1()">
+                                                <div id="rateFeedback" class="input-feedback text-xs"></div>
+                                            </div>
+                                        </div>
+                                        <div id="usageDisplay" class="usage-display !p-3 mt-3 hidden">
+                                            <div class="usage-title text-sm">📊 Client's Usage Analysis</div>
+                                            <div class="usage-details text-xs" id="usageDetails"></div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-6"></div> <!-- Padding between steps -->
+                                    <div class="form-section" id="section2">
+                                        <div class="section-header">
+                                            <span class="section-header-pill">
+                                                <span class="section-icon">2</span> Contract & Sell Rate
+                                            </span>
+                                        </div>
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <div class="input-group">
+                                                <label for="contractEndDate" class="input-label text-xs">Contract End Date</label>
+                                                <input type="text" class="form-input !p-2 !text-sm" id="contractEndDate" placeholder="YYYY-MM-DD" onfocus="openDatePicker()">
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="sellRate" class="input-label text-xs">Sell Rate ($/kWh)</label>
+                                                <input type="number" class="form-input !p-2 !text-sm" id="sellRate" placeholder="e.g., 0.088" step="0.001" oninput="validateSection2()">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-6"></div> <!-- Padding between steps -->
+                                    <div class="form-section" id="section3">
+                                        <div class="section-header">
+                                            <span class="section-header-pill">
+                                                <span class="section-icon">3</span> Get Results
+                                            </span>
+                                        </div>
+                                        <p class="text-sm text-gray-400 text-center">Ready to see the analysis!</p>
+                                    </div>
+                                </div>
+                                <button class="calculate-button w-full !p-3 !text-sm !font-bold mt-4" id="calculateBtn" onclick="runCalculation()">
+                                    Complete All Sections Above
+                                </button>
+                                <button class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors mt-2 text-sm" id="resetBtn" onclick="resetForm()">
+                                  Reset Form
+                                </button>
+                                <div id="loadingAnimation" class="loading-animation">
+                                    <div class="spinner"></div>
+                                    <div class="text-gray-400 mt-4 text-sm" id="loadingMessage">Running analysis...</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Call Notes Widget -->
+                        <div class="sidebar-card">
+                            <h3 class="sidebar-card-title">📝 Call Notes</h3>
+                            <div class="sidebar-input-group">
+                                <textarea id="call-notes" placeholder="Type your call notes here..."></textarea>
+                            </div>
+                            <div class="sidebar-actions">
+                                <button class="add-notes-btn" onclick="saveProspectAndNotes()">Save Notes</button>
+                                <button class="clear-btn" onclick="clearNotes()">Clear</button>
+                            </div>
+                        </div>
+
+                        <!-- Call Strategy Tips Widget -->
+                        <div class="sidebar-card">
+                            <h3 class="sidebar-card-title">💡 Call Strategy Tips</h3>
+                            <ul class="text-sm text-gray-300 space-y-3">
+                                <li class="list-item">
+                                    <strong class="text-white">Mirror their energy:</strong> Match their speaking pace and enthusiasm.
+                                </li>
+                                <li class="list-item">
+                                    <strong class="text-white">Use their name:</strong> Say their name 2-3 times during the call to maintain a personal connection.
+                                </li>
+                                <li class="list-item">
+                                    <strong class="text-white">Pause power:</strong> Use 2-3 second pauses after questions to let them process and respond.
+                                </li>
+                                <li class="list-item">
+                                    <strong class="text-white">Assume the close:</strong> When scheduling, offer two specific times rather than an open-ended "when works?".
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Objection Responses Widget -->
+                        <div class="sidebar-card">
+                            <h3 class="sidebar-card-title">🛡️ Quick Objection Responses</h3>
+                            <div class="text-sm space-y-4">
+                                <div class="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                                    <p class="font-semibold text-white">"We're happy with our provider."</p>
+                                    <p class="text-gray-400 mt-1">"That's great to hear. This isn't about changing providers; it's about optimizing your position within the current market structure."</p>
+                                </div>
+                                <div class="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                                    <p class="font-semibold text-white">"We just renewed our contract."</p>
+                                    <p class="text-gray-400 mt-1">"Perfect timing, actually. This gives us a chance to prepare strategically for your next cycle rather than scrambling later."</p>
+                                </div>
+                                <div class="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                                    <p class="font-semibold text-white">"Send me some information."</p>
+                                    <p class="text-gray-400 mt-1">"I can definitely do that. What specific information would be most valuable to you - a rate comparison or market timing strategies?"</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </main>
+
+        <div id="add-account-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Add New Account</h3>
+                    <p class="modal-subtitle">Enter the company details below.</p>
+                </div>
+                <form id="add-account-form">
+                    <div class="form-group">
+                        <label for="account-name" class="form-label">Company Name *</label>
+                        <input type="text" id="account-name" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-industry" class="form-label">Industry</label>
+                        <input type="text" id="account-industry" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="account-phone" class="form-label">Phone</label>
+                        <input type="tel" id="account-phone" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="account-website" class="form-label">Website</label>
+                        <input type="url" id="account-website" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="account-address" class="form-label">Address</label>
+                        <input type="text" id="account-address" class="form-input">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('add-account-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="add-contact-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Add New Contact</h3>
+                    <p class="modal-subtitle">Enter the contact details below.</p>
+                </div>
+                <form id="add-contact-form">
+                    <div class="form-group">
+                        <label for="contact-first-name" class="form-label">First Name *</label>
+                        <input type="text" id="contact-first-name" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-last-name" class="form-label">Last Name</label>
+                        <input type="text" id="contact-last-name" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-email" class="form-label">Email</label>
+                        <input type="email" id="contact-email" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-phone" class="form-label">Phone</label>
+                        <input type="tel" id="contact-phone" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-title" class="form-label">Job Title</label>
+                        <input type="text" id="contact-title" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-account" class="form-label">Account</label>
+                        <select id="contact-account" class="form-input">
+                            <option value="">Select an account</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('add-contact-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Contact</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div id="bulk-import-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Bulk Import from CSV</h3>
+                    <p class="modal-subtitle">Upload a CSV file to import contacts or accounts.</p>
+                </div>
+                <form id="bulk-import-form">
+                    <div class="form-group">
+                        <label for="import-type" class="form-label">Import Type *</label>
+                        <select id="import-type" class="form-input" required>
+                            <option value="contacts">Contacts</option>
+                            <option value="accounts">Accounts</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="csv-file" class="form-label">Select CSV File *</label>
+                        <input type="file" id="csv-file" class="form-input" accept=".csv" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('bulk-import-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Import</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="notification-dropdown" id="notification-dropdown">
+            <div class="notification-header">
+                <h3 class="notification-title">Notifications</h3>
+                <span class="notification-count" id="notification-count">0</span>
+            </div>
+            <ul class="notification-list" id="notification-list"></ul>
+        </div>
+    </div>
+
+    <div id="taskModal" class="modal" onclick="closeModal(event)">
+      <div class="modal-content">
+        <div class="modal-card-container">
+          <div class="modal-card" id="dateCard">
+            <h3 class="text-lg font-semibold text-white mb-4">Select Contract End Date</h3>
+            <div class="calendar-header">
+                <button onclick="prevMonth()" class="text-gray-400 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <div class="flex-grow flex justify-center items-center">
+                    <div id="monthYearDisplay">
+                        <span id="monthYearSpan" class="text-white font-semibold cursor-pointer" onclick="toggleMonthYearPicker()"></span>
+                    </div>
+                    <div id="monthYearPicker" class="flex justify-center items-center hidden">
+                        <select id="monthSelector" class="form-input w-2/5 mr-2" onchange="selectMonthYear()"></select>
+                        <select id="yearSelector" class="form-input w-2/5 ml-2" onchange="selectMonthYear()"></select>
+                    </div>
+                </div>
+                <button onclick="nextMonth()" class="text-gray-400 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <button onclick="closeModal(event)" class="mt-6 w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors" id="cancel-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Firebase App (required for Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <!-- Firebase Firestore (required for database operations) -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
     
-    /* Ensure stat cards stay in one row even on smaller screens */
-    .stat-cards-grid {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
-    }
-    
-    .stat-card {
-        padding: 20px 16px;
-    }
-    
-    .stat-value {
-        font-size: 1.8rem;
-    }
-    
-    .stat-label {
-        font-size: 0.75rem;
-    }
-}
+    <!-- Your Firebase configuration file -->
+    <script src="firebase-config.js"></script>
+    <!-- Your main CRM application logic -->
+    <script src="crm-app.js"></script>
 
-@media (max-width: 968px) {
-    /* Only on very small screens allow stat cards to wrap */
-    .stat-cards-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 16px;
-    }
-}
+    <!-- Cold Calling Hub Specific JavaScript (now embedded directly) -->
+    <script>
+        // This script block contains the logic for the Cold Calling Hub,
+        // which was previously in call-scripts-content.html.
+        // It's now embedded here and initialized by CRMApp.
 
-@media (max-width: 768px) {
-    .app-header {
-        padding: 0 16px;
-    }
-    
-    .header-center {
-        margin: 0 16px;
-    }
-    
-    .app-sidebar {
-        width: 50px;
-    }
-    
-    .app-sidebar:hover {
-        width: 200px;
-    }
-    
-    .main-content {
-        padding: 20px 16px 0 16px;
-    }
-    
-    .widget-panel {
-        padding: 20px 16px 0 16px;
-    }
-    
-    .stat-cards-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 16px;
-    }
-}
+        function initializeColdCallingHub() {
+            // JavaScript for the cold calling script logic
+            const CRMApp = window.CRMApp; // Make CRMApp globally accessible within this script
 
-@media (max-width: 480px) {
-    .app-content-container {
-        flex-direction: column;
-    }
-    
-    .main-content {
-        flex: none;
-        height: 60%;
-    }
-    
-    .widget-panel {
-        flex: none;
-        height: 40%;
-        border-left: none;
-        border-top: 1px solid var(--border-light);
-    }
-    
-    .stat-cards-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
+            // State Machine for the call script flow.
+            const scriptData = {
+                start: {
+                    you: "Click 'Dial' to begin the call",
+                    mood: "neutral",
+                    responses: []
+                },
+                dialing: {
+                    you: "Dialing... Ringing...",
+                    mood: "neutral",
+                    responses: [
+                        { text: "📞 Call Connected", next: "hook" },
+                        { text: "📞 Transferred - Decision Maker Answers", next: "main_script_start" },
+                        { text: "🚫 No Answer", next: "voicemail_or_hangup" }
+                    ]
+                },
+                voicemail_or_hangup: {
+                    you: "No answer. What would you like to do?",
+                    mood: "neutral",
+                    responses: [
+                        { text: "Leave Voicemail", next: "voicemail", disposition: "Left Voicemail" },
+                        { text: "Hang Up / Start New Call", next: "start", disposition: "No Answer / Hang Up" }
+                    ]
+                },
+                hook: {
+                    you: "Hi, is this <span class='emphasis'>[N]</span>?",
+                    mood: "neutral",
+                    responses: [
+                        { text: "✅ Yes, this is [N]", next: "main_script_start", disposition: "Connected" },
+                        { text: "🗣️ Speaking", next: "main_script_start", disposition: "Connected" },
+                        { text: "❓ Who's calling?", next: "main_script_start", disposition: "Connected" },
+                        { text: "👥 Gatekeeper / Not the right person", next: "gatekeeper_intro", disposition: "Gatekeeper" }
+                    ]
+                },
+                main_script_start: {
+                    you: "Good mornin'/afternoon, <span class='emphasis'>[N]</span>. <span class='pause'>--</span> I'm Lewis with PowerChoosers and I'm needin' to speak with someone over electricity agreements and contracts for <span class='emphasis'>[CN]</span>. <span class='highlight-yellow'>Would that be yourself?</span>",
+                    mood: "neutral",
+                    responses: [
+                        { text: "✅ Yes, that's me / I handle that", next: "pathA", disposition: "Decision Maker - Engaged" },
+                        { text: "👥 That would be [OP] / Not the right person", next: "gatekeeper_intro", disposition: "Gatekeeper" },
+                        { text: "🤝 We both handle it / Team decision", next: "pathA", disposition: "Decision Maker - Engaged" },
+                        { text: "🤔 Unsure or hesitant", next: "pathD", disposition: "Decision Maker - Hesitant" }
+                    ]
+                },
+                gatekeeper_intro: {
+                    you: "Good afternoon/morning. I'm needin' to speak with someone over electricity agreements and contracts for <span class='emphasis'>[CN]</span>. <span class='highlight-yellow'>Do you know who would be responsible for that?</span>",
+                    mood: "neutral",
+                    responses: [
+                        { text: "❓ What's this about?", next: "gatekeeper_whats_about", disposition: "Gatekeeper - Asking" },
+                        { text: "🔗 I'll connect you", next: "transfer_dialing", disposition: "Gatekeeper - Transferring" },
+                        { text: "🚫 They're not available / Take a message", next: "voicemail", disposition: "Gatekeeper - Take Message" }
+                    ]
+                },
+                gatekeeper_whats_about: {
+                    you: "My name is Lewis with PowerChoosers.com and I'm needin' to speak with someone about the future electricity agreements for <span class='emphasis'>[CN]</span>. <span class='highlight-yellow'>Do you know who might be the best person for that?</span>",
+                    mood: "neutral",
+                    responses: [
+                        { text: "🔗 I'll connect you", next: "transfer_dialing", disposition: "Gatekeeper - Transferring" },
+                        { text: "🚫 They're not available / Take a message", next: "voicemail", disposition: "Gatekeeper - Take Message" },
+                        { text: "✅ I can help you", next: "pathA", disposition: "Gatekeeper - Connected" }
+                    ]
+                },
+                voicemail: {
+                    you: "Good afternoon/morning <span class='emphasis'>[N]</span>, this is <span class='emphasis'>Lewis</span> and I was told to speak with you. You can give me a call at <span class='emphasis'>817-409-4215</span>. Also, I shot you over a short email kinda explaining why I'm reaching out to you today. The email should be coming from <span class='emphasis'>Lewis Patterson</span> that's <span class='emphasis'>(L.E.W.I.S)</span>. Thank you so much and you have a great day.",
+                    mood: "neutral",
+                    responses: [
+                        { text: "🔄 End Call / Start New Call", next: "start", action: "saveProspectAndNotes" }
+                    ]
+                },
+                pathA: {
+                    you: "Perfect. <span class='pause'>--</span> So, <span class='emphasis'>[N]</span>, I've been working closely with <span class='emphasis'>[CI]</span> across Texas with electricity agreements, and we're about to see an <span class='emphasis'>unprecedented dip in the market in the next few months</span>. <span class='pause'>--</span> <span class='highlight-yellow'>Is getting the best price for your next renewal a priority for you and [CN]?</span> <span class='highlight-yellow'>Do you know when your contract expires?</span>",
+                    mood: "neutral",
+                    responses: [
+                        { text: "😰 Struggling / It's tough", next: "discovery", disposition: "Discovery - Struggle" },
+                        { text: "📅 Haven't renewed / Contract not up yet", next: "discovery", disposition: "Discovery - Not Renewed" },
+                        { text: "🔒 Locked in / Just renewed", next: "discovery", disposition: "Discovery - Locked In" },
+                        { text: "🛒 Shopping around / Looking at options", next: "discovery", disposition: "Discovery - Shopping" },
+                        { text: "🤝 Have someone handling it / Work with broker", next: "discovery", disposition: "Discovery - Has Broker" },
+                        { text: "🤷 Haven't thought about it / It is what it is", next: "discovery", disposition: "Discovery - No Plan" }
+                    ]
+                },
+                discovery: {
+                    you: "Gotcha! So, <span class='emphasis'>[N]</span>, just so I understand your situation a little better. <span class='pause'>--</span> <span class='highlight-yellow'>What's your current approach to renewing your electricity agreements? Do you handle it internally or work with a consultant?</span>",
+                    mood: "neutral",
+                    responses: [
+                        { text: "💚 Prospect is engaged / ready for appointment", next: "closeForAppointment", disposition: "Interested - Ready for Appointment" },
+                        { text: "🟡 Prospect is hesitant / needs more info", next: "handleHesitation", disposition: "Hesitant - Needs More Info" },
+                        { text: "❌ Objection: Happy with current provider", next: "objHappy", disposition: "Objection - Happy with Provider" },
+                        { text: "❌ Objection: No time", next: "objNoTime", disposition: "Objection - No Time" }
+                    ]
+                },
+                closeForAppointment: {
+                    you: "Awesome! So, <span class='emphasis'>[N]</span>. <span class='pause'>--</span> I really believe you'll be able to benefit from <span class='emphasis'>[SB]</span> that way you won't have to <span class='emphasis'>[PP]</span>. Our process is super simple! We start with an <span class='emphasis'>energy health check</span> where I look at your usage, contract terms, and then we can talk about what options might look like for <span class='emphasis'>[CN]</span> moving forward.",
+                    mood: "positive",
+                    responses: [
+                        { text: "📅 Schedule Friday 11 AM", next: "callSuccess", disposition: "Appointment Set - Fri 11 AM" },
+                        { text: "📅 Schedule Monday 2 PM", next: "callSuccess", disposition: "Appointment Set - Mon 2 PM" },
+                        { text: "🤔 Still hesitant", next: "handleHesitation", disposition: "Hesitant - Still Unsure" }
+                    ]
+                },
+                handleHesitation: {
+                    you: "I get it <span class='pause'>--</span> and called you out of the blue, so now is probably not the best time. How about this <span class='pause'>--</span> let me put together a quick case study specific to <span class='emphasis'>[TIA]</span>s in your area.",
+                    mood: "unsure",
+                    responses: [
+                        { text: "✅ Yes, send analysis", next: "callSuccess", disposition: "Sent Analysis" },
+                        { text: "❌ No, not interested", next: "softClose", disposition: "Not Interested" }
+                    ]
+                },
+                objHappy: {
+                    you: "That's actually great to hear, and I'm not suggesting you should be unhappy or you need to switch your supplier today. <span class='highlight-yellow'>Is it the customer service that you're happy with or are you just getting a rate that you can't find anywhere else?</span>",
+                    mood: "positive",
+                    responses: [
+                        { text: "✅ Yes, worth understanding", next: "closeForAppointment", disposition: "Open to discussion" },
+                        { text: "❌ No, not interested", next: "softClose", disposition: "Not Interested" }
+                    ]
+                },
+                objNoTime: {
+                    you: "I completely get it <span class='pause'>--</span> that's exactly why most businesses end up overpaying. Energy is a complicated market that requires ongoing attention that most internal teams <span class='pause'>--</span> simply don't have time for.",
+                    mood: "challenging",
+                    responses: [
+                        { text: "✅ Yes, schedule 10-minute assessment", next: "callSuccess", disposition: "Appointment Set - Short Call" },
+                        { text: "❌ Still no time", next: "softClose", disposition: "No Time - Declined" }
+                    ]
+                },
+                softClose: {
+                    you: "No problem at all <span class='pause'>--</span> I know energy strategy isn't urgent until it becomes critical. Here's what I'll do: I'm going to add you to my quarterly market intelligence updates.",
+                    mood: "neutral",
+                    responses: [
+                        { text: "✅ That sounds reasonable", next: "callSuccess", disposition: "Opt-in to updates" },
+                        { text: "❌ No thanks", next: "callEnd", disposition: "Opt-out / Cold" }
+                    ]
+                },
+                callSuccess: {
+                    you: "🎉 <span class='emphasis'>Call Completed Successfully!</span><br><br>Remember to track:<br>• Decision maker level<br>• Current contract status<br>• Pain points identified<br>• Interest level<br>• Next action committed",
+                    mood: "positive",
+                    responses: [{ text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }]
+                },
+                callEnd: {
+                    you: "Thanks for your time. Have a great day!",
+                    mood: "neutral",
+                    responses: [{ text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }]
+                },
+                // New state for gatekeeper transfer
+                transfer_dialing: {
+                    you: "Connecting... Ringing...",
+                    mood: "neutral",
+                    responses: [
+                        { text: "📞 Call Connected", next: "hook", disposition: "Transferred - Connected" },
+                        { text: "🚫 Not Connected", next: "voicemail", disposition: "Transferred - Not Connected" }
+                    ]
+                }
+            };
 
-/* --- Cold Calling Hub Specific Styles (Merged and Adapted) --- */
+            // Global state for the application
+            const appState = {
+                placeholders: {
+                    'N': '', 'YN': 'Lewis', 'CN': '', 'CI': '', 'SB': '', 'PP': '', 'CT': '', 'TIA': '',
+                    'TE': '', 'DT': '', 'EAC': '', 'TF': '', 'OP': 'the responsible party', 'XX': '$XX.00/40%', 'P': ''
+                },
+                inputMap: {
+                    'input-name': 'N',
+                    'input-title': 'CT',
+                    'input-company-name': 'CN',
+                    'input-company-industry': 'CI',
+                    'input-benefit': 'SB',
+                    'input-pain': 'PP',
+                    'input-phone': 'P'
+                },
+                currentStep: 'start',
+                history: []
+            };
+            
+            let callActive = false;
+            let callTimeout;
+            let currentDisposition = "";
+            const callRingingSound = new Tone.MembraneSynth().toDestination();
+            
+            // Helper function to get an element by ID
+            const getEl = id => document.getElementById(id);
 
-/* Ensure the main content wrapper can adjust its flex basis */
-.main-content-wrapper {
-    flex: 3; /* Default flex for main content */
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: var(--spacing-lg);
-    position: relative;
-    gap: var(--spacing-lg);
-    padding-bottom: 80px;
-    min-width: 0;
-}
+            /**
+             * Updates the script display with the current text, replacing placeholders.
+             * Renders response buttons for the current step.
+             */
+            const displayCurrentStep = () => {
+                const step = scriptData[appState.currentStep];
+                if (!step) return;
+                
+                const scriptDisplay = getEl('script-display');
+                const responsesContainer = getEl('responses-container');
+                const backBtn = getEl('back-btn');
+                
+                const processedText = applyPlaceholders(step.you);
+                
+                if (scriptDisplay) {
+                    scriptDisplay.innerHTML = processedText;
+                    scriptDisplay.className = `script-display mood-${step.mood}`;
+                    // Special case for 'start' screen to center the text
+                    if (appState.currentStep === 'start') {
+                        scriptDisplay.classList.add('start');
+                    } else {
+                        scriptDisplay.classList.remove('start');
+                    }
+                }
+                
+                if (responsesContainer) {
+                    responsesContainer.innerHTML = '';
+                    if (appState.currentStep === 'start') {
+                        // Render the main "Dial" button for the start screen
+                        const dialButtonHtml = `
+                            <button class="dial-button" onclick="handleDialClick()">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                Dial
+                            </button>
+                        `;
+                        responsesContainer.innerHTML = dialButtonHtml;
+                    } else if (step.responses && step.responses.length > 0) {
+                        // Render response buttons for the current step
+                        step.responses.forEach(response => {
+                            const button = document.createElement('button');
+                            button.className = 'response-btn';
+                            button.innerHTML = applyPlaceholders(response.text);
+                            button.onclick = () => {
+                                if (response.disposition) {
+                                    currentDisposition = response.disposition;
+                                }
+                                selectResponse(response.next, response.action);
+                            };
+                            responsesContainer.appendChild(button);
+                        });
+                        
+                        // Adjust grid layout for a single button or more
+                        if (step.responses.length === 1) {
+                            responsesContainer.classList.add('full-width');
+                        } else {
+                            responsesContainer.classList.remove('full-width');
+                        }
+                    }
+                }
+                
+                if (backBtn) {
+                    backBtn.disabled = appState.history.length === 0;
+                }
+            };
 
-/* Styles for the cold calling main content area when active */
-.call-scripts-layout-main {
-    display: flex; /* Ensure it uses flex for its internal layout */
-    flex-direction: column;
-    gap: 20px;
-    background: linear-gradient(135deg, var(--cch-dark-blue) 0%, var(--cch-bg-card) 100%);
-    border: 1px solid var(--cch-border-color);
-    border-radius: 15px;
-    padding: 30px;
-    position: relative;
-    overflow-y: hidden;
-    height: 100%; /* Take full height of main-content-wrapper */
-}
+            /**
+             * Replaces placeholders in the script text with values from the state.
+             * @param {string} text - The text string containing placeholders.
+             * @returns {string} The text with placeholders replaced.
+             */
+            const applyPlaceholders = (text) => {
+                let newText = text;
+                for (const key in appState.placeholders) {
+                    const regex = new RegExp('\\[' + key + '\\]', 'g');
+                    let replacement = appState.placeholders[key];
+                    
+                    // Special case: Only use the first name for the [N] placeholder
+                    if (key === 'N' && replacement) {
+                        replacement = replacement.split(' ')[0];
+                    }
+                    
+                    newText = newText.replace(regex, replacement);
+                }
+                return newText;
+            };
 
-.calls-hub-main-inner {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-    align-items: center; /* Center the entire main content block */
-    justify-content: center;
-}
+            /**
+             * Updates the global placeholders from the input fields and refreshes the script.
+             */
+            const updateScript = () => {
+                for (const inputId in appState.inputMap) {
+                    const placeholderKey = appState.inputMap[inputId];
+                    const inputElement = getEl(inputId);
+                    if (inputElement) {
+                        const inputValue = inputElement.value || '';
+                        appState.placeholders[placeholderKey] = inputValue;
+                    }
+                }
+                // Alias for Company Industry
+                appState.placeholders['TIA'] = appState.placeholders['CI'];
+                displayCurrentStep();
+            };
 
-.script-display {
-    background: var(--cch-darker-blue);
-    padding: 24px;
-    border-radius: 12px;
-    font-size: 1.25rem;
-    line-height: 1.6;
-    min-height: 250px;
-    text-align: left; /* Default to left-aligned text */
-    border: 1px solid var(--cch-border-color);
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    flex-grow: 1;
-    width: 100%;
-    overflow-y: auto;
-    color: var(--cch-text-primary);
-}
+            /**
+             * Handles the click event for the "Dial" button.
+             * Simulates a call and transitions to the 'dialing' state.
+             */
+            const handleDialClick = () => {
+                const phoneNumber = getEl('input-phone').value;
+                if (!phoneNumber) {
+                    CRMApp.showToast('Please enter a phone number to dial.', 'error');
+                    return;
+                }
 
-.script-display.start {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
+                // Start the simulated ringing
+                callActive = true;
+                getEl('script-display').classList.add('ringing');
+                
+                // Tone.js sound effect for ringing
+                callRingingSound.triggerAttackRelease("C4", "3s");
+                
+                // After 3 seconds, simulate a connection
+                callTimeout = setTimeout(() => {
+                    callActive = false;
+                    callRingingSound.triggerRelease();
+                    getEl('script-display').classList.remove('ringing');
+                    selectResponse('dialing');
+                }, 3000);
+            };
+            
+            /**
+             * Adds a digit from the dialpad to the phone number input field.
+             * @param {string} digit - The digit or character to add.
+             */
+            const dialpadInput = (digit) => {
+                const phoneInput = getEl('input-phone');
+                if (phoneInput) {
+                    phoneInput.value += digit;
+                    updateScript();
+                }
+            };
 
-/* Mood-based borders for the script display */
-.script-display.mood-neutral { border-left: 4px solid var(--cch-text-secondary); }
-.script-display.mood-positive { border-left: 4px solid #10b981; }
-.script-display.mood-challenging { border-left: 4px solid var(--cch-accent-orange); }
-.script-display.mood-unsure { border-left: 4px solid #8b5cf6; }
+            /**
+             * Handles a user selecting a response button.
+             * Pushes the current step to history and navigates to the next step.
+             * @param {string} nextStep - The key for the next step in `scriptData`.
+             * @param {string} action - An optional action to perform, e.g., 'save'.
+             */
+            const selectResponse = (nextStep, action) => {
+                if (nextStep && scriptData[nextStep]) {
+                    appState.history.push(appState.currentStep);
+                    appState.currentStep = nextStep;
+                    displayCurrentStep();
+                }
+                if (action === 'saveProspectAndNotes') {
+                    saveProspectAndNotes();
+                }
+            };
 
-.script-display.ringing {
-    animation: ring-pulse 1.5s infinite;
-}
+            /**
+             * Navigates back to the previous step in the call history.
+             */
+            const goBack = () => {
+                if (appState.history.length > 0) {
+                    appState.currentStep = appState.history.pop();
+                    displayCurrentStep();
+                }
+            };
 
-@keyframes ring-pulse {
-    0% { box-shadow: 0 0 0 0 var(--cch-professional-blue); }
-    100% { box-shadow: 0 0 0 20px rgba(33, 150, 243, 0); } /* Adjusted to CRM accent-blue */
-}
+            /**
+             * Resets the entire call script and state to the initial values.
+             */
+            const restart = () => {
+                appState.currentStep = 'start';
+                appState.history = [];
+                currentDisposition = "";
+                
+                // Clear all input fields
+                for(const inputId in appState.inputMap) {
+                    const input = getEl(inputId);
+                    if (input) input.value = '';
+                }
+                // Clear the call notes
+                getEl('call-notes').value = '';
 
-/* Styling for emphasis and highlight */
-.emphasis { 
-    font-weight: bold; 
-}
-.highlight-yellow { 
-    background-color: #e2b34a; /* New, sleeker yellow */
-    color: black; 
-    padding: 2px 5px; 
-    border-radius: 4px; 
-    font-weight: bold; 
-    display: inline-block;
-}
-.pause { 
-    font-style: italic; 
-    opacity: 0.7; 
-}
+                updateScript();
+            };
 
-.response-buttons {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-    margin-top: 25px;
-    margin-bottom: 20px;
-    width: 100%;
-}
+            /**
+             * Saves the prospect info and call notes to the CRM via CRMApp.
+             */
+            const saveProspectAndNotes = () => {
+                const notes = getEl('call-notes').value;
+                const disposition = currentDisposition || "Call Ended - No Disposition";
+                const companyName = getEl('input-company-name').value;
+                const contactName = getEl('input-name').value;
+                const phoneNumber = getEl('input-phone').value;
+                const contactTitle = getEl('input-title').value;
 
-.response-buttons.full-width {
-    grid-template-columns: 1fr;
-}
+                const log = {
+                    disposition: disposition,
+                    notes: notes,
+                    prospect: {
+                        name: contactName,
+                        company: companyName,
+                        phone: phoneNumber,
+                        title: contactTitle
+                    },
+                    timestamp: new Date().toISOString()
+                };
 
-.response-btn, .dial-button {
-    padding: 14px 20px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-align: center;
-    border: none;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-}
+                CRMApp.saveCallLog(log, disposition); // Call the CRMApp function
+                
+                // Reset for the next call
+                restart();
+            };
+            
+            /**
+             * Clears the call notes textarea.
+             */
+            const clearNotes = () => {
+                getEl('call-notes').value = '';
+            };
 
-.response-btn {
-    background: var(--cch-bg-hover);
-}
+            // Energy Health Check widget code
+            const supplierData = {
+              "NRG": { bbbRating: "A+", popularity: 4, customerService: 3 },
+              "TXU": { bbbRating: "A+", popularity: 5, customerService: 4 },
+              "APG & E": { bbbRating: "Unaccredited", popularity: 2, customerService: 3 },
+              "Reliant": { bbbRating: "A+", popularity: 5, customerService: 3 },
+              "Hudson": { bbbRating: "Unaccredited", popularity: 2, customerService: 2 },
+              "Green Mountain": { bbbRating: "Unaccredited", popularity: 3, customerService: 2 },
+              "Constellation": { bbbRating: "A+", popularity: 4, customerService: 4 },
+              "Tara Energy": { bbbRating: "Unaccredited", popularity: 2, customerService: 3 },
+              "Cirro": { bbbRating: "A+", popularity: 3, customerService: 4 },
+              "Engie": { bbbRating: "A+", popularity: 3, customerService: 1 },
+              "Gexa": { bbbRating: "Unaccredited", popularity: 4, customerService: 2 },
+              "Freepoint": { bbbRating: "A+", popularity: 1, customerService: 3 },
+              "Shell Energy": { bbbRating: "Unaccredited", popularity: 3, customerService: 2 },
+              "Ironhorse": { bbbRating: "4.0 stars", popularity: 1, customerService: 3 }, // Note: Ironhorse has a Powertochoose.org rating, not a standard BBB rating.
+              "Ammper Power": { bbbRating: "Unaccredited", popularity: 1, customerService: 1 }
+            };
+            const supplierNames = Object.keys(supplierData);
 
-.response-btn:hover {
-    background: var(--cch-professional-blue);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-}
+            const ESTIMATED_DELIVERY_CHARGE_CENTS = 0.05;
+            let section1Complete = false, section2Complete = false;
+            let currentAnnualUsage = 0, currentMonthlyBill = 0, currentRate = 0, sellRate = 0, currentSupplier = '';
+            let currentDate = new Date(), selectedDate = null;
+            const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+            
+            const formatNumber = num => Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            const updateProgress = () => {
+                const progress = getEl('progressFill');
+                if (!progress) return; // Add check to prevent error
+                
+                let percentage = 0;
+                if (section1Complete) percentage += 50;
+                if (section2Complete) percentage += 50;
+                progress.style.width = percentage + '%';
+            };
+            
+            function validateSection1() {
+                const supplierInput = getEl('currentSupplier');
+                const monthlyBillInput = getEl('monthlyBill');
+                const currentRateInput = getEl('currentRate');
+                
+                const supplierValue = supplierInput.value.trim();
+                currentMonthlyBill = parseFloat(monthlyBillInput.value);
+                currentRate = parseFloat(currentRateInput.value);
+                
+                const rateFeedback = getEl('rateFeedback');
+                const usageDisplay = getEl('usageDisplay');
+                const usageDetails = getEl('usageDetails');
 
-.dial-button {
-    background: #10b981;
-    font-size: 1.1rem;
-    font-weight: 700;
-    width: 100%;
-}
+                rateFeedback.classList.remove('show', 'feedback-danger', 'feedback-warning', 'feedback-success', 'feedback-info');
+                usageDisplay.classList.add('hidden');
+                
+                // Check if all fields are filled with valid data
+                if (supplierValue && supplierNames.includes(supplierValue) && currentMonthlyBill > 0 && currentRate > 0) {
+                    currentSupplier = supplierValue;
+                    const effectiveCurrentRateAllIn = currentRate + ESTIMATED_DELIVERY_CHARGE_CENTS;
+                    rateFeedback.classList.add('show');
+                    if (effectiveCurrentRateAllIn <= 0.10) { rateFeedback.className = 'input-feedback show feedback-danger'; rateFeedback.textContent = '🚨 Very old rate - significant increase expected at renewal'; }
+                    else if (effectiveCurrentRateAllIn <= 0.12) { rateFeedback.className = 'input-feedback show feedback-warning'; rateFeedback.textContent = '⚠️ Below market rate - likely increase ahead'; }
+                    else if (effectiveCurrentRateAllIn <= 0.145) { rateFeedback.className = 'input-feedback show feedback-success'; rateFeedback.textContent = '✅ Current market range - competitive rate'; }
+                    else { rateFeedback.className = 'input-feedback show feedback-info'; rateFeedback.textContent = '💰 Above market - savings opportunity available'; }
+                    
+                    const monthlyUsage = (currentMonthlyBill / effectiveCurrentRateAllIn);
+                    currentAnnualUsage = monthlyUsage * 12;
+                    usageDisplay.classList.remove('hidden');
+                    let businessSize = (currentAnnualUsage < 50000) ? 'Small Business' : (currentAnnualUsage < 200000) ? 'Medium Business' : 'Large Business';
+                    usageDetails.innerHTML = `<strong>Monthly Usage:</strong> ${formatNumber(monthlyUsage)} kWh<br><strong>Annual Usage:</strong> ${formatNumber(currentAnnualUsage)} kWh<br><strong>Business Size:</strong> ${businessSize}`;
+                    
+                    section1Complete = true;
+                    getEl('section1').classList.add('completed');
+                    getEl('section1').querySelector('.section-header-pill').classList.add('completed');
+                    getEl('section1').querySelector('.section-icon').innerHTML = '✓';
+                    activateSection(2);
+                } else {
+                    section1Complete = false;
+                    getEl('section1').classList.remove('completed');
+                    getEl('section1').querySelector('.section-header-pill').classList.remove('completed');
+                    getEl('section1').querySelector('.section-icon').innerHTML = '1';
+                    
+                    // Also reset the next section if this one is not complete
+                    getEl('section2').classList.remove('active', 'completed');
+                    getEl('section2').querySelector('.section-header-pill').classList.remove('active', 'completed');
+                    getEl('section2').querySelector('.section-icon').innerHTML = '2';
+                    getEl('section3').classList.remove('active', 'completed');
+                    getEl('section3').querySelector('.section-header-pill').classList.remove('active', 'completed');
+                    getEl('section3').querySelector('.section-icon').innerHTML = '3';
+                    section2Complete = false;
+                }
+                updateProgress();
+                updateButton();
+            }
 
-.dial-button:hover {
-    background: #059669;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-}
+            function validateSection2() {
+                const contractEndDateInput = getEl('contractEndDate');
+                const sellRateInput = getEl('sellRate');
+                const contractEndDate = contractEndDateInput.value;
+                sellRate = parseFloat(sellRateInput.value);
+                
+                // Check if all fields are filled with valid data
+                if (contractEndDate && sellRate > 0) {
+                    section2Complete = true;
+                    getEl('section2').classList.add('completed');
+                    getEl('section2').querySelector('.section-header-pill').classList.add('completed');
+                    getEl('section2').querySelector('.section-icon').innerHTML = '✓';
+                    activateSection(3);
+                } else {
+                    section2Complete = false;
+                    getEl('section2').classList.remove('completed');
+                    getEl('section2').querySelector('.section-header-pill').classList.remove('completed');
+                    getEl('section2').querySelector('.section-header-pill').classList.add('active');
+                    getEl('section2').querySelector('.section-icon').innerHTML = '2';
 
-.calls-hub-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
+                    // Reset the next section if this one is not complete
+                    getEl('section3').classList.remove('active', 'completed');
+                    getEl('section3').querySelector('.section-header-pill').classList.remove('active', 'completed');
+                    getEl('section3').querySelector('.section-icon').innerHTML = '3';
+                }
+                updateProgress();
+                updateButton();
+            }
 
-/* Updated button styles */
-.calls-hub-footer .action-btn {
-    background: var(--cch-bg-hover);
-    color: var(--cch-text-primary);
-    border-radius: 8px;
-    padding: 12px 15px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border: 1px solid var(--cch-border-color);
-}
+            function activateSection(sectionNumber) {
+                for (let i = 1; i <= 3; i++) {
+                    const section = getEl(`section${i}`);
+                    const pill = section.querySelector('.section-header-pill');
+                    const icon = pill.querySelector('.section-icon');
+                    if (i < sectionNumber) {
+                        section.classList.remove('active');
+                        section.classList.add('completed');
+                        pill.classList.remove('active');
+                        pill.classList.add('completed');
+                        icon.innerHTML = '✓';
+                    } else if (i === sectionNumber) {
+                        section.classList.add('active');
+                        section.classList.remove('completed');
+                        pill.classList.add('active');
+                        pill.classList.remove('completed');
+                        icon.innerHTML = i;
+                    } else {
+                        section.classList.remove('active', 'completed');
+                        pill.classList.remove('active', 'completed');
+                        icon.innerHTML = i;
+                    }
+                }
+            }
 
-.calls-hub-footer .action-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: #475569;
-}
-.calls-hub-footer .action-btn:hover:not(:disabled) {
-    background: var(--cch-professional-blue);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-}
+            const updateButton = () => {
+                const button = getEl('calculateBtn');
+                const isReady = section1Complete && section2Complete;
+                button.classList.toggle('ready', isReady);
+                button.textContent = isReady ? 'Calculate Savings Potential' : 'Complete All Sections Above';
+            };
 
-/* New styling for the restart icon button */
-.restart-btn-icon {
-    background: var(--cch-bg-hover);
-    color: var(--cch-text-primary);
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border: 1px solid var(--cch-border-color);
-}
+            const runCalculation = () => {
+                if (!section1Complete || !section2Complete || !isFinite(currentMonthlyBill) || !isFinite(currentRate) || !isFinite(sellRate) || !supplierNames.includes(currentSupplier)) {
+                  console.warn("Attempted to calculate results before all sections were complete or with invalid data.");
+                  CRMApp.showToast("Please complete all sections with valid data to run the health check.", "warning");
+                  return;
+                }
+                
+                getEl('calculateBtn').style.display = 'none';
+                getEl('loadingAnimation').classList.add('show');
+                getEl('loadingMessage').textContent = 'Running analysis...';
+                getEl('calculator-wrapper').classList.add('is-calculating');
+                setTimeout(calculateResults, 1500);
+            };
 
-.restart-btn-icon:hover {
-    background: var(--cch-professional-blue);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-}
+            function calculateResults() {
+                try {
+                    const contractEndDateStr = getEl('contractEndDate').value;
+                    const effectiveSellRateAllIn = sellRate + ESTIMATED_DELIVERY_CHARGE_CENTS;
+                    const annualCurrentCost = currentMonthlyBill * 12;
+                    const annualProjectedCost = (currentAnnualUsage * effectiveSellRateAllIn);
+                    const annualSavingsOrIncrease = annualCurrentCost - annualProjectedCost;
+                    const monthlySavingsOrIncrease = annualSavingsOrIncrease / 12;
+                    const percentageChange = ((annualSavingsOrIncrease / annualCurrentCost) * 100).toFixed(2);
+                    
+                    const currentSupplierData = supplierData[currentSupplier] || { bbbRating: 'N/A', popularity: 1, customerService: 1 };
+                    
+                    // Calculate Energy Health Score
+                    // Score is a weighted combination of savings potential and supplier quality
+                    // Savings factor: (percentageChange + 100) / 2 (normalizes to 0-100)
+                    // Supplier factor: (popularity + customerService) / 10 * 100 (normalizes to 0-100, based on max score of 5 for each)
+                    const savingsFactor = Math.min(Math.max((percentageChange + 100), 0), 200) / 2;
+                    const supplierFactor = ((currentSupplierData.popularity || 1) + (currentSupplierData.customerService || 1)) / 10 * 100;
+                    const energyHealthScore = Math.round((savingsFactor * 0.7) + (supplierFactor * 0.3));
 
-.sidebar-actions button {
-    flex: 1;
-    padding: 10px 15px;
-    border-radius: 8px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    color: white;
-    border: 1px solid transparent;
-}
+                    let actionableTips = '';
+                    const today = new Date();
+                    const contractEndDate = new Date(contractEndDateStr);
+                    const monthsUntilExpiration = (contractEndDate.getFullYear() - today.getFullYear()) * 12 + (contractEndDate.getMonth() - today.getMonth());
+                    
+                    const formatTips = (title, tips) => `<h4 class="text-green-500 text-sm font-bold mb-2">${title}</h4><ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">${tips.map(t => `<li><strong>${t.bold}:</strong> ${t.text}</li>`).join('')}</ul>`;
+                    
+                    // New logic based on user's rules
+                    const isSummer = today.getMonth() >= 5 && today.getMonth() <= 7; // June, July, August
+                    const tolerancePercentage = 0.5;
 
-.sidebar-actions .add-notes-btn {
-    background: var(--cch-professional-blue);
-    border-color: var(--cch-professional-blue);
-}
-.sidebar-actions .add-notes-btn:hover {
-    background: var(--cch-secondary-blue);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-}
-.sidebar-actions .clear-btn {
-    background: #ef4444;
-    border-color: #ef4444;
-}
-.sidebar-actions .clear-btn:hover {
-    background: #dc2626;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-}
+                    if (monthsUntilExpiration > 36) { // > 3 years
+                        if (percentageChange > 40) {
+                            actionableTips = formatTips('Consider Cancelling for Major Savings:', [{ bold: 'Significant Savings', text: 'With savings over 40%, it may be worth cancelling your current agreement. Review the terms for any penalties.' }]);
+                        } else {
+                            actionableTips = formatTips('No Action Needed:', [{ bold: 'Stable Contract', text: 'Your contract expires far in the future. Monitor the market, but no immediate action is necessary.' }]);
+                        }
+                    } else if (monthsUntilExpiration >= 6 && monthsUntilExpiration <= 12) { // 6 months to 1 year
+                        if (isSummer && percentageChange > 15) {
+                            actionableTips = formatTips('Optimal Renewal Time (Summer Savings):', [{ bold: 'Summer Opportunity', text: 'This is a high-rate season, but your potential savings of over 15% make it an ideal time to renew and lock in a good rate.' }]);
+                        } else if (!isSummer && annualSavingsOrIncrease > 0) {
+                            actionableTips = formatTips('Optimal Renewal Time:', [{ bold: 'Proactive Renewal', text: 'Your contract is approaching its renewal window. Secure a new plan now to lock in savings and avoid market fluctuations.' }]);
+                        } else {
+                             actionableTips = formatTips('Monitor Market Closely:', [{ bold: 'Strategic Planning', text: 'Your contract is nearing its end. Keep an eye on market trends to find the best rate before your renewal date.' }]);
+                        }
+                    } else { // All other cases
+                        let idealMonths = monthsUntilExpiration + 6;
+                        let renewalYear = new Date(contractEndDateStr);
+                        renewalYear.setMonth(renewalYear.getMonth() - 6);
+                        
+                        if (percentageChange < -30 && monthsUntilExpiration < 12) {
+                             actionableTips = formatTips('High-Risk Renewal Alert:', [{ bold: 'Act Now for Best Rates', text: `You are facing a potential rate increase of over 30%. Consider reserving a new price in advance to lock in a more favorable rate before your contract ends.` }]);
+                        } else if (percentageChange < -30 && monthsUntilExpiration >= 12) {
+                            actionableTips = formatTips('High-Risk Renewal Alert:', [{ bold: 'Plan Ahead for Best Rates', text: `You are facing a potential rate increase of over 30%. We recommend starting the process around ${monthNames[renewalYear.getMonth()]} of ${renewalYear.getFullYear()} to reserve a price in advance.` }]);
+                        }
+                        else {
+                            actionableTips = formatTips('General Advice:', [{ bold: 'Strategic Planning is Key', text: `Based on your contract end date, it's important to have a plan in place. Start monitoring rates to be ready when the time comes to renew.` }]);
+                        }
+                    }
 
-/* Sidebar & Widgets */
-/* This is the container for the cold calling specific widgets */
-#cold-calling-widgets-container {
-    display: flex; /* This will be toggled by JS */
-    flex-direction: column;
-    gap: 20px;
-    overflow-y: auto;
-    min-width: 350px; /* Maintain minimum width */
-    padding: 0 8px; /* For scrollbar padding */
-}
+                    const resultsSection = document.createElement('div');
+                    resultsSection.id = 'results';
+                    resultsSection.className = 'results-section show p-6 mt-6 rounded-xl border';
 
-/* This is the container for the default CRM widgets */
-#crm-widgets-container {
-    display: flex; /* This will be toggled by JS */
-    flex-direction: column;
-    gap: 19px; /* Match original CRM widget panel gap */
-    height: 100%; /* Ensure it takes full height */
-    overflow-y: auto; /* Allow scrolling for CRM widgets */
-}
+                    let resultAmountClass = '', resultLabelText = '', mainResultClass = '';
+                    if (annualSavingsOrIncrease > (annualCurrentCost * (tolerancePercentage / 100))) {
+                        resultAmountClass = 'text-green-500'; mainResultClass = 'savings'; resultLabelText = 'Potential Annual Client Savings';
+                    } else if (annualSavingsOrIncrease < -(annualCurrentCost * (tolerancePercentage / 100))) {
+                        resultAmountClass = 'text-red-500'; mainResultClass = 'increase'; resultLabelText = 'Projected Annual Increase Risk';
+                    } else {
+                        resultAmountClass = 'text-white'; mainResultClass = 'neutral'; resultLabelText = 'No Significant Change Projected';
+                    }
+                    
+                    resultsSection.innerHTML = `
+                        <div class="main-result ${mainResultClass} p-4 rounded-xl border-2 mb-4">
+                            <div class="text-3xl font-bold ${resultAmountClass}">$${formatNumber(Math.abs(annualSavingsOrIncrease))}</div>
+                            <div class="text-sm font-semibold text-white mt-1">${resultLabelText}</div>
+                        </div>
+                        <div class="details-grid grid grid-cols-2 gap-4 text-center text-sm mb-4">
+                            <div class="detail-item p-3 rounded-lg bg-gray-700">
+                                <div class="text-white font-bold">${energyHealthScore}%</div>
+                                <div class="text-gray-400 text-xs">Energy Health Score</div>
+                            </div>
+                            <div class="detail-item p-3 rounded-lg bg-gray-700">
+                                <div class="text-white font-bold">${currentSupplierData.bbbRating}</div>
+                                <div class="text-gray-400 text-xs">Supplier BBB Rating</div>
+                            </div>
+                            <div class="detail-item p-3 rounded-lg bg-gray-700 col-span-2">
+                               <div class="text-white font-bold">$${formatNumber(Math.abs(monthlySavingsOrIncrease))}</div>
+                               <div class="text-gray-400 text-xs">${resultLabelText.replace('Annual', 'Monthly')}</div>
+                            </div>
+                        </div>
+                        <div class="analysis-box p-4 rounded-xl border-l-4 border-blue-500 bg-gray-700">
+                            <div class="analysis-title flex items-center text-blue-500 text-sm font-semibold mb-2">
+                                <span class="mr-2">💡</span> Recommended Next Steps
+                            </div>
+                            <div class="analysis-text text-xs text-gray-400">${actionableTips}</div>
+                        </div>`;
+                    
+                    const existingResults = getEl('results');
+                    if (existingResults) existingResults.remove();
+                    getEl('calculator-wrapper').appendChild(resultsSection);
+                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+                    // Call CRMApp to update account details
+                    const companyName = getEl('input-company-name').value;
+                    const updatedAccountData = {
+                        currentSupplier: currentSupplier,
+                        monthlyBill: currentMonthlyBill,
+                        currentRate: currentRate,
+                        contractEndDate: contractEndDateStr,
+                        sellRate: sellRate,
+                        annualSavingsOrIncrease: annualSavingsOrIncrease,
+                        energyHealthScore: energyHealthScore
+                    };
+                    CRMApp.updateAccountDetailsFromHealthCheck(companyName, updatedAccountData);
 
-.sidebar-card {
-    background: linear-gradient(135deg, var(--cch-dark-blue) 0%, var(--cch-bg-card) 100%);
-    border: 1px solid var(--cch-border-color);
-    border-radius: 15px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    height: max-content; /* Ensure container matches content size */
-}
+                } catch (error) {
+                    console.error("An error occurred during calculation:", error);
+                    CRMApp.showToast("An error occurred during calculation. Please check inputs.", "error");
+                } finally {
+                    // Ensure the loading state is always reset
+                    getEl('loadingAnimation').classList.remove('show');
+                    getEl('calculateBtn').style.display = 'block';
+                    getEl('calculator-wrapper').classList.remove('is-calculating');
+                }
+            }
 
-.sidebar-card-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--cch-text-primary);
-    margin-bottom: 15px;
-}
+            const openDatePicker = () => {
+                const modal = getEl('taskModal');
+                if(modal) {
+                    modal.classList.add('open');
+                    renderCalendar();
+                }
+            };
 
-.sidebar-input-group {
-    margin-bottom: 12px;
-}
+            const closeModal = (event) => {
+                const modal = getEl('taskModal');
+                // Only close the modal if the click is on the background or a cancel button
+                if (event.target === modal || event.target.id === 'cancel-btn') {
+                    modal.classList.remove('open');
+                }
+            };
 
-.sidebar-input-group label {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--cch-text-secondary);
-    margin-bottom: 4px;
-}
+            const resetForm = () => {
+                // Reset all form inputs and state
+                getEl('currentSupplier').value = '';
+                getEl('monthlyBill').value = '';
+                getEl('currentRate').value = '';
+                getEl('sellRate').value = '';
+                getEl('contractEndDate').value = '';
+                getEl('usageDisplay').classList.add('hidden');
+                getEl('rateFeedback').classList.remove('show');
+                const results = getEl('results');
+                if(results) results.remove();
+                
+                // Reset state variables
+                section1Complete = false;
+                section2Complete = false;
 
-.sidebar-input-group input, .sidebar-input-group textarea {
-    width: 100%;
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: var(--cch-bg-hover);
-    border: 1px solid var(--cch-border-color);
-    color: var(--cch-text-primary);
-    font-size: 0.9rem;
-    transition: border-color 0.3s ease;
-}
-.sidebar-input-group input:disabled, .sidebar-input-group textarea:disabled { opacity: 0.7; }
-.sidebar-input-group input:focus, .sidebar-input-group textarea:focus { outline: none; border-color: var(--cch-professional-blue); box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2); } /* Adjusted to CRM accent-blue */
-.sidebar-input-group textarea { min-height: 120px; resize: vertical; }
+                // Reset UI to initial state
+                activateSection(1);
+                updateButton();
+            };
 
-.list-item {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--cch-border-color);
-    font-size: 0.9rem;
-}
-.list-item:last-child { border-bottom: none; }
+            const renderCalendar = () => {
+                const [monthYearSpan, calendarGrid] = [getEl('monthYearSpan'), getEl('calendarGrid')];
+                const [year, month] = [currentDate.getFullYear(), currentDate.getMonth()];
+                
+                const monthYearPicker = getEl('monthYearPicker');
+                const display = getEl('monthYearDisplay');
+                
+                display.classList.remove('hidden');
+                monthYearPicker.classList.add('hidden');
 
-.list-item strong {
-    color: var(--cch-text-primary);
-    font-weight: 600;
-}
-.list-item p {
-    color: var(--cch-text-secondary);
-    line-height: 1.4;
-}
+                calendarGrid.innerHTML = '';
+                monthYearSpan.textContent = `${monthNames[month]} ${year}`;
+                
+                const firstDay = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                daysOfWeek.forEach(day => { const dayHeader = document.createElement('div'); dayHeader.className = 'calendar-day'; dayHeader.textContent = day; calendarGrid.appendChild(dayHeader); });
+                for (let i = 0; i < firstDay; i++) calendarGrid.innerHTML += '<div></div>';
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const dateElement = document.createElement('div');
+                    dateElement.className = 'calendar-date';
+                    dateElement.textContent = i;
+                    const fullDate = new Date(year, month, i);
+                    if (fullDate.toDateString() === new Date().toDateString()) dateElement.classList.add('today');
+                    dateElement.onclick = () => {
+                        document.querySelectorAll('.calendar-date').forEach(d => d.classList.remove('selected'));
+                        dateElement.classList.add('selected');
+                        selectedDate = fullDate;
+                        getEl('contractEndDate').value = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                        // Directly close the modal and run the validation
+                        getEl('taskModal').classList.remove('open');
+                        validateSection2();
+                    };
+                    calendarGrid.appendChild(dateElement);
+                }
+            };
 
-/* Energy Health Check Styles */
-.calculator-wrapper {
-    background: linear-gradient(135deg, var(--cch-dark-blue), var(--cch-header-blue));
-    border-radius: 15px;
-    padding: 24px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-    border: 1px solid var(--cch-bg-hover);
-    transition: all 0.3s ease;
-}
-.calculator-wrapper.is-calculating { animation: pulse-border 1.5s infinite; }
-@keyframes pulse-border { 0% { border-color: var(--cch-bg-hover); } 50% { border-color: var(--cch-professional-blue); } 100% { border-color: var(--cch-bg-hover); } }
-.calculator-title, .section-title, .input-label { color: var(--cch-text-primary); }
-.calculator-subtitle { color: var(--cch-text-secondary); }
-.progress-bar { background: var(--cch-bg-hover); border-radius: 9999px; height: 6px; }
-.progress-fill { background: linear-gradient(90deg, var(--cch-professional-blue), var(--cch-secondary-blue)); border-radius: 9999px; }
-.form-section { background: var(--cch-bg-card); border-color: var(--cch-bg-hover); border-radius: 15px; padding: 24px; }
-.form-section.active { border-color: var(--cch-professional-blue); }
-.form-section.completed { border-color: #10b981; }
-.section-header-pill {
-    display: inline-flex;
-    align-items: center;
-    background-color: var(--cch-bg-hover);
-    border-radius: 9999px;
-    padding: 4px 12px;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--cch-text-primary);
-    margin-bottom: 12px;
-    border: 1px solid var(--cch-border-color);
-    transition: all 0.3s ease;
-}
-.section-header-pill.active { background-color: var(--cch-professional-blue); border-color: var(--cch-secondary-blue); }
-.section-header-pill.completed { background-color: #10b981; border-color: #16a34a; }
-.section-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background-color: var(--cch-darker-blue); color: white; border-radius: 9999px; font-weight: 700; margin-right: 8px; }
-.form-input { background: var(--cch-bg-hover); border: 2px solid var(--cch-border-color); color: var(--cch-text-primary); border-radius: 12px; padding: 8px; font-size: 14px; width: 100%; }
-.form-input:focus { outline: none; border-color: var(--cch-professional-blue); box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2); } /* Adjusted to CRM accent-blue */
-.input-feedback { margin-top: 12px; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; text-align: center; }
-.feedback-danger { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); }
-.feedback-warning { background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4); }
-.feedback-success { background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.4); }
-.feedback-info { background: rgba(30,64,175,0.2); color: var(--cch-professional-blue); border: 1px solid rgba(30,64,175,0.4); }
-.usage-display { background: var(--cch-bg-card); border: 2px solid var(--cch-professional-blue); border-radius: 12px; padding: 12px; margin-top: 12px; }
-.usage-title { color: var(--cch-text-primary); font-size: 14px; }
-.usage-details { color: #cbd5e1; font-size: 12px; }
-.calculate-button { background: linear-gradient(135deg, var(--cch-professional-blue), var(--cch-secondary-blue)); color: white; opacity: 0.4; cursor: not-allowed; font-size: 1rem; font-weight: bold; border-radius: 12px; padding: 12px; margin-top: 16px; transition: all 0.3s ease; }
-.calculate-button.ready { opacity: 1; cursor: pointer; }
-.calculate-button.ready:hover { box-shadow: 0 12px 30px rgba(33, 150, 243, 0.4); transform: translateY(-3px); } /* Adjusted to CRM accent-blue */
-.results-section { background: linear-gradient(135deg, var(--cch-dark-blue), var(--cch-bg-card)); border: 1px solid var(--cch-bg-hover); border-radius: 15px; padding: 24px; margin-top: 24px; animation: fadeIn 0.5s ease-in-out; }
-.main-result.savings { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.2)); border-color: #10b981; }
-.main-result.increase { background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.2)); border-color: #ef4444; }
-.main-result.neutral { background: linear-gradient(135deg, rgba(30,64,175,0.1), rgba(30,64,175,0.2)); border-color: var(--cch-professional-blue); }
-.result-amount.positive { color: #10b981; }
-.result-amount.negative { color: #ef4444; }
-.result-amount.neutral { color: var(--cch-text-primary); }
-.result-label { color: var(--cch-text-primary); }
-.result-description, .analysis-text { color: var(--cch-text-secondary); }
-.loading-animation { display: none; flex-direction: column; justify-content: center; align-items: center; height: 200px; text-align: center;}
-.loading-animation.show { display: flex; }
-.spinner { width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--cch-professional-blue); border-radius: 50%; animation: spin 1s linear infinite; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-.detail-field { position: relative; cursor: pointer; padding: 5px 0; }
-.detail-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(33, 150, 243, 0.8); border-radius: 8px; display: flex; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease; } /* Adjusted to CRM accent-blue */
-.detail-field:hover .detail-overlay { opacity: 1; }
-.overlay-button { background: none; border: none; color: white; padding: 8px; transition: all 0.2s ease; }
-.overlay-button:hover { background: rgba(255,255,255,0.2); border-radius: 50%; }
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-.modal.open { display: flex; }
-.modal-content { background: linear-gradient(135deg, var(--cch-dark-blue), var(--cch-bg-card)); border-radius: 15px; padding: 30px; width: 90%; max-width: 400px; border: 1px solid var(--cch-bg-hover); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; overflow: hidden; height: max-content; display: flex; flex-direction: column; }
-.modal-card-container { display: flex; width: 100%; transition: transform 0.4s cubic-bezier(0.68,-0.55,0.27,1.55); }
-.modal-card { flex-shrink: 0; opacity: 1; transition: opacity 0.4s ease; padding-right: 20px; }
-.modal-card.fading-out { opacity: 0; }
-.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.calendar-header select { background: var(--cch-bg-hover); color: var(--cch-text-primary); border-radius: 8px; padding: 4px 8px; font-size: 14px; }
-.calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 5px; text-align: center; }
-.calendar-day, .calendar-date { padding: 8px; border-radius: 8px; font-size: 14px; }
-.calendar-day { color: var(--cch-professional-blue); font-weight: 600; }
-.calendar-date { background: var(--cch-bg-hover); cursor: pointer; transition: all 0.2s ease; }
-.calendar-date:hover { background: var(--cch-professional-blue); }
-.calendar-date.selected { background: var(--cch-professional-blue); color: white; font-weight: 700; }
-.calendar-date.today { border: 2px solid var(--cch-accent-orange); }
-.date-input { width: 100%; padding: 10px; background: var(--cch-bg-hover); border: 1px solid var(--cch-border-color); border-radius: 8px; color: var(--cch-text-primary); cursor: pointer; }
+            const toggleMonthYearPicker = () => {
+                const picker = getEl('monthYearPicker');
+                const calendarGrid = getEl('calendarGrid');
+                const monthYearSpan = getEl('monthYearSpan');
 
-/* Responsive Design for Cold Calling Hub */
-@media (max-width: 1200px) {
-    /* Adjust main content and widget panel for smaller screens */
-    .main-content {
-        flex: 1; /* Allow main content to shrink */
-    }
-    .widget-panel {
-        flex: 1; /* Allow widget panel to shrink */
-    }
+                const isPickerVisible = picker.classList.contains('hidden');
 
-    /* For cold calling view, make main content full width on smaller screens */
-    .main-content-wrapper.cold-calling-active {
-        flex: 1 100%; /* Take full width */
-    }
-    .widget-panel.cold-calling-active {
-        display: none; /* Hide widget panel completely */
-    }
+                if (isPickerVisible) {
+                    picker.classList.remove('hidden');
+                    calendarGrid.classList.add('hidden');
+                    monthYearSpan.classList.add('hidden');
 
-    .calls-hub-sidebar {
-        min-width: unset;
-        flex-direction: row;
-        overflow-x: auto;
-        padding-bottom: 20px;
-        flex-wrap: nowrap;
-    }
-    .calls-hub-sidebar .sidebar-card {
-        flex-shrink: 0;
-        min-width: 300px;
-    }
-}
+                    // Populate selectors with current date
+                    const year = currentDate.getFullYear();
+                    const month = currentDate.getMonth();
+                    const monthSelector = getEl('monthSelector');
+                    const yearSelector = getEl('yearSelector');
+                    monthSelector.innerHTML = monthNames.map((name, index) => `<option value="${index}" ${index === month ? 'selected' : ''}>${name}</option>`).join('');
+                    
+                    const currentYear = new Date().getFullYear();
+                    yearSelector.innerHTML = '';
+                    for (let y = currentYear - 5; y <= currentYear + 10; y++) {
+                        yearSelector.innerHTML += `<option value="${y}" ${y === year ? 'selected' : ''}>${y}</option>`;
+                    }
 
-@media (max-width: 768px) {
-    .script-display {
-        font-size: 1rem;
-    }
-    .sidebar-card-title {
-        font-size: 1.1rem;
-    }
-    .app-content-container {
-        flex-direction: column;
-    }
-    .main-content, .widget-panel {
-        flex: none;
-        width: 100%;
-        height: auto;
-    }
-    .widget-panel {
-        border-left: none;
-        border-top: 1px solid var(--border-light);
-    }
-    .main-content-wrapper.cold-calling-active {
-        flex: none;
-        width: 100%;
-        height: auto;
-    }
-    .calls-hub-sidebar {
-        flex-direction: column; /* Stack sidebar cards vertically on very small screens */
-        padding: 0;
-    }
-    .calls-hub-sidebar .sidebar-card {
-        min-width: unset;
-        width: 100%;
-    }
-}
+                } else {
+                    picker.classList.add('hidden');
+                    calendarGrid.classList.remove('hidden');
+                    monthYearSpan.classList.remove('hidden');
+                }
+            };
+
+            const selectMonthYear = () => {
+                const month = getEl('monthSelector').value;
+                const year = getEl('yearSelector').value;
+                currentDate.setMonth(month);
+                currentDate.setFullYear(year);
+                renderCalendar();
+                toggleMonthYearPicker();
+            }
+
+            // Expose functions to the global scope so CRMApp can call them
+            window.handleDialClick = handleDialClick;
+            window.selectResponse = selectResponse;
+            window.goBack = goBack;
+            window.restart = restart;
+            window.saveProspectAndNotes = saveProspectAndNotes;
+            window.clearNotes = clearNotes;
+            window.dialpadInput = dialpadInput;
+            window.updateScript = updateScript; // Expose for CRMApp to call
+            window.validateSection1 = validateSection1; // Expose for CRMApp to call
+            window.validateSection2 = validateSection2; // Expose for CRMApp to call
+            window.runCalculation = runCalculation; // Expose for CRMApp to call
+            window.resetForm = resetForm; // Expose for CRMApp to call
+            window.openDatePicker = openDatePicker; // Expose for CRMApp to call
+            window.closeModal = closeModal; // Expose for CRMApp to call
+            window.activateSection = activateSection; // Expose for CRMApp to call
+            window.updateButton = updateButton; // Expose for CRMApp to call
+
+            // Energy Health Check Widget initialization
+            activateSection(1);
+            updateButton(); 
+            // Automatically set the datalist for suppliers
+            const datalist = getEl('supplierList');
+            supplierNames.forEach(supplier => {
+                const option = document.createElement('option');
+                option.value = supplier;
+                datalist.appendChild(option);
+            });
+        }
+    </script>
+</body>
+</html>
