@@ -470,7 +470,7 @@ html, body {
     max-height: calc(100vh - 70px);
     padding: var(--spacing-lg);
     padding-left: var(--spacing-lg); /* Match widget panel padding exactly */
-    padding-bottom: 80px; /* Match main content bottom padding */
+    padding-bottom: 0; /* REMOVED bottom padding */
     position: relative;
     box-shadow: var(--shadow-scroll);
 }
@@ -484,6 +484,18 @@ html, body {
     width: 25%;
     height: 20px;
     background: linear-gradient(to bottom, var(--dark-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
+}
+
+.calls-hub-sidebar::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 25%;
+    height: 40px;
+    background: linear-gradient(to top, var(--dark-blue), transparent);
     pointer-events: none;
     z-index: 100;
 }
@@ -508,7 +520,7 @@ html, body {
     position: relative !important;
     background: var(--darker-blue);
     padding: var(--spacing-lg);
-    padding-bottom: 80px; /* Match main content bottom padding */
+    padding-bottom: 0; /* REMOVED bottom padding */
     z-index: auto !important;
     overflow-y: auto;
     box-shadow: var(--shadow-scroll);
@@ -562,7 +574,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
-    padding-bottom: 80px; /* Increased from 60px for more bottom spacing */
+    padding-bottom: 0; /* REMOVED bottom padding */
     min-width: 0; /* Allow flex shrinking */
 }
 
@@ -596,14 +608,16 @@ html, body {
     overflow-y: auto;
     overflow-x: hidden;
     padding: var(--spacing-lg);
+    padding-bottom: 0; /* REMOVED bottom padding */
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 19px;
-    padding-bottom: 80px; /* Increased from 60px to match main content */
+    gap: var(--spacing-lg);
     min-width: 0; /* Allow flex shrinking */
+    box-shadow: var(--shadow-scroll);
 }
 
+/* Add gradient shadows for scroll-under effect */
 .widget-panel::before {
     content: '';
     position: fixed;
@@ -616,9 +630,16 @@ html, body {
     z-index: 100;
 }
 
-/* Widget panel scroll shadow */
-.widget-panel {
-    box-shadow: var(--shadow-scroll);
+.widget-panel::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 25%;
+    height: 40px;
+    background: linear-gradient(to top, var(--dark-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
 }
 
 /* Enhanced widget cards with better margins */
