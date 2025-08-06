@@ -20,9 +20,10 @@
 
 /* --- 1. CSS Variables & Global Styles --- */
 
-/* Reduce top margin above Cold Calling Script title */
+/* Fix Cold Calling Script title margin to match home page */
 .calls-hub-main h2 {
-    margin-top: 8px !important;
+    margin-top: 0 !important;
+    margin-bottom: 24px;
 }
 
 :root {
@@ -102,6 +103,7 @@ html, body {
     display: flex;
     height: calc(100vh - 70px);
     position: relative;
+    margin-top: 70px;
 }
 
 /* Special handling for call scripts view to enable scroll-under effect */
@@ -115,12 +117,6 @@ html, body {
     overflow: hidden;
     display: flex;
     height: calc(100vh - 70px); /* Full height minus header */
-}
-
-.main-content {
-    padding-top: 24px; /* Creates the margin below the header */
-    padding-left: 24px;
-    padding-right: 24px;
 }
 
 /* Card title and icon spacing */
@@ -1919,8 +1915,8 @@ html, body {
 /* Call Center Hub Specific Styles */
 /* Ensure the main view and sidebar scroll independently and have consistent padding. */
 #call-scripts-view, #cold-calling-widgets-container {
-    padding: 0 1.5rem 1.5rem 1.5rem; /* Removed top padding */
-    height: calc(100vh - 70px - 1.5rem); /* Adjust height for new padding */
+    padding: var(--spacing-lg); /* Match home page padding */
+    height: calc(100vh - 70px); /* Remove the extra height reduction */
     overflow-y: auto;
 }
 
@@ -1996,8 +1992,8 @@ html, body {
 /* Call Center Hub Specific Styles */
 /* Ensure the main view and sidebar scroll independently and have consistent padding. */
 #call-scripts-view, #cold-calling-widgets-container {
-    padding: 0 1.5rem 1.5rem 1.5rem; /* Removed top padding */
-    height: calc(100vh - 70px - 1.5rem); /* Adjust height for new padding */
+    padding: var(--spacing-lg); /* Match home page padding */
+    height: calc(100vh - 70px); /* Remove the extra height reduction */
     overflow-y: auto;
 }
 
