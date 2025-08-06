@@ -13,8 +13,6 @@
  * - Removed grey separator lines from sidebar
  * - Adjusted activity carousel navigation arrows to prevent content overlap
  * - Increased margin between Tasks and Account Details in the sidebar
- * - Added styles for Cold Calling Hub integration
- * - Implemented dynamic layout for Cold Calling Script view to expand main content and swap widgets
  */
 
 /* --- 1. CSS Variables & Global Styles --- */
@@ -36,20 +34,6 @@
     --spacing-lg: 32px;
     --widget-bg: #1f1f1f;
     --widget-border: #333333;
-
-    /* Cold Calling Hub specific variables, adapted to CRM theme */
-    --cch-primary-blue: #1a237e; /* Matches CRM primary-blue */
-    --cch-secondary-blue: #2196f3; /* Matches CRM accent-blue */
-    --cch-dark-blue: #0d1421; /* Matches CRM dark-blue */
-    --cch-darker-blue: #0a0f1a; /* Matches CRM darker-blue */
-    --cch-header-blue: #1a237e; /* Matches CRM header-blue */
-    --cch-professional-blue: #2196f3; /* Matches CRM accent-blue */
-    --cch-text-primary: #ffffff; /* Matches CRM text-primary */
-    --cch-text-secondary: #b0b0b0; /* Matches CRM text-secondary */
-    --cch-accent-orange: #f59e0b; /* Existing orange from cold-calling-hub */
-    --cch-bg-card: #1a1a1a; /* Matches CRM bg-card */
-    --cch-bg-hover: #242424; /* Matches CRM bg-hover */
-    --cch-border-color: #2a2a2a; /* Matches CRM border-light */
 }
 
 * {
@@ -102,35 +86,6 @@ html, body {
     flex: 1;
     overflow: hidden;
     display: flex;
-}
-
-/* Card title and icon spacing */
-.card-title {
-    position: relative;
-    padding-left: 14px; /* Increased from 12px for additional right shift */
-}
-
-.card-title svg {
-    margin-right: 12px;
-    position: relative;
-    left: 0; /* Reset left position */
-}
-
-/* Navigation buttons and arrow centering */
-.activity-navigation {
-    display: flex;
-    gap: 8px;
-}
-
-.nav-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.nav-btn svg {
-    position: relative;
-    left: 1px; /* Adjust this value to center the arrow in the button */
 }
 
 /* --- 3. Header Styles (Fixed) --- */
@@ -204,9 +159,9 @@ html, body {
 
 .search-bar input:focus {
     outline: none;
-    border-color: var(--primary-blue); /* Changed from accent-blue to primary-blue */
+    border-color: var(--accent-blue);
     background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 2px rgba(26, 35, 126, 0.3); /* Updated to match primary-blue */
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
 .search-icon {
@@ -303,8 +258,6 @@ html, body {
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* Align content to top */
-    padding-top: 20px; /* Add padding to top */
 }
 
 .app-sidebar:hover {
@@ -326,19 +279,23 @@ html, body {
 .nav-section {
     display: flex;
     flex-direction: column;
-    gap: 6px; /* Slightly increased gap for better spacing */
+    gap: 4px;
     width: 100%;
 }
 
-/* Navigation section spacing */
-.nav-section {
-    margin-bottom: 20px; /* Reduced from 30px for better balance */
+/* First section - reduced margin after accounts */
+.nav-section:first-child {
+    margin-bottom: 20px; /* Reduced from 30px to 20px */
 }
 
-/* Account Details and Settings section - adjusted spacing */
+/* Second section - normal spacing */
+.nav-section:nth-child(2) {
+    margin-bottom: 30px; /* Increased margin after tasks as requested */
+}
+
+/* Last section */
 .nav-section:last-child {
-    margin-top: 10px; /* Pull up the last section */
-    margin-bottom: 0;
+    /* No additional margin needed - container padding handles bottom space */
 }
 
 /* REMOVED: .nav-separator styles completely */
@@ -347,17 +304,15 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    height: 52px; /* Slightly increased height */
+    height: 50px;
     margin: 0 8px;
-    padding: 0 16px; /* Increased padding for better spacing */
+    padding: 0 12px;
     color: var(--text-secondary);
     text-decoration: none;
     border-radius: 8px;
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
-    font-size: 1.05rem; /* Increased font size */
-    font-weight: 500; /* Slightly bolder text */
 }
 
 .app-sidebar:not(:hover) .nav-item {
@@ -409,8 +364,8 @@ html, body {
 }
 
 .nav-item svg {
-    width: 22px; /* Slightly larger icons */
-    height: 22px; /* Slightly larger icons */
+    width: 20px;
+    height: 20px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -460,10 +415,10 @@ html, body {
     overflow-x: hidden;
     padding: var(--spacing-lg);
     position: relative;
-    display: flex; /* Changed to flex to allow internal column layout */
+    display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
-    padding-bottom: 80px; /* Increased from 60px for more bottom spacing */
+    padding-bottom: 60px;
     min-width: 0; /* Allow flex shrinking */
 }
 
@@ -501,7 +456,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 19px;
-    padding-bottom: 80px; /* Increased from 60px to match main content */
+    padding-bottom: 60px;
     min-width: 0; /* Allow flex shrinking */
 }
 
@@ -541,19 +496,23 @@ html, body {
 
 /* --- 7. Page Views --- */
 .page-view {
-    display: none; /* All page views are hidden by default */
+    display: none;
     width: 100%;
-    height: 100%; /* Ensure views take full height of their container */
-    flex-direction: column; /* Default to column for dashboard items */
-    gap: var(--spacing-lg); /* Apply general spacing */
+    height: 100%;
 }
 
 .page-view.active {
-    display: flex; /* Active views are displayed as flex */
+    display: block;
 }
 
 #dashboard-view {
-    /* This view is explicitly set to flex by CRMApp.showView */
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px; /* Reduced gap for tighter, more even spacing */
+}
+
+#dashboard-view.active {
+    display: flex !important;
 }
 
 /* --- 8. Dashboard Components (FIXED STAT CARDS) --- */
@@ -810,7 +769,6 @@ html, body {
     justify-content: center;
     position: relative;
     top: 0;
-    padding-left: 3px; /* Increased from 2px for additional right shift */
     left: 0;
     z-index: 10;
 }
@@ -902,16 +860,10 @@ html, body {
 
 /* No Items State - Better centered for widgets */
 .no-items {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     text-align: center;
     color: var(--text-muted);
     font-style: italic;
-    padding: 32px;
-    width: 100%;
-    box-sizing: border-box;
+    padding: 32px 20px; /* Added horizontal padding for better centering */
     background: rgba(255, 255, 255, 0.02);
     border: 1px dashed var(--border-light);
     border-radius: 8px;
@@ -1195,65 +1147,89 @@ html, body {
 
 /* --- 12. Responsive Design --- */
 @media (max-width: 1200px) {
-    /* Adjust main content and widget panel for smaller screens */
     .main-content {
-        flex: 1; /* Allow main content to shrink */
+        flex: 2;
     }
     .widget-panel {
-        flex: 1; /* Allow widget panel to shrink */
+        flex: 1;
     }
+    
+    /* Ensure stat cards stay in one row even on smaller screens */
+    .stat-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+    }
+    
+    .stat-card {
+        padding: 20px 16px;
+    }
+    
+    .stat-value {
+        font-size: 1.8rem;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+    }
+}
 
-    /* For cold calling view, make main content full width on smaller screens */
-    .main-content-wrapper.cold-calling-active {
-        flex: 1 100%; /* Take full width */
-    }
-    .widget-panel.cold-calling-active {
-        display: none; /* Hide widget panel completely */
-    }
-
-    .calls-hub-sidebar {
-        min-width: unset;
-        flex-direction: row;
-        overflow-x: auto;
-        padding-bottom: 20px;
-        flex-wrap: nowrap;
-    }
-    .calls-hub-sidebar .sidebar-card {
-        flex-shrink: 0;
-        min-width: 300px;
+@media (max-width: 968px) {
+    /* Only on very small screens allow stat cards to wrap */
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
     }
 }
 
 @media (max-width: 768px) {
-    .script-display {
-        font-size: 1rem;
+    .app-header {
+        padding: 0 16px;
     }
-    .sidebar-card-title {
-        font-size: 1.1rem;
+    
+    .header-center {
+        margin: 0 16px;
     }
+    
+    .app-sidebar {
+        width: 50px;
+    }
+    
+    .app-sidebar:hover {
+        width: 200px;
+    }
+    
+    .main-content {
+        padding: 20px 16px 0 16px;
+    }
+    
+    .widget-panel {
+        padding: 20px 16px 0 16px;
+    }
+    
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+}
+
+@media (max-width: 480px) {
     .app-content-container {
         flex-direction: column;
     }
-    .main-content, .widget-panel {
+    
+    .main-content {
         flex: none;
-        width: 100%;
-        height: auto;
+        height: 60%;
     }
+    
     .widget-panel {
+        flex: none;
+        height: 40%;
         border-left: none;
         border-top: 1px solid var(--border-light);
     }
-    .main-content-wrapper.cold-calling-active {
-        flex: none;
-        width: 100%;
-        height: auto;
-    }
-    .calls-hub-sidebar {
-        flex-direction: column; /* Stack sidebar cards vertically on very small screens */
-        padding: 0;
-    }
-    .calls-hub-sidebar .sidebar-card {
-        min-width: unset;
-        width: 100%;
+    
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
