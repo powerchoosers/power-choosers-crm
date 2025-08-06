@@ -99,6 +99,12 @@ html, body {
     margin-top: 70px;
 }
 
+/* Special handling for call scripts view to enable scroll-under effect */
+#call-scripts-view .app-main {
+    margin-top: 0;
+    height: 100vh;
+}
+
 .app-content-container {
     flex: 1;
     overflow: hidden;
@@ -474,6 +480,12 @@ html, body {
     position: relative;
 }
 
+/* Add proper margins for call scripts view */
+#call-scripts-view .calls-hub-sidebar {
+    max-height: 100vh;
+    padding: calc(70px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+}
+
 .calls-hub-sidebar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -548,6 +560,12 @@ html, body {
     z-index: auto !important;
     overflow-y: auto;
     box-shadow: var(--shadow-scroll);
+}
+
+/* Add proper margins for call scripts view */
+#call-scripts-view .calls-hub-main {
+    height: 100vh;
+    padding: calc(70px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
 }
 
 .calls-hub-main > *:first-child {
@@ -1855,10 +1873,4 @@ html, body {
     .sidebar-card-title {
         font-size: 1.1rem;
     }
-}
-
-#call-scripts-view .calls-hub-main,
-#call-scripts-view .calls-hub-sidebar {
-    padding-top: var(--spacing-lg);
-    padding-bottom: var(--spacing-lg);
 }
