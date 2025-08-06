@@ -4,16 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Choosers CRM Dashboard</title>
-    <!-- Link to your main CRM stylesheet -->
-    <link rel="stylesheet" href="crm-styles.css">
-    <!-- Tailwind CSS CDN (if not already part of crm-styles.css or main index.html) -->
-    <!-- Assuming crm-styles.css handles all styling including Tailwind imports/directives -->
+    
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <!-- Tone.js for sound effects in Cold Calling Hub -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    
+    <!-- Main CRM Styles -->
+    <link rel="stylesheet" href="crm-styles.css">
 </head>
 <body>
     <div class="app-wrapper">
+        <!-- Fixed Header -->
         <header class="app-header">
             <div class="header-left">
                 <div class="app-logo">
@@ -21,6 +24,7 @@
                 </div>
                 <h1 class="app-title">CRM Dashboard</h1>
             </div>
+            
             <div class="header-center">
                 <div class="search-bar">
                     <input type="text" id="global-search" placeholder="Search accounts, contacts, or anything...">
@@ -32,8 +36,9 @@
                     </button>
                 </div>
             </div>
+            
             <div class="header-right">
-                <!-- Call Scripts button will open the new call scripts view -->
+                <!-- Call Scripts Button -->
                 <button class="icon-button" id="call-scripts-btn" title="Call Scripts">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -44,6 +49,7 @@
                     </svg>
                 </button>
                 
+                <!-- Notifications Button -->
                 <button class="icon-button" id="notification-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -52,15 +58,19 @@
                     <span class="notification-badge" id="notification-badge">0</span>
                 </button>
                 
+                <!-- User Profile -->
                 <div class="user-profile">
                     <div class="profile-avatar" id="profile-avatar">LC</div>
                 </div>
             </div>
         </header>
 
+        <!-- Main Application -->
         <main class="app-main">
+            <!-- Expandable Left Sidebar -->
             <aside class="app-sidebar">
                 <nav class="sidebar-nav">
+                    <!-- Main Navigation -->
                     <div class="nav-section">
                         <a href="#" class="nav-item active" data-view="dashboard-view">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -95,6 +105,7 @@
                         </a>
                     </div>
 
+                    <!-- Communication Section -->
                     <div class="nav-section">
                         <a href="#" class="nav-item" data-view="calls-view">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -120,6 +131,7 @@
                         </a>
                     </div>
                     
+                    <!-- Additional Section -->
                     <div class="nav-section">
                         <a href="#" class="nav-item" data-view="account-details-view">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -131,7 +143,7 @@
                         <a href="#" class="nav-item" data-view="settings-view">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="3"></circle>
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                             </svg>
                             <span>Settings</span>
                         </a>
@@ -139,9 +151,13 @@
                 </nav>
             </aside>
 
+            <!-- Main Content Container -->
             <div class="app-content-container">
+                <!-- Main Content Area -->
                 <div class="main-content">
+                    <!-- Dashboard View -->
                     <div id="dashboard-view" class="page-view" style="display: flex;">
+                        <!-- Statistics Cards -->
                         <section class="stat-cards-grid">
                             <div class="stat-card">
                                 <h2 class="stat-value" id="total-accounts-value">0</h2>
@@ -161,6 +177,7 @@
                             </div>
                         </section>
 
+                        <!-- Market Trends Card -->
                         <section class="dashboard-card">
                             <h3 class="card-title">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -173,15 +190,15 @@
                             <div class="market-pricing-grid">
                                 <div class="pricing-card">
                                     <p class="pricing-label">Historical Avg</p>
-                                    <p class="pricing-value">8.2垄</p>
+                                    <p class="pricing-value">8.2¢</p>
                                 </div>
                                 <div class="pricing-card">
                                     <p class="pricing-label">Current Avg</p>
-                                    <p class="pricing-value">13.1垄</p>
+                                    <p class="pricing-value">13.1¢</p>
                                 </div>
                                 <div class="pricing-card">
                                     <p class="pricing-label">Projected 2026</p>
-                                    <p class="pricing-value">16.8垄</p>
+                                    <p class="pricing-value">16.8¢</p>
                                 </div>
                             </div>
                             <div class="market-insights">
@@ -189,6 +206,7 @@
                             </div>
                         </section>
 
+                        <!-- Recent Activities Card -->
                         <section class="dashboard-card">
                             <h3 class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
                                 <span style="display: flex; align-items: center;">
@@ -198,7 +216,7 @@
                                     </svg>
                                     Recent Activities
                                 </span>
-                                <div class="activity-navigation" style="position: relative; top: auto; right: auto; transform: translateY(0); width: auto; padding: 0; display: flex; justify-content: flex-end;">
+                                <div class="activity-navigation">
                                     <button class="nav-btn" id="activity-prev-btn">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <polyline points="15 18 9 12 15 6"></polyline>
@@ -217,20 +235,51 @@
                         </section>
                     </div>
 
-                    <div id="contacts-view" class="page-view" style="display: none;"></div>
-                    <div id="accounts-view" class="page-view" style="display: none;"></div>
-                    <div id="calls-view" class="page-view" style="display: none;"></div>
-                    <div id="emails-view" class="page-view" style="display: none;"></div>
-                    <div id="tasks-view" class="page-view" style="display: none;"></div>
-                    <div id="account-details-view" class="page-view" style="display: none;"></div>
-                    <div id="settings-view" class="page-view" style="display: none;"></div>
-                    <!-- New view for the Call Scripts content -->
+                    <!-- Other Views (Empty for now) -->
+                    <div id="contacts-view" class="page-view" style="display: none;">
+                        <h2>Contacts View</h2>
+                        <p>Contact management functionality will be implemented here.</p>
+                    </div>
+                    
+                    <div id="accounts-view" class="page-view" style="display: none;">
+                        <h2>Accounts View</h2>
+                        <p>Account management functionality will be implemented here.</p>
+                    </div>
+                    
+                    <div id="calls-view" class="page-view" style="display: none;">
+                        <h2>Calls View</h2>
+                        <p>Call history and management functionality will be implemented here.</p>
+                    </div>
+                    
+                    <div id="emails-view" class="page-view" style="display: none;">
+                        <h2>Emails View</h2>
+                        <p>Email management functionality will be implemented here.</p>
+                    </div>
+                    
+                    <div id="tasks-view" class="page-view" style="display: none;">
+                        <h2>Tasks View</h2>
+                        <p>Task management functionality will be implemented here.</p>
+                    </div>
+                    
+                    <div id="account-details-view" class="page-view" style="display: none;">
+                        <h2>Account Details View</h2>
+                        <p>Detailed account information will be displayed here.</p>
+                    </div>
+                    
+                    <div id="settings-view" class="page-view" style="display: none;">
+                        <h2>Settings View</h2>
+                        <p>Application settings and configuration options will be implemented here.</p>
+                    </div>
+
+                    <!-- Call Scripts View (Integrated Cold Calling Hub) -->
                     <div id="call-scripts-view" class="page-view" style="display: none;">
-                        <!-- Content will be loaded here dynamically -->
+                        <!-- Content will be dynamically loaded by the JavaScript -->
                     </div>
                 </div>
 
-                <aside class="widget-panel" style="gap: 19px;">
+                <!-- Right Widget Panel -->
+                <aside class="widget-panel">
+                    <!-- Quick Actions Widget -->
                     <section class="widget-card">
                         <h3 class="card-title">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -270,6 +319,7 @@
                         </div>
                     </section>
 
+                    <!-- Today's Tasks Widget -->
                     <section class="widget-card">
                         <h3 class="card-title">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -284,6 +334,7 @@
                         <ul class="tasks-list" id="tasks-list"></ul>
                     </section>
 
+                    <!-- Energy News Widget -->
                     <section class="widget-card">
                         <h3 class="card-title">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -300,6 +351,7 @@
             </div>
         </main>
 
+        <!-- Modal: Add Account -->
         <div id="add-account-modal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
@@ -335,6 +387,7 @@
             </div>
         </div>
 
+        <!-- Modal: Add Contact -->
         <div id="add-contact-modal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
@@ -376,6 +429,7 @@
             </div>
         </div>
         
+        <!-- Modal: Bulk Import -->
         <div id="bulk-import-modal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
@@ -402,6 +456,7 @@
             </div>
         </div>
 
+        <!-- Notification Dropdown -->
         <div class="notification-dropdown" id="notification-dropdown">
             <div class="notification-header">
                 <h3 class="notification-title">Notifications</h3>
@@ -411,16 +466,17 @@
         </div>
     </div>
 
+    <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Firebase App (required for Firestore) -->
+    <!-- Firebase Scripts -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-    <!-- Firebase Firestore (required for database operations) -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
     
-    <!-- Your Firebase configuration file -->
+    <!-- Firebase Configuration -->
     <script src="firebase-config.js"></script>
-    <!-- Your main CRM application logic -->
+    
+    <!-- Main CRM Application Logic -->
     <script src="crm-app.js"></script>
 </body>
 </html>
