@@ -452,7 +452,32 @@ html, body {
     right: 12px;
 }
 
-/* --- 5. Main Content Area (3/4 width) - FIXED STAT CARDS --- */
+/* --- 5. Widget Container Management --- */
+.crm-widgets-container {
+    display: flex;
+    flex-direction: column;
+    gap: 19px;
+    width: 100%;
+}
+
+.calls-hub-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 19px;
+    width: 100%;
+    overflow-y: auto;
+    max-height: calc(100vh - 70px);
+}
+
+/* Call Scripts Layout Main Content */
+.call-scripts-layout-main {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+/* --- 6. Main Content Area (3/4 width) - FIXED STAT CARDS --- */
 .main-content {
     flex: 3;
     overflow-y: auto;

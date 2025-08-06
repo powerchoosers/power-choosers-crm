@@ -205,13 +205,39 @@ const CRMApp = {
     // Show/hide views in the single-page application
     showView(viewName) {
         this.currentView = viewName;
+        
+        // Hide all main content views
         document.querySelectorAll('.page-view').forEach(view => {
             view.style.display = 'none';
         });
+        
+        // Hide both widget containers
+        const crmWidgetsContainer = document.getElementById('crm-widgets-container');
+        const coldCallingWidgetsContainer = document.getElementById('cold-calling-widgets-container');
+        const mainContentWrapper = document.getElementById('main-content-wrapper');
+        const widgetPanel = document.getElementById('widget-panel');
+        
+        if (crmWidgetsContainer) crmWidgetsContainer.style.display = 'none';
+        if (coldCallingWidgetsContainer) coldCallingWidgetsContainer.style.display = 'none';
+        
+        // Reset flex properties to default dashboard ratios
+        if (mainContentWrapper) mainContentWrapper.style.flex = '3';
+        if (widgetPanel) widgetPanel.style.flex = '1';
+        
+        // Show the requested view
         const activeView = document.getElementById(viewName);
         if (activeView) {
-            // Use 'flex' for call-scripts-view to ensure its internal grid layout works
-            activeView.style.display = (viewName === 'call-scripts-view') ? 'flex' : 'block';
+            if (viewName === 'call-scripts-view') {
+                // Call Scripts View - Special Layout
+                activeView.style.display = 'flex';
+                if (coldCallingWidgetsContainer) coldCallingWidgetsContainer.style.display = 'flex';
+                // Make the main content area wider for call scripts
+                if (mainContentWrapper) mainContentWrapper.style.flex = '4';
+            } else {
+                // All other CRM views - Standard Layout
+                activeView.style.display = (viewName === 'dashboard-view') ? 'flex' : 'block';
+                if (crmWidgetsContainer) crmWidgetsContainer.style.display = 'flex';
+            }
         }
         
         if (viewName === 'dashboard-view') {
@@ -511,6 +537,8 @@ const CRMApp = {
     // Function to load and display the Call Scripts view
     async showCallScriptsView() {
         const callScriptsView = document.getElementById('call-scripts-view');
+        const coldCallingWidgetsContainer = document.getElementById('cold-calling-widgets-container');
+        
         if (!callScriptsView) {
             console.error('Call scripts view element not found.');
             this.showToast('Call scripts view not available.', 'error');
@@ -525,11 +553,25 @@ const CRMApp = {
             // Fetch the content of call-scripts-content.html
             const response = await fetch('call-scripts-content.html');
             if (!response.ok) {
-                console.error(`Failed to fetch call-scripts-content.html: ${response.status} ${response.statusText}`);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const htmlContent = await response.text();
-            callScriptsView.innerHTML = htmlContent;
+            
+            // Parse the HTML to separate main content from sidebar widgets
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+            
+            // Extract main call scripts content (everything except the sidebar)
+            const mainContent = doc.querySelector('.calls-hub-main');
+            if (mainContent) {
+                callScriptsView.innerHTML = mainContent.outerHTML;
+            }
+            
+            // Extract sidebar widgets and inject into the cold calling widgets container
+            const sidebarContent = doc.querySelector('.calls-hub-sidebar');
+            if (sidebarContent && coldCallingWidgetsContainer) {
+                coldCallingWidgetsContainer.innerHTML = sidebarContent.innerHTML;
+            }
 
             // Initialize call scripts functionality
             this.initializeCallScripts();
