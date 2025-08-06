@@ -497,12 +497,20 @@ html, body {
     overflow-y: auto;
     height: calc(100vh - 70px);
     margin-top: 70px;
+    margin-right: 32px; /* Move sidebar away from right edge */
     padding: var(--spacing-lg);
     background: var(--darker-blue);
     position: relative;
     z-index: 900;
     box-shadow: -2px 0 10px rgba(0,0,0,0.2);
 }
+
+/* Remove the gradient overlays for the sidebar */
+.calls-hub-sidebar::before,
+.calls-hub-sidebar::after {
+    display: none !important;
+}
+
 
 /* Add proper margins for call scripts view */
 #call-scripts-view .calls-hub-sidebar {
