@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { db } from '../firebase';
+import { db } from './firebase';
 // import { collection, getDocs, query, where } from 'firebase/firestore';
 // For now, we'll mock the data and logic
 

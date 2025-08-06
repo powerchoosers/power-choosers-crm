@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import EnergyHealthCheck from '../widgets/EnergyHealthCheck';
-import NotesWidget from '../widgets/NotesWidget';
+import { db } from './firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import EnergyHealthCheck from './EnergyHealthCheck';
+import NotesWidget from './NotesWidget';
 
 const FIELDS = [
   { key: 'firstName', label: 'First Name' },
