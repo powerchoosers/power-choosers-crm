@@ -237,15 +237,15 @@ const CRMApp = {
             activeView.style.visibility = 'visible';
             
             if (viewName === 'call-scripts-view') {
-                // Call Scripts View - Special Layout
+                // Call Scripts View - Use same layout as dashboard
                 console.log('Activating call scripts view');
                 activeView.style.display = 'flex';
                 if (coldCallingWidgetsContainer) {
                     coldCallingWidgetsContainer.style.display = 'flex';
                     console.log('Showing cold calling widgets');
                 }
-                // Make the main content area wider for call scripts
-                if (mainContentWrapper) mainContentWrapper.style.flex = '4';
+                // Keep the same flex ratio as dashboard for consistent layout
+                if (mainContentWrapper) mainContentWrapper.style.flex = '3';
             } else {
                 // All other CRM views - Standard Layout
                 console.log('Activating standard CRM view');
