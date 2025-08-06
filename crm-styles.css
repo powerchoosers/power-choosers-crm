@@ -469,7 +469,7 @@ html, body {
     overflow-y: auto;
     max-height: calc(100vh - 70px);
     padding: var(--spacing-lg);
-    padding-left: 0; /* Remove left padding to align with home screen */
+    padding-left: var(--spacing-lg); /* Match widget panel padding exactly */
     padding-bottom: 80px; /* Match main content bottom padding */
     position: relative;
     box-shadow: var(--shadow-scroll);
