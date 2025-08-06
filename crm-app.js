@@ -519,34 +519,22 @@ const CRMApp = {
 
         // Ensure the call scripts view is visible and other views are hidden
         this.showView('call-scripts-view'); 
-        // Update the active navigation button to reflect the current view (if applicable)
-        // Since Call Scripts is a button in the header, we might want to keep 'Dashboard' active
-        // or add a dedicated 'Call Scripts' nav item if it's a primary view.
-        // For now, let's keep the Dashboard nav item active.
         this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
-
 
         try {
             // Fetch the content of call-scripts-content.html
             const response = await fetch('call-scripts-content.html');
             if (!response.ok) {
-                // Log the full response to help debug network issues
                 console.error(`Failed to fetch call-scripts-content.html: ${response.status} ${response.statusText}`);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const htmlContent = await response.text();
             callScriptsView.innerHTML = htmlContent;
 
-            // Initialize the script within the loaded content
-            // The script in call-scripts-content.html is wrapped in initializeCallScriptsPage()
-            if (typeof window.initializeCallScriptsPage === 'function') {
-                window.initializeCallScriptsPage();
-                this.autoPopulateCallScripts();
-                console.log('Call scripts content loaded and initialized.');
-            } else {
-                console.error('initializeCallScriptsPage function not found in loaded script.');
-                this.showToast('Failed to initialize call scripts functionality.', 'error');
-            }
+            // Initialize call scripts functionality
+            this.initializeCallScripts();
+            this.autoPopulateCallScripts();
+            console.log('Call scripts content loaded and initialized.');
         } catch (error) {
             console.error('Error loading call scripts content:', error);
             this.showToast('Failed to load call scripts. Please check the file path or network.', 'error');
@@ -616,6 +604,186 @@ const CRMApp = {
             window.validateSection2(); // Re-validate section 2
             window.runCalculation();
         }
+    },
+
+    // Initialize call scripts functionality
+    initializeCallScripts() {
+        // Make call script functions globally available
+        window.handleDialClick = this.handleDialClick.bind(this);
+        window.selectResponse = this.selectResponse.bind(this);
+        window.goBack = this.goBack.bind(this);
+        window.restart = this.restart.bind(this);
+        window.saveProspectAndNotes = this.saveProspectAndNotes.bind(this);
+        window.clearNotes = this.clearNotes.bind(this);
+        window.updateScript = this.updateScript.bind(this);
+        
+        // Initialize call script state
+        this.callScriptState = {
+            currentStep: 'start',
+            history: [],
+            currentDisposition: ''
+        };
+        
+        // Initialize the script display
+        this.updateScript();
+    },
+
+    // Handle dial button click
+    handleDialClick() {
+        const phoneInput = document.getElementById('input-phone');
+        if (!phoneInput || !phoneInput.value.trim()) {
+            this.showToast('Please enter a phone number to dial.', 'error');
+            return;
+        }
+        
+        const scriptDisplay = document.getElementById('script-display');
+        const responsesContainer = document.getElementById('responses-container');
+        
+        if (scriptDisplay && responsesContainer) {
+            scriptDisplay.innerHTML = 'Dialing... Ringing...';
+            scriptDisplay.className = 'script-display mood-neutral ringing';
+            
+            // Simulate dialing delay
+            setTimeout(() => {
+                scriptDisplay.classList.remove('ringing');
+                responsesContainer.innerHTML = `
+                    <button class="response-btn" onclick="selectResponse('connected')">📞 Call Connected</button>
+                    <button class="response-btn" onclick="selectResponse('voicemail')">📧 Voicemail</button>
+                    <button class="response-btn" onclick="selectResponse('no-answer')">🚫 No Answer</button>
+                `;
+            }, 2000);
+        }
+    },
+
+    // Handle response selection
+    selectResponse(response) {
+        const scriptDisplay = document.getElementById('script-display');
+        const responsesContainer = document.getElementById('responses-container');
+        
+        if (!scriptDisplay || !responsesContainer) return;
+        
+        switch(response) {
+            case 'connected':
+                scriptDisplay.innerHTML = 'Great! You\'re connected. Begin your script...';
+                responsesContainer.innerHTML = `
+                    <button class="response-btn" onclick="selectResponse('interested')">✅ Interested</button>
+                    <button class="response-btn" onclick="selectResponse('not-interested')">❌ Not Interested</button>
+                    <button class="response-btn" onclick="selectResponse('callback')">📞 Callback</button>
+                `;
+                break;
+            case 'voicemail':
+                scriptDisplay.innerHTML = 'Leave a professional voicemail message.';
+                this.callScriptState.currentDisposition = 'Left Voicemail';
+                responsesContainer.innerHTML = `
+                    <button class="response-btn" onclick="saveProspectAndNotes()">💾 Save & End Call</button>
+                `;
+                break;
+            case 'no-answer':
+                scriptDisplay.innerHTML = 'No answer. Try again later.';
+                this.callScriptState.currentDisposition = 'No Answer';
+                responsesContainer.innerHTML = `
+                    <button class="response-btn" onclick="saveProspectAndNotes()">💾 Save & End Call</button>
+                `;
+                break;
+            case 'interested':
+                scriptDisplay.innerHTML = 'Excellent! Schedule a follow-up meeting.';
+                this.callScriptState.currentDisposition = 'Interested - Meeting Scheduled';
+                responsesContainer.innerHTML = `
+                    <button class="response-btn" onclick="saveProspectAndNotes()">📅 Schedule Meeting</button>
+                `;
+                break;
+            case 'not-interested':
+                scriptDisplay.innerHTML = 'Thank them for their time and end professionally.';
+                this.callScriptState.currentDisposition = 'Not Interested';
+                responsesContainer.innerHTML = `
+                    <button class="response-btn" onclick="saveProspectAndNotes()">💾 Save & End Call</button>
+                `;
+                break;
+            case 'callback':
+                scriptDisplay.innerHTML = 'Schedule a callback time.';
+                this.callScriptState.currentDisposition = 'Callback Scheduled';
+                responsesContainer.innerHTML = `
+                    <button class="response-btn" onclick="saveProspectAndNotes()">📞 Schedule Callback</button>
+                `;
+                break;
+        }
+    },
+
+    // Go back in call script
+    goBack() {
+        // Simple implementation - restart the call
+        this.restart();
+    },
+
+    // Restart call script
+    restart() {
+        const scriptDisplay = document.getElementById('script-display');
+        const responsesContainer = document.getElementById('responses-container');
+        
+        if (scriptDisplay && responsesContainer) {
+            scriptDisplay.innerHTML = 'Click \'Dial\' to begin the call';
+            scriptDisplay.className = 'script-display start';
+            responsesContainer.innerHTML = `
+                <button class="dial-button" onclick="handleDialClick()">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                    Dial
+                </button>
+            `;
+        }
+        
+        // Reset state
+        this.callScriptState = {
+            currentStep: 'start',
+            history: [],
+            currentDisposition: ''
+        };
+    },
+
+    // Save prospect and notes
+    saveProspectAndNotes() {
+        const companyName = document.getElementById('input-company-name')?.value || '';
+        const contactName = document.getElementById('input-name')?.value || '';
+        const contactTitle = document.getElementById('input-title')?.value || '';
+        const phoneNumber = document.getElementById('input-phone')?.value || '';
+        const notes = document.getElementById('call-notes')?.value || '';
+        const disposition = this.callScriptState.currentDisposition || 'Call Completed';
+        
+        if (!companyName && !contactName) {
+            this.showToast('Please fill in at least Company Name or Contact Name before saving.', 'error');
+            return;
+        }
+        
+        const callLogData = {
+            companyName,
+            contactName,
+            contactTitle,
+            phoneNumber,
+            notes,
+            outcome: disposition,
+            timestamp: new Date().toISOString()
+        };
+        
+        this.saveCallLog(callLogData, disposition);
+        this.restart(); // Reset for next call
+    },
+
+    // Clear notes
+    clearNotes() {
+        const notesTextarea = document.getElementById('call-notes');
+        if (notesTextarea) {
+            if (confirm('Are you sure you want to clear all notes?')) {
+                notesTextarea.value = '';
+            }
+        }
+    },
+
+    // Update script display
+    updateScript() {
+        // This function can be used to update dynamic content in the script
+        // For now, it's a placeholder that can be extended as needed
+        console.log('Script updated');
     },
 
     // Save call log to Firebase and update notifications
