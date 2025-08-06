@@ -14,6 +14,8 @@
  * - Adjusted activity carousel navigation arrows to prevent content overlap
  * - Increased margin between Tasks and Account Details in the sidebar
  * - Added styles for Cold Calling Hub integration
+ * - Adjusted margins for cold calling script and right-side widgets
+ * - Toned down blue color in the Energy Health Check section
  */
 
 /* --- 1. CSS Variables & Global Styles --- */
@@ -42,7 +44,7 @@
     --cch-dark-blue: #0d1421; /* Matches CRM dark-blue */
     --cch-darker-blue: #0a0f1a; /* Matches CRM darker-blue */
     --cch-header-blue: #1a237e; /* Matches CRM header-blue */
-    --cch-professional-blue: #2196f3; /* Matches CRM accent-blue */
+    --cch-professional-blue: #4a5568; /* Muted blue, was #2196f3 */
     --cch-text-primary: #ffffff; /* Matches CRM text-primary */
     --cch-text-secondary: #b0b0b0; /* Matches CRM text-secondary */
     --cch-accent-orange: #f59e0b; /* Existing orange from cold-calling-hub */
@@ -468,9 +470,8 @@ html, body {
     width: 100%;
     overflow-y: auto;
     max-height: calc(100vh - 70px);
-    padding: 0 var(--spacing-lg); /* Vertical padding removed */
+    padding: var(--spacing-lg); /* Consistent padding */
     position: relative;
-    box-shadow: var(--shadow-scroll);
 }
 
 .calls-hub-sidebar > *:first-child {
@@ -525,7 +526,7 @@ html, body {
     flex-direction: column;
     position: relative !important;
     background: var(--darker-blue);
-    padding: 0 var(--spacing-lg); /* Vertical padding removed */
+    padding: var(--spacing-lg); /* Consistent padding */
     z-index: auto !important;
     overflow-y: auto;
     box-shadow: var(--shadow-scroll);
