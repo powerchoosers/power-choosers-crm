@@ -1,7 +1,6 @@
 // Power Choosers CRM Dashboard - Main JavaScript File (UPDATED)
 // This file contains the complete application logic for the redesigned Power Choosers CRM.
-// Updated with white SVG activity icons for better theme consistency
-// Added Call Scripts button functionality
+// Updated with Call Scripts integration and bug fixes
 
 // --- 1. Firebase Configuration & Initialization ---
 const firebaseConfig = {
@@ -27,6 +26,7 @@ const CRMApp = {
     activities: [],
     tasks: [],
     notifications: [],
+    callLogs: [],
     currentView: 'dashboard-view',
     currentContact: null,
     currentAccount: null,
@@ -52,10 +52,11 @@ const CRMApp = {
     // Load initial data from Firestore
     async loadInitialData() {
         try {
-            const [accountsSnapshot, contactsSnapshot, activitiesSnapshot] = await Promise.all([
+            const [accountsSnapshot, contactsSnapshot, activitiesSnapshot, callLogsSnapshot] = await Promise.all([
                 db.collection('accounts').get(),
                 db.collection('contacts').get(),
-                db.collection('activities').orderBy('createdAt', 'desc').limit(50).get()
+                db.collection('activities').orderBy('createdAt', 'desc').limit(50).get(),
+                db.collection('call_logs').orderBy('timestamp', 'desc').limit(50).get()
             ]);
             
             this.accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -65,11 +66,17 @@ const CRMApp = {
                 ...doc.data(), 
                 createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date() 
             }));
+            this.callLogs = callLogsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                timestamp: doc.data().timestamp ? doc.data().timestamp.toDate() : new Date()
+            }));
             
             console.log('Initial data loaded:', {
                 accounts: this.accounts.length,
                 contacts: this.contacts.length,
-                activities: this.activities.length
+                activities: this.activities.length,
+                callLogs: this.callLogs.length
             });
             
             return true;
@@ -108,6 +115,7 @@ const CRMApp = {
             { id: 't2', title: 'Prepare energy analysis for Sarah Johnson', time: '3:30 PM', contactId: 'con2', dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), completed: false },
             { id: 't3', title: 'Review Mike Davis multi-site proposal', time: '9:00 AM', contactId: 'con3', dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), completed: false }
         ];
+        this.callLogs = [];
         return true;
     },
 
@@ -147,12 +155,13 @@ const CRMApp = {
             });
         }
 
-        // Call Scripts button
+        // Call Scripts button - FIXED
         const callScriptsBtn = document.getElementById('call-scripts-btn');
         if (callScriptsBtn) {
             callScriptsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                this.openCallScriptsModal();
+                this.loadCallScriptsView();
             });
         }
         
@@ -168,6 +177,7 @@ const CRMApp = {
 
         this.setupModalHandlers();
 
+        // Global functions
         window.addAccount = () => this.addAccount();
         window.addContact = () => this.addContact();
         window.bulkImport = () => this.bulkImport();
@@ -214,6 +224,8 @@ const CRMApp = {
         
         if (viewName === 'dashboard-view') {
             this.renderDashboard();
+        } else if (viewName === 'call-scripts-view') {
+            this.renderCallScriptsView();
         } else {
             console.log(`Mapped to: ${viewName}`);
         }
@@ -223,6 +235,1066 @@ const CRMApp = {
     updateActiveNavButton(activeNav) {
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
         activeNav.classList.add('active');
+    },
+
+    // Load and render Call Scripts view - FIXED
+    async loadCallScriptsView() {
+        console.log('Loading Call Scripts view...');
+        
+        try {
+            // Show the call scripts view
+            this.showView('call-scripts-view');
+            
+            // Update nav to show Call Scripts as active (if it has a nav item)
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            
+            // Load the call scripts content
+            await this.renderCallScriptsView();
+            
+            this.showToast('Call Scripts loaded successfully!', 'success');
+        } catch (error) {
+            console.error('Error loading Call Scripts:', error);
+            this.showToast('Failed to load Call Scripts', 'error');
+        }
+    },
+
+    // Render Call Scripts view with the cold calling hub
+    async renderCallScriptsView() {
+        const callScriptsView = document.getElementById('call-scripts-view');
+        if (!callScriptsView) {
+            console.error('Call scripts view element not found');
+            return;
+        }
+
+        // Insert the cold calling hub HTML content
+        callScriptsView.innerHTML = `
+            <div class="calls-hub-layout">
+                <!-- Main Script Area -->
+                <div class="calls-hub-main">
+                    <h2 class="text-2xl font-bold mb-6 text-white text-center">Cold Calling Script</h2>
+                    
+                    <div class="calls-hub-main-inner">
+                        <div class="script-display p-6" id="script-display">
+                            Click 'Dial' to begin the call
+                        </div>
+
+                        <div class="response-buttons mt-6" id="responses-container">
+                            <button class="dial-button" onclick="handleDialClick()">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                Dial
+                            </button>
+                        </div>
+
+                        <div class="calls-hub-footer">
+                            <button id="back-btn" class="action-btn" onclick="goBack()" disabled>← Back</button>
+                            <button id="restart-btn" class="restart-btn-icon" onclick="restart()">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path d="M21.5 13a9.5 9.5 0 1 1-9.5-9.5V3a.5.5 0 0 0-1 0v.5A9.5 9.5 0 1 1 21.5 13zM12 2v4M12 18v4M22 12h-4M6 12H2M18 18l-3-3M18 6l-3 3M6 18l3-3M6 6l3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Hand Side Scrolling Sidebar -->
+                <div class="calls-hub-sidebar">
+                    
+                    <!-- Prospect Information Widget -->
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-card-title">📋 Prospect Info</h3>
+                        <div class="sidebar-input-group">
+                            <label for="input-phone">Phone Number:</label>
+                            <input type="text" id="input-phone" placeholder="(555) 555-5555" oninput="updateScript()">
+                        </div>
+                        <div class="sidebar-input-group">
+                            <label for="input-company-name">Company Name:</label>
+                            <input type="text" id="input-company-name" placeholder="ABC Manufacturing" oninput="updateScript()">
+                        </div>
+                        <div class="sidebar-input-group">
+                            <label for="input-name">Contact Name:</label>
+                            <input type="text" id="input-name" placeholder="John Smith" oninput="updateScript()">
+                        </div>
+                        <div class="sidebar-input-group">
+                            <label for="input-title">Contact Title:</label>
+                            <input type="text" id="input-title" placeholder="Company Leader" oninput="updateScript()">
+                        </div>
+                        <div class="sidebar-input-group">
+                            <label for="input-company-industry">Company Industry:</label>
+                            <input type="text" id="input-company-industry" placeholder="businesses" oninput="updateScript()">
+                        </div>
+                        <div class="sidebar-input-group">
+                            <label for="input-benefit">Specific Benefit:</label>
+                            <input type="text" id="input-benefit" placeholder="a strategic procurement strategy" oninput="updateScript()">
+                        </div>
+                        <div class="sidebar-input-group">
+                            <label for="input-pain">Pain Point:</label>
+                            <input type="text" id="input-pain" placeholder="you're not stuck paying more" oninput="updateScript()">
+                        </div>
+                    </div>
+
+                    <!-- Energy Health Check Widget -->
+                    <div class="sidebar-card !p-4" style="height: max-content;">
+                        <h3 class="sidebar-card-title">📉 Energy Health Check</h3>
+                        <div class="calculator-wrapper !p-6" id="calculator-wrapper">
+                            <div class="form-sections">
+                                <div class="form-section active" id="section1">
+                                    <div class="section-header">
+                                        <span class="section-header-pill">
+                                            <span class="section-icon">1</span> Current Bill
+                                        </span>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4">
+                                        <div class="input-group">
+                                            <label for="currentSupplier" class="input-label text-xs">Current Supplier</label>
+                                            <input type="text" class="form-input !p-2 !text-sm" id="currentSupplier" placeholder="e.g., TXU" list="supplierList" oninput="validateSection1()">
+                                            <datalist id="supplierList"></datalist>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="monthlyBill" class="input-label text-xs">Monthly Bill ($)</label>
+                                            <input type="number" class="form-input !p-2 !text-sm" id="monthlyBill" placeholder="e.g., 1,450.00" step="0.01" oninput="validateSection1()">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="currentRate" class="input-label text-xs">Current Rate (¢/kWh)</label>
+                                            <input type="number" class="form-input !p-2 !text-sm" id="currentRate" placeholder="e.g., 6.2" step="0.01" oninput="validateSection1()">
+                                            <div id="rateFeedback" class="input-feedback text-xs"></div>
+                                        </div>
+                                    </div>
+                                    <div id="usageDisplay" class="usage-display !p-3 mt-3 hidden">
+                                        <div class="usage-title text-sm">📊 Client's Usage Analysis</div>
+                                        <div class="usage-details text-xs" id="usageDetails"></div>
+                                    </div>
+                                </div>
+                                <div class="mt-6"></div>
+                                <div class="form-section" id="section2">
+                                    <div class="section-header">
+                                        <span class="section-header-pill">
+                                            <span class="section-icon">2</span> Contract & Sell Rate
+                                        </span>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4">
+                                        <div class="input-group">
+                                            <label for="contractEndDate" class="input-label text-xs">Contract End Date</label>
+                                            <input type="text" class="form-input !p-2 !text-sm" id="contractEndDate" placeholder="YYYY-MM-DD" onfocus="openDatePicker()">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="sellRate" class="input-label text-xs">Sell Rate (¢/kWh)</label>
+                                            <input type="number" class="form-input !p-2 !text-sm" id="sellRate" placeholder="e.g., 8.8" step="0.01" oninput="validateSection2()">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-6"></div>
+                                <div class="form-section" id="section3">
+                                    <div class="section-header">
+                                        <span class="section-header-pill">
+                                            <span class="section-icon">3</span> Get Results
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-gray-400 text-center">Ready to see the analysis!</p>
+                                </div>
+                            </div>
+                            <button class="calculate-button w-full !p-3 !text-sm !font-bold mt-4" id="calculateBtn" onclick="runCalculation()">
+                                Complete All Sections Above
+                            </button>
+                            <button class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors mt-2 text-sm" id="resetBtn" onclick="resetForm()">
+                              Reset Form
+                            </button>
+                            <div id="loadingAnimation" class="loading-animation">
+                                <div class="spinner"></div>
+                                <div class="text-gray-400 mt-4 text-sm" id="loadingMessage">Running analysis...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Call Notes Widget -->
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-card-title">📝 Call Notes</h3>
+                        <div class="sidebar-input-group">
+                            <textarea id="call-notes" placeholder="Type your call notes here..."></textarea>
+                        </div>
+                        <div class="sidebar-actions">
+                            <button class="add-notes-btn" onclick="saveProspectAndNotes()">Save Notes</button>
+                            <button class="clear-btn" onclick="clearNotes()">Clear</button>
+                        </div>
+                    </div>
+
+                    <!-- Call Strategy Tips Widget -->
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-card-title">💡 Call Strategy Tips</h3>
+                        <ul class="text-sm text-gray-300 space-y-3">
+                            <li class="list-item">
+                                <strong class="text-white">Mirror their energy:</strong> Match their speaking pace and enthusiasm.
+                            </li>
+                            <li class="list-item">
+                                <strong class="text-white">Use their name:</strong> Say their name 2-3 times during the call to maintain a personal connection.
+                            </li>
+                            <li class="list-item">
+                                <strong class="text-white">Pause power:</strong> Use 2-3 second pauses after questions to let them process and respond.
+                            </li>
+                            <li class="list-item">
+                                <strong class="text-white">Assume the close:</strong> When scheduling, offer two specific times rather than an open-ended "when works?".
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Objection Responses Widget -->
+                    <div class="sidebar-card">
+                        <h3 class="sidebar-card-title">🛡️ Quick Objection Responses</h3>
+                        <div class="text-sm space-y-4">
+                            <div class="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                                <p class="font-semibold text-white">"We're happy with our provider."</p>
+                                <p class="text-gray-400 mt-1">"That's great to hear. This isn't about changing providers; it's about optimizing your position within the current market structure."</p>
+                            </div>
+                            <div class="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                                <p class="font-semibold text-white">"We just renewed our contract."</p>
+                                <p class="text-gray-400 mt-1">"Perfect timing, actually. This gives us a chance to prepare strategically for your next cycle rather than scrambling later."</p>
+                            </div>
+                            <div class="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                                <p class="font-semibold text-white">"Send me some information."</p>
+                                <p class="text-gray-400 mt-1">"I can definitely do that. What specific information would be most valuable to you - a rate comparison or market timing strategies?"</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal for Energy Health Check Calendar -->
+            <div id="taskModal" class="modal" onclick="closeModal(event)">
+              <div class="modal-content">
+                <div class="modal-card-container">
+                  <div class="modal-card" id="dateCard">
+                    <h3 class="text-lg font-semibold text-white mb-4">Select Contract End Date</h3>
+                    <div class="calendar-header">
+                        <button onclick="prevMonth()" class="text-gray-400 hover:text-white transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <div class="flex-grow flex justify-center items-center">
+                            <div id="monthYearDisplay">
+                                <span id="monthYearSpan" class="text-white font-semibold cursor-pointer" onclick="toggleMonthYearPicker()"></span>
+                            </div>
+                            <div id="monthYearPicker" class="flex justify-center items-center hidden">
+                                <select id="monthSelector" class="form-input w-2/5 mr-2" onchange="selectMonthYear()"></select>
+                                <select id="yearSelector" class="form-input w-2/5 ml-2" onchange="selectMonthYear()"></select>
+                            </div>
+                        </div>
+                        <button onclick="nextMonth()" class="text-gray-400 hover:text-white transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid"></div>
+                    <button onclick="closeModal(event)" class="mt-6 w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors" id="cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+        `;
+
+        // Initialize the call scripts functionality
+        this.initializeCallScriptsPage();
+    },
+
+    // Initialize Call Scripts functionality
+    initializeCallScriptsPage() {
+        // State Machine for the call script flow
+        const scriptData = {
+            start: {
+                you: "Click 'Dial' to begin the call",
+                mood: "neutral",
+                responses: []
+            },
+            dialing: {
+                you: "Dialing... Ringing...",
+                mood: "neutral",
+                responses: [
+                    { text: "📞 Call Connected", next: "hook" },
+                    { text: "📞 Transferred - Decision Maker Answers", next: "main_script_start" },
+                    { text: "🚫 No Answer", next: "voicemail_or_hangup" }
+                ]
+            },
+            voicemail_or_hangup: {
+                you: "No answer. What would you like to do?",
+                mood: "neutral",
+                responses: [
+                    { text: "Leave Voicemail", next: "voicemail", disposition: "Left Voicemail" },
+                    { text: "Hang Up / Start New Call", next: "start", disposition: "No Answer / Hang Up" }
+                ]
+            },
+            hook: {
+                you: "Hi, is this <span class='emphasis'>[N]</span>?",
+                mood: "neutral",
+                responses: [
+                    { text: "✅ Yes, this is [N]", next: "main_script_start", disposition: "Connected" },
+                    { text: "🗣️ Speaking", next: "main_script_start", disposition: "Connected" },
+                    { text: "❓ Who's calling?", next: "main_script_start", disposition: "Connected" },
+                    { text: "👥 Gatekeeper / Not the right person", next: "gatekeeper_intro", disposition: "Gatekeeper" }
+                ]
+            },
+            main_script_start: {
+                you: "Good mornin'/afternoon, <span class='emphasis'>[N]</span>. <span class='pause'>--</span> I'm Lewis with PowerChoosers and I'm needin' to speak with someone over electricity agreements and contracts for <span class='emphasis'>[CN]</span>. <span class='highlight-yellow'>Would that be yourself?</span>",
+                mood: "neutral",
+                responses: [
+                    { text: "✅ Yes, that's me / I handle that", next: "pathA", disposition: "Decision Maker - Engaged" },
+                    { text: "👥 That would be [OP] / Not the right person", next: "gatekeeper_intro", disposition: "Gatekeeper" },
+                    { text: "🤝 We both handle it / Team decision", next: "pathA", disposition: "Decision Maker - Engaged" },
+                    { text: "🤔 Unsure or hesitant", next: "pathD", disposition: "Decision Maker - Hesitant" }
+                ]
+            },
+            gatekeeper_intro: {
+                you: "Good afternoon/morning. I'm needin' to speak with someone over electricity agreements and contracts for <span class='emphasis'>[CN]</span>. <span class='highlight-yellow'>Do you know who would be responsible for that?</span>",
+                mood: "neutral",
+                responses: [
+                    { text: "❓ What's this about?", next: "gatekeeper_whats_about", disposition: "Gatekeeper - Asking" },
+                    { text: "🔗 I'll connect you", next: "transfer_dialing", disposition: "Gatekeeper - Transferring" },
+                    { text: "🚫 They're not available / Take a message", next: "voicemail", disposition: "Gatekeeper - Take Message" }
+                ]
+            },
+            gatekeeper_whats_about: {
+                you: "My name is Lewis with PowerChoosers.com and I'm needin' to speak with someone about the future electricity agreements for <span class='emphasis'>[CN]</span>. <span class='highlight-yellow'>Do you know who might be the best person for that?</span>",
+                mood: "neutral",
+                responses: [
+                    { text: "🔗 I'll connect you", next: "transfer_dialing", disposition: "Gatekeeper - Transferring" },
+                    { text: "🚫 They're not available / Take a message", next: "voicemail", disposition: "Gatekeeper - Take Message" },
+                    { text: "✅ I can help you", next: "pathA", disposition: "Gatekeeper - Connected" }
+                ]
+            },
+            voicemail: {
+                you: "Good afternoon/morning <span class='emphasis'>[N]</span>, this is <span class='emphasis'>Lewis</span> and I was told to speak with you. You can give me a call at <span class='emphasis'>817-409-4215</span>. Also, I shot you over a short email kinda explaining why I'm reaching out to you today. The email should be coming from <span class='emphasis'>Lewis Patterson</span> that's <span class='emphasis'>(L.E.W.I.S)</span>. Thank you so much and you have a great day.",
+                mood: "neutral",
+                responses: [
+                    { text: "🔄 End Call / Start New Call", next: "start", action: "saveProspectAndNotes" }
+                ]
+            },
+            pathA: {
+                you: "Perfect. <span class='pause'>--</span> So, <span class='emphasis'>[N]</span>, I've been working closely with <span class='emphasis'>[CI]</span> across Texas with electricity agreements, and we're about to see an <span class='emphasis'>unprecedented dip in the market in the next few months</span>. <span class='pause'>--</span> <span class='highlight-yellow'>Is getting the best price for your next renewal a priority for you and [CN]?</span> <span class='highlight-yellow'>Do you know when your contract expires?</span>",
+                mood: "neutral",
+                responses: [
+                    { text: "😰 Struggling / It's tough", next: "discovery", disposition: "Discovery - Struggle" },
+                    { text: "📅 Haven't renewed / Contract not up yet", next: "discovery", disposition: "Discovery - Not Renewed" },
+                    { text: "🔒 Locked in / Just renewed", next: "discovery", disposition: "Discovery - Locked In" },
+                    { text: "🛒 Shopping around / Looking at options", next: "discovery", disposition: "Discovery - Shopping" },
+                    { text: "🤝 Have someone handling it / Work with broker", next: "discovery", disposition: "Discovery - Has Broker" },
+                    { text: "🤷 Haven't thought about it / It is what it is", next: "discovery", disposition: "Discovery - No Plan" }
+                ]
+            },
+            discovery: {
+                you: "Gotcha! So, <span class='emphasis'>[N]</span>, just so I understand your situation a little better. <span class='pause'>--</span> <span class='highlight-yellow'>What's your current approach to renewing your electricity agreements? Do you handle it internally or work with a consultant?</span>",
+                mood: "neutral",
+                responses: [
+                    { text: "💚 Prospect is engaged / ready for appointment", next: "closeForAppointment", disposition: "Interested - Ready for Appointment" },
+                    { text: "🟡 Prospect is hesitant / needs more info", next: "handleHesitation", disposition: "Hesitant - Needs More Info" },
+                    { text: "❌ Objection: Happy with current provider", next: "objHappy", disposition: "Objection - Happy with Provider" },
+                    { text: "❌ Objection: No time", next: "objNoTime", disposition: "Objection - No Time" }
+                ]
+            },
+            closeForAppointment: {
+                you: "Awesome! So, <span class='emphasis'>[N]</span>. <span class='pause'>--</span> I really believe you'll be able to benefit from <span class='emphasis'>[SB]</span> that way you won't have to <span class='emphasis'>[PP]</span>. Our process is super simple! We start with an <span class='emphasis'>energy health check</span> where I look at your usage, contract terms, and then we can talk about what options might look like for <span class='emphasis'>[CN]</span> moving forward.",
+                mood: "positive",
+                responses: [
+                    { text: "📅 Schedule Friday 11 AM", next: "callSuccess", disposition: "Appointment Set - Fri 11 AM" },
+                    { text: "📅 Schedule Monday 2 PM", next: "callSuccess", disposition: "Appointment Set - Mon 2 PM" },
+                    { text: "🤔 Still hesitant", next: "handleHesitation", disposition: "Hesitant - Still Unsure" }
+                ]
+            },
+            handleHesitation: {
+                you: "I get it <span class='pause'>--</span> and called you out of the blue, so now is probably not the best time. How about this <span class='pause'>--</span> let me put together a quick case study specific to <span class='emphasis'>[TIA]</span>s in your area.",
+                mood: "unsure",
+                responses: [
+                    { text: "✅ Yes, send analysis", next: "callSuccess", disposition: "Sent Analysis" },
+                    { text: "❌ No, not interested", next: "softClose", disposition: "Not Interested" }
+                ]
+            },
+            objHappy: {
+                you: "That's actually great to hear, and I'm not suggesting you should be unhappy or you need to switch your supplier today. <span class='highlight-yellow'>Is it the customer service that you're happy with or are you just getting a rate that you can't find anywhere else?</span>",
+                mood: "positive",
+                responses: [
+                    { text: "✅ Yes, worth understanding", next: "closeForAppointment", disposition: "Open to discussion" },
+                    { text: "❌ No, not interested", next: "softClose", disposition: "Not Interested" }
+                ]
+            },
+            objNoTime: {
+                you: "I completely get it <span class='pause'>--</span> that's exactly why most businesses end up overpaying. Energy is a complicated market that requires ongoing attention that most internal teams <span class='pause'>--</span> simply don't have time for.",
+                mood: "challenging",
+                responses: [
+                    { text: "✅ Yes, schedule 10-minute assessment", next: "callSuccess", disposition: "Appointment Set - Short Call" },
+                    { text: "❌ Still no time", next: "softClose", disposition: "No Time - Declined" }
+                ]
+            },
+            softClose: {
+                you: "No problem at all <span class='pause'>--</span> I know energy strategy isn't urgent until it becomes critical. Here's what I'll do: I'm going to add you to my quarterly market intelligence updates.",
+                mood: "neutral",
+                responses: [
+                    { text: "✅ That sounds reasonable", next: "callSuccess", disposition: "Opt-in to updates" },
+                    { text: "❌ No thanks", next: "callEnd", disposition: "Opt-out / Cold" }
+                ]
+            },
+            callSuccess: {
+                you: "🎉 <span class='emphasis'>Call Completed Successfully!</span><br><br>Remember to track:<br>• Decision maker level<br>• Current contract status<br>• Pain points identified<br>• Interest level<br>• Next action committed",
+                mood: "positive",
+                responses: [{ text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }]
+            },
+            callEnd: {
+                you: "Thanks for your time. Have a great day!",
+                mood: "neutral",
+                responses: [{ text: "🔄 Start New Call", next: "start", action: "saveProspectAndNotes" }]
+            },
+            transfer_dialing: {
+                you: "Connecting... Ringing...",
+                mood: "neutral",
+                responses: [
+                    { text: "📞 Call Connected", next: "hook", disposition: "Transferred - Connected" },
+                    { text: "🚫 Not Connected", next: "voicemail", disposition: "Transferred - Not Connected" }
+                ]
+            },
+            pathD: {
+                you: "I understand this might not be exactly what you handle, but since it affects your company's operating costs, I'd love to get you the right information. <span class='highlight-yellow'>Who would be the best person to speak with about your company's electricity contracts?</span>",
+                mood: "neutral",
+                responses: [
+                    { text: "✅ I can handle it / I'll listen", next: "pathA", disposition: "Decision Maker - Engaged" },
+                    { text: "👥 That would be [OP]", next: "gatekeeper_intro", disposition: "Referred to Decision Maker" },
+                    { text: "❌ Not interested", next: "softClose", disposition: "Not Interested" }
+                ]
+            }
+        };
+
+        // Global state for the call script application
+        const appState = {
+            placeholders: {
+                'N': '', 'YN': 'Lewis', 'CN': '', 'CI': '', 'SB': '', 'PP': '', 'CT': '', 'TIA': '',
+                'TE': '', 'DT': '', 'EAC': '', 'TF': '', 'OP': 'the responsible party', 'XX': '$XX.00/40%', 'P': ''
+            },
+            inputMap: {
+                'input-name': 'N',
+                'input-title': 'CT',
+                'input-company-name': 'CN',
+                'input-company-industry': 'CI',
+                'input-benefit': 'SB',
+                'input-pain': 'PP',
+                'input-phone': 'P'
+            },
+            currentStep: 'start',
+            history: []
+        };
+        
+        let callActive = false;
+        let callTimeout;
+        let currentDisposition = "";
+        
+        // Helper function to get an element by ID
+        const getEl = id => document.getElementById(id);
+
+        // Updates the script display with the current text, replacing placeholders
+        const displayCurrentStep = () => {
+            const step = scriptData[appState.currentStep];
+            if (!step) return;
+            
+            const scriptDisplay = getEl('script-display');
+            const responsesContainer = getEl('responses-container');
+            const backBtn = getEl('back-btn');
+            
+            const processedText = applyPlaceholders(step.you);
+            
+            if (scriptDisplay) {
+                scriptDisplay.innerHTML = processedText;
+                scriptDisplay.className = `script-display mood-${step.mood}`;
+                if (appState.currentStep === 'start') {
+                    scriptDisplay.classList.add('start');
+                } else {
+                    scriptDisplay.classList.remove('start');
+                }
+            }
+            
+            if (responsesContainer) {
+                responsesContainer.innerHTML = '';
+                if (appState.currentStep === 'start') {
+                    const dialButtonHtml = `
+                        <button class="dial-button" onclick="handleDialClick()">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            Dial
+                        </button>
+                    `;
+                    responsesContainer.innerHTML = dialButtonHtml;
+                } else if (step.responses && step.responses.length > 0) {
+                    step.responses.forEach(response => {
+                        const button = document.createElement('button');
+                        button.className = 'response-btn';
+                        button.innerHTML = applyPlaceholders(response.text);
+                        button.onclick = () => {
+                            if (response.disposition) {
+                                currentDisposition = response.disposition;
+                            }
+                            selectResponse(response.next, response.action);
+                        };
+                        responsesContainer.appendChild(button);
+                    });
+                    
+                    if (step.responses.length === 1) {
+                        responsesContainer.classList.add('full-width');
+                    } else {
+                        responsesContainer.classList.remove('full-width');
+                    }
+                }
+            }
+            
+            if (backBtn) {
+                backBtn.disabled = appState.history.length === 0;
+            }
+        };
+
+        // Replaces placeholders in the script text with values from the state
+        const applyPlaceholders = (text) => {
+            let newText = text;
+            for (const key in appState.placeholders) {
+                const regex = new RegExp('\\[' + key + '\\]', 'g');
+                let replacement = appState.placeholders[key];
+                
+                if (key === 'N' && replacement) {
+                    replacement = replacement.split(' ')[0];
+                }
+                
+                newText = newText.replace(regex, replacement);
+            }
+            return newText;
+        };
+
+        // Updates the global placeholders from the input fields and refreshes the script
+        const updateScript = () => {
+            for (const inputId in appState.inputMap) {
+                const placeholderKey = appState.inputMap[inputId];
+                const inputElement = getEl(inputId);
+                if (inputElement) {
+                    const inputValue = inputElement.value || '';
+                    appState.placeholders[placeholderKey] = inputValue;
+                }
+            }
+            appState.placeholders['TIA'] = appState.placeholders['CI'];
+            displayCurrentStep();
+        };
+
+        // Handles the click event for the "Dial" button
+        const handleDialClick = () => {
+            const phoneNumber = getEl('input-phone').value;
+            if (!phoneNumber) {
+                CRMApp.showToast('Please enter a phone number to dial.', 'error');
+                return;
+            }
+
+            callActive = true;
+            getEl('script-display').classList.add('ringing');
+            
+            callTimeout = setTimeout(() => {
+                callActive = false;
+                getEl('script-display').classList.remove('ringing');
+                selectResponse('dialing');
+            }, 3000);
+        };
+
+        // Handles a user selecting a response button
+        const selectResponse = (nextStep, action) => {
+            if (nextStep && scriptData[nextStep]) {
+                appState.history.push(appState.currentStep);
+                appState.currentStep = nextStep;
+                displayCurrentStep();
+            }
+            if (action === 'saveProspectAndNotes') {
+                saveProspectAndNotes();
+            }
+        };
+
+        // Navigates back to the previous step in the call history
+        const goBack = () => {
+            if (appState.history.length > 0) {
+                appState.currentStep = appState.history.pop();
+                displayCurrentStep();
+            }
+        };
+
+        // Resets the entire call script and state to the initial values
+        const restart = () => {
+            appState.currentStep = 'start';
+            appState.history = [];
+            currentDisposition = "";
+            
+            for(const inputId in appState.inputMap) {
+                const input = getEl(inputId);
+                if (input) input.value = '';
+            }
+            getEl('call-notes').value = '';
+
+            updateScript();
+        };
+
+        // Saves the prospect info and call notes
+        const saveProspectAndNotes = () => {
+            const notes = getEl('call-notes').value;
+            const disposition = currentDisposition || "Call Ended - No Disposition";
+            const companyName = getEl('input-company-name').value;
+            const contactName = getEl('input-name').value;
+            const phoneNumber = getEl('input-phone').value;
+            const contactTitle = getEl('input-title').value;
+
+            const log = {
+                disposition: disposition,
+                notes: notes,
+                prospect: {
+                    name: contactName,
+                    company: companyName,
+                    phone: phoneNumber,
+                    title: contactTitle
+                },
+                timestamp: new Date().toISOString()
+            };
+
+            CRMApp.saveCallLog(log, disposition);
+            restart();
+        };
+        
+        // Clears the call notes textarea
+        const clearNotes = () => {
+            getEl('call-notes').value = '';
+        };
+
+        // Energy Health Check widget code
+        const supplierData = {
+            "NRG": { bbbRating: "A+", popularity: 4, customerService: 3 },
+            "TXU": { bbbRating: "A+", popularity: 5, customerService: 4 },
+            "APG & E": { bbbRating: "Unaccredited", popularity: 2, customerService: 3 },
+            "Reliant": { bbbRating: "A+", popularity: 5, customerService: 3 },
+            "Hudson": { bbbRating: "Unaccredited", popularity: 2, customerService: 2 },
+            "Green Mountain": { bbbRating: "Unaccredited", popularity: 3, customerService: 2 },
+            "Constellation": { bbbRating: "A+", popularity: 4, customerService: 4 },
+            "Tara Energy": { bbbRating: "Unaccredited", popularity: 2, customerService: 3 },
+            "Cirro": { bbbRating: "A+", popularity: 3, customerService: 4 },
+            "Engie": { bbbRating: "A+", popularity: 3, customerService: 1 },
+            "Gexa": { bbbRating: "Unaccredited", popularity: 4, customerService: 2 },
+            "Freepoint": { bbbRating: "A+", popularity: 1, customerService: 3 },
+            "Shell Energy": { bbbRating: "Unaccredited", popularity: 3, customerService: 2 },
+            "Ironhorse": { bbbRating: "4.0 stars", popularity: 1, customerService: 3 },
+            "Ammper Power": { bbbRating: "Unaccredited", popularity: 1, customerService: 1 }
+        };
+        const supplierNames = Object.keys(supplierData);
+
+        const ESTIMATED_DELIVERY_CHARGE_CENTS = 0.05;
+        let section1Complete = false, section2Complete = false;
+        let currentAnnualUsage = 0, currentMonthlyBill = 0, currentRate = 0, sellRate = 0, currentSupplier = '';
+        let currentDate = new Date(), selectedDate = null;
+        const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        
+        const formatNumber = num => Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        const updateProgress = () => {
+            const progress = getEl('progressFill');
+            if (!progress) return;
+            
+            let percentage = 0;
+            if (section1Complete) percentage += 50;
+            if (section2Complete) percentage += 50;
+            progress.style.width = percentage + '%';
+        };
+        
+        function validateSection1() {
+            const supplierInput = getEl('currentSupplier');
+            const monthlyBillInput = getEl('monthlyBill');
+            const currentRateInput = getEl('currentRate');
+            
+            const supplierValue = supplierInput.value.trim();
+            currentMonthlyBill = parseFloat(monthlyBillInput.value);
+            currentRate = parseFloat(currentRateInput.value) / 100; // Convert cents to dollars
+            
+            const rateFeedback = getEl('rateFeedback');
+            const usageDisplay = getEl('usageDisplay');
+            const usageDetails = getEl('usageDetails');
+
+            rateFeedback.classList.remove('show', 'feedback-danger', 'feedback-warning', 'feedback-success', 'feedback-info');
+            usageDisplay.classList.add('hidden');
+            
+            if (supplierValue && supplierNames.includes(supplierValue) && currentMonthlyBill > 0 && currentRate > 0) {
+                currentSupplier = supplierValue;
+                const effectiveCurrentRateAllIn = currentRate + ESTIMATED_DELIVERY_CHARGE_CENTS;
+                rateFeedback.classList.add('show');
+                if (effectiveCurrentRateAllIn <= 0.10) { 
+                    rateFeedback.className = 'input-feedback show feedback-danger'; 
+                    rateFeedback.textContent = '🚨 Very old rate - significant increase expected at renewal'; 
+                }
+                else if (effectiveCurrentRateAllIn <= 0.12) { 
+                    rateFeedback.className = 'input-feedback show feedback-warning'; 
+                    rateFeedback.textContent = '⚠️ Below market rate - likely increase ahead'; 
+                }
+                else if (effectiveCurrentRateAllIn <= 0.145) { 
+                    rateFeedback.className = 'input-feedback show feedback-success'; 
+                    rateFeedback.textContent = '✅ Current market range - competitive rate'; 
+                }
+                else { 
+                    rateFeedback.className = 'input-feedback show feedback-info'; 
+                    rateFeedback.textContent = '💰 Above market - savings opportunity available'; 
+                }
+                
+                const monthlyUsage = (currentMonthlyBill / effectiveCurrentRateAllIn);
+                currentAnnualUsage = monthlyUsage * 12;
+                usageDisplay.classList.remove('hidden');
+                let businessSize = (currentAnnualUsage < 50000) ? 'Small Business' : (currentAnnualUsage < 200000) ? 'Medium Business' : 'Large Business';
+                usageDetails.innerHTML = `<strong>Monthly Usage:</strong> ${formatNumber(monthlyUsage)} kWh<br><strong>Annual Usage:</strong> ${formatNumber(currentAnnualUsage)} kWh<br><strong>Business Size:</strong> ${businessSize}`;
+                
+                section1Complete = true;
+                getEl('section1').classList.add('completed');
+                getEl('section1').querySelector('.section-header-pill').classList.add('completed');
+                getEl('section1').querySelector('.section-icon').innerHTML = '✓';
+                activateSection(2);
+            } else {
+                section1Complete = false;
+                getEl('section1').classList.remove('completed');
+                getEl('section1').querySelector('.section-header-pill').classList.remove('completed');
+                getEl('section1').querySelector('.section-icon').innerHTML = '1';
+                
+                getEl('section2').classList.remove('active', 'completed');
+                getEl('section2').querySelector('.section-header-pill').classList.remove('active', 'completed');
+                getEl('section2').querySelector('.section-icon').innerHTML = '2';
+                getEl('section3').classList.remove('active', 'completed');
+                getEl('section3').querySelector('.section-header-pill').classList.remove('active', 'completed');
+                getEl('section3').querySelector('.section-icon').innerHTML = '3';
+                section2Complete = false;
+            }
+            updateProgress();
+            updateButton();
+        }
+
+        function validateSection2() {
+            const contractEndDateInput = getEl('contractEndDate');
+            const sellRateInput = getEl('sellRate');
+            const contractEndDate = contractEndDateInput.value;
+            sellRate = parseFloat(sellRateInput.value) / 100; // Convert cents to dollars
+            
+            if (contractEndDate && sellRate > 0) {
+                section2Complete = true;
+                getEl('section2').classList.add('completed');
+                getEl('section2').querySelector('.section-header-pill').classList.add('completed');
+                getEl('section2').querySelector('.section-icon').innerHTML = '✓';
+                activateSection(3);
+            } else {
+                section2Complete = false;
+                getEl('section2').classList.remove('completed');
+                getEl('section2').querySelector('.section-header-pill').classList.remove('completed');
+                getEl('section2').querySelector('.section-header-pill').classList.add('active');
+                getEl('section2').querySelector('.section-icon').innerHTML = '2';
+
+                getEl('section3').classList.remove('active', 'completed');
+                getEl('section3').querySelector('.section-header-pill').classList.remove('active', 'completed');
+                getEl('section3').querySelector('.section-icon').innerHTML = '3';
+            }
+            updateProgress();
+            updateButton();
+        }
+
+        function activateSection(sectionNumber) {
+            for (let i = 1; i <= 3; i++) {
+                const section = getEl(`section${i}`);
+                const pill = section.querySelector('.section-header-pill');
+                const icon = pill.querySelector('.section-icon');
+                if (i < sectionNumber) {
+                    section.classList.remove('active');
+                    section.classList.add('completed');
+                    pill.classList.remove('active');
+                    pill.classList.add('completed');
+                    icon.innerHTML = '✓';
+                } else if (i === sectionNumber) {
+                    section.classList.add('active');
+                    section.classList.remove('completed');
+                    pill.classList.add('active');
+                    pill.classList.remove('completed');
+                    icon.innerHTML = i;
+                } else {
+                    section.classList.remove('active', 'completed');
+                    pill.classList.remove('active', 'completed');
+                    icon.innerHTML = i;
+                }
+            }
+        }
+
+        const updateButton = () => {
+            const button = getEl('calculateBtn');
+            const isReady = section1Complete && section2Complete;
+            button.classList.toggle('ready', isReady);
+            button.textContent = isReady ? 'Calculate Savings Potential' : 'Complete All Sections Above';
+        };
+
+        const runCalculation = () => {
+            if (!section1Complete || !section2Complete || !isFinite(currentMonthlyBill) || !isFinite(currentRate) || !isFinite(sellRate) || !supplierNames.includes(currentSupplier)) {
+                console.warn("Attempted to calculate results before all sections were complete or with invalid data.");
+                CRMApp.showToast("Please complete all sections with valid data to run the health check.", "warning");
+                return;
+            }
+            
+            getEl('calculateBtn').style.display = 'none';
+            getEl('loadingAnimation').classList.add('show');
+            getEl('loadingMessage').textContent = 'Running analysis...';
+            getEl('calculator-wrapper').classList.add('is-calculating');
+            setTimeout(calculateResults, 1500);
+        };
+
+        function calculateResults() {
+            try {
+                const contractEndDateStr = getEl('contractEndDate').value;
+                const effectiveSellRateAllIn = sellRate + ESTIMATED_DELIVERY_CHARGE_CENTS;
+                const annualCurrentCost = currentMonthlyBill * 12;
+                const annualProjectedCost = (currentAnnualUsage * effectiveSellRateAllIn);
+                const annualSavingsOrIncrease = annualCurrentCost - annualProjectedCost;
+                const monthlySavingsOrIncrease = annualSavingsOrIncrease / 12;
+                const percentageChange = ((annualSavingsOrIncrease / annualCurrentCost) * 100).toFixed(2);
+                
+                const currentSupplierData = supplierData[currentSupplier] || { bbbRating: 'N/A', popularity: 1, customerService: 1 };
+                
+                const savingsFactor = Math.min(Math.max((percentageChange + 100), 0), 200) / 2;
+                const supplierFactor = ((currentSupplierData.popularity || 1) + (currentSupplierData.customerService || 1)) / 10 * 100;
+                const energyHealthScore = Math.round((savingsFactor * 0.7) + (supplierFactor * 0.3));
+
+                let actionableTips = '';
+                const today = new Date();
+                const contractEndDate = new Date(contractEndDateStr);
+                const monthsUntilExpiration = (contractEndDate.getFullYear() - today.getFullYear()) * 12 + (contractEndDate.getMonth() - today.getMonth());
+                
+                const formatTips = (title, tips) => `<h4 class="text-green-500 text-sm font-bold mb-2">${title}</h4><ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">${tips.map(t => `<li><strong>${t.bold}:</strong> ${t.text}</li>`).join('')}</ul>`;
+                
+                const isSummer = today.getMonth() >= 5 && today.getMonth() <= 7;
+                const tolerancePercentage = 0.5;
+
+                if (monthsUntilExpiration > 36) {
+                    if (percentageChange > 40) {
+                        actionableTips = formatTips('Consider Cancelling for Major Savings:', [{ bold: 'Significant Savings', text: 'With savings over 40%, it may be worth cancelling your current agreement. Review the terms for any penalties.' }]);
+                    } else {
+                        actionableTips = formatTips('No Action Needed:', [{ bold: 'Stable Contract', text: 'Your contract expires far in the future. Monitor the market, but no immediate action is necessary.' }]);
+                    }
+                } else if (monthsUntilExpiration >= 6 && monthsUntilExpiration <= 12) {
+                    if (isSummer && percentageChange > 15) {
+                        actionableTips = formatTips('Optimal Renewal Time (Summer Savings):', [{ bold: 'Summer Opportunity', text: 'This is a high-rate season, but your potential savings of over 15% make it an ideal time to renew and lock in a good rate.' }]);
+                    } else if (!isSummer && annualSavingsOrIncrease > 0) {
+                        actionableTips = formatTips('Optimal Renewal Time:', [{ bold: 'Proactive Renewal', text: 'Your contract is approaching its renewal window. Secure a new plan now to lock in savings and avoid market fluctuations.' }]);
+                    } else {
+                         actionableTips = formatTips('Monitor Market Closely:', [{ bold: 'Strategic Planning', text: 'Your contract is nearing its end. Keep an eye on market trends to find the best rate before your renewal date.' }]);
+                    }
+                } else {
+                    let idealMonths = monthsUntilExpiration + 6;
+                    let renewalYear = new Date(contractEndDateStr);
+                    renewalYear.setMonth(renewalYear.getMonth() - 6);
+                    
+                    if (percentageChange < -30 && monthsUntilExpiration < 12) {
+                         actionableTips = formatTips('High-Risk Renewal Alert:', [{ bold: 'Act Now for Best Rates', text: `You are facing a potential rate increase of over 30%. Consider reserving a new price in advance to lock in a more favorable rate before your contract ends.` }]);
+                    } else if (percentageChange < -30 && monthsUntilExpiration >= 12) {
+                        actionableTips = formatTips('High-Risk Renewal Alert:', [{ bold: 'Plan Ahead for Best Rates', text: `You are facing a potential rate increase of over 30%. We recommend starting the process around ${monthNames[renewalYear.getMonth()]} of ${renewalYear.getFullYear()} to reserve a price in advance.` }]);
+                    }
+                    else {
+                        actionableTips = formatTips('General Advice:', [{ bold: 'Strategic Planning is Key', text: `Based on your contract end date, it's important to have a plan in place. Start monitoring rates to be ready when the time comes to renew.` }]);
+                    }
+                }
+
+                const resultsSection = document.createElement('div');
+                resultsSection.id = 'results';
+                resultsSection.className = 'results-section show p-6 mt-6 rounded-xl border';
+
+                let resultAmountClass = '', resultLabelText = '', mainResultClass = '';
+                if (annualSavingsOrIncrease > (annualCurrentCost * (tolerancePercentage / 100))) {
+                    resultAmountClass = 'text-green-500'; mainResultClass = 'savings'; resultLabelText = 'Potential Annual Client Savings';
+                } else if (annualSavingsOrIncrease < -(annualCurrentCost * (tolerancePercentage / 100))) {
+                    resultAmountClass = 'text-red-500'; mainResultClass = 'increase'; resultLabelText = 'Projected Annual Increase Risk';
+                } else {
+                    resultAmountClass = 'text-white'; mainResultClass = 'neutral'; resultLabelText = 'No Significant Change Projected';
+                }
+                
+                resultsSection.innerHTML = `
+                    <div class="main-result ${mainResultClass} p-4 rounded-xl border-2 mb-4">
+                        <div class="text-3xl font-bold ${resultAmountClass}">${formatNumber(Math.abs(annualSavingsOrIncrease))}</div>
+                        <div class="text-sm font-semibold text-white mt-1">${resultLabelText}</div>
+                    </div>
+                    <div class="details-grid grid grid-cols-2 gap-4 text-center text-sm mb-4">
+                        <div class="detail-item p-3 rounded-lg bg-gray-700">
+                            <div class="text-white font-bold">${energyHealthScore}%</div>
+                            <div class="text-gray-400 text-xs">Energy Health Score</div>
+                        </div>
+                        <div class="detail-item p-3 rounded-lg bg-gray-700">
+                            <div class="text-white font-bold">${currentSupplierData.bbbRating}</div>
+                            <div class="text-gray-400 text-xs">Supplier BBB Rating</div>
+                        </div>
+                        <div class="detail-item p-3 rounded-lg bg-gray-700 col-span-2">
+                           <div class="text-white font-bold">${formatNumber(Math.abs(monthlySavingsOrIncrease))}</div>
+                           <div class="text-gray-400 text-xs">${resultLabelText.replace('Annual', 'Monthly')}</div>
+                        </div>
+                    </div>
+                    <div class="analysis-box p-4 rounded-xl border-l-4 border-blue-500 bg-gray-700">
+                        <div class="analysis-title flex items-center text-blue-500 text-sm font-semibold mb-2">
+                            <span class="mr-2">💡</span> Recommended Next Steps
+                        </div>
+                        <div class="analysis-text text-xs text-gray-400">${actionableTips}</div>
+                    </div>`;
+                
+                const existingResults = getEl('results');
+                if (existingResults) existingResults.remove();
+                getEl('calculator-wrapper').appendChild(resultsSection);
+                resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                const companyName = getEl('input-company-name').value;
+                const updatedAccountData = {
+                    currentSupplier: currentSupplier,
+                    monthlyBill: currentMonthlyBill,
+                    currentRate: currentRate,
+                    contractEndDate: contractEndDateStr,
+                    sellRate: sellRate,
+                    annualSavingsOrIncrease: annualSavingsOrIncrease,
+                    energyHealthScore: energyHealthScore
+                };
+                CRMApp.updateAccountDetailsFromHealthCheck(companyName, updatedAccountData);
+
+            } catch (error) {
+                console.error("An error occurred during calculation:", error);
+                CRMApp.showToast("An error occurred during calculation. Please check inputs.", "error");
+            } finally {
+                getEl('loadingAnimation').classList.remove('show');
+                getEl('calculateBtn').style.display = 'block';
+                getEl('calculator-wrapper').classList.remove('is-calculating');
+            }
+        }
+
+        const openDatePicker = () => {
+            const modal = getEl('taskModal');
+            if(modal) {
+                modal.classList.add('open');
+                renderCalendar();
+            }
+        };
+
+        const closeModal = (event) => {
+            const modal = getEl('taskModal');
+            if (event.target === modal || event.target.id === 'cancel-btn') {
+                modal.classList.remove('open');
+            }
+        };
+
+        const resetForm = () => {
+            getEl('currentSupplier').value = '';
+            getEl('monthlyBill').value = '';
+            getEl('currentRate').value = '';
+            getEl('sellRate').value = '';
+            getEl('contractEndDate').value = '';
+            getEl('usageDisplay').classList.add('hidden');
+            getEl('rateFeedback').classList.remove('show');
+            const results = getEl('results');
+            if(results) results.remove();
+            
+            section1Complete = false;
+            section2Complete = false;
+
+            activateSection(1);
+            updateButton();
+        };
+
+        const renderCalendar = () => {
+            const [monthYearSpan, calendarGrid] = [getEl('monthYearSpan'), getEl('calendarGrid')];
+            const [year, month] = [currentDate.getFullYear(), currentDate.getMonth()];
+            
+            const monthYearPicker = getEl('monthYearPicker');
+            const display = getEl('monthYearDisplay');
+            
+            display.classList.remove('hidden');
+            monthYearPicker.classList.add('hidden');
+
+            calendarGrid.innerHTML = '';
+            monthYearSpan.textContent = `${monthNames[month]} ${year}`;
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            daysOfWeek.forEach(day => { const dayHeader = document.createElement('div'); dayHeader.className = 'calendar-day'; dayHeader.textContent = day; calendarGrid.appendChild(dayHeader); });
+            for (let i = 0; i < firstDay; i++) calendarGrid.innerHTML += '<div></div>';
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateElement = document.createElement('div');
+                dateElement.className = 'calendar-date';
+                dateElement.textContent = i;
+                const fullDate = new Date(year, month, i);
+                if (fullDate.toDateString() === new Date().toDateString()) dateElement.classList.add('today');
+                dateElement.onclick = () => {
+                    document.querySelectorAll('.calendar-date').forEach(d => d.classList.remove('selected'));
+                    dateElement.classList.add('selected');
+                    selectedDate = fullDate;
+                    getEl('contractEndDate').value = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    getEl('taskModal').classList.remove('open');
+                    validateSection2();
+                };
+                calendarGrid.appendChild(dateElement);
+            }
+        };
+
+        const toggleMonthYearPicker = () => {
+            const picker = getEl('monthYearPicker');
+            const calendarGrid = getEl('calendarGrid');
+            const monthYearSpan = getEl('monthYearSpan');
+
+            const isPickerVisible = picker.classList.contains('hidden');
+
+            if (isPickerVisible) {
+                picker.classList.remove('hidden');
+                calendarGrid.classList.add('hidden');
+                monthYearSpan.classList.add('hidden');
+
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const monthSelector = getEl('monthSelector');
+                const yearSelector = getEl('yearSelector');
+                monthSelector.innerHTML = monthNames.map((name, index) => `<option value="${index}" ${index === month ? 'selected' : ''}>${name}</option>`).join('');
+                
+                const currentYear = new Date().getFullYear();
+                yearSelector.innerHTML = '';
+                for (let y = currentYear - 5; y <= currentYear + 10; y++) {
+                    yearSelector.innerHTML += `<option value="${y}" ${y === year ? 'selected' : ''}>${y}</option>`;
+                }
+
+            } else {
+                picker.classList.add('hidden');
+                calendarGrid.classList.remove('hidden');
+                monthYearSpan.classList.remove('hidden');
+            }
+        };
+
+        const selectMonthYear = () => {
+            const month = getEl('monthSelector').value;
+            const year = getEl('yearSelector').value;
+            currentDate.setMonth(month);
+            currentDate.setFullYear(year);
+            renderCalendar();
+            toggleMonthYearPicker();
+        }
+
+        const prevMonth = () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); };
+        const nextMonth = () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); };
+
+        // Expose functions to the global scope
+        window.handleDialClick = handleDialClick;
+        window.selectResponse = selectResponse;
+        window.goBack = goBack;
+        window.restart = restart;
+        window.saveProspectAndNotes = saveProspectAndNotes;
+        window.clearNotes = clearNotes;
+        window.updateScript = updateScript;
+        window.validateSection1 = validateSection1;
+        window.validateSection2 = validateSection2;
+        window.runCalculation = runCalculation;
+        window.resetForm = resetForm;
+        window.openDatePicker = openDatePicker;
+        window.closeModal = closeModal;
+        window.activateSection = activateSection;
+        window.updateButton = updateButton;
+        window.prevMonth = prevMonth;
+        window.nextMonth = nextMonth;
+        window.toggleMonthYearPicker = toggleMonthYearPicker;
+        window.selectMonthYear = selectMonthYear;
+
+        // Initialize everything
+        activateSection(1);
+        updateButton(); 
+        const datalist = getEl('supplierList');
+        supplierNames.forEach(supplier => {
+            const option = document.createElement('option');
+            option.value = supplier;
+            datalist.appendChild(option);
+        });
+
+        // Display initial step
+        displayCurrentStep();
+        updateScript();
     },
 
     // Main dashboard rendering function
@@ -281,11 +1353,9 @@ const CRMApp = {
 
         if (!carouselWrapper) return;
         
-        // Sort activities by date (most recent first)
         const sortedActivities = this.activities.sort((a, b) => b.createdAt - a.createdAt);
         const totalPages = Math.ceil(sortedActivities.length / this.activitiesPerPage);
 
-        // Clear existing content
         carouselWrapper.innerHTML = '';
 
         if (sortedActivities.length === 0) {
@@ -298,7 +1368,6 @@ const CRMApp = {
             nextBtn.style.display = 'block';
         }
         
-        // Render each page of activities
         for (let i = 0; i < totalPages; i++) {
             const page = document.createElement('div');
             page.className = 'activity-page';
@@ -322,7 +1391,6 @@ const CRMApp = {
             carouselWrapper.appendChild(page);
         }
         
-        // Set the carousel to the current page and update buttons
         carouselWrapper.style.width = `${totalPages * 100}%`;
         carouselWrapper.style.transform = `translateX(-${this.activitiesPageIndex * (100 / totalPages)}%)`;
         this.updateActivityCarouselButtons(totalPages);
@@ -347,7 +1415,7 @@ const CRMApp = {
         if (nextBtn) nextBtn.disabled = this.activitiesPageIndex >= totalPages - 1;
     },
 
-    // Get activity icon based on type - Updated with white SVG icons
+    // Get activity icon based on type
     getActivityIcon(type) {
         const icons = {
             'call_note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -491,17 +1559,6 @@ const CRMApp = {
         this.openModal('bulk-import-modal');
     },
 
-    // Open call scripts modal/panel
-    openCallScriptsModal() {
-        // For now, show a toast - replace this with your call scripts functionality later
-        this.showToast('Call Scripts feature coming soon!', 'info');
-        
-        // Later you can replace this with:
-        // this.showView('call-scripts-view');
-        // or
-        // this.openModal('call-scripts-modal');
-    },
-
     // Modal functions
     openModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -518,475 +1575,3 @@ const CRMApp = {
             document.body.style.overflow = '';
             const form = modal.querySelector('form');
             if (form) form.reset();
-        }
-    },
-
-    async handleAddAccount(e) {
-        const accountData = {
-            name: document.getElementById('account-name').value,
-            industry: document.getElementById('account-industry').value,
-            phone: document.getElementById('account-phone').value,
-            website: document.getElementById('account-website').value,
-            address: document.getElementById('account-address').value,
-            createdAt: new Date()
-        };
-        
-        try {
-            const tempId = 'temp_' + Date.now();
-            this.accounts.push({ id: tempId, ...accountData });
-            
-            const docRef = await db.collection('accounts').add({
-                ...accountData,
-                createdAt: serverTimestamp()
-            });
-            
-            const accountIndex = this.accounts.findIndex(a => a.id === tempId);
-            if (accountIndex !== -1) {
-                this.accounts[accountIndex].id = docRef.id;
-            }
-            
-            console.log('Account saved successfully with ID:', docRef.id);
-            this.showToast('Account created successfully!', 'success');
-            this.closeModal('add-account-modal');
-            this.renderDashboardStats();
-            this.updateNotifications();
-            
-            await this.saveActivity({
-                type: 'account_added',
-                description: `New account created: ${accountData.name}`,
-                accountId: docRef.id,
-                accountName: accountData.name
-            });
-            
-        } catch (error) {
-            this.accounts = this.accounts.filter(a => a.id !== tempId);
-            console.error('Error saving account:', error);
-            this.showToast('Failed to create account', 'error');
-        }
-    },
-
-    async handleAddContact(e) {
-        const contactData = {
-            firstName: document.getElementById('contact-first-name').value,
-            lastName: document.getElementById('contact-last-name').value,
-            email: document.getElementById('contact-email').value,
-            phone: document.getElementById('contact-phone').value,
-            title: document.getElementById('contact-title').value,
-            accountId: document.getElementById('contact-account').value,
-            accountName: document.getElementById('contact-account').selectedOptions[0]?.textContent || '',
-            createdAt: new Date()
-        };
-        
-        try {
-            const tempId = 'temp_' + Date.now();
-            this.contacts.push({ id: tempId, ...contactData });
-            
-            const docRef = await db.collection('contacts').add({
-                ...contactData,
-                createdAt: serverTimestamp()
-            });
-            
-            const contactIndex = this.contacts.findIndex(c => c.id === tempId);
-            if (contactIndex !== -1) {
-                this.contacts[contactIndex].id = docRef.id;
-            }
-            
-            console.log('Contact saved successfully with ID:', docRef.id);
-            this.showToast('Contact created successfully!', 'success');
-            this.closeModal('add-contact-modal');
-            this.renderDashboardStats();
-            this.updateNotifications();
-            
-            await this.saveActivity({
-                type: 'contact_added',
-                description: `New contact added: ${contactData.firstName} ${contactData.lastName}`,
-                contactId: docRef.id,
-                contactName: `${contactData.firstName} ${contactData.lastName}`,
-                accountId: contactData.accountId,
-                accountName: contactData.accountName
-            });
-            
-        } catch (error) {
-            this.contacts = this.contacts.filter(c => c.id !== tempId);
-            console.error('Error saving contact:', error);
-            this.showToast('Failed to create contact', 'error');
-        }
-    },
-
-    async handleBulkImport(e) {
-        const importType = document.getElementById('import-type').value;
-        const fileInput = document.getElementById('csv-file');
-        const file = fileInput.files[0];
-        
-        if (!file) {
-            this.showToast('Please select a CSV file', 'error');
-            return;
-        }
-        
-        if (!file.name.toLowerCase().endsWith('.csv')) {
-            this.showToast('Please select a valid CSV file', 'error');
-            return;
-        }
-        
-        try {
-            this.showToast('Processing CSV file...', 'info');
-            
-            const text = await file.text();
-            const rows = text.split('\n').map(row => 
-                row.split(',').map(cell => cell.trim().replace(/"/g, ''))
-            );
-            const headers = rows[0].map(h => h.trim().toLowerCase());
-            const data = rows.slice(1).filter(row => row.length > 1 && row.some(cell => cell.trim()));
-            
-            let imported = 0;
-            let errors = 0;
-            
-            for (const row of data) {
-                try {
-                    if (importType === 'contacts') {
-                        const contactData = {
-                            firstName: this.getColumnValue(row, headers, ['first name', 'firstname', 'first']),
-                            lastName: this.getColumnValue(row, headers, ['last name', 'lastname', 'last']),
-                            email: this.getColumnValue(row, headers, ['email', 'email address']),
-                            phone: this.getColumnValue(row, headers, ['phone', 'phone number', 'telephone']),
-                            title: this.getColumnValue(row, headers, ['title', 'job title', 'position']),
-                            accountName: this.getColumnValue(row, headers, ['company', 'account', 'organization']),
-                            createdAt: new Date()
-                        };
-                        
-                        if (contactData.firstName && contactData.lastName && contactData.email) {
-                            const tempId = 'temp_' + Date.now() + '_' + imported;
-                            this.contacts.push({ id: tempId, ...contactData });
-                            
-                            const docRef = await db.collection('contacts').add({
-                                ...contactData,
-                                createdAt: serverTimestamp()
-                            });
-                            
-                            const contactIndex = this.contacts.findIndex(c => c.id === tempId);
-                            if (contactIndex !== -1) {
-                                this.contacts[contactIndex].id = docRef.id;
-                            }
-                            
-                            imported++;
-                        } else {
-                            errors++;
-                        }
-                    } else if (importType === 'accounts') {
-                        const accountData = {
-                            name: this.getColumnValue(row, headers, ['company', 'name', 'company name']),
-                            industry: this.getColumnValue(row, headers, ['industry', 'sector']),
-                            phone: this.getColumnValue(row, headers, ['phone', 'phone number', 'telephone']),
-                            website: this.getColumnValue(row, headers, ['website', 'url', 'web']),
-                            address: this.getColumnValue(row, headers, ['address', 'location']),
-                            createdAt: new Date()
-                        };
-                        
-                        if (accountData.name) {
-                            const tempId = 'temp_' + Date.now() + '_' + imported;
-                            this.accounts.push({ id: tempId, ...accountData });
-                            
-                            const docRef = await db.collection('accounts').add({
-                                ...accountData,
-                                createdAt: serverTimestamp()
-                            });
-                            
-                            const accountIndex = this.accounts.findIndex(a => a.id === tempId);
-                            if (accountIndex !== -1) {
-                                this.accounts[accountIndex].id = docRef.id;
-                            }
-                            
-                            imported++;
-                        } else {
-                            errors++;
-                        }
-                    }
-                } catch (rowError) {
-                    console.error('Error processing row:', rowError);
-                    errors++;
-                }
-            }
-            
-            let message = `Successfully imported ${imported} ${importType}`;
-            if (errors > 0) {
-                message += ` (${errors} rows had errors and were skipped)`;
-            }
-            
-            this.showToast(message, imported > 0 ? 'success' : 'warning');
-            this.closeModal('bulk-import-modal');
-            
-            this.renderDashboardStats();
-            this.updateNotifications();
-            
-            if (imported > 0) {
-                await this.saveActivity({
-                    type: 'bulk_import',
-                    description: `Bulk imported ${imported} ${importType} from CSV`,
-                });
-            }
-            
-        } catch (error) {
-            console.error('Error importing CSV:', error);
-            this.showToast('Error processing CSV file. Please check the format.', 'error');
-        }
-    },
-
-    getColumnValue(row, headers, columnNames) {
-        for (const name of columnNames) {
-            const index = headers.indexOf(name);
-            if (index !== -1 && row[index]) {
-                return row[index].trim();
-            }
-        }
-        return '';
-    },
-
-    updateNotifications() {
-        this.notifications = [];
-        
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const newContacts = this.contacts.filter(c => new Date(c.createdAt) > yesterday);
-        const newAccounts = this.accounts.filter(a => new Date(a.createdAt) > yesterday);
-        const today = new Date();
-        const pendingTasks = this.tasks.filter(t => !t.completed && new Date(t.dueDate) <= today);
-        
-        if (newContacts.length > 0) {
-            this.notifications.push({
-                type: 'contact',
-                message: `${newContacts.length} new contact(s) added`,
-                count: newContacts.length,
-                time: 'Recently'
-            });
-        }
-        
-        if (newAccounts.length > 0) {
-            this.notifications.push({
-                type: 'account',
-                message: `${newAccounts.length} new account(s) added`,
-                count: newAccounts.length,
-                time: 'Recently'
-            });
-        }
-        
-        if (pendingTasks.length > 0) {
-            this.notifications.push({
-                type: 'task',
-                message: `${pendingTasks.length} pending task(s) for today`,
-                count: pendingTasks.length,
-                time: 'Due today'
-            });
-        }
-        
-        this.renderNotifications();
-        this.updateNavigationBadges();
-    },
-
-    renderNotifications() {
-        const notificationList = document.getElementById('notification-list');
-        const notificationBadge = document.getElementById('notification-badge');
-        const notificationCount = document.getElementById('notification-count');
-        
-        const totalCount = this.notifications.reduce((sum, n) => sum + n.count, 0);
-        
-        if (notificationBadge) {
-            notificationBadge.textContent = totalCount;
-            notificationBadge.style.display = totalCount > 0 ? 'flex' : 'none';
-        }
-        
-        if (notificationCount) {
-            notificationCount.textContent = totalCount;
-        }
-        
-        if (notificationList) {
-            if (this.notifications.length === 0) {
-                notificationList.innerHTML = '<div class="notification-empty">No new notifications</div>';
-            } else {
-                notificationList.innerHTML = this.notifications.map(notification => `
-                    <div class="notification-item">
-                        <div class="notification-icon ${notification.type}">
-                            ${this.getNotificationIcon(notification.type)}
-                        </div>
-                        <div class="notification-text">
-                            <div class="notification-message">${notification.message}</div>
-                            <div class="notification-time">${notification.time}</div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        }
-    },
-
-    updateNavigationBadges() {
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        
-        const newContacts = this.contacts.filter(c => new Date(c.createdAt) > yesterday).length;
-        this.updateBadge('contacts-badge', newContacts);
-        
-        const newAccounts = this.accounts.filter(a => new Date(a.createdAt) > yesterday).length;
-        this.updateBadge('accounts-badge', newAccounts);
-        
-        const today = new Date();
-        const pendingTasks = this.tasks.filter(t => !t.completed && new Date(t.dueDate) <= today).length;
-        this.updateBadge('tasks-badge', pendingTasks);
-        
-        this.updateBadge('emails-badge', 0);
-    },
-
-    updateBadge(badgeId, count) {
-        const badge = document.getElementById(badgeId);
-        if (badge) {
-            badge.textContent = count;
-            badge.style.display = count > 0 ? 'flex' : 'none';
-        }
-    },
-
-    getNotificationIcon(type) {
-        const icons = {
-            contact: '👤',
-            account: '🏢',
-            email: '📧',
-            task: '✅'
-        };
-        return icons[type] || '📋';
-    },
-
-    updateElement(id, value) {
-        const element = document.getElementById(id);
-        if (element) {
-            element.textContent = value;
-        }
-    },
-
-    formatDate(date) {
-        if (!date) return 'Unknown';
-        const now = new Date();
-        const dateObj = new Date(date);
-        const diffMs = now - dateObj;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-        
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins} minutes ago`;
-        if (diffHours < 24) return `${diffHours} hours ago`;
-        if (diffDays < 7) return `${diffDays} days ago`;
-        
-        return dateObj.toLocaleDateString();
-    },
-
-    showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        
-        let container = document.getElementById('toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'toast-container';
-            container.className = 'toast-container';
-            document.body.appendChild(container);
-        }
-        
-        container.appendChild(toast);
-        
-        requestAnimationFrame(() => {
-            toast.style.transform = 'translateX(0)';
-            toast.style.opacity = '1';
-        });
-        
-        setTimeout(() => {
-            toast.style.transform = 'translateX(100%)';
-            toast.style.opacity = '0';
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.remove();
-                }
-            }, 300);
-        }, 4000);
-    },
-
-    async saveActivity(activityData) {
-        try {
-            const docRef = await db.collection('activities').add({
-                ...activityData,
-                createdAt: serverTimestamp()
-            });
-            
-            this.activities.unshift({
-                id: docRef.id,
-                ...activityData,
-                createdAt: new Date()
-            });
-            
-            console.log('Activity saved successfully with ID:', docRef.id);
-            this.renderActivityCarousel();
-            return docRef.id;
-        } catch (error) {
-            console.error('Error saving activity:', error);
-            return null;
-        }
-    },
-
-    async saveAccount(accountData) {
-        try {
-            const docRef = await db.collection('accounts').add({
-                ...accountData,
-                createdAt: serverTimestamp()
-            });
-            
-            console.log('Account saved successfully with ID:', docRef.id);
-            return docRef.id;
-        } catch (error) {
-            console.error('Error saving account:', error);
-            throw error;
-        }
-    },
-
-    async saveContact(contactData) {
-        try {
-            const docRef = await db.collection('contacts').add({
-                ...contactData,
-                createdAt: serverTimestamp()
-            });
-            
-            console.log('Contact saved successfully with ID:', docRef.id);
-            return docRef.id;
-        } catch (error) {
-            console.error('Error saving contact:', error);
-            throw error;
-        }
-    }
-};
-
-// --- 3. Initialize the application when DOM is loaded ---
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing CRM App...');
-    CRMApp.init();
-});
-
-// --- 4. Make CRMApp globally available for debugging ---
-window.CRMApp = CRMApp;
-
-// --- 5. Additional utility functions ---
-function formatCurrency(amount) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-    }).format(amount);
-}
-
-function formatNumber(num) {
-    return new Intl.NumberFormat('en-US').format(num);
-}
-
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
