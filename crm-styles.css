@@ -94,9 +94,8 @@ html, body {
 
 .app-main {
     display: flex;
-    flex: 1;
-    overflow: hidden;
-    margin-top: 70px;
+    height: calc(100vh - 70px);
+    position: relative;
 }
 
 /* Special handling for call scripts view to enable scroll-under effect */
@@ -615,8 +614,12 @@ html, body {
 }
 
 /* --- 6. Main Content Area (3/4 width) - FIXED STAT CARDS --- */
-.main-content {
+.main-content-wrapper {
     flex: 3;
+    height: 100%;
+}
+
+.main-content {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 0 var(--spacing-lg); /* Vertical padding removed */
@@ -660,11 +663,11 @@ html, body {
 /* --- 6. Right Widget Panel (Enhanced) --- */
 .widget-panel {
     flex: 1;
-    background: var(--dark-blue);
+    height: 100%;
+    padding: 1.5rem;
     border-left: 1px solid var(--border-light);
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 0 var(--spacing-lg); /* Vertical padding removed */
     position: relative;
     display: flex;
     flex-direction: column;
@@ -1878,8 +1881,8 @@ html, body {
 /* Call Center Hub Specific Styles */
 /* Ensure the main view and sidebar scroll independently and have consistent padding. */
 #call-scripts-view, #cold-calling-widgets-container {
-    padding: 1.5rem;
-    height: calc(100vh - 70px - 3rem); /* Full height minus header and top/bottom padding */
+    padding: 0 1.5rem 1.5rem 1.5rem; /* Removed top padding */
+    height: calc(100vh - 70px - 1.5rem); /* Adjust height for new padding */
     overflow-y: auto;
 }
 
@@ -1928,7 +1931,23 @@ html, body {
     /* Padding is now handled by the parent #cold-calling-widgets-container */
 }
 
+
+
+.script-section {
+    margin-bottom: 1.5rem;
+}
+
 .call-script-container {
+    background-color: var(--cch-secondary-bg);
+    border-radius: var(--border-radius-large);
+    padding: 2rem;
+    text-align: center;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin-top: 1.5rem; /* Reduced top margin */
     margin-bottom: 1.5rem;
 }
 
@@ -1936,12 +1955,63 @@ html, body {
     margin-bottom: 1.5rem;
 }
 
-/* Ensure no conflicting global styles exist for these classes */
-/* The old conflicting rules at the end of the file should already be removed. */
+/* Call Center Hub Specific Styles */
+/* Ensure the main view and sidebar scroll independently and have consistent padding. */
+#call-scripts-view, #cold-calling-widgets-container {
+    padding: 0 1.5rem 1.5rem 1.5rem; /* Removed top padding */
+    height: calc(100vh - 70px - 1.5rem); /* Adjust height for new padding */
+    overflow-y: auto;
+}
+
+#call-scripts-view {
+    flex: 3;
+}
+
+#cold-calling-widgets-container {
+    flex: 1;
+}
+
+/* Custom scrollbar for a cleaner look in the call hub */
+#call-scripts-view::-webkit-scrollbar, 
+#cold-calling-widgets-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#call-scripts-view::-webkit-scrollbar-track, 
+#cold-calling-widgets-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#call-scripts-view::-webkit-scrollbar-thumb, 
+#cold-calling-widgets-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+#call-scripts-view::-webkit-scrollbar-thumb:hover, 
+#cold-calling-widgets-container::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.calls-hub-layout {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.calls-hub-main {
+    flex: 3;
+    /* Padding is now handled by the parent #call-scripts-view */
+}
+
+.calls-hub-sidebar {
+    flex: 1;
+    /* Padding is now handled by the parent #cold-calling-widgets-container */
+}
 
 /* --- 10. Responsive Design --- */
 @media (max-width: 1200px) {
     .app-main {
+        display: flex;
         flex-direction: column;
     }
     .main-content {
