@@ -2,7 +2,6 @@
 // This file contains the complete application logic for the redesigned Power Choosers CRM.
 // Updated with white SVG activity icons for better theme consistency
 // Added Call Scripts button functionality
-// Integrated Cold Calling Hub with auto-population and Firebase updates
 
 // --- 1. Firebase Configuration & Initialization ---
 const firebaseConfig = {
@@ -94,7 +93,7 @@ const CRMApp = {
             { id: 'con3', firstName: 'Mike', lastName: 'Davis', title: 'Operations Manager', accountId: 'acc2', accountName: 'XYZ Energy Solutions', email: 'mike@xyzenergy.com', phone: '(972) 555-0456', createdAt: new Date() }
         ];
         this.activities = [
-            { id: 'act1', type: 'call_note', description: 'Call with John Smith - Q1 Energy Contract', noteContent: 'Call with John Smith - Q1 Energy Contract', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+            { id: 'act1', type: 'call_note', description: 'Call with John Smith - Q1 Energy Contract', noteContent: 'Discussed renewal options', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
             { id: 'act2', type: 'email', description: 'Sent energy analysis to Sarah Johnson', contactId: 'con2', contactName: 'Sarah Johnson', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
             { id: 'act3', type: 'call_note', description: 'Follow-up with Mike Davis - Multi-site proposal', noteContent: 'Reviewing proposal details', contactId: 'con3', contactName: 'Mike Davis', accountId: 'acc2', accountName: 'XYZ Energy Solutions', createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
             { id: 'act4', type: 'note', description: 'Added a note for John Smith', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000) },
@@ -153,7 +152,7 @@ const CRMApp = {
         if (callScriptsBtn) {
             callScriptsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.showCallScriptsView(); // Directly call the function to show the view
+                this.openCallScriptsModal();
             });
         }
         
@@ -204,247 +203,34 @@ const CRMApp = {
 
     // Show/hide views in the single-page application
     showView(viewName) {
-        // Get references to main containers
-        const mainContent = document.querySelector('.main-content');
-        const widgetPanel = document.querySelector('.widget-panel');
-        const callScriptsView = document.getElementById('call-scripts-view');
-        
-        // Hide all main containers
-        if (mainContent) mainContent.style.display = 'none';
-        if (widgetPanel) widgetPanel.style.display = 'none';
-        if (callScriptsView) callScriptsView.style.display = 'none';
-        
-        // Hide all individual page views
-        document.querySelectorAll('.main-content .page-view').forEach(view => {
+        this.currentView = viewName;
+        document.querySelectorAll('.page-view').forEach(view => {
             view.style.display = 'none';
         });
-
-        // Show the appropriate container based on the view
-        if (viewName === 'call-scripts-view') {
-            if (callScriptsView) callScriptsView.style.display = 'flex';
-        } else {
-            if (mainContent) mainContent.style.display = 'flex';
-            if (widgetPanel) widgetPanel.style.display = 'flex';
-            const activeView = document.getElementById(viewName);
-            if (activeView) {
-                activeView.style.display = 'flex';
-            }
-            
-            // Re-render dashboard content if returning to it
-            if (viewName === 'dashboard-view') {
-                this.renderDashboard();
-            }
+        const activeView = document.getElementById(viewName);
+        if (activeView) {
+            activeView.style.display = 'block';
         }
-
-        // Update active navigation button state
-        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-        const activeNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
-        if (activeNav) {
-            activeNav.classList.add('active');
-        } else if (viewName === 'call-scripts-view') {
-            const dashboardNav = document.querySelector('.nav-item[data-view="dashboard-view"]');
-            if (dashboardNav) dashboardNav.classList.add('active');
-        }
-    },
-
-    // Function to load and display the Call Scripts view
-    async showCallScriptsView() {
-        const callScriptsView = document.getElementById('call-scripts-view');
-        if (!callScriptsView) {
-            console.error('Call scripts view element not found.');
-            this.showToast('Call scripts view not available.', 'error');
-            return;
-        }
-
-        this.showView('call-scripts-view');
         
-        try {
-            const response = await fetch('call-scripts-content.html');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const htmlContent = await response.text();
-            callScriptsView.innerHTML = htmlContent;
-
-            if (typeof window.initializeCallScriptsPage === 'function') {
-                window.initializeCallScriptsPage();
-                
-                // Auto-populate fields if data is available
-                this.autoPopulateCallScripts();
-                
-                console.log('Call scripts content loaded and initialized.');
-                this.showToast('Cold Calling Hub loaded successfully!', 'success');
-            }
-        } catch (error) {
-            console.error('Error loading call scripts content:', error);
-            this.showToast('Failed to load call scripts content.', 'error');
-            callScriptsView.innerHTML = `<div class="error-state">
-                <p>Failed to load Cold Calling Hub content.</p>
-                <p>Please check the file path and try again.</p>
-                <button class="retry-button" onclick="window.CRMApp.showCallScriptsView()">Retry</button>
-            </div>`;
+        if (viewName === 'dashboard-view') {
+            this.renderDashboard();
+        } else {
+            console.log(`Mapped to: ${viewName}`);
         }
     },
 
-    // Function to handle auto-population of call script fields
-    autoPopulateCallScripts() {
-        // For demonstration, let's grab the first contact and account from our sample data
-        const contactToPopulate = this.contacts && this.contacts.length > 0 ? this.contacts[0] : null;
-        const accountToPopulate = contactToPopulate ? this.accounts.find(a => a.id === contactToPopulate.accountId) : null;
-    
-        // Populate Cold Calling Script fields
-        const inputPhone = document.getElementById('input-phone');
-        const inputCompanyName = document.getElementById('input-company-name');
-        const inputName = document.getElementById('input-name');
-        const inputTitle = document.getElementById('input-title');
-        const inputCompanyIndustry = document.getElementById('input-company-industry');
-        const inputBenefit = document.getElementById('input-benefit');
-        const inputPain = document.getElementById('input-pain');
-
-        if (inputPhone && contactToPopulate) inputPhone.value = contactToPopulate.phone || '';
-        if (inputCompanyName && accountToPopulate) inputCompanyName.value = accountToPopulate.name || '';
-        if (inputName && contactToPopulate) inputName.value = `${contactToPopulate.firstName || ''} ${contactToPopulate.lastName || ''}`.trim();
-        if (inputTitle && contactToPopulate) inputTitle.value = contactToPopulate.title || '';
-        if (inputCompanyIndustry && accountToPopulate) inputCompanyIndustry.value = accountToPopulate.industry || '';
-        if (inputBenefit && accountToPopulate) inputBenefit.value = accountToPopulate.benefits || '';
-        if (inputPain && accountToPopulate) inputPain.value = accountToPopulate.painPoints || '';
-
-        // Populate Energy Health Check fields
-        const currentSupplierInput = document.getElementById('currentSupplier');
-        const monthlyBillInput = document.getElementById('monthlyBill');
-        const currentRateInput = document.getElementById('currentRate');
-        const contractEndDateInput = document.getElementById('contractEndDate');
-        const sellRateInput = document.getElementById('sellRate');
-
-        if (currentSupplierInput && accountToPopulate) currentSupplierInput.value = accountToPopulate.currentSupplier || '';
-        if (monthlyBillInput && accountToPopulate) monthlyBillInput.value = accountToPopulate.monthlyBill || '';
-        if (currentRateInput && accountToPopulate) currentRateInput.value = accountToPopulate.currentRate || '';
-        if (contractEndDateInput && accountToPopulate) contractEndDateInput.value = accountToPopulate.contractEndDate || '';
-        if (sellRateInput && accountToPopulate) sellRateInput.value = accountToPopulate.sellRate || '';
-
-        // Trigger updateScript in the call scripts page to update placeholders
-        if (typeof window.updateScript === 'function') {
-            window.updateScript();
-        }
-
-        // If all Energy Health Check fields are known, run the report automatically
-        const allHealthCheckFieldsKnown = 
-            (currentSupplierInput && currentSupplierInput.value) &&
-            (monthlyBillInput && monthlyBillInput.value) &&
-            (currentRateInput && currentRateInput.value) &&
-            (contractEndDateInput && contractEndDateInput.value) &&
-            (sellRateInput && sellRateInput.value);
-
-        if (allHealthCheckFieldsKnown && typeof window.runCalculation === 'function') {
-            console.log("All health check fields populated, running calculation automatically.");
-            window.validateSection1(); // Re-validate section 1 to ensure internal state is correct
-            window.validateSection2(); // Re-validate section 2
-            window.runCalculation();
-        }
+    // Update the active state of navigation buttons
+    updateActiveNavButton(activeNav) {
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        activeNav.classList.add('active');
     },
 
-    // Save call log to Firebase and update notifications
-    async saveCallLog(logData, disposition) {
-        try {
-            const docRef = await db.collection('call_logs').add({
-                ...logData,
-                createdAt: serverTimestamp()
-            });
-
-            // Find or create contact based on prospect info
-            let contactId = null;
-            let contactFound = this.contacts.find(c => 
-                c.firstName === logData.prospect.name.split(' ')[0] && 
-                c.lastName === logData.prospect.name.split(' ')[1]
-            );
-
-            if (contactFound) {
-                contactId = contactFound.id;
-                // Update existing contact details if provided
-                await db.collection('contacts').doc(contactId).update({
-                    phone: logData.prospect.phone || contactFound.phone,
-                    title: logData.prospect.title || contactFound.title,
-                    // Potentially update accountName if it changed or was newly provided
-                    accountName: logData.prospect.company || contactFound.accountName,
-                    updatedAt: serverTimestamp()
-                });
-                // Update local contacts array
-                const index = this.contacts.findIndex(c => c.id === contactId);
-                if (index !== -1) {
-                    this.contacts[index] = { 
-                        ...this.contacts[index], 
-                        phone: logData.prospect.phone || this.contacts[index].phone,
-                        title: logData.prospect.title || this.contacts[index].title,
-                        accountName: logData.prospect.company || this.contacts[index].accountName,
-                        updatedAt: new Date()
-                    };
-                }
-            } else {
-                // Create new contact if not found
-                const newContactData = {
-                    firstName: logData.prospect.name.split(' ')[0] || '',
-                    lastName: logData.prospect.name.split(' ')[1] || '',
-                    phone: logData.prospect.phone || '',
-                    title: logData.prospect.title || '',
-                    accountName: logData.prospect.company || '', // Link to company name
-                    createdAt: serverTimestamp()
-                };
-                const newContactRef = await db.collection('contacts').add(newContactData);
-                contactId = newContactRef.id;
-                this.contacts.push({ id: contactId, ...newContactData, createdAt: new Date() });
-            }
-
-            // Save activity for the call log
-            await this.saveActivity({
-                type: 'call_log_saved',
-                description: `Call Log saved for ${logData.prospect.company || 'Unknown Company'} (${disposition})`,
-                contactId: contactId,
-                contactName: logData.prospect.name,
-                accountId: this.accounts.find(acc => acc.name === logData.prospect.company)?.id || null, // Link to account if exists
-                accountName: logData.prospect.company
-            });
-
-            this.showToast(`Note added and prospect contact details updated for ${logData.prospect.name}!`, 'success');
-            this.updateNotifications();
-            this.renderDashboardStats(); // Update stats if new contacts/accounts were added
-        } catch (error) {
-            console.error('Error saving call log or updating contact:', error);
-            this.showToast('Failed to save call notes or update contact details.', 'error');
-        }
-    },
-
-    // Update account details from Energy Health Check results
-    async updateAccountDetailsFromHealthCheck(companyName, healthCheckData) {
-        try {
-            const account = this.accounts.find(acc => acc.name === companyName);
-            if (account) {
-                const accountRef = db.collection('accounts').doc(account.id);
-                await accountRef.update({
-                    ...healthCheckData,
-                    updatedAt: serverTimestamp()
-                });
-
-                // Update local accounts array
-                const index = this.accounts.findIndex(acc => acc.id === account.id);
-                if (index !== -1) {
-                    this.accounts[index] = { ...this.accounts[index], ...healthCheckData, updatedAt: new Date() };
-                }
-
-                this.showToast(`Account details for ${companyName} updated from Health Check!`, 'success');
-                await this.saveActivity({
-                    type: 'health_check_updated',
-                    description: `Energy Health Check updated for ${companyName}`,
-                    accountId: account.id,
-                    accountName: companyName
-                });
-                this.updateNotifications();
-            } else {
-                this.showToast(`Account "${companyName}" not found. Cannot update health check details.`, 'warning');
-            }
-        } catch (error) {
-            console.error('Error updating account details from health check:', error);
-            this.showToast('Failed to update account details from health check.', 'error');
-        }
+    // Main dashboard rendering function
+    renderDashboard() {
+        this.renderDashboardStats();
+        this.renderTodayTasks();
+        this.renderActivityCarousel();
+        this.renderEnergyMarketNews();
     },
 
     // Render dashboard statistics cards
@@ -561,18 +347,51 @@ const CRMApp = {
         if (nextBtn) nextBtn.disabled = this.activitiesPageIndex >= totalPages - 1;
     },
 
-    // Get activity icon based on type
+    // Get activity icon based on type - Updated with white SVG icons
     getActivityIcon(type) {
         const icons = {
-            'call_note': '📞',
-            'email': '📧',
-            'note': '📝',
-            'task_completed': '✅',
-            'contact_added': '👤',
-            'account_added': '🏢',
-            'bulk_import': '📊',
+            'call_note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+            </svg>`,
+            'email': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>`,
+            'note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <line x1="10" y1="9" x2="8" y2="9"></line>
+            </svg>`,
+            'task_completed': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>`,
+            'contact_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>`,
+            'account_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 21h18"></path>
+                <path d="M5 21V7l8-4v18"></path>
+                <path d="M19 21V11l-6-4"></path>
+            </svg>`,
+            'bulk_import': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>`,
         };
-        return icons[type] || '📋';
+        return icons[type] || `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+        </svg>`;
     },
 
     // Render energy market news feed
@@ -672,6 +491,17 @@ const CRMApp = {
         this.openModal('bulk-import-modal');
     },
 
+    // Open call scripts modal/panel
+    openCallScriptsModal() {
+        // For now, show a toast - replace this with your call scripts functionality later
+        this.showToast('Call Scripts feature coming soon!', 'info');
+        
+        // Later you can replace this with:
+        // this.showView('call-scripts-view');
+        // or
+        // this.openModal('call-scripts-modal');
+    },
+
     // Modal functions
     openModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -727,12 +557,11 @@ const CRMApp = {
                 accountId: docRef.id,
                 accountName: accountData.name
             });
-
+            
         } catch (error) {
             this.accounts = this.accounts.filter(a => a.id !== tempId);
             console.error('Error saving account:', error);
             this.showToast('Failed to create account', 'error');
-            throw error;
         }
     },
 
@@ -957,7 +786,7 @@ const CRMApp = {
         const notificationBadge = document.getElementById('notification-badge');
         const notificationCount = document.getElementById('notification-count');
         
-        const totalCount = this.notifications.reduce((sum, n) => sum + n.count, 0); 
+        const totalCount = this.notifications.reduce((sum, n) => sum + n.count, 0);
         
         if (notificationBadge) {
             notificationBadge.textContent = totalCount;
@@ -1016,9 +845,7 @@ const CRMApp = {
             contact: '👤',
             account: '🏢',
             email: '📧',
-            task: '✅',
-            health_check_updated: '📈',
-            call_log_saved: '📞'
+            task: '✅'
         };
         return icons[type] || '📋';
     },
