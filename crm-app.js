@@ -1,8 +1,5 @@
-// Power Choosers CRM Dashboard - Main JavaScript File (UPDATED)
+// Power Choosers CRM Dashboard - Main JavaScript File (UPDATED & CONSOLIDATED)
 // This file contains the complete application logic for the redesigned Power Choosers CRM.
-// Updated with white SVG activity icons for better theme consistency
-// Added Call Scripts button functionality
-// Integrated Cold Calling Hub with auto-population and Firebase updates
 
 // --- 1. Firebase Configuration & Initialization ---
 const firebaseConfig = {
@@ -147,13 +144,13 @@ const CRMApp = {
                 }
             });
         }
-
+        
         // Call Scripts button
         const callScriptsBtn = document.getElementById('call-scripts-btn');
         if (callScriptsBtn) {
             callScriptsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.showCallScriptsView(); // Directly call the function to show the view
+                this.showCallScriptsView();
             });
         }
         
@@ -166,7 +163,7 @@ const CRMApp = {
         if (activityNextBtn) {
             activityNextBtn.addEventListener('click', () => this.scrollActivityCarousel('next'));
         }
-
+        
         this.setupModalHandlers();
 
         window.addAccount = () => this.addAccount();
@@ -184,7 +181,6 @@ const CRMApp = {
                 await this.handleAddAccount(e);
             });
         }
-
         const addContactForm = document.getElementById('add-contact-form');
         if (addContactForm) {
             addContactForm.addEventListener('submit', async (e) => {
@@ -192,7 +188,6 @@ const CRMApp = {
                 await this.handleAddContact(e);
             });
         }
-
         const bulkImportForm = document.getElementById('bulk-import-form');
         if (bulkImportForm) {
             bulkImportForm.addEventListener('submit', async (e) => {
@@ -211,33 +206,17 @@ const CRMApp = {
             view.style.display = 'none';
         });
         
-        // Special handling for call scripts view
-        if (viewName === 'call-scripts-view') {
-            // Don't automatically load the call scripts view - it should only be loaded via the button
-            this.showView('dashboard-view');
-            return;
-        }
-        
-        // Show the requested view
         const activeView = document.getElementById(viewName);
         if (activeView) {
-            activeView.style.display = 'block';
+            activeView.style.display = 'flex';
         }
         
         // Handle view-specific logic
         if (viewName === 'dashboard-view') {
-            // Make sure to show dashboard content and hide any call scripts view that might be showing
             const callScriptsContainer = document.querySelector('.calls-hub-layout');
             if (callScriptsContainer) {
-                callScriptsContainer.style.display = 'none';
+                callScriptsContainer.remove();
             }
-            
-            // Show all dashboard content
-            document.querySelectorAll('.dashboard-card, .stat-cards-grid').forEach(el => {
-                el.style.display = '';
-            });
-            
-            // Render dashboard content
             this.renderDashboard();
         }
     },
@@ -245,8 +224,6 @@ const CRMApp = {
     // Update the active state of navigation buttons
     updateActiveNavButton(activeNav) {
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-        // If the clicked item is the Call Scripts button (which is not a nav-item in the sidebar)
-        // ensure the dashboard nav item remains active if we're just switching content within the main area
         if (activeNav.id === 'call-scripts-btn') {
             document.querySelector('.nav-item[data-view="dashboard-view"]').classList.add('active');
         } else {
@@ -307,27 +284,23 @@ const CRMApp = {
         const carouselWrapper = document.getElementById('activity-list-wrapper');
         const prevBtn = document.getElementById('activity-prev-btn');
         const nextBtn = document.getElementById('activity-next-btn');
-
         if (!carouselWrapper) return;
         
-        // Sort activities by date (most recent first)
         const sortedActivities = this.activities.sort((a, b) => b.createdAt - a.createdAt);
         const totalPages = Math.ceil(sortedActivities.length / this.activitiesPerPage);
 
-        // Clear existing content
         carouselWrapper.innerHTML = '';
 
         if (sortedActivities.length === 0) {
             carouselWrapper.innerHTML = '<div class="no-items">No recent activity.</div>';
-            prevBtn.style.display = 'none';
-            nextBtn.style.display = 'none';
+            if (prevBtn) prevBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'none';
             return;
         } else {
-            prevBtn.style.display = 'block';
-            nextBtn.style.display = 'block';
+            if (prevBtn) prevBtn.style.display = 'flex';
+            if (nextBtn) nextBtn.style.display = 'flex';
         }
         
-        // Render each page of activities
         for (let i = 0; i < totalPages; i++) {
             const page = document.createElement('div');
             page.className = 'activity-page';
@@ -351,7 +324,6 @@ const CRMApp = {
             carouselWrapper.appendChild(page);
         }
         
-        // Set the carousel to the current page and update buttons
         carouselWrapper.style.width = `${totalPages * 100}%`;
         carouselWrapper.style.transform = `translateX(-${this.activitiesPageIndex * (100 / totalPages)}%)`;
         this.updateActivityCarouselButtons(totalPages);
@@ -376,87 +348,32 @@ const CRMApp = {
         if (nextBtn) nextBtn.disabled = this.activitiesPageIndex >= totalPages - 1;
     },
 
-    // Get activity icon based on type - Updated with white SVG icons
+    // Get activity icon based on type
     getActivityIcon(type) {
         const icons = {
-            'call_note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-            </svg>`,
-            'email': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                <polyline points="22,6 12,13 2,6"></polyline>
-            </svg>`,
-            'note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <line x1="10" y1="9" x2="8" y2="9"></line>
-            </svg>`,
-            'task_completed': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 11l3 3L22 4"></path>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>`,
-            'contact_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>`,
-            'account_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 21h18"></path>
-                <path d="M5 21V7l8-4v18"></path>
-                <path d="M19 21V11l-6-4"></path>
-            </svg>`,
-            'bulk_import': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>`,
-            'health_check_updated': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-            </svg>`,
-            'call_log_saved': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>`
+            'call_note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>`,
+            'email': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`,
+            'note': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>`,
+            'task_completed': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>`,
+            'contact_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
+            'account_added': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path></svg>`,
+            'bulk_import': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
+            'health_check_updated': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>`,
+            'call_log_saved': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>`
         };
-        return icons[type] || `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <line x1="10" y1="9" x2="8" y2="9"></line>
-        </svg>`;
+        return icons[type] || `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>`;
     },
 
     // Render energy market news feed
     renderEnergyMarketNews() {
         const newsFeed = document.getElementById('news-feed');
         if (!newsFeed) return;
-        
         newsFeed.innerHTML = '';
-        
         const newsItems = [
-            { 
-                title: 'ERCOT Demand Rises', 
-                content: 'ERCOT demand is increasing due to summer heat, putting pressure on grid reliability.',
-                time: '2 hours ago'
-            },
-            { 
-                title: 'Natural Gas Prices Fluctuate', 
-                content: 'Recent geopolitical events have caused volatility in natural gas prices, impacting futures.',
-                time: '4 hours ago'
-            },
-            { 
-                title: 'Renewable Energy Growth', 
-                content: 'Texas continues to lead in renewable energy adoption with new wind and solar projects.',
-                time: '6 hours ago'
-            }
+            { title: 'ERCOT Demand Rises', content: 'ERCOT demand is increasing due to summer heat, putting pressure on grid reliability.', time: '2 hours ago' },
+            { title: 'Natural Gas Prices Fluctuate', content: 'Recent geopolitical events have caused volatility in natural gas prices, impacting futures.', time: '4 hours ago' },
+            { title: 'Renewable Energy Growth', content: 'Texas continues to lead in renewable energy adoption with new wind and solar projects.', time: '6 hours ago' }
         ];
-        
         if (newsItems.length > 0) {
             newsItems.forEach(item => {
                 const div = document.createElement('div');
@@ -476,33 +393,18 @@ const CRMApp = {
     // Handle search functionality
     handleSearch(query) {
         if (query.length < 2) return;
-        
         const results = [];
-        
         this.accounts.forEach(account => {
             if (account.name.toLowerCase().includes(query.toLowerCase())) {
-                results.push({
-                    type: 'account',
-                    id: account.id,
-                    name: account.name,
-                    subtitle: account.industry || 'Account'
-                });
+                results.push({ type: 'account', id: account.id, name: account.name, subtitle: account.industry || 'Account' });
             }
         });
-        
         this.contacts.forEach(contact => {
             const fullName = `${contact.firstName} ${contact.lastName}`;
-            if (fullName.toLowerCase().includes(query.toLowerCase()) || 
-                (contact.email && contact.email.toLowerCase().includes(query.toLowerCase()))) {
-                results.push({
-                    type: 'contact',
-                    id: contact.id,
-                    name: fullName,
-                    subtitle: contact.accountName || 'Contact'
-                });
+            if (fullName.toLowerCase().includes(query.toLowerCase()) || (contact.email && contact.email.toLowerCase().includes(query.toLowerCase()))) {
+                results.push({ type: 'contact', id: contact.id, name: fullName, subtitle: contact.accountName || 'Contact' });
             }
         });
-        
         console.log('Search results:', results);
     },
 
@@ -531,39 +433,55 @@ const CRMApp = {
 
     // Function to load and display the Call Scripts view
     async showCallScriptsView() {
-        const callScriptsView = document.getElementById('call-scripts-view');
-        if (!callScriptsView) {
-            console.error('Call scripts view element not found.');
-            this.showToast('Call scripts view not available.', 'error');
-            return;
-        }
-
-        // Ensure the call scripts view is visible and other views are hidden
-        this.showView('call-scripts-view'); 
-        // Update the active navigation button to reflect the current view (if applicable)
-        // Since Call Scripts is a button in the header, we might want to keep 'Dashboard' active
-        // or add a dedicated 'Call Scripts' nav item if it's a primary view.
-        // For now, let's keep the Dashboard nav item active.
-        this.updateActiveNavButton(document.querySelector('.nav-item[data-view="dashboard-view"]'));
+        const mainContent = document.getElementById('dashboard-view');
+        const callsHubUrl = 'https://powerchoosers.github.io/power-choosers-crm/cold-calling-hub.html';
 
         try {
-            // Fetch the content of call-scripts-content.html
-            const response = await fetch('call-scripts-content.html');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const response = await fetch(callsHubUrl);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const htmlContent = await response.text();
-            callScriptsView.innerHTML = htmlContent;
 
-            // Initialize the script within the loaded content
-            // The script in call-scripts-content.html is wrapped in initializeCallScriptsPage()
-            if (typeof window.initializeCallScriptsPage === 'function') {
-                window.initializeCallScriptsPage();
-                this.autoPopulateCallScripts();
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlContent;
+
+            const scripts = Array.from(tempDiv.querySelectorAll('script'));
+            const hubBody = tempDiv.querySelector('.calls-hub-layout');
+
+            if (hubBody) {
+                // Clear the main content and append the call hub body
+                mainContent.innerHTML = '';
+                mainContent.appendChild(hubBody);
+
+                // Re-execute scripts to initialize the hub
+                scripts.forEach(script => {
+                    const newScript = document.createElement('script');
+                    if (script.src) {
+                        newScript.src = script.src;
+                    } else {
+                        newScript.textContent = script.textContent;
+                    }
+                    hubBody.appendChild(newScript);
+                });
+
+                // Auto-populate data
+                this.autoPopulateCallScripts(hubBody);
+                
+                // Add event listener to the Call Hub's save button
+                const saveButton = hubBody.querySelector('.add-notes-btn');
+                if (saveButton) {
+                    saveButton.onclick = () => {
+                        const notes = hubBody.querySelector('#call-notes').value;
+                        const disposition = window.currentDisposition; // Assuming the hub script sets this
+                        const prospect = {
+                            name: window.appState.placeholders.N,
+                            company: window.appState.placeholders.CN,
+                            phone: window.appState.placeholders.P
+                        };
+                        this.saveCallLog({ notes, prospect, disposition });
+                    };
+                }
+                
                 console.log('Call scripts content loaded and initialized.');
-            } else {
-                console.error('initializeCallScriptsPage function not found in loaded script.');
-                this.showToast('Failed to initialize call scripts functionality.', 'error');
             }
         } catch (error) {
             console.error('Error loading call scripts content:', error);
@@ -572,29 +490,17 @@ const CRMApp = {
     },
 
     // Auto-populate fields in the Call Scripts page
-    autoPopulateCallScripts() {
+    autoPopulateCallScripts(container) {
         // Find a contact and their associated account to pre-populate
-        let contactToPopulate = null;
-        let accountToPopulate = null;
-
-        // Try to find a contact with an associated account
-        if (this.contacts.length > 0) {
-            contactToPopulate = this.contacts[0]; // Take the first contact
-            if (contactToPopulate.accountId) {
-                accountToPopulate = this.accounts.find(acc => acc.id === contactToPopulate.accountId);
-            }
-        }
-        // If no contact with account, just try to find any account
-        if (!accountToPopulate && this.accounts.length > 0) {
-            accountToPopulate = this.accounts[0];
-        }
+        const contactToPopulate = this.contacts[0];
+        const accountToPopulate = this.accounts.find(acc => acc.id === contactToPopulate.accountId);
 
         // Populate Prospect Info fields
-        const inputPhone = document.getElementById('input-phone');
-        const inputCompanyName = document.getElementById('input-company-name');
-        const inputName = document.getElementById('input-name');
-        const inputTitle = document.getElementById('input-title');
-        const inputCompanyIndustry = document.getElementById('input-company-industry');
+        const inputPhone = container.querySelector('#input-phone');
+        const inputCompanyName = container.querySelector('#input-company-name');
+        const inputName = container.querySelector('#input-name');
+        const inputTitle = container.querySelector('#input-title');
+        const inputCompanyIndustry = container.querySelector('#input-company-industry');
 
         if (inputPhone && contactToPopulate) inputPhone.value = contactToPopulate.phone || '';
         if (inputCompanyName && accountToPopulate) inputCompanyName.value = accountToPopulate.name || '';
@@ -602,108 +508,50 @@ const CRMApp = {
         if (inputTitle && contactToPopulate) inputTitle.value = contactToPopulate.title || '';
         if (inputCompanyIndustry && accountToPopulate) inputCompanyIndustry.value = accountToPopulate.industry || '';
 
-        // Populate Energy Health Check fields
-        const currentSupplierInput = document.getElementById('currentSupplier');
-        const monthlyBillInput = document.getElementById('monthlyBill');
-        const currentRateInput = document.getElementById('currentRate');
-        const contractEndDateInput = document.getElementById('contractEndDate');
-        const sellRateInput = document.getElementById('sellRate');
-
-        if (currentSupplierInput && accountToPopulate) currentSupplierInput.value = accountToPopulate.currentSupplier || '';
-        if (monthlyBillInput && accountToPopulate) monthlyBillInput.value = accountToPopulate.monthlyBill || '';
-        if (currentRateInput && accountToPopulate) currentRateInput.value = accountToPopulate.currentRate || '';
-        if (contractEndDateInput && accountToPopulate) contractEndDateInput.value = accountToPopulate.contractEndDate || '';
-        if (sellRateInput && accountToPopulate) sellRateInput.value = accountToPopulate.sellRate || '';
-
         // Trigger updateScript in the call scripts page to update placeholders
-        if (typeof window.updateScript === 'function') {
+        if (window.updateScript) {
             window.updateScript();
-        }
-
-        // If all Energy Health Check fields are known, run the report automatically
-        const allHealthCheckFieldsKnown = 
-            (currentSupplierInput && currentSupplierInput.value) &&
-            (monthlyBillInput && monthlyBillInput.value) &&
-            (currentRateInput && currentRateInput.value) &&
-            (contractEndDateInput && contractEndDateInput.value) &&
-            (sellRateInput && sellRateInput.value);
-
-        if (allHealthCheckFieldsKnown && typeof window.runCalculation === 'function') {
-            console.log("All health check fields populated, running calculation automatically.");
-            window.validateSection1(); // Re-validate section 1 to ensure internal state is correct
-            window.validateSection2(); // Re-validate section 2
-            window.runCalculation();
         }
     },
 
     // Save call log to Firebase and update notifications
-    async saveCallLog(logData, disposition) {
+    async saveCallLog(logData) {
         try {
-            const docRef = await db.collection('call_logs').add({
-                ...logData,
+            const docRef = await db.collection('activities').add({
+                type: 'call_log_saved',
+                description: `Call Log saved for ${logData.prospect.company || 'Unknown Company'} (${logData.disposition})`,
+                noteContent: logData.notes,
+                contactName: logData.prospect.name,
+                contactPhone: logData.prospect.phone,
+                companyName: logData.prospect.company,
                 createdAt: serverTimestamp()
             });
-
-            // Find or create contact based on prospect info
-            let contactId = null;
-            let contactFound = this.contacts.find(c => 
-                c.firstName === logData.prospect.name.split(' ')[0] && 
-                c.lastName === logData.prospect.name.split(' ')[1]
-            );
-
-            if (contactFound) {
-                contactId = contactFound.id;
-                // Update existing contact details if provided
-                await db.collection('contacts').doc(contactId).update({
-                    phone: logData.prospect.phone || contactFound.phone,
-                    title: logData.prospect.title || contactFound.title,
-                    // Potentially update accountName if it changed or was newly provided
-                    accountName: logData.prospect.company || contactFound.accountName,
-                    updatedAt: serverTimestamp()
-                });
-                // Update local contacts array
-                const index = this.contacts.findIndex(c => c.id === contactId);
-                if (index !== -1) {
-                    this.contacts[index] = { 
-                        ...this.contacts[index], 
-                        phone: logData.prospect.phone || this.contacts[index].phone,
-                        title: logData.prospect.title || this.contacts[index].title,
-                        accountName: logData.prospect.company || this.contacts[index].accountName,
-                        updatedAt: new Date()
-                    };
-                }
-            } else {
-                // Create new contact if not found
-                const newContactData = {
-                    firstName: logData.prospect.name.split(' ')[0] || '',
-                    lastName: logData.prospect.name.split(' ')[1] || '',
-                    phone: logData.prospect.phone || '',
-                    title: logData.prospect.title || '',
-                    accountName: logData.prospect.company || '', // Link to company name
-                    createdAt: serverTimestamp()
-                };
-                const newContactRef = await db.collection('contacts').add(newContactData);
-                contactId = newContactRef.id;
-                this.contacts.push({ id: contactId, ...newContactData, createdAt: new Date() });
-            }
-
-            // Save activity for the call log
-            await this.saveActivity({
-                type: 'call_log_saved',
-                description: `Call Log saved for ${logData.prospect.company || 'Unknown Company'} (${disposition})`,
-                contactId: contactId,
-                contactName: logData.prospect.name,
-                accountId: this.accounts.find(acc => acc.name === logData.prospect.company)?.id || null, // Link to account if exists
-                accountName: logData.prospect.company
-            });
-
-            this.showToast(`Note added and prospect contact details updated for ${logData.prospect.name}!`, 'success');
+            
+            // Re-fetch activities to include the new log
+            await this.loadInitialData();
+            this.showToast(`Note added and call log saved for ${logData.prospect.name}!`, 'success');
             this.updateNotifications();
-            this.renderDashboardStats(); // Update stats if new contacts/accounts were added
+            this.renderDashboardStats();
         } catch (error) {
-            console.error('Error saving call log or updating contact:', error);
-            this.showToast('Failed to save call notes or update contact details.', 'error');
+            console.error('Error saving call log:', error);
+            this.showToast('Failed to save call notes.', 'error');
         }
+    },
+    
+    // Placeholder to handle a call hub note save
+    // NOTE: This function is now handled by the `showCallScriptsView` function's event listener.
+    // It's included here to show the data flow.
+    async handleSaveCallHubNotes() {
+        const logData = {
+             notes: window.getEl('call-notes').value,
+             prospect: {
+                 name: window.appState.placeholders.N,
+                 company: window.appState.placeholders.CN,
+                 phone: window.appState.placeholders.P
+             },
+             disposition: window.currentDisposition || 'Call ended manually'
+        };
+        await this.saveCallLog(logData);
     },
 
     // Update account details from Energy Health Check results
@@ -716,20 +564,14 @@ const CRMApp = {
                     ...healthCheckData,
                     updatedAt: serverTimestamp()
                 });
-
-                // Update local accounts array
+                
                 const index = this.accounts.findIndex(acc => acc.id === account.id);
                 if (index !== -1) {
                     this.accounts[index] = { ...this.accounts[index], ...healthCheckData, updatedAt: new Date() };
                 }
-
+                
                 this.showToast(`Account details for ${companyName} updated from Health Check!`, 'success');
-                await this.saveActivity({
-                    type: 'health_check_updated',
-                    description: `Energy Health Check updated for ${companyName}`,
-                    accountId: account.id,
-                    accountName: companyName
-                });
+                await this.saveActivity({ type: 'health_check_updated', description: `Energy Health Check updated for ${companyName}`, accountId: account.id, accountName: companyName });
                 this.updateNotifications();
             } else {
                 this.showToast(`Account "${companyName}" not found. Cannot update health check details.`, 'warning');
@@ -766,24 +608,15 @@ const CRMApp = {
             phone: document.getElementById('account-phone').value,
             website: document.getElementById('account-website').value,
             address: document.getElementById('account-address').value,
-            createdAt: new Date()
         };
         
         try {
             const tempId = 'temp_' + Date.now();
             this.accounts.push({ id: tempId, ...accountData });
-            
-            const docRef = await db.collection('accounts').add({
-                ...accountData,
-                createdAt: serverTimestamp()
-            });
-            
+            const docRef = await db.collection('accounts').add({ ...accountData, createdAt: serverTimestamp() });
             const accountIndex = this.accounts.findIndex(a => a.id === tempId);
-            if (accountIndex !== -1) {
-                this.accounts[accountIndex].id = docRef.id;
-            }
+            if (accountIndex !== -1) this.accounts[accountIndex].id = docRef.id;
             
-            console.log('Account saved successfully with ID:', docRef.id);
             this.showToast('Account created successfully!', 'success');
             this.closeModal('add-account-modal');
             this.renderDashboardStats();
@@ -795,7 +628,6 @@ const CRMApp = {
                 accountId: docRef.id,
                 accountName: accountData.name
             });
-            
         } catch (error) {
             this.accounts = this.accounts.filter(a => a.id !== tempId);
             console.error('Error saving account:', error);
@@ -812,24 +644,15 @@ const CRMApp = {
             title: document.getElementById('contact-title').value,
             accountId: document.getElementById('contact-account').value,
             accountName: document.getElementById('contact-account').selectedOptions[0]?.textContent || '',
-            createdAt: new Date()
         };
         
         try {
             const tempId = 'temp_' + Date.now();
             this.contacts.push({ id: tempId, ...contactData });
-            
-            const docRef = await db.collection('contacts').add({
-                ...contactData,
-                createdAt: serverTimestamp()
-            });
-            
+            const docRef = await db.collection('contacts').add({ ...contactData, createdAt: serverTimestamp() });
             const contactIndex = this.contacts.findIndex(c => c.id === tempId);
-            if (contactIndex !== -1) {
-                this.contacts[contactIndex].id = docRef.id;
-            }
+            if (contactIndex !== -1) this.contacts[contactIndex].id = docRef.id;
             
-            console.log('Contact saved successfully with ID:', docRef.id);
             this.showToast('Contact created successfully!', 'success');
             this.closeModal('add-contact-modal');
             this.renderDashboardStats();
@@ -843,7 +666,6 @@ const CRMApp = {
                 accountId: contactData.accountId,
                 accountName: contactData.accountName
             });
-            
         } catch (error) {
             this.contacts = this.contacts.filter(c => c.id !== tempId);
             console.error('Error saving contact:', error);
@@ -856,88 +678,40 @@ const CRMApp = {
         const fileInput = document.getElementById('csv-file');
         const file = fileInput.files[0];
         
-        if (!file) {
-            this.showToast('Please select a CSV file', 'error');
-            return;
-        }
-        
-        if (!file.name.toLowerCase().endsWith('.csv')) {
+        if (!file || !file.name.toLowerCase().endsWith('.csv')) {
             this.showToast('Please select a valid CSV file', 'error');
             return;
         }
         
         try {
             this.showToast('Processing CSV file...', 'info');
-            
             const text = await file.text();
-            const rows = text.split('\n').map(row => 
-                row.split(',').map(cell => cell.trim().replace(/"/g, ''))
-            );
+            const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim().replace(/"/g, '')));
             const headers = rows[0].map(h => h.trim().toLowerCase());
             const data = rows.slice(1).filter(row => row.length > 1 && row.some(cell => cell.trim()));
-            
-            let imported = 0;
-            let errors = 0;
+            let imported = 0, errors = 0;
             
             for (const row of data) {
                 try {
-                    if (importType === 'contacts') {
-                        const contactData = {
-                            firstName: this.getColumnValue(row, headers, ['first name', 'firstname', 'first']),
-                            lastName: this.getColumnValue(row, headers, ['last name', 'lastname', 'last']),
-                            email: this.getColumnValue(row, headers, ['email', 'email address']),
-                            phone: this.getColumnValue(row, headers, ['phone', 'phone number', 'telephone']),
-                            title: this.getColumnValue(row, headers, ['title', 'job title', 'position']),
-                            accountName: this.getColumnValue(row, headers, ['company', 'account', 'organization']),
-                            createdAt: new Date()
-                        };
-                        
-                        if (contactData.firstName && contactData.lastName && contactData.email) {
-                            const tempId = 'temp_' + Date.now() + '_' + imported;
-                            this.contacts.push({ id: tempId, ...contactData });
-                            
-                            const docRef = await db.collection('contacts').add({
-                                ...contactData,
-                                createdAt: serverTimestamp()
-                            });
-                            
-                            const contactIndex = this.contacts.findIndex(c => c.id === tempId);
-                            if (contactIndex !== -1) {
-                                this.contacts[contactIndex].id = docRef.id;
-                            }
-                            
-                            imported++;
-                        } else {
-                            errors++;
-                        }
-                    } else if (importType === 'accounts') {
-                        const accountData = {
-                            name: this.getColumnValue(row, headers, ['company', 'name', 'company name']),
-                            industry: this.getColumnValue(row, headers, ['industry', 'sector']),
-                            phone: this.getColumnValue(row, headers, ['phone', 'phone number', 'telephone']),
-                            website: this.getColumnValue(row, headers, ['website', 'url', 'web']),
-                            address: this.getColumnValue(row, headers, ['address', 'location']),
-                            createdAt: new Date()
-                        };
-                        
-                        if (accountData.name) {
-                            const tempId = 'temp_' + Date.now() + '_' + imported;
-                            this.accounts.push({ id: tempId, ...accountData });
-                            
-                            const docRef = await db.collection('accounts').add({
-                                ...accountData,
-                                createdAt: serverTimestamp()
-                            });
-                            
-                            const accountIndex = this.accounts.findIndex(a => a.id === tempId);
-                            if (accountIndex !== -1) {
-                                this.accounts[accountIndex].id = docRef.id;
-                            }
-                            
-                            imported++;
-                        } else {
-                            errors++;
-                        }
+                    const rowData = {};
+                    headers.forEach((header, index) => { rowData[header] = row[index]; });
+
+                    if (importType === 'contacts' && rowData['first name'] && rowData['last name'] && rowData['email']) {
+                         await db.collection('contacts').add({
+                            firstName: rowData['first name'], lastName: rowData['last name'], email: rowData['email'],
+                            phone: rowData['phone number'] || rowData['phone'], title: rowData['title'],
+                            accountName: rowData['company'] || rowData['account'], createdAt: serverTimestamp()
+                         });
+                         imported++;
+                    } else if (importType === 'accounts' && rowData['company']) {
+                         await db.collection('accounts').add({
+                            name: rowData['company'], industry: rowData['industry'],
+                            phone: rowData['phone number'] || rowData['phone'], website: rowData['website'],
+                            address: rowData['address'], createdAt: serverTimestamp()
+                         });
+                         imported++;
+                    } else {
+                         errors++;
                     }
                 } catch (rowError) {
                     console.error('Error processing row:', rowError);
@@ -945,76 +719,33 @@ const CRMApp = {
                 }
             }
             
+            await this.loadInitialData(); // Reload all data after import
             let message = `Successfully imported ${imported} ${importType}`;
-            if (errors > 0) {
-                message += ` (${errors} rows had errors and were skipped)`;
-            }
-            
+            if (errors > 0) message += ` (${errors} rows had errors and were skipped)`;
             this.showToast(message, imported > 0 ? 'success' : 'warning');
             this.closeModal('bulk-import-modal');
-            
             this.renderDashboardStats();
             this.updateNotifications();
             
             if (imported > 0) {
-                await this.saveActivity({
-                    type: 'bulk_import',
-                    description: `Bulk imported ${imported} ${importType} from CSV`,
-                });
+                await this.saveActivity({ type: 'bulk_import', description: `Bulk imported ${imported} ${importType} from CSV` });
             }
-            
         } catch (error) {
             console.error('Error importing CSV:', error);
             this.showToast('Error processing CSV file. Please check the format.', 'error');
         }
     },
 
-    getColumnValue(row, headers, columnNames) {
-        for (const name of columnNames) {
-            const index = headers.indexOf(name);
-            if (index !== -1 && row[index]) {
-                return row[index].trim();
-            }
-        }
-        return '';
-    },
-
     updateNotifications() {
         this.notifications = [];
-        
         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const newContacts = this.contacts.filter(c => new Date(c.createdAt) > yesterday);
         const newAccounts = this.accounts.filter(a => new Date(a.createdAt) > yesterday);
         const today = new Date();
         const pendingTasks = this.tasks.filter(t => !t.completed && new Date(t.dueDate) <= today);
-        
-        if (newContacts.length > 0) {
-            this.notifications.push({
-                type: 'contact',
-                message: `${newContacts.length} new contact(s) added`,
-                count: newContacts.length,
-                time: 'Recently'
-            });
-        }
-        
-        if (newAccounts.length > 0) {
-            this.notifications.push({
-                type: 'account',
-                message: `${newAccounts.length} new account(s) added`,
-                count: newAccounts.length,
-                time: 'Recently'
-            });
-        }
-        
-        if (pendingTasks.length > 0) {
-            this.notifications.push({
-                type: 'task',
-                message: `${pendingTasks.length} pending task(s) for today`,
-                count: pendingTasks.length,
-                time: 'Due today'
-            });
-        }
-        
+        if (newContacts.length > 0) this.notifications.push({ type: 'contact', message: `${newContacts.length} new contact(s) added`, count: newContacts.length, time: 'Recently' });
+        if (newAccounts.length > 0) this.notifications.push({ type: 'account', message: `${newAccounts.length} new account(s) added`, count: newAccounts.length, time: 'Recently' });
+        if (pendingTasks.length > 0) this.notifications.push({ type: 'task', message: `${pendingTasks.length} pending task(s) for today`, count: pendingTasks.length, time: 'Due today' });
         this.renderNotifications();
         this.updateNavigationBadges();
     },
@@ -1023,27 +754,19 @@ const CRMApp = {
         const notificationList = document.getElementById('notification-list');
         const notificationBadge = document.getElementById('notification-badge');
         const notificationCount = document.getElementById('notification-count');
-        
-        const totalCount = this.notifications.reduce((sum, n) => sum + n.count, 0); 
-        
+        const totalCount = this.notifications.reduce((sum, n) => sum + n.count, 0);
         if (notificationBadge) {
             notificationBadge.textContent = totalCount;
             notificationBadge.style.display = totalCount > 0 ? 'flex' : 'none';
         }
-        
-        if (notificationCount) {
-            notificationCount.textContent = totalCount;
-        }
-        
+        if (notificationCount) notificationCount.textContent = totalCount;
         if (notificationList) {
             if (this.notifications.length === 0) {
                 notificationList.innerHTML = '<div class="notification-empty">No new notifications</div>';
             } else {
                 notificationList.innerHTML = this.notifications.map(notification => `
                     <div class="notification-item">
-                        <div class="notification-icon ${notification.type}">
-                            ${this.getNotificationIcon(notification.type)}
-                        </div>
+                        <div class="notification-icon ${notification.type}">${this.getNotificationIcon(notification.type)}</div>
                         <div class="notification-text">
                             <div class="notification-message">${notification.message}</div>
                             <div class="notification-time">${notification.time}</div>
@@ -1056,17 +779,13 @@ const CRMApp = {
 
     updateNavigationBadges() {
         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        
         const newContacts = this.contacts.filter(c => new Date(c.createdAt) > yesterday).length;
         this.updateBadge('contacts-badge', newContacts);
-        
         const newAccounts = this.accounts.filter(a => new Date(a.createdAt) > yesterday).length;
         this.updateBadge('accounts-badge', newAccounts);
-        
         const today = new Date();
         const pendingTasks = this.tasks.filter(t => !t.completed && new Date(t.dueDate) <= today).length;
         this.updateBadge('tasks-badge', pendingTasks);
-        
         this.updateBadge('emails-badge', 0);
     },
 
@@ -1080,21 +799,15 @@ const CRMApp = {
 
     getNotificationIcon(type) {
         const icons = {
-            contact: '👤',
-            account: '🏢',
-            email: '📧',
-            task: '✅',
-            health_check_updated: '📈',
-            call_log_saved: '📞'
+            contact: '👤', account: '🏢', email: '📧', task: '✅',
+            health_check_updated: '📈', call_log_saved: '📞'
         };
         return icons[type] || '📋';
     },
 
     updateElement(id, value) {
         const element = document.getElementById(id);
-        if (element) {
-            element.textContent = value;
-        }
+        if (element) element.textContent = value;
     },
 
     formatDate(date) {
@@ -1105,12 +818,10 @@ const CRMApp = {
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
-        
         if (diffMins < 1) return 'Just now';
         if (diffMins < 60) return `${diffMins} minutes ago`;
         if (diffHours < 24) return `${diffHours} hours ago`;
         if (diffDays < 7) return `${diffDays} days ago`;
-        
         return dateObj.toLocaleDateString();
     },
 
@@ -1118,7 +829,6 @@ const CRMApp = {
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
         toast.textContent = message;
-        
         let container = document.getElementById('toast-container');
         if (!container) {
             container = document.createElement('div');
@@ -1126,38 +836,24 @@ const CRMApp = {
             container.className = 'toast-container';
             document.body.appendChild(container);
         }
-        
         container.appendChild(toast);
-        
         requestAnimationFrame(() => {
             toast.style.transform = 'translateX(0)';
             toast.style.opacity = '1';
         });
-        
         setTimeout(() => {
             toast.style.transform = 'translateX(100%)';
             toast.style.opacity = '0';
             setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.remove();
-                }
+                if (toast.parentNode) toast.remove();
             }, 300);
         }, 4000);
     },
 
     async saveActivity(activityData) {
         try {
-            const docRef = await db.collection('activities').add({
-                ...activityData,
-                createdAt: serverTimestamp()
-            });
-            
-            this.activities.unshift({
-                id: docRef.id,
-                ...activityData,
-                createdAt: new Date()
-            });
-            
+            const docRef = await db.collection('activities').add({ ...activityData, createdAt: serverTimestamp() });
+            this.activities.unshift({ id: docRef.id, ...activityData, createdAt: new Date() });
             console.log('Activity saved successfully with ID:', docRef.id);
             this.renderActivityCarousel();
             return docRef.id;
@@ -1166,36 +862,6 @@ const CRMApp = {
             return null;
         }
     },
-
-    async saveAccount(accountData) {
-        try {
-            const docRef = await db.collection('accounts').add({
-                ...accountData,
-                createdAt: serverTimestamp()
-            });
-            
-            console.log('Account saved successfully with ID:', docRef.id);
-            return docRef.id;
-        } catch (error) {
-            console.error('Error saving account:', error);
-            throw error;
-        }
-    },
-
-    async saveContact(contactData) {
-        try {
-            const docRef = await db.collection('contacts').add({
-                ...contactData,
-                createdAt: serverTimestamp()
-            });
-            
-            console.log('Contact saved successfully with ID:', docRef.id);
-            return docRef.id;
-        } catch (error) {
-            console.error('Error saving contact:', error);
-            throw error;
-        }
-    }
 };
 
 // --- 3. Initialize the application when DOM is loaded ---
@@ -1208,17 +874,6 @@ document.addEventListener('DOMContentLoaded', () => {
 window.CRMApp = CRMApp;
 
 // --- 5. Additional utility functions ---
-function formatCurrency(amount) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-    }).format(amount);
-}
-
-function formatNumber(num) {
-    return new Intl.NumberFormat('en-US').format(num);
-}
-
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
