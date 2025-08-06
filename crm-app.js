@@ -247,53 +247,67 @@ const CRMApp = {
         }
     },
 
-// Function to load and display the Call Scripts view
-showCallScriptsView() {
-    const callScriptsView = document.getElementById('call-scripts-view');
-    if (!callScriptsView) {
-        console.error('Call scripts view element not found.');
-        this.showToast('Call scripts view not available.', 'error');
-        return;
-    }
+    // Function to load and display the Call Scripts view
+    async showCallScriptsView() {
+        const callScriptsView = document.getElementById('call-scripts-view');
+        if (!callScriptsView) {
+            console.error('Call scripts view element not found.');
+            this.showToast('Call scripts view not available.', 'error');
+            return;
+        }
 
-    // Show loading state
-    callScriptsView.innerHTML = '<div class="loading-state">Loading Cold Calling Hub...</div>';
-    this.showView('call-scripts-view');
-    
-    // Fetch the content of call-scripts-content.html
-    fetch('call-scripts-content.html')
-        .then(response => {
+        this.showView('call-scripts-view');
+        
+        try {
+            const response = await fetch('call-scripts-content.html');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            return response.text();
-        })
-        .then(htmlContent => {
+            const htmlContent = await response.text();
             callScriptsView.innerHTML = htmlContent;
-            
-            // Now, call the initialization function which is globally available
+
             if (typeof window.initializeCallScriptsPage === 'function') {
                 window.initializeCallScriptsPage();
-                this.autoPopulateCallScripts();
-                console.log('Call scripts content loaded and initialized.');
-                this.showToast('Cold Calling Hub loaded successfully!', 'success');
                 
                 // Auto-populate fields if data is available
-                const inputPhone = document.getElementById('input-phone');
-                const contactToPopulate = this.contacts && this.contacts.length > 0 ? this.contacts[0] : null;
-                const accountToPopulate = this.accounts && this.accounts.length > 0 ? this.accounts[0] : null;
+                this.autoPopulateCallScripts();
                 
-                        if (inputPhone && contactToPopulate) inputPhone.value = contactToPopulate.phone || '';
-                
-                const inputCompanyName = document.getElementById('input-company-name');
-                const inputName = document.getElementById('input-name');
-                const inputTitle = document.getElementById('input-title');
-                const inputCompanyIndustry = document.getElementById('input-company-industry');
-                
-                if (inputCompanyName && accountToPopulate) inputCompanyName.value = accountToPopulate.name || '';
-                if (inputName && contactToPopulate) inputName.value = `${contactToPopulate.firstName || ''} ${contactToPopulate.lastName || ''}`.trim();
-                if (inputTitle && contactToPopulate) inputTitle.value = contactToPopulate.title || '';
-                if (inputCompanyIndustry && accountToPopulate) inputCompanyIndustry.value = accountToPopulate.industry || '';
+                console.log('Call scripts content loaded and initialized.');
+                this.showToast('Cold Calling Hub loaded successfully!', 'success');
+            }
+        } catch (error) {
+            console.error('Error loading call scripts content:', error);
+            this.showToast('Failed to load call scripts content.', 'error');
+            callScriptsView.innerHTML = `<div class="error-state">
+                <p>Failed to load Cold Calling Hub content.</p>
+                <p>Please check the file path and try again.</p>
+                <button class="retry-button" onclick="window.CRMApp.showCallScriptsView()">Retry</button>
+            </div>`;
+        }
+    },
+
+    // Function to handle auto-population of call script fields
+    autoPopulateCallScripts() {
+        // For demonstration, let's grab the first contact and account from our sample data
+        const contactToPopulate = this.contacts && this.contacts.length > 0 ? this.contacts[0] : null;
+        const accountToPopulate = contactToPopulate ? this.accounts.find(a => a.id === contactToPopulate.accountId) : null;
+    
+        // Populate Cold Calling Script fields
+        const inputPhone = document.getElementById('input-phone');
+        const inputCompanyName = document.getElementById('input-company-name');
+        const inputName = document.getElementById('input-name');
+        const inputTitle = document.getElementById('input-title');
+        const inputCompanyIndustry = document.getElementById('input-company-industry');
+        const inputBenefit = document.getElementById('input-benefit');
+        const inputPain = document.getElementById('input-pain');
+
+        if (inputPhone && contactToPopulate) inputPhone.value = contactToPopulate.phone || '';
+        if (inputCompanyName && accountToPopulate) inputCompanyName.value = accountToPopulate.name || '';
+        if (inputName && contactToPopulate) inputName.value = `${contactToPopulate.firstName || ''} ${contactToPopulate.lastName || ''}`.trim();
+        if (inputTitle && contactToPopulate) inputTitle.value = contactToPopulate.title || '';
+        if (inputCompanyIndustry && accountToPopulate) inputCompanyIndustry.value = accountToPopulate.industry || '';
+        if (inputBenefit && accountToPopulate) inputBenefit.value = accountToPopulate.benefits || '';
+        if (inputPain && accountToPopulate) inputPain.value = accountToPopulate.painPoints || '';
 
         // Populate Energy Health Check fields
         const currentSupplierInput = document.getElementById('currentSupplier');
@@ -431,6 +445,231 @@ showCallScriptsView() {
             console.error('Error updating account details from health check:', error);
             this.showToast('Failed to update account details from health check.', 'error');
         }
+    },
+
+    // Render dashboard statistics cards
+    renderDashboardStats() {
+        const totalAccounts = this.accounts.length;
+        const totalContacts = this.contacts.length;
+        const recentActivities = this.activities.length;
+        const hotLeads = this.contacts.filter(c => c.isHotLead).length;
+
+        this.updateElement('total-accounts-value', totalAccounts);
+        this.updateElement('total-contacts-value', totalContacts);
+        this.updateElement('recent-activities-value', recentActivities);
+        this.updateElement('hot-leads-value', hotLeads);
+    },
+
+    // Render today's tasks in the sidebar
+    renderTodayTasks() {
+        const tasksList = document.getElementById('tasks-list');
+        if (!tasksList) return;
+        
+        tasksList.innerHTML = '';
+        
+        const today = new Date();
+        const todaysTasks = this.tasks.filter(task => !task.completed && new Date(task.dueDate).toDateString() === today.toDateString());
+        
+        if (todaysTasks.length > 0) {
+            todaysTasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = 'task-item';
+                li.innerHTML = `
+                    <div class="task-content">
+                        <p class="task-title">${task.title}</p>
+                        <p class="task-due-time">Due: ${task.time}</p>
+                    </div>
+                `;
+                tasksList.appendChild(li);
+            });
+        } else {
+            tasksList.innerHTML = '<li class="no-items">No tasks for today!</li>';
+        }
+    },
+
+    // Renders the recent activities carousel
+    renderActivityCarousel() {
+        const carouselWrapper = document.getElementById('activity-list-wrapper');
+        const prevBtn = document.getElementById('activity-prev-btn');
+        const nextBtn = document.getElementById('activity-next-btn');
+
+        if (!carouselWrapper) return;
+        
+        // Sort activities by date (most recent first)
+        const sortedActivities = this.activities.sort((a, b) => b.createdAt - a.createdAt);
+        const totalPages = Math.ceil(sortedActivities.length / this.activitiesPerPage);
+
+        // Clear existing content
+        carouselWrapper.innerHTML = '';
+
+        if (sortedActivities.length === 0) {
+            carouselWrapper.innerHTML = '<div class="no-items">No recent activity.</div>';
+            prevBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
+            return;
+        } else {
+            prevBtn.style.display = 'block';
+            nextBtn.style.display = 'block';
+        }
+        
+        // Render each page of activities
+        for (let i = 0; i < totalPages; i++) {
+            const page = document.createElement('div');
+            page.className = 'activity-page';
+            
+            const startIndex = i * this.activitiesPerPage;
+            const endIndex = startIndex + this.activitiesPerPage;
+            const pageActivities = sortedActivities.slice(startIndex, endIndex);
+
+            pageActivities.forEach(activity => {
+                const item = document.createElement('div');
+                item.className = 'activity-item';
+                item.innerHTML = `
+                    <div class="activity-icon">${this.getActivityIcon(activity.type)}</div>
+                    <div class="activity-content">
+                        <p class="activity-text">${activity.description}</p>
+                        <span class="activity-timestamp">${this.formatDate(activity.createdAt)}</span>
+                    </div>
+                `;
+                page.appendChild(item);
+            });
+            carouselWrapper.appendChild(page);
+        }
+        
+        // Set the carousel to the current page and update buttons
+        carouselWrapper.style.width = `${totalPages * 100}%`;
+        carouselWrapper.style.transform = `translateX(-${this.activitiesPageIndex * (100 / totalPages)}%)`;
+        this.updateActivityCarouselButtons(totalPages);
+    },
+    
+    // Scrolls the activity carousel
+    scrollActivityCarousel(direction) {
+        const totalPages = Math.ceil(this.activities.length / this.activitiesPerPage);
+        if (direction === 'next' && this.activitiesPageIndex < totalPages - 1) {
+            this.activitiesPageIndex++;
+        } else if (direction === 'prev' && this.activitiesPageIndex > 0) {
+            this.activitiesPageIndex--;
+        }
+        this.renderActivityCarousel();
+    },
+
+    // Updates the state of the carousel navigation buttons
+    updateActivityCarouselButtons(totalPages) {
+        const prevBtn = document.getElementById('activity-prev-btn');
+        const nextBtn = document.getElementById('activity-next-btn');
+        if (prevBtn) prevBtn.disabled = this.activitiesPageIndex === 0;
+        if (nextBtn) nextBtn.disabled = this.activitiesPageIndex >= totalPages - 1;
+    },
+
+    // Get activity icon based on type
+    getActivityIcon(type) {
+        const icons = {
+            'call_note': '📞',
+            'email': '📧',
+            'note': '📝',
+            'task_completed': '✅',
+            'contact_added': '👤',
+            'account_added': '🏢',
+            'bulk_import': '📊',
+        };
+        return icons[type] || '📋';
+    },
+
+    // Render energy market news feed
+    renderEnergyMarketNews() {
+        const newsFeed = document.getElementById('news-feed');
+        if (!newsFeed) return;
+        
+        newsFeed.innerHTML = '';
+        
+        const newsItems = [
+            { 
+                title: 'ERCOT Demand Rises', 
+                content: 'ERCOT demand is increasing due to summer heat, putting pressure on grid reliability.',
+                time: '2 hours ago'
+            },
+            { 
+                title: 'Natural Gas Prices Fluctuate', 
+                content: 'Recent geopolitical events have caused volatility in natural gas prices, impacting futures.',
+                time: '4 hours ago'
+            },
+            { 
+                title: 'Renewable Energy Growth', 
+                content: 'Texas continues to lead in renewable energy adoption with new wind and solar projects.',
+                time: '6 hours ago'
+            }
+        ];
+        
+        if (newsItems.length > 0) {
+            newsItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'news-item';
+                div.innerHTML = `
+                    <h4 class="news-title">${item.title}</h4>
+                    <p class="news-content">${item.content}</p>
+                    <span class="news-time">${item.time}</span>
+                `;
+                newsFeed.appendChild(div);
+            });
+        } else {
+            newsFeed.innerHTML = '<p class="no-items">No news to display.</p>';
+        }
+    },
+
+    // Handle search functionality
+    handleSearch(query) {
+        if (query.length < 2) return;
+        
+        const results = [];
+        
+        this.accounts.forEach(account => {
+            if (account.name.toLowerCase().includes(query.toLowerCase())) {
+                results.push({
+                    type: 'account',
+                    id: account.id,
+                    name: account.name,
+                    subtitle: account.industry || 'Account'
+                });
+            }
+        });
+        
+        this.contacts.forEach(contact => {
+            const fullName = `${contact.firstName} ${contact.lastName}`;
+            if (fullName.toLowerCase().includes(query.toLowerCase()) || 
+                (contact.email && contact.email.toLowerCase().includes(query.toLowerCase()))) {
+                results.push({
+                    type: 'contact',
+                    id: contact.id,
+                    name: fullName,
+                    subtitle: contact.accountName || 'Contact'
+                });
+            }
+        });
+        
+        console.log('Search results:', results);
+    },
+
+    // Quick action functions
+    addAccount() {
+        this.openModal('add-account-modal');
+    },
+
+    addContact() {
+        const accountSelect = document.getElementById('contact-account');
+        if (accountSelect) {
+            accountSelect.innerHTML = '<option value="">Select an account</option>';
+            this.accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = account.name;
+                accountSelect.appendChild(option);
+            });
+        }
+        this.openModal('add-contact-modal');
+    },
+
+    bulkImport() {
+        this.openModal('bulk-import-modal');
     },
 
     // Modal functions
