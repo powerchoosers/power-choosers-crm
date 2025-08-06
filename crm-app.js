@@ -41,7 +41,7 @@ const CRMApp = {
         try {
             await this.loadInitialData();
             this.setupEventListeners();
-            this.showView('dashboard-view');
+            this.showView('dashboard-view'); // Ensure dashboard is shown first
             this.updateNotifications();
             console.log('CRM App initialized successfully');
         } catch (error) {
@@ -206,54 +206,67 @@ const CRMApp = {
     showView(viewName) {
         this.currentView = viewName;
         
-        const mainContent = document.querySelector('.main-content');
+        const mainContentWrapper = document.getElementById('main-content-wrapper'); // Get the wrapper
+        const dashboardView = document.getElementById('dashboard-view');
+        const contactsView = document.getElementById('contacts-view');
+        const accountsView = document.getElementById('accounts-view');
+        const callsView = document.getElementById('calls-view');
+        const emailsView = document.getElementById('emails-view');
+        const tasksView = document.getElementById('tasks-view');
+        const accountDetailsView = document.getElementById('account-details-view');
+        const settingsView = document.getElementById('settings-view');
+        const callScriptsMainView = document.getElementById('call-scripts-view');
+
         const widgetPanel = document.getElementById('widget-panel');
         const crmWidgetsContainer = document.getElementById('crm-widgets-container');
         const coldCallingWidgetsContainer = document.getElementById('cold-calling-widgets-container');
-        const callScriptsMainView = document.getElementById('call-scripts-main-view'); // Corrected ID reference
 
-        // Hide all page views initially
-        document.querySelectorAll('.page-view').forEach(view => {
-            view.style.display = 'none';
-        });
+        // Hide all main content views
+        dashboardView.style.display = 'none';
+        contactsView.style.display = 'none';
+        accountsView.style.display = 'none';
+        callsView.style.display = 'none';
+        emailsView.style.display = 'none';
+        tasksView.style.display = 'none';
+        accountDetailsView.style.display = 'none';
+        settingsView.style.display = 'none';
+        callScriptsMainView.style.display = 'none';
 
-        // Reset main content and widget panel flex properties
-        // These are the default flex values for the dashboard view
-        mainContent.style.flex = '3'; 
+        // Reset main content and widget panel flex properties to default CRM layout
+        mainContentWrapper.style.flex = '3';
         widgetPanel.style.flex = '1';
-        
-        // Hide all widget containers by default, then show the relevant one
-        crmWidgetsContainer.style.display = 'none';
-        coldCallingWidgetsContainer.style.display = 'none';
+        crmWidgetsContainer.style.display = 'flex'; // Default to showing CRM widgets
+        coldCallingWidgetsContainer.style.display = 'none'; // Default to hiding cold calling widgets
 
         if (viewName === 'call-scripts-view') {
-            // Show the main cold calling script area
-            callScriptsMainView.style.display = 'flex'; // Use flex for the main script area
-            // Hide default CRM widgets and show cold calling widgets
+            // Adjust layout for cold calling view
+            mainContentWrapper.style.flex = '4'; // Make main content wider
+            widgetPanel.style.flex = '1'; // Keep widget panel as 1 part
+            
+            // Show cold calling main script and its specific widgets
+            callScriptsMainView.style.display = 'flex';
+            crmWidgetsContainer.style.display = 'none'; // Hide CRM widgets
             coldCallingWidgetsContainer.style.display = 'flex'; // Show cold calling widgets
-            // Adjust flex to make main content wider for cold calling
-            mainContent.style.flex = '4'; 
-            widgetPanel.style.flex = '1'; 
             
             // Initialize the cold calling hub if not already
-            // This function is now defined in crm-dashboard.html
             if (typeof window.initializeColdCallingHub === 'function') {
                 window.initializeColdCallingHub();
                 this.autoPopulateCallScripts();
                 console.log('Cold Calling Hub initialized and populated.');
             } else {
-                console.error('initializeColdCallingHub function not found.');
+                console.error('initializeColdCallingHub function not found. Did you embed it in crm-dashboard.html?');
                 this.showToast('Cold Calling functionality not fully loaded.', 'error');
             }
             
         } else {
-            // Show the requested CRM view
+            // Show the requested CRM view (e.g., dashboard, contacts, accounts)
             const activeView = document.getElementById(viewName);
             if (activeView) {
-                activeView.style.display = 'flex'; // Default CRM views are flex
+                activeView.style.display = 'flex'; // Use flex for CRM views
             }
             // Ensure CRM widgets are visible for non-call-scripts views
             crmWidgetsContainer.style.display = 'flex';
+            coldCallingWidgetsContainer.style.display = 'none';
             
             if (viewName === 'dashboard-view') {
                 this.renderDashboard();
