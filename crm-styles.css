@@ -293,10 +293,7 @@ html, body {
     margin-bottom: 30px; /* Increased margin after tasks as requested */
 }
 
-/* Last section */
-.nav-section:last-child {
-    /* No additional margin needed - container padding handles bottom space */
-}
+/* Last section has no additional margin */
 
 /* REMOVED: .nav-separator styles completely */
 
@@ -502,20 +499,31 @@ html, body {
 }
 
 .page-view.active {
-    display: block;
+    display: flex; /* Use flex for active views */
 }
 
 #dashboard-view {
-    display: flex !important;
+    display: none; /* Keep hidden by default */
     flex-direction: column;
-    gap: 8px; /* Reduced gap for tighter, more even spacing */
+    gap: var(--spacing-lg);
 }
 
 #dashboard-view.active {
-    display: flex !important;
+    display: flex !important; /* Ensure it displays as a flex container */
 }
 
 /* --- 8. Dashboard Components (FIXED STAT CARDS) --- */
+
+.card-title-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-title-inner-flex {
+    display: flex;
+    align-items: center;
+}
 .stat-cards-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr); /* Force 4 equal columns */
@@ -1147,7 +1155,7 @@ html, body {
 
 /* --- 12. Responsive Design --- */
 @media (max-width: 1200px) {
-    .main-content {
+    .main-content-wrapper {
         flex: 2;
     }
     .widget-panel {
