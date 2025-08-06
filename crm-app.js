@@ -210,7 +210,7 @@ const CRMApp = {
         const widgetPanel = document.getElementById('widget-panel');
         const crmWidgetsContainer = document.getElementById('crm-widgets-container');
         const coldCallingWidgetsContainer = document.getElementById('cold-calling-widgets-container');
-        const callScriptsMainView = document.getElementById('call-scripts-view'); // Corrected ID
+        const callScriptsMainView = document.getElementById('call-scripts-main-view'); // Corrected ID reference
 
         // Hide all page views initially
         document.querySelectorAll('.page-view').forEach(view => {
@@ -218,23 +218,25 @@ const CRMApp = {
         });
 
         // Reset main content and widget panel flex properties
-        mainContent.style.flex = '3';
+        // These are the default flex values for the dashboard view
+        mainContent.style.flex = '3'; 
         widgetPanel.style.flex = '1';
-        crmWidgetsContainer.style.display = 'flex';
+        
+        // Hide all widget containers by default, then show the relevant one
+        crmWidgetsContainer.style.display = 'none';
         coldCallingWidgetsContainer.style.display = 'none';
-        callScriptsMainView.style.display = 'none'; // Ensure main script area is hidden by default
 
         if (viewName === 'call-scripts-view') {
             // Show the main cold calling script area
             callScriptsMainView.style.display = 'flex'; // Use flex for the main script area
             // Hide default CRM widgets and show cold calling widgets
-            crmWidgetsContainer.style.display = 'none';
-            coldCallingWidgetsContainer.style.display = 'flex';
-            // Adjust flex to make main content wider
-            mainContent.style.flex = '4'; // Make main content wider
-            widgetPanel.style.flex = '1'; // Keep widget panel as 1 part
+            coldCallingWidgetsContainer.style.display = 'flex'; // Show cold calling widgets
+            // Adjust flex to make main content wider for cold calling
+            mainContent.style.flex = '4'; 
+            widgetPanel.style.flex = '1'; 
             
             // Initialize the cold calling hub if not already
+            // This function is now defined in crm-dashboard.html
             if (typeof window.initializeColdCallingHub === 'function') {
                 window.initializeColdCallingHub();
                 this.autoPopulateCallScripts();
@@ -250,9 +252,8 @@ const CRMApp = {
             if (activeView) {
                 activeView.style.display = 'flex'; // Default CRM views are flex
             }
-            // Ensure CRM widgets are visible
+            // Ensure CRM widgets are visible for non-call-scripts views
             crmWidgetsContainer.style.display = 'flex';
-            coldCallingWidgetsContainer.style.display = 'none';
             
             if (viewName === 'dashboard-view') {
                 this.renderDashboard();
