@@ -117,10 +117,14 @@ const CRMApp = {
         // Navigation links
         document.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', (e) => {
-                e.preventDefault();
                 const viewName = e.currentTarget.getAttribute('data-view');
-                this.showView(viewName);
-                this.updateActiveNavButton(e.currentTarget);
+                // If it's a view-switching link, prevent default and switch view
+                if (viewName) {
+                    e.preventDefault();
+                    this.showView(viewName);
+                    this.updateActiveNavButton(e.currentTarget);
+                }
+                // If no data-view attribute, the default link behavior will execute.
             });
         });
 
