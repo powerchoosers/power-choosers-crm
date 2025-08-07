@@ -15,3 +15,9 @@
     padding-left: calc(var(--spacing-lg) / 2) !important;
     padding-right: calc(var(--spacing-lg) / 2) !important;
 }
+
+/* Reduce margin above the "Cold Calling Script" title by half */
+.calls-hub-main h2 {
+    margin-top: calc(var(--spacing-lg) / 2) !important;
+    margin-bottom: 24px;
+}
