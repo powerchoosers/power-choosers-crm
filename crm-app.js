@@ -577,7 +577,18 @@ const CRMApp = {
         } else {
             tableBody.innerHTML = filteredContacts.map(contact => `
                 <tr style="border-bottom: 1px solid #555;">
-                    <td style="padding: 12px; color: #fff;">${(contact.firstName || '') + ' ' + (contact.lastName || '')}</td>
+                    <td style="padding: 12px; color: #fff;">
+                        <span onclick="CRMApp.showContactDetail('${contact.id}')" style="
+                            cursor: pointer;
+                            color: #4CAF50;
+                            text-decoration: underline;
+                            font-weight: 500;
+                        " 
+                        onmouseover="this.style.color='#66BB6A'"
+                        onmouseout="this.style.color='#4CAF50'">
+                            ${(contact.firstName || '') + ' ' + (contact.lastName || '')}
+                        </span>
+                    </td>
                     <td style="padding: 12px; color: #fff; width: 120px;">${contact.phone || contact.id || 'N/A'}</td>
                     <td style="padding: 12px; color: #fff;">${contact.email || 'N/A'}</td>
                     <td style="padding: 12px; color: #fff;">${contact.company || 'N/A'}</td>
@@ -612,6 +623,788 @@ const CRMApp = {
         if (accountFilter) accountFilter.value = '';
         
         this.renderSimpleContactsTable();
+    },
+
+    // Show individual contact detail view
+    showContactDetail(contactId) {
+        const contact = this.contacts.find(c => c.id === contactId);
+        if (!contact) {
+            console.error('Contact not found:', contactId);
+            return;
+        }
+
+        this.currentContact = contact;
+        this.renderContactDetailView(contact);
+        this.showView('contact-detail-view');
+    },
+
+    // MD5 hash function for Gravatar
+    md5(string) {
+        function md5cycle(x, k) {
+            var a = x[0], b = x[1], c = x[2], d = x[3];
+            a = ff(a, b, c, d, k[0], 7, -680876936);
+            d = ff(d, a, b, c, k[1], 12, -389564586);
+            c = ff(c, d, a, b, k[2], 17, 606105819);
+            b = ff(b, c, d, a, k[3], 22, -1044525330);
+            a = ff(a, b, c, d, k[4], 7, -176418897);
+            d = ff(d, a, b, c, k[5], 12, 1200080426);
+            c = ff(c, d, a, b, k[6], 17, -1473231341);
+            b = ff(b, c, d, a, k[7], 22, -45705983);
+            a = ff(a, b, c, d, k[8], 7, 1770035416);
+            d = ff(d, a, b, c, k[9], 12, -1958414417);
+            c = ff(c, d, a, b, k[10], 17, -42063);
+            b = ff(b, c, d, a, k[11], 22, -1990404162);
+            a = ff(a, b, c, d, k[12], 7, 1804603682);
+            d = ff(d, a, b, c, k[13], 12, -40341101);
+            c = ff(c, d, a, b, k[14], 17, -1502002290);
+            b = ff(b, c, d, a, k[15], 22, 1236535329);
+            a = gg(a, b, c, d, k[1], 5, -165796510);
+            d = gg(d, a, b, c, k[6], 9, -1069501632);
+            c = gg(c, d, a, b, k[11], 14, 643717713);
+            b = gg(b, c, d, a, k[0], 20, -373897302);
+            a = gg(a, b, c, d, k[5], 5, -701558691);
+            d = gg(d, a, b, c, k[10], 9, 38016083);
+            c = gg(c, d, a, b, k[15], 14, -660478335);
+            b = gg(b, c, d, a, k[4], 20, -405537848);
+            a = gg(a, b, c, d, k[9], 5, 568446438);
+            d = gg(d, a, b, c, k[14], 9, -1019803690);
+            c = gg(c, d, a, b, k[3], 14, -187363961);
+            b = gg(b, c, d, a, k[8], 20, 1163531501);
+            a = gg(a, b, c, d, k[13], 5, -1444681467);
+            d = gg(d, a, b, c, k[2], 9, -51403784);
+            c = gg(c, d, a, b, k[7], 14, 1735328473);
+            b = gg(b, c, d, a, k[12], 20, -1926607734);
+            a = hh(a, b, c, d, k[5], 4, -378558);
+            d = hh(d, a, b, c, k[8], 11, -2022574463);
+            c = hh(c, d, a, b, k[11], 16, 1839030562);
+            b = hh(b, c, d, a, k[14], 23, -35309556);
+            a = hh(a, b, c, d, k[1], 4, -1530992060);
+            d = hh(d, a, b, c, k[4], 11, 1272893353);
+            c = hh(c, d, a, b, k[7], 16, -155497632);
+            b = hh(b, c, d, a, k[10], 23, -1094730640);
+            a = hh(a, b, c, d, k[13], 4, 681279174);
+            d = hh(d, a, b, c, k[0], 11, -358537222);
+            c = hh(c, d, a, b, k[3], 16, -722521979);
+            b = hh(b, c, d, a, k[6], 23, 76029189);
+            a = hh(a, b, c, d, k[9], 4, -640364487);
+            d = hh(d, a, b, c, k[12], 11, -421815835);
+            c = hh(c, d, a, b, k[15], 16, 530742520);
+            b = hh(b, c, d, a, k[2], 23, -995338651);
+            a = ii(a, b, c, d, k[0], 6, -198630844);
+            d = ii(d, a, b, c, k[7], 10, 1126891415);
+            c = ii(c, d, a, b, k[14], 15, -1416354905);
+            b = ii(b, c, d, a, k[5], 21, -57434055);
+            a = ii(a, b, c, d, k[12], 6, 1700485571);
+            d = ii(d, a, b, c, k[3], 10, -1894986606);
+            c = ii(c, d, a, b, k[10], 15, -1051523);
+            b = ii(b, c, d, a, k[1], 21, -2054922799);
+            a = ii(a, b, c, d, k[8], 6, 1873313359);
+            d = ii(d, a, b, c, k[15], 10, -30611744);
+            c = ii(c, d, a, b, k[6], 15, -1560198380);
+            b = ii(b, c, d, a, k[13], 21, 1309151649);
+            a = ii(a, b, c, d, k[4], 6, -145523070);
+            d = ii(d, a, b, c, k[11], 10, -1120210379);
+            c = ii(c, d, a, b, k[2], 15, 718787259);
+            b = ii(b, c, d, a, k[9], 21, -343485551);
+            x[0] = add32(a, x[0]);
+            x[1] = add32(b, x[1]);
+            x[2] = add32(c, x[2]);
+            x[3] = add32(d, x[3]);
+        }
+        function cmn(q, a, b, x, s, t) {
+            a = add32(add32(a, q), add32(x, t));
+            return add32((a << s) | (a >>> (32 - s)), b);
+        }
+        function ff(a, b, c, d, x, s, t) {
+            return cmn((b & c) | ((~b) & d), a, b, x, s, t);
+        }
+        function gg(a, b, c, d, x, s, t) {
+            return cmn((b & d) | (c & (~d)), a, b, x, s, t);
+        }
+        function hh(a, b, c, d, x, s, t) {
+            return cmn(b ^ c ^ d, a, b, x, s, t);
+        }
+        function ii(a, b, c, d, x, s, t) {
+            return cmn(c ^ (b | (~d)), a, b, x, s, t);
+        }
+        function md51(s) {
+            var n = s.length,
+                state = [1732584193, -271733879, -1732584194, 271733878], i;
+            for (i = 64; i <= s.length; i += 64) {
+                md5cycle(state, md5blk(s.substring(i - 64, i)));
+            }
+            s = s.substring(i - 64);
+            var tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            for (i = 0; i < s.length; i++)
+                tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
+            tail[i >> 2] |= 0x80 << ((i % 4) << 3);
+            if (i > 55) {
+                md5cycle(state, tail);
+                for (i = 0; i < 16; i++) tail[i] = 0;
+            }
+            tail[14] = n * 8;
+            md5cycle(state, tail);
+            return state;
+        }
+        function md5blk(s) {
+            var md5blks = [], i;
+            for (i = 0; i < 64; i += 4) {
+                md5blks[i >> 2] = s.charCodeAt(i)
+                    + (s.charCodeAt(i + 1) << 8)
+                    + (s.charCodeAt(i + 2) << 16)
+                    + (s.charCodeAt(i + 3) << 24);
+            }
+            return md5blks;
+        }
+        var hex_chr = '0123456789abcdef'.split('');
+        function rhex(n) {
+            var s = '', j = 0;
+            for (; j < 4; j++)
+                s += hex_chr[(n >> (j * 8 + 4)) & 0x0F]
+                    + hex_chr[(n >> (j * 8)) & 0x0F];
+            return s;
+        }
+        function hex(x) {
+            for (var i = 0; i < x.length; i++)
+                x[i] = rhex(x[i]);
+            return x.join('');
+        }
+        function add32(a, b) {
+            return (a + b) & 0xFFFFFFFF;
+        }
+        return hex(md51(string));
+    },
+
+    // Render the Apollo.io-style contact detail view
+    renderContactDetailView(contact) {
+        const contactDetailView = document.getElementById('contact-detail-view');
+        if (!contactDetailView) return;
+
+        // Get profile picture from email (Gravatar)
+        const getProfilePicture = (email) => {
+            if (!email) return 'https://via.placeholder.com/80x80/333/fff?text=' + (contact.name ? contact.name.charAt(0).toUpperCase() : '?');
+            const hash = this.md5(email.toLowerCase().trim());
+            return `https://www.gravatar.com/avatar/${hash}?s=80&d=identicon`;
+        };
+
+        // Get company favicon
+        const getCompanyFavicon = (domain) => {
+            if (!domain) return 'https://via.placeholder.com/24x24/666/fff?text=C';
+            return `https://www.google.com/s2/favicons?domain=${domain}&sz=24`;
+        };
+
+        // Extract domain from email or website
+        const getCompanyDomain = (contact) => {
+            if (contact.website) {
+                return contact.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+            }
+            if (contact.email) {
+                return contact.email.split('@')[1];
+            }
+            return null;
+        };
+
+        const companyDomain = getCompanyDomain(contact);
+        const profilePic = getProfilePicture(contact.email);
+        const companyFavicon = getCompanyFavicon(companyDomain);
+        const contactName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown Contact';
+
+        contactDetailView.innerHTML = `
+            <div style="
+                display: flex;
+                flex-direction: column;
+                height: calc(100vh - 120px);
+                background: #1a1a1a;
+                color: #fff;
+                margin-top: 32px;
+                padding: 20px;
+                border-radius: 20px;
+                overflow-y: auto;
+                gap: 20px;
+            ">
+                <!-- Back Button -->
+                <div style="margin-bottom: 10px;">
+                    <button onclick="CRMApp.showView('contacts-view')" style="
+                        background: rgba(30, 60, 120, 0.4);
+                        border: 1px solid rgba(30, 60, 120, 0.6);
+                        color: #fff;
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-size: 14px;
+                    ">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        Back to Contacts
+                    </button>
+                </div>
+
+                <!-- Contact Header with Profile -->
+                <div style="
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 24px;
+                    border-radius: 18px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    align-items: center;
+                    gap: 20px;
+                ">
+                    <!-- Profile Picture -->
+                    <img src="${profilePic}" alt="${contactName}" style="
+                        width: 80px;
+                        height: 80px;
+                        border-radius: 50%;
+                        border: 3px solid rgba(30, 60, 120, 0.6);
+                        object-fit: cover;
+                    ">
+                    
+                    <!-- Contact Info -->
+                    <div style="flex: 1;">
+                        <h1 style="
+                            margin: 0 0 8px 0;
+                            font-size: 28px;
+                            font-weight: 700;
+                            color: #fff;
+                            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                        ">${contactName}</h1>
+                        
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            ${contact.company ? `
+                                <img src="${companyFavicon}" alt="Company" style="width: 24px; height: 24px; border-radius: 4px;">
+                                <span style="color: #ccc; font-size: 16px;">${contact.company}</span>
+                            ` : '<span style="color: #888;">No company specified</span>'}
+                        </div>
+                        
+                        <!-- Quick Actions -->
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            ${contact.email ? `
+                                <button onclick="window.open('mailto:${contact.email}', '_blank')" style="
+                                    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                                    border: none;
+                                    color: white;
+                                    padding: 8px 16px;
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    font-size: 14px;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 6px;
+                                ">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                                    </svg>
+                                    Email
+                                </button>
+                            ` : ''}
+                            
+                            ${contact.phone ? `
+                                <button onclick="window.open('tel:${contact.phone}', '_blank')" style="
+                                    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+                                    border: none;
+                                    color: white;
+                                    padding: 8px 16px;
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    font-size: 14px;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 6px;
+                                ">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+                                    </svg>
+                                    Call
+                                </button>
+                            ` : ''}
+                            
+                            <button onclick="CRMApp.createTaskForContact('${contact.id}')" style="
+                                background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+                                border: none;
+                                color: white;
+                                padding: 8px 16px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                            ">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                </svg>
+                                Create Task
+                            </button>
+                            
+                            <button onclick="CRMApp.addToSequence('${contact.id}')" style="
+                                background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+                                border: none;
+                                color: white;
+                                padding: 8px 16px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                            ">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H9V15H11V17M11,13H9V7H11V13Z"/>
+                                </svg>
+                                Add to Sequence
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area - All Content Flows Together -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Top Row: Notes (Square) + Contact Information -->
+                    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+                        <!-- Notes Section (Square Widget) -->
+                        <div style="
+                            flex: 0 0 300px;
+                            height: 300px;
+                            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                            padding: 20px;
+                            border-radius: 18px;
+                            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                            display: flex;
+                            flex-direction: column;
+                        ">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <h3 style="margin: 0; color: #fff; font-size: 18px;">Notes</h3>
+                                <button onclick="CRMApp.addNoteToActivity('${contact.id}')" style="
+                                    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                                    border: none;
+                                    color: white;
+                                    padding: 6px 12px;
+                                    border-radius: 6px;
+                                    cursor: pointer;
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 4px;
+                                ">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
+                                    </svg>
+                                    Add Note
+                                </button>
+                            </div>
+                            <textarea 
+                                id="contact-notes-${contact.id}"
+                                placeholder="Add notes about this contact..."
+                                style="
+                                    flex: 1;
+                                    width: 100%;
+                                    background: rgba(0, 0, 0, 0.3);
+                                    border: 1px solid rgba(255, 255, 255, 0.1);
+                                    border-radius: 8px;
+                                    padding: 12px;
+                                    color: #fff;
+                                    font-family: inherit;
+                                    font-size: 14px;
+                                    resize: none;
+                                "
+                                onblur="CRMApp.saveContactNotes('${contact.id}', this.value)"
+                            >${contact.notes || ''}</textarea>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div style="
+                            flex: 1;
+                            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                            padding: 20px;
+                            border-radius: 18px;
+                            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                        ">
+                            <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px;">Contact Information</h3>
+                            <div style="display: grid; gap: 12px;">
+                                ${this.renderEditableField('Email', contact.email, 'email', contact.id)}
+                                ${this.renderEditableField('Phone', contact.phone, 'phone', contact.id)}
+                                ${this.renderEditableField('Company', contact.company, 'company', contact.id)}
+                                ${this.renderEditableField('Title', contact.title, 'title', contact.id)}
+                                ${this.renderEditableField('Location', contact.location, 'location', contact.id)}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Company Information (Full Width Rectangle) -->
+                    ${contact.company ? `
+                        <div style="
+                            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                            padding: 20px;
+                            border-radius: 18px;
+                            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                            margin-bottom: 20px;
+                        ">
+                            <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                                <img src="${companyFavicon}" alt="Company" style="width: 24px; height: 24px; border-radius: 4px;">
+                                Company Information
+                            </h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+                                <div style="color: #ccc;">Company: <strong style="color: #fff;">${contact.company}</strong></div>
+                                ${companyDomain ? `<div style="color: #ccc;">Domain: <strong style="color: #fff;">${companyDomain}</strong></div>` : ''}
+                                ${contact.industry ? `<div style="color: #ccc;">Industry: <strong style="color: #fff;">${contact.industry}</strong></div>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Recent Activity (Full Width Rectangle) -->
+                    <div style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 20px;
+                        border-radius: 18px;
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                        margin-bottom: 20px;
+                    ">
+                        <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px;">Recent Activity</h3>
+                        <div class="recent-activity-content" style="color: #888; font-style: italic;">
+                            ${this.renderContactActivities(contact.id)}
+                        </div>
+                    </div>
+
+                    <!-- Associated Accounts (Full Width Rectangle) -->
+                    <div style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 20px;
+                        border-radius: 18px;
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                        margin-bottom: 20px;
+                    ">
+                        <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px;">Associated Accounts</h3>
+                        ${this.renderAssociatedAccounts(contact)}
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // Render an editable field with hover actions
+    renderEditableField(label, value, fieldType, contactId) {
+        const displayValue = value || 'Not specified';
+        const isEmpty = !value;
+        
+        return `
+            <div class="editable-field" style="
+                position: relative;
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                transition: all 0.3s ease;
+            " 
+            onmouseenter="this.style.background='rgba(0, 0, 0, 0.4)'; this.querySelector('.field-actions').style.opacity='1';"
+            onmouseleave="this.style.background='rgba(0, 0, 0, 0.2)'; this.querySelector('.field-actions').style.opacity='0';">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="color: #888; font-size: 12px; margin-bottom: 4px;">${label}</div>
+                        <div style="color: ${isEmpty ? '#666' : '#fff'}; font-size: 14px;">${displayValue}</div>
+                    </div>
+                    <div class="field-actions" style="
+                        opacity: 0;
+                        transition: opacity 0.3s ease;
+                        display: flex;
+                        gap: 8px;
+                    ">
+                        ${!isEmpty ? `
+                            <button onclick="CRMApp.copyToClipboard('${value}')" style="
+                                background: rgba(76, 175, 80, 0.2);
+                                border: 1px solid rgba(76, 175, 80, 0.4);
+                                color: #4CAF50;
+                                padding: 4px 8px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            " title="Copy">
+                                📋
+                            </button>
+                        ` : ''}
+                        <button onclick="CRMApp.editContactField('${contactId}', '${fieldType}', '${label}')" style="
+                            background: rgba(33, 150, 243, 0.2);
+                            border: 1px solid rgba(33, 150, 243, 0.4);
+                            color: #2196F3;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 12px;
+                        " title="Edit">
+                            ✏️
+                        </button>
+                        ${!isEmpty ? `
+                            <button onclick="CRMApp.deleteContactField('${contactId}', '${fieldType}')" style="
+                                background: rgba(244, 67, 54, 0.2);
+                                border: 1px solid rgba(244, 67, 54, 0.4);
+                                color: #f44336;
+                                padding: 4px 8px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            " title="Delete">
+                                🗑️
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // Render associated accounts
+    renderAssociatedAccounts(contact) {
+        const associatedAccounts = this.accounts.filter(account => 
+            account.company === contact.company || 
+            (contact.email && account.domain === contact.email.split('@')[1])
+        );
+
+        if (associatedAccounts.length === 0) {
+            return '<div style="color: #888; font-style: italic;">No associated accounts found</div>';
+        }
+
+        return associatedAccounts.map(account => `
+            <div style="
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                margin-bottom: 8px;
+                cursor: pointer;
+            " onclick="CRMApp.showAccountDetail('${account.id}')">
+                <div style="color: #fff; font-weight: 600; margin-bottom: 4px;">${account.name || account.company}</div>
+                <div style="color: #ccc; font-size: 12px;">${account.industry || 'Unknown industry'}</div>
+            </div>
+        `).join('');
+    },
+
+    // Copy text to clipboard
+    copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            this.showToast('Copied to clipboard!', 'success');
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+            this.showToast('Failed to copy to clipboard', 'error');
+        });
+    },
+
+    // Edit contact field
+    editContactField(contactId, fieldType, label) {
+        const contact = this.contacts.find(c => c.id === contactId);
+        if (!contact) return;
+
+        const currentValue = contact[fieldType] || '';
+        const newValue = prompt(`Edit ${label}:`, currentValue);
+        
+        if (newValue !== null && newValue !== currentValue) {
+            contact[fieldType] = newValue;
+            this.updateContactInFirebase(contactId, { [fieldType]: newValue });
+            this.renderContactDetailView(contact);
+            this.showToast(`${label} updated successfully!`, 'success');
+        }
+    },
+
+    // Delete contact field
+    deleteContactField(contactId, fieldType) {
+        if (confirm(`Are you sure you want to delete this field?`)) {
+            const contact = this.contacts.find(c => c.id === contactId);
+            if (!contact) return;
+
+            contact[fieldType] = '';
+            this.updateContactInFirebase(contactId, { [fieldType]: '' });
+            this.renderContactDetailView(contact);
+            this.showToast('Field deleted successfully!', 'success');
+        }
+    },
+
+    // Save contact notes
+    saveContactNotes(contactId, notes) {
+        const contact = this.contacts.find(c => c.id === contactId);
+        if (!contact) return;
+
+        contact.notes = notes;
+        this.updateContactInFirebase(contactId, { notes: notes });
+        this.showToast('Notes saved!', 'success');
+    },
+
+    // Update contact in Firebase
+    async updateContactInFirebase(contactId, updates) {
+        try {
+            if (typeof db !== 'undefined') {
+                await db.collection('contacts').doc(contactId).update(updates);
+                console.log('Contact updated in Firebase:', contactId, updates);
+            }
+        } catch (error) {
+            console.error('Error updating contact in Firebase:', error);
+            this.showToast('Failed to save changes to database', 'error');
+        }
+    },
+
+    // Create task for contact
+    createTaskForContact(contactId) {
+        const contact = this.contacts.find(c => c.id === contactId);
+        if (!contact) return;
+
+        const contactName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown Contact';
+        const taskDescription = prompt(`Create a task for ${contactName}:`, `Follow up with ${contactName}`);
+        
+        if (taskDescription) {
+            // Here you would typically save to Firebase tasks collection
+            this.showToast(`Task created: ${taskDescription}`, 'success');
+            console.log('Task created for contact:', contactId, taskDescription);
+        }
+    },
+
+    // Add contact to sequence
+    addToSequence(contactId) {
+        const contact = this.contacts.find(c => c.id === contactId);
+        if (!contact) return;
+
+        const contactName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown Contact';
+        // Here you would typically show a sequence selection dialog
+        this.showToast(`${contactName} added to email sequence!`, 'success');
+        console.log('Contact added to sequence:', contactId);
+    },
+
+    // Add note to contact's recent activities
+    addNoteToActivity(contactId) {
+        const contact = this.contacts.find(c => c.id === contactId);
+        if (!contact) return;
+
+        const noteTextarea = document.getElementById(`contact-notes-${contactId}`);
+        const noteContent = noteTextarea ? noteTextarea.value.trim() : '';
+        
+        if (!noteContent) {
+            this.showToast('Please add some content to the note first!', 'warning');
+            return;
+        }
+
+        const contactName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown Contact';
+        
+        // Create activity entry
+        const activity = {
+            id: Date.now().toString(),
+            type: 'note',
+            contactId: contactId,
+            contactName: contactName,
+            content: noteContent,
+            createdAt: new Date(),
+            timestamp: new Date().toISOString()
+        };
+
+        // Add to activities array
+        if (!this.activities) {
+            this.activities = [];
+        }
+        this.activities.unshift(activity); // Add to beginning of array
+
+        // Save to Firebase if available
+        this.saveActivityToFirebase(activity);
+
+        // Clear the note textarea
+        if (noteTextarea) {
+            noteTextarea.value = '';
+        }
+
+        // Update the recent activity section in the current view
+        this.updateRecentActivityDisplay(contactId);
+
+        this.showToast('Note added to recent activities!', 'success');
+        console.log('Note added to activities:', activity);
+    },
+
+    // Save activity to Firebase
+    async saveActivityToFirebase(activity) {
+        try {
+            if (typeof db !== 'undefined') {
+                await db.collection('activities').add(activity);
+                console.log('Activity saved to Firebase:', activity.id);
+            }
+        } catch (error) {
+            console.error('Error saving activity to Firebase:', error);
+        }
+    },
+
+    // Update recent activity display
+    updateRecentActivityDisplay(contactId) {
+        const contactActivities = this.activities.filter(activity => 
+            activity.contactId === contactId
+        ).slice(0, 5); // Show last 5 activities
+
+        const activityContainer = document.querySelector('#contact-detail-view .recent-activity-content');
+        if (activityContainer) {
+            if (contactActivities.length === 0) {
+                activityContainer.innerHTML = '<div style="color: #888; font-style: italic;">No recent activity</div>';
+            } else {
+                activityContainer.innerHTML = contactActivities.map(activity => `
+                    <div style="
+                        padding: 12px;
+                        background: rgba(0, 0, 0, 0.2);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        border-radius: 8px;
+                        margin-bottom: 8px;
+                    ">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="color: #4CAF50; font-weight: 500; font-size: 12px;">📝 Note Added</span>
+                            <span style="color: #888; font-size: 11px;">${this.formatActivityDate(activity.createdAt)}</span>
+                        </div>
+                        <div style="color: #ccc; font-size: 13px; line-height: 1.4;">${activity.content}</div>
+                    </div>
+                `).join('');
+            }
+        }
+    },
+
+    // Format activity date for display
+    formatActivityDate(date) {
+        const now = new Date();
+        const activityDate = new Date(date);
+        const diffMs = now - activityDate;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return activityDate.toLocaleDateString();
+    },
+
+    // Render contact activities for initial load
+    renderContactActivities(contactId) {
+        if (!this.activities) {
+            return 'No recent activity';
+        }
+
+        const contactActivities = this.activities.filter(activity => 
+            activity.contactId === contactId
+        ).slice(0, 5); // Show last 5 activities
+
+        if (contactActivities.length === 0) {
+            return 'No recent activity';
+        }
+
+        return contactActivities.map(activity => `
+            <div style="
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                margin-bottom: 8px;
+            ">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="color: #4CAF50; font-weight: 500; font-size: 12px;">
+                        ${activity.type === 'note' ? '📝 Note Added' : '📋 Activity'}
+                    </span>
+                    <span style="color: #888; font-size: 11px;">${this.formatActivityDate(activity.createdAt)}</span>
+                </div>
+                <div style="color: #ccc; font-size: 13px; line-height: 1.4;">${activity.content}</div>
+            </div>
+        `).join('');
     },
     
     // Initialize contacts UI, filtering, and Firebase data (LEGACY - keeping for compatibility)
