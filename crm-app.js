@@ -274,6 +274,7 @@ const CRMApp = {
 
     // Render the contacts page, load HTML, apply CSS, and wire up Firebase
     async renderContactsPage() {
+    console.log("renderContactsPage called");
         const contactsView = document.getElementById('contacts-view');
         if (!contactsView) return;
         // If already loaded, don't reload
@@ -282,6 +283,7 @@ const CRMApp = {
         contactsView.innerHTML = '<div class="contacts-loading"><div class="loading-spinner"></div><p>Loading contacts...</p></div>';
         // Load contacts-content.html
         try {
+            console.log("Fetching contacts-content.html");
             const res = await fetch('contacts-content.html');
             const html = await res.text();
             contactsView.innerHTML = html;
