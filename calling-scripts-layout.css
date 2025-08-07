@@ -1,6 +1,12 @@
 /* === CALLING SCRIPTS PAGE LAYOUT FIXES === */
 
 /* --- CRM Dashboard Alignment Fixes --- */
+
+/* Add space below header for main content */
+.app-main {
+    margin-top: 32px !important;
+}
+
 /* Move main contacts content down to align with blue line (below header) */
 .contacts-main-layout {
     margin-top: 70px !important; /* Height of header */
