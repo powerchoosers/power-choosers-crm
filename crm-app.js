@@ -5,21 +5,9 @@
 // Integrated Cold Calling Hub with auto-population and Firebase updates
 
 // --- 1. Firebase Configuration & Initialization ---
-const firebaseConfig = {
-    apiKey: "AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE",
-    authDomain: "power-choosers-crm.firebaseapp.com",
-    projectId: "power-choosers-crm",
-    storageBucket: "power-choosers-crm.firebasestorage.app",
-    messagingSenderId: "792458658491",
-    appId: "1:792458658491:web:a197a4a8ce7a860cfa1f9e",
-    measurementId: "G-XEC3BFHJHW"
-};
+// Use the firebaseConfig, app, db, and serverTimestamp from firebase-config.js
+// (No need to redeclare here)
 
-// Initialize Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
-const fieldValue = firebase.firestore.FieldValue;
 
 // --- 2. Global Application State and Data ---
 const CRMApp = {
