@@ -31,9 +31,11 @@
     margin-bottom: 16px; /* Reduce bottom margin slightly */
 }
 
-/* Remove the space above the title (the red rectangle area) */
+/* Align the title with the top red line while constraining modal height */
 #call-scripts-view {
-    padding-top: 0 !important; /* Remove all top padding */
+    padding-top: var(--spacing-lg) !important; /* Add padding to bring title down to red line */
+    height: calc(100vh - 70px - var(--spacing-lg)) !important; /* Constrain height to not pass bottom red line */
+    overflow-y: auto !important; /* Ensure scrolling if content is too tall */
 }
 
 /* Also remove any margin from the calls-hub-main container */
