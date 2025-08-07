@@ -1788,6 +1788,32 @@ window.CRMApp = CRMApp;
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing CRM App...');
     CRMApp.init();
+
+    // --- Layout Alignment Fix ---
+    // Move contacts main layout below header
+    const contactsMain = document.querySelector('.contacts-main-layout');
+    if (contactsMain) {
+        contactsMain.style.marginTop = '70px'; // height of header
+    }
+    // Move widget panel flush to top of main content
+    const widgetPanel = document.querySelector('.widget-panel');
+    if (widgetPanel) {
+        widgetPanel.style.marginTop = '0';
+    }
+    // Also remove any margin from first widget card
+    const widgetCard = widgetPanel ? widgetPanel.querySelector('.widget-card') : null;
+    if (widgetCard) {
+        widgetCard.style.marginTop = '0';
+    }
+
+    // --- Contacts Page: Move All Contacts Section Down ---
+    // Look for the main contacts container by matching the style or a unique selector
+    const allContactsSection = Array.from(document.querySelectorAll('div')).find(div => {
+        return div.innerText && div.innerText.trim().startsWith('All Contacts');
+    });
+    if (allContactsSection) {
+        allContactsSection.style.marginTop = '32px'; // Adjust as needed
+    }
 });
 
 // --- 4. Make CRMApp globally available for debugging ---
