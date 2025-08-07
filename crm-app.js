@@ -40,7 +40,21 @@ const CRMApp = {
 
     // Load initial data from Firestore
     async loadInitialData() {
+        console.log('Attempting to load data from Firebase...');
+        
+        // Check if Firebase is properly initialized
+        if (typeof db === 'undefined') {
+            console.error('Firebase db is not defined. Check Firebase initialization.');
+            this.showToast('Firebase not initialized. Using sample data.', 'warning');
+            return this.loadSampleData();
+        }
+        
         try {
+            // Test Firebase connection first
+            console.log('Testing Firebase connection...');
+            const testQuery = await db.collection('contacts').limit(1).get();
+            console.log('Firebase connection successful, loading all data...');
+            
             const [accountsSnapshot, contactsSnapshot, activitiesSnapshot] = await Promise.all([
                 db.collection('accounts').get(),
                 db.collection('contacts').get(),
@@ -55,16 +69,35 @@ const CRMApp = {
                 createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date() 
             }));
             
-            console.log('Initial data loaded:', {
+            console.log('✅ Firebase data loaded successfully:', {
                 accounts: this.accounts.length,
                 contacts: this.contacts.length,
                 activities: this.activities.length
             });
             
+            if (this.contacts.length === 0) {
+                console.log('⚠️  No contacts found in Firebase. Your Firebase contacts collection might be empty.');
+                this.showToast('No contacts found in Firebase database. Add some contacts first!', 'info');
+            }
+            
             return true;
         } catch (error) {
-            console.error('Error loading initial data:', error);
-            this.showToast('Failed to load data. Using sample data.', 'warning');
+            console.error('❌ Error loading Firebase data:', error);
+            console.error('Error details:', {
+                name: error.name,
+                message: error.message,
+                code: error.code
+            });
+            
+            // Show specific error message based on error type
+            if (error.code === 'permission-denied') {
+                this.showToast('Firebase permission denied. Check your Firestore security rules.', 'error');
+            } else if (error.code === 'unavailable') {
+                this.showToast('Firebase is unavailable. Check your internet connection.', 'error');
+            } else {
+                this.showToast(`Firebase error: ${error.message}. Using sample data.`, 'warning');
+            }
+            
             return this.loadSampleData();
         }
     },
@@ -79,7 +112,10 @@ const CRMApp = {
         this.contacts = [
             { id: 'con1', firstName: 'John', lastName: 'Smith', title: 'CEO', accountId: 'acc1', accountName: 'ABC Manufacturing', email: 'john@abcmfg.com', phone: '(214) 555-0123', createdAt: new Date() },
             { id: 'con2', firstName: 'Sarah', lastName: 'Johnson', title: 'CFO', accountId: 'acc1', accountName: 'ABC Manufacturing', email: 'sarah@abcmfg.com', phone: '(214) 555-0124', createdAt: new Date() },
-            { id: 'con3', firstName: 'Mike', lastName: 'Davis', title: 'Operations Manager', accountId: 'acc2', accountName: 'XYZ Energy Solutions', email: 'mike@xyzenergy.com', phone: '(972) 555-0456', createdAt: new Date() }
+            { id: 'con3', firstName: 'Mike', lastName: 'Davis', title: 'Operations Manager', accountId: 'acc2', accountName: 'XYZ Energy Solutions', email: 'mike@xyzenergy.com', phone: '(972) 555-0456', createdAt: new Date() },
+            { id: 'con4', firstName: 'potter', lastName: '', title: '', accountId: '', accountName: '', email: 'N/A', phone: '', createdAt: new Date() },
+            { id: 'con5', firstName: 'Contact', lastName: '', title: '', accountId: '', accountName: '', email: 'N/A', phone: '', createdAt: new Date() },
+            { id: 'con6', firstName: 'Lewis', lastName: 'Patterson', title: '', accountId: '', accountName: '', email: 'l.patterson@powerchooser.com', phone: '', createdAt: new Date() }
         ];
         this.activities = [
             { id: 'act1', type: 'call_note', description: 'Call with John Smith - Q1 Energy Contract', noteContent: 'Discussed renewal options', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
@@ -286,39 +322,162 @@ const CRMApp = {
         }
 
         console.log("Creating contacts HTML with classes");
-        // Move layout classes to contacts-view element
-        contactsView.classList.add('contacts-container');
+        // Rebuild contacts HTML with enhanced inline styling
         const contactsHTML = `
-            <div class="contacts-header">
-                <h2 class="contacts-title">All Contacts</h2>
+            <div class="contacts-header" style="
+                margin-bottom: 20px;
+                padding: 20px;
+                background: linear-gradient(135deg, #2c2c2c 0%, #1e1e1e 100%);
+                border-radius: 18px;
+                border: 1px solid #333;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            ">
+                <h2 class="contacts-title" style="
+                    font-size: 24px;
+                    font-weight: 600;
+                    color: #fff;
+                    margin: 0;
+                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+                ">All Contacts</h2>
             </div>
-            <div class="contacts-content">
+            <div class="contacts-content" style="display: flex; gap: 20px; flex: 1;">
                 <!-- Filters Sidebar -->
-                <div class="filters-sidebar">
-                    <h3 class="filters-title">Filters</h3>
+                <div class="filters-sidebar" style="
+                    width: 250px;
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 20px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 15px;
+                ">
+                    <h3 class="filters-title" style="color: #fff; margin: 0 0 10px 0; font-size: 18px;">Filters</h3>
                     <div class="filter-group">
-                        <label class="filter-label">Search</label>
-                        <input type="text" id="contact-search-simple" placeholder="Search contacts..." class="filter-input">
+                        <label class="filter-label" style="color: #ccc; font-size: 14px; margin-bottom: 5px; display: block;">Search</label>
+                        <input type="text" id="contact-search-simple" placeholder="Search contacts..." class="filter-input" style="
+                            width: 100%;
+                            padding: 10px;
+                            background: #333;
+                            color: #fff;
+                            border: 1px solid #555;
+                            border-radius: 6px;
+                            font-size: 14px;
+                        ">
                     </div>
                     <div class="filter-group">
-                        <label class="filter-label">Account</label>
-                        <select id="account-filter-simple" class="filter-input">
+                        <label class="filter-label" style="color: #ccc; font-size: 14px; margin-bottom: 5px; display: block;">Account</label>
+                        <select id="account-filter-simple" class="filter-input" style="
+                            width: 100%;
+                            padding: 10px;
+                            background: #333;
+                            color: #fff;
+                            border: 1px solid #555;
+                            border-radius: 6px;
+                            font-size: 14px;
+                        ">
                             <option value="">All Accounts</option>
                         </select>
                     </div>
-                    <button onclick="CRMApp.clearContactsFilters()" class="btn btn-clear-filters">Clear Filters</button>
+                    <button onclick="CRMApp.clearContactsFilters()" class="btn btn-clear-filters" style="
+                        width: 100%;
+                        padding: 12px;
+                        background: linear-gradient(135deg, #666 0%, #555 100%);
+                        color: #fff;
+                        border: 1px solid #777;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                        transition: all 0.2s ease;
+                        font-size: 14px;
+                    ">Clear Filters</button>
                 </div>
                 <!-- Contacts Table -->
-                <div class="contacts-table-section">
-                    <div id="contacts-count-simple" class="contacts-count">Loading contacts...</div>
-                    <div id="contacts-table-container" class="contacts-table-wrapper">
-                        <table class="contacts-table">
+                <div class="contacts-table-section" style="
+                    flex: 1;
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 20px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    flex-direction: column;
+                ">
+                    <div id="contacts-count-simple" class="contacts-count" style="
+                        color: #ccc;
+                        margin-bottom: 15px;
+                        font-size: 14px;
+                        font-weight: 500;
+                    ">Loading contacts...</div>
+                    <div id="contacts-table-container" class="contacts-table-wrapper" style="flex: 1; overflow: auto;">
+                        <table class="contacts-table" style="
+                            width: 100%;
+                            border-collapse: collapse;
+                            background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
+                            border-radius: 18px;
+                            overflow: hidden;
+                            border: 1px solid #444;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+                        ">
                             <thead>
-                                <tr class="table-header-row">
-                                    <th class="table-header-cell">Name</th>
-                                    <th class="table-header-cell">Email</th>
-                                    <th class="table-header-cell">Company</th>
-                                    <th class="table-header-cell">Actions</th>
+                                <tr class="table-header-row" style="
+                                    background: linear-gradient(135deg, #444 0%, #333 100%);
+                                    border-bottom: 2px solid #555;
+                                ">
+                                    <th class="table-header-cell" style="
+                                        padding: 15px 12px;
+                                        text-align: left;
+                                        font-weight: 600;
+                                        color: #fff;
+                                        border-bottom: 1px solid #555;
+                                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                                        font-size: 14px;
+                                        letter-spacing: 0.5px;
+                                    ">Name</th>
+                                    <th class="table-header-cell" style="
+                                        padding: 15px 12px;
+                                        text-align: left;
+                                        font-weight: 600;
+                                        color: #fff;
+                                        border-bottom: 1px solid #555;
+                                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                                        font-size: 14px;
+                                        letter-spacing: 0.5px;
+                                        width: 120px;
+                                    ">Number</th>
+                                    <th class="table-header-cell" style="
+                                        padding: 15px 12px;
+                                        text-align: left;
+                                        font-weight: 600;
+                                        color: #fff;
+                                        border-bottom: 1px solid #555;
+                                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                                        font-size: 14px;
+                                        letter-spacing: 0.5px;
+                                    ">Email</th>
+                                    <th class="table-header-cell" style="
+                                        padding: 15px 12px;
+                                        text-align: left;
+                                        font-weight: 600;
+                                        color: #fff;
+                                        border-bottom: 1px solid #555;
+                                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                                        font-size: 14px;
+                                        letter-spacing: 0.5px;
+                                    ">Company</th>
+                                    <th class="table-header-cell" style="
+                                        padding: 15px 12px;
+                                        text-align: left;
+                                        font-weight: 600;
+                                        color: #fff;
+                                        border-bottom: 1px solid #555;
+                                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                                        font-size: 14px;
+                                        letter-spacing: 0.5px;
+                                    ">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="contacts-table-body-simple"></tbody>
@@ -332,14 +491,20 @@ const CRMApp = {
         contactsView.setAttribute('data-loaded', 'true');
         console.log("Contacts HTML created and injected");
 
-        // Force remove all inline styles and ensure CSS takes effect
-        contactsView.removeAttribute('style');
-        contactsView.style.cssText = 'display: block !important;';
+        // Apply layout, spacing, and essential background styles for visibility
+        contactsView.style.cssText = `
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100vh - 120px) !important;
+            background: #1a1a1a !important;
+            color: #fff !important;
+            margin-top: 32px !important;
+            padding: 20px !important;
+            border-radius: 20px !important;
+            overflow: hidden !important;
+        `;
         
-        // Force a reflow to ensure styles are applied
-        setTimeout(() => {
-            contactsView.style.cssText = 'display: block !important;';
-        }, 10);
+        console.log('Applied direct styles to contacts-view:', contactsView.style.cssText);
 
         // Initialize the simple contacts functionality
         this.initSimpleContactsUI();
@@ -349,6 +514,7 @@ const CRMApp = {
     // Initialize simple contacts UI with basic functionality
     initSimpleContactsUI() {
         console.log("Initializing simple contacts UI");
+        console.log(`Found ${this.contacts ? this.contacts.length : 0} contacts from Firebase`);
         
         // Populate contacts table
         this.renderSimpleContactsTable();
@@ -407,11 +573,12 @@ const CRMApp = {
         
         // Render table rows
         if (filteredContacts.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="4" style="padding: 20px; text-align: center; color: #888;">No contacts found</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #888;">No contacts found</td></tr>';
         } else {
             tableBody.innerHTML = filteredContacts.map(contact => `
                 <tr style="border-bottom: 1px solid #555;">
                     <td style="padding: 12px; color: #fff;">${(contact.firstName || '') + ' ' + (contact.lastName || '')}</td>
+                    <td style="padding: 12px; color: #fff; width: 120px;">${contact.phone || contact.id || 'N/A'}</td>
                     <td style="padding: 12px; color: #fff;">${contact.email || 'N/A'}</td>
                     <td style="padding: 12px; color: #fff;">${contact.company || 'N/A'}</td>
                     <td style="padding: 12px;">
