@@ -1,4 +1,21 @@
 /* === CALLING SCRIPTS PAGE LAYOUT FIXES === */
+
+/* --- CRM Dashboard Alignment Fixes --- */
+/* Move main contacts content down to align with blue line (below header) */
+.contacts-main-layout {
+    margin-top: 70px !important; /* Height of header */
+}
+
+/* Move right widget panel (Quick Actions) up to align with red line */
+.widget-panel {
+    margin-top: 0 !important;
+}
+
+/* If you want the widget card (Quick Actions) itself to be flush to the top of the widget panel: */
+.widget-panel > .widget-card:first-child {
+    margin-top: 0 !important;
+}
+
 /* Additional CSS to fix calling scripts page layout to match home page */
 
 /* Fix right sidebar container to prevent overflow and add proper margins */
