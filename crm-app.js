@@ -272,76 +272,66 @@ const CRMApp = {
         }
     },
 
-    // Render the contacts page with inline HTML (no external file dependencies)
+    // Render the contacts page using class-based HTML for maintainability
     renderContactsPage() {
         console.log("renderContactsPage called");
         const contactsView = document.getElementById('contacts-view');
-        console.log("contactsView found:", contactsView);
-        
         if (!contactsView) {
             console.log("contactsView not found, returning");
             return;
         }
-        
-        // If already loaded, don't reload
         if (contactsView.getAttribute('data-loaded') === 'true') {
             console.log("contacts already loaded, returning");
             return;
         }
-        
-        console.log("Creating contacts HTML inline");
-        
-        // Create the contacts HTML directly
+
+        console.log("Creating contacts HTML with classes");
+        // Move layout classes to contacts-view element
+        contactsView.classList.add('contacts-container');
         const contactsHTML = `
-            <div style="padding: 20px; background: #1a1a1a; color: #fff; height: calc(100vh - 120px); margin-top: 0; display: flex; flex-direction: column;">
-                <div style="margin-bottom: 20px;">
-                    <h2 style="color: #fff; margin: 0;">All Contacts</h2>
-                </div>
-                
-                <div style="display: flex; gap: 20px;">
-                    <!-- Filters Sidebar -->
-                    <div style="width: 250px; background: #2a2a2a; padding: 15px; border-radius: 8px;">
-                        <h3 style="color: #fff; margin-top: 0;">Filters</h3>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; color: #ccc; margin-bottom: 5px;">Search</label>
-                            <input type="text" id="contact-search-simple" placeholder="Search contacts..." style="width: 100%; padding: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px;">
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; color: #ccc; margin-bottom: 5px;">Account</label>
-                            <select id="account-filter-simple" style="width: 100%; padding: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px;">
-                                <option value="">All Accounts</option>
-                            </select>
-                        </div>
-                        <button onclick="CRMApp.clearContactsFilters()" style="width: 100%; padding: 8px; background: #666; color: #fff; border: none; border-radius: 4px;">Clear Filters</button>
+            <div class="contacts-header">
+                <h2 class="contacts-title">All Contacts</h2>
+            </div>
+            <div class="contacts-content">
+                <!-- Filters Sidebar -->
+                <div class="filters-sidebar">
+                    <h3 class="filters-title">Filters</h3>
+                    <div class="filter-group">
+                        <label class="filter-label">Search</label>
+                        <input type="text" id="contact-search-simple" placeholder="Search contacts..." class="filter-input">
                     </div>
-                    
-                    <!-- Contacts Table -->
-                    <div style="flex: 1; background: #2a2a2a; padding: 15px; border-radius: 8px;">
-                        <div id="contacts-count-simple" style="color: #ccc; margin-bottom: 15px;">Loading contacts...</div>
-                        <div id="contacts-table-container" style="background: #333; border-radius: 4px; overflow: hidden;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="background: #444;">
-                                        <th style="padding: 12px; text-align: left; color: #fff; border-bottom: 1px solid #555;">Name</th>
-                                        <th style="padding: 12px; text-align: left; color: #fff; border-bottom: 1px solid #555;">Email</th>
-                                        <th style="padding: 12px; text-align: left; color: #fff; border-bottom: 1px solid #555;">Company</th>
-                                        <th style="padding: 12px; text-align: left; color: #fff; border-bottom: 1px solid #555;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="contacts-table-body-simple">
-                                    <!-- Contacts will be populated here -->
-                                </tbody>
-                            </table>
-                        </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Account</label>
+                        <select id="account-filter-simple" class="filter-input">
+                            <option value="">All Accounts</option>
+                        </select>
+                    </div>
+                    <button onclick="CRMApp.clearContactsFilters()" class="btn btn-clear-filters">Clear Filters</button>
+                </div>
+                <!-- Contacts Table -->
+                <div class="contacts-table-section">
+                    <div id="contacts-count-simple" class="contacts-count">Loading contacts...</div>
+                    <div id="contacts-table-container" class="contacts-table-wrapper">
+                        <table class="contacts-table">
+                            <thead>
+                                <tr class="table-header-row">
+                                    <th class="table-header-cell">Name</th>
+                                    <th class="table-header-cell">Email</th>
+                                    <th class="table-header-cell">Company</th>
+                                    <th class="table-header-cell">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contacts-table-body-simple"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         `;
-        
+
         contactsView.innerHTML = contactsHTML;
         contactsView.setAttribute('data-loaded', 'true');
         console.log("Contacts HTML created and injected");
-        
+
         // Initialize the simple contacts functionality
         this.initSimpleContactsUI();
         console.log("Simple contacts UI initialized");
@@ -1789,57 +1779,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing CRM App...');
     CRMApp.init();
 
-    // --- Layout Alignment Fix ---
-    // Move contacts main layout below header
-    const contactsMain = document.querySelector('.contacts-main-layout');
-    if (contactsMain) {
-        contactsMain.style.marginTop = '70px'; // height of header
-    }
-    // Move widget panel flush to top of main content
-    const widgetPanel = document.querySelector('.widget-panel');
-    if (widgetPanel) {
-        widgetPanel.style.marginTop = '0';
-    }
-    // Also remove any margin from first widget card
-    const widgetCard = widgetPanel ? widgetPanel.querySelector('.widget-card') : null;
-    if (widgetCard) {
-        widgetCard.style.marginTop = '0';
-    }
 
-    // --- Contacts Page: Move All Contacts Section Down ---
-    // Use setTimeout to ensure DOM is fully rendered
-    setTimeout(() => {
-        // Try multiple approaches to find the contacts container
-        let contactsContainer = null;
-        
-        // Method 1: Find div with All Contacts text and inline margin-top: 0
-        contactsContainer = Array.from(document.querySelectorAll('div')).find(div => {
-            return (
-                div.innerText && div.innerText.includes('All Contacts') &&
-                div.style && div.style.marginTop === '0px'
-            );
-        });
-        
-        // Method 2: If not found, look for any div with the specific inline styles
-        if (!contactsContainer) {
-            contactsContainer = Array.from(document.querySelectorAll('div')).find(div => {
-                return (
-                    div.style && 
-                    div.style.padding === '20px' &&
-                    div.style.background === 'rgb(26, 26, 26)' &&
-                    div.style.marginTop === '0px'
-                );
-            });
-        }
-        
-        // Apply the margin if found
-        if (contactsContainer) {
-            contactsContainer.style.marginTop = '32px';
-            console.log('Applied margin-top to contacts container');
-        } else {
-            console.log('Contacts container not found');
-        }
-    }, 500); // Wait 500ms for DOM to be fully rendered
+
+
 });
 
 // --- 4. Make CRMApp globally available for debugging ---
