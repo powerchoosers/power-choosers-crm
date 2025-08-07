@@ -276,9 +276,17 @@ const CRMApp = {
     async renderContactsPage() {
     console.log("renderContactsPage called");
         const contactsView = document.getElementById('contacts-view');
-        if (!contactsView) return;
+        console.log("contactsView found:", contactsView);
+        if (!contactsView) {
+            console.log("contactsView not found, returning");
+            return;
+        }
         // If already loaded, don't reload
-        if (contactsView.getAttribute('data-loaded') === 'true') return;
+        if (contactsView.getAttribute('data-loaded') === 'true') {
+            console.log("contacts already loaded, returning");
+            return;
+        }
+        console.log("proceeding to load contacts content");
         // Show loading
         contactsView.innerHTML = '<div class="contacts-loading"><div class="loading-spinner"></div><p>Loading contacts...</p></div>';
         // Load contacts-content.html
