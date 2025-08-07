@@ -31,6 +31,13 @@ const CRMApp = {
     currentView: 'dashboard-view',
     currentContact: null,
     currentAccount: null,
+
+    // --- Contacts View State ---
+    contactsViewInitialized: false,
+    activeFilters: {},
+    // IMPORTANT: Update these to match your actual contact fields from Firebase
+    contactFields: ['name', 'email', 'phone', 'company', 'title', 'location'], 
+    filterableFields: ['company', 'title', 'location'], // Fields that will appear in the filter sidebar
     
     // State for the activity carousel
     activitiesPageIndex: 0,
@@ -42,6 +49,10 @@ const CRMApp = {
             await this.loadInitialData();
             this.setupEventListeners();
             this.showView('dashboard-view');
+
+        // Specific initializations for views can be added here if needed
+        // For example, initializing the contacts view logic when the app loads
+        // Or, it can be initialized on first view, see showView method.
             this.updateNotifications();
             console.log('CRM App initialized successfully');
         } catch (error) {
@@ -117,14 +128,10 @@ const CRMApp = {
         // Navigation links
         document.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', (e) => {
+                e.preventDefault();
                 const viewName = e.currentTarget.getAttribute('data-view');
-                // If it's a view-switching link, prevent default and switch view
-                if (viewName) {
-                    e.preventDefault();
-                    this.showView(viewName);
-                    this.updateActiveNavButton(e.currentTarget);
-                }
-                // If no data-view attribute, the default link behavior will execute.
+                this.showView(viewName);
+                this.updateActiveNavButton(e.currentTarget);
             });
         });
 
@@ -208,9 +215,10 @@ const CRMApp = {
 
     // Show/hide views in the single-page application
     showView(viewName) {
+        if (viewName === this.currentView) return;
         console.log(`Switching to view: ${viewName}`);
         this.currentView = viewName;
-        
+
         // Hide all main content views with explicit display none
         document.querySelectorAll('.page-view').forEach(view => {
             view.style.display = 'none';
@@ -263,8 +271,16 @@ const CRMApp = {
         
         if (viewName === 'dashboard-view') {
             this.renderDashboard();
-        } else {
-            console.log(`Mapped to: ${viewName}`);
+        } else if (viewName === 'contacts-view' && !this.contactsViewInitialized) {
+            this.initContactsView();
+        }
+
+        // Additional logic for other views can be placed here
+        // For example, re-rendering a view if its data has changed
+        if (viewName === 'contacts-view' && this.contactsViewInitialized) {
+            // If returning to the contacts view, you might want to re-render 
+            // in case data has changed, or just ensure it's visible.
+            console.log('Returning to contacts view.');
         }
     },
 
@@ -381,6 +397,152 @@ const CRMApp = {
         carouselWrapper.style.width = `${totalPages * 100}%`;
         carouselWrapper.style.transform = `translateX(-${this.activitiesPageIndex * (100 / totalPages)}%)`;
         this.updateActivityCarouselButtons(totalPages);
+    },
+
+    // --- CONTACTS VIEW METHODS ---
+
+    initContactsView() {
+        console.log('Initializing Contacts View for the first time...');
+        this.contactsViewInitialized = true;
+        // The main contacts data is already loaded in this.contacts
+        this.renderContactsUI();
+    },
+
+    renderContactsUI() {
+        this.renderTableHeaders();
+        this.renderFilters();
+        this.applyFiltersAndRenderTable();
+    },
+
+    renderTableHeaders() {
+        const tableHead = document.querySelector('#contacts-table thead');
+        if (!tableHead) return;
+        const headerRow = `<tr>
+            ${this.contactFields.map(field => `<th>${field.charAt(0).toUpperCase() + field.slice(1)}</th>`).join('')}
+            <th>Actions</th>
+        </tr>`;
+        tableHead.innerHTML = headerRow;
+    },
+
+    renderFilters() {
+        const filtersContent = document.getElementById('filters-content');
+        if (!filtersContent) return;
+
+        let filtersHtml = '';
+        this.filterableFields.forEach(field => {
+            filtersHtml += `
+                <div class="filter-category">
+                    <h3>${field.charAt(0).toUpperCase() + field.slice(1)}</h3>
+                    <input type="text" id="filter-${field}" data-field="${field}" placeholder="Filter by ${field}...">
+                </div>
+            `;
+        });
+        filtersContent.innerHTML = filtersHtml;
+
+        // Add event listeners to the new input fields
+        this.filterableFields.forEach(field => {
+            document.getElementById(`filter-${field}`).addEventListener('keyup', (e) => {
+                this.activeFilters[field] = e.target.value.toLowerCase();
+                this.applyFiltersAndRenderTable();
+                this.updateFilterChips();
+            });
+        });
+    },
+
+    applyFiltersAndRenderTable() {
+        const filteredContacts = this.contacts.filter(contact => {
+            return Object.entries(this.activeFilters).every(([field, value]) => {
+                if (!value) return true;
+                // Ensure contact[field] exists and is a string before calling toLowerCase()
+                const contactFieldValue = contact[field] ? String(contact[field]).toLowerCase() : '';
+                return contactFieldValue.includes(value);
+            });
+        });
+        this.renderTable(filteredContacts);
+    },
+
+    renderTable(contacts) {
+        const tableBody = document.getElementById('contacts-table-body');
+        if (!tableBody) return;
+
+        if (contacts.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="${this.contactFields.length + 1}">No contacts found.</td></tr>`;
+            return;
+        }
+
+        // TODO: Implement pagination
+        const contactsToDisplay = contacts.slice(0, 50);
+
+        let tableHtml = '';
+        contactsToDisplay.forEach(contact => {
+            // Use contact's full name if available, otherwise combine first/last
+            const contactName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+            const contactWithFullName = { ...contact, name: contactName };
+
+            tableHtml += `<tr>`;
+            this.contactFields.forEach(field => {
+                tableHtml += `<td>${this.createCellContent(contactWithFullName, field)}</td>`;
+            });
+            tableHtml += `<td class="action-buttons">
+                            <button title="Email">📧</button>
+                            <button title="Call">📞</button>
+                            <button title="Add to Sequence">➕</button>
+                         </td>`;
+            tableHtml += `</tr>`;
+        });
+        tableBody.innerHTML = tableHtml;
+    },
+
+    createCellContent(contact, field) {
+        const value = contact[field] || '';
+        if (field === 'name') {
+             // Using a placeholder for profile pic, replace with actual logic if available
+            const profilePicUrl = 'https://via.placeholder.com/24'; 
+            return `<div class="contact-name-cell">
+                        <img src="${profilePicUrl}" class="profile-pic" alt="Profile">
+                        <span>${value}</span>
+                    </div>`;
+        }
+        if (field === 'company' && contact.accountName) {
+            // Attempt to get domain from email for favicon
+            let domain = '';
+            if (contact.email && contact.email.includes('@')) {
+                domain = contact.email.split('@')[1];
+            }
+            const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}`;
+            return `<div class="account-name-cell">
+                        <img src="${faviconUrl}" class="favicon" alt="Favicon">
+                        <span>${contact.accountName}</span>
+                    </div>`;
+        }
+        return value;
+    },
+
+    updateFilterChips() {
+        const selectedFiltersContainer = document.querySelector('#contacts-view .selected-filters-container');
+        if (!selectedFiltersContainer) return;
+
+        let chipsHtml = '';
+        Object.entries(this.activeFilters).forEach(([field, value]) => {
+            if (value) {
+                chipsHtml += `<div class="filter-chip">
+                                ${field}: ${value}
+                                <span class="remove-filter" data-field="${field}">x</span>
+                              </div>`;
+            }
+        });
+        selectedFiltersContainer.innerHTML = chipsHtml;
+
+        document.querySelectorAll('#contacts-view .remove-filter').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const fieldToRemove = e.target.dataset.field;
+                this.activeFilters[fieldToRemove] = '';
+                const filterInput = document.getElementById(`filter-${fieldToRemove}`);
+                if (filterInput) filterInput.value = '';
+                this.applyFiltersAndRenderTable();
+                this.updateFilterChips();
+            });
+        });
     },
     
     // Scrolls the activity carousel
