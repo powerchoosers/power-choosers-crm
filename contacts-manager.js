@@ -24,6 +24,8 @@ class ContactsManager {
     }
 
     bindEvents() {
+        // Apollo-style filter panel interactivity
+        this.initApolloFilterPanel();
         // Search functionality
         document.getElementById('contacts-search')?.addEventListener('input', (e) => {
             this.handleSearch(e.target.value);
@@ -65,15 +67,133 @@ class ContactsManager {
     }
 
     bindFilterEvents() {
-        const filterInputs = ['filter-company', 'filter-job-title', 'filter-location', 'filter-phone-status', 'filter-email-status'];
-        filterInputs.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.addEventListener('change', () => this.applyFilters());
-                element.addEventListener('input', () => this.applyFilters());
+        // Apollo-style filter search and checkboxes
+        document.querySelectorAll('.filter-category-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                const category = header.parentElement;
+                category.classList.toggle('expanded');
+            });
+        });
+
+        // Filter option selection (checkboxes, etc.)
+        document.querySelectorAll('.filter-options input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                this.handleApolloFilterChange();
+            });
+        });
+        document.querySelectorAll('.filter-search').forEach(input => {
+            input.addEventListener('input', (e) => {
+                this.handleApolloFilterChange();
+            });
+        });
+    }
+
+    // Apollo filter panel logic
+    initApolloFilterPanel() {
+        // Collapse panel
+        const collapseBtn = document.getElementById('collapse-filters');
+        const panel = document.getElementById('contacts-filter-panel');
+        if (collapseBtn && panel) {
+            collapseBtn.addEventListener('click', () => {
+                panel.classList.toggle('collapsed');
+            });
+        }
+        // Active filter chips
+        this.renderActiveFilterChips();
+        // Listen for chip remove
+        document.getElementById('active-filters')?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('chip-remove')) {
+                const field = e.target.getAttribute('data-filter');
+                const value = e.target.getAttribute('data-value');
+                this.removeApolloFilter(field, value);
             }
         });
     }
+
+    handleApolloFilterChange() {
+        // Collect all checked/filled filter values
+        const filters = {};
+        document.querySelectorAll('.filter-category').forEach(cat => {
+            const category = cat.getAttribute('data-category');
+            // Checkboxes
+            cat.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                if (!filters[category]) filters[category] = [];
+                filters[category].push(cb.value);
+            });
+            // Text search
+            cat.querySelectorAll('input.filter-search').forEach(input => {
+                if (input.value.trim()) {
+                    filters[category] = [input.value.trim()];
+                }
+            });
+        });
+        this.apolloFilters = filters;
+        this.renderActiveFilterChips();
+        this.applyApolloFilters();
+    }
+
+    renderActiveFilterChips() {
+        const chipContainer = document.getElementById('active-filters');
+        if (!chipContainer) return;
+        chipContainer.innerHTML = '';
+        if (!this.apolloFilters) return;
+        Object.entries(this.apolloFilters).forEach(([field, values]) => {
+            if (!values) return;
+            values.forEach(val => {
+                const chip = document.createElement('div');
+                chip.className = 'filter-chip';
+                chip.innerHTML = `${field.charAt(0).toUpperCase() + field.slice(1)}: ${val} <span class="chip-remove" data-filter="${field}" data-value="${val}">&times;</span>`;
+                chipContainer.appendChild(chip);
+            });
+        });
+    }
+
+    removeApolloFilter(field, value) {
+        if (!this.apolloFilters || !this.apolloFilters[field]) return;
+        this.apolloFilters[field] = this.apolloFilters[field].filter(v => v !== value);
+        if (this.apolloFilters[field].length === 0) delete this.apolloFilters[field];
+        // Uncheck or clear input
+        document.querySelectorAll(`.filter-category[data-category="${field}"] input`).forEach(input => {
+            if (input.type === 'checkbox' && input.value === value) input.checked = false;
+            if (input.classList.contains('filter-search') && input.value === value) input.value = '';
+        });
+        this.renderActiveFilterChips();
+        this.applyApolloFilters();
+    }
+
+    applyApolloFilters() {
+        let filtered = [...this.contacts];
+        if (this.apolloFilters) {
+            Object.entries(this.apolloFilters).forEach(([field, values]) => {
+                if (!values || values.length === 0) return;
+                filtered = filtered.filter(contact => {
+                    if (field === 'company') {
+                        return values.some(val => contact.company.toLowerCase().includes(val.toLowerCase()));
+                    }
+                    if (field === 'job-title') {
+                        return values.some(val => contact.jobTitle.toLowerCase().includes(val.toLowerCase()));
+                    }
+                    if (field === 'location') {
+                        return values.some(val => contact.location.toLowerCase().includes(val.toLowerCase()));
+                    }
+                    if (field === 'status') {
+                        return values.some(val => {
+                            if (val === 'verified') return contact.phoneStatus === 'verified';
+                            if (val === 'email-verified') return contact.emailStatus === 'verified';
+                            if (val === 'bounced') return contact.emailStatus === 'bounced';
+                            return false;
+                        });
+                    }
+                    return true;
+                });
+            });
+        }
+        this.filteredContacts = filtered;
+        this.currentPage = 1;
+        this.renderContacts();
+        this.updatePagination();
+    }
+
 
     async loadContacts() {
         try {
