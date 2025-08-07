@@ -1,0 +1,17 @@
+/* === CALLING SCRIPTS MARGIN ADJUSTMENTS === */
+/* Reduce margins between side panel and cold calling script container by half */
+
+.calls-hub-layout {
+    gap: 0.75rem !important; /* Cut the gap in half from 1.5rem to 0.75rem */
+}
+
+/* Reduce padding on both sides to extend the script container */
+#call-scripts-view {
+    padding-left: calc(var(--spacing-lg) / 2) !important;
+    padding-right: calc(var(--spacing-lg) / 2) !important;
+}
+
+#cold-calling-widgets-container {
+    padding-left: calc(var(--spacing-lg) / 2) !important;
+    padding-right: calc(var(--spacing-lg) / 2) !important;
+}
