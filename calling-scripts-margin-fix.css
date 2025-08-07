@@ -22,7 +22,19 @@
     margin-bottom: 16px; /* Reduce bottom margin slightly */
 }
 
-/* Reduce the top padding of the main content area to bring title closer to top */
+/* Remove the space above the title (the red rectangle area) */
 #call-scripts-view {
-    padding-top: 16px !important; /* Much smaller top padding */
+    padding-top: 0 !important; /* Remove all top padding */
+}
+
+/* Also remove any margin from the calls-hub-main container */
+.calls-hub-main {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Remove any top margin from the calls-hub-main-inner container */
+.calls-hub-main-inner {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
