@@ -1,0 +1,230 @@
+<!-- All Contacts View Content -->
+<div class="contacts-container">
+    <!-- Contacts Header -->
+    <div class="contacts-header">
+        <div class="contacts-title-section">
+            <h2 class="contacts-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                All Contacts
+            </h2>
+            <span class="contacts-count" id="contacts-count">0 contacts</span>
+        </div>
+        <div class="contacts-actions">
+            <button class="btn-secondary" id="export-contacts-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export
+            </button>
+            <button class="btn-primary" id="add-contact-from-contacts-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Contact
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Contacts Layout -->
+    <div class="contacts-main-layout">
+        <!-- Filters Sidebar -->
+        <div class="contacts-filters-sidebar" id="contacts-filters-sidebar">
+            <div class="filters-header">
+                <h3>Filters</h3>
+                <button class="filters-collapse-btn" id="filters-collapse-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="filters-content" id="filters-content">
+                <!-- Search Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Search</label>
+                    <input type="text" class="filter-input" id="contact-search" placeholder="Search contacts...">
+                </div>
+
+                <!-- Account Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Account</label>
+                    <select class="filter-select" id="account-filter">
+                        <option value="">All Accounts</option>
+                    </select>
+                </div>
+
+                <!-- Title Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Title</label>
+                    <select class="filter-select" id="title-filter">
+                        <option value="">All Titles</option>
+                    </select>
+                </div>
+
+                <!-- Location Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Location</label>
+                    <select class="filter-select" id="location-filter">
+                        <option value="">All Locations</option>
+                    </select>
+                </div>
+
+                <!-- Industry Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Industry</label>
+                    <select class="filter-select" id="industry-filter">
+                        <option value="">All Industries</option>
+                    </select>
+                </div>
+
+                <!-- Date Range Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Created Date</label>
+                    <select class="filter-select" id="date-filter">
+                        <option value="">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="quarter">This Quarter</option>
+                    </select>
+                </div>
+
+                <!-- Clear Filters -->
+                <div class="filter-actions">
+                    <button class="btn-secondary btn-small" id="clear-filters-btn">Clear All</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contacts Table Container -->
+        <div class="contacts-table-container">
+            <!-- Table Controls -->
+            <div class="table-controls">
+                <div class="table-controls-left">
+                    <button class="btn-secondary btn-small" id="select-all-btn">Select All</button>
+                    <button class="btn-secondary btn-small" id="bulk-actions-btn" disabled>
+                        Bulk Actions
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                <div class="table-controls-right">
+                    <span class="results-info" id="results-info">Showing 0 of 0 contacts</span>
+                </div>
+            </div>
+
+            <!-- Contacts Table -->
+            <div class="contacts-table-wrapper">
+                <table class="contacts-table" id="contacts-table">
+                    <thead>
+                        <tr>
+                            <th class="checkbox-column">
+                                <input type="checkbox" id="select-all-checkbox">
+                            </th>
+                            <th class="sortable" data-sort="name">
+                                Name
+                                <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </th>
+                            <th class="sortable" data-sort="title">
+                                Title
+                                <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </th>
+                            <th class="sortable" data-sort="account">
+                                Account
+                                <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </th>
+                            <th class="sortable" data-sort="email">
+                                Email
+                                <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </th>
+                            <th class="sortable" data-sort="phone">
+                                Phone
+                                <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </th>
+                            <th class="sortable" data-sort="location">
+                                Location
+                                <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </th>
+                            <th class="sortable" data-sort="createdAt">
+                                Created
+                                <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </th>
+                            <th class="actions-column">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contacts-table-body">
+                        <!-- Contacts will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    <span id="pagination-info">Showing 0-0 of 0 contacts</span>
+                </div>
+                <div class="pagination-controls">
+                    <button class="pagination-btn" id="prev-page-btn" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        Previous
+                    </button>
+                    <div class="pagination-numbers" id="pagination-numbers">
+                        <!-- Page numbers will be populated here -->
+                    </div>
+                    <button class="pagination-btn" id="next-page-btn" disabled>
+                        Next
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading State -->
+<div class="contacts-loading" id="contacts-loading" style="display: none;">
+    <div class="loading-spinner"></div>
+    <p>Loading contacts...</p>
+</div>
+
+<!-- Empty State -->
+<div class="contacts-empty" id="contacts-empty" style="display: none;">
+    <div class="empty-state-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+    </div>
+    <h3>No contacts found</h3>
+    <p>Get started by adding your first contact or adjusting your filters.</p>
+    <button class="btn-primary" onclick="addContact()">Add Contact</button>
+</div>
