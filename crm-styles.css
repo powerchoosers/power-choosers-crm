@@ -408,7 +408,7 @@ html, body {
 .nav-item.active {
     background: rgba(33, 150, 243, 0.2);
     color: var(--text-primary);
-    border: 1px solid rgba(33, 150, 243, 0.3);
+    border: 1px solid var(--accent-blue);
 }
 
 .nav-item.active::before {
