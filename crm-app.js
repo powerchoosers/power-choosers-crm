@@ -1807,12 +1807,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Contacts Page: Move All Contacts Section Down ---
-    // Look for the main contacts container by matching the style or a unique selector
+    // Find the div with All Contacts and inline style margin-top: 0
     const allContactsSection = Array.from(document.querySelectorAll('div')).find(div => {
-        return div.innerText && div.innerText.trim().startsWith('All Contacts');
+        return (
+            div.innerText && div.innerText.trim().startsWith('All Contacts') &&
+            div.style && div.style.marginTop === '0px'
+        );
     });
     if (allContactsSection) {
-        allContactsSection.style.marginTop = '32px'; // Adjust as needed
+        allContactsSection.style.marginTop = '32px'; // This will override the inline style
     }
 });
 
