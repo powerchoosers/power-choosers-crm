@@ -12,10 +12,13 @@
 }
 
 #cold-calling-widgets-container {
-    padding-left: 0 !important; /* Remove left padding to move widgets left */
+    padding-left: 0 !important; /* Remove left padding to align with red line */
     padding-right: var(--spacing-lg) !important; /* Keep right padding for proper margin */
-    padding-top: 0 !important; /* Remove top padding to move widgets up */
-    margin-top: 0 !important; /* Ensure no top margin */
+    padding-top: 0 !important; /* Start at blue line top */
+    padding-bottom: 0 !important; /* Extend to blue line bottom */
+    margin: 0 !important; /* Remove all margins */
+    height: calc(100vh - 70px) !important; /* Full height from blue line to blue line */
+    overflow-y: auto !important; /* Allow scrolling within the container */
 }
 
 /* Ensure the sidebar matches home screen widget dimensions and positioning */
@@ -48,4 +51,33 @@
 .calls-hub-main-inner {
     margin-top: 0 !important;
     padding-top: 0 !important;
+}
+
+/* Dim the bright blue colors to match the page theme */
+.calculator-wrapper,
+.form-sections,
+.form-section {
+    background: var(--cch-dark-blue) !important;
+}
+
+/* Make the blue buttons much darker and more subtle */
+.section-nav button.active,
+.get-results-btn,
+.complete-sections-btn,
+button[style*="background"] {
+    background: var(--cch-darker-blue) !important;
+    border-color: var(--cch-darker-blue) !important;
+}
+
+/* Dim the bright blue gradient backgrounds */
+.main-result.neutral,
+.calculator-wrapper {
+    background: linear-gradient(135deg, rgba(13, 20, 33, 0.4), rgba(26, 35, 126, 0.2)) !important;
+    border-color: var(--cch-darker-blue) !important;
+}
+
+/* Target any bright blue elements specifically */
+[style*="background-color: #2196f3"],
+[style*="background: #2196f3"] {
+    background: var(--cch-darker-blue) !important;
 }
