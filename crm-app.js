@@ -293,12 +293,19 @@ const CRMApp = {
         try {
             console.log("Fetching contacts-content.html");
             const res = await fetch('contacts-content.html');
+            console.log("Fetch response:", res.status, res.statusText);
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
             const html = await res.text();
+            console.log("HTML loaded, length:", html.length);
             contactsView.innerHTML = html;
             contactsView.setAttribute('data-loaded', 'true');
+            console.log("HTML injected into contactsView");
             // Load CSS for contacts page
             let cssId = 'contacts-styles';
             if (!document.getElementById(cssId)) {
+                console.log("Loading contacts-styles.css");
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
                 link.href = 'contacts-styles.css';
@@ -306,9 +313,12 @@ const CRMApp = {
                 document.head.appendChild(link);
             }
             // Initialize contacts UI and filtering
+            console.log("Initializing contacts UI");
             this.initContactsUI();
+            console.log("Contacts page loaded successfully");
         } catch (err) {
-            contactsView.innerHTML = '<div class="contacts-empty"><h3>Failed to load contacts page.</h3></div>';
+            console.error("Error loading contacts page:", err);
+            contactsView.innerHTML = '<div class="contacts-empty"><h3>Failed to load contacts page.</h3><p>Error: ' + err.message + '</p></div>';
         }
     },
 
