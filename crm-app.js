@@ -1807,16 +1807,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Contacts Page: Move All Contacts Section Down ---
-    // Find the div with All Contacts and inline style margin-top: 0
-    const allContactsSection = Array.from(document.querySelectorAll('div')).find(div => {
-        return (
-            div.innerText && div.innerText.trim().startsWith('All Contacts') &&
-            div.style && div.style.marginTop === '0px'
-        );
-    });
-    if (allContactsSection) {
-        allContactsSection.style.marginTop = '32px'; // This will override the inline style
-    }
+    // Use setTimeout to ensure DOM is fully rendered
+    setTimeout(() => {
+        // Try multiple approaches to find the contacts container
+        let contactsContainer = null;
+        
+        // Method 1: Find div with All Contacts text and inline margin-top: 0
+        contactsContainer = Array.from(document.querySelectorAll('div')).find(div => {
+            return (
+                div.innerText && div.innerText.includes('All Contacts') &&
+                div.style && div.style.marginTop === '0px'
+            );
+        });
+        
+        // Method 2: If not found, look for any div with the specific inline styles
+        if (!contactsContainer) {
+            contactsContainer = Array.from(document.querySelectorAll('div')).find(div => {
+                return (
+                    div.style && 
+                    div.style.padding === '20px' &&
+                    div.style.background === 'rgb(26, 26, 26)' &&
+                    div.style.marginTop === '0px'
+                );
+            });
+        }
+        
+        // Apply the margin if found
+        if (contactsContainer) {
+            contactsContainer.style.marginTop = '32px';
+            console.log('Applied margin-top to contacts container');
+        } else {
+            console.log('Contacts container not found');
+        }
+    }, 500); // Wait 500ms for DOM to be fully rendered
 });
 
 // --- 4. Make CRMApp globally available for debugging ---
