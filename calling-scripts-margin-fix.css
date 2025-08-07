@@ -16,8 +16,13 @@
     padding-right: calc(var(--spacing-lg) / 2) !important;
 }
 
-/* Reduce margin above the "Cold Calling Script" title by half */
+/* Reduce wasted space inside the container above the title */
 .calls-hub-main h2 {
-    margin-top: calc(var(--spacing-lg) / 2) !important;
-    margin-bottom: 24px;
+    margin-top: 0 !important; /* Remove top margin completely */
+    margin-bottom: 16px; /* Reduce bottom margin slightly */
+}
+
+/* Reduce the top padding of the main content area to bring title closer to top */
+#call-scripts-view {
+    padding-top: 16px !important; /* Much smaller top padding */
 }
