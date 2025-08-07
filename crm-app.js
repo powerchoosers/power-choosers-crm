@@ -272,57 +272,183 @@ const CRMApp = {
         }
     },
 
-    // Render the contacts page, load HTML, apply CSS, and wire up Firebase
-    async renderContactsPage() {
-    console.log("renderContactsPage called");
+    // Render the contacts page with inline HTML (no external file dependencies)
+    renderContactsPage() {
+        console.log("renderContactsPage called");
         const contactsView = document.getElementById('contacts-view');
         console.log("contactsView found:", contactsView);
+        
         if (!contactsView) {
             console.log("contactsView not found, returning");
             return;
         }
+        
         // If already loaded, don't reload
         if (contactsView.getAttribute('data-loaded') === 'true') {
             console.log("contacts already loaded, returning");
             return;
         }
-        console.log("proceeding to load contacts content");
-        // Show loading
-        contactsView.innerHTML = '<div class="contacts-loading"><div class="loading-spinner"></div><p>Loading contacts...</p></div>';
-        // Load contacts-content.html
-        try {
-            console.log("Fetching contacts-content.html");
-            const res = await fetch('contacts-content.html');
-            console.log("Fetch response:", res.status, res.statusText);
-            if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
-            }
-            const html = await res.text();
-            console.log("HTML loaded, length:", html.length);
-            contactsView.innerHTML = html;
-            contactsView.setAttribute('data-loaded', 'true');
-            console.log("HTML injected into contactsView");
-            // Load CSS for contacts page
-            let cssId = 'contacts-styles';
-            if (!document.getElementById(cssId)) {
-                console.log("Loading contacts-styles.css");
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = 'contacts-styles.css';
-                link.id = cssId;
-                document.head.appendChild(link);
-            }
-            // Initialize contacts UI and filtering
-            console.log("Initializing contacts UI");
-            this.initContactsUI();
-            console.log("Contacts page loaded successfully");
-        } catch (err) {
-            console.error("Error loading contacts page:", err);
-            contactsView.innerHTML = '<div class="contacts-empty"><h3>Failed to load contacts page.</h3><p>Error: ' + err.message + '</p></div>';
-        }
+        
+        console.log("Creating contacts HTML inline");
+        
+        // Create the contacts HTML directly
+        const contactsHTML = `
+            <div style="padding: 20px; background: #1a1a1a; color: #fff; height: calc(100vh - 120px); margin-top: 0; display: flex; flex-direction: column;">
+                <div style="margin-bottom: 20px;">
+                    <h2 style="color: #fff; margin: 0;">All Contacts</h2>
+                </div>
+                
+                <div style="display: flex; gap: 20px;">
+                    <!-- Filters Sidebar -->
+                    <div style="width: 250px; background: #2a2a2a; padding: 15px; border-radius: 8px;">
+                        <h3 style="color: #fff; margin-top: 0;">Filters</h3>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; color: #ccc; margin-bottom: 5px;">Search</label>
+                            <input type="text" id="contact-search-simple" placeholder="Search contacts..." style="width: 100%; padding: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; color: #ccc; margin-bottom: 5px;">Account</label>
+                            <select id="account-filter-simple" style="width: 100%; padding: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px;">
+                                <option value="">All Accounts</option>
+                            </select>
+                        </div>
+                        <button onclick="CRMApp.clearContactsFilters()" style="width: 100%; padding: 8px; background: #666; color: #fff; border: none; border-radius: 4px;">Clear Filters</button>
+                    </div>
+                    
+                    <!-- Contacts Table -->
+                    <div style="flex: 1; background: #2a2a2a; padding: 15px; border-radius: 8px;">
+                        <div id="contacts-count-simple" style="color: #ccc; margin-bottom: 15px;">Loading contacts...</div>
+                        <div id="contacts-table-container" style="background: #333; border-radius: 4px; overflow: hidden;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #444;">
+                                        <th style="padding: 12px; text-align: left; color: #fff; border-bottom: 1px solid #555;">Name</th>
+                                        <th style="padding: 12px; text-align: left; color: #fff; border-bottom: 1px solid #555;">Email</th>
+                                        <th style="padding: 12px; text-align: left; color: #fff; border-bottom: 1px solid #555;">Company</th>
+                                        <th style="padding: 12px; text-align: left; color: #fff; border-bottom: 1px solid #555;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="contacts-table-body-simple">
+                                    <!-- Contacts will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        contactsView.innerHTML = contactsHTML;
+        contactsView.setAttribute('data-loaded', 'true');
+        console.log("Contacts HTML created and injected");
+        
+        // Initialize the simple contacts functionality
+        this.initSimpleContactsUI();
+        console.log("Simple contacts UI initialized");
     },
 
-    // Initialize contacts UI, filtering, and Firebase data
+    // Initialize simple contacts UI with basic functionality
+    initSimpleContactsUI() {
+        console.log("Initializing simple contacts UI");
+        
+        // Populate contacts table
+        this.renderSimpleContactsTable();
+        
+        // Set up search functionality
+        const searchInput = document.getElementById('contact-search-simple');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                this.renderSimpleContactsTable(searchInput.value);
+            });
+        }
+        
+        // Set up account filter
+        this.populateSimpleAccountFilter();
+        const accountFilter = document.getElementById('account-filter-simple');
+        if (accountFilter) {
+            accountFilter.addEventListener('change', () => {
+                this.renderSimpleContactsTable();
+            });
+        }
+    },
+    
+    // Render the contacts table with optional search filter
+    renderSimpleContactsTable(searchTerm = '') {
+        console.log("Rendering simple contacts table, search:", searchTerm);
+        
+        const tableBody = document.getElementById('contacts-table-body-simple');
+        const contactsCount = document.getElementById('contacts-count-simple');
+        const accountFilter = document.getElementById('account-filter-simple');
+        
+        if (!tableBody || !contactsCount) {
+            console.log("Table elements not found");
+            return;
+        }
+        
+        // Filter contacts
+        let filteredContacts = this.contacts || [];
+        
+        if (searchTerm) {
+            filteredContacts = filteredContacts.filter(contact => 
+                (contact.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (contact.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (contact.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (contact.company || '').toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        if (accountFilter && accountFilter.value) {
+            filteredContacts = filteredContacts.filter(contact => 
+                contact.company === accountFilter.value
+            );
+        }
+        
+        // Update count
+        contactsCount.textContent = `${filteredContacts.length} contacts`;
+        
+        // Render table rows
+        if (filteredContacts.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4" style="padding: 20px; text-align: center; color: #888;">No contacts found</td></tr>';
+        } else {
+            tableBody.innerHTML = filteredContacts.map(contact => `
+                <tr style="border-bottom: 1px solid #555;">
+                    <td style="padding: 12px; color: #fff;">${(contact.firstName || '') + ' ' + (contact.lastName || '')}</td>
+                    <td style="padding: 12px; color: #fff;">${contact.email || 'N/A'}</td>
+                    <td style="padding: 12px; color: #fff;">${contact.company || 'N/A'}</td>
+                    <td style="padding: 12px;">
+                        <button onclick="alert('Call ${contact.firstName}')" style="margin-right: 5px; padding: 4px 8px; background: #28a745; color: #fff; border: none; border-radius: 3px; font-size: 12px;">Call</button>
+                        <button onclick="alert('Email ${contact.email}')" style="margin-right: 5px; padding: 4px 8px; background: #007bff; color: #fff; border: none; border-radius: 3px; font-size: 12px;">Email</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        console.log(`Rendered ${filteredContacts.length} contacts`);
+    },
+    
+    // Populate account filter dropdown
+    populateSimpleAccountFilter() {
+        const accountFilter = document.getElementById('account-filter-simple');
+        if (!accountFilter) return;
+        
+        const companies = [...new Set((this.contacts || []).map(c => c.company).filter(Boolean))];
+        
+        accountFilter.innerHTML = '<option value="">All Accounts</option>' + 
+            companies.map(company => `<option value="${company}">${company}</option>`).join('');
+    },
+    
+    // Clear all filters
+    clearContactsFilters() {
+        const searchInput = document.getElementById('contact-search-simple');
+        const accountFilter = document.getElementById('account-filter-simple');
+        
+        if (searchInput) searchInput.value = '';
+        if (accountFilter) accountFilter.value = '';
+        
+        this.renderSimpleContactsTable();
+    },
+    
+    // Initialize contacts UI, filtering, and Firebase data (LEGACY - keeping for compatibility)
     initContactsUI() {
         const contactsTableBody = document.getElementById('contacts-table-body');
         const resultsInfo = document.getElementById('results-info');
