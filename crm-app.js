@@ -1637,6 +1637,9 @@ const CRMApp = {
     }
 };
 
+// Make CRMApp globally accessible for onclick handlers
+window.CRMApp = CRMApp;
+
 // --- 3. Initialize the application when DOM is loaded ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing CRM App...');
