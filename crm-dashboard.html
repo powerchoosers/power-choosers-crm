@@ -6,9 +6,8 @@
     <title>Power Choosers CRM Dashboard</title>
     <!-- Link to your main CRM stylesheet -->
     <link rel="stylesheet" href="crm-styles.css">
-    <link rel="stylesheet" href="calling-scripts-layout-fixes.css">
+    <!-- Calling scripts margin adjustments -->
     <link rel="stylesheet" href="calling-scripts-margin-fix.css">
-    <link rel="stylesheet" href="contacts-styles.css">
     <!-- Tailwind CSS CDN (if not already part of crm-styles.css or main index.html) -->
     <!-- Assuming crm-styles.css handles all styling including Tailwind imports/directives -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -226,213 +225,12 @@
                                 </div>
                             </h3>
                             <div class="activity-list-container">
-                    <div id="contacts-view" class="page-view" style="display: block;">
-                        <!-- Contacts Layout Container -->
-                        <div class="contacts-layout">
-                            <!-- Left Filter Panel -->
-                            <div class="contacts-filter-panel" id="contacts-filter-panel">
-                                <div class="filter-panel-header">
-                                    <h3>Filters</h3>
-                                    <button class="btn-icon" id="collapse-filters" title="Collapse Filters">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="15 18 9 12 15 6"></polyline>
-                                        </svg>
-                                    </button>
-                                </div>
-                                
-                                <!-- Active Filters Display -->
-                                <div class="active-filters" id="active-filters">
-                                    <!-- Active filter chips will appear here -->
-                                </div>
-                                
-                                <!-- Filter Categories -->
-                                <div class="filter-categories">
-                                    <div class="filter-category" data-category="company">
-                                        <div class="filter-category-header">
-                                            <span>Company</span>
-                                            <svg class="expand-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="6 9 12 15 18 9"></polyline>
-                                            </svg>
-                                        </div>
-                                        <div class="filter-category-content">
-                                            <input type="text" placeholder="Search companies..." class="filter-search" data-filter="company">
-                                            <div class="filter-options" id="company-options"></div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="filter-category" data-category="job-title">
-                                        <div class="filter-category-header">
-                                            <span>Job Title</span>
-                                            <svg class="expand-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="6 9 12 15 18 9"></polyline>
-                                            </svg>
-                                        </div>
-                                        <div class="filter-category-content">
-                                            <input type="text" placeholder="Search job titles..." class="filter-search" data-filter="job-title">
-                                            <div class="filter-options" id="job-title-options"></div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="filter-category" data-category="location">
-                                        <div class="filter-category-header">
-                                            <span>Location</span>
-                                            <svg class="expand-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="6 9 12 15 18 9"></polyline>
-                                            </svg>
-                                        </div>
-                                        <div class="filter-category-content">
-                                            <input type="text" placeholder="Search locations..." class="filter-search" data-filter="location">
-                                            <div class="filter-options" id="location-options"></div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="filter-category" data-category="status">
-                                        <div class="filter-category-header">
-                                            <span>Status</span>
-                                            <svg class="expand-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="6 9 12 15 18 9"></polyline>
-                                            </svg>
-                                        </div>
-                                        <div class="filter-category-content">
-                                            <div class="filter-options">
-                                                <label class="filter-checkbox">
-                                                    <input type="checkbox" value="verified" data-filter="phone-status">
-                                                    <span>Phone Verified</span>
-                                                </label>
-                                                <label class="filter-checkbox">
-                                                    <input type="checkbox" value="email-verified" data-filter="email-status">
-                                                    <span>Email Verified</span>
-                                                </label>
-                                                <label class="filter-checkbox">
-                                                    <input type="checkbox" value="bounced" data-filter="email-status">
-                                                    <span>Email Bounced</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div class="activity-list-wrapper" id="activity-list-wrapper"></div>
                             </div>
-                            
-                            <!-- Main Content Area -->
-                            <div class="contacts-main-content">
-
-                        <!-- Contacts Table Container -->
-                        <div class="contacts-table-container">
-                            <div class="table-controls">
-                                <div class="table-controls-left">
-                                    <button class="btn-icon" id="toggle-filters-btn" title="Toggle Filters">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                                        </svg>
-                                    </button>
-                                    <div class="view-options">
-                                        <button class="btn-icon active" id="table-view" title="Table View">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M3 6h18"></path>
-                                                <path d="M3 12h18"></path>
-                                                <path d="M3 18h18"></path>
-                                            </svg>
-                                        </button>
-                                        <button class="btn-icon" id="card-view" title="Card View">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <rect x="3" y="3" width="7" height="7"></rect>
-                                                <rect x="14" y="3" width="7" height="7"></rect>
-                                                <rect x="3" y="14" width="7" height="7"></rect>
-                                                <rect x="14" y="14" width="7" height="7"></rect>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="table-controls-right">
-                                    <div class="pagination-info" id="pagination-info">1-25 of 435</div>
-                                    <div class="pagination-controls">
-                                        <button class="btn-icon" id="prev-page" disabled>
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="15 18 9 12 15 6"></polyline>
-                                            </svg>
-                                        </button>
-                                        <select id="page-size">
-                                            <option value="25">25</option>
-                                            <option value="50">50</option>
-                                            <option value="100">100</option>
-                                        </select>
-                                        <button class="btn-icon" id="next-page">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="9 18 15 12 9 6"></polyline>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Contacts Table -->
-                            <div class="contacts-table-wrapper">
-                                <table class="contacts-table" id="contacts-table">
-                                    <thead>
-                                        <tr id="table-header">
-                                            <th class="sortable draggable" data-column="select">
-                                                <input type="checkbox" id="select-all">
-                                            </th>
-                                            <th class="sortable draggable" data-column="name">
-                                                <div class="th-content">
-                                                    <span>Name</span>
-                                                    <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M7 10l5 5 5-5"></path>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th class="sortable draggable" data-column="company">
-                                                <div class="th-content">
-                                                    <span>Company</span>
-                                                    <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M7 10l5 5 5-5"></path>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th class="sortable draggable" data-column="title">
-                                                <div class="th-content">
-                                                    <span>Job Title</span>
-                                                    <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M7 10l5 5 5-5"></path>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th class="sortable draggable" data-column="email">
-                                                <div class="th-content">
-                                                    <span>Email</span>
-                                                    <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M7 10l5 5 5-5"></path>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th class="sortable draggable" data-column="phone">
-                                                <div class="th-content">
-                                                    <span>Phone</span>
-                                                    <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M7 10l5 5 5-5"></path>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th class="sortable draggable" data-column="location">
-                                                <div class="th-content">
-                                                    <span>Location</span>
-                                                    <svg class="sort-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M7 10l5 5 5-5"></path>
-                                                    </svg>
-                                                </div>
-                                            </th>
-                                            <th class="draggable" data-column="actions">
-                                                <span>Actions</span>
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="contacts-table-body">
-                                        <!-- Contacts will be populated here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        </section>
                     </div>
+
+                    <div id="contacts-view" class="page-view" style="display: none;"></div>
                     <div id="accounts-view" class="page-view" style="display: none;"></div>
                     <div id="calls-view" class="page-view" style="display: none;"></div>
                     <div id="emails-view" class="page-view" style="display: none;"></div>
@@ -644,7 +442,5 @@
     <script src="firebase-config.js"></script>
     <!-- Your main CRM application logic -->
     <script src="crm-app.js"></script>
-    <!-- Contacts manager for Apollo-inspired interface -->
-    <script src="contacts-manager.js"></script>
 </body>
 </html>
