@@ -208,6 +208,10 @@ const CRMApp = {
 
     // Show/hide views in the single-page application
     showView(viewName) {
+        // Special: Contacts view
+        if (viewName === 'contacts-view') {
+            this.renderContactsPage();
+        }
         console.log(`Switching to view: ${viewName}`);
         this.currentView = viewName;
         
@@ -280,7 +284,233 @@ const CRMApp = {
         }
     },
 
-    // Main dashboard rendering function
+    // Render the contacts page, load HTML, apply CSS, and wire up Firebase
+    async renderContactsPage() {
+        const contactsView = document.getElementById('contacts-view');
+        if (!contactsView) return;
+        // If already loaded, don't reload
+        if (contactsView.getAttribute('data-loaded') === 'true') return;
+        // Show loading
+        contactsView.innerHTML = '<div class="contacts-loading"><div class="loading-spinner"></div><p>Loading contacts...</p></div>';
+        // Load contacts-content.html
+        try {
+            const res = await fetch('contacts-content.html');
+            const html = await res.text();
+            contactsView.innerHTML = html;
+            contactsView.setAttribute('data-loaded', 'true');
+            // Load CSS for contacts page
+            let cssId = 'contacts-styles';
+            if (!document.getElementById(cssId)) {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'contacts-styles.css';
+                link.id = cssId;
+                document.head.appendChild(link);
+            }
+            // Initialize contacts UI and filtering
+            this.initContactsUI();
+        } catch (err) {
+            contactsView.innerHTML = '<div class="contacts-empty"><h3>Failed to load contacts page.</h3></div>';
+        }
+    },
+
+    // Initialize contacts UI, filtering, and Firebase data
+    initContactsUI() {
+        const contactsTableBody = document.getElementById('contacts-table-body');
+        const resultsInfo = document.getElementById('results-info');
+        const contactsCount = document.getElementById('contacts-count');
+        const paginationInfo = document.getElementById('pagination-info');
+        const accountFilter = document.getElementById('account-filter');
+        const titleFilter = document.getElementById('title-filter');
+        const locationFilter = document.getElementById('location-filter');
+        const industryFilter = document.getElementById('industry-filter');
+        const dateFilter = document.getElementById('date-filter');
+        const searchInput = document.getElementById('contact-search');
+        const clearFiltersBtn = document.getElementById('clear-filters-btn');
+        const prevPageBtn = document.getElementById('prev-page-btn');
+        const nextPageBtn = document.getElementById('next-page-btn');
+        const paginationNumbers = document.getElementById('pagination-numbers');
+        // State
+        let filteredContacts = [...this.contacts];
+        let currentPage = 1;
+        let pageSize = 50;
+        // Populate filter options
+        this.populateContactsFilters(accountFilter, titleFilter, locationFilter, industryFilter);
+        // Filtering logic
+        function applyFilters() {
+            let filtered = [...CRMApp.contacts];
+            // Account
+            if (accountFilter.value) filtered = filtered.filter(c => c.accountName === accountFilter.value);
+            // Title
+            if (titleFilter.value) filtered = filtered.filter(c => c.title === titleFilter.value);
+            // Location
+            if (locationFilter.value) filtered = filtered.filter(c => [c.city, c.state].join(', ').includes(locationFilter.value));
+            // Industry
+            if (industryFilter.value) filtered = filtered.filter(c => c.industry === industryFilter.value);
+            // Date
+            if (dateFilter.value) {
+                const now = new Date();
+                filtered = filtered.filter(c => {
+                    if (!c.createdAt) return false;
+                    let created = c.createdAt instanceof Date ? c.createdAt : c.createdAt.toDate();
+                    if (dateFilter.value === 'today') {
+                        return created.toDateString() === now.toDateString();
+                    } else if (dateFilter.value === 'week') {
+                        const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+                        return created >= weekAgo;
+                    } else if (dateFilter.value === 'month') {
+                        const monthAgo = new Date(now); monthAgo.setMonth(now.getMonth() - 1);
+                        return created >= monthAgo;
+                    } else if (dateFilter.value === 'quarter') {
+                        const quarterAgo = new Date(now); quarterAgo.setMonth(now.getMonth() - 3);
+                        return created >= quarterAgo;
+                    }
+                    return true;
+                });
+            }
+            // Search
+            if (searchInput.value) {
+                const q = searchInput.value.toLowerCase();
+                filtered = filtered.filter(c =>
+                    [c.firstName, c.lastName, c.email, c.accountName, c.title, c.phone].some(f => f && f.toLowerCase().includes(q))
+                );
+            }
+            filteredContacts = filtered;
+            currentPage = 1;
+            renderTable();
+        }
+        // Populate filters
+        [accountFilter, titleFilter, locationFilter, industryFilter, dateFilter].forEach(f => f && f.addEventListener('change', applyFilters));
+        searchInput && searchInput.addEventListener('input', CRMApp.debounce(applyFilters, 300));
+        clearFiltersBtn && clearFiltersBtn.addEventListener('click', () => {
+            [accountFilter, titleFilter, locationFilter, industryFilter, dateFilter].forEach(f => f && (f.value = ''));
+            searchInput.value = '';
+            applyFilters();
+        });
+        // Pagination
+        prevPageBtn && prevPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderTable(); }});
+        nextPageBtn && nextPageBtn.addEventListener('click', () => { if (currentPage < Math.ceil(filteredContacts.length / pageSize)) { currentPage++; renderTable(); }});
+        // Render table
+        function renderTable() {
+            // Pagination
+            let start = (currentPage - 1) * pageSize;
+            let end = start + pageSize;
+            let pageContacts = filteredContacts.slice(start, end);
+            // Update info
+            resultsInfo.textContent = `Showing ${pageContacts.length} of ${filteredContacts.length} contacts`;
+            contactsCount.textContent = `${filteredContacts.length} contacts`;
+            paginationInfo.textContent = `Showing ${start + 1}-${Math.min(end, filteredContacts.length)} of ${filteredContacts.length} contacts`;
+            // Pagination numbers
+            paginationNumbers.innerHTML = '';
+            let totalPages = Math.ceil(filteredContacts.length / pageSize);
+            for (let i = 1; i <= totalPages; i++) {
+                let btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = (i === currentPage) ? 'active' : '';
+                btn.onclick = () => { currentPage = i; renderTable(); };
+                paginationNumbers.appendChild(btn);
+            }
+            prevPageBtn.disabled = currentPage === 1;
+            nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
+            // Render rows
+            contactsTableBody.innerHTML = '';
+            if (pageContacts.length === 0) {
+                contactsTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No contacts found.</td></tr>';
+                return;
+            }
+            for (let c of pageContacts) {
+                let tr = document.createElement('tr');
+                // Checkbox
+                let tdCheck = document.createElement('td');
+                tdCheck.className = 'checkbox-column';
+                tdCheck.innerHTML = `<input type="checkbox" data-id="${c.id}">`;
+                tr.appendChild(tdCheck);
+                // Name with profile image
+                let tdName = document.createElement('td');
+                tdName.innerHTML = `<img src="https://www.gravatar.com/avatar/${CRMApp.md5(c.email || '')}?s=32&d=identicon" class="profile-pic" style="border-radius:50%;width:32px;height:32px;margin-right:8px;vertical-align:middle;"> ${c.firstName || ''} ${c.lastName || ''}`;
+                tr.appendChild(tdName);
+                // Title
+                let tdTitle = document.createElement('td');
+                tdTitle.textContent = c.title || '';
+                tr.appendChild(tdTitle);
+                // Account with favicon
+                let tdAccount = document.createElement('td');
+                tdAccount.innerHTML = `<img src="https://www.google.com/s2/favicons?domain=${(c.email || '').split('@')[1] || ''}" class="company-favicon" style="width:20px;height:20px;margin-right:7px;vertical-align:middle;"> ${c.accountName || ''}`;
+                tr.appendChild(tdAccount);
+                // Email
+                let tdEmail = document.createElement('td');
+                tdEmail.textContent = c.email || '';
+                tr.appendChild(tdEmail);
+                // Phone
+                let tdPhone = document.createElement('td');
+                tdPhone.textContent = c.phone || '';
+                tr.appendChild(tdPhone);
+                // Location
+                let tdLoc = document.createElement('td');
+                tdLoc.textContent = [c.city, c.state].filter(Boolean).join(', ');
+                tr.appendChild(tdLoc);
+                // Created
+                let tdCreated = document.createElement('td');
+                tdCreated.textContent = CRMApp.formatDate(c.createdAt);
+                tr.appendChild(tdCreated);
+                // Actions
+                let tdActions = document.createElement('td');
+                tdActions.className = 'actions-column';
+                tdActions.innerHTML = `
+                    <button class="action-btn" title="Call" onclick="CRMApp.callContact('${c.id}')"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92V21a2 2 0 0 1-2.18 2A19.72 19.72 0 0 1 3 5.18 2 2 0 0 1 5 3h4.09a2 2 0 0 1 2 1.72c.13.81.37 1.6.72 2.34a2 2 0 0 1-.45 2.11l-1.27 1.27a16 16 0 0 0 6.29 6.29l1.27-1.27a2 2 0 0 1 2.11-.45c.74.35 1.53.59 2.34.72A2 2 0 0 1 21 18.91V21z"></path></svg></button>
+                    <button class="action-btn" title="Email" onclick="CRMApp.emailContact('${c.id}')"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><polyline points="16 3 12 7 8 3"></polyline></svg></button>
+                    <button class="action-btn" title="Add to Sequence" onclick="CRMApp.addToSequence('${c.id}')"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></button>
+                `;
+                tr.appendChild(tdActions);
+                contactsTableBody.appendChild(tr);
+            }
+        }
+        // Initial render
+        applyFilters();
+    },
+
+    // Populate filter dropdowns for contacts
+    populateContactsFilters(accountFilter, titleFilter, locationFilter, industryFilter) {
+        // Account
+        let accounts = Array.from(new Set(this.contacts.map(c => c.accountName))).filter(Boolean);
+        accountFilter.innerHTML = '<option value="">All Accounts</option>' + accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+        // Title
+        let titles = Array.from(new Set(this.contacts.map(c => c.title))).filter(Boolean);
+        titleFilter.innerHTML = '<option value="">All Titles</option>' + titles.map(t => `<option value="${t}">${t}</option>`).join('');
+        // Location
+        let locations = Array.from(new Set(this.contacts.map(c => [c.city, c.state].filter(Boolean).join(', ')))).filter(Boolean);
+        locationFilter.innerHTML = '<option value="">All Locations</option>' + locations.map(l => `<option value="${l}">${l}</option>`).join('');
+        // Industry
+        let industries = Array.from(new Set(this.contacts.map(c => c.industry))).filter(Boolean);
+        industryFilter.innerHTML = '<option value="">All Industries</option>' + industries.map(i => `<option value="${i}">${i}</option>`).join('');
+    },
+
+    // Utility for gravatar hash
+    md5(str) {
+        // Simple MD5 for gravatar (use a library in production)
+        function L(k, d) { return (k << d) | (k >>> (32 - d)); }
+        function K(G, k) { let I, d, F, H, x; F = (G & 2147483648); H = (k & 2147483648); I = (G & 1073741824); d = (k & 1073741824); x = (G & 1073741823) + (k & 1073741823); if (I & d) return (x ^ 2147483648 ^ F ^ H); if (I | d) { if (x & 1073741824) return (x ^ 3221225472 ^ F ^ H); else return (x ^ 1073741824 ^ F ^ H); } else { return (x ^ F ^ H); } }
+        function r(d, F, k) { return (d & F) | (~d & k); }
+        function q(d, F, k) { return (d & k) | (F & ~k); }
+        function p(d, F, k) { return d ^ F ^ k; }
+        function n(d, F, k) { return F ^ (d | ~k); }
+        function u(G, F, aa, Z, k, H, I) { G = K(G, K(K(r(F, aa, Z), k), I)); return K(L(G, H), F); }
+        function f(G, F, aa, Z, k, H, I) { G = K(G, K(K(q(F, aa, Z), k), I)); return K(L(G, H), F); }
+        function D(G, F, aa, Z, k, H, I) { G = K(G, K(K(p(F, aa, Z), k), I)); return K(L(G, H), F); }
+        function t(G, F, aa, Z, k, H, I) { G = K(G, K(K(n(F, aa, Z), k), I)); return K(L(G, H), F); }
+        function e(G) { let Z, F = G.length, x = F + 8, k = (x - (x % 64)) / 64, I = 16 * (k + 1), aa = Array(I - 1), d = 0, H = 0; while (H < F) { Z = (H - (H % 4)) / 4; d = (H % 4) * 8; aa[Z] = (aa[Z] | (G.charCodeAt(H) << d)); H++; } Z = (H - (H % 4)) / 4; d = (H % 4) * 8; aa[Z] = aa[Z] | (128 << d); aa[I - 2] = F << 3; aa[I - 1] = F >>> 29; return aa; }
+        function B(x) { let k = '', F = '', G, d; for (d = 0; d <= 3; d++) { G = (x >>> (d * 8)) & 255; F = '0' + G.toString(16); k += F.substr(F.length - 2, 2); } return k; }
+        function J(k) { k = k.replace(/\r\n/g, '\n'); let d = ''; for (let F = 0; F < k.length; F++) { let G = k.charCodeAt(F); if (G < 128) { d += String.fromCharCode(G); } else if ((G > 127) && (G < 2048)) { d += String.fromCharCode((G >> 6) | 192); d += String.fromCharCode((G & 63) | 128); } else { d += String.fromCharCode((G >> 12) | 224); d += String.fromCharCode(((G >> 6) & 63) | 128); d += String.fromCharCode((G & 63) | 128); } } return d; }
+        let C = Array(); let P, h, E, v, g, Y, X, W, V; let S = 7, Q = 12, N = 17, M = 22, A = 5, z = 9, y = 14, w = 20, o = 4, m = 11, l = 16, j = 23, U = 6, T = 10, R = 15, O = 21; str = J(str); C = e(str); Y = 1732584193; X = 4023233417; W = 2562383102; V = 271733878; for (P = 0; P < C.length; P += 16) { h = Y; E = X; v = W; g = V; Y = u(Y, X, W, V, C[P + 0], S, 3614090360); V = u(V, Y, X, W, C[P + 1], Q, 3905402710); W = u(W, V, Y, X, C[P + 2], N, 606105819); X = u(X, W, V, Y, C[P + 3], M, 3250441966); Y = u(Y, X, W, V, C[P + 4], A, 4118548399); V = u(V, Y, X, W, C[P + 5], z, 1200080426); W = u(W, V, Y, X, C[P + 6], y, 2821735955); X = u(X, W, V, Y, C[P + 7], w, 4249261313); Y = u(Y, X, W, V, C[P + 8], S, 1770035416); V = u(V, Y, X, W, C[P + 9], Q, 2336552879); W = u(W, V, Y, X, C[P + 10], N, 4294925233); X = u(X, W, V, Y, C[P + 11], M, 2304563134); Y = u(Y, X, W, V, C[P + 12], A, 1804603682); V = u(V, Y, X, W, C[P + 13], z, 4254626195); W = u(W, V, Y, X, C[P + 14], y, 2792965006); X = u(X, W, V, Y, C[P + 15], w, 1236535329); Y = f(Y, X, W, V, C[P + 1], o, 4129170786); V = f(V, Y, X, W, C[P + 6], m, 3225465664); W = f(W, V, Y, X, C[P + 11], l, 643717713);
+        X = f(X, W, V, Y, C[P + 0], j, 3921069994); Y = f(Y, X, W, V, C[P + 5], U, 3593408605); V = f(V, Y, X, W, C[P + 10], T, 38016083); W = f(W, V, Y, X, C[P + 15], R, 3634488961); X = f(X, W, V, Y, C[P + 4], o, 3889429448); Y = f(Y, X, W, V, C[P + 9], m, 568446438); V = f(V, Y, X, W, C[P + 14], l, 3275163606); W = f(W, V, Y, X, C[P + 3], j, 4107603335); X = f(X, W, V, Y, C[P + 8], U, 1163531501); Y = D(Y, X, W, V, C[P + 6], o, 2850285829); V = D(V, Y, X, W, C[P + 11], m, 4243563512); W = D(W, V, Y, X, C[P + 0], l, 1735328473); X = D(X, W, V, Y, C[P + 5], j, 2368359562); Y = D(Y, X, W, V, C[P + 10], U, 4294588738); V = D(V, Y, X, W, C[P + 15], T, 2272392833); W = D(W, V, Y, X, C[P + 4], R, 1839030562); X = D(X, W, V, Y, C[P + 13], o, 4259657749); Y = t(Y, X, W, V, C[P + 8], m, 2763975236); V = t(V, Y, X, W, C[P + 3], l, 1272893353); W = t(W, V, Y, X, C[P + 10], j, 4139469664); X = t(X, W, V, Y, C[P + 1], U, 3200235594); Y = t(Y, X, W, V, C[P + 6], T, 681279174); V = t(V, Y, X, W, C[P + 11], R, 3936430074); W = t(W, V, Y, X, C[P + 0], o, 3572445317); X = t(X, W, V, Y, C[P + 5], m, 76029189); Y = t(Y, X, W, V, C[P + 12], l, 3654602809); V = t(V, Y, X, W, C[P + 3], j, 3873151461); W = t(W, V, Y, X, C[P + 10], o, 530742520); X = t(X, W, V, Y, C[P + 15], m, 3299628640); Y = K(Y, h); X = K(X, E); W = K(W, v); V = K(V, g); } var i = B(Y) + B(X) + B(W) + B(V); return i.toLowerCase();
+    },
+
+    // Call, email, sequence actions (stub)
+    callContact(id) { alert('Call contact ' + id); },
+    emailContact(id) { alert('Email contact ' + id); },
+    addToSequence(id) { alert('Add to sequence ' + id); },
+
+// Main dashboard rendering function
     renderDashboard() {
         this.renderDashboardStats();
         this.renderTodayTasks();
