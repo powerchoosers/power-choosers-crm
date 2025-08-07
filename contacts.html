@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contacts - CRM</title>
+    <link rel="stylesheet" href="crm-styles.css">
+    <link rel="stylesheet" href="contacts.css">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-firestore.js"></script>
+</head>
+<body>
+    <div class="contacts-container">
+        <aside class="filters-sidebar">
+            <h2>Filters</h2>
+            <div id="filters-content">
+                <!-- Filter categories will be dynamically added here -->
+            </div>
+        </aside>
+        <main class="contacts-main">
+            <div class="selected-filters-container">
+                <!-- Selected filter chips will be displayed here -->
+            </div>
+            <div class="contacts-table-container">
+                <table id="contacts-table">
+                    <thead>
+                        <!-- Table headers will be dynamically added here -->
+                    </thead>
+                    <tbody id="contacts-table-body">
+                        <!-- Contact rows will be dynamically added here -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination-container">
+                <!-- Pagination controls will be here -->
+            </div>
+        </main>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="contacts.js"></script>
+</body>
+</html>
