@@ -81,3 +81,51 @@ button[style*="background"] {
 [style*="background: #2196f3"] {
     background: var(--cch-darker-blue) !important;
 }
+
+/* Restore original widget container styling - made smaller to fit red line guidelines */
+.sidebar-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 8px !important; /* Smaller border radius */
+    padding: 12px !important; /* Reduced padding */
+    margin-bottom: 12px !important; /* Reduced margin */
+    font-size: 0.85rem !important; /* Smaller font size */
+}
+
+/* Ensure step numbers and titles are visible - made smaller */
+.sidebar-card-title {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    margin-bottom: 10px !important; /* Reduced margin */
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important; /* Smaller gap */
+    font-size: 0.9rem !important; /* Smaller title font */
+}
+
+/* Style the input groups properly - made smaller */
+.sidebar-input-group {
+    margin-bottom: 10px !important; /* Reduced margin */
+}
+
+.sidebar-input-group label {
+    color: var(--text-secondary) !important;
+    font-size: 0.75rem !important; /* Smaller label font */
+    margin-bottom: 4px !important; /* Reduced margin */
+    display: block !important;
+}
+
+/* Make input fields smaller */
+.sidebar-input-group input,
+.sidebar-input-group textarea {
+    padding: 8px 10px !important; /* Smaller input padding */
+    font-size: 0.8rem !important; /* Smaller input font */
+    border-radius: 6px !important; /* Smaller border radius */
+}
+
+/* Make buttons smaller */
+.sidebar-card button {
+    padding: 8px 12px !important; /* Smaller button padding */
+    font-size: 0.8rem !important; /* Smaller button font */
+    border-radius: 6px !important; /* Smaller border radius */
+}
