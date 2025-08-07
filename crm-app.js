@@ -332,6 +332,13 @@ const CRMApp = {
         contactsView.setAttribute('data-loaded', 'true');
         console.log("Contacts HTML created and injected");
 
+        // Remove all inline styles except display: block (for visibility)
+        const display = contactsView.style.display;
+        contactsView.removeAttribute('style');
+        if (display === 'block') {
+            contactsView.style.display = 'block';
+        }
+
         // Initialize the simple contacts functionality
         this.initSimpleContactsUI();
         console.log("Simple contacts UI initialized");
