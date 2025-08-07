@@ -12,8 +12,17 @@
 }
 
 #cold-calling-widgets-container {
-    padding-left: calc(var(--spacing-lg) / 2) !important;
-    padding-right: calc(var(--spacing-lg) / 2) !important;
+    padding-left: 0 !important; /* Remove left padding to move widgets left */
+    padding-right: var(--spacing-lg) !important; /* Keep right padding for proper margin */
+    padding-top: 0 !important; /* Remove top padding to move widgets up */
+    margin-top: 0 !important; /* Ensure no top margin */
+}
+
+/* Ensure the sidebar matches home screen widget dimensions and positioning */
+.calls-hub-sidebar {
+    padding: 0 !important;
+    margin: 0 !important;
+    align-self: flex-start; /* Align to top of container */
 }
 
 /* Reduce wasted space inside the container above the title */
