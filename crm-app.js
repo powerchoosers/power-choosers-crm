@@ -323,6 +323,10 @@ const CRMApp = {
             } else if (viewName === 'sequences-view') {
                 // Sequences View - Render sequences page
                 console.log('Activating sequences view');
+                
+                // Use the fixed version
+                this.renderSequencesPageFixed();
+                
                 activeView.style.display = 'block';
                 if (crmWidgetsContainer) {
                     crmWidgetsContainer.style.display = 'flex';
@@ -338,6 +342,8 @@ const CRMApp = {
                     crmWidgetsContainer.style.display = 'flex';
                     console.log('Showing CRM widgets for sequence builder');
                 }
+                // Initialize the sequence builder with proper data
+                this.initializeSequenceBuilder();
             } else {
                 // All other CRM views - Standard Layout
                 console.log('Activating standard CRM view');
@@ -1314,6 +1320,1371 @@ const CRMApp = {
                 filtersSidebar.style.display = 'flex';
             }
         }, 100);
+    },
+
+    // Render the sequences page with list of all sequences
+    renderSequencesPage() {
+        // Prevent infinite recursion
+        if (this._renderingSequences) {
+            console.warn('renderSequencesPage already in progress, preventing recursion');
+            return;
+        }
+        
+        this._renderingSequences = true;
+        console.log('Rendering sequences page...');
+        
+        try {
+            const sequencesView = document.getElementById('sequences-view');
+            if (!sequencesView) {
+                console.error('sequences-view element not found');
+                return;
+            }
+
+            // Initialize sequences array if it doesn't exist
+            if (!this.sequences) {
+                console.log('Sequences array not found, initializing empty array');
+                this.sequences = [];
+            }
+
+            console.log('Sequences data:', {
+                count: this.sequences.length,
+                sequences: this.sequences
+            });
+
+            const sequencesHTML = `
+            <div style="padding: 20px; background: #1a1a1a; min-height: 100vh;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <div>
+                        <h1 style="color: #fff; font-size: 28px; font-weight: 600; margin: 0;">Sequences</h1>
+                        <p style="color: #888; margin: 5px 0 0 0;">Manage your email sequences and automation</p>
+                    </div>
+                    <button onclick="CRMApp.createNewSequence()" style="
+                        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                        border: none;
+                        border-radius: 8px;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                        padding: 12px 20px;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(139, 92, 246, 0.3)'" 
+                       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        + New Sequence
+                    </button>
+                </div>
+
+                <div style="background: #2a2a2a; border-radius: 12px; overflow: hidden;">
+                    ${this.sequences.length === 0 ? `
+                        <div style="padding: 60px 20px; text-align: center;">
+                            <div style="color: #666; font-size: 48px; margin-bottom: 20px;">📧</div>
+                            <h3 style="color: #fff; font-size: 20px; margin: 0 0 10px 0;">No sequences yet</h3>
+                            <p style="color: #888; margin: 0 0 30px 0;">Create your first email sequence to start automating your outreach</p>
+                            <button onclick="CRMApp.createNewSequence()" style="
+                                background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                                border: none;
+                                border-radius: 8px;
+                                color: #fff;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                padding: 12px 24px;
+                                transition: all 0.2s ease;
+                            ">Create First Sequence</button>
+                        </div>
+                    ` : `
+                        <div style="padding: 0;">
+                            ${this.sequences.map(sequence => `
+                                <div onclick="CRMApp.openSequenceBuilder('${sequence.id}')" style="
+                                    border-bottom: 1px solid #333;
+                                    cursor: pointer;
+                                    padding: 20px;
+                                    transition: all 0.2s ease;
+                                " onmouseover="this.style.backgroundColor='#333'" onmouseout="this.style.backgroundColor='transparent'">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                        <div style="flex: 1;">
+                                            <h3 style="color: #fff; font-size: 18px; font-weight: 600; margin: 0 0 8px 0;">${sequence.name || 'Untitled Sequence'}</h3>
+                                            <p style="color: #888; font-size: 14px; margin: 0 0 12px 0;">${sequence.description || 'No description'}</p>
+                                            <div style="display: flex; gap: 20px; align-items: center;">
+                                                <span style="color: #666; font-size: 12px;">${sequence.steps?.length || 0} steps</span>
+                                                <span style="color: #666; font-size: 12px;">${sequence.contacts?.length || 0} contacts</span>
+                                                <span style="color: ${sequence.active ? '#10b981' : '#ef4444'}; font-size: 12px;">
+                                                    ${sequence.active ? '● Active' : '● Inactive'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 15px;">
+                                            <div style="text-align: right;">
+                                                <div style="color: #888; font-size: 12px;">Open Rate</div>
+                                                <div style="color: #fff; font-size: 16px; font-weight: 600;">${sequence.stats?.openRate || '0'}%</div>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <div style="color: #888; font-size: 12px;">Reply Rate</div>
+                                                <div style="color: #fff; font-size: 16px; font-weight: 600;">${sequence.stats?.replyRate || '0'}%</div>
+                                            </div>
+                                            <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                                                <input type="checkbox" ${sequence.active ? 'checked' : ''} onchange="CRMApp.toggleSequence('${sequence.id}', this.checked)" style="opacity: 0; width: 0; height: 0;">
+                                                <span style="
+                                                    position: absolute;
+                                                    cursor: pointer;
+                                                    top: 0;
+                                                    left: 0;
+                                                    right: 0;
+                                                    bottom: 0;
+                                                    background-color: ${sequence.active ? '#10b981' : '#374151'};
+                                                    transition: .4s;
+                                                    border-radius: 24px;
+                                                ">
+                                                    <span style="
+                                                        position: absolute;
+                                                        content: '';
+                                                        height: 18px;
+                                                        width: 18px;
+                                                        left: ${sequence.active ? '23px' : '3px'};
+                                                        bottom: 3px;
+                                                        background-color: white;
+                                                        transition: .4s;
+                                                        border-radius: 50%;
+                                                    "></span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+            sequencesView.innerHTML = sequencesHTML;
+            console.log('Sequences page rendered successfully');
+        } catch (error) {
+            console.error('Error rendering sequences page:', error);
+            const sequencesView = document.getElementById('sequences-view');
+            if (sequencesView) {
+                sequencesView.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #fff;">
+                        <h2>Error Loading Sequences</h2>
+                        <p style="color: #888;">There was an error loading the sequences page. Please try again.</p>
+                        <button onclick="location.reload()" style="
+                            background: #8b5cf6;
+                            border: none;
+                            border-radius: 8px;
+                            color: #fff;
+                            cursor: pointer;
+                            font-size: 14px;
+                            padding: 10px 20px;
+                            margin-top: 20px;
+                        ">Reload Page</button>
+                    </div>
+                `;
+            }
+        } finally {
+            // Reset the recursion guard
+            this._renderingSequences = false;
+        }
+    },
+
+    // Simplified version to debug the freeze issue
+    renderSequencesPageSimplified() {
+        console.log('Starting simplified sequences page render...');
+        
+        try {
+            const sequencesView = document.getElementById('sequences-view');
+            if (!sequencesView) {
+                console.error('sequences-view element not found');
+                return;
+            }
+
+            console.log('Found sequences view element');
+
+            // Check sequences data safely
+            console.log('Checking sequences data...');
+            console.log('this.sequences exists:', !!this.sequences);
+            console.log('this.sequences type:', typeof this.sequences);
+            
+            if (this.sequences) {
+                console.log('this.sequences length:', this.sequences.length);
+                console.log('this.sequences is array:', Array.isArray(this.sequences));
+            }
+
+            // Initialize sequences array if it doesn't exist
+            if (!this.sequences) {
+                console.log('Initializing empty sequences array');
+                this.sequences = [];
+            }
+
+            console.log('About to render HTML with sequences data...');
+
+            // Test processing sequences data safely
+            let sequencesList = '';
+            if (this.sequences && this.sequences.length > 0) {
+                console.log('Processing sequences...');
+                try {
+                    for (let i = 0; i < this.sequences.length; i++) {
+                        const sequence = this.sequences[i];
+                        console.log(`Processing sequence ${i}:`, sequence?.name || 'unnamed');
+                        
+                        // Safely access sequence properties
+                        const name = sequence?.name || 'Untitled Sequence';
+                        const description = sequence?.description || 'No description';
+                        const stepsCount = sequence?.steps?.length || 0;
+                        const contactsCount = sequence?.contacts?.length || 0;
+                        const isActive = sequence?.active || false;
+                        
+                        sequencesList += `
+                            <div style="border: 1px solid #333; padding: 15px; margin: 10px 0; border-radius: 8px;">
+                                <h3 style="color: #fff; margin: 0 0 10px 0;">${name}</h3>
+                                <p style="color: #888; margin: 0 0 10px 0;">${description}</p>
+                                <p style="color: #666; font-size: 12px;">
+                                    ${stepsCount} steps, ${contactsCount} contacts, ${isActive ? 'Active' : 'Inactive'}
+                                </p>
+                            </div>
+                        `;
+                    }
+                    console.log('Sequences processed successfully');
+                } catch (error) {
+                    console.error('Error processing sequences:', error);
+                    sequencesList = `<p style="color: #f00;">Error processing sequences: ${error.message}</p>`;
+                }
+            } else {
+                sequencesList = '<p style="color: #888;">No sequences found</p>';
+            }
+
+            const simpleHTML = `
+                <div style="padding: 20px; background: #1a1a1a; min-height: 100vh; color: #fff;">
+                    <h1>Sequences (Debug Mode)</h1>
+                    <p>Sequences count: ${this.sequences ? this.sequences.length : 'undefined'}</p>
+                    <div style="background: #2a2a2a; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                        ${sequencesList}
+                    </div>
+                </div>
+            `;
+
+            console.log('Setting innerHTML...');
+            sequencesView.innerHTML = simpleHTML;
+            console.log('Simplified sequences page rendered successfully');
+
+        } catch (error) {
+            console.error('Error in simplified render:', error);
+            const sequencesView = document.getElementById('sequences-view');
+            if (sequencesView) {
+                sequencesView.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #fff; background: #1a1a1a;">
+                        <h2>Error in Simplified Render</h2>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    },
+
+    // Fixed version of renderSequencesPage that avoids the infinite loop
+    renderSequencesPageFixed() {
+        console.log('Rendering sequences page (fixed version)...');
+        
+        try {
+            const sequencesView = document.getElementById('sequences-view');
+            if (!sequencesView) {
+                console.error('sequences-view element not found');
+                return;
+            }
+
+            // Initialize sequences array if it doesn't exist
+            if (!this.sequences) {
+                this.sequences = [];
+            }
+
+            console.log(`Rendering ${this.sequences.length} sequences...`);
+
+            // Build sequences HTML safely using for loop instead of map
+            let sequencesListHTML = '';
+            
+            if (this.sequences.length === 0) {
+                sequencesListHTML = `
+                    <div style="padding: 60px 20px; text-align: center;">
+                        <div style="color: #666; font-size: 48px; margin-bottom: 20px;">📧</div>
+                        <h3 style="color: #fff; font-size: 20px; margin: 0 0 10px 0;">No sequences yet</h3>
+                        <p style="color: #888; margin: 0 0 30px 0;">Create your first email sequence to start automating your outreach</p>
+                        <button onclick="CRMApp.createNewSequence()" style="
+                            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                            border: none;
+                            border-radius: 8px;
+                            color: #fff;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 500;
+                            padding: 12px 24px;
+                            transition: all 0.2s ease;
+                        ">Create First Sequence</button>
+                    </div>
+                `;
+            } else {
+                // Process sequences safely with for loop
+                for (let i = 0; i < this.sequences.length; i++) {
+                    const sequence = this.sequences[i];
+                    
+                    // Safely extract sequence properties
+                    const sequenceId = sequence.id || `seq_${i}`;
+                    const sequenceName = sequence.name || 'Untitled Sequence';
+                    const sequenceDescription = sequence.description || 'No description';
+                    const stepsCount = sequence.steps?.length || 0;
+                    const contactsCount = sequence.contacts?.length || 0;
+                    const isActive = sequence.active || false;
+                    const openRate = sequence.stats?.openRate || '0';
+                    const replyRate = sequence.stats?.replyRate || '0';
+                    
+                    sequencesListHTML += `
+                        <div onclick="CRMApp.openSequenceBuilder('${sequenceId}')" style="
+                            border-bottom: 1px solid #333;
+                            cursor: pointer;
+                            padding: 20px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.backgroundColor='#333'" onmouseout="this.style.backgroundColor='transparent'">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div style="flex: 1;">
+                                    <h3 style="color: #fff; font-size: 18px; font-weight: 600; margin: 0 0 8px 0;">${sequenceName}</h3>
+                                    <p style="color: #888; font-size: 14px; margin: 0 0 12px 0;">${sequenceDescription}</p>
+                                    <div style="display: flex; gap: 20px; align-items: center;">
+                                        <span style="color: #666; font-size: 12px;">${stepsCount} steps</span>
+                                        <span style="color: #666; font-size: 12px;">${contactsCount} contacts</span>
+                                        <span style="color: ${isActive ? '#10b981' : '#ef4444'}; font-size: 12px;">
+                                            ${isActive ? '● Active' : '● Inactive'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <div style="text-align: right;">
+                                        <div style="color: #888; font-size: 12px;">Open Rate</div>
+                                        <div style="color: #fff; font-size: 16px; font-weight: 600;">${openRate}%</div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="color: #888; font-size: 12px;">Reply Rate</div>
+                                        <div style="color: #fff; font-size: 16px; font-weight: 600;">${replyRate}%</div>
+                                    </div>
+                                    <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                                        <input type="checkbox" ${isActive ? 'checked' : ''} onchange="CRMApp.toggleSequence('${sequenceId}', this.checked)" style="opacity: 0; width: 0; height: 0;">
+                                        <span style="
+                                            position: absolute;
+                                            cursor: pointer;
+                                            top: 0;
+                                            left: 0;
+                                            right: 0;
+                                            bottom: 0;
+                                            background-color: ${isActive ? '#10b981' : '#374151'};
+                                            transition: .4s;
+                                            border-radius: 24px;
+                                        ">
+                                            <span style="
+                                                position: absolute;
+                                                content: '';
+                                                height: 18px;
+                                                width: 18px;
+                                                left: ${isActive ? '23px' : '3px'};
+                                                bottom: 3px;
+                                                background-color: white;
+                                                transition: .4s;
+                                                border-radius: 50%;
+                                            "></span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            // Build the complete HTML
+            const sequencesHTML = `
+                <div style="padding: 20px; background: #1a1a1a; min-height: 100vh;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                        <div>
+                            <h1 style="color: #fff; font-size: 28px; font-weight: 600; margin: 0;">Sequences</h1>
+                            <p style="color: #888; margin: 5px 0 0 0;">Manage your email sequences and automation</p>
+                        </div>
+                        <button onclick="createNewSequence()" style="
+                            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                            border: none;
+                            border-radius: 8px;
+                            color: #fff;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 500;
+                            padding: 12px 20px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(139, 92, 246, 0.3)'" 
+                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                            + New Sequence
+                        </button>
+                    </div>
+
+                    <div style="background: #2a2a2a; border-radius: 12px; overflow: hidden;">
+                        <div style="padding: 0;">
+                            ${sequencesListHTML}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            sequencesView.innerHTML = sequencesHTML;
+            console.log('Sequences page rendered successfully (fixed version)');
+
+        } catch (error) {
+            console.error('Error rendering sequences page:', error);
+            const sequencesView = document.getElementById('sequences-view');
+            if (sequencesView) {
+                sequencesView.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #fff; background: #1a1a1a; min-height: 100vh;">
+                        <h2>Error Loading Sequences</h2>
+                        <p style="color: #888;">There was an error loading the sequences page: ${error.message}</p>
+                        <button onclick="location.reload()" style="
+                            background: #8b5cf6;
+                            border: none;
+                            border-radius: 8px;
+                            color: #fff;
+                            cursor: pointer;
+                            font-size: 14px;
+                            padding: 10px 20px;
+                            margin-top: 20px;
+                        ">Reload Page</button>
+                    </div>
+                `;
+            }
+        }
+    },
+
+    // Create a new sequence
+    createNewSequence() {
+        console.log('🚀 createNewSequence() function called!');
+        console.log('Current CRMApp instance:', this);
+        console.log('Current sequences array:', this.sequences);
+        
+        // Prompt for sequence name
+        const sequenceName = prompt('Enter a name for your new sequence:', 'My New Sequence');
+        
+        // If user cancelled or entered empty name, abort
+        if (!sequenceName || sequenceName.trim() === '') {
+            console.log('Sequence creation cancelled - no name provided');
+            return;
+        }
+        
+        // Create a new sequence object
+        const newSequenceId = 'seq_' + Date.now();
+        const newSequence = {
+            id: newSequenceId,
+            name: sequenceName.trim(),
+            description: 'Click to add description',
+            steps: [],
+            contacts: [],
+            active: false,
+            stats: {
+                openRate: 0,
+                replyRate: 0,
+                clickRate: 0
+            },
+            createdAt: new Date().toISOString()
+        };
+
+        // Add to sequences array
+        if (!this.sequences) {
+            this.sequences = [];
+        }
+        this.sequences.push(newSequence);
+
+        // Save to Firebase (TODO: implement Firebase save)
+        console.log('New sequence created:', newSequence);
+        
+        // Open the sequence builder for the new sequence
+        this.showView('sequence-builder-view');
+        this.initializeSequenceBuilder(newSequence.name, newSequenceId);
+        
+        this.showNotification(`Sequence "${sequenceName}" created! Start building your automation.`, 'success');
+    },
+
+    // Make createNewSequence globally accessible for button onclick
+    makeGloballyAccessible() {
+        window.createNewSequence = () => this.createNewSequence();
+        window.testButtonClick = () => this.testButtonClick();
+        console.log('✅ Functions made globally accessible');
+    },
+
+    // Show notification to user
+    showNotification(message, type = 'info') {
+        console.log(`📢 Notification (${type}):`, message);
+        
+        // Create a simple toast notification
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#8b5cf6'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-width: 300px;
+            word-wrap: break-word;
+        `;
+        toast.textContent = message;
+        
+        document.body.appendChild(toast);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 3000);
+    },
+
+    // Test function to verify button clicks work
+    testButtonClick() {
+        console.log('🧪 Test button click works!');
+        alert('Button click test successful!');
+    },
+
+    // Open sequence builder for a specific sequence
+    openSequenceBuilder(sequenceId) {
+        console.log('Opening sequence builder for:', sequenceId);
+        const sequence = this.sequences.find(s => s.id === sequenceId);
+        if (sequence) {
+            // Store the current sequence being edited
+            this.currentSequence = sequence;
+            this.showView('sequence-builder-view');
+            this.initializeSequenceBuilder(sequence.name, sequenceId);
+        } else {
+            console.error('Sequence not found:', sequenceId);
+            this.showNotification('Sequence not found', 'error');
+        }
+    },
+
+    // Initialize the sequence builder view
+    initializeSequenceBuilder(sequenceName = 'New Sequence', sequenceId = null) {
+        console.log('Initializing sequence builder for:', sequenceName, sequenceId);
+        
+        try {
+            const sequenceBuilderView = document.getElementById('sequence-builder-view');
+            if (!sequenceBuilderView) {
+                console.error('sequence-builder-view element not found');
+                return;
+            }
+
+            // Clear any existing content first
+            sequenceBuilderView.innerHTML = '';
+
+            // Get the current sequence data
+            let currentSequence = null;
+            if (sequenceId) {
+                currentSequence = this.sequences.find(s => s.id === sequenceId);
+            } else if (this.currentSequence) {
+                currentSequence = this.currentSequence;
+            }
+
+            // If no sequence found, create a basic structure
+            if (!currentSequence) {
+                currentSequence = {
+                    id: sequenceId || 'new_sequence',
+                    name: sequenceName,
+                    description: 'Click to add description',
+                    steps: [],
+                    contacts: [],
+                    active: false
+                };
+            }
+
+            // Store the current sequence
+            this.currentSequence = currentSequence;
+            
+            console.log('Current sequence data:', currentSequence);
+
+            // Build the sequence builder HTML
+            const sequenceBuilderHTML = `
+                <div style="padding: 20px; background: #1a1a1a; min-height: 100vh; color: #fff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                        <div>
+                            <button onclick="CRMApp.showView('sequences-view')" style="
+                                background: transparent;
+                                border: 1px solid #333;
+                                border-radius: 6px;
+                                color: #888;
+                                cursor: pointer;
+                                font-size: 14px;
+                                padding: 8px 12px;
+                                margin-right: 15px;
+                                transition: all 0.2s ease;
+                            " onmouseover="this.style.borderColor='#666'; this.style.color='#fff'" 
+                               onmouseout="this.style.borderColor='#333'; this.style.color='#888'">
+                                ← Back to Sequences
+                            </button>
+                            <h1 style="display: inline; color: #fff; font-size: 28px; font-weight: 600; margin: 0;">${currentSequence.name}</h1>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="CRMApp.saveSequence()" style="
+                                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                                border: none;
+                                border-radius: 8px;
+                                color: #fff;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                padding: 12px 20px;
+                                transition: all 0.2s ease;
+                            ">Save Sequence</button>
+                            <button onclick="CRMApp.testSequence()" style="
+                                background: transparent;
+                                border: 1px solid #8b5cf6;
+                                border-radius: 8px;
+                                color: #8b5cf6;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                padding: 12px 20px;
+                                transition: all 0.2s ease;
+                            ">Test Sequence</button>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 30px;">
+                        <!-- Main sequence builder area -->
+                        <div style="background: #2a2a2a; border-radius: 12px; padding: 30px;">
+                            <h2 style="color: #fff; font-size: 20px; margin: 0 0 20px 0;">Sequence Steps</h2>
+                            
+                            <div id="sequence-steps-container">
+                                ${this.renderSequenceSteps(currentSequence.steps)}
+                            </div>
+
+                            <button onclick="CRMApp.addSequenceStep()" style="
+                                background: transparent;
+                                border: 2px dashed #666;
+                                border-radius: 8px;
+                                color: #888;
+                                cursor: pointer;
+                                font-size: 14px;
+                                padding: 20px;
+                                width: 100%;
+                                transition: all 0.2s ease;
+                                margin-top: 20px;
+                            " onmouseover="this.style.borderColor='#8b5cf6'; this.style.color='#8b5cf6'" 
+                               onmouseout="this.style.borderColor='#666'; this.style.color='#888'">
+                                + Add Step
+                            </button>
+                        </div>
+
+                        <!-- Sequence settings sidebar -->
+                        <div style="background: #2a2a2a; border-radius: 12px; padding: 20px; height: fit-content;">
+                            <h3 style="color: #fff; font-size: 16px; margin: 0 0 15px 0;">Sequence Settings</h3>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <label style="color: #888; font-size: 12px; display: block; margin-bottom: 5px;">Sequence Name</label>
+                                <input type="text" value="${currentSequence.name}" onchange="CRMApp.updateSequenceName(this.value)" style="
+                                    background: #1a1a1a;
+                                    border: 1px solid #333;
+                                    border-radius: 6px;
+                                    color: #fff;
+                                    font-size: 14px;
+                                    padding: 10px;
+                                    width: 100%;
+                                ">
+                            </div>
+
+                            <div style="margin-bottom: 20px;">
+                                <label style="color: #888; font-size: 12px; display: block; margin-bottom: 5px;">Description</label>
+                                <textarea onchange="CRMApp.updateSequenceDescription(this.value)" style="
+                                    background: #1a1a1a;
+                                    border: 1px solid #333;
+                                    border-radius: 6px;
+                                    color: #fff;
+                                    font-size: 14px;
+                                    padding: 10px;
+                                    width: 100%;
+                                    height: 80px;
+                                    resize: vertical;
+                                " placeholder="Describe this sequence...">${currentSequence.description}</textarea>
+                            </div>
+
+                            <div style="margin-bottom: 20px;">
+                                <label style="color: #888; font-size: 12px; display: block; margin-bottom: 10px;">Status</label>
+                                <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                                    <input type="checkbox" ${currentSequence.active ? 'checked' : ''} onchange="CRMApp.toggleCurrentSequence(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                                    <span style="
+                                        position: absolute;
+                                        cursor: pointer;
+                                        top: 0;
+                                        left: 0;
+                                        right: 0;
+                                        bottom: 0;
+                                        background-color: ${currentSequence.active ? '#10b981' : '#374151'};
+                                        transition: .4s;
+                                        border-radius: 24px;
+                                    ">
+                                        <span style="
+                                            position: absolute;
+                                            content: '';
+                                            height: 18px;
+                                            width: 18px;
+                                            left: ${currentSequence.active ? '23px' : '3px'};
+                                            bottom: 3px;
+                                            background-color: white;
+                                            transition: .4s;
+                                            border-radius: 50%;
+                                        "></span>
+                                    </span>
+                                </label>
+                                <span style="color: #888; font-size: 12px; margin-left: 10px;">
+                                    ${currentSequence.active ? 'Active' : 'Inactive'}
+                                </span>
+                            </div>
+
+                            <div style="border-top: 1px solid #333; padding-top: 15px; margin-top: 20px;">
+                                <h4 style="color: #fff; font-size: 14px; margin: 0 0 10px 0;">Statistics</h4>
+                                <div style="color: #888; font-size: 12px; line-height: 1.5;">
+                                    <div>Steps: ${currentSequence.steps.length}</div>
+                                    <div>Contacts: ${currentSequence.contacts?.length || 0}</div>
+                                    <div>Open Rate: ${currentSequence.stats?.openRate || 0}%</div>
+                                    <div>Reply Rate: ${currentSequence.stats?.replyRate || 0}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            sequenceBuilderView.innerHTML = sequenceBuilderHTML;
+            console.log('Sequence builder initialized successfully');
+
+        } catch (error) {
+            console.error('Error initializing sequence builder:', error);
+            this.showNotification('Error loading sequence builder', 'error');
+        }
+    },
+
+    // Render sequence steps
+    renderSequenceSteps(steps = []) {
+        if (!steps || steps.length === 0) {
+            return `
+                <div style="text-align: center; padding: 40px 20px; color: #666;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">📧</div>
+                    <p>No steps added yet</p>
+                    <p style="font-size: 12px; margin-top: 5px;">Click "Add Step" to create your first automation step</p>
+                </div>
+            `;
+        }
+
+        return steps.map((step, index) => `
+            <div style="border: 1px solid #333; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <span style="
+                                background: #8b5cf6;
+                                border-radius: 50%;
+                                color: #fff;
+                                font-size: 12px;
+                                font-weight: 600;
+                                height: 24px;
+                                line-height: 24px;
+                                text-align: center;
+                                width: 24px;
+                                margin-right: 10px;
+                            ">${index + 1}</span>
+                            <h4 style="color: #fff; font-size: 16px; margin: 0;">${step.type || 'Email'}</h4>
+                        </div>
+                        <p style="color: #888; font-size: 14px; margin: 0 0 10px 0;">${step.subject || step.description || 'No description'}</p>
+                        <div style="color: #666; font-size: 12px;">
+                            ${step.timing || 'Immediate'} • ${step.priority || 'Medium'} priority
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <button onclick="CRMApp.editSequenceStep(${index})" style="
+                            background: transparent;
+                            border: 1px solid #333;
+                            border-radius: 4px;
+                            color: #888;
+                            cursor: pointer;
+                            font-size: 12px;
+                            padding: 5px 8px;
+                        ">Edit</button>
+                        <button onclick="CRMApp.deleteSequenceStep(${index})" style="
+                            background: transparent;
+                            border: 1px solid #ef4444;
+                            border-radius: 4px;
+                            color: #ef4444;
+                            cursor: pointer;
+                            font-size: 12px;
+                            padding: 5px 8px;
+                        ">Delete</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    // Add missing sequence builder functions
+    updateSequenceName(newName) {
+        if (this.currentSequence) {
+            this.currentSequence.name = newName;
+            console.log('Updated sequence name to:', newName);
+        }
+    },
+
+    updateSequenceDescription(newDescription) {
+        if (this.currentSequence) {
+            this.currentSequence.description = newDescription;
+            console.log('Updated sequence description to:', newDescription);
+        }
+    },
+
+    toggleCurrentSequence(isActive) {
+        if (this.currentSequence) {
+            this.currentSequence.active = isActive;
+            console.log('Toggled current sequence to:', isActive ? 'active' : 'inactive');
+        }
+    },
+
+    saveSequence() {
+        if (this.currentSequence) {
+            console.log('Saving sequence:', this.currentSequence);
+            // TODO: Implement Firebase save
+            this.showNotification('Sequence saved successfully!', 'success');
+        }
+    },
+
+    testSequence() {
+        if (this.currentSequence) {
+            console.log('Testing sequence:', this.currentSequence);
+            this.showNotification('Sequence test functionality coming soon!', 'info');
+        }
+    },
+
+    addSequenceStep() {
+        console.log('Adding sequence step...');
+        this.showStepSelectionModal();
+    },
+
+    // Show the step selection modal (Stage 1)
+    showStepSelectionModal() {
+        const modalHTML = `
+            <div id="step-selection-modal" class="modal-overlay" style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            ">
+                <div class="modal-content" style="
+                    background: #2a2a2a;
+                    border-radius: 12px;
+                    padding: 30px;
+                    width: 500px;
+                    max-width: 90vw;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                        <h2 style="color: #fff; font-size: 20px; margin: 0;">Add Step</h2>
+                        <button onclick="CRMApp.closeStepModal()" style="
+                            background: transparent;
+                            border: none;
+                            color: #888;
+                            cursor: pointer;
+                            font-size: 24px;
+                            width: 30px;
+                            height: 30px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        ">×</button>
+                    </div>
+
+                    <p style="color: #888; margin: 0 0 25px 0;">Choose the type of step you want to add to your sequence:</p>
+
+                    <div class="step-type-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div onclick="CRMApp.selectStepType('email')" style="
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            padding: 20px;
+                            text-align: center;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.borderColor='#8b5cf6'; this.style.backgroundColor='rgba(139, 92, 246, 0.1)'" 
+                           onmouseout="this.style.borderColor='#333'; this.style.backgroundColor='transparent'">
+                            <div style="color: #8b5cf6; font-size: 24px; margin-bottom: 10px;">📧</div>
+                            <h3 style="color: #fff; font-size: 16px; margin: 0 0 5px 0;">Automatic Email</h3>
+                            <p style="color: #888; font-size: 12px; margin: 0;">Send personalized emails</p>
+                        </div>
+
+                        <div onclick="CRMApp.selectStepType('call')" style="
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            padding: 20px;
+                            text-align: center;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.borderColor='#10b981'; this.style.backgroundColor='rgba(16, 185, 129, 0.1)'" 
+                           onmouseout="this.style.borderColor='#333'; this.style.backgroundColor='transparent'">
+                            <div style="color: #10b981; font-size: 24px; margin-bottom: 10px;">📞</div>
+                            <h3 style="color: #fff; font-size: 16px; margin: 0 0 5px 0;">Phone Call</h3>
+                            <p style="color: #888; font-size: 12px; margin: 0;">Schedule a call task</p>
+                        </div>
+
+                        <div onclick="CRMApp.selectStepType('linkedin')" style="
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            padding: 20px;
+                            text-align: center;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.borderColor='#0077b5'; this.style.backgroundColor='rgba(0, 119, 181, 0.1)'" 
+                           onmouseout="this.style.borderColor='#333'; this.style.backgroundColor='transparent'">
+                            <div style="color: #0077b5; font-size: 24px; margin-bottom: 10px;">💼</div>
+                            <h3 style="color: #fff; font-size: 16px; margin: 0 0 5px 0;">LinkedIn Message</h3>
+                            <p style="color: #888; font-size: 12px; margin: 0;">Send LinkedIn connection</p>
+                        </div>
+
+                        <div onclick="CRMApp.selectStepType('task')" style="
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            padding: 20px;
+                            text-align: center;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.borderColor='#f59e0b'; this.style.backgroundColor='rgba(245, 158, 11, 0.1)'" 
+                           onmouseout="this.style.borderColor='#333'; this.style.backgroundColor='transparent'">
+                            <div style="color: #f59e0b; font-size: 24px; margin-bottom: 10px;">✅</div>
+                            <h3 style="color: #fff; font-size: 16px; margin: 0 0 5px 0;">Manual Task</h3>
+                            <p style="color: #888; font-size: 12px; margin: 0;">Create a manual task</p>
+                        </div>
+
+                        <div onclick="CRMApp.selectStepType('sms')" style="
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            padding: 20px;
+                            text-align: center;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.borderColor='#06b6d4'; this.style.backgroundColor='rgba(6, 182, 212, 0.1)'" 
+                           onmouseout="this.style.borderColor='#333'; this.style.backgroundColor='transparent'">
+                            <div style="color: #06b6d4; font-size: 24px; margin-bottom: 10px;">💬</div>
+                            <h3 style="color: #fff; font-size: 16px; margin: 0 0 5px 0;">Text Message</h3>
+                            <p style="color: #888; font-size: 12px; margin: 0;">Send SMS message</p>
+                        </div>
+
+                        <div onclick="CRMApp.selectStepType('wait')" style="
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            padding: 20px;
+                            text-align: center;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.borderColor='#6b7280'; this.style.backgroundColor='rgba(107, 114, 128, 0.1)'" 
+                           onmouseout="this.style.borderColor='#333'; this.style.backgroundColor='transparent'">
+                            <div style="color: #6b7280; font-size: 24px; margin-bottom: 10px;">⏰</div>
+                            <h3 style="color: #fff; font-size: 16px; margin: 0 0 5px 0;">Wait/Delay</h3>
+                            <p style="color: #888; font-size: 12px; margin: 0;">Add a delay period</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    },
+
+    // Select step type and proceed to configuration (Stage 2)
+    selectStepType(stepType) {
+        console.log('Selected step type:', stepType);
+        this.currentStepType = stepType;
+        this.showStepConfigurationModal(stepType);
+    },
+
+    // Show the step configuration modal (Stage 2)
+    showStepConfigurationModal(stepType) {
+        // Remove the step selection modal
+        const selectionModal = document.getElementById('step-selection-modal');
+        if (selectionModal) {
+            selectionModal.remove();
+        }
+
+        // Determine if this is the first step
+        const isFirstStep = !this.currentSequence || this.currentSequence.steps.length === 0;
+        
+        // Get step type info
+        const stepTypeInfo = this.getStepTypeInfo(stepType);
+
+        const configModalHTML = `
+            <div id="step-config-modal" class="modal-overlay" style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            ">
+                <div class="modal-content" style="
+                    background: #2a2a2a;
+                    border-radius: 12px;
+                    padding: 30px;
+                    width: 600px;
+                    max-width: 90vw;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <button onclick="CRMApp.showStepSelectionModal(); CRMApp.closeStepModal('step-config-modal')" style="
+                                background: transparent;
+                                border: 1px solid #333;
+                                border-radius: 6px;
+                                color: #888;
+                                cursor: pointer;
+                                font-size: 14px;
+                                padding: 6px 10px;
+                            ">← Back</button>
+                            <div style="color: ${stepTypeInfo.color}; font-size: 20px;">${stepTypeInfo.icon}</div>
+                            <h2 style="color: #fff; font-size: 20px; margin: 0;">Configure ${stepTypeInfo.name}</h2>
+                        </div>
+                        <button onclick="CRMApp.closeStepModal()" style="
+                            background: transparent;
+                            border: none;
+                            color: #888;
+                            cursor: pointer;
+                            font-size: 24px;
+                            width: 30px;
+                            height: 30px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        ">×</button>
+                    </div>
+
+                    <form id="step-config-form" onsubmit="CRMApp.saveStepConfiguration(event)">
+                        <!-- Timing Configuration -->
+                        <div style="margin-bottom: 25px;">
+                            <label style="color: #fff; font-size: 16px; font-weight: 600; display: block; margin-bottom: 15px;">
+                                ⏰ When should this step execute?
+                            </label>
+                            
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 12px; border: 1px solid #333; border-radius: 8px; transition: all 0.2s ease;" 
+                                       onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#333'">
+                                    <input type="radio" name="timing" value="immediate" checked style="accent-color: #8b5cf6;">
+                                    <span style="color: #fff; font-size: 14px;">
+                                        ${isFirstStep ? 'Immediately after contact is added to sequence' : 'Immediately after previous step'}
+                                    </span>
+                                </label>
+                                
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 12px; border: 1px solid #333; border-radius: 8px; transition: all 0.2s ease;"
+                                       onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#333'">
+                                    <input type="radio" name="timing" value="delayed" style="accent-color: #8b5cf6;">
+                                    <span style="color: #fff; font-size: 14px;">Wait for a specific amount of time</span>
+                                </label>
+                            </div>
+
+                            <div id="delay-options" style="margin-top: 15px; padding: 15px; background: #1a1a1a; border-radius: 8px; display: none;">
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <span style="color: #888; font-size: 14px;">Wait</span>
+                                    <input type="number" id="delay-amount" min="1" value="1" style="
+                                        background: #2a2a2a;
+                                        border: 1px solid #333;
+                                        border-radius: 6px;
+                                        color: #fff;
+                                        font-size: 14px;
+                                        padding: 8px 12px;
+                                        width: 80px;
+                                    ">
+                                    <select id="delay-unit" style="
+                                        background: #2a2a2a;
+                                        border: 1px solid #333;
+                                        border-radius: 6px;
+                                        color: #fff;
+                                        font-size: 14px;
+                                        padding: 8px 12px;
+                                    ">
+                                        <option value="hours">hours</option>
+                                        <option value="days" selected>days</option>
+                                        <option value="weeks">weeks</option>
+                                    </select>
+                                    <span style="color: #888; font-size: 14px;">
+                                        ${isFirstStep ? 'after contact is added' : 'after previous step'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Priority Configuration -->
+                        <div style="margin-bottom: 25px;">
+                            <label style="color: #fff; font-size: 16px; font-weight: 600; display: block; margin-bottom: 15px;">
+                                🎯 Priority Level
+                            </label>
+                            
+                            <div style="display: flex; gap: 10px;">
+                                <label style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 12px; border: 1px solid #333; border-radius: 8px; transition: all 0.2s ease;"
+                                       onmouseover="this.style.borderColor='#ef4444'" onmouseout="this.style.borderColor='#333'">
+                                    <input type="radio" name="priority" value="high" style="accent-color: #ef4444;">
+                                    <span style="color: #ef4444; font-size: 14px; font-weight: 600;">🔥 High</span>
+                                </label>
+                                
+                                <label style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 12px; border: 1px solid #333; border-radius: 8px; transition: all 0.2s ease;"
+                                       onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='#333'">
+                                    <input type="radio" name="priority" value="medium" checked style="accent-color: #f59e0b;">
+                                    <span style="color: #f59e0b; font-size: 14px; font-weight: 600;">⚡ Medium</span>
+                                </label>
+                                
+                                <label style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 12px; border: 1px solid #333; border-radius: 8px; transition: all 0.2s ease;"
+                                       onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='#333'">
+                                    <input type="radio" name="priority" value="low" style="accent-color: #10b981;">
+                                    <span style="color: #10b981; font-size: 14px; font-weight: 600;">📝 Low</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Notes Configuration -->
+                        <div style="margin-bottom: 30px;">
+                            <label style="color: #fff; font-size: 16px; font-weight: 600; display: block; margin-bottom: 10px;">
+                                📝 Notes (Optional)
+                            </label>
+                            <textarea id="step-notes" placeholder="Add any notes or instructions for this step..." style="
+                                background: #1a1a1a;
+                                border: 1px solid #333;
+                                border-radius: 8px;
+                                color: #fff;
+                                font-size: 14px;
+                                padding: 12px;
+                                width: 100%;
+                                height: 80px;
+                                resize: vertical;
+                                font-family: inherit;
+                            " maxlength="500"></textarea>
+                            <div style="color: #666; font-size: 12px; margin-top: 5px; text-align: right;">
+                                <span id="notes-counter">0</span>/500 characters
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                            <button type="button" onclick="CRMApp.closeStepModal()" style="
+                                background: transparent;
+                                border: 1px solid #333;
+                                border-radius: 8px;
+                                color: #888;
+                                cursor: pointer;
+                                font-size: 14px;
+                                padding: 12px 20px;
+                                transition: all 0.2s ease;
+                            " onmouseover="this.style.borderColor='#666'; this.style.color='#fff'" 
+                               onmouseout="this.style.borderColor='#333'; this.style.color='#888'">
+                                Cancel
+                            </button>
+                            <button type="submit" style="
+                                background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                                border: none;
+                                border-radius: 8px;
+                                color: #fff;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                padding: 12px 20px;
+                                transition: all 0.2s ease;
+                            " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(139, 92, 246, 0.3)'" 
+                               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                                Add Step
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', configModalHTML);
+
+        // Add event listeners for timing options
+        this.setupStepConfigurationListeners();
+    },
+
+    // Get step type information
+    getStepTypeInfo(stepType) {
+        const stepTypes = {
+            email: { name: 'Automatic Email', icon: '📧', color: '#8b5cf6' },
+            call: { name: 'Phone Call', icon: '📞', color: '#10b981' },
+            linkedin: { name: 'LinkedIn Message', icon: '💼', color: '#0077b5' },
+            task: { name: 'Manual Task', icon: '✅', color: '#f59e0b' },
+            sms: { name: 'Text Message', icon: '💬', color: '#06b6d4' },
+            wait: { name: 'Wait/Delay', icon: '⏰', color: '#6b7280' }
+        };
+        return stepTypes[stepType] || { name: 'Unknown', icon: '❓', color: '#666' };
+    },
+
+    // Setup event listeners for step configuration
+    setupStepConfigurationListeners() {
+        // Handle timing radio button changes
+        const timingRadios = document.querySelectorAll('input[name="timing"]');
+        const delayOptions = document.getElementById('delay-options');
+        
+        timingRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'delayed') {
+                    delayOptions.style.display = 'block';
+                } else {
+                    delayOptions.style.display = 'none';
+                }
+            });
+        });
+
+        // Handle notes character counter
+        const notesTextarea = document.getElementById('step-notes');
+        const notesCounter = document.getElementById('notes-counter');
+        
+        if (notesTextarea && notesCounter) {
+            notesTextarea.addEventListener('input', function() {
+                notesCounter.textContent = this.value.length;
+            });
+        }
+    },
+
+    // Close step modal
+    closeStepModal(modalId = null) {
+        if (modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.remove();
+        } else {
+            // Close any step-related modals
+            const selectionModal = document.getElementById('step-selection-modal');
+            const configModal = document.getElementById('step-config-modal');
+            if (selectionModal) selectionModal.remove();
+            if (configModal) configModal.remove();
+        }
+    },
+
+    // Save step configuration and add to sequence
+    saveStepConfiguration(event) {
+        event.preventDefault();
+        
+        const form = document.getElementById('step-config-form');
+        const formData = new FormData(form);
+        
+        // Get form values
+        const timing = formData.get('timing');
+        const priority = formData.get('priority');
+        const notes = document.getElementById('step-notes').value;
+        
+        // Build timing description
+        let timingDescription = 'Immediate';
+        if (timing === 'delayed') {
+            const delayAmount = document.getElementById('delay-amount').value;
+            const delayUnit = document.getElementById('delay-unit').value;
+            timingDescription = `Wait ${delayAmount} ${delayUnit}`;
+        }
+        
+        // Get step type info
+        const stepTypeInfo = this.getStepTypeInfo(this.currentStepType);
+        
+        // Create the step object
+        const newStep = {
+            id: 'step_' + Date.now(),
+            type: this.currentStepType,
+            name: stepTypeInfo.name,
+            timing: timingDescription,
+            priority: priority,
+            notes: notes,
+            createdAt: new Date().toISOString(),
+            // Add step-specific properties
+            ...(this.currentStepType === 'email' && {
+                subject: 'New Email Subject',
+                template: 'Click to edit email template'
+            }),
+            ...(this.currentStepType === 'call' && {
+                duration: 15,
+                callType: 'outbound'
+            }),
+            ...(this.currentStepType === 'linkedin' && {
+                messageType: 'connection',
+                template: 'Hi {{firstName}}, I\'d like to connect!'
+            }),
+            ...(this.currentStepType === 'task' && {
+                taskType: 'manual',
+                description: 'Complete this task manually'
+            }),
+            ...(this.currentStepType === 'sms' && {
+                template: 'Hi {{firstName}}, this is a text message.'
+            }),
+            ...(this.currentStepType === 'wait' && {
+                waitDuration: timing === 'delayed' ? `${document.getElementById('delay-amount').value} ${document.getElementById('delay-unit').value}` : '0'
+            })
+        };
+        
+        // Add step to current sequence
+        if (!this.currentSequence.steps) {
+            this.currentSequence.steps = [];
+        }
+        this.currentSequence.steps.push(newStep);
+        
+        console.log('Step added to sequence:', newStep);
+        console.log('Updated sequence:', this.currentSequence);
+        
+        // Close modal
+        this.closeStepModal();
+        
+        // Refresh the sequence builder view
+        this.initializeSequenceBuilder(this.currentSequence.name, this.currentSequence.id);
+        
+        // Show success notification
+        this.showNotification(`${stepTypeInfo.name} step added successfully!`, 'success');
+        
+        // Special handling for email steps - show email builder modal
+        if (this.currentStepType === 'email') {
+            setTimeout(() => {
+                this.showEmailBuilderModal(newStep);
+            }, 500);
+        }
+    },
+
+    // Show email builder modal for email steps
+    showEmailBuilderModal(emailStep) {
+        console.log('Opening email builder for step:', emailStep);
+        this.showNotification('Email builder modal coming soon! This will be Apollo.io-style with rich text editor.', 'info');
+        // TODO: Implement Apollo-style email builder modal
+    },
+
+    editSequenceStep(stepIndex) {
+        console.log('Editing sequence step:', stepIndex);
+        this.showNotification('Edit step functionality coming soon!', 'info');
+    },
+
+    deleteSequenceStep(stepIndex) {
+        if (this.currentSequence && this.currentSequence.steps) {
+            this.currentSequence.steps.splice(stepIndex, 1);
+            this.initializeSequenceBuilder(); // Refresh the view
+            this.showNotification('Step deleted successfully!', 'success');
+        }
+    },
+
+    // Toggle sequence active/inactive status
+    toggleSequence(sequenceId, isActive) {
+        console.log('Toggling sequence:', sequenceId, 'to', isActive ? 'active' : 'inactive');
+        const sequence = this.sequences.find(s => s.id === sequenceId);
+        if (sequence) {
+            sequence.active = isActive;
+            // TODO: Update in Firebase
+            this.showNotification(`Sequence ${isActive ? 'activated' : 'deactivated'}`, 'success');
+        }
     },
 
     // Initialize simple accounts UI with basic functionality
@@ -4556,7 +5927,17 @@ const CRMApp = {
                         </span>
                     </label>
                 </td>
-                <td style="padding: 16px; color: #fff; font-weight: 500;">${sequence.name}</td>
+                <td style="padding: 16px;">
+                    <span onclick="CRMApp.openSequenceBuilder(${JSON.stringify(sequence).replace(/"/g, '&quot;')})" style="
+                        color: #fff;
+                        font-weight: 500;
+                        cursor: pointer;
+                        text-decoration: none;
+                        transition: color 0.2s ease;
+                    " onmouseover="this.style.color='#4a90e2'" onmouseout="this.style.color='#fff'">
+                        ${sequence.name}
+                    </span>
+                </td>
                 <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.sequenceBy}</td>
                 <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.activeCount}</td>
                 <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.value}</td>
@@ -4958,6 +6339,67 @@ const CRMApp = {
             <div id="sequence-contacts-content" class="sequence-tab-content" style="display: none;">
                 ${this.renderSequenceContacts(sequence)}
             </div>
+        `;
+
+        sequenceBuilderView.innerHTML = sequenceBuilderHTML;
+
+        // Apply layout styles
+        const layoutStyles = `
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100vh - 120px) !important;
+            background: #1a1a1a !important;
+            color: #fff !important;
+            margin-top: 32px !important;
+            padding: 20px !important;
+            border-radius: 20px !important;
+            overflow: auto !important;
+        `;
+        sequenceBuilderView.style.cssText = layoutStyles;
+
+        // Show the sequence builder view
+        console.log('About to show sequence builder view');
+        console.log('Sequence builder view element:', sequenceBuilderView);
+        console.log('Sequence builder view HTML length:', sequenceBuilderView.innerHTML.length);
+        this.showView('sequence-builder-view');
+        console.log('Sequence builder view should now be visible');
+        
+        // Verify the view is actually visible
+        setTimeout(() => {
+            const view = document.getElementById('sequence-builder-view');
+            console.log('Final sequence builder view state:', {
+                display: view?.style.display,
+                visibility: view?.style.visibility,
+                position: view?.style.position
+            });
+        }, 50);
+    },
+
+    renderSequenceSteps(sequence) {
+        const steps = sequence?.steps || [];
+        
+        if (steps.length === 0) {
+            return `
+                <div class="sequence-overview" style="
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 60px 40px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    text-align: center;
+                    position: relative;
+                    overflow: hidden;
+                ">
+                    <!-- Power Choosers Lightning Icon -->
+                    <div style="
+                        width: 80px;
+                        height: 80px;
+                        background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin: 0 auto 24px auto;
                         box-shadow: 0 4px 16px rgba(74, 144, 226, 0.3);
                     ">
                         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
@@ -5006,10 +6448,27 @@ const CRMApp = {
                         Add a step
                     </button>
                 </div>
+            `;
+        }
+        
+        // Render existing steps (for future implementation)
+        return `
+            <div class="sequence-steps">
+                ${steps.map((step, index) => `
+                    <div class="sequence-step" style="margin-bottom: 16px; padding: 16px; background: #2a2a2a; border-radius: 8px;">
+                        <h4>Step ${index + 1}: ${step.type}</h4>
+                        <p>${step.content}</p>
+                    </div>
+                `).join('')}
             </div>
+        `;
+    },
 
-            <!-- Contacts Tab Content -->
-            <div id="sequence-contacts-content" class="sequence-tab-content" style="display: none;">
+    renderSequenceContacts(sequence) {
+        const contacts = sequence?.contacts || [];
+        
+        if (contacts.length === 0) {
+            return `
                 <div class="sequence-contacts" style="
                     background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
                     padding: 20px;
@@ -5027,7 +6486,7 @@ const CRMApp = {
                         </svg>
                         <h4 style="color: #fff; font-size: 20px; margin-bottom: 12px;">No contacts in this sequence yet</h4>
                         <p style="color: #888; margin-bottom: 24px;">Add contacts to start your sequence outreach.</p>
-                        <button onclick="CRMApp.openAddContactsModal()" style="
+                        <button onclick="CRMApp.addContactsToSequence()" style="
                             background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
                             border: 1px solid #4a90e2;
                             color: #fff;
@@ -5043,41 +6502,2103 @@ const CRMApp = {
                         </button>
                     </div>
                 </div>
+            `;
+        }
+        
+        // Render existing contacts (for future implementation)
+        return `
+            <div class="sequence-contacts-list">
+                ${contacts.map(contact => `
+                    <div class="contact-item" style="padding: 12px; background: #2a2a2a; border-radius: 8px; margin-bottom: 8px;">
+                        <strong>${contact.firstName} ${contact.lastName}</strong>
+                        <span style="color: #888;"> - ${contact.email}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    },
+
+    addSequenceStep() {
+        console.log('Opening add sequence step modal...');
+        this.showAddStepModal();
+    },
+
+    showAddStepModal() {
+        // Create modal backdrop
+        const modalBackdrop = document.createElement('div');
+        modalBackdrop.id = 'add-step-modal-backdrop';
+        modalBackdrop.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(4px);
+        `;
+
+        // Create modal content
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+            border-radius: 16px;
+            border: 1px solid #333;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        `;
+
+        modalContent.innerHTML = `
+            <div style="
+                padding: 24px;
+                border-bottom: 1px solid #333;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <h2 style="
+                    color: #fff;
+                    font-size: 24px;
+                    font-weight: 600;
+                    margin: 0;
+                ">Select a sequence step</h2>
+                <button onclick="CRMApp.closeAddStepModal()" style="
+                    background: transparent;
+                    border: none;
+                    color: #888;
+                    font-size: 24px;
+                    cursor: pointer;
+                    padding: 8px;
+                    border-radius: 6px;
+                    transition: all 0.2s ease;
+                    width: 40px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                " onmouseover="this.style.color='#fff'; this.style.background='rgba(255,255,255,0.1)'" 
+                   onmouseout="this.style.color='#888'; this.style.background='transparent'">×</button>
+            </div>
+
+            <div style="padding: 24px;">
+                <p style="
+                    color: #ccc;
+                    margin: 0 0 24px 0;
+                    font-size: 16px;
+                ">Add a step for the sequence to follow and automate for you.</p>
+
+                <!-- Automatic Section -->
+                <div style="margin-bottom: 32px;">
+                    <h3 style="
+                        color: #fff;
+                        font-size: 18px;
+                        font-weight: 600;
+                        margin: 0 0 16px 0;
+                    ">Automatic</h3>
+
+                    <div onclick="CRMApp.selectStepType('automatic-email')" style="
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid #333;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 16px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='#4a90e2'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='#333'">
+                        <div style="
+                            width: 40px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        ">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                <polyline points="22,6 12,13 2,6"></polyline>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0;">Automatic email</h4>
+                                <span style="
+                                    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                                    color: #fff;
+                                    padding: 2px 8px;
+                                    border-radius: 12px;
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                ">AI available!</span>
+                            </div>
+                            <p style="color: #888; margin: 0; font-size: 14px; line-height: 1.4;">
+                                Sends automatically to the prospect based on the schedule—no action needed.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tasks Section -->
+                <div style="margin-bottom: 32px;">
+                    <h3 style="
+                        color: #fff;
+                        font-size: 18px;
+                        font-weight: 600;
+                        margin: 0 0 16px 0;
+                    ">Tasks</h3>
+
+                    <div onclick="CRMApp.selectStepType('manual-email')" style="
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid #333;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 16px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='#4a90e2'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='#333'">
+                        <div style="
+                            width: 40px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        ">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                <polyline points="22,6 12,13 2,6"></polyline>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0;">Manual email</h4>
+                                <span style="
+                                    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                                    color: #fff;
+                                    padding: 2px 8px;
+                                    border-radius: 12px;
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                ">AI available!</span>
+                            </div>
+                            <p style="color: #888; margin: 0; font-size: 14px; line-height: 1.4;">
+                                Creates a draft for your review—you'll send it when ready.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div onclick="CRMApp.selectStepType('phone-call')" style="
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid #333;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 16px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='#28a745'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='#333'">
+                        <div style="
+                            width: 40px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        ">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">Phone call</h4>
+                            <p style="color: #888; margin: 0; font-size: 14px; line-height: 1.4;">
+                                Task is created to call prospect.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div onclick="CRMApp.selectStepType('action-item')" style="
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid #333;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 16px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='#ffc107'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='#333'">
+                        <div style="
+                            width: 40px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        ">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                                <path d="M9 11l3 3l8-8"></path>
+                                <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9s4.03-9 9-9c1.51 0 2.93.37 4.18 1.03"></path>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">Action item</h4>
+                            <p style="color: #888; margin: 0; font-size: 14px; line-height: 1.4;">
+                                Task is created to perform custom action.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LinkedIn Tasks Section -->
+                <div>
+                    <h3 style="
+                        color: #fff;
+                        font-size: 18px;
+                        font-weight: 600;
+                        margin: 0 0 16px 0;
+                    ">LinkedIn tasks</h3>
+
+                    <div onclick="CRMApp.selectStepType('linkedin-connection')" style="
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid #333;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 16px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='#0077b5'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='#333'">
+                        <div style="
+                            width: 40px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #0077b5 0%, #005885 100%);
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        ">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                                <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                                <rect x="2" y="9" width="4" height="12"></rect>
+                                <circle cx="4" cy="4" r="2"></circle>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">LinkedIn - Send connection request</h4>
+                            <p style="color: #888; margin: 0; font-size: 14px; line-height: 1.4;">
+                                Send personalized invitations to connect with contacts for a positive first impression.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div onclick="CRMApp.selectStepType('linkedin-message')" style="
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid #333;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 16px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='#0077b5'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='#333'">
+                        <div style="
+                            width: 40px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #0077b5 0%, #005885 100%);
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        ">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">LinkedIn - Send message</h4>
+                            <p style="color: #888; margin: 0; font-size: 14px; line-height: 1.4;">
+                                Send personalized direct messages to contacts you're connected with to build relationships.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div onclick="CRMApp.selectStepType('linkedin-view-profile')" style="
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid #333;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 16px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='#0077b5'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='#333'">
+                        <div style="
+                            width: 40px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #0077b5 0%, #005885 100%);
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        ">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">LinkedIn - View profile</h4>
+                            <p style="color: #888; margin: 0; font-size: 14px; line-height: 1.4;">
+                                View a contact's LinkedIn profile to gather key information for more effective engagement.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div onclick="CRMApp.selectStepType('linkedin-interact-post')" style="
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid #333;
+                        border-radius: 12px;
+                        padding: 16px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 16px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='#0077b5'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='#333'">
+                        <div style="
+                            width: 40px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #0077b5 0%, #005885 100%);
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        ">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                                <path d="M7 10v12"></path>
+                                <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"></path>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">LinkedIn - Interact with post</h4>
+                            <p style="color: #888; margin: 0; font-size: 14px; line-height: 1.4;">
+                                View a contact's activities and interact with their recent posts to foster engagement and boost visibility.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
 
-        sequenceBuilderView.innerHTML = sequenceBuilderHTML;
+        modalBackdrop.appendChild(modalContent);
+        document.body.appendChild(modalBackdrop);
 
-        // Apply layout styles
-        const layoutStyles = `
-            display: flex !important;
-            flex-direction: column !important;
-            height: calc(100vh - 120px) !important;
-            background: #1a1a1a !important;
-            color: #fff !important;
-            margin-top: 32px !important;
-            padding: 20px !important;
-            border-radius: 20px !important;
-            overflow: auto !important;
-        `;
-        sequenceBuilderView.style.cssText = layoutStyles;
+        // Close modal when clicking backdrop
+        modalBackdrop.addEventListener('click', (e) => {
+            if (e.target === modalBackdrop) {
+                this.closeAddStepModal();
+            }
+        });
+    },
 
-        // Show the sequence builder view
-        console.log('About to show sequence builder view');
-        console.log('Sequence builder view element:', sequenceBuilderView);
-        console.log('Sequence builder view HTML length:', sequenceBuilderView.innerHTML.length);
-        this.showView('sequence-builder-view');
-        console.log('Sequence builder view should now be visible');
+    closeAddStepModal() {
+        const modal = document.getElementById('add-step-modal-backdrop');
+        if (modal) {
+            modal.remove();
+        }
+    },
+
+    selectStepType(stepType) {
+        console.log('Selected step type:', stepType);
         
-        // Verify the view is actually visible
-        setTimeout(() => {
-            const view = document.getElementById('sequence-builder-view');
-            console.log('Final sequence builder view state:', {
-                display: view?.style.display,
-                visibility: view?.style.visibility,
-                position: view?.style.position
-            });
-        }, 50);
+        // Special handling for automatic email - skip config and go straight to email builder
+        if (stepType === 'automatic-email') {
+            // Close step selection modal
+            this.closeAddStepModal();
+            
+            // Add step to sequence with default settings
+            const step = {
+                id: Date.now(),
+                type: stepType,
+                timing: 'immediate',
+                delay: null,
+                priority: 'medium',
+                note: '',
+                createdAt: new Date().toISOString(),
+                emailContent: {
+                    subject: '',
+                    body: '',
+                    isHtml: false
+                }
+            };
+            
+            // TODO: Add to sequence steps list (for now just log)
+            console.log('Added automatic email step:', step);
+            
+            // Open email builder
+            this.showEmailBuilder(step);
+        } else {
+            // Show step configuration modal for other step types
+            this.showStepConfigModal(stepType);
+        }
+    },
+
+    showStepConfigModal(stepType) {
+        // Close the step selection modal first
+        this.closeAddStepModal();
+        
+        // Get step details for display
+        const stepDetails = this.getStepTypeDetails(stepType);
+        
+        // Determine if this is the first step (for timing options)
+        const isFirstStep = this.getCurrentSequenceSteps().length === 0;
+        
+        // Create modal backdrop
+        const modalBackdrop = document.createElement('div');
+        modalBackdrop.id = 'step-config-modal-backdrop';
+        modalBackdrop.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(4px);
+        `;
+
+        // Create modal content
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+            border-radius: 16px;
+            border: 1px solid #333;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        `;
+
+        modalContent.innerHTML = `
+            <!-- Header -->
+            <div style="
+                padding: 24px 24px 16px 24px;
+                border-bottom: 1px solid #333;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            ">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="
+                        width: 40px;
+                        height: 40px;
+                        background: ${stepDetails.gradient};
+                        border-radius: 8px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        flex-shrink: 0;
+                    ">
+                        ${stepDetails.icon}
+                    </div>
+                    <div>
+                        <h2 style="color: #fff; font-size: 20px; font-weight: 600; margin: 0;">${stepDetails.title}</h2>
+                        <p style="color: #888; margin: 4px 0 0 0; font-size: 14px;">${stepDetails.description}</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button onclick="CRMApp.changeStepType()" style="
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                        padding: 8px 12px;
+                        transition: all 0.2s ease;
+                        white-space: nowrap;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.1)'">Change step</button>
+                    <button onclick="CRMApp.closeStepConfigModal()" style="
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 18px;
+                        width: 40px;
+                        height: 40px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 8px;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.1)'">×</button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 24px;">
+                <!-- When to start this step -->
+                <div style="margin-bottom: 32px;">
+                    <h3 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 16px 0;">When to start this step</h3>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <label style="
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            padding: 16px;
+                            background: rgba(255, 255, 255, 0.05);
+                            border: 2px solid #4a90e2;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='rgba(255,255,255,0.08)'" 
+                           onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                            <input type="radio" name="timing" value="immediate" checked style="
+                                accent-color: #4a90e2;
+                                transform: scale(1.2);
+                            ">
+                            <span style="color: #fff; font-size: 14px; font-weight: 500;">
+                                ${isFirstStep ? 'Immediately after the contact is added to sequence' : 'Immediately after the previous step'}
+                            </span>
+                        </label>
+                        
+                        <label style="
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            padding: 16px;
+                            background: rgba(255, 255, 255, 0.05);
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='rgba(255,255,255,0.08)'" 
+                           onmouseout="this.style.background='rgba(255,255,255,0.05)'"
+                           onclick="this.querySelector('input').checked = true; CRMApp.toggleDelayInput(true)">
+                            <input type="radio" name="timing" value="delayed" style="
+                                accent-color: #4a90e2;
+                                transform: scale(1.2);
+                            ">
+                            <div style="flex: 1;">
+                                <div style="color: #fff; font-size: 14px; font-weight: 500; margin-bottom: 8px;">
+                                    ${isFirstStep ? 'Wait before starting the sequence' : 'Wait after the previous step'}
+                                </div>
+                                <div id="delay-input-container" style="display: none; margin-top: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="number" id="delay-amount" min="1" value="30" style="
+                                            background: #1a1a1a;
+                                            border: 1px solid #444;
+                                            border-radius: 4px;
+                                            color: #fff;
+                                            padding: 8px 12px;
+                                            width: 80px;
+                                            font-size: 14px;
+                                        ">
+                                        <select id="delay-unit" style="
+                                            background: #1a1a1a;
+                                            border: 1px solid #444;
+                                            border-radius: 4px;
+                                            color: #fff;
+                                            padding: 8px 12px;
+                                            font-size: 14px;
+                                        ">
+                                            <option value="minutes">minutes</option>
+                                            <option value="hours">hours</option>
+                                            <option value="days">days</option>
+                                            <option value="weeks">weeks</option>
+                                        </select>
+                                        <span style="color: #888; font-size: 14px;">after ${isFirstStep ? 'contact is added' : 'previous step'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Priority -->
+                <div style="margin-bottom: 32px;">
+                    <h3 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 16px 0;">Assign task priority</h3>
+                    
+                    <div style="display: flex; gap: 12px;">
+                        <label style="
+                            flex: 1;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 12px;
+                            background: rgba(255, 255, 255, 0.05);
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        " onclick="CRMApp.selectPriority(this, 'high')">
+                            <input type="radio" name="priority" value="high" style="display: none;">
+                            <span style="color: #fff; font-size: 14px; font-weight: 500;">High priority</span>
+                        </label>
+                        
+                        <label style="
+                            flex: 1;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 12px;
+                            background: rgba(255, 255, 255, 0.05);
+                            border: 2px solid #4a90e2;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        " onclick="CRMApp.selectPriority(this, 'medium')">
+                            <input type="radio" name="priority" value="medium" checked style="display: none;">
+                            <span style="color: #fff; font-size: 14px; font-weight: 500;">Medium priority</span>
+                        </label>
+                        
+                        <label style="
+                            flex: 1;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 12px;
+                            background: rgba(255, 255, 255, 0.05);
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        " onclick="CRMApp.selectPriority(this, 'low')">
+                            <input type="radio" name="priority" value="low" style="display: none;">
+                            <span style="color: #fff; font-size: 14px; font-weight: 500;">Low priority</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Add note -->
+                <div style="margin-bottom: 32px;">
+                    <h3 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">Add note</h3>
+                    <p style="color: #888; font-size: 14px; margin: 0 0 16px 0;">Add a description, purpose or goal for the task</p>
+                    
+                    <textarea id="step-note" placeholder="Add a description, purpose or goal for the task" style="
+                        width: 100%;
+                        min-height: 120px;
+                        background: #1a1a1a;
+                        border: 1px solid #444;
+                        border-radius: 8px;
+                        color: #fff;
+                        padding: 16px;
+                        font-size: 14px;
+                        font-family: inherit;
+                        resize: vertical;
+                        box-sizing: border-box;
+                    " oninput="CRMApp.updateNoteCounter(this)"></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                        <span id="note-counter" style="color: #888; font-size: 12px;">0 / 500 characters</span>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button onclick="CRMApp.closeStepConfigModal()" style="
+                        background: transparent;
+                        border: 1px solid #444;
+                        border-radius: 8px;
+                        color: #888;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                        padding: 12px 24px;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.borderColor='#666'; this.style.color='#fff'" 
+                       onmouseout="this.style.borderColor='#444'; this.style.color='#888'">Cancel</button>
+                    
+                    <button onclick="CRMApp.saveSequenceStep('${stepType}')" style="
+                        background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                        border: none;
+                        border-radius: 8px;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                        padding: 12px 24px;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(74, 144, 226, 0.3)'" 
+                       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">Add Step</button>
+                </div>
+            </div>
+        `;
+
+        modalBackdrop.appendChild(modalContent);
+        document.body.appendChild(modalBackdrop);
+
+        // Close modal when clicking backdrop
+        modalBackdrop.addEventListener('click', (e) => {
+            if (e.target === modalBackdrop) {
+                this.closeStepConfigModal();
+            }
+        });
+    },
+
+    closeStepConfigModal() {
+        const modal = document.getElementById('step-config-modal-backdrop');
+        if (modal) {
+            modal.remove();
+        }
+    },
+
+    changeStepType() {
+        // Close the current step configuration modal
+        this.closeStepConfigModal();
+        
+        // Reopen the step selection modal
+        this.showAddStepModal();
+    },
+
+    getStepTypeDetails(stepType) {
+        const stepTypes = {
+            'automatic-email': {
+                title: 'Automatic email',
+                description: 'Sends automatically to the prospect based on the schedule—no action needed.',
+                gradient: 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)',
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>'
+            },
+            'manual-email': {
+                title: 'Manual email',
+                description: 'Creates a draft for your review—you\'ll send it when ready.',
+                gradient: 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)',
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>'
+            },
+            'phone-call': {
+                title: 'Phone call',
+                description: 'Task is created to call prospect.',
+                gradient: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>'
+            },
+            'action-item': {
+                title: 'Action item',
+                description: 'Task is created to perform custom action.',
+                gradient: 'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)',
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;"><path d="M9 11l3 3l8-8"></path><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9s4.03-9 9-9c1.51 0 2.93.37 4.18 1.03"></path></svg>'
+            },
+            'linkedin-connection': {
+                title: 'LinkedIn - Send connection request',
+                description: 'Send personalized invitations to connect with contacts for a positive first impression.',
+                gradient: 'linear-gradient(135deg, #0077b5 0%, #005885 100%)',
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>'
+            },
+            'linkedin-message': {
+                title: 'LinkedIn - Send message',
+                description: 'Send personalized direct messages to contacts you\'re connected with to build relationships.',
+                gradient: 'linear-gradient(135deg, #0077b5 0%, #005885 100%)',
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>'
+            },
+            'linkedin-view-profile': {
+                title: 'LinkedIn - View profile',
+                description: 'View a contact\'s LinkedIn profile to gather key information for more effective engagement.',
+                gradient: 'linear-gradient(135deg, #0077b5 0%, #005885 100%)',
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>'
+            },
+            'linkedin-interact-post': {
+                title: 'LinkedIn - Interact with post',
+                description: 'View a contact\'s activities and interact with their recent posts to foster engagement and boost visibility.',
+                gradient: 'linear-gradient(135deg, #0077b5 0%, #005885 100%)',
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;"><path d="M7 10v12"></path><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"></path></svg>'
+            }
+        };
+        
+        return stepTypes[stepType] || stepTypes['action-item'];
+    },
+
+    getCurrentSequenceSteps() {
+        // For now, return empty array - in a real app this would fetch from the current sequence
+        return [];
+    },
+
+    toggleDelayInput(show) {
+        const container = document.getElementById('delay-input-container');
+        if (container) {
+            container.style.display = show ? 'block' : 'none';
+        }
+    },
+
+    selectPriority(element, priority) {
+        // Remove selection from all priority options
+        const priorityLabels = element.parentNode.querySelectorAll('label');
+        priorityLabels.forEach(label => {
+            label.style.borderColor = '#333';
+            label.style.background = 'rgba(255, 255, 255, 0.05)';
+        });
+        
+        // Select the clicked option
+        element.style.borderColor = '#4a90e2';
+        element.style.background = 'rgba(74, 144, 226, 0.1)';
+        
+        // Update the hidden input
+        const input = element.querySelector('input[type="radio"]');
+        if (input) {
+            input.checked = true;
+        }
+    },
+
+    updateNoteCounter(textarea) {
+        const counter = document.getElementById('note-counter');
+        const maxLength = 500;
+        const currentLength = textarea.value.length;
+        
+        if (counter) {
+            counter.textContent = `${currentLength} / ${maxLength} characters`;
+            
+            // Change color if approaching limit
+            if (currentLength > maxLength * 0.9) {
+                counter.style.color = '#ffc107';
+            } else if (currentLength > maxLength * 0.8) {
+                counter.style.color = '#888';
+            } else {
+                counter.style.color = '#888';
+            }
+        }
+        
+        // Prevent exceeding max length
+        if (currentLength > maxLength) {
+            textarea.value = textarea.value.substring(0, maxLength);
+            if (counter) {
+                counter.textContent = `${maxLength} / ${maxLength} characters`;
+                counter.style.color = '#dc3545';
+            }
+        }
+    },
+
+    saveSequenceStep(stepType) {
+        // Get form values
+        const timingRadios = document.querySelectorAll('input[name="timing"]');
+        let timing = 'immediate';
+        timingRadios.forEach(radio => {
+            if (radio.checked) timing = radio.value;
+        });
+        
+        const priorityRadios = document.querySelectorAll('input[name="priority"]');
+        let priority = 'medium';
+        priorityRadios.forEach(radio => {
+            if (radio.checked) priority = radio.value;
+        });
+        
+        const delayAmount = document.getElementById('delay-amount')?.value || '30';
+        const delayUnit = document.getElementById('delay-unit')?.value || 'minutes';
+        const note = document.getElementById('step-note')?.value || '';
+        
+        // Create step object
+        const step = {
+            id: Date.now(), // Simple ID generation
+            type: stepType,
+            timing: timing,
+            delay: timing === 'delayed' ? { amount: parseInt(delayAmount), unit: delayUnit } : null,
+            priority: priority,
+            note: note,
+            createdAt: new Date().toISOString()
+        };
+        
+        console.log('Saving sequence step:', step);
+        
+        // Close modal
+        this.closeStepConfigModal();
+        
+        // Show success message
+        this.showToast(`Added ${this.getStepTypeDetails(stepType).title} step to sequence`, 'success');
+        
+        // TODO: In a real app, this would save to the backend and update the sequence view
+        // For now, we'll just show the success message
+    },
+
+    showEmailBuilder(step) {
+        // Create modal backdrop
+        const modalBackdrop = document.createElement('div');
+        modalBackdrop.id = 'email-builder-modal-backdrop';
+        modalBackdrop.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(4px);
+        `;
+
+        // Create modal content
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+            border-radius: 16px;
+            border: 1px solid #333;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            width: 95%;
+            max-width: 1400px;
+            height: 90vh;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        `;
+
+        modalContent.innerHTML = `
+            <!-- Header -->
+            <div style="
+                padding: 20px 24px;
+                border-bottom: 1px solid #333;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-shrink: 0;
+            ">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="
+                        width: 40px;
+                        height: 40px;
+                        background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                        border-radius: 8px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        flex-shrink: 0;
+                    ">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 style="color: #fff; font-size: 20px; font-weight: 600; margin: 0;">Email Builder - Automatic Email</h2>
+                        <p style="color: #888; margin: 4px 0 0 0; font-size: 14px;">Create your email template with dynamic variables</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; color: #fff; font-size: 14px;">
+                        <input type="checkbox" id="html-toggle" style="accent-color: #4a90e2; transform: scale(1.2);" onchange="CRMApp.toggleHtmlMode(this.checked)">
+                        HTML Mode
+                    </label>
+                    <button onclick="CRMApp.saveEmailTemplate()" style="
+                        background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                        border: none;
+                        border-radius: 8px;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                        padding: 10px 20px;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.transform='translateY(-1px)'" 
+                       onmouseout="this.style.transform='translateY(0)'">Save Template</button>
+                    <button onclick="CRMApp.closeEmailBuilder()" style="
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 18px;
+                        width: 40px;
+                        height: 40px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.1)'">×</button>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div style="flex: 1; display: flex; overflow: hidden;">
+                <!-- Left Panel - Editor -->
+                <div style="
+                    width: 50%;
+                    border-right: 1px solid #333;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                ">
+                    <!-- Subject Line -->
+                    <div style="padding: 20px; border-bottom: 1px solid #333;">
+                        <label style="color: #fff; font-size: 14px; font-weight: 500; margin-bottom: 8px; display: block;">Subject Line</label>
+                        <input type="text" id="email-subject" placeholder="Enter email subject..." style="
+                            width: 100%;
+                            background: #1a1a1a;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            color: #fff;
+                            padding: 12px 16px;
+                            font-size: 14px;
+                            box-sizing: border-box;
+                        " oninput="CRMApp.updateEmailPreview()">
+                    </div>
+
+                    <!-- Toolbar -->
+                    <div style="
+                        padding: 12px 20px;
+                        border-bottom: 1px solid #333;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        flex-wrap: wrap;
+                        background: rgba(255, 255, 255, 0.02);
+                    ">
+                        <!-- Text Formatting -->
+                        <div style="display: flex; align-items: center; gap: 4px; padding-right: 8px; border-right: 1px solid #444;">
+                            <button onclick="CRMApp.formatText('bold')" title="Bold" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 1px solid #444;
+                                border-radius: 4px;
+                                color: #fff;
+                                cursor: pointer;
+                                font-size: 12px;
+                                font-weight: bold;
+                                width: 32px;
+                                height: 32px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                               onmouseout="this.style.background='rgba(255,255,255,0.1)'">B</button>
+                            <button onclick="CRMApp.formatText('italic')" title="Italic" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 1px solid #444;
+                                border-radius: 4px;
+                                color: #fff;
+                                cursor: pointer;
+                                font-size: 12px;
+                                font-style: italic;
+                                width: 32px;
+                                height: 32px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                               onmouseout="this.style.background='rgba(255,255,255,0.1)'">I</button>
+                            <button onclick="CRMApp.formatText('underline')" title="Underline" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 1px solid #444;
+                                border-radius: 4px;
+                                color: #fff;
+                                cursor: pointer;
+                                font-size: 12px;
+                                text-decoration: underline;
+                                width: 32px;
+                                height: 32px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                               onmouseout="this.style.background='rgba(255,255,255,0.1)'">U</button>
+                        </div>
+
+                        <!-- Lists -->
+                        <div style="display: flex; align-items: center; gap: 4px; padding-right: 8px; border-right: 1px solid #444;">
+                            <button onclick="CRMApp.formatText('insertUnorderedList')" title="Bullet List - Create bulleted list items" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 1px solid #444;
+                                border-radius: 4px;
+                                color: #fff;
+                                cursor: pointer;
+                                font-size: 10px;
+                                width: 32px;
+                                height: 32px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-weight: bold;
+                            " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                               onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="6" cy="6" r="2"/>
+                                    <circle cx="6" cy="12" r="2"/>
+                                    <circle cx="6" cy="18" r="2"/>
+                                    <rect x="12" y="5" width="10" height="2"/>
+                                    <rect x="12" y="11" width="10" height="2"/>
+                                    <rect x="12" y="17" width="10" height="2"/>
+                                </svg>
+                            </button>
+                            <button onclick="CRMApp.formatText('insertOrderedList')" title="Numbered List - Create numbered list items" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 1px solid #444;
+                                border-radius: 4px;
+                                color: #fff;
+                                cursor: pointer;
+                                font-size: 10px;
+                                width: 32px;
+                                height: 32px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-weight: bold;
+                            " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                               onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <rect x="2" y="4" width="2" height="2"/>
+                                    <rect x="2" y="10" width="2" height="2"/>
+                                    <rect x="2" y="16" width="2" height="2"/>
+                                    <text x="3" y="5.5" font-size="2" text-anchor="middle" fill="currentColor">1</text>
+                                    <text x="3" y="11.5" font-size="2" text-anchor="middle" fill="currentColor">2</text>
+                                    <text x="3" y="17.5" font-size="2" text-anchor="middle" fill="currentColor">3</text>
+                                    <rect x="8" y="4" width="14" height="2"/>
+                                    <rect x="8" y="10" width="14" height="2"/>
+                                    <rect x="8" y="16" width="14" height="2"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Links -->
+                        <button onclick="CRMApp.insertLink()" title="Insert Link" style="
+                            background: rgba(255, 255, 255, 0.1);
+                            border: 1px solid #444;
+                            border-radius: 4px;
+                            color: #fff;
+                            cursor: pointer;
+                            font-size: 12px;
+                            padding: 0 8px;
+                            height: 32px;
+                            margin-right: 8px;
+                        " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                           onmouseout="this.style.background='rgba(255,255,255,0.1)'">🔗 Link</button>
+
+                        <!-- Variables -->
+                        <button onclick="CRMApp.showVariableSelector()" title="Insert Variable" style="
+                            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                            border: none;
+                            border-radius: 4px;
+                            color: #fff;
+                            cursor: pointer;
+                            font-size: 12px;
+                            font-weight: 500;
+                            padding: 0 12px;
+                            height: 32px;
+                        " onmouseover="this.style.transform='translateY(-1px)'" 
+                           onmouseout="this.style.transform='translateY(0)'">+ Variable</button>
+                    </div>
+
+                    <!-- Editor Content -->
+                    <div style="flex: 1; padding: 20px; overflow-y: auto;">
+                        <div id="email-editor" contenteditable="true" style="
+                            min-height: 300px;
+                            background: #1a1a1a;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            color: #fff;
+                            padding: 16px;
+                            font-size: 14px;
+                            line-height: 1.6;
+                            outline: none;
+                            font-family: inherit;
+                        " placeholder="Start typing your email content..." oninput="CRMApp.updateEmailPreview()"></div>
+                        
+                        <textarea id="html-editor" style="
+                            display: none;
+                            width: 100%;
+                            min-height: 300px;
+                            background: #1a1a1a;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            color: #fff;
+                            padding: 16px;
+                            font-size: 14px;
+                            font-family: 'Courier New', monospace;
+                            resize: vertical;
+                            box-sizing: border-box;
+                        " placeholder="Enter HTML code..." oninput="CRMApp.updateEmailPreview()"></textarea>
+                    </div>
+                </div>
+
+                <!-- Right Panel - Preview -->
+                <div style="
+                    width: 50%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                ">
+                    <div style="
+                        padding: 20px;
+                        border-bottom: 1px solid #333;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                    ">
+                        <h3 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0;">Preview</h3>
+                        <select id="preview-contact" onchange="CRMApp.updateEmailPreview()" style="
+                            background: #1a1a1a;
+                            border: 1px solid #444;
+                            border-radius: 6px;
+                            color: #fff;
+                            padding: 8px 12px;
+                            font-size: 14px;
+                        ">
+                            <option value="sample">Sample Contact</option>
+                        </select>
+                    </div>
+                    
+                    <div style="flex: 1; padding: 20px; overflow-y: auto;">
+                        <div id="email-preview" style="
+                            background: #fff;
+                            border-radius: 8px;
+                            padding: 24px;
+                            color: #333;
+                            font-size: 14px;
+                            line-height: 1.6;
+                            min-height: 400px;
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                        ">
+                            <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #eee;">
+                                <strong id="preview-subject" style="font-size: 16px; color: #333;">Subject: Enter your subject line...</strong>
+                            </div>
+                            <div id="preview-body" style="color: #333;">
+                                Start typing your email content to see the preview...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        modalBackdrop.appendChild(modalContent);
+        document.body.appendChild(modalBackdrop);
+
+        // Store current step for reference
+        this.currentEmailStep = step;
+
+        // Initialize preview
+        this.updateEmailPreview();
+
+        // Close modal when clicking backdrop
+        modalBackdrop.addEventListener('click', (e) => {
+            if (e.target === modalBackdrop) {
+                this.closeEmailBuilder();
+            }
+        });
+    },
+
+    closeEmailBuilder() {
+        const modal = document.getElementById('email-builder-modal-backdrop');
+        if (modal) {
+            modal.remove();
+        }
+        this.currentEmailStep = null;
+    },
+
+    toggleHtmlMode(isHtml) {
+        const richEditor = document.getElementById('email-editor');
+        const htmlEditor = document.getElementById('html-editor');
+        
+        if (isHtml) {
+            // Switch to HTML mode
+            htmlEditor.value = richEditor.innerHTML;
+            richEditor.style.display = 'none';
+            htmlEditor.style.display = 'block';
+        } else {
+            // Switch to rich text mode
+            richEditor.innerHTML = htmlEditor.value;
+            richEditor.style.display = 'block';
+            htmlEditor.style.display = 'none';
+        }
+        this.updateEmailPreview();
+    },
+
+    formatText(command) {
+        const editor = document.getElementById('email-editor');
+        if (editor.style.display !== 'none') {
+            document.execCommand(command, false, null);
+            editor.focus();
+            this.updateEmailPreview();
+        }
+    },
+
+    insertLink() {
+        const url = prompt('Enter the URL:');
+        if (url) {
+            const text = prompt('Enter the link text:') || url;
+            const editor = document.getElementById('email-editor');
+            if (editor.style.display !== 'none') {
+                document.execCommand('insertHTML', false, `<a href="${url}" target="_blank">${text}</a>`);
+                editor.focus();
+                this.updateEmailPreview();
+            }
+        }
+    },
+
+    showVariableSelector() {
+        // Create variable selector modal
+        const backdrop = document.createElement('div');
+        backdrop.id = 'variable-selector-backdrop';
+        backdrop.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10001;
+        `;
+
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+            border-radius: 12px;
+            border: 1px solid #333;
+            width: 600px;
+            max-height: 70vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        `;
+
+        modal.innerHTML = `
+            <div style="padding: 20px; border-bottom: 1px solid #333;">
+                <h3 style="color: #fff; margin: 0; font-size: 18px; font-weight: 600;">Insert Dynamic Variable</h3>
+                <p style="color: #888; margin: 8px 0 0 0; font-size: 14px;">Select a field to insert into your email</p>
+            </div>
+            <div style="flex: 1; overflow-y: auto;">
+                <div style="padding: 20px;">
+                    <div style="margin-bottom: 24px;">
+                        <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">Contact Information</h4>
+                        <div style="display: grid; gap: 8px;">
+                            ${this.getContactVariables().map(variable => `
+                                <button onclick="CRMApp.insertVariable('${variable.key}', '${variable.label}')" style="
+                                    background: rgba(255, 255, 255, 0.05);
+                                    border: 1px solid #444;
+                                    border-radius: 8px;
+                                    color: #fff;
+                                    cursor: pointer;
+                                    padding: 12px 16px;
+                                    text-align: left;
+                                    transition: all 0.2s ease;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: space-between;
+                                " onmouseover="this.style.background='rgba(255,255,255,0.1)'" 
+                                   onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                                    <span style="font-weight: 500;">${variable.label}</span>
+                                    <span style="color: #888; font-size: 12px;">{{${variable.key}}}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">Company Information</h4>
+                        <div style="display: grid; gap: 8px;">
+                            ${this.getCompanyVariables().map(variable => `
+                                <button onclick="CRMApp.insertVariable('${variable.key}', '${variable.label}')" style="
+                                    background: rgba(255, 255, 255, 0.05);
+                                    border: 1px solid #444;
+                                    border-radius: 8px;
+                                    color: #fff;
+                                    cursor: pointer;
+                                    padding: 12px 16px;
+                                    text-align: left;
+                                    transition: all 0.2s ease;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: space-between;
+                                " onmouseover="this.style.background='rgba(255,255,255,0.1)'" 
+                                   onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                                    <span style="font-weight: 500;">${variable.label}</span>
+                                    <span style="color: #888; font-size: 12px;">{{${variable.key}}}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="padding: 20px; border-top: 1px solid #333; display: flex; justify-content: flex-end;">
+                <button onclick="CRMApp.closeVariableSelector()" style="
+                    background: transparent;
+                    border: 1px solid #444;
+                    border-radius: 8px;
+                    color: #888;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    padding: 10px 20px;
+                    transition: all 0.2s ease;
+                " onmouseover="this.style.borderColor='#666'; this.style.color='#fff'" 
+                   onmouseout="this.style.borderColor='#444'; this.style.color='#888'">Cancel</button>
+            </div>
+        `;
+
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) {
+                this.closeVariableSelector();
+            }
+        });
+    },
+
+    getContactVariables() {
+        return [
+            { key: 'contact.firstName', label: 'First Name' },
+            { key: 'contact.lastName', label: 'Last Name' },
+            { key: 'contact.fullName', label: 'Full Name' },
+            { key: 'contact.email', label: 'Email Address' },
+            { key: 'contact.phone', label: 'Phone Number' },
+            { key: 'contact.jobTitle', label: 'Job Title' },
+            { key: 'contact.timeInJob', label: 'Time in Current Job' },
+            { key: 'contact.location', label: 'Location' },
+            { key: 'contact.education', label: 'Education' },
+            { key: 'contact.linkedinUrl', label: 'LinkedIn URL' }
+        ];
+    },
+
+    getCompanyVariables() {
+        return [
+            { key: 'company.name', label: 'Company Name' },
+            { key: 'company.industry', label: 'Industry' },
+            { key: 'company.size', label: 'Company Size' },
+            { key: 'company.website', label: 'Website' },
+            { key: 'company.location', label: 'Company Location' },
+            { key: 'company.description', label: 'Company Description' },
+            { key: 'company.revenue', label: 'Annual Revenue' },
+            { key: 'company.founded', label: 'Founded Year' }
+        ];
+    },
+
+    insertVariable(key, label) {
+        const isHtmlMode = document.getElementById('html-toggle').checked;
+        const variableTag = `{{${key}}}`;
+        
+        if (isHtmlMode) {
+            const htmlEditor = document.getElementById('html-editor');
+            const cursorPos = htmlEditor.selectionStart;
+            const textBefore = htmlEditor.value.substring(0, cursorPos);
+            const textAfter = htmlEditor.value.substring(htmlEditor.selectionEnd);
+            htmlEditor.value = textBefore + variableTag + textAfter;
+            htmlEditor.focus();
+            htmlEditor.setSelectionRange(cursorPos + variableTag.length, cursorPos + variableTag.length);
+        } else {
+            const richEditor = document.getElementById('email-editor');
+            document.execCommand('insertHTML', false, `<span style="background: #8b5cf6; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 500;">${variableTag}</span>&nbsp;`);
+            richEditor.focus();
+        }
+        
+        this.closeVariableSelector();
+        this.updateEmailPreview();
+    },
+
+    closeVariableSelector() {
+        const modal = document.getElementById('variable-selector-backdrop');
+        if (modal) {
+            modal.remove();
+        }
+    },
+
+    updateEmailPreview() {
+        const subject = document.getElementById('email-subject')?.value || '';
+        const isHtmlMode = document.getElementById('html-toggle')?.checked || false;
+        
+        let content = '';
+        if (isHtmlMode) {
+            content = document.getElementById('html-editor')?.value || '';
+        } else {
+            content = document.getElementById('email-editor')?.innerHTML || '';
+        }
+
+        // Replace variables with sample data
+        const sampleData = {
+            'contact.firstName': 'John',
+            'contact.lastName': 'Doe',
+            'contact.fullName': 'John Doe',
+            'contact.email': 'john.doe@example.com',
+            'contact.phone': '+1 (555) 123-4567',
+            'contact.jobTitle': 'Marketing Director',
+            'contact.timeInJob': '2 years',
+            'contact.location': 'San Francisco, CA',
+            'contact.education': 'MBA from Stanford',
+            'contact.linkedinUrl': 'linkedin.com/in/johndoe',
+            'company.name': 'Acme Corporation',
+            'company.industry': 'Technology',
+            'company.size': '500-1000 employees',
+            'company.website': 'acme.com',
+            'company.location': 'San Francisco, CA',
+            'company.description': 'Leading technology solutions provider',
+            'company.revenue': '$50M - $100M',
+            'company.founded': '2010'
+        };
+
+        let previewContent = content;
+        let previewSubject = subject;
+
+        // Replace variables in content and subject
+        Object.keys(sampleData).forEach(key => {
+            const regex = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}}}`, 'g');
+            previewContent = previewContent.replace(regex, sampleData[key]);
+            previewSubject = previewSubject.replace(regex, sampleData[key]);
+        });
+
+        // Update preview
+        const previewSubjectEl = document.getElementById('preview-subject');
+        const previewBodyEl = document.getElementById('preview-body');
+
+        if (previewSubjectEl) {
+            previewSubjectEl.textContent = `Subject: ${previewSubject || 'Enter your subject line...'}`;
+        }
+
+        if (previewBodyEl) {
+            if (previewContent.trim()) {
+                previewBodyEl.innerHTML = previewContent;
+            } else {
+                previewBodyEl.textContent = 'Start typing your email content to see the preview...';
+            }
+        }
+    },
+
+    saveEmailTemplate() {
+        const subject = document.getElementById('email-subject')?.value || '';
+        const isHtmlMode = document.getElementById('html-toggle')?.checked || false;
+        
+        let content = '';
+        if (isHtmlMode) {
+            content = document.getElementById('html-editor')?.value || '';
+        } else {
+            content = document.getElementById('email-editor')?.innerHTML || '';
+        }
+
+        if (this.currentEmailStep) {
+            this.currentEmailStep.emailContent = {
+                subject: subject,
+                body: content,
+                isHtml: isHtmlMode
+            };
+        }
+
+        console.log('Saved email template:', {
+            subject,
+            content,
+            isHtmlMode,
+            step: this.currentEmailStep
+        });
+
+        this.closeEmailBuilder();
+        this.showToast('Email template saved successfully!', 'success');
+        
+        // Update sequence view to show the new step
+        this.renderSequenceSteps();
+    },
+
+    renderSequenceSteps() {
+        console.log('renderSequenceSteps called');
+        // Create or update the sequence steps view with statistics
+        const sequenceContainer = document.getElementById('sequence-steps-container');
+        if (!sequenceContainer) {
+            console.error('sequence-steps-container not found!');
+            return;
+        }
+        console.log('Found sequence-steps-container, rendering content...');
+
+        // Sample sequence data with statistics (in real app, this would come from Firebase)
+        const sequenceData = {
+            id: 'seq_001',
+            name: 'Prospecting Decision Makers',
+            isActive: true,
+            totalContacts: 282,
+            statistics: {
+                active: 79,
+                paused: 0,
+                finished: 129,
+                bounced: 2,
+                notSent: 31
+            },
+            steps: [
+                {
+                    id: 1,
+                    type: 'automatic-email',
+                    name: 'Day 1: Automatic email',
+                    subject: '{{contact.firstName}}, AI Subject Line',
+                    isActive: true,
+                    statistics: {
+                        scheduled: 165,
+                        delivered: 155,
+                        bounced: 2,
+                        spamBlocked: 1,
+                        open: 89,
+                        click: 31,
+                        reply: 1,
+                        interested: 0,
+                        optOut: 2
+                    },
+                    rates: {
+                        delivered: 94.5,
+                        open: 57.4,
+                        click: 14.2,
+                        reply: 0.7,
+                        interested: 0.4
+                    }
+                },
+                {
+                    id: 2,
+                    type: 'phone-call',
+                    name: 'Day 5: Phone call',
+                    isActive: true,
+                    statistics: {
+                        scheduled: 26,
+                        noAnswer: 36.5,
+                        leftVoicemail: 1.2,
+                        busy: 61.9,
+                        gatekeeper: 20.0,
+                        notSet: 1.1,
+                        connected: 3.6,
+                        connected2: 40.4,
+                        connected3: 3.8
+                    }
+                },
+                {
+                    id: 3,
+                    type: 'linkedin-connection',
+                    name: 'Day 4: LinkedIn - send connection request',
+                    isActive: true,
+                    statistics: {
+                        scheduled: 0,
+                        delivered: 0,
+                        bounced: 0
+                    }
+                }
+            ]
+        };
+
+        sequenceContainer.innerHTML = `
+            <!-- Sequence Header with Toggle -->
+            <div style="
+                background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                border-radius: 12px;
+                border: 1px solid #333;
+                padding: 24px;
+                margin-bottom: 24px;
+            ">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                    <div>
+                        <h2 style="color: #fff; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">${sequenceData.name}</h2>
+                        <p style="color: #888; margin: 0; font-size: 14px;">${sequenceData.totalContacts} contacts in sequence</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <label style="display: flex; align-items: center; gap: 8px; color: #fff; font-size: 14px; font-weight: 500;">
+                            <div style="position: relative;">
+                                <input type="checkbox" id="sequence-toggle" ${sequenceData.isActive ? 'checked' : ''} 
+                                       onchange="CRMApp.toggleSequence(this.checked)" style="display: none;">
+                                <div onclick="CRMApp.toggleSequenceSwitch()" style="
+                                    width: 48px;
+                                    height: 24px;
+                                    background: ${sequenceData.isActive ? 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)' : '#444'};
+                                    border-radius: 12px;
+                                    position: relative;
+                                    cursor: pointer;
+                                    transition: all 0.3s ease;
+                                ">
+                                    <div style="
+                                        width: 20px;
+                                        height: 20px;
+                                        background: #fff;
+                                        border-radius: 50%;
+                                        position: absolute;
+                                        top: 2px;
+                                        left: ${sequenceData.isActive ? '26px' : '2px'};
+                                        transition: all 0.3s ease;
+                                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                                    "></div>
+                                </div>
+                            </div>
+                            ${sequenceData.isActive ? 'Active' : 'Paused'}
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Overall Statistics -->
+                <div style="
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                    gap: 16px;
+                    padding: 16px;
+                    background: rgba(255, 255, 255, 0.02);
+                    border-radius: 8px;
+                    border: 1px solid #333;
+                ">
+                    <div style="text-align: center;">
+                        <div style="color: #4a90e2; font-size: 24px; font-weight: 700;">${sequenceData.statistics.active}</div>
+                        <div style="color: #888; font-size: 12px; margin-top: 4px;">Active</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: #888; font-size: 24px; font-weight: 700;">${sequenceData.statistics.paused}</div>
+                        <div style="color: #888; font-size: 12px; margin-top: 4px;">Paused</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: #28a745; font-size: 24px; font-weight: 700;">${sequenceData.statistics.finished}</div>
+                        <div style="color: #888; font-size: 12px; margin-top: 4px;">Finished</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: #dc3545; font-size: 24px; font-weight: 700;">${sequenceData.statistics.bounced}</div>
+                        <div style="color: #888; font-size: 12px; margin-top: 4px;">Bounced</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: #ffc107; font-size: 24px; font-weight: 700;">${sequenceData.statistics.notSent}</div>
+                        <div style="color: #888; font-size: 12px; margin-top: 4px;">Not sent</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sequence Steps -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                ${sequenceData.steps.map((step, index) => `
+                    <div style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        border-radius: 12px;
+                        border: 1px solid #333;
+                        overflow: hidden;
+                    ">
+                        <!-- Step Header -->
+                        <div style="
+                            padding: 20px;
+                            border-bottom: 1px solid #333;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                        ">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="
+                                    width: 32px;
+                                    height: 32px;
+                                    background: ${this.getStepTypeDetails(step.type).gradient};
+                                    border-radius: 50%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    color: #fff;
+                                    font-weight: bold;
+                                    font-size: 14px;
+                                ">${index + 1}</div>
+                                <div>
+                                    <h3 style="color: #fff; font-size: 16px; font-weight: 600; margin: 0;">${step.name}</h3>
+                                    ${step.subject ? `<p style="color: #888; margin: 4px 0 0 0; font-size: 14px;">${step.subject}</p>` : ''}
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <label style="display: flex; align-items: center; gap: 8px; color: #fff; font-size: 12px;">
+                                    <div style="position: relative;">
+                                        <input type="checkbox" ${step.isActive ? 'checked' : ''} 
+                                               onchange="CRMApp.toggleStep(${step.id}, this.checked)" style="display: none;">
+                                        <div onclick="CRMApp.toggleStepSwitch(${step.id})" style="
+                                            width: 40px;
+                                            height: 20px;
+                                            background: ${step.isActive ? 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)' : '#444'};
+                                            border-radius: 10px;
+                                            position: relative;
+                                            cursor: pointer;
+                                            transition: all 0.3s ease;
+                                        ">
+                                            <div style="
+                                                width: 16px;
+                                                height: 16px;
+                                                background: #fff;
+                                                border-radius: 50%;
+                                                position: absolute;
+                                                top: 2px;
+                                                left: ${step.isActive ? '22px' : '2px'};
+                                                transition: all 0.3s ease;
+                                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+                                            "></div>
+                                        </div>
+                                    </div>
+                                </label>
+                                <button onclick="CRMApp.editStep(${step.id})" style="
+                                    background: rgba(255, 255, 255, 0.1);
+                                    border: 1px solid #444;
+                                    border-radius: 6px;
+                                    color: #fff;
+                                    cursor: pointer;
+                                    font-size: 12px;
+                                    padding: 6px 12px;
+                                    transition: all 0.2s ease;
+                                " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                                   onmouseout="this.style.background='rgba(255,255,255,0.1)'">Edit</button>
+                            </div>
+                        </div>
+
+                        <!-- Step Statistics -->
+                        ${step.type === 'automatic-email' ? `
+                            <div style="padding: 16px 20px;">
+                                <div style="
+                                    display: grid;
+                                    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                                    gap: 12px;
+                                    margin-bottom: 16px;
+                                ">
+                                    <div style="text-align: center;">
+                                        <div style="color: #4a90e2; font-size: 18px; font-weight: 600;">${step.statistics.scheduled}</div>
+                                        <div style="color: #888; font-size: 11px;">Scheduled</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #28a745; font-size: 18px; font-weight: 600;">${step.statistics.delivered}</div>
+                                        <div style="color: #888; font-size: 11px;">Delivered</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #17a2b8; font-size: 18px; font-weight: 600;">${step.statistics.open}</div>
+                                        <div style="color: #888; font-size: 11px;">Open</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #6f42c1; font-size: 18px; font-weight: 600;">${step.statistics.click}</div>
+                                        <div style="color: #888; font-size: 11px;">Click</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #28a745; font-size: 18px; font-weight: 600;">${step.statistics.reply}</div>
+                                        <div style="color: #888; font-size: 11px;">Reply</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #ffc107; font-size: 18px; font-weight: 600;">${step.statistics.interested}</div>
+                                        <div style="color: #888; font-size: 11px;">Interested</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #dc3545; font-size: 18px; font-weight: 600;">${step.statistics.optOut}</div>
+                                        <div style="color: #888; font-size: 11px;">Opt out</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Percentage Rates -->
+                                <div style="
+                                    display: grid;
+                                    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+                                    gap: 12px;
+                                    padding: 12px;
+                                    background: rgba(255, 255, 255, 0.02);
+                                    border-radius: 6px;
+                                ">
+                                    <div style="text-align: center;">
+                                        <div style="color: #28a745; font-size: 14px; font-weight: 600;">${step.rates.delivered}%</div>
+                                        <div style="color: #888; font-size: 10px;">Delivered</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #17a2b8; font-size: 14px; font-weight: 600;">${step.rates.open}%</div>
+                                        <div style="color: #888; font-size: 10px;">Open</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #6f42c1; font-size: 14px; font-weight: 600;">${step.rates.click}%</div>
+                                        <div style="color: #888; font-size: 10px;">Click</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #28a745; font-size: 14px; font-weight: 600;">${step.rates.reply}%</div>
+                                        <div style="color: #888; font-size: 10px;">Reply</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #ffc107; font-size: 14px; font-weight: 600;">${step.rates.interested}%</div>
+                                        <div style="color: #888; font-size: 10px;">Interested</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : step.type === 'phone-call' ? `
+                            <div style="padding: 16px 20px;">
+                                <div style="
+                                    display: grid;
+                                    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+                                    gap: 12px;
+                                ">
+                                    <div style="text-align: center;">
+                                        <div style="color: #4a90e2; font-size: 18px; font-weight: 600;">${step.statistics.scheduled}</div>
+                                        <div style="color: #888; font-size: 11px;">Scheduled</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #ffc107; font-size: 14px; font-weight: 600;">${step.statistics.noAnswer}%</div>
+                                        <div style="color: #888; font-size: 11px;">No Answer</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #17a2b8; font-size: 14px; font-weight: 600;">${step.statistics.leftVoicemail}%</div>
+                                        <div style="color: #888; font-size: 11px;">Left Voicemail</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #dc3545; font-size: 14px; font-weight: 600;">${step.statistics.busy}%</div>
+                                        <div style="color: #888; font-size: 11px;">Busy</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #28a745; font-size: 14px; font-weight: 600;">${step.statistics.connected}%</div>
+                                        <div style="color: #888; font-size: 11px;">Connected</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div style="padding: 16px 20px;">
+                                <div style="
+                                    display: grid;
+                                    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                                    gap: 12px;
+                                ">
+                                    <div style="text-align: center;">
+                                        <div style="color: #888; font-size: 18px; font-weight: 600;">${step.statistics.scheduled}</div>
+                                        <div style="color: #888; font-size: 11px;">Scheduled</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #888; font-size: 18px; font-weight: 600;">${step.statistics.delivered}</div>
+                                        <div style="color: #888; font-size: 11px;">Delivered</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #888; font-size: 18px; font-weight: 600;">${step.statistics.bounced}</div>
+                                        <div style="color: #888; font-size: 11px;">Bounced</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `}
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Centered Add Step Button -->
+            <div style="
+                display: flex;
+                justify-content: center;
+                margin: 32px 0;
+                padding: 24px;
+            ">
+                <button onclick="CRMApp.addSequenceStep()" style="
+                    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                    border: none;
+                    border-radius: 12px;
+                    color: #fff;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: 600;
+                    padding: 16px 32px;
+                    transition: all 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(74, 144, 226, 0.4)'" 
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(74, 144, 226, 0.3)'">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add a step
+                </button>
+            </div>
+        `;
+    },
+
+    toggleSequenceSwitch() {
+        const toggle = document.getElementById('sequence-toggle');
+        if (toggle) {
+            toggle.checked = !toggle.checked;
+            this.toggleSequence(toggle.checked);
+        }
+    },
+
+    toggleSequence(isActive) {
+        console.log('Toggling sequence:', isActive ? 'Active' : 'Paused');
+        
+        // Update UI immediately
+        const switchElement = document.querySelector('#sequence-toggle').parentNode.querySelector('div');
+        const labelText = document.querySelector('#sequence-toggle').parentNode.parentNode.querySelector('label');
+        const switchButton = switchElement.querySelector('div');
+        
+        if (isActive) {
+            switchElement.style.background = 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)';
+            switchButton.style.left = '26px';
+            labelText.innerHTML = labelText.innerHTML.replace(/Paused|Active/, 'Active');
+        } else {
+            switchElement.style.background = '#444';
+            switchButton.style.left = '2px';
+            labelText.innerHTML = labelText.innerHTML.replace(/Paused|Active/, 'Paused');
+        }
+        
+        // TODO: Save to Firebase
+        this.showToast(`Sequence ${isActive ? 'activated' : 'paused'}`, 'info');
+    },
+
+    toggleStepSwitch(stepId) {
+        const stepElements = document.querySelectorAll(`input[onchange*="toggleStep(${stepId}"]`);
+        stepElements.forEach(toggle => {
+            toggle.checked = !toggle.checked;
+            this.toggleStep(stepId, toggle.checked);
+        });
+    },
+
+    toggleStep(stepId, isActive) {
+        console.log(`Toggling step ${stepId}:`, isActive ? 'Active' : 'Paused');
+        
+        // Find and update the step switch UI
+        const stepSwitches = document.querySelectorAll(`div[onclick*="toggleStepSwitch(${stepId})"]`);
+        stepSwitches.forEach(switchElement => {
+            const switchButton = switchElement.querySelector('div');
+            if (isActive) {
+                switchElement.style.background = 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)';
+                switchButton.style.left = '22px';
+            } else {
+                switchElement.style.background = '#444';
+                switchButton.style.left = '2px';
+            }
+        });
+        
+        // TODO: Save to Firebase
+        this.showToast(`Step ${stepId} ${isActive ? 'activated' : 'paused'}`, 'info');
+    },
+
+    editStep(stepId) {
+        console.log('Editing step:', stepId);
+        // TODO: Open step editor based on step type
+        this.showToast('Step editing functionality coming soon!', 'info');
+    },
+
+    addSequenceStep() {
+        console.log('Opening add sequence step modal...');
+        this.showAddStepModal();
     },
 
     createSequenceBuilderView() {
@@ -5086,12 +8607,137 @@ const CRMApp = {
         sequenceBuilderView.className = 'page-view';
         sequenceBuilderView.style.display = 'none';
         
+        // Initialize the sequence builder with proper structure
+        sequenceBuilderView.innerHTML = `
+            <div class="sequence-builder-header" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #333;
+            ">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button onclick="CRMApp.showView('sequences-view')" style="
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid #555;
+                        color: #fff;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                        ← Back to Sequences
+                    </button>
+                    <h1 id="sequence-title" style="color: #fff; font-size: 24px; font-weight: 600; margin: 0;">Loading Sequence...</h1>
+                </div>
+                <button onclick="CRMApp.openAddContactsModal()" style="
+                    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                    border: none;
+                    color: #fff;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+                    + Add Contacts
+                </button>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; gap: 8px; margin-bottom: 24px;">
+                <button id="sequence-tab-overview" class="sequence-tab" onclick="CRMApp.switchSequenceBuilderTab('overview')" style="
+                    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                    border: none;
+                    color: #fff;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s ease;
+                ">Overview</button>
+                <button id="sequence-tab-contacts" class="sequence-tab" onclick="CRMApp.switchSequenceBuilderTab('contacts')" style="
+                    background: transparent;
+                    border: 1px solid #444;
+                    color: #888;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s ease;
+                ">Contacts (0)</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div id="sequence-overview-content" class="sequence-tab-content" style="display: block;">
+                <div id="sequence-steps-container">
+                    <!-- Statistics dashboard will be rendered here -->
+                </div>
+            </div>
+
+            <div id="sequence-contacts-content" class="sequence-tab-content" style="display: none;">
+                <div style="
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    border-radius: 12px;
+                    border: 1px solid #333;
+                    padding: 40px;
+                    text-align: center;
+                ">
+                    <h3 style="color: #fff; font-size: 18px; font-weight: 600; margin: 0 0 12px 0;">No contacts added yet</h3>
+                    <p style="color: #888; margin: 0 0 20px 0; font-size: 14px;">Add contacts to start your sequence</p>
+                    <button onclick="CRMApp.openAddContactsModal()" style="
+                        background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                        border: none;
+                        color: #fff;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+                        + Add Contacts
+                    </button>
+                </div>
+            </div>
+        `;
+        
         const mainContentWrapper = document.getElementById('main-content-wrapper');
         if (mainContentWrapper) {
             mainContentWrapper.appendChild(sequenceBuilderView);
         }
         
         return sequenceBuilderView;
+    },
+
+    initializeSequenceBuilder(sequenceName = 'New Sequence') {
+        console.log('Initializing sequence builder with name:', sequenceName);
+        
+        // Update the sequence title
+        const titleElement = document.getElementById('sequence-title');
+        if (titleElement) {
+            titleElement.textContent = sequenceName;
+            console.log('Updated sequence title to:', sequenceName);
+        } else {
+            console.error('sequence-title element not found');
+        }
+        
+        // Small delay to ensure DOM is ready, then render the statistics dashboard
+        setTimeout(() => {
+            console.log('Calling renderSequenceSteps...');
+            this.renderSequenceSteps();
+        }, 100);
     },
 
     switchSequenceBuilderTab(tabName) {
@@ -5124,11 +8770,7 @@ const CRMApp = {
         }
     },
 
-    addSequenceStep() {
-        console.log('Adding sequence step...');
-        this.showNotification('Add sequence step functionality coming soon!', 'info');
-        // TODO: Implement add sequence step modal
-    },
+
 
     openAddContactsModal() {
         console.log('Opening add contacts modal...');
@@ -5384,7 +9026,10 @@ const CRMApp = {
         // Re-render the table with cleared filters
         this.renderSimpleContactsTable('');
     }
+
 };
+
+// End of CRMApp
 
 // Make CRMApp globally accessible for onclick handlers
 window.CRMApp = CRMApp;
