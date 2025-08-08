@@ -55,10 +55,11 @@ const CRMApp = {
             const testQuery = await db.collection('contacts').limit(1).get();
             console.log('Firebase connection successful, loading all data...');
             
-            const [accountsSnapshot, contactsSnapshot, activitiesSnapshot] = await Promise.all([
+            const [accountsSnapshot, contactsSnapshot, activitiesSnapshot, sequencesSnapshot] = await Promise.all([
                 db.collection('accounts').get(),
                 db.collection('contacts').get(),
-                db.collection('activities').orderBy('createdAt', 'desc').limit(50).get()
+                db.collection('activities').orderBy('createdAt', 'desc').limit(50).get(),
+                db.collection('sequences').orderBy('createdAt', 'desc').get()
             ]);
             
             this.accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -68,11 +69,17 @@ const CRMApp = {
                 ...doc.data(), 
                 createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date() 
             }));
+            this.sequences = sequencesSnapshot.docs.map(doc => ({ 
+                id: doc.id, 
+                ...doc.data(), 
+                createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date() 
+            }));
             
             console.log('✅ Firebase data loaded successfully:', {
                 accounts: this.accounts.length,
                 contacts: this.contacts.length,
-                activities: this.activities.length
+                activities: this.activities.length,
+                sequences: this.sequences.length
             });
             
             if (this.contacts.length === 0) {
@@ -320,6 +327,16 @@ const CRMApp = {
                 if (crmWidgetsContainer) {
                     crmWidgetsContainer.style.display = 'flex';
                     console.log('Showing CRM widgets for sequences');
+                }
+                // Update navigation highlight
+                this.updateActiveNavButton(document.querySelector('.nav-item[data-view="sequences-view"]'));
+            } else if (viewName === 'sequence-builder-view') {
+                // Sequence Builder View - Show sequence builder
+                console.log('Activating sequence builder view');
+                activeView.style.display = 'block';
+                if (crmWidgetsContainer) {
+                    crmWidgetsContainer.style.display = 'flex';
+                    console.log('Showing CRM widgets for sequence builder');
                 }
             } else {
                 // All other CRM views - Standard Layout
@@ -4755,7 +4772,7 @@ const CRMApp = {
         }
     },
 
-    createNewSequence() {
+    async createNewSequence() {
         const input = document.getElementById('sequence-name-input');
         const sequenceName = input?.value?.trim();
 
@@ -4766,7 +4783,6 @@ const CRMApp = {
 
         // Create new sequence object
         const newSequence = {
-            id: `seq-${Date.now()}`,
             name: sequenceName,
             active: true,
             sequenceBy: 'LF',
@@ -4780,37 +4796,78 @@ const CRMApp = {
             delivered: 0,
             replied: 0,
             interested: 0,
+            steps: [],
+            contacts: [],
             createdAt: new Date()
         };
 
-        // Add to sequences array
-        if (!this.sequences) {
-            this.sequences = [];
+        try {
+            // Save to Firebase
+            const docRef = await db.collection('sequences').add({
+                ...newSequence,
+                createdAt: serverTimestamp()
+            });
+            
+            // Add Firebase ID and add to local array
+            newSequence.id = docRef.id;
+            if (!this.sequences) {
+                this.sequences = [];
+            }
+            this.sequences.unshift(newSequence);
+            
+            // Save activity
+            await this.saveActivity({
+                type: 'sequence_created',
+                description: `New sequence created: ${sequenceName}`,
+                sequenceId: docRef.id,
+                sequenceName: sequenceName
+            });
+            
+            console.log('Sequence saved to Firebase with ID:', docRef.id);
+            
+        } catch (error) {
+            console.error('Error saving sequence:', error);
+            // Still add to local array for offline functionality
+            newSequence.id = `seq-${Date.now()}`;
+            if (!this.sequences) {
+                this.sequences = [];
+            }
+            this.sequences.unshift(newSequence);
+            this.showToast('Sequence created locally (Firebase error)', 'warning');
         }
-        this.sequences.unshift(newSequence); // Add to beginning of array
 
         // Re-render the table
         this.renderSequencesTable();
 
         // Close modal and open sequence builder
         this.closeCreateSequenceModal();
-        this.showNotification(`Sequence "${sequenceName}" created successfully!`, 'success');
+        this.showToast(`Sequence "${sequenceName}" created successfully!`, 'success');
         
-        // Open the sequence builder page
-        setTimeout(() => {
-            this.openSequenceBuilder(newSequence);
-        }, 500);
+        // Open the sequence builder page immediately
+        console.log('Opening sequence builder for new sequence:', newSequence);
+        this.openSequenceBuilder(newSequence);
     },
 
     openSequenceBuilder(sequence) {
         console.log('Opening sequence builder for:', sequence.name);
         this.currentSequence = sequence;
-        this.renderSequenceBuilderPage();
+        
+        // Ensure the sequence builder view exists
+        let sequenceBuilderView = document.getElementById('sequence-builder-view');
+        if (!sequenceBuilderView) {
+            console.log('Creating sequence builder view...');
+            sequenceBuilderView = this.createSequenceBuilderView();
+        }
+        
+        this.renderSequenceBuilderPage(sequence);
     },
 
-    renderSequenceBuilderPage() {
-        console.log("renderSequenceBuilderPage called");
+    renderSequenceBuilderPage(sequence) {
+        console.log("renderSequenceBuilderPage called for sequence:", sequence);
         const sequenceBuilderView = document.getElementById('sequence-builder-view') || this.createSequenceBuilderView();
+        
+        // Store current sequence for reference
+        this.currentSequence = sequence;
         
         const sequenceBuilderHTML = `
             <div class="sequence-builder-header" style="
@@ -4823,31 +4880,25 @@ const CRMApp = {
             ">
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <button onclick="CRMApp.showView('sequences-view')" style="
-                        background: #333;
-                        border: 1px solid #444;
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid #555;
                         color: #fff;
-                        padding: 8px 12px;
+                        padding: 8px 16px;
                         border-radius: 6px;
                         cursor: pointer;
                         font-size: 14px;
                         transition: all 0.2s ease;
                         display: flex;
                         align-items: center;
-                        gap: 6px;
-                    " onmouseover="this.style.background='#404040'" onmouseout="this.style.background='#333'">
+                        gap: 8px;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
                         ← Back to Sequences
                     </button>
-                    <h2 style="
-                        margin: 0;
-                        color: #fff;
-                        font-size: 28px;
-                        font-weight: 600;
-                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-                    ">${this.currentSequence?.name || 'Sequence Builder'}</h2>
+                    <h2 style="margin: 0; color: #fff; font-size: 24px; font-weight: 600;">${sequence?.name || 'Sequence Builder'}</h2>
                 </div>
-                <button onclick="CRMApp.openAddContactsModal()" style="
+                <button onclick="CRMApp.addContactsToSequence()" style="
                     background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-                    border: 1px solid #4a90e2;
+                    border: 1px solid #5ba0f2;
                     color: #fff;
                     padding: 10px 20px;
                     border-radius: 8px;
@@ -4859,78 +4910,54 @@ const CRMApp = {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                " onmouseover="this.style.background='linear-gradient(135deg, #357abd 0%, #2968a3 100%)'" 
-                   onmouseout="this.style.background='linear-gradient(135deg, #4a90e2 0%, #357abd 100%)'">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <line x1="19" y1="8" x2="24" y2="13"></line>
-                        <line x1="24" y1="8" x2="19" y2="13"></line>
-                    </svg>
-                    Add Contacts
+                " onmouseover="this.style.background='linear-gradient(135deg, #5ba0f2 0%, #4a90e2 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #4a90e2 0%, #357abd 100%)'">
+                    + Add Contacts
                 </button>
             </div>
 
-            <!-- Sequence Builder Tabs -->
-            <div class="sequence-builder-tabs" style="
+            <!-- Tabs -->
+            <div class="sequence-tabs" style="
                 display: flex;
-                gap: 2px;
+                gap: 8px;
                 margin-bottom: 24px;
-                background: #1a1a1a;
-                border-radius: 12px;
-                padding: 4px;
-                border: 1px solid #333;
+                border-bottom: 1px solid #333;
+                padding-bottom: 16px;
             ">
-                <button onclick="CRMApp.switchSequenceBuilderTab('overview')" 
-                        id="sequence-tab-overview"
-                        class="sequence-tab active" style="
-                    flex: 1;
+                <button id="sequence-tab-overview" class="sequence-tab active" onclick="CRMApp.switchSequenceBuilderTab('overview')" style="
                     padding: 12px 24px;
                     background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                    color: #fff;
                     border: none;
                     border-radius: 8px;
-                    color: #fff;
-                    font-size: 14px;
-                    font-weight: 600;
                     cursor: pointer;
+                    font-weight: 500;
+                    font-size: 14px;
                     transition: all 0.2s ease;
-                ">Overview</button>
-                <button onclick="CRMApp.switchSequenceBuilderTab('contacts')" 
-                        id="sequence-tab-contacts"
-                        class="sequence-tab" style="
-                    flex: 1;
+                " onmouseover="if(!this.classList.contains('active')) this.style.background='rgba(255,255,255,0.1)'" 
+                   onmouseout="if(!this.classList.contains('active')) this.style.background='transparent'">Overview</button>
+                <button id="sequence-tab-contacts" class="sequence-tab" onclick="CRMApp.switchSequenceBuilderTab('contacts')" style="
                     padding: 12px 24px;
                     background: transparent;
+                    color: #888;
                     border: none;
                     border-radius: 8px;
-                    color: #888;
-                    font-size: 14px;
-                    font-weight: 600;
                     cursor: pointer;
+                    font-weight: 500;
+                    font-size: 14px;
                     transition: all 0.2s ease;
-                " onmouseover="if(!this.classList.contains('active')) this.style.background='rgba(255,255,255,0.05)'" 
-                   onmouseout="if(!this.classList.contains('active')) this.style.background='transparent'">Contacts</button>
+                " onmouseover="if(!this.classList.contains('active')) this.style.background='rgba(255,255,255,0.1)'" 
+                   onmouseout="if(!this.classList.contains('active')) this.style.background='transparent'">Contacts (${sequence?.contacts?.length || 0})</button>
             </div>
 
             <!-- Overview Tab Content -->
             <div id="sequence-overview-content" class="sequence-tab-content" style="display: block;">
-                <div class="sequence-overview" style="
-                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
-                    padding: 40px;
-                    border-radius: 18px;
-                    border: 1px solid #333;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-                    text-align: center;
-                ">
-                    <div style="
-                        background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-                        width: 80px;
-                        height: 80px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        margin: 0 auto 24px auto;
+                ${this.renderSequenceSteps(sequence)}
+            </div>
+
+            <!-- Contacts Tab Content -->
+            <div id="sequence-contacts-content" class="sequence-tab-content" style="display: none;">
+                ${this.renderSequenceContacts(sequence)}
+            </div>
                         box-shadow: 0 4px 16px rgba(74, 144, 226, 0.3);
                     ">
                         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
@@ -5036,7 +5063,21 @@ const CRMApp = {
         sequenceBuilderView.style.cssText = layoutStyles;
 
         // Show the sequence builder view
+        console.log('About to show sequence builder view');
+        console.log('Sequence builder view element:', sequenceBuilderView);
+        console.log('Sequence builder view HTML length:', sequenceBuilderView.innerHTML.length);
         this.showView('sequence-builder-view');
+        console.log('Sequence builder view should now be visible');
+        
+        // Verify the view is actually visible
+        setTimeout(() => {
+            const view = document.getElementById('sequence-builder-view');
+            console.log('Final sequence builder view state:', {
+                display: view?.style.display,
+                visibility: view?.style.visibility,
+                position: view?.style.position
+            });
+        }, 50);
     },
 
     createSequenceBuilderView() {
