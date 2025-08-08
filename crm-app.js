@@ -33,8 +33,8 @@ const CRMApp = {
             this.updateNotifications();
             console.log('CRM App initialized successfully');
         } catch (error) {
-            console.error('Error initializing CRM App:', error);
-            this.showToast('Failed to initialize application', 'error');
+            console.error('Error saving call log:', error);
+            this.showNotification('Error saving call log: ' + error.message, 'error');
         }
     },
 
@@ -232,10 +232,6 @@ const CRMApp = {
 
     // Show/hide views in the single-page application
     showView(viewName) {
-        // Special: Contacts view
-        if (viewName === 'contacts-view') {
-            this.renderContactsPage();
-        }
         console.log(`Switching to view: ${viewName}`);
         this.currentView = viewName;
         
@@ -245,6 +241,10 @@ const CRMApp = {
             view.style.visibility = 'hidden';
             view.style.position = 'absolute';
             view.style.left = '-9999px';
+            // Clear any content that might be lingering
+            if (view.id !== viewName && (view.id === 'contacts-view' || view.id === 'accounts-view')) {
+                view.innerHTML = '';
+            }
         });
         
         // Hide both widget containers
@@ -268,6 +268,8 @@ const CRMApp = {
             activeView.style.left = 'auto';
             activeView.style.visibility = 'visible';
             
+            console.log(`Showing view: ${viewName}`);
+            
             if (viewName === 'call-scripts-view') {
                 // Call Scripts View - Use same layout as dashboard
                 console.log('Activating call scripts view');
@@ -278,6 +280,47 @@ const CRMApp = {
                 }
                 // Keep the same flex ratio as dashboard for consistent layout
                 if (mainContentWrapper) mainContentWrapper.style.flex = '3';
+            } else if (viewName === 'contacts-view') {
+                // Contacts View - Render contacts page
+                console.log('Activating contacts view');
+                this.renderContactsPage();
+                activeView.style.display = 'block';
+                if (crmWidgetsContainer) {
+                    crmWidgetsContainer.style.display = 'flex';
+                    console.log('Showing CRM widgets for contacts');
+                }
+                // Update navigation highlight
+                this.updateActiveNavButton(document.querySelector('.nav-item[data-view="contacts-view"]'));
+            } else if (viewName === 'accounts-view') {
+                // Accounts View - Render accounts page
+                console.log('Activating accounts view');
+                this.renderAccountsPage();
+                activeView.style.display = 'block';
+                if (crmWidgetsContainer) {
+                    crmWidgetsContainer.style.display = 'flex';
+                    console.log('Showing CRM widgets for accounts');
+                }
+                // Update navigation highlight
+                this.updateActiveNavButton(document.querySelector('.nav-item[data-view="accounts-view"]'));
+            } else if (viewName === 'tasks-view') {
+                // Tasks View - Render tasks page
+                console.log('Activating tasks view');
+                this.renderTasksPage();
+                activeView.style.display = 'block';
+                if (crmWidgetsContainer) {
+                    crmWidgetsContainer.style.display = 'flex';
+                    console.log('Showing CRM widgets for tasks');
+                }
+                // Update navigation highlight
+                this.updateActiveNavButton(document.querySelector('.nav-item[data-view="tasks-view"]'));
+            } else if (viewName === 'sequences-view') {
+                // Sequences View - Render sequences page
+                console.log('Activating sequences view');
+                activeView.style.display = 'block';
+                if (crmWidgetsContainer) {
+                    crmWidgetsContainer.style.display = 'flex';
+                    console.log('Showing CRM widgets for sequences');
+                }
             } else {
                 // All other CRM views - Standard Layout
                 console.log('Activating standard CRM view');
@@ -316,10 +359,8 @@ const CRMApp = {
             console.log("contactsView not found, returning");
             return;
         }
-        if (contactsView.getAttribute('data-loaded') === 'true') {
-            console.log("contacts already loaded, returning");
-            return;
-        }
+        // Remove the data-loaded check to allow re-rendering
+        // This ensures contacts page always renders properly
 
         console.log("Creating contacts HTML with classes");
         // Rebuild contacts HTML with enhanced inline styling
@@ -340,10 +381,12 @@ const CRMApp = {
                     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
                 ">All Contacts</h2>
             </div>
-            <div class="contacts-content" style="display: flex; gap: 20px; flex: 1;">
+            <div class="contacts-content" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
                 <!-- Filters Sidebar -->
-                <div class="filters-sidebar" style="
-                    width: 250px;
+                <div id="filters-sidebar" class="filters-sidebar" style="
+                    min-width: 280px;
+                    max-width: 320px;
+                    flex-shrink: 0;
                     background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
                     padding: 20px;
                     border-radius: 18px;
@@ -352,8 +395,25 @@ const CRMApp = {
                     display: flex;
                     flex-direction: column;
                     gap: 15px;
+                    transition: all 0.3s ease;
                 ">
-                    <h3 class="filters-title" style="color: #fff; margin: 0 0 10px 0; font-size: 18px;">Filters</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 class="filters-title" style="color: #fff; margin: 0; font-size: 18px;">Filters</h3>
+                        <button id="toggle-filters-btn" onclick="toggleFilters()" style="
+                            background: #444;
+                            border: 1px solid #666;
+                            color: #fff;
+                            padding: 6px 10px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
                     <div class="filter-group">
                         <label class="filter-label" style="color: #ccc; font-size: 14px; margin-bottom: 5px; display: block;">Search</label>
                         <input type="text" id="contact-search-simple" placeholder="Search contacts..." class="filter-input" style="
@@ -395,9 +455,10 @@ const CRMApp = {
                         font-size: 14px;
                     ">Clear Filters</button>
                 </div>
-                <!-- Contacts Table -->
+                <!-- Contacts Table Section -->
                 <div class="contacts-table-section" style="
                     flex: 1;
+                    min-width: 0;
                     background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
                     padding: 20px;
                     border-radius: 18px;
@@ -405,22 +466,101 @@ const CRMApp = {
                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
                     display: flex;
                     flex-direction: column;
+                    overflow: hidden;
                 ">
-                    <div id="contacts-count-simple" class="contacts-count" style="
-                        color: #ccc;
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
                         margin-bottom: 15px;
-                        font-size: 14px;
-                        font-weight: 500;
-                    ">Loading contacts...</div>
-                    <div id="contacts-table-container" class="contacts-table-wrapper" style="flex: 1; overflow: auto;">
+                        flex-shrink: 0;
+                    ">
+                        <button id="show-filters-btn" onclick="toggleFilters()" style="
+                            display: none;
+                            background: #444;
+                            border: 1px solid #666;
+                            color: #fff;
+                            padding: 6px 8px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'" title="Show Filters">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                        <div id="contacts-count-simple" class="contacts-count" style="
+                            color: #ccc;
+                            font-size: 14px;
+                            font-weight: 500;
+                        ">Loading contacts...</div>
+                        <div id="pagination-controls" style="
+                            display: none;
+                            align-items: center;
+                            gap: 8px;
+                            margin-left: auto;
+                        ">
+                            <button id="prev-page-btn" onclick="changePage(-1)" style="
+                                background: #444;
+                                border: 1px solid #666;
+                                color: #fff;
+                                padding: 6px 8px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                transition: all 0.2s ease;
+                                display: flex;
+                                align-items: center;
+                            " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'" title="Previous Page">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                            <span id="page-info" style="
+                                color: #999;
+                                font-size: 12px;
+                                min-width: 60px;
+                                text-align: center;
+                            ">1 / 1</span>
+                            <button id="next-page-btn" onclick="changePage(1)" style="
+                                background: #444;
+                                border: 1px solid #666;
+                                color: #fff;
+                                padding: 6px 8px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                transition: all 0.2s ease;
+                                display: flex;
+                                align-items: center;
+                            " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'" title="Next Page">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="contacts-table-container" class="contacts-table-wrapper" style="
+                        flex: 1; 
+                        overflow-x: auto; 
+                        overflow-y: auto;
+                        border-radius: 12px;
+                        min-height: 0;
+                        scrollbar-width: thin;
+                        scrollbar-color: #555 #2a2a2a;
+                    ">
                         <table class="contacts-table" style="
-                            width: 100%;
+                            min-width: 1200px;
+                            width: max-content;
                             border-collapse: collapse;
                             background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
                             border-radius: 18px;
                             overflow: hidden;
                             border: 1px solid #444;
                             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+                            white-space: nowrap;
+                            table-layout: fixed;
                         ">
                             <thead>
                                 <tr class="table-header-row" style="
@@ -480,7 +620,8 @@ const CRMApp = {
                                     ">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="contacts-table-body-simple"></tbody>
+                            <tbody id="contacts-table-body-simple">
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -488,7 +629,6 @@ const CRMApp = {
         `;
 
         contactsView.innerHTML = contactsHTML;
-        contactsView.setAttribute('data-loaded', 'true');
         console.log("Contacts HTML created and injected");
 
         // Apply layout, spacing, and essential background styles for visibility
@@ -505,13 +645,1296 @@ const CRMApp = {
         `;
         
         console.log('Applied direct styles to contacts-view:', contactsView.style.cssText);
-
+        
         // Initialize the simple contacts functionality
         this.initSimpleContactsUI();
         console.log("Simple contacts UI initialized");
+        
+        // Initialize button visibility after UI is ready
+        setTimeout(() => {
+            // Show pagination controls if we have more than 50 contacts (for testing, show always)
+            const paginationControls = document.getElementById('pagination-controls');
+            if (paginationControls) {
+                // For now, always show pagination controls so you can see them
+                paginationControls.style.display = 'flex';
+                
+                // Update pagination info
+                const pageInfo = document.getElementById('page-info');
+                if (pageInfo) {
+                    pageInfo.textContent = '1 / 1';
+                }
+            }
+            
+            // Ensure filters sidebar is visible
+            const filtersSidebar = document.getElementById('filters-sidebar');
+            if (filtersSidebar) {
+                filtersSidebar.style.display = 'flex';
+            }
+        }, 100);
     },
 
-    // Initialize simple contacts UI with basic functionality
+    // Render the tasks page with tabbed interface and pagination
+    renderTasksPage() {
+        console.log("renderTasksPage called");
+        const tasksView = document.getElementById('tasks-view');
+        if (!tasksView) {
+            console.error('tasks-view element not found');
+            return;
+        }
+
+        console.log("Creating tasks HTML with tabs and pagination");
+        const tasksHTML = `
+            <div class="tasks-header" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #333;
+            ">
+                <h2 style="
+                    margin: 0;
+                    color: #fff;
+                    font-size: 28px;
+                    font-weight: 600;
+                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+                ">All Tasks</h2>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button onclick="CRMApp.openSequences()" style="
+                        background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+                        border: 1px solid #444;
+                        color: #fff;
+                        padding: 10px 20px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    " onmouseover="this.style.background='linear-gradient(135deg, #4a4a4a 0%, #3a3a3a 100%)'" 
+                       onmouseout="this.style.background='linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%)'">
+                        Sequences
+                    </button>
+                    <button onclick="CRMApp.openAddTaskModal()" style="
+                        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                        border: 1px solid #28a745;
+                        color: #fff;
+                        padding: 10px 20px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    " onmouseover="this.style.background='linear-gradient(135deg, #218838 0%, #1e7e34 100%)'" 
+                       onmouseout="this.style.background='linear-gradient(135deg, #28a745 0%, #20c997 100%)'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add Task
+                    </button>
+                </div>
+            </div>
+
+            <!-- Task Type Tabs -->
+            <div class="task-tabs" style="
+                display: flex;
+                gap: 4px;
+                margin-bottom: 20px;
+                background: #2a2a2a;
+                padding: 4px;
+                border-radius: 12px;
+                border: 1px solid #333;
+            ">
+                <button id="all-tasks-tab" class="task-tab active-tab" onclick="CRMApp.switchTaskTab('all')" style="
+                    flex: 1;
+                    padding: 12px 20px;
+                    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                    color: #fff;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 600;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                    text-align: center;
+                ">All tasks <span id="all-tasks-count" class="task-count">0</span></button>
+                <button id="call-tasks-tab" class="task-tab" onclick="CRMApp.switchTaskTab('calls')" style="
+                    flex: 1;
+                    padding: 12px 20px;
+                    background: transparent;
+                    color: #ccc;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                    text-align: center;
+                ">Call tasks <span id="call-tasks-count" class="task-count">0</span></button>
+                <button id="email-tasks-tab" class="task-tab" onclick="CRMApp.switchTaskTab('emails')" style="
+                    flex: 1;
+                    padding: 12px 20px;
+                    background: transparent;
+                    color: #ccc;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                    text-align: center;
+                ">Email tasks <span id="email-tasks-count" class="task-count">0</span></button>
+                <button id="linkedin-tasks-tab" class="task-tab" onclick="CRMApp.switchTaskTab('linkedin')" style="
+                    flex: 1;
+                    padding: 12px 20px;
+                    background: transparent;
+                    color: #ccc;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                    text-align: center;
+                ">LinkedIn tasks <span id="linkedin-tasks-count" class="task-count">0</span></button>
+            </div>
+
+            <div class="tasks-content" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
+                <!-- Filters Sidebar -->
+                <div id="tasks-filters-sidebar" class="filters-sidebar" style="
+                    min-width: 280px;
+                    max-width: 320px;
+                    flex-shrink: 0;
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 20px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 15px;
+                    transition: all 0.3s ease;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 class="filters-title" style="color: #fff; margin: 0; font-size: 18px;">Filters</h3>
+                        <button id="toggle-tasks-filters-btn" onclick="toggleTasksFilters()" style="
+                            background: #444;
+                            border: 1px solid #666;
+                            color: #fff;
+                            padding: 6px 10px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" style="color: #ccc; font-size: 14px; margin-bottom: 5px; display: block;">Search</label>
+                        <input type="text" id="task-search-simple" placeholder="Search tasks..." class="filter-input" style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            background: #333;
+                            color: #fff;
+                            font-size: 14px;
+                            transition: border-color 0.2s ease;
+                        " oninput="CRMApp.renderSimpleTasksTable(this.value)">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" style="color: #ccc; font-size: 14px; margin-bottom: 5px; display: block;">Priority</label>
+                        <select id="task-priority-filter" class="filter-select" style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            background: #333;
+                            color: #fff;
+                            font-size: 14px;
+                            cursor: pointer;
+                        " onchange="CRMApp.renderSimpleTasksTable(document.getElementById('task-search-simple').value)">
+                            <option value="">All Priorities</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" style="color: #ccc; font-size: 14px; margin-bottom: 5px; display: block;">Status</label>
+                        <select id="task-status-filter" class="filter-select" style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            background: #333;
+                            color: #fff;
+                            font-size: 14px;
+                            cursor: pointer;
+                        " onchange="CRMApp.renderSimpleTasksTable(document.getElementById('task-search-simple').value)">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <button onclick="CRMApp.clearTasksFilters()" class="btn btn-clear-filters" style="
+                        width: 100%;
+                        padding: 12px;
+                        background: linear-gradient(135deg, #666 0%, #555 100%);
+                        color: #fff;
+                        border: 1px solid #777;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                        transition: all 0.2s ease;
+                        font-size: 14px;
+                    " onmouseover="this.style.background='linear-gradient(135deg, #777 0%, #666 100%)'" 
+                       onmouseout="this.style.background='linear-gradient(135deg, #666 0%, #555 100%)'">Clear Filters</button>
+                </div>
+
+                <!-- Tasks Table Section -->
+                <div class="tasks-table-section" style="
+                    flex: 1;
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 20px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <button id="show-tasks-filters-btn" onclick="toggleTasksFilters()" style="
+                                display: none;
+                                align-items: center;
+                                gap: 8px;
+                                background: #444;
+                                border: 1px solid #666;
+                                color: #fff;
+                                padding: 8px 12px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                transition: all 0.2s ease;
+                            " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                                Show Filters
+                            </button>
+                            <div id="tasks-count-simple" class="tasks-count" style="color: #fff; font-size: 16px; font-weight: 500;">0 tasks</div>
+                        </div>
+                        <div id="tasks-pagination-controls" style="display: flex; align-items: center; gap: 12px;">
+                            <button id="tasks-prev-page" title="Previous Page" style="
+                                background: #444;
+                                border: 1px solid #666;
+                                color: #fff;
+                                padding: 6px 10px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                transition: all 0.2s ease;
+                            " onclick="CRMApp.changeTasksPage(-1)" onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                            <span id="tasks-page-info" style="color: #ccc; font-size: 14px; min-width: 60px; text-align: center;">1 / 1</span>
+                            <button id="tasks-next-page" title="Next Page" style="
+                                background: #444;
+                                border: 1px solid #666;
+                                color: #fff;
+                                padding: 6px 10px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                transition: all 0.2s ease;
+                            " onclick="CRMApp.changeTasksPage(1)" onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="tasks-table-container" class="tasks-table-wrapper" style="
+                        flex: 1;
+                        overflow-x: auto;
+                        overflow-y: auto;
+                        border-radius: 12px;
+                        border: 1px solid #333;
+                    ">
+                        <table class="tasks-table" style="
+                            width: 100%;
+                            border-collapse: collapse;
+                            background: #1f1f1f;
+                        ">
+                            <thead style="
+                                background: linear-gradient(135deg, #333 0%, #2a2a2a 100%);
+                                position: sticky;
+                                top: 0;
+                                z-index: 10;
+                            ">
+                                <tr>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Task</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Associated With</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Company</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Actions</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Due Date</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Priority</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tasks-table-body-simple">
+                                <tr>
+                                    <td colspan="6" style="padding: 40px; text-align: center; color: #888; font-style: italic;">Loading tasks...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        tasksView.innerHTML = tasksHTML;
+
+        console.log("Tasks HTML created and injected");
+
+        // Apply layout styles
+        const layoutStyles = `
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100vh - 120px) !important;
+            background: #1a1a1a !important;
+            color: #fff !important;
+            margin-top: 32px !important;
+            padding: 20px !important;
+            border-radius: 20px !important;
+            overflow: hidden !important;
+        `;
+        tasksView.style.cssText = layoutStyles;
+
+        console.log("Applied direct styles to tasks-view");
+
+        // Initialize tasks UI
+        setTimeout(() => {
+            this.initSimpleTasksUI();
+            console.log("Simple tasks UI initialized");
+        }, 100);
+    },
+
+    // Render the accounts page with enhanced layout and functionality
+    renderAccountsPage() {
+        console.log("renderAccountsPage called");
+        const accountsView = document.getElementById('accounts-view');
+        if (!accountsView) {
+            console.error('accounts-view element not found');
+            return;
+        }
+
+        console.log("Creating accounts HTML with classes");
+        const accountsHTML = `
+            <div class="accounts-header" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #333;
+            ">
+                <h2 style="
+                    margin: 0;
+                    color: #fff;
+                    font-size: 28px;
+                    font-weight: 600;
+                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+                ">All Accounts</h2>
+            </div>
+            <div class="accounts-content" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
+                <!-- Filters Sidebar -->
+                <div id="accounts-filters-sidebar" class="filters-sidebar" style="
+                    min-width: 280px;
+                    max-width: 320px;
+                    flex-shrink: 0;
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 20px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 15px;
+                    transition: all 0.3s ease;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 class="filters-title" style="color: #fff; margin: 0; font-size: 18px;">Filters</h3>
+                        <button id="toggle-accounts-filters-btn" onclick="toggleAccountsFilters()" style="
+                            background: #444;
+                            border: 1px solid #666;
+                            color: #fff;
+                            padding: 6px 10px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" style="color: #ccc; font-size: 14px; margin-bottom: 5px; display: block;">Search</label>
+                        <input type="text" id="account-search-simple" placeholder="Search accounts..." class="filter-input" style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            background: #333;
+                            color: #fff;
+                            font-size: 14px;
+                            transition: border-color 0.2s ease;
+                        " oninput="crmApp.renderSimpleAccountsTable(this.value)">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" style="color: #ccc; font-size: 14px; margin-bottom: 5px; display: block;">Industry</label>
+                        <select id="account-industry-filter" class="filter-select" style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            background: #333;
+                            color: #fff;
+                            font-size: 14px;
+                            cursor: pointer;
+                        " onchange="crmApp.renderSimpleAccountsTable(document.getElementById('account-search-simple').value)">
+                            <option value="">All Industries</option>
+                        </select>
+                    </div>
+                    <button onclick="CRMApp.clearAccountsFilters()" class="btn btn-clear-filters" style="
+                        width: 100%;
+                        padding: 12px;
+                        background: linear-gradient(135deg, #666 0%, #555 100%);
+                        color: #fff;
+                        border: 1px solid #777;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                        transition: all 0.2s ease;
+                        font-size: 14px;
+                    " onmouseover="this.style.background='linear-gradient(135deg, #777 0%, #666 100%)'" 
+                       onmouseout="this.style.background='linear-gradient(135deg, #666 0%, #555 100%)'">Clear Filters</button>
+                </div>
+
+                <!-- Accounts Table Section -->
+                <div class="accounts-table-section" style="
+                    flex: 1;
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 24px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    flex-direction: column;
+                    min-width: 0;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div id="accounts-count-simple" class="accounts-count" style="
+                                color: #fff;
+                                font-size: 16px;
+                                font-weight: 500;
+                            ">Loading accounts...</div>
+                            
+                            <!-- Show Filters Button (hidden by default) -->
+                            <button id="show-accounts-filters-btn" onclick="toggleAccountsFilters()" style="
+                                display: none;
+                                background: #4a90e2;
+                                border: 1px solid #5ba0f2;
+                                color: #fff;
+                                padding: 8px 12px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.2s ease;
+                                align-items: center;
+                                gap: 6px;
+                            " onmouseover="this.style.background='#5ba0f2'" onmouseout="this.style.background='#4a90e2'">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                                </svg>
+                                Show Filters
+                            </button>
+                            
+                            <!-- Pagination Controls -->
+                            <div id="accounts-pagination-controls" style="
+                                display: none;
+                                align-items: center;
+                                gap: 10px;
+                                margin-left: auto;
+                            ">
+                                <button id="accounts-prev-page" onclick="changeAccountsPage(-1)" style="
+                                    background: #444;
+                                    border: 1px solid #666;
+                                    color: #fff;
+                                    padding: 6px 10px;
+                                    border-radius: 6px;
+                                    cursor: pointer;
+                                    display: flex;
+                                    align-items: center;
+                                    transition: all 0.2s ease;
+                                " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="15 18 9 12 15 6"></polyline>
+                                    </svg>
+                                </button>
+                                <span id="accounts-page-info" style="color: #ccc; font-size: 14px; min-width: 60px; text-align: center;">1 / 1</span>
+                                <button id="accounts-next-page" onclick="changeAccountsPage(1)" style="
+                                    background: #444;
+                                    border: 1px solid #666;
+                                    color: #fff;
+                                    padding: 6px 10px;
+                                    border-radius: 6px;
+                                    cursor: pointer;
+                                    display: flex;
+                                    align-items: center;
+                                    transition: all 0.2s ease;
+                                " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="accounts-table-container" class="accounts-table-wrapper" style="
+                        flex: 1;
+                        overflow: auto;
+                        border-radius: 12px;
+                        border: 1px solid #333;
+                        min-width: 0;
+                    ">
+                        <table class="accounts-table" style="
+                            width: 100%;
+                            min-width: 800px;
+                            border-collapse: collapse;
+                            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                            table-layout: fixed;
+                        ">
+                            <thead>
+                                <tr style="background: linear-gradient(135deg, #333 0%, #2a2a2a 100%); border-bottom: 2px solid #444;">
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; width: 25%; min-width: 200px; white-space: nowrap;">Company Name</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; width: 15%; min-width: 120px; white-space: nowrap;">Phone</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; width: 20%; min-width: 150px; white-space: nowrap;">Location</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; width: 15%; min-width: 120px; white-space: nowrap;">Industry</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; width: 15%; min-width: 120px; white-space: nowrap;">Contacts</th>
+                                    <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; width: 10%; min-width: 100px; white-space: nowrap;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accounts-table-body-simple">
+                                <!-- Account rows will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        console.log("Accounts HTML created and injected");
+        accountsView.innerHTML = accountsHTML;
+
+        // Apply layout styles directly to the accounts-view element for reliability
+        const layoutStyles = `
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100vh - 120px) !important;
+            background: #1a1a1a !important;
+            color: #fff !important;
+            margin-top: 32px !important;
+            padding: 20px !important;
+            border-radius: 20px !important;
+            overflow: hidden !important;
+        `;
+        accountsView.style.cssText = layoutStyles;
+        console.log("Applied direct styles to accounts-view:", layoutStyles);
+
+        // Initialize the simple accounts functionality
+        this.initSimpleAccountsUI();
+        console.log("Simple accounts UI initialized");
+        
+        // Initialize button visibility after UI is ready
+        setTimeout(() => {
+            // Show pagination controls if we have more than 50 accounts (for testing, show always)
+            const paginationControls = document.getElementById('accounts-pagination-controls');
+            if (paginationControls) {
+                // For now, always show pagination controls so you can see them
+                paginationControls.style.display = 'flex';
+                
+                // Update pagination info
+                const pageInfo = document.getElementById('accounts-page-info');
+                if (pageInfo) {
+                    pageInfo.textContent = '1 / 1';
+                }
+            }
+            
+            // Ensure filters sidebar is visible
+            const filtersSidebar = document.getElementById('accounts-filters-sidebar');
+            if (filtersSidebar) {
+                filtersSidebar.style.display = 'flex';
+            }
+        }, 100);
+    },
+
+    // Initialize simple accounts UI with basic functionality
+    initSimpleAccountsUI() {
+        console.log("Initializing simple accounts UI");
+        console.log(`Found ${this.accounts ? this.accounts.length : 0} accounts from Firebase`);
+        
+        // Populate industry filter
+        this.populateAccountIndustryFilter();
+        
+        // Render the accounts table
+        this.renderSimpleAccountsTable();
+    },
+
+    // Populate the industry filter dropdown for accounts
+    populateAccountIndustryFilter() {
+        const industryFilter = document.getElementById('account-industry-filter');
+        if (!industryFilter) return;
+        
+        // Get unique industries from accounts
+        let industries = Array.from(new Set(this.accounts.map(a => a.industry))).filter(Boolean);
+        industryFilter.innerHTML = '<option value="">All Industries</option>' + 
+            industries.map(i => `<option value="${i}">${i}</option>`).join('');
+    },
+
+    // Render the accounts table with search and pagination
+    renderSimpleAccountsTable(searchTerm = '', accountsToRender = null) {
+        console.log("Rendering simple accounts table, search:", searchTerm);
+        
+        let filteredAccounts = accountsToRender || this.accounts || [];
+        
+        // Apply search filter
+        if (searchTerm) {
+            filteredAccounts = filteredAccounts.filter(account => 
+                account.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                account.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                account.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                account.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                account.industry?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        // Apply industry filter
+        const industryFilter = document.getElementById('account-industry-filter');
+        if (industryFilter && industryFilter.value) {
+            filteredAccounts = filteredAccounts.filter(account => 
+                account.industry === industryFilter.value
+            );
+        }
+        
+        // Pagination logic
+        const accountsPerPage = 50;
+        const totalPages = Math.ceil(filteredAccounts.length / accountsPerPage);
+        const currentPage = this.currentAccountsPage || 1;
+        const startIndex = (currentPage - 1) * accountsPerPage;
+        const endIndex = startIndex + accountsPerPage;
+        const paginatedAccounts = filteredAccounts.slice(startIndex, endIndex);
+        
+        // Update accounts count
+        const accountsCount = document.getElementById('accounts-count-simple');
+        if (accountsCount) {
+            accountsCount.textContent = `${filteredAccounts.length} account${filteredAccounts.length !== 1 ? 's' : ''}`;
+        }
+        
+        // Update pagination controls
+        this.updateAccountsPaginationControls(currentPage, totalPages, filteredAccounts.length);
+        
+        // Render table rows
+        const tableBody = document.getElementById('accounts-table-body-simple');
+        if (!tableBody) return;
+        
+        if (paginatedAccounts.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="padding: 40px; text-align: center; color: #888; font-style: italic;">
+                        ${searchTerm ? 'No accounts found matching your search.' : 'No accounts available.'}
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tableBody.innerHTML = paginatedAccounts.map(account => {
+            // Get contact count for this account
+            const contactCount = this.contacts.filter(c => c.accountId === account.id).length;
+            
+            // Extract domain from account name for favicon
+            const domain = this.extractDomainFromAccountName(account.name);
+            const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : '';
+            
+            return `
+                <tr style="border-bottom: 1px solid #333; transition: background-color 0.2s ease;" 
+                    onmouseover="this.style.backgroundColor='rgba(255,255,255,0.05)'" 
+                    onmouseout="this.style.backgroundColor='transparent'">
+                    <td style="padding: 16px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            ${faviconUrl ? `<img src="${faviconUrl}" alt="${account.name}" style="width: 24px; height: 24px; border-radius: 4px; flex-shrink: 0;" onerror="this.style.display='none'">` : ''}
+                            <span style="font-weight: 500; cursor: pointer; color: #fff; text-decoration: none;" 
+                                  onclick="CRMApp.showAccountDetails('${account.id}')"
+                                  onmouseover="this.style.color='#ccc'"
+                                  onmouseout="this.style.color='#fff'">${account.name || 'N/A'}</span>
+                        </div>
+                    </td>
+                    <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${account.phone || 'N/A'}</td>
+                    <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${account.city && account.state ? `${account.city}, ${account.state}` : 'N/A'}</td>
+                    <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${account.industry || 'N/A'}</td>
+                    <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${contactCount} contact${contactCount !== 1 ? 's' : ''}</td>
+                    <td style="padding: 16px; white-space: nowrap;">
+                        <button onclick="CRMApp.showAccountDetails('${account.id}')" style="
+                            background: #4a90e2;
+                            border: 1px solid #5ba0f2;
+                            color: #fff;
+                            padding: 6px 12px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='#5ba0f2'" onmouseout="this.style.background='#4a90e2'">
+                            View
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        console.log(`Rendered ${paginatedAccounts.length} accounts`);
+    },
+
+    // Show individual account details page
+    showAccountDetails(accountId) {
+        console.log(`Showing account details for ID: ${accountId}`);
+        const account = this.accounts.find(a => a.id === accountId);
+        if (!account) {
+            console.error('Account not found:', accountId);
+            return;
+        }
+
+        // Switch to a dedicated account details view
+        const accountsView = document.getElementById('accounts-view');
+        if (!accountsView) return;
+
+        // Get contacts for this account
+        const accountContacts = this.contacts.filter(c => c.accountId === accountId);
+        
+        // Get activities for this account
+        const accountActivities = this.activities.filter(a => a.accountId === accountId);
+
+        // Extract domain for favicon
+        const domain = this.extractDomainFromAccountName(account.name);
+        const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : '';
+
+        const accountDetailsHTML = `
+            <div class="account-details-header" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #333;
+            ">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button onclick="crmApp.renderAccountsPage()" style="
+                        background: #444;
+                        border: 1px solid #666;
+                        color: #fff;
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        Back to Accounts
+                    </button>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        ${faviconUrl ? `<img src="${faviconUrl}" alt="${account.name}" style="width: 48px; height: 48px; border-radius: 8px;" onerror="this.style.display='none'">` : ''}
+                        <h2 style="margin: 0; color: #fff; font-size: 28px; font-weight: 600;">${account.name}</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="account-details-content" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
+                <!-- Account Info Section -->
+                <div class="account-info-section" style="
+                    flex: 2;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                    min-width: 0;
+                ">
+                    <!-- Account Information Card -->
+                    <div class="account-info-card" style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 24px;
+                        border-radius: 18px;
+                        border: 1px solid #333;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    ">
+                        <h3 style="margin: 0 0 20px 0; color: #fff; font-size: 20px;">Account Information</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Company Name</label>
+                                <div style="color: #fff; font-size: 16px; font-weight: 500;">${account.name || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Phone</label>
+                                <div style="color: #fff; font-size: 16px;">${account.phone || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Location</label>
+                                <div style="color: #fff; font-size: 16px;">${account.city && account.state ? `${account.city}, ${account.state}` : 'N/A'}</div>
+                            </div>
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Industry</label>
+                                <div style="color: #fff; font-size: 16px;">${account.industry || 'N/A'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Account Contacts -->
+                    <div class="account-contacts-card" style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 24px;
+                        border-radius: 18px;
+                        border: 1px solid #333;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                    ">
+                        <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px;">Contacts (${accountContacts.length})</h3>
+                        <div style="flex: 1; overflow-y: auto; max-height: 300px;">
+                            ${accountContacts.length > 0 ? accountContacts.map(contact => `
+                                <div style="
+                                    padding: 12px;
+                                    border: 1px solid #333;
+                                    border-radius: 8px;
+                                    margin-bottom: 8px;
+                                    cursor: pointer;
+                                    transition: all 0.2s ease;
+                                " onmouseover="this.style.backgroundColor='rgba(255,255,255,0.05)'" 
+                                   onmouseout="this.style.backgroundColor='transparent'"
+                                   onclick="crmApp.showContactDetails('${contact.id}')">
+                                    <div style="color: #fff; font-weight: 500; margin-bottom: 4px;">
+                                        ${contact.firstName} ${contact.lastName}
+                                    </div>
+                                    <div style="color: #ccc; font-size: 14px;">
+                                        ${contact.title || 'No title'} • ${contact.email || 'No email'}
+                                    </div>
+                                </div>
+                            `).join('') : '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No contacts found for this account</div>'}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Widget Panel (same as other pages) -->
+                <div id="account-widget-panel" style="
+                    flex: 1;
+                    min-width: 300px;
+                    max-width: 400px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                ">
+                    <!-- Recent Activities for this Account -->
+                    <div class="widget-card" style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 20px;
+                        border-radius: 18px;
+                        border: 1px solid #333;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    ">
+                        <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px;">Recent Activities</h3>
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            ${accountActivities.length > 0 ? accountActivities.slice(0, 10).map(activity => `
+                                <div style="
+                                    padding: 12px 0;
+                                    border-bottom: 1px solid #333;
+                                    last-child: border-bottom: none;
+                                ">
+                                    <div style="color: #fff; font-size: 14px; margin-bottom: 4px;">
+                                        ${activity.description}
+                                    </div>
+                                    <div style="color: #888; font-size: 12px;">
+                                        ${new Date(activity.createdAt).toLocaleDateString()}
+                                    </div>
+                                </div>
+                            `).join('') : '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No recent activities</div>'}
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="widget-card" style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 20px;
+                        border-radius: 18px;
+                        border: 1px solid #333;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    ">
+                        <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px;">Quick Actions</h3>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <button style="
+                                background: #4a90e2;
+                                border: 1px solid #5ba0f2;
+                                color: #fff;
+                                padding: 12px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.2s ease;
+                                width: 100%;
+                            " onmouseover="this.style.background='#5ba0f2'" onmouseout="this.style.background='#4a90e2'"
+                               onclick="crmApp.showAddContactForm('${accountId}')">
+                                Add Contact
+                            </button>
+                            <button style="
+                                background: #28a745;
+                                border: 1px solid #34ce57;
+                                color: #fff;
+                                padding: 12px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.2s ease;
+                                width: 100%;
+                            " onmouseover="this.style.background='#34ce57'" onmouseout="this.style.background='#28a745'"
+                               onclick="crmApp.addAccountNote('${accountId}')">
+                                Add Note
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        accountsView.innerHTML = accountDetailsHTML;
+        
+        // Apply the same layout styles
+        const layoutStyles = `
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100vh - 120px) !important;
+            background: #1a1a1a !important;
+            color: #fff !important;
+            margin-top: 32px !important;
+            padding: 20px !important;
+            border-radius: 20px !important;
+            overflow: hidden !important;
+        `;
+        accountsView.style.cssText = layoutStyles;
+    },
+
+    // Extract domain from account name for favicon
+    extractDomainFromAccountName(accountName) {
+        if (!accountName) return null;
+        
+        // Common patterns to extract domain
+        const patterns = [
+            // Direct domain patterns
+            /([a-zA-Z0-9-]+\.(com|org|net|edu|gov|co\.uk|ca|au|de|fr|jp|cn|in|br|mx|it|es|ru|nl|se|no|dk|fi|pl|cz|hu|gr|pt|ie|be|ch|at|sk|si|hr|bg|ro|lt|lv|ee|lu|mt|cy))/i,
+            // Company name to domain patterns
+            /^([a-zA-Z0-9\s&-]+)/
+        ];
+        
+        for (const pattern of patterns) {
+            const match = accountName.match(pattern);
+            if (match) {
+                let domain = match[1].toLowerCase();
+                // If it's not already a domain, try to convert company name to domain
+                if (!domain.includes('.')) {
+                    domain = domain.replace(/\s+/g, '').replace(/&/g, 'and') + '.com';
+                }
+                return domain;
+            }
+        }
+        
+        return null;
+    },
+
+    // Show individual contact details page
+    showContactDetails(contactId) {
+        console.log(`Showing contact details for ID: ${contactId}`);
+        const contact = this.contacts.find(c => c.id === contactId);
+        if (!contact) {
+            console.error('Contact not found:', contactId);
+            return;
+        }
+
+        // Find the account for this contact
+        const account = this.accounts.find(a => a.id === contact.accountId);
+        
+        // Get activities for this contact
+        const contactActivities = this.activities.filter(a => a.contactId === contactId);
+
+        // Extract domain for company favicon (if account exists)
+        const domain = account ? this.extractDomainFromAccountName(account.name) : null;
+        const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : '';
+
+        // Switch to contacts view and show contact details
+        const contactsView = document.getElementById('contacts-view');
+        if (!contactsView) return;
+
+        const contactDetailsHTML = `
+            <div class="contact-details-header" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #333;
+            ">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button onclick="CRMApp.renderContactsPage()" style="
+                        background: #444;
+                        border: 1px solid #666;
+                        color: #fff;
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        Back to Contacts
+                    </button>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        ${faviconUrl ? `<img src="${faviconUrl}" alt="${account?.name || 'Company'}" style="width: 48px; height: 48px; border-radius: 8px;" onerror="this.style.display='none'">` : ''}
+                        <h2 style="margin: 0; color: #fff; font-size: 28px; font-weight: 600;">${contact.firstName} ${contact.lastName}</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="contact-details-content" style="display: flex; gap: 20px; flex: 1; overflow: hidden;">
+                <!-- Contact Info Section -->
+                <div class="contact-info-section" style="
+                    flex: 2;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                    min-width: 0;
+                ">
+                    <!-- Contact Information Card -->
+                    <div class="contact-info-card" style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 24px;
+                        border-radius: 18px;
+                        border: 1px solid #333;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    ">
+                        <h3 style="margin: 0 0 20px 0; color: #fff; font-size: 20px;">Contact Information</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Full Name</label>
+                                <div style="color: #fff; font-size: 16px; font-weight: 500;">${contact.firstName} ${contact.lastName}</div>
+                            </div>
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Email</label>
+                                <div style="color: #fff; font-size: 16px;">${contact.email || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Phone</label>
+                                <div style="color: #fff; font-size: 16px;">${contact.phone || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Job Title</label>
+                                <div style="color: #fff; font-size: 16px;">${contact.title || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <label style="color: #ccc; font-size: 14px; margin-bottom: 4px; display: block;">Company</label>
+                                <div style="color: #fff; font-size: 16px;">
+                                    ${account ? `<span style="cursor: pointer; text-decoration: none;" onclick="CRMApp.showAccountDetails('${account.id}')" onmouseover="this.style.color='#ccc'" onmouseout="this.style.color='#fff'">${account.name}</span>` : contact.accountName || 'N/A'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Activities -->
+                    <div class="contact-activities-card" style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 24px;
+                        border-radius: 18px;
+                        border: 1px solid #333;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                    ">
+                        <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px;">Recent Activities (${contactActivities.length})</h3>
+                        <div style="flex: 1; overflow-y: auto; max-height: 300px;">
+                            ${contactActivities.length > 0 ? contactActivities.slice(0, 10).map(activity => `
+                                <div style="
+                                    padding: 12px 0;
+                                    border-bottom: 1px solid #333;
+                                ">
+                                    <div style="color: #fff; font-size: 14px; margin-bottom: 4px;">
+                                        ${activity.description}
+                                    </div>
+                                    <div style="color: #888; font-size: 12px;">
+                                        ${new Date(activity.createdAt).toLocaleDateString()}
+                                    </div>
+                                </div>
+                            `).join('') : '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No recent activities</div>'}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Widget Panel (same as other pages) -->
+                <div id="contact-widget-panel" style="
+                    flex: 1;
+                    min-width: 300px;
+                    max-width: 400px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                ">
+                    <!-- Quick Actions -->
+                    <div class="widget-card" style="
+                        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                        padding: 20px;
+                        border-radius: 18px;
+                        border: 1px solid #333;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    ">
+                        <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 18px;">Quick Actions</h3>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <button style="
+                                background: #4a90e2;
+                                border: 1px solid #5ba0f2;
+                                color: #fff;
+                                padding: 12px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.2s ease;
+                                width: 100%;
+                            " onmouseover="this.style.background='#5ba0f2'" onmouseout="this.style.background='#4a90e2'"
+                               onclick="CRMApp.addContactCall('${contactId}')">
+                                Log Call
+                            </button>
+                            <button style="
+                                background: #28a745;
+                                border: 1px solid #34ce57;
+                                color: #fff;
+                                padding: 12px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.2s ease;
+                                width: 100%;
+                            " onmouseover="this.style.background='#34ce57'" onmouseout="this.style.background='#28a745'"
+                               onclick="CRMApp.addContactNote('${contactId}')">
+                                Add Note
+                            </button>
+                            <button style="
+                                background: #dc3545;
+                                border: 1px solid #e74c3c;
+                                color: #fff;
+                                padding: 12px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.2s ease;
+                                width: 100%;
+                            " onmouseover="this.style.background='#e74c3c'" onmouseout="this.style.background='#dc3545'"
+                               onclick="CRMApp.sendContactEmail('${contactId}')">
+                                Send Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        contactsView.innerHTML = contactDetailsHTML;
+        
+        // Apply the same layout styles
+        const layoutStyles = `
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100vh - 120px) !important;
+            background: #1a1a1a !important;
+            color: #fff !important;
+            margin-top: 32px !important;
+            padding: 20px !important;
+            border-radius: 20px !important;
+            overflow: hidden !important;
+        `;
+        contactsView.style.cssText = layoutStyles;
+    },
+
+    // Update pagination controls for accounts
+    updateAccountsPaginationControls(currentPage, totalPages, totalAccounts) {
+        const paginationControls = document.getElementById('accounts-pagination-controls');
+        const prevButton = document.getElementById('accounts-prev-page');
+        const nextButton = document.getElementById('accounts-next-page');
+        const pageInfo = document.getElementById('accounts-page-info');
+        
+        if (!paginationControls) return;
+        
+        // Show/hide pagination based on total accounts
+        if (totalAccounts > 50) {
+            paginationControls.style.display = 'flex';
+        } else {
+            paginationControls.style.display = 'none';
+        }
+        
+        // Update page info
+        if (pageInfo) {
+            pageInfo.textContent = `${currentPage} / ${Math.max(1, totalPages)}`;
+        }
+        
+        // Update button states
+        if (prevButton) {
+            prevButton.disabled = currentPage <= 1;
+            prevButton.style.opacity = currentPage <= 1 ? '0.5' : '1';
+            prevButton.style.cursor = currentPage <= 1 ? 'not-allowed' : 'pointer';
+        }
+        
+        if (nextButton) {
+            nextButton.disabled = currentPage >= totalPages;
+            nextButton.style.opacity = currentPage >= totalPages ? '0.5' : '1';
+            nextButton.style.cursor = currentPage >= totalPages ? 'not-allowed' : 'pointer';
+        }
+    },
+
     initSimpleContactsUI() {
         console.log("Initializing simple contacts UI");
         console.log(`Found ${this.contacts ? this.contacts.length : 0} contacts from Firebase`);
@@ -538,7 +1961,7 @@ const CRMApp = {
     },
     
     // Render the contacts table with optional search filter
-    renderSimpleContactsTable(searchTerm = '') {
+    renderSimpleContactsTable(searchTerm = '', contactsToRender = null) {
         console.log("Rendering simple contacts table, search:", searchTerm);
         
         const tableBody = document.getElementById('contacts-table-body-simple');
@@ -550,51 +1973,75 @@ const CRMApp = {
             return;
         }
         
-        // Filter contacts
-        let filteredContacts = this.contacts || [];
+        // Use provided contacts or filter from all contacts
+        let filteredContacts = contactsToRender || this.contacts || [];
+        console.log("Initial contacts for rendering:", filteredContacts.length, filteredContacts);
         
-        if (searchTerm) {
-            filteredContacts = filteredContacts.filter(contact => 
-                (contact.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (contact.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (contact.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (contact.company || '').toLowerCase().includes(searchTerm.toLowerCase())
-            );
-        }
-        
-        if (accountFilter && accountFilter.value) {
-            filteredContacts = filteredContacts.filter(contact => 
-                contact.company === accountFilter.value
-            );
+        // If no specific contacts provided, apply filters
+        if (!contactsToRender) {
+            if (searchTerm) {
+                filteredContacts = filteredContacts.filter(contact => 
+                    (contact.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (contact.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (contact.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (contact.accountName || '').toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }
+            
+            if (accountFilter && accountFilter.value) {
+                filteredContacts = filteredContacts.filter(contact => 
+                    contact.accountName === accountFilter.value
+                );
+            }
+            
+            // Pagination logic (simplified for now)
+            const contactsPerPage = 50;
+            if (filteredContacts.length > contactsPerPage) {
+                filteredContacts = filteredContacts.slice(0, contactsPerPage);
+                console.log(`Showing first ${contactsPerPage} of ${filteredContacts.length} contacts`);
+            }
         }
         
         // Update count
-        contactsCount.textContent = `${filteredContacts.length} contacts`;
+        contactsCount.textContent = `${filteredContacts.length} contact${filteredContacts.length !== 1 ? 's' : ''}`;
+        console.log("About to render table rows for", filteredContacts.length, "contacts");
         
         // Render table rows
         if (filteredContacts.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #888;">No contacts found</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="5" style="padding: 40px; text-align: center; color: #888; font-style: italic;">No contacts found</td></tr>';
         } else {
             tableBody.innerHTML = filteredContacts.map(contact => `
-                <tr style="border-bottom: 1px solid #555;">
-                    <td style="padding: 12px; color: #fff;">
-                        <span onclick="CRMApp.showContactDetail('${contact.id}')" style="
+                <tr style="border-bottom: 1px solid #333; transition: background-color 0.2s ease;" 
+                    onmouseover="this.style.backgroundColor='rgba(255,255,255,0.05)'" 
+                    onmouseout="this.style.backgroundColor='transparent'">
+                    <td style="padding: 16px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <span onclick="CRMApp.showContactDetails('${contact.id}')" style="
                             cursor: pointer;
-                            color: #4CAF50;
-                            text-decoration: underline;
+                            color: #fff;
                             font-weight: 500;
+                            text-decoration: none;
                         " 
-                        onmouseover="this.style.color='#66BB6A'"
-                        onmouseout="this.style.color='#4CAF50'">
+                        onmouseover="this.style.color='#ccc'"
+                        onmouseout="this.style.color='#fff'">
                             ${(contact.firstName || '') + ' ' + (contact.lastName || '')}
                         </span>
                     </td>
-                    <td style="padding: 12px; color: #fff; width: 120px;">${contact.phone || contact.id || 'N/A'}</td>
-                    <td style="padding: 12px; color: #fff;">${contact.email || 'N/A'}</td>
-                    <td style="padding: 12px; color: #fff;">${contact.company || 'N/A'}</td>
-                    <td style="padding: 12px;">
-                        <button onclick="alert('Call ${contact.firstName}')" style="margin-right: 5px; padding: 4px 8px; background: #28a745; color: #fff; border: none; border-radius: 3px; font-size: 12px;">Call</button>
-                        <button onclick="alert('Email ${contact.email}')" style="margin-right: 5px; padding: 4px 8px; background: #007bff; color: #fff; border: none; border-radius: 3px; font-size: 12px;">Email</button>
+                    <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${contact.phone || 'N/A'}</td>
+                    <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${contact.email || 'N/A'}</td>
+                    <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${contact.accountName || 'N/A'}</td>
+                    <td style="padding: 16px; white-space: nowrap;">
+                        <button onclick="CRMApp.showContactDetails('${contact.id}')" style="
+                            background: #4a90e2;
+                            border: 1px solid #5ba0f2;
+                            color: #fff;
+                            padding: 6px 12px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='#5ba0f2'" onmouseout="this.style.background='#4a90e2'">
+                            View
+                        </button>
                     </td>
                 </tr>
             `).join('');
@@ -608,7 +2055,7 @@ const CRMApp = {
         const accountFilter = document.getElementById('account-filter-simple');
         if (!accountFilter) return;
         
-        const companies = [...new Set((this.contacts || []).map(c => c.company).filter(Boolean))];
+        const companies = [...new Set((this.contacts || []).map(c => c.accountName).filter(Boolean))];
         
         accountFilter.innerHTML = '<option value="">All Accounts</option>' + 
             companies.map(company => `<option value="${company}">${company}</option>`).join('');
@@ -2521,6 +3968,1140 @@ const CRMApp = {
         return '';
     },
 
+    // Tasks page functionality
+    initSimpleTasksUI() {
+        console.log("Initializing simple tasks UI");
+        
+        // Initialize tasks data if not present
+        if (!this.tasks) {
+            this.tasks = this.generateSampleTasks();
+        }
+        
+        // Initialize pagination
+        this.currentTasksPage = 1;
+        this.currentTaskType = 'all';
+        
+        // Render initial tasks table
+        this.renderSimpleTasksTable();
+        
+        // Update task counts in tabs
+        this.updateTaskCounts();
+    },
+
+    generateSampleTasks() {
+        const taskTypes = ['call', 'email', 'linkedin'];
+        const priorities = ['high', 'medium', 'low'];
+        const statuses = ['pending', 'in-progress', 'completed'];
+        const sampleTasks = [];
+
+        // Generate sample tasks based on existing contacts and accounts
+        const contacts = this.contacts || [];
+        const accounts = this.accounts || [];
+
+        for (let i = 0; i < 75; i++) {
+            const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+            const priority = priorities[Math.floor(Math.random() * priorities.length)];
+            const status = statuses[Math.floor(Math.random() * statuses.length)];
+            
+            // Randomly assign to contact or account
+            const useContact = Math.random() > 0.5;
+            const contact = useContact && contacts.length > 0 ? contacts[Math.floor(Math.random() * contacts.length)] : null;
+            const account = accounts.length > 0 ? accounts[Math.floor(Math.random() * accounts.length)] : null;
+
+            const taskDescriptions = {
+                call: ['Follow up call', 'Discovery call', 'Demo call', 'Check-in call'],
+                email: ['Send proposal', 'Follow up email', 'Introduction email', 'Thank you email'],
+                linkedin: ['Connect on LinkedIn', 'Send LinkedIn message', 'Endorse skills', 'Share content']
+            };
+
+            const descriptions = taskDescriptions[taskType];
+            const description = descriptions[Math.floor(Math.random() * descriptions.length)];
+
+            // Generate due date (some past, some future)
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + Math.floor(Math.random() * 30) - 15);
+
+            sampleTasks.push({
+                id: `task-${i + 1}`,
+                type: taskType,
+                description: description,
+                priority: priority,
+                status: status,
+                dueDate: dueDate,
+                contactId: contact?.id || null,
+                contactName: contact ? `${contact.firstName} ${contact.lastName}` : null,
+                accountId: account?.id || null,
+                accountName: account?.name || null,
+                createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
+            });
+        }
+
+        return sampleTasks;
+    },
+
+    switchTaskTab(taskType) {
+        console.log(`Switching to task tab: ${taskType}`);
+        this.currentTaskType = taskType;
+        this.currentTasksPage = 1; // Reset to first page when switching tabs
+
+        // Update tab styling
+        document.querySelectorAll('.task-tab').forEach(tab => {
+            tab.style.background = 'transparent';
+            tab.style.color = '#ccc';
+        });
+
+        const activeTab = document.getElementById(`${taskType === 'all' ? 'all' : taskType === 'calls' ? 'call' : taskType === 'emails' ? 'email' : 'linkedin'}-tasks-tab`);
+        if (activeTab) {
+            activeTab.style.background = 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)';
+            activeTab.style.color = '#fff';
+        }
+
+        // Update header title
+        const header = document.querySelector('.tasks-header h2');
+        if (header) {
+            const titles = {
+                all: 'All Tasks',
+                calls: 'Call Tasks',
+                emails: 'Email Tasks',
+                linkedin: 'LinkedIn Tasks'
+            };
+            header.textContent = titles[taskType] || 'All Tasks';
+        }
+
+        // Re-render table with filtered tasks
+        this.renderSimpleTasksTable();
+    },
+
+    renderSimpleTasksTable(searchTerm = '', tasksToRender = null) {
+        console.log("Rendering simple tasks table, search:", searchTerm);
+        
+        const tableBody = document.getElementById('tasks-table-body-simple');
+        const tasksCount = document.getElementById('tasks-count-simple');
+        
+        if (!tableBody || !tasksCount) {
+            console.log("Table elements not found");
+            return;
+        }
+        
+        // Use provided tasks or filter from all tasks
+        let filteredTasks = tasksToRender || this.tasks || [];
+        console.log("Initial tasks for rendering:", filteredTasks.length);
+        
+        // If no specific tasks provided, apply filters
+        if (!tasksToRender) {
+            // Filter by task type (tab)
+            if (this.currentTaskType !== 'all') {
+                const typeMap = { calls: 'call', emails: 'email', linkedin: 'linkedin' };
+                filteredTasks = filteredTasks.filter(task => task.type === typeMap[this.currentTaskType]);
+            }
+
+            // Apply search filter
+            if (searchTerm) {
+                filteredTasks = filteredTasks.filter(task =>
+                    (task.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (task.contactName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (task.accountName || '').toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }
+            
+            // Apply priority filter
+            const priorityFilter = document.getElementById('task-priority-filter');
+            if (priorityFilter && priorityFilter.value) {
+                filteredTasks = filteredTasks.filter(task => task.priority === priorityFilter.value);
+            }
+
+            // Apply status filter
+            const statusFilter = document.getElementById('task-status-filter');
+            if (statusFilter && statusFilter.value) {
+                filteredTasks = filteredTasks.filter(task => task.status === statusFilter.value);
+            }
+        }
+        
+        // Pagination logic
+        const tasksPerPage = 50;
+        const totalPages = Math.ceil(filteredTasks.length / tasksPerPage);
+        const currentPage = this.currentTasksPage || 1;
+        const startIndex = (currentPage - 1) * tasksPerPage;
+        const endIndex = startIndex + tasksPerPage;
+        const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+        
+        // Update count
+        tasksCount.textContent = `${filteredTasks.length} task${filteredTasks.length !== 1 ? 's' : ''}`;
+        
+        // Update pagination controls
+        this.updateTasksPaginationControls(currentPage, totalPages, filteredTasks.length);
+        
+        // Render table rows
+        if (paginatedTasks.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="padding: 40px; text-align: center; color: #888; font-style: italic;">No tasks found</td></tr>';
+        } else {
+            tableBody.innerHTML = paginatedTasks.map(task => {
+                const priorityColors = {
+                    high: '#ff6b6b',
+                    medium: '#ffa726',
+                    low: '#66bb6a'
+                };
+
+                const typeIcons = {
+                    call: '📞',
+                    email: '✉️',
+                    linkedin: '💼'
+                };
+
+                const dueDateFormatted = task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date';
+                const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed';
+
+                return `
+                    <tr style="border-bottom: 1px solid #333; transition: background-color 0.2s ease;" 
+                        onmouseover="this.style.backgroundColor='rgba(255,255,255,0.05)'" 
+                        onmouseout="this.style.backgroundColor='transparent'">
+                        <td style="padding: 16px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 16px;">${typeIcons[task.type] || '📋'}</span>
+                                <span style="font-weight: 500;">${task.description || 'N/A'}</span>
+                            </div>
+                        </td>
+                        <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${task.contactName ? `<span style="color: #fff; cursor: pointer;" onclick="CRMApp.showContactDetails('${task.contactId}')">${task.contactName}</span>` : 'N/A'}
+                        </td>
+                        <td style="padding: 16px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${task.accountName ? `<span style="color: #fff; cursor: pointer;" onclick="CRMApp.showAccountDetails('${task.accountId}')">${task.accountName}</span>` : 'N/A'}
+                        </td>
+                        <td style="padding: 16px; white-space: nowrap;">
+                            <button onclick="CRMApp.completeTask('${task.id}')" style="
+                                background: ${task.status === 'completed' ? '#66bb6a' : '#4a90e2'};
+                                border: 1px solid ${task.status === 'completed' ? '#81c784' : '#5ba0f2'};
+                                color: #fff;
+                                padding: 6px 12px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                transition: all 0.2s ease;
+                                margin-right: 8px;
+                            " onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                                ${task.status === 'completed' ? '✓ Done' : 'Complete'}
+                            </button>
+                        </td>
+                        <td style="padding: 16px; color: ${isOverdue ? '#ff6b6b' : '#ccc'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${dueDateFormatted}${isOverdue ? ' (Overdue)' : ''}
+                        </td>
+                        <td style="padding: 16px; white-space: nowrap;">
+                            <span style="
+                                background: ${priorityColors[task.priority] || '#666'};
+                                color: #fff;
+                                padding: 4px 8px;
+                                border-radius: 4px;
+                                font-size: 12px;
+                                font-weight: 500;
+                                text-transform: capitalize;
+                            ">${task.priority}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    },
+
+    updateTaskCounts() {
+        const allCount = this.tasks?.length || 0;
+        const callCount = this.tasks?.filter(t => t.type === 'call').length || 0;
+        const emailCount = this.tasks?.filter(t => t.type === 'email').length || 0;
+        const linkedinCount = this.tasks?.filter(t => t.type === 'linkedin').length || 0;
+
+        const allCountEl = document.getElementById('all-tasks-count');
+        const callCountEl = document.getElementById('call-tasks-count');
+        const emailCountEl = document.getElementById('email-tasks-count');
+        const linkedinCountEl = document.getElementById('linkedin-tasks-count');
+
+        if (allCountEl) allCountEl.textContent = allCount;
+        if (callCountEl) callCountEl.textContent = callCount;
+        if (emailCountEl) emailCountEl.textContent = emailCount;
+        if (linkedinCountEl) linkedinCountEl.textContent = linkedinCount;
+    },
+
+    updateTasksPaginationControls(currentPage, totalPages, totalTasks) {
+        const pageInfo = document.getElementById('tasks-page-info');
+        const prevBtn = document.getElementById('tasks-prev-page');
+        const nextBtn = document.getElementById('tasks-next-page');
+
+        if (pageInfo) {
+            pageInfo.textContent = `${currentPage} / ${totalPages}`;
+        }
+
+        if (prevBtn) {
+            prevBtn.disabled = currentPage <= 1;
+            prevBtn.style.opacity = currentPage <= 1 ? '0.5' : '1';
+            prevBtn.style.cursor = currentPage <= 1 ? 'not-allowed' : 'pointer';
+        }
+
+        if (nextBtn) {
+            nextBtn.disabled = currentPage >= totalPages;
+            nextBtn.style.opacity = currentPage >= totalPages ? '0.5' : '1';
+            nextBtn.style.cursor = currentPage >= totalPages ? 'not-allowed' : 'pointer';
+        }
+    },
+
+    changeTasksPage(direction) {
+        const filteredTasks = this.getFilteredTasks();
+        const totalPages = Math.ceil(filteredTasks.length / 50);
+        
+        this.currentTasksPage = Math.max(1, Math.min(totalPages, this.currentTasksPage + direction));
+        this.renderSimpleTasksTable();
+    },
+
+    getFilteredTasks() {
+        let filteredTasks = this.tasks || [];
+        
+        // Filter by task type
+        if (this.currentTaskType !== 'all') {
+            const typeMap = { calls: 'call', emails: 'email', linkedin: 'linkedin' };
+            filteredTasks = filteredTasks.filter(task => task.type === typeMap[this.currentTaskType]);
+        }
+
+        // Apply search filter
+        const searchTerm = document.getElementById('task-search-simple')?.value || '';
+        if (searchTerm) {
+            filteredTasks = filteredTasks.filter(task =>
+                (task.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (task.contactName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (task.accountName || '').toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        // Apply priority filter
+        const priorityFilter = document.getElementById('task-priority-filter');
+        if (priorityFilter && priorityFilter.value) {
+            filteredTasks = filteredTasks.filter(task => task.priority === priorityFilter.value);
+        }
+
+        // Apply status filter
+        const statusFilter = document.getElementById('task-status-filter');
+        if (statusFilter && statusFilter.value) {
+            filteredTasks = filteredTasks.filter(task => task.status === statusFilter.value);
+        }
+
+        return filteredTasks;
+    },
+
+    clearTasksFilters() {
+        // Clear all filter inputs
+        const searchInput = document.getElementById('task-search-simple');
+        const priorityFilter = document.getElementById('task-priority-filter');
+        const statusFilter = document.getElementById('task-status-filter');
+
+        if (searchInput) searchInput.value = '';
+        if (priorityFilter) priorityFilter.value = '';
+        if (statusFilter) statusFilter.value = '';
+
+        // Re-render table
+        this.renderSimpleTasksTable();
+    },
+
+    completeTask(taskId) {
+        const task = this.tasks?.find(t => t.id === taskId);
+        if (task) {
+            task.status = task.status === 'completed' ? 'pending' : 'completed';
+            this.renderSimpleTasksTable();
+            this.updateTaskCounts();
+            
+            const action = task.status === 'completed' ? 'completed' : 'reopened';
+            this.showNotification(`Task ${action} successfully`, 'success');
+        }
+    },
+
+    // Open sequences functionality
+    openSequences() {
+        console.log('Opening sequences...');
+        this.renderSequencesPage();
+    },
+
+    // Render the sequences page
+    renderSequencesPage() {
+        console.log("renderSequencesPage called");
+        const sequencesView = document.getElementById('sequences-view') || this.createSequencesView();
+        
+        console.log("Creating sequences HTML");
+        const sequencesHTML = `
+            <div class="sequences-header" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #333;
+            ">
+                <h2 style="
+                    margin: 0;
+                    color: #fff;
+                    font-size: 28px;
+                    font-weight: 600;
+                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+                ">Sequences</h2>
+                <button onclick="CRMApp.openCreateSequenceModal()" style="
+                    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                    border: 1px solid #28a745;
+                    color: #fff;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                " onmouseover="this.style.background='linear-gradient(135deg, #218838 0%, #1e7e34 100%)'" 
+                   onmouseout="this.style.background='linear-gradient(135deg, #28a745 0%, #20c997 100%)'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Create Sequence
+                </button>
+            </div>
+
+            <div class="sequences-content" style="
+                background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                padding: 20px;
+                border-radius: 18px;
+                border: 1px solid #333;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                overflow: visible;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            ">
+                <div id="sequences-table-container" class="sequences-table-wrapper" style="
+                    overflow-x: auto;
+                    overflow-y: auto;
+                    border-radius: 12px;
+                    border: 1px solid #333;
+                    flex: 1;
+                    max-height: calc(100vh - 300px);
+                ">
+                    <table class="sequences-table" style="
+                        width: 100%;
+                        border-collapse: collapse;
+                        background: #1f1f1f;
+                        min-width: 1200px;
+                    ">
+                        <thead style="
+                            background: linear-gradient(135deg, #333 0%, #2a2a2a 100%);
+                            position: sticky;
+                            top: 0;
+                            z-index: 10;
+                        ">
+                            <tr>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap; width: 80px;">Active</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap; min-width: 200px;">Name</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Sequence By</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Active</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Value</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Hot Sent</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Bounced</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Open Rate</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Finished</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Scheduled</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Delivered</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Replied</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Interested</th>
+                                <th style="padding: 16px; text-align: left; color: #fff; font-weight: 600; border-bottom: 1px solid #444; white-space: nowrap;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sequences-table-body">
+                            <tr>
+                                <td colspan="14" style="padding: 40px; text-align: center; color: #888; font-style: italic;">Loading sequences...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        sequencesView.innerHTML = sequencesHTML;
+
+        // Apply layout styles
+        const layoutStyles = `
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100vh - 120px) !important;
+            background: #1a1a1a !important;
+            color: #fff !important;
+            margin-top: 32px !important;
+            padding: 20px !important;
+            border-radius: 20px !important;
+            overflow: hidden !important;
+        `;
+        sequencesView.style.cssText = layoutStyles;
+
+        // Initialize sequences data and render
+        setTimeout(() => {
+            this.initSequencesData();
+            this.renderSequencesTable();
+        }, 100);
+
+        // Show the sequences view
+        this.showView('sequences-view');
+    },
+
+    createSequencesView() {
+        const sequencesView = document.createElement('div');
+        sequencesView.id = 'sequences-view';
+        sequencesView.className = 'page-view';
+        sequencesView.style.display = 'none';
+        
+        const mainContentWrapper = document.getElementById('main-content-wrapper');
+        if (mainContentWrapper) {
+            mainContentWrapper.appendChild(sequencesView);
+        }
+        
+        return sequencesView;
+    },
+
+    initSequencesData() {
+        if (!this.sequences) {
+            this.sequences = this.generateSampleSequences();
+        }
+    },
+
+    generateSampleSequences() {
+        const sequenceNames = [
+            'Marketing Emails',
+            'Prospecting Decision Makers', 
+            'HR-new hires',
+            'Prospecting Hotel Owners',
+            'Interested',
+            'test',
+            'Welcome To Power Choosers',
+            'Energy Invoice Received',
+            'HR-new hires',
+            'Not interested',
+            'Invoice Received'
+        ];
+
+        const sequenceTypes = ['LF', 'LP'];
+        
+        return sequenceNames.map((name, index) => ({
+            id: `seq-${index + 1}`,
+            name: name,
+            active: Math.random() > 0.3, // 70% chance of being active
+            sequenceBy: sequenceTypes[Math.floor(Math.random() * sequenceTypes.length)],
+            activeCount: Math.floor(Math.random() * 100),
+            value: Math.floor(Math.random() * 50),
+            hotSent: Math.floor(Math.random() * 300),
+            bounced: Math.floor(Math.random() * 10),
+            openRate: (Math.random() * 100).toFixed(1) + '%',
+            finished: Math.floor(Math.random() * 50),
+            scheduled: Math.floor(Math.random() * 100),
+            delivered: Math.floor(Math.random() * 250),
+            replied: Math.floor(Math.random() * 30),
+            interested: Math.floor(Math.random() * 20),
+            createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
+        }));
+    },
+
+    renderSequencesTable() {
+        const tableBody = document.getElementById('sequences-table-body');
+        if (!tableBody || !this.sequences) return;
+
+        tableBody.innerHTML = this.sequences.map(sequence => `
+            <tr style="border-bottom: 1px solid #333; transition: background-color 0.2s ease;" 
+                onmouseover="this.style.backgroundColor='rgba(255,255,255,0.05)'" 
+                onmouseout="this.style.backgroundColor='transparent'">
+                <td style="padding: 16px; text-align: center;">
+                    <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
+                        <input type="checkbox" ${sequence.active ? 'checked' : ''} 
+                               onchange="CRMApp.toggleSequence('${sequence.id}')"
+                               style="opacity: 0; width: 0; height: 0;">
+                        <span style="
+                            position: absolute;
+                            cursor: pointer;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            bottom: 0;
+                            background-color: ${sequence.active ? '#28a745' : '#ccc'};
+                            transition: .4s;
+                            border-radius: 24px;
+                        ">
+                            <span style="
+                                position: absolute;
+                                content: '';
+                                height: 18px;
+                                width: 18px;
+                                left: ${sequence.active ? '26px' : '3px'};
+                                bottom: 3px;
+                                background-color: white;
+                                transition: .4s;
+                                border-radius: 50%;
+                            "></span>
+                        </span>
+                    </label>
+                </td>
+                <td style="padding: 16px; color: #fff; font-weight: 500;">${sequence.name}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.sequenceBy}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.activeCount}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.value}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.hotSent}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.bounced}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.openRate}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.finished}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.scheduled}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.delivered}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.replied}</td>
+                <td style="padding: 16px; color: #ccc; text-align: center;">${sequence.interested}</td>
+                <td style="padding: 16px; text-align: center;">
+                    <button onclick="CRMApp.editSequence('${sequence.id}')" style="
+                        background: #4a90e2;
+                        border: 1px solid #5ba0f2;
+                        color: #fff;
+                        padding: 6px 12px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        transition: all 0.2s ease;
+                        margin-right: 8px;
+                    " onmouseover="this.style.background='#5ba0f2'" onmouseout="this.style.background='#4a90e2'">
+                        Edit
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    },
+
+    toggleSequence(sequenceId) {
+        const sequence = this.sequences?.find(s => s.id === sequenceId);
+        if (sequence) {
+            sequence.active = !sequence.active;
+            this.renderSequencesTable();
+            const status = sequence.active ? 'activated' : 'deactivated';
+            this.showNotification(`Sequence "${sequence.name}" ${status}`, 'success');
+        }
+    },
+
+    editSequence(sequenceId) {
+        const sequence = this.sequences?.find(s => s.id === sequenceId);
+        if (sequence) {
+            this.showNotification(`Edit sequence "${sequence.name}" - Coming soon!`, 'info');
+        }
+    },
+
+    openCreateSequenceModal() {
+        console.log('Opening create sequence modal...');
+        this.showCreateSequenceModal();
+    },
+
+    showCreateSequenceModal() {
+        // Create modal overlay
+        const modalOverlay = document.createElement('div');
+        modalOverlay.id = 'create-sequence-modal-overlay';
+        modalOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        `;
+
+        // Create modal content
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+            border-radius: 16px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            width: 400px;
+            max-width: 90vw;
+            padding: 0;
+            overflow: hidden;
+        `;
+
+        modalContent.innerHTML = `
+            <div style="
+                padding: 24px;
+                border-bottom: 1px solid #333;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <h3 style="
+                    margin: 0;
+                    color: #fff;
+                    font-size: 20px;
+                    font-weight: 600;
+                ">New Sequence</h3>
+                <button onclick="CRMApp.closeCreateSequenceModal()" style="
+                    background: none;
+                    border: none;
+                    color: #888;
+                    font-size: 20px;
+                    cursor: pointer;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 6px;
+                    transition: all 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                " onmouseover="this.style.color='#fff'; this.style.background='rgba(255,255,255,0.1)'" 
+                   onmouseout="this.style.color='#888'; this.style.background='none'">×</button>
+            </div>
+            
+            <div style="padding: 24px;">
+                <div style="margin-bottom: 20px;">
+                    <label style="
+                        display: block;
+                        color: #fff;
+                        font-size: 14px;
+                        font-weight: 600;
+                        margin-bottom: 8px;
+                    ">Sequence Name</label>
+                    <input 
+                        type="text" 
+                        id="sequence-name-input"
+                        placeholder="Enter sequence name..."
+                        style="
+                            width: 100%;
+                            padding: 12px 16px;
+                            background: #1a1a1a;
+                            border: 1px solid #444;
+                            border-radius: 8px;
+                            color: #fff;
+                            font-size: 14px;
+                            outline: none;
+                            transition: all 0.2s ease;
+                            box-sizing: border-box;
+                        "
+                        onfocus="this.style.borderColor='#4a90e2'; this.style.boxShadow='0 0 0 3px rgba(74, 144, 226, 0.1)'"
+                        onblur="this.style.borderColor='#444'; this.style.boxShadow='none'"
+                    >
+                </div>
+                
+                <div style="
+                    display: flex;
+                    gap: 12px;
+                    justify-content: flex-end;
+                    margin-top: 24px;
+                ">
+                    <button onclick="CRMApp.closeCreateSequenceModal()" style="
+                        background: #333;
+                        border: 1px solid #444;
+                        color: #fff;
+                        padding: 10px 20px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='#404040'" onmouseout="this.style.background='#333'">
+                        Cancel
+                    </button>
+                    <button onclick="CRMApp.createNewSequence()" style="
+                        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                        border: 1px solid #28a745;
+                        color: #fff;
+                        padding: 10px 20px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='linear-gradient(135deg, #218838 0%, #1e7e34 100%)'" 
+                       onmouseout="this.style.background='linear-gradient(135deg, #28a745 0%, #20c997 100%)'">
+                        Create
+                    </button>
+                </div>
+            </div>
+        `;
+
+        modalOverlay.appendChild(modalContent);
+        document.body.appendChild(modalOverlay);
+
+        // Focus on input field
+        setTimeout(() => {
+            const input = document.getElementById('sequence-name-input');
+            if (input) input.focus();
+        }, 100);
+
+        // Close modal when clicking outside
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                this.closeCreateSequenceModal();
+            }
+        });
+
+        // Handle Enter key
+        const input = document.getElementById('sequence-name-input');
+        if (input) {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.createNewSequence();
+                }
+            });
+        }
+    },
+
+    closeCreateSequenceModal() {
+        const modal = document.getElementById('create-sequence-modal-overlay');
+        if (modal) {
+            modal.remove();
+        }
+    },
+
+    createNewSequence() {
+        const input = document.getElementById('sequence-name-input');
+        const sequenceName = input?.value?.trim();
+
+        if (!sequenceName) {
+            this.showNotification('Please enter a sequence name', 'error');
+            return;
+        }
+
+        // Create new sequence object
+        const newSequence = {
+            id: `seq-${Date.now()}`,
+            name: sequenceName,
+            active: true,
+            sequenceBy: 'LF',
+            activeCount: 0,
+            value: 0,
+            hotSent: 0,
+            bounced: 0,
+            openRate: '0.0%',
+            finished: 0,
+            scheduled: 0,
+            delivered: 0,
+            replied: 0,
+            interested: 0,
+            createdAt: new Date()
+        };
+
+        // Add to sequences array
+        if (!this.sequences) {
+            this.sequences = [];
+        }
+        this.sequences.unshift(newSequence); // Add to beginning of array
+
+        // Re-render the table
+        this.renderSequencesTable();
+
+        // Close modal and open sequence builder
+        this.closeCreateSequenceModal();
+        this.showNotification(`Sequence "${sequenceName}" created successfully!`, 'success');
+        
+        // Open the sequence builder page
+        setTimeout(() => {
+            this.openSequenceBuilder(newSequence);
+        }, 500);
+    },
+
+    openSequenceBuilder(sequence) {
+        console.log('Opening sequence builder for:', sequence.name);
+        this.currentSequence = sequence;
+        this.renderSequenceBuilderPage();
+    },
+
+    renderSequenceBuilderPage() {
+        console.log("renderSequenceBuilderPage called");
+        const sequenceBuilderView = document.getElementById('sequence-builder-view') || this.createSequenceBuilderView();
+        
+        const sequenceBuilderHTML = `
+            <div class="sequence-builder-header" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #333;
+            ">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button onclick="CRMApp.showView('sequences-view')" style="
+                        background: #333;
+                        border: 1px solid #444;
+                        color: #fff;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    " onmouseover="this.style.background='#404040'" onmouseout="this.style.background='#333'">
+                        ← Back to Sequences
+                    </button>
+                    <h2 style="
+                        margin: 0;
+                        color: #fff;
+                        font-size: 28px;
+                        font-weight: 600;
+                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+                    ">${this.currentSequence?.name || 'Sequence Builder'}</h2>
+                </div>
+                <button onclick="CRMApp.openAddContactsModal()" style="
+                    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                    border: 1px solid #4a90e2;
+                    color: #fff;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                " onmouseover="this.style.background='linear-gradient(135deg, #357abd 0%, #2968a3 100%)'" 
+                   onmouseout="this.style.background='linear-gradient(135deg, #4a90e2 0%, #357abd 100%)'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <line x1="19" y1="8" x2="24" y2="13"></line>
+                        <line x1="24" y1="8" x2="19" y2="13"></line>
+                    </svg>
+                    Add Contacts
+                </button>
+            </div>
+
+            <!-- Sequence Builder Tabs -->
+            <div class="sequence-builder-tabs" style="
+                display: flex;
+                gap: 2px;
+                margin-bottom: 24px;
+                background: #1a1a1a;
+                border-radius: 12px;
+                padding: 4px;
+                border: 1px solid #333;
+            ">
+                <button onclick="CRMApp.switchSequenceBuilderTab('overview')" 
+                        id="sequence-tab-overview"
+                        class="sequence-tab active" style="
+                    flex: 1;
+                    padding: 12px 24px;
+                    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                    border: none;
+                    border-radius: 8px;
+                    color: #fff;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                ">Overview</button>
+                <button onclick="CRMApp.switchSequenceBuilderTab('contacts')" 
+                        id="sequence-tab-contacts"
+                        class="sequence-tab" style="
+                    flex: 1;
+                    padding: 12px 24px;
+                    background: transparent;
+                    border: none;
+                    border-radius: 8px;
+                    color: #888;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                " onmouseover="if(!this.classList.contains('active')) this.style.background='rgba(255,255,255,0.05)'" 
+                   onmouseout="if(!this.classList.contains('active')) this.style.background='transparent'">Contacts</button>
+            </div>
+
+            <!-- Overview Tab Content -->
+            <div id="sequence-overview-content" class="sequence-tab-content" style="display: block;">
+                <div class="sequence-overview" style="
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 40px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    text-align: center;
+                ">
+                    <div style="
+                        background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                        width: 80px;
+                        height: 80px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin: 0 auto 24px auto;
+                        box-shadow: 0 4px 16px rgba(74, 144, 226, 0.3);
+                    ">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                        </svg>
+                    </div>
+                    
+                    <h3 style="
+                        color: #fff;
+                        font-size: 32px;
+                        font-weight: 700;
+                        margin: 0 0 16px 0;
+                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+                    ">Supercharge your workflow with sequences</h3>
+                    
+                    <p style="
+                        color: #ccc;
+                        font-size: 18px;
+                        line-height: 1.6;
+                        margin: 0 0 32px 0;
+                        max-width: 600px;
+                        margin-left: auto;
+                        margin-right: auto;
+                    ">Harness the power of Power Choosers AI to create multi-step sequences that help you scale your outreach efforts, book more meetings, and close more deals.</p>
+                    
+                    <button onclick="CRMApp.addSequenceStep()" style="
+                        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                        border: 1px solid #28a745;
+                        color: #fff;
+                        padding: 16px 32px;
+                        border-radius: 12px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                        box-shadow: 0 4px 16px rgba(40, 167, 69, 0.3);
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 12px;
+                    " onmouseover="this.style.background='linear-gradient(135deg, #218838 0%, #1e7e34 100%)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(40, 167, 69, 0.4)'" 
+                       onmouseout="this.style.background='linear-gradient(135deg, #28a745 0%, #20c997 100%)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(40, 167, 69, 0.3)'">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add a step
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contacts Tab Content -->
+            <div id="sequence-contacts-content" class="sequence-tab-content" style="display: none;">
+                <div class="sequence-contacts" style="
+                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+                    padding: 20px;
+                    border-radius: 18px;
+                    border: 1px solid #333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    text-align: center;
+                ">
+                    <div style="padding: 40px;">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1" style="margin-bottom: 20px;">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <h4 style="color: #fff; font-size: 20px; margin-bottom: 12px;">No contacts in this sequence yet</h4>
+                        <p style="color: #888; margin-bottom: 24px;">Add contacts to start your sequence outreach.</p>
+                        <button onclick="CRMApp.openAddContactsModal()" style="
+                            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+                            border: 1px solid #4a90e2;
+                            color: #fff;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 600;
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='linear-gradient(135deg, #357abd 0%, #2968a3 100%)'" 
+                           onmouseout="this.style.background='linear-gradient(135deg, #4a90e2 0%, #357abd 100%)'">
+                            Add Contacts
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        sequenceBuilderView.innerHTML = sequenceBuilderHTML;
+
+        // Apply layout styles
+        const layoutStyles = `
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100vh - 120px) !important;
+            background: #1a1a1a !important;
+            color: #fff !important;
+            margin-top: 32px !important;
+            padding: 20px !important;
+            border-radius: 20px !important;
+            overflow: auto !important;
+        `;
+        sequenceBuilderView.style.cssText = layoutStyles;
+
+        // Show the sequence builder view
+        this.showView('sequence-builder-view');
+    },
+
+    createSequenceBuilderView() {
+        const sequenceBuilderView = document.createElement('div');
+        sequenceBuilderView.id = 'sequence-builder-view';
+        sequenceBuilderView.className = 'page-view';
+        sequenceBuilderView.style.display = 'none';
+        
+        const mainContentWrapper = document.getElementById('main-content-wrapper');
+        if (mainContentWrapper) {
+            mainContentWrapper.appendChild(sequenceBuilderView);
+        }
+        
+        return sequenceBuilderView;
+    },
+
+    switchSequenceBuilderTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.sequence-tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (tabName === 'overview' && tab.id === 'sequence-tab-overview') {
+                tab.style.background = 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)';
+                tab.style.color = '#fff';
+                tab.classList.add('active');
+            } else if (tabName === 'contacts' && tab.id === 'sequence-tab-contacts') {
+                tab.style.background = 'linear-gradient(135deg, #4a90e2 0%, #357abd 100%)';
+                tab.style.color = '#fff';
+                tab.classList.add('active');
+            } else {
+                tab.style.background = 'transparent';
+                tab.style.color = '#888';
+            }
+        });
+
+        // Show/hide tab content
+        document.querySelectorAll('.sequence-tab-content').forEach(content => {
+            content.style.display = 'none';
+        });
+
+        if (tabName === 'overview') {
+            document.getElementById('sequence-overview-content').style.display = 'block';
+        } else if (tabName === 'contacts') {
+            document.getElementById('sequence-contacts-content').style.display = 'block';
+        }
+    },
+
+    addSequenceStep() {
+        console.log('Adding sequence step...');
+        this.showNotification('Add sequence step functionality coming soon!', 'info');
+        // TODO: Implement add sequence step modal
+    },
+
+    openAddContactsModal() {
+        console.log('Opening add contacts modal...');
+        this.showNotification('Add contacts to sequence functionality coming soon!', 'info');
+        // TODO: Implement add contacts modal
+    },
+
+    // Open add task modal
+    openAddTaskModal() {
+        console.log('Opening add task modal...');
+        this.showNotification('Add Task modal coming soon!', 'info');
+        // TODO: Implement add task modal
+    },
+
     updateNotifications() {
         this.notifications = [];
         
@@ -2737,6 +5318,30 @@ const CRMApp = {
             console.error('Error saving contact:', error);
             throw error;
         }
+    },
+
+    // Clear accounts filters
+    clearAccountsFilters() {
+        const searchInput = document.getElementById('account-search-simple');
+        const industryFilter = document.getElementById('account-industry-filter');
+        
+        if (searchInput) searchInput.value = '';
+        if (industryFilter) industryFilter.value = '';
+        
+        // Re-render the table with cleared filters
+        this.renderSimpleAccountsTable('');
+    },
+
+    // Clear contacts filters
+    clearContactsFilters() {
+        const searchInput = document.getElementById('contact-search-simple');
+        const accountFilter = document.getElementById('account-filter-simple');
+        
+        if (searchInput) searchInput.value = '';
+        if (accountFilter) accountFilter.value = '';
+        
+        // Re-render the table with cleared filters
+        this.renderSimpleContactsTable('');
     }
 };
 
@@ -2762,6 +5367,173 @@ function formatCurrency(amount) {
         style: 'currency',
         currency: 'USD'
     }).format(amount);
+}
+
+// Toggle filters sidebar visibility
+function toggleFilters() {
+    const sidebar = document.getElementById('filters-sidebar');
+    const toggleBtn = document.getElementById('toggle-filters-btn');
+    const showFiltersBtn = document.getElementById('show-filters-btn');
+    const arrow = toggleBtn ? toggleBtn.querySelector('svg polyline') : null;
+    
+    if (!sidebar) return;
+    
+    const isCollapsed = sidebar.style.marginLeft === '-300px';
+    
+    if (isCollapsed) {
+        // Show filters
+        sidebar.style.marginLeft = '0';
+        sidebar.style.opacity = '1';
+        if (arrow) {
+            arrow.setAttribute('points', '15 18 9 12 15 6'); // Left arrow
+            toggleBtn.title = 'Hide Filters';
+        }
+        if (showFiltersBtn) {
+            showFiltersBtn.style.display = 'none'; // Hide the show filters button
+        }
+    } else {
+        // Hide filters
+        sidebar.style.marginLeft = '-300px';
+        sidebar.style.opacity = '0';
+        if (arrow) {
+            arrow.setAttribute('points', '9 18 15 12 9 6'); // Right arrow
+            toggleBtn.title = 'Show Filters';
+        }
+        if (showFiltersBtn) {
+            showFiltersBtn.style.display = 'flex'; // Show the show filters button
+        }
+    }
+}
+
+// Pagination variables
+
+function changeAccountsPage(direction) {
+    const currentPage = crmApp.currentAccountsPage || 1;
+    const newPage = Math.max(1, currentPage + direction);
+    crmApp.currentAccountsPage = newPage;
+    
+    const searchTerm = document.getElementById('account-search-simple')?.value || '';
+    crmApp.renderSimpleAccountsTable(searchTerm);
+}
+
+function toggleContactsFilters() {
+    const sidebar = document.getElementById('contacts-filters-sidebar');
+    const btn = document.getElementById('toggle-contacts-filters-btn');
+    
+    if (sidebar && btn) {
+        const isCollapsed = sidebar.style.minWidth === '60px';
+        
+        if (isCollapsed) {
+            // Expand
+            sidebar.style.minWidth = '280px';
+            sidebar.style.maxWidth = '320px';
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+        } else {
+            // Collapse
+            sidebar.style.minWidth = '60px';
+            sidebar.style.maxWidth = '60px';
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        }
+    }
+}
+
+function toggleAccountsFilters() {
+    const sidebar = document.getElementById('accounts-filters-sidebar');
+    const btn = document.getElementById('toggle-accounts-filters-btn');
+    
+    if (sidebar && btn) {
+        const isCollapsed = sidebar.style.minWidth === '60px';
+        
+        if (isCollapsed) {
+            // Expand
+            sidebar.style.minWidth = '280px';
+            sidebar.style.maxWidth = '320px';
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+        } else {
+            // Collapse
+            sidebar.style.minWidth = '60px';
+            sidebar.style.maxWidth = '60px';
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        }
+    }
+}
+
+function toggleTasksFilters() {
+    const sidebar = document.getElementById('tasks-filters-sidebar');
+    const showButton = document.getElementById('show-tasks-filters-btn');
+    const toggleButton = document.getElementById('toggle-tasks-filters-btn');
+    
+    if (!sidebar) return;
+    
+    const isCollapsed = sidebar.style.marginLeft === '-320px';
+    
+    if (isCollapsed) {
+        // Show filters
+        sidebar.style.marginLeft = '0';
+        sidebar.style.opacity = '1';
+        if (showButton) showButton.style.display = 'none';
+        if (toggleButton) {
+            toggleButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+        }
+    } else {
+        // Hide filters
+        sidebar.style.marginLeft = '-320px';
+        sidebar.style.opacity = '0';
+        if (showButton) showButton.style.display = 'flex';
+        if (toggleButton) {
+            toggleButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        }
+    }
+}
+
+function changePage(direction) {
+    const totalPages = Math.ceil(totalContacts / contactsPerPage);
+    const newPage = currentPage + direction;
+    
+    if (newPage >= 1 && newPage <= totalPages) {
+        currentPage = newPage;
+        updateContactsDisplay();
+        updatePaginationControls();
+    }
+}
+
+// Update pagination controls visibility and state
+function updatePaginationControls() {
+    const paginationControls = document.getElementById('pagination-controls');
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
+    const pageInfo = document.getElementById('page-info');
+    
+    if (!paginationControls || !prevBtn || !nextBtn || !pageInfo) return;
+    
+    const totalPages = Math.ceil(totalContacts / contactsPerPage);
+    
+    // Show/hide pagination controls based on total contacts
+    if (totalContacts > contactsPerPage) {
+        paginationControls.style.display = 'flex';
+        
+        // Update page info
+        pageInfo.textContent = `${currentPage} / ${totalPages}`;
+        
+        // Enable/disable buttons based on current page
+        prevBtn.style.opacity = currentPage === 1 ? '0.5' : '1';
+        prevBtn.style.cursor = currentPage === 1 ? 'not-allowed' : 'pointer';
+        
+        nextBtn.style.opacity = currentPage === totalPages ? '0.5' : '1';
+        nextBtn.style.cursor = currentPage === totalPages ? 'not-allowed' : 'pointer';
+    } else {
+        paginationControls.style.display = 'none';
+    }
+}
+
+// Update contacts display with pagination
+function updateContactsDisplay() {
+    const startIndex = (currentPage - 1) * contactsPerPage;
+    const endIndex = startIndex + contactsPerPage;
+    const contactsToShow = allContacts.slice(startIndex, endIndex);
+    
+    // Update the contacts table with paginated data
+    CRMApp.renderSimpleContactsTable('', contactsToShow);
 }
 
 function formatNumber(num) {
