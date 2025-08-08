@@ -324,8 +324,18 @@ const CRMApp = {
                 // Sequences View - Render sequences page
                 console.log('Activating sequences view');
                 
-                // Use the fixed version
-                this.renderSequencesPageFixed();
+                try {
+                    // Use the fixed version
+                    this.renderSequencesPageFixed();
+                    console.log('Sequences page rendered successfully');
+                } catch (error) {
+                    console.error('Error rendering sequences page:', error);
+                    activeView.innerHTML = `<div style="padding: 40px; color: #fff; text-align: center;">
+                        <h3>Error loading sequences</h3>
+                        <p style="color: #888;">Error: ${error.message}</p>
+                        <button onclick="location.reload()" style="background: #4a90e2; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-top: 20px;">Reload Page</button>
+                    </div>`;
+                }
                 
                 activeView.style.display = 'block';
                 if (crmWidgetsContainer) {
@@ -5987,7 +5997,12 @@ const CRMApp = {
 
     openCreateSequenceModal() {
         console.log('Opening create sequence modal...');
-        this.showCreateSequenceModal();
+        try {
+            this.showCreateSequenceModal();
+        } catch (error) {
+            console.error('Error opening sequence modal:', error);
+            alert('Error opening sequence modal: ' + error.message);
+        }
     },
 
     showCreateSequenceModal() {
@@ -6229,34 +6244,76 @@ const CRMApp = {
         this.openSequenceBuilder(newSequence);
     },
 
-    openSequenceBuilder(sequence) {
-        console.log('Opening sequence builder for:', sequence.name);
-        this.currentSequence = sequence;
+    async openSequenceBuilder(sequenceOrId) {
+        console.log('Opening sequence builder for:', sequenceOrId);
         
-        // Ensure the sequence builder view exists
-        let sequenceBuilderView = document.getElementById('sequence-builder-view');
-        if (!sequenceBuilderView) {
-            console.log('Creating sequence builder view...');
-            sequenceBuilderView = this.createSequenceBuilderView();
+        let sequence;
+        
+        // Check if we received just an ID string or a full sequence object
+        if (typeof sequenceOrId === 'string') {
+            console.log('Received sequence ID, loading full sequence from Firebase...');
+            const sequenceId = sequenceOrId;
+            
+            // First try to find it in local sequences array
+            sequence = this.sequences?.find(seq => seq.id === sequenceId);
+            
+            if (!sequence) {
+                console.log('Sequence not found locally, loading from Firebase...');
+                try {
+                    const doc = await firebase.firestore().collection('sequences').doc(sequenceId).get();
+                    if (doc.exists) {
+                        sequence = { id: doc.id, ...doc.data() };
+                        console.log('Loaded sequence from Firebase:', sequence);
+                    } else {
+                        console.error('Sequence not found in Firebase');
+                        this.showNotification('Sequence not found', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error loading sequence from Firebase:', error);
+                    this.showNotification('Failed to load sequence', 'error');
+                    return;
+                }
+            }
+        } else {
+            // We received a full sequence object
+            sequence = sequenceOrId;
         }
         
+        console.log('Final sequence object:', sequence);
+        console.log('Sequence steps:', sequence.steps?.length || 0);
+        
+        this.currentSequence = sequence;
+        
+        // Store sequence ID for recovery
+        if (sequence && sequence.id) {
+            sessionStorage.setItem('currentSequenceId', sequence.id);
+            console.log('Stored sequence ID:', sequence.id);
+        }
+        
+        // Render the sequence builder content
         this.renderSequenceBuilderPage(sequence);
+        
+        // Switch to the sequence builder view
+        console.log('Switching to sequence-builder-view');
+        this.showView('sequence-builder-view');
     },
 
     renderSequenceBuilderPage(sequence) {
         console.log("renderSequenceBuilderPage called for sequence:", sequence);
-        const sequenceBuilderView = document.getElementById('sequence-builder-view') || this.createSequenceBuilderView();
+        const sequenceBuilderView = document.getElementById('sequence-builder-view');
         
         // Store current sequence for reference
         this.currentSequence = sequence;
         
+        // Create modern Apollo-style sequence builder
         const sequenceBuilderHTML = `
             <div class="sequence-builder-header" style="
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                margin-bottom: 24px;
-                padding-bottom: 16px;
+                margin-bottom: 32px;
+                padding-bottom: 20px;
                 border-bottom: 1px solid #333;
             ">
                 <div style="display: flex; align-items: center; gap: 16px;">
@@ -6264,10 +6321,11 @@ const CRMApp = {
                         background: rgba(255, 255, 255, 0.1);
                         border: 1px solid #555;
                         color: #fff;
-                        padding: 8px 16px;
-                        border-radius: 6px;
+                        padding: 10px 16px;
+                        border-radius: 8px;
                         cursor: pointer;
                         font-size: 14px;
+                        font-weight: 500;
                         transition: all 0.2s ease;
                         display: flex;
                         align-items: center;
@@ -6275,23 +6333,23 @@ const CRMApp = {
                     " onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
                         ← Back to Sequences
                     </button>
-                    <h2 style="margin: 0; color: #fff; font-size: 24px; font-weight: 600;">${sequence?.name || 'Sequence Builder'}</h2>
+                    <h1 style="margin: 0; color: #fff; font-size: 28px; font-weight: 700;">${sequence?.name || 'New Sequence'}</h1>
                 </div>
                 <button onclick="CRMApp.addContactsToSequence()" style="
                     background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
                     border: 1px solid #5ba0f2;
                     color: #fff;
-                    padding: 10px 20px;
+                    padding: 12px 24px;
                     border-radius: 8px;
                     cursor: pointer;
                     font-size: 14px;
                     font-weight: 600;
                     transition: all 0.2s ease;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                " onmouseover="this.style.background='linear-gradient(135deg, #5ba0f2 0%, #4a90e2 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #4a90e2 0%, #357abd 100%)'">
+                " onmouseover="this.style.background='linear-gradient(135deg, #5ba0f2 0%, #4a90e2 100%)'; this.style.transform='translateY(-1px)'" onmouseout="this.style.background='linear-gradient(135deg, #4a90e2 0%, #357abd 100%)'; this.style.transform='translateY(0)'">
                     + Add Contacts
                 </button>
             </div>
@@ -6300,34 +6358,34 @@ const CRMApp = {
             <div class="sequence-tabs" style="
                 display: flex;
                 gap: 8px;
-                margin-bottom: 24px;
+                margin-bottom: 32px;
                 border-bottom: 1px solid #333;
                 padding-bottom: 16px;
             ">
                 <button id="sequence-tab-overview" class="sequence-tab active" onclick="CRMApp.switchSequenceBuilderTab('overview')" style="
-                    padding: 12px 24px;
+                    padding: 14px 28px;
                     background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
                     color: #fff;
                     border: none;
                     border-radius: 8px;
                     cursor: pointer;
-                    font-weight: 500;
+                    font-weight: 600;
                     font-size: 14px;
                     transition: all 0.2s ease;
-                " onmouseover="if(!this.classList.contains('active')) this.style.background='rgba(255,255,255,0.1)'" 
-                   onmouseout="if(!this.classList.contains('active')) this.style.background='transparent'">Overview</button>
+                    box-shadow: 0 2px 4px rgba(74, 144, 226, 0.2);
+                ">Overview</button>
                 <button id="sequence-tab-contacts" class="sequence-tab" onclick="CRMApp.switchSequenceBuilderTab('contacts')" style="
-                    padding: 12px 24px;
+                    padding: 14px 28px;
                     background: transparent;
                     color: #888;
-                    border: none;
+                    border: 1px solid #444;
                     border-radius: 8px;
                     cursor: pointer;
                     font-weight: 500;
                     font-size: 14px;
                     transition: all 0.2s ease;
-                " onmouseover="if(!this.classList.contains('active')) this.style.background='rgba(255,255,255,0.1)'" 
-                   onmouseout="if(!this.classList.contains('active')) this.style.background='transparent'">Contacts (${sequence?.contacts?.length || 0})</button>
+                " onmouseover="if(!this.classList.contains('active')) { this.style.background='rgba(255,255,255,0.05)'; this.style.color='#fff'; }" 
+                   onmouseout="if(!this.classList.contains('active')) { this.style.background='transparent'; this.style.color='#888'; }">Contacts (${sequence?.contacts?.length || 0})</button>
             </div>
 
             <!-- Overview Tab Content -->
@@ -6343,125 +6401,647 @@ const CRMApp = {
 
         sequenceBuilderView.innerHTML = sequenceBuilderHTML;
 
-        // Apply layout styles
+        // Apply modern layout styles
         const layoutStyles = `
             display: flex !important;
             flex-direction: column !important;
             height: calc(100vh - 120px) !important;
-            background: #1a1a1a !important;
+            background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
             color: #fff !important;
             margin-top: 32px !important;
-            padding: 20px !important;
+            padding: 32px !important;
             border-radius: 20px !important;
             overflow: auto !important;
+            border: 1px solid #333 !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
         `;
         sequenceBuilderView.style.cssText = layoutStyles;
 
-        // Show the sequence builder view
-        console.log('About to show sequence builder view');
-        console.log('Sequence builder view element:', sequenceBuilderView);
-        console.log('Sequence builder view HTML length:', sequenceBuilderView.innerHTML.length);
+        // Show the sequence builder view - FORCE VIEW SWITCH
+        console.log('🚀 FORCING VIEW SWITCH TO sequence-builder-view');
         this.showView('sequence-builder-view');
-        console.log('Sequence builder view should now be visible');
         
-        // Verify the view is actually visible
+        // Double-check: Force view switch with direct DOM manipulation as backup
         setTimeout(() => {
-            const view = document.getElementById('sequence-builder-view');
-            console.log('Final sequence builder view state:', {
-                display: view?.style.display,
-                visibility: view?.style.visibility,
-                position: view?.style.position
-            });
-        }, 50);
+            console.log('🔍 Backup view switch check...');
+            const allViews = document.querySelectorAll('.page-view');
+            allViews.forEach(view => view.style.display = 'none');
+            const targetView = document.getElementById('sequence-builder-view');
+            if (targetView) {
+                targetView.style.display = 'block';
+                console.log('✅ SEQUENCE BUILDER VIEW FORCED TO DISPLAY');
+            } else {
+                console.error('❌ sequence-builder-view element not found!');
+            }
+        }, 100);
     },
 
     renderSequenceSteps(sequence) {
+        console.log('🔍 renderSequenceSteps called with sequence:', sequence);
         const steps = sequence?.steps || [];
+        console.log('🔍 Steps found:', steps.length);
         
         if (steps.length === 0) {
+            console.log('🎨 Rendering Apollo-style interface (no steps)');
             return `
-                <div class="sequence-overview" style="
-                    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
-                    padding: 60px 40px;
-                    border-radius: 18px;
-                    border: 1px solid #333;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                <div style="
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 400px;
                     text-align: center;
-                    position: relative;
-                    overflow: hidden;
+                    padding: 60px 40px;
                 ">
-                    <!-- Power Choosers Lightning Icon -->
+                    <!-- AI-driven workflow banner -->
                     <div style="
-                        width: 80px;
-                        height: 80px;
-                        background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        margin: 0 auto 24px auto;
-                        box-shadow: 0 4px 16px rgba(74, 144, 226, 0.3);
+                        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                        border-radius: 16px;
+                        padding: 40px;
+                        margin-bottom: 40px;
+                        box-shadow: 0 8px 32px rgba(30, 41, 59, 0.3);
+                        border: 1px solid #334155;
+                        position: relative;
+                        overflow: hidden;
+                        max-width: 600px;
+                        width: 100%;
                     ">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #fff;">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
-                        </svg>
+                        <!-- Sparkle icon -->
+                        <div style="
+                            position: absolute;
+                            top: 20px;
+                            right: 20px;
+                            color: #fbbf24;
+                            font-size: 24px;
+                        ">✨</div>
+                        
+                        <h2 style="
+                            color: #fff;
+                            font-size: 24px;
+                            font-weight: 700;
+                            margin: 0 0 20px 0;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 12px;
+                        ">
+                            ⚡ AI-powered outreach
+                        </h2>
+                        
+                        <!-- Sample sequence steps preview -->
+                        <div style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 16px;
+                            margin-bottom: 30px;
+                        ">
+                            <div style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border-radius: 12px;
+                                padding: 16px;
+                                display: flex;
+                                align-items: center;
+                                gap: 12px;
+                                backdrop-filter: blur(10px);
+                            ">
+                                <div style="
+                                    background: #10b981;
+                                    color: #fff;
+                                    width: 32px;
+                                    height: 32px;
+                                    border-radius: 50%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 16px;
+                                ">📧</div>
+                                <div style="text-align: left;">
+                                    <div style="color: #fff; font-weight: 600; font-size: 14px;">Day 1 • Manual email</div>
+                                    <div style="color: #e5e7eb; font-size: 12px;">🤖 Personalized with AI</div>
+                                </div>
+                            </div>
+                            
+                            <div style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border-radius: 12px;
+                                padding: 16px;
+                                display: flex;
+                                align-items: center;
+                                gap: 12px;
+                                backdrop-filter: blur(10px);
+                            ">
+                                <div style="
+                                    background: #3b82f6;
+                                    color: #fff;
+                                    width: 32px;
+                                    height: 32px;
+                                    border-radius: 50%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 16px;
+                                ">📨</div>
+                                <div style="text-align: left;">
+                                    <div style="color: #fff; font-weight: 600; font-size: 14px;">Day 3 • Automatic email</div>
+                                    <div style="color: #e5e7eb; font-size: 12px;">🤖 AI-generated templates</div>
+                                </div>
+                            </div>
+                            
+                            <div style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border-radius: 12px;
+                                padding: 16px;
+                                display: flex;
+                                align-items: center;
+                                gap: 12px;
+                                backdrop-filter: blur(10px);
+                            ">
+                                <div style="
+                                    background: #8b5cf6;
+                                    color: #fff;
+                                    width: 32px;
+                                    height: 32px;
+                                    border-radius: 50%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 16px;
+                                ">📞</div>
+                                <div style="text-align: left;">
+                                    <div style="color: #fff; font-weight: 600; font-size: 14px;">Day 5 • Phone call</div>
+                                    <div style="color: #e5e7eb; font-size: 12px;">Personal touch</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <h3 style="
+                    <!-- Inspirational messaging -->
+                    <h1 style="
                         color: #fff;
                         font-size: 32px;
                         font-weight: 700;
                         margin: 0 0 16px 0;
-                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-                    ">Supercharge your workflow with sequences</h3>
+                    ">Supercharge your workflow with sequences</h1>
                     
                     <p style="
-                        color: #ccc;
+                        color: #9ca3af;
                         font-size: 18px;
                         line-height: 1.6;
-                        margin: 0 0 32px 0;
+                        margin: 0 0 40px 0;
                         max-width: 600px;
-                        margin-left: auto;
-                        margin-right: auto;
-                    ">Harness the power of Power Choosers AI to create multi-step sequences that help you scale your outreach efforts, book more meetings, and close more deals.</p>
+                    ">
+                        Harness the power of Power Choosers AI to create multi-step sequences that help you scale your energy outreach efforts, book more qualified meetings, and close more profitable deals.
+                    </p>
                     
-                    <button onclick="CRMApp.addSequenceStep()" style="
-                        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-                        border: 1px solid #28a745;
-                        color: #fff;
-                        padding: 16px 32px;
-                        border-radius: 12px;
-                        cursor: pointer;
-                        font-size: 16px;
-                        font-weight: 600;
-                        transition: all 0.2s ease;
-                        box-shadow: 0 4px 16px rgba(40, 167, 69, 0.3);
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 12px;
-                    " onmouseover="this.style.background='linear-gradient(135deg, #218838 0%, #1e7e34 100%)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(40, 167, 69, 0.4)'" 
-                       onmouseout="this.style.background='linear-gradient(135deg, #28a745 0%, #20c997 100%)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(40, 167, 69, 0.3)'">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Add a step
-                    </button>
+                    <!-- Add step button -->
+                    <div style="display: flex; gap: 16px; justify-content: center;">
+                        <button onclick="CRMApp.addSequenceStep()" style="
+                            background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+                            border: none;
+                            border-radius: 12px;
+                            color: #fff;
+                            cursor: pointer;
+                            font-size: 16px;
+                            font-weight: 600;
+                            padding: 16px 32px;
+                            transition: all 0.3s ease;
+                            box-shadow: 0 4px 16px rgba(30, 64, 175, 0.3);
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        " onmouseover="this.style.background='linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(30, 64, 175, 0.4)'" onmouseout="this.style.background='linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(30, 64, 175, 0.3)'">
+                            <span style="font-size: 18px;">+</span>
+                            Add a step
+                        </button>
+                        
+                        <!-- Temporary test button -->
+                        <button onclick="CRMApp.addTestSteps()" style="
+                            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+                            border: none;
+                            border-radius: 12px;
+                            color: #fff;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 600;
+                            padding: 12px 24px;
+                            transition: all 0.3s ease;
+                            box-shadow: 0 4px 16px rgba(5, 150, 105, 0.3);
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        " onmouseover="this.style.background='linear-gradient(135deg, #10b981 0%, #22c55e 100%)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(5, 150, 105, 0.4)'" onmouseout="this.style.background='linear-gradient(135deg, #059669 0%, #10b981 100%)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(5, 150, 105, 0.3)'">
+                            🎯 Preview Apollo Steps
+                        </button>
+                    </div>
                 </div>
             `;
         }
         
-        // Render existing steps (for future implementation)
+        // Render existing steps (Apollo-style with statistics and controls)
+        console.log('🎯 Rendering existing steps in Apollo-style');
         return `
-            <div class="sequence-steps">
-                ${steps.map((step, index) => `
-                    <div class="sequence-step" style="margin-bottom: 16px; padding: 16px; background: #2a2a2a; border-radius: 8px;">
-                        <h4>Step ${index + 1}: ${step.type}</h4>
-                        <p>${step.content}</p>
-                    </div>
-                `).join('')}
+            <div class="sequence-steps" style="display: flex; flex-direction: column; gap: 16px;">
+                ${steps.map((step, index) => {
+                    const nextStep = steps[index + 1];
+                    const dayInterval = nextStep ? (nextStep.day || (index + 2)) - (step.day || (index + 1)) : 0;
+                    
+                    return `
+                        <div class="sequence-step" draggable="true" 
+                             data-step-index="${index}"
+                             ondragstart="CRMApp.handleDragStart(event, ${index})"
+                             ondragover="CRMApp.handleDragOver(event)"
+                             ondrop="CRMApp.handleDrop(event, ${index})"
+                             ondragend="CRMApp.handleDragEnd(event)"
+                             style="
+                            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                            border-radius: 12px;
+                            border: 1px solid #334155;
+                            overflow: hidden;
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                            cursor: move;
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.boxShadow='0 6px 20px rgba(0, 0, 0, 0.4)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.3)'; this.style.transform='translateY(0)'">
+                            <!-- Step Header -->
+                            <div style="
+                                padding: 20px;
+                                border-bottom: 1px solid #334155;
+                                display: flex;
+                                align-items: center;
+                                justify-content: space-between;
+                            ">
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <!-- Step Number/Icon -->
+                                    <div style="
+                                        width: 40px;
+                                        height: 40px;
+                                        background: ${this.getStepTypeGradient(step.type)};
+                                        border-radius: 50%;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        color: #fff;
+                                        font-size: 18px;
+                                        font-weight: 600;
+                                    ">${this.getStepTypeIcon(step.type)}</div>
+                                    
+                                    <!-- Step Info -->
+                                    <div>
+                                        <div style="
+                                            color: #fff;
+                                            font-size: 18px;
+                                            font-weight: 600;
+                                            margin-bottom: 4px;
+                                        ">Day ${step.day || (index + 1)} • ${this.getStepTypeName(step.type)}</div>
+                                        <div style="
+                                            color: #94a3b8;
+                                            font-size: 14px;
+                                            display: flex;
+                                            align-items: center;
+                                            gap: 8px;
+                                        ">
+                                            ${this.getStepTypeDescription(step.type)}
+                                            ${step.priority ? `<span style="
+                                                background: ${this.getPriorityColor(step.priority)};
+                                                color: #fff;
+                                                padding: 2px 8px;
+                                                border-radius: 12px;
+                                                font-size: 12px;
+                                                font-weight: 500;
+                                            ">${step.priority}</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Step Toggle -->
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="color: #94a3b8; font-size: 14px;">
+                                        ${step.active !== false ? 'Active' : 'Paused'}
+                                    </span>
+                                    <div onclick="CRMApp.toggleSequenceStep(${index})" style="
+                                        width: 48px;
+                                        height: 26px;
+                                        background: ${step.active !== false ? 'linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)' : '#475569'};
+                                        border-radius: 13px;
+                                        position: relative;
+                                        cursor: pointer;
+                                        transition: all 0.3s ease;
+                                        border: 1px solid ${step.active !== false ? '#1e40af' : '#64748b'};
+                                    ">
+                                        <div style="
+                                            width: 20px;
+                                            height: 20px;
+                                            background: #fff;
+                                            border-radius: 50%;
+                                            position: absolute;
+                                            top: 2px;
+                                            left: ${step.active !== false ? '25px' : '3px'};
+                                            transition: all 0.3s ease;
+                                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                                        "></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step Statistics (Apollo-style) -->
+                            <div style="padding: 16px 20px;">
+                                <div style="
+                                    display: grid;
+                                    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+                                    gap: 12px;
+                                ">
+                                    <div style="text-align: center;">
+                                        <div style="color: #fff; font-size: 16px; font-weight: 600;">${step.stats?.scheduled || 0}</div>
+                                        <div style="color: #94a3b8; font-size: 12px;">Scheduled</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #fff; font-size: 16px; font-weight: 600;">${step.stats?.delivered || 0}</div>
+                                        <div style="color: #94a3b8; font-size: 12px;">Delivered</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #fff; font-size: 16px; font-weight: 600;">${step.stats?.bounced || 0}</div>
+                                        <div style="color: #94a3b8; font-size: 12px;">Bounced</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #fff; font-size: 16px; font-weight: 600;">${step.stats?.opened || 0}</div>
+                                        <div style="color: #94a3b8; font-size: 12px;">Opened</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #fff; font-size: 16px; font-weight: 600;">${step.stats?.clicked || 0}</div>
+                                        <div style="color: #94a3b8; font-size: 12px;">Clicked</div>
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <div style="color: #fff; font-size: 16px; font-weight: 600;">${step.stats?.replied || 0}</div>
+                                        <div style="color: #94a3b8; font-size: 12px;">Replied</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${dayInterval > 0 ? `
+                            <!-- Day Interval Indicator -->
+                            <div style="
+                                display: flex;
+                                justify-content: center;
+                                margin: 8px 0;
+                            ">
+                                <div style="
+                                    background: rgba(30, 64, 175, 0.1);
+                                    border: 1px solid #1e40af;
+                                    border-radius: 20px;
+                                    padding: 6px 16px;
+                                    color: #fff;
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                ">
+                                    ${dayInterval} day${dayInterval > 1 ? 's' : ''} later
+                                </div>
+                            </div>
+                        ` : ''}
+                    `;
+                }).join('')}
+                
+                <!-- Add Step Button (always at bottom) -->
+                <div style="
+                    display: flex;
+                    justify-content: center;
+                    margin: 24px 0;
+                ">
+                    <button onclick="CRMApp.addSequenceStep()" style="
+                        background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+                        border: none;
+                        border-radius: 12px;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 16px;
+                        font-weight: 600;
+                        padding: 16px 32px;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 16px rgba(30, 64, 175, 0.3);
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    " onmouseover="this.style.background='linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(30, 64, 175, 0.4)'" onmouseout="this.style.background='linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(30, 64, 175, 0.3)'">
+                        <span style="font-size: 18px;">+</span>
+                        Add a step
+                    </button>
+                </div>
             </div>
         `;
+    },
+
+    // Helper functions for Apollo-style step rendering
+    getStepTypeIcon(type) {
+        const icons = {
+            'automatic-email': '📧',
+            'manual-email': '✉️',
+            'phone-call': '📞',
+            'linkedin-connection': '🔗',
+            'linkedin-message': '💼',
+            'sms': '💬',
+            'task': '✅',
+            'wait': '⏱️'
+        };
+        return icons[type] || '📋';
+    },
+
+    getStepTypeGradient(type) {
+        const gradients = {
+            'automatic-email': 'linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)',
+            'manual-email': 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+            'phone-call': 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+            'linkedin-connection': 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+            'linkedin-message': 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
+            'sms': 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)',
+            'task': 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+            'wait': 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)'
+        };
+        return gradients[type] || 'linear-gradient(135deg, #374151 0%, #4b5563 100%)';
+    },
+
+    getStepTypeName(type) {
+        const names = {
+            'automatic-email': 'Automatic email',
+            'manual-email': 'Manual email',
+            'phone-call': 'Phone call',
+            'linkedin-connection': 'LinkedIn connection',
+            'linkedin-message': 'LinkedIn message',
+            'sms': 'SMS message',
+            'task': 'Task',
+            'wait': 'Wait period'
+        };
+        return names[type] || 'Unknown step';
+    },
+
+    getStepTypeDescription(type) {
+        const descriptions = {
+            'automatic-email': '🤖 AI-generated templates',
+            'manual-email': '🤖 Personalized with AI',
+            'phone-call': 'Personal touch',
+            'linkedin-connection': 'Send connection request',
+            'linkedin-message': 'Send LinkedIn message',
+            'sms': 'Text message',
+            'task': 'Manual task',
+            'wait': 'Pause sequence'
+        };
+        return descriptions[type] || 'Custom step';
+    },
+
+    getPriorityColor(priority) {
+        const colors = {
+            'high': '#dc2626',
+            'medium': '#ea580c',
+            'low': '#16a34a'
+        };
+        return colors[priority] || '#6b7280';
+    },
+
+    toggleSequenceStep(stepIndex) {
+        console.log('Toggling step:', stepIndex);
+        if (this.currentSequence && this.currentSequence.steps && this.currentSequence.steps[stepIndex]) {
+            const step = this.currentSequence.steps[stepIndex];
+            step.active = step.active !== false ? false : true;
+            
+            // Re-render the sequence builder to show the updated toggle state
+            this.renderSequenceBuilderPage(this.currentSequence);
+            
+            // Show notification
+            this.showNotification(`Step ${stepIndex + 1} ${step.active ? 'activated' : 'paused'}`, 'success');
+        }
+    },
+
+    // Add test steps to see Apollo-style interface
+    addTestSteps() {
+        console.log('Adding test steps to current sequence');
+        console.log('Current sequence before adding steps:', this.currentSequence);
+        
+        if (!this.currentSequence) {
+            console.log('No current sequence found, creating a temporary one for testing');
+            // Create a temporary sequence for testing
+            this.currentSequence = {
+                name: 'Test Sequence',
+                active: true,
+                steps: [],
+                contacts: [],
+                createdAt: new Date()
+            };
+        }
+
+        // Add sample steps with realistic data
+        const testSteps = [
+            {
+                type: 'manual-email',
+                day: 1,
+                active: true,
+                priority: 'high',
+                stats: {
+                    scheduled: 150,
+                    delivered: 142,
+                    bounced: 8,
+                    opened: 89,
+                    clicked: 23,
+                    replied: 12
+                }
+            },
+            {
+                type: 'automatic-email',
+                day: 3,
+                active: true,
+                priority: 'medium',
+                stats: {
+                    scheduled: 138,
+                    delivered: 135,
+                    bounced: 3,
+                    opened: 67,
+                    clicked: 18,
+                    replied: 8
+                }
+            },
+            {
+                type: 'phone-call',
+                day: 5,
+                active: false,
+                priority: 'high',
+                stats: {
+                    scheduled: 126,
+                    delivered: 126,
+                    bounced: 0,
+                    opened: 0,
+                    clicked: 0,
+                    replied: 34
+                }
+            }
+        ];
+
+        this.currentSequence.steps = testSteps;
+        console.log('Test steps added to sequence:', this.currentSequence);
+        console.log('Steps array:', this.currentSequence.steps);
+        
+        // Re-render to show the Apollo-style step cards
+        this.renderSequenceBuilderPage(this.currentSequence);
+        
+        this.showNotification('Test steps added! You can now see the Apollo-style interface.', 'success');
+    },
+
+    // Drag and drop functionality for step reordering
+    draggedStepIndex: null,
+
+    handleDragStart(event, stepIndex) {
+        this.draggedStepIndex = stepIndex;
+        event.dataTransfer.effectAllowed = 'move';
+        event.target.style.opacity = '0.5';
+        console.log('Drag started for step:', stepIndex);
+    },
+
+    handleDragOver(event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        return false;
+    },
+
+    handleDrop(event, dropIndex) {
+        event.preventDefault();
+        
+        if (this.draggedStepIndex === null || this.draggedStepIndex === dropIndex) {
+            return false;
+        }
+
+        console.log(`Moving step from ${this.draggedStepIndex} to ${dropIndex}`);
+        
+        if (this.currentSequence && this.currentSequence.steps) {
+            const steps = this.currentSequence.steps;
+            
+            // Remove the dragged step
+            const draggedStep = steps.splice(this.draggedStepIndex, 1)[0];
+            
+            // Insert it at the new position
+            steps.splice(dropIndex, 0, draggedStep);
+            
+            // Update day numbers based on new order
+            steps.forEach((step, index) => {
+                step.day = index + 1;
+            });
+            
+            console.log('Steps reordered:', steps);
+            
+            // Re-render the sequence builder to show the new order
+            this.renderSequenceBuilderPage(this.currentSequence);
+            
+            this.showNotification('Step order updated!', 'success');
+        }
+        
+        return false;
+    },
+
+    handleDragEnd(event) {
+        event.target.style.opacity = '1';
+        this.draggedStepIndex = null;
+        
+        // Remove any drag-over styling
+        const allSteps = document.querySelectorAll('.sequence-step');
+        allSteps.forEach(step => {
+            step.style.borderTop = '';
+            step.style.borderBottom = '';
+        });
     },
 
     renderSequenceContacts(sequence) {
@@ -7450,14 +8030,106 @@ const CRMApp = {
         
         console.log('Saving sequence step:', step);
         
+        // Actually add the step to the current sequence
+        console.log('Current sequence before adding step:', this.currentSequence);
+        
+        // Check if currentSequence is just an ID string instead of an object
+        if (typeof this.currentSequence === 'string') {
+            console.log('Current sequence is just an ID, finding actual sequence object...');
+            const sequenceId = this.currentSequence;
+            this.currentSequence = null;
+            
+            // Find the actual sequence object
+            if (this.sequences) {
+                this.currentSequence = this.sequences.find(seq => seq.id === sequenceId);
+                console.log('Found sequence object:', this.currentSequence);
+            }
+        }
+        
+        if (!this.currentSequence) {
+            console.error('No current sequence found! Attempting to recover...');
+            // Try to find the sequence from the sequences list
+            const sequenceId = sessionStorage.getItem('currentSequenceId');
+            if (sequenceId && this.sequences) {
+                this.currentSequence = this.sequences.find(seq => seq.id === sequenceId);
+                console.log('Recovered sequence from storage:', this.currentSequence);
+            }
+            
+            // If still no sequence, create a temporary one
+            if (!this.currentSequence) {
+                console.log('Creating temporary sequence for step');
+                this.currentSequence = {
+                    id: 'temp-' + Date.now(),
+                    name: 'New Sequence',
+                    active: true,
+                    steps: [],
+                    contacts: [],
+                    createdAt: new Date()
+                };
+            }
+        }
+        
+        if (!this.currentSequence.steps) {
+            this.currentSequence.steps = [];
+        }
+        
+        this.currentSequence.steps.push(step);
+        console.log('Step added to sequence. Total steps:', this.currentSequence.steps.length);
+        console.log('Updated sequence:', this.currentSequence);
+        
+        // Store the sequence ID for recovery
+        sessionStorage.setItem('currentSequenceId', this.currentSequence.id);
+        
+        // Save the updated sequence to Firebase
+        this.saveSequenceToFirebase(this.currentSequence);
+        
+        // Refresh the sequence builder view to show the new step
+        this.renderSequenceBuilderPage(this.currentSequence);
+        
         // Close modal
         this.closeStepConfigModal();
         
         // Show success message
         this.showToast(`Added ${this.getStepTypeDetails(stepType).title} step to sequence`, 'success');
-        
-        // TODO: In a real app, this would save to the backend and update the sequence view
-        // For now, we'll just show the success message
+    },
+
+    // Save sequence to Firebase with all steps
+    async saveSequenceToFirebase(sequence) {
+        try {
+            console.log('💾 Saving sequence to Firebase:', sequence.name);
+            console.log('Steps to save:', sequence.steps?.length || 0);
+            
+            if (!sequence.id) {
+                console.error('No sequence ID found, cannot save to Firebase');
+                return;
+            }
+
+            // Prepare sequence data for Firebase
+            const sequenceData = {
+                name: sequence.name,
+                active: sequence.active,
+                steps: sequence.steps || [],
+                contacts: sequence.contacts || [],
+                createdAt: sequence.createdAt,
+                updatedAt: new Date().toISOString()
+            };
+
+            // Save to Firebase
+            const sequenceRef = firebase.firestore().collection('sequences').doc(sequence.id);
+            await sequenceRef.set(sequenceData, { merge: true });
+            
+            console.log('✅ Sequence saved to Firebase successfully');
+            
+            // Update local sequences array
+            const sequenceIndex = this.sequences.findIndex(seq => seq.id === sequence.id);
+            if (sequenceIndex !== -1) {
+                this.sequences[sequenceIndex] = { ...sequence, ...sequenceData };
+            }
+            
+        } catch (error) {
+            console.error('❌ Error saving sequence to Firebase:', error);
+            this.showNotification('Failed to save sequence. Please try again.', 'error');
+        }
     },
 
     showEmailBuilder(step) {
@@ -8138,8 +8810,8 @@ const CRMApp = {
         this.renderSequenceSteps();
     },
 
-    renderSequenceSteps() {
-        console.log('renderSequenceSteps called');
+    renderSequenceStepsOLD() {
+        console.log('renderSequenceStepsOLD called (deprecated)');
         // Create or update the sequence steps view with statistics
         const sequenceContainer = document.getElementById('sequence-steps-container');
         if (!sequenceContainer) {
@@ -9237,3 +9909,20 @@ function debounce(func, wait) {
         timeout = setTimeout(later, wait);
     };
 }
+
+// Global function to make Create Sequence button work
+window.openCreateSequenceModal = function() {
+    console.log('Global openCreateSequenceModal called');
+    if (window.CRMApp && window.CRMApp.openCreateSequenceModal) {
+        window.CRMApp.openCreateSequenceModal();
+    } else {
+        console.error('CRMApp not found or openCreateSequenceModal method missing');
+        alert('CRM App not properly initialized. Please refresh the page.');
+    }
+};
+
+// Global function for createNewSequence (alias for compatibility)
+window.createNewSequence = function() {
+    console.log('Global createNewSequence called (redirecting to openCreateSequenceModal)');
+    window.openCreateSequenceModal();
+};
