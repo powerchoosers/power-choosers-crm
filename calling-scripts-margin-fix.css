@@ -1,0 +1,131 @@
+/* === CALLING SCRIPTS MARGIN ADJUSTMENTS === */
+/* Reduce margins between side panel and cold calling script container by half */
+
+.calls-hub-layout {
+    gap: 0.75rem !important; /* Cut the gap in half from 1.5rem to 0.75rem */
+}
+
+/* Reduce padding on both sides to extend the script container */
+#call-scripts-view {
+    padding-left: calc(var(--spacing-lg) / 2) !important;
+    padding-right: calc(var(--spacing-lg) / 2) !important;
+}
+
+#cold-calling-widgets-container {
+    padding-left: 0 !important; /* Remove left padding to align with red line */
+    padding-right: var(--spacing-lg) !important; /* Keep right padding for proper margin */
+    padding-top: 0 !important; /* Start at blue line top */
+    padding-bottom: 0 !important; /* Extend to blue line bottom */
+    margin: 0 !important; /* Remove all margins */
+    height: calc(100vh - 70px) !important; /* Full height from blue line to blue line */
+    overflow-y: auto !important; /* Allow scrolling within the container */
+}
+
+/* Ensure the sidebar matches home screen widget dimensions and positioning */
+.calls-hub-sidebar {
+    padding: 0 !important;
+    margin: 0 !important;
+    align-self: flex-start; /* Align to top of container */
+}
+
+/* Reduce wasted space inside the container above the title */
+.calls-hub-main h2 {
+    margin-top: 0 !important; /* Remove top margin completely */
+    margin-bottom: 16px; /* Reduce bottom margin slightly */
+}
+
+/* Align the title with the top red line while constraining modal height */
+#call-scripts-view {
+    padding-top: var(--spacing-lg) !important; /* Add padding to bring title down to red line */
+    height: calc(100vh - 70px - var(--spacing-lg)) !important; /* Constrain height to not pass bottom red line */
+    overflow-y: auto !important; /* Ensure scrolling if content is too tall */
+}
+
+/* Also remove any margin from the calls-hub-main container */
+.calls-hub-main {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Remove any top margin from the calls-hub-main-inner container */
+.calls-hub-main-inner {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Dim the bright blue colors to match the page theme */
+.calculator-wrapper,
+.form-sections,
+.form-section {
+    background: var(--cch-dark-blue) !important;
+}
+
+/* Make the blue buttons much darker and more subtle */
+.section-nav button.active,
+.get-results-btn,
+.complete-sections-btn,
+button[style*="background"] {
+    background: var(--cch-darker-blue) !important;
+    border-color: var(--cch-darker-blue) !important;
+}
+
+/* Dim the bright blue gradient backgrounds */
+.main-result.neutral,
+.calculator-wrapper {
+    background: linear-gradient(135deg, rgba(13, 20, 33, 0.4), rgba(26, 35, 126, 0.2)) !important;
+    border-color: var(--cch-darker-blue) !important;
+}
+
+/* Target any bright blue elements specifically */
+[style*="background-color: #2196f3"],
+[style*="background: #2196f3"] {
+    background: var(--cch-darker-blue) !important;
+}
+
+/* Restore original widget container styling - made smaller to fit red line guidelines */
+.sidebar-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 8px !important; /* Smaller border radius */
+    padding: 12px !important; /* Reduced padding */
+    margin-bottom: 12px !important; /* Reduced margin */
+    font-size: 0.85rem !important; /* Smaller font size */
+}
+
+/* Ensure step numbers and titles are visible - made smaller */
+.sidebar-card-title {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    margin-bottom: 10px !important; /* Reduced margin */
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important; /* Smaller gap */
+    font-size: 0.9rem !important; /* Smaller title font */
+}
+
+/* Style the input groups properly - made smaller */
+.sidebar-input-group {
+    margin-bottom: 10px !important; /* Reduced margin */
+}
+
+.sidebar-input-group label {
+    color: var(--text-secondary) !important;
+    font-size: 0.75rem !important; /* Smaller label font */
+    margin-bottom: 4px !important; /* Reduced margin */
+    display: block !important;
+}
+
+/* Make input fields smaller */
+.sidebar-input-group input,
+.sidebar-input-group textarea {
+    padding: 8px 10px !important; /* Smaller input padding */
+    font-size: 0.8rem !important; /* Smaller input font */
+    border-radius: 6px !important; /* Smaller border radius */
+}
+
+/* Make buttons smaller */
+.sidebar-card button {
+    padding: 8px 12px !important; /* Smaller button padding */
+    font-size: 0.8rem !important; /* Smaller button font */
+    border-radius: 6px !important; /* Smaller border radius */
+}
