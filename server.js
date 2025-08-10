@@ -28,19 +28,26 @@ const server = http.createServer((req, res) => {
       .filter(Boolean);
     const defaultAllowed = [
       'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
       'http://localhost:5555',
       'http://localhost:5550'
     ];
     const allowed = new Set([...defaultAllowed, ...envList]);
     const isNgrok = /^(https?:\/\/)?[a-z0-9-]+\.(?:ngrok(?:-free)?\.app)$/i.test(origin);
-    if (allowed.has(origin) || isNgrok) {
+    const isAllowed = allowed.has(origin) || isNgrok;
+    if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
+      // Only allow credentials when a specific origin is echoed back (not with '*')
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
     } else {
+      // Fallback for generic tools; do NOT set credentials with '*'
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
-    res.setHeader('Vary', 'Origin');
+    const reqHeaders = req.headers['access-control-request-headers'];
+    res.setHeader('Vary', 'Origin, Access-Control-Request-Headers');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, ngrok-skip-browser-warning');
+    res.setHeader('Access-Control-Max-Age', '600');
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       return res.end();
