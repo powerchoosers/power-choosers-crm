@@ -1,0 +1,16 @@
+# Node/JS common
+node_modules/
+*.log
+npm-debug.log*
+yarn-error.log*
+.DS_Store
+
+# Env & secrets (DO NOT COMMIT)
+.env
+private.key
+.vscode/
+.idea/
+
+# Build artifacts
+/dist/
+/build/
