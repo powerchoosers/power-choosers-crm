@@ -647,8 +647,8 @@ html, body {
     display: none !important;
 }
 
-/* --- 6. Main Content Area (3/4 width) - FIXED STAT CARDS --- */
-.main-content-wrapper {
+/* --- 6. Main Content Area (3/4 width) - CONSISTENT 3:1 LAYOUT --- */
+.main-content-wrapper, #main-content-wrapper {
     flex: 3;
     height: 100%;
 }
@@ -1419,8 +1419,8 @@ html, body {
 
 /* --- 12. Responsive Design --- */
 @media (max-width: 1200px) {
-    .main-content {
-        flex: 2;
+    .main-content-wrapper, #main-content-wrapper {
+        flex: 3;
     }
     .widget-panel {
         flex: 1;
