@@ -209,16 +209,36 @@
 
       try {
         this.showNotification(`Calling ${number}...`, 'info');
+        // Disable the Call button while the request is in flight
+        const callBtn = document.getElementById('dialer-call-btn');
+        const prevText = callBtn ? callBtn.textContent : '';
+        if (callBtn) {
+          callBtn.disabled = true;
+          callBtn.textContent = 'Calling...';
+        }
         const base = apiBase();
         const res = await fetch(`${base}/api/vonage/call`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': '1'
+          },
           body: JSON.stringify({ to: number })
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const msg = data && (data.title || data.error || data.detail) || `HTTP ${res.status}`;
-          this.showNotification(`Vonage call failed: ${msg}`, 'error');
+          const baseMsg = (data && (data.title || data.error || data.detail)) || `HTTP ${res.status}`;
+          let hint = '';
+          if (res.status === 400) {
+            hint = ' Check the phone number format (use E.164 like +19725551234).';
+          } else if (res.status === 401 || res.status === 403) {
+            hint = ' Auth error: verify VONAGE_APPLICATION_ID and private key on the backend.';
+          } else if (res.status >= 500) {
+            hint = ' Server/upstream error: check backend logs and Vonage status.';
+          }
+          this.showNotification(`Vonage call failed: ${baseMsg}.${hint}`, 'error');
+          const id = document.getElementById('dialer-caller-id');
+          if (id) id.textContent = `Caller: ${number} – Error: ${baseMsg}`;
           return;
         }
         // Success response typically includes uuid/status
@@ -238,7 +258,9 @@
             if (Date.now() - start > 60000) { clearInterval(poll); return; }
             try {
               const base = apiBase();
-              const r = await fetch(`${base}/api/vonage/call/status?uuid=${encodeURIComponent(uuid)}`);
+              const r = await fetch(`${base}/api/vonage/call/status?uuid=${encodeURIComponent(uuid)}`, {
+                headers: { 'ngrok-skip-browser-warning': '1' }
+              });
               const s = await r.json().catch(() => ({}));
               const status = (s.status || s.state || s.detail || '').toString();
               const label = document.getElementById('dialer-caller-id');
@@ -251,7 +273,22 @@
         }
       } catch (e) {
         console.error(e);
-        this.showNotification('Network error placing call', 'error');
+        let advice = 'Network error placing call';
+        try {
+          const base = apiBase();
+          if (!base) advice += ' – API base is relative. If your backend is remote, set window.CRM_API_BASE_URL or localStorage.CRM_API_BASE_URL.';
+        } catch (_) {}
+        advice += ' Check CORS allowlist on the backend and confirm the API URL is reachable.';
+        this.showNotification(advice, 'error');
+        const id = document.getElementById('dialer-caller-id');
+        if (id) id.textContent = `Caller: ${number} – Network error`;
+      }
+      finally {
+        const callBtn = document.getElementById('dialer-call-btn');
+        if (callBtn) {
+          callBtn.disabled = false;
+          callBtn.textContent = prevText || 'Call';
+        }
       }
     },
 
