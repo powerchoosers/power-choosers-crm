@@ -1,0 +1,2064 @@
+/*
+ * Power Choosers CRM Dashboard - Complete Redesign CSS
+ * Modern dark theme with scroll-under effects and expandable sidebar
+ *
+ * **UPDATED**
+ * - Fixed sidebar navigation spacing to maintain consistent 20px margins
+ * - Improved sidebar spacing and visual hierarchy
+ * - Enhanced widget panel with background containers
+ * - Updated activity icons to white theme-consistent icons
+ * - Fixed notification bell positioning
+ * - Improved overall visual consistency
+ * - Fixed stat cards to maintain single row when sidebar expands
+ * - Removed grey separator lines from sidebar
+ * - Adjusted activity carousel navigation arrows to prevent content overlap
+ * - Increased margin between Tasks and Account Details in the sidebar
+ * - Added styles for Cold Calling Hub integration
+ * - Adjusted margins for cold calling script and right-side widgets
+ * - Toned down blue color in the Energy Health Check section
+ */
+
+/* --- 1. CSS Variables & Global Styles --- */
+
+/* Fix Cold Calling Script title margin to match home page */
+.calls-hub-main h2 {
+    margin-top: 0 !important;
+    margin-bottom: 24px;
+}
+
+:root {
+    --primary-blue: #1a237e;
+    --dark-blue: #0d1421;
+    --darker-blue: #0a0f1a;
+    --header-blue: #1a237e;
+    --text-primary: #ffffff;
+    --text-secondary: #b0b0b0;
+    --text-muted: #808080;
+    --accent-blue: #2196f3;
+    --border-light: #2a2a2a;
+    --bg-card: #1a1a1a;
+    --bg-hover: #242424;
+    --shadow-header: 0 4px 20px rgba(0, 0, 0, 0.5);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-scroll: inset 0 10px 20px -10px rgba(0, 0, 0, 0.4);
+    --spacing-lg: 32px;
+    --widget-bg: #1f1f1f;
+    --widget-border: #333333;
+
+    /* Cold Calling Hub specific variables, adapted to CRM theme */
+    --cch-primary-blue: #1a237e; /* Matches CRM primary-blue */
+    --cch-secondary-blue: #2196f3; /* Matches CRM accent-blue */
+    --cch-dark-blue: #0d1421; /* Matches CRM dark-blue */
+    --cch-darker-blue: #0a0f1a; /* Matches CRM darker-blue */
+    --cch-header-blue: #1a237e; /* Matches CRM header-blue */
+    --cch-professional-blue: #4a5568; /* Muted blue, was #2196f3 */
+    --cch-text-primary: #ffffff; /* Matches CRM text-primary */
+    --cch-text-secondary: #b0b0b0; /* Matches CRM text-secondary */
+    --cch-accent-orange: #f59e0b; /* Existing orange from cold-calling-hub */
+    --cch-bg-card: #1a1a1a; /* Matches CRM bg-card */
+    --cch-bg-hover: #242424; /* Matches CRM bg-hover */
+    --cch-border-color: #2a2a2a; /* Matches CRM border-light */
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100vh;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: var(--darker-blue);
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* --- 2. Main Application Layout --- */
+.app-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-main {
+    display: flex;
+    height: calc(100vh - 70px);
+    position: relative;
+    margin-top: 70px;
+}
+
+/* Special handling for call scripts view to enable scroll-under effect */
+#call-scripts-view .app-main {
+    margin-top: 0;
+    height: 100vh;
+}
+
+.app-content-container {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    height: calc(100vh - 70px); /* Full height minus header */
+}
+
+/* Card title and icon spacing */
+.card-title {
+    position: relative;
+    padding-left: 14px; /* Increased from 12px for additional right shift */
+}
+
+.card-title svg {
+    margin-right: 12px;
+    position: relative;
+    left: 0; /* Reset left position */
+}
+
+/* Navigation buttons and arrow centering */
+.activity-navigation {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-btn svg {
+    position: relative;
+    left: 1px; /* Adjust this value to center the arrow in the button */
+}
+
+/* --- 3. Header Styles (Fixed) --- */
+.app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    background: var(--dark-blue);
+    border-bottom: 2px solid var(--primary-blue);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 1000;
+    box-shadow: var(--shadow-header);
+    backdrop-filter: blur(10px);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 200px;
+}
+
+.app-logo img {
+    height: 36px;
+    width: auto;
+    border-radius: 4px;
+}
+
+.app-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    margin-top: 3px; /* Align with logo and search bar */
+}
+
+.header-center {
+    flex: 1;
+    max-width: 600px;
+    margin: 0 32px;
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+.search-bar {
+    position: relative;
+    width: 100%;
+}
+
+.search-bar input {
+    width: 100%;
+    height: 42px;
+    padding: 0 16px 0 48px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-light);
+    border-radius: 21px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.search-bar input::placeholder {
+    color: var(--text-muted);
+}
+
+.search-bar input:focus {
+    outline: none;
+    border-color: var(--primary-blue); /* Changed from accent-blue to primary-blue */
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 0 2px rgba(26, 35, 126, 0.3); /* Updated to match primary-blue */
+}
+
+.search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 120px;
+    justify-content: flex-end;
+}
+
+.icon-button {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.icon-button:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+}
+
+.notification-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ff4444;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--dark-blue);
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-profile .profile-avatar {
+    width: 40px;
+    height: 40px;
+    background: var(--primary-blue);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.user-profile .profile-avatar:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
+}
+
+/* --- 4. Expandable Left Sidebar (REMOVED SEPARATORS) --- */
+.app-sidebar {
+    width: 60px;
+    min-width: 60px;
+    background: var(--darker-blue);
+    border-right: 1px solid var(--border-light);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    position: relative;
+    z-index: 900;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* Align content to top */
+    padding-top: 20px; /* Add padding to top */
+}
+
+.app-sidebar:hover {
+    width: 240px;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 40px 0 30px 0; /* Increased top padding to push first section down */
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Navigation sections with adjusted margins - REMOVED SEPARATORS */
+.nav-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px; /* Slightly increased gap for better spacing */
+    width: 100%;
+}
+
+/* Navigation section spacing */
+.nav-section {
+    margin-bottom: 20px; /* Reduced from 30px for better balance */
+}
+
+/* Account Details and Settings section - adjusted spacing */
+.nav-section:last-child {
+    margin-top: 10px; /* Pull up the last section */
+    margin-bottom: 0;
+}
+
+/* REMOVED: .nav-separator styles completely */
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    height: 52px; /* Slightly increased height */
+    margin: 0 8px;
+    padding: 0 16px; /* Increased padding for better spacing */
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    font-size: 1.05rem; /* Increased font size */
+    font-weight: 500; /* Slightly bolder text */
+}
+
+.app-sidebar:not(:hover) .nav-item {
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+}
+
+.app-sidebar:not(:hover) .nav-item span {
+    display: none;
+}
+
+.app-sidebar:not(:hover) .nav-item svg {
+    margin: 0;
+}
+
+.app-sidebar:not(:hover) .nav-badge {
+    opacity: 1;
+    right: 4px;
+    top: 4px;
+}
+
+.app-sidebar:hover .nav-item {
+    justify-content: flex-start;
+    padding: 0 16px;
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.nav-item.active {
+    background: rgba(30, 60, 120, 0.4);
+    color: var(--text-primary);
+    border: 1px solid rgba(30, 60, 120, 0.6);
+}
+
+.nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 24px;
+    background: var(--darker-blue);
+    border-radius: 0 2px 2px 0;
+}
+
+.nav-item svg {
+    width: 22px; /* Slightly larger icons */
+    height: 22px; /* Slightly larger icons */
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    flex-shrink: 0;
+    transition: margin-right 0.3s ease;
+}
+
+.app-sidebar:hover .nav-item svg {
+    margin-right: 12px;
+}
+
+.nav-item span {
+    opacity: 0;
+    font-weight: 500;
+    font-size: 1rem; /* Increased from 0.9rem to 1rem */
+    white-space: nowrap;
+    transition: opacity 0.3s ease;
+}
+
+.app-sidebar:hover .nav-item span {
+    opacity: 1;
+}
+
+.nav-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #ff4444;
+    color: white;
+    border-radius: 8px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.app-sidebar:hover .nav-badge {
+    opacity: 1;
+    right: 12px;
+}
+
+/* --- 5. Widget Container Management --- */
+.crm-widgets-container {
+    display: flex;
+    flex-direction: column;
+    gap: 19px;
+    width: 100%;
+}
+
+.calls-hub-layout {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+}
+
+.calls-hub-main {
+    flex: 1 1 0%;
+    min-width: 0;
+}
+
+.calls-hub-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 19px;
+    width: 400px;
+    min-width: 320px;
+    max-width: 500px;
+    overflow-y: auto;
+    height: calc(100vh - 70px);
+    margin-top: 70px;
+    margin-right: 32px; /* Move sidebar away from right edge */
+    padding: var(--spacing-lg);
+    background: var(--darker-blue);
+    position: relative;
+    z-index: 900;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+}
+
+/* Remove the gradient overlays for the sidebar */
+.calls-hub-sidebar::before,
+.calls-hub-sidebar::after {
+    display: none !important;
+}
+
+
+/* Add proper margins for call scripts view */
+#call-scripts-view .calls-hub-sidebar {
+    max-height: 100vh;
+    padding: calc(70px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+}
+
+.calls-hub-sidebar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.calls-hub-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.calls-hub-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.calls-hub-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.calls-hub-sidebar > *:first-child {
+    padding-top: var(--spacing-lg);
+}
+
+.calls-hub-sidebar > *:last-child {
+    padding-bottom: var(--spacing-lg);
+}
+
+/* Add gradient shadow for cold calling sidebar to match widget panel */
+.calls-hub-sidebar::before {
+    content: '';
+    position: absolute;
+    top: 70px;
+    left: 0;
+    width: 100%;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--dark-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
+}
+
+.calls-hub-sidebar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 40px;
+    background: linear-gradient(to top, var(--dark-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Call Scripts Layout Main Content */
+.call-scripts-layout-main {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: calc(100vh - 70px); /* Full viewport height minus header */
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+}
+
+/* Ensure call scripts main content fills the space properly */
+.calls-hub-main {
+    width: 100%;
+    height: calc(100vh - 70px); /* Full height minus header */
+    display: flex;
+    flex-direction: column;
+    position: relative !important;
+    background: var(--darker-blue);
+    padding: 0 var(--spacing-lg); /* Reverted to original padding */
+    z-index: auto !important;
+    overflow-y: auto;
+    box-shadow: var(--shadow-scroll);
+}
+
+/* Add proper margins for call scripts view */
+#call-scripts-view .calls-hub-main {
+    height: 100vh;
+    padding: calc(70px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+}
+
+.calls-hub-main > *:first-child {
+    padding-top: var(--spacing-lg);
+}
+
+.calls-hub-main > *:last-child {
+    padding-bottom: var(--spacing-lg);
+}
+
+/* Add gradient shadow for call scripts main content */
+.calls-hub-main::before {
+    content: '';
+    position: fixed;
+    top: 70px;
+    left: 60px;
+    right: 25%;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--darker-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+/* Fix calls-hub-layout positioning */
+.calls-hub-layout {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    z-index: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+}
+
+/* Page view management - ensure only one view shows at a time */
+.page-view {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.page-view:not([style*="display: flex"]):not([style*="display: block"]) {
+    display: none !important;
+}
+
+/* --- 6. Main Content Area (3/4 width) - CONSISTENT 3:1 LAYOUT --- */
+.main-content-wrapper, #main-content-wrapper {
+    flex: 3;
+    height: 100%;
+}
+
+.main-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 var(--spacing-lg); /* Vertical padding removed */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    min-width: 0; /* Allow flex shrinking */
+}
+
+.main-content > *:first-child {
+    padding-top: var(--spacing-lg);
+}
+
+.main-content > *:last-child {
+    padding-bottom: var(--spacing-lg);
+}
+
+.main-content::before {
+    content: '';
+    position: fixed;
+    top: 70px;
+    left: 60px;
+    right: 25%;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--darker-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+.app-sidebar:hover + .app-content-container .main-content::before {
+    left: 240px;
+}
+
+/* Scroll shadow effect */
+.main-content {
+    box-shadow: var(--shadow-scroll);
+}
+
+/* --- 6. Right Widget Panel (Enhanced) --- */
+.widget-panel {
+    flex: 1;
+    height: 100%;
+    padding: 1.5rem;
+    border-left: 1px solid var(--border-light);
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    min-width: 0; /* Allow flex shrinking */
+    box-shadow: var(--shadow-scroll);
+}
+
+.widget-panel > *:first-child {
+    padding-top: var(--spacing-lg);
+}
+
+.widget-panel > *:last-child {
+    padding-bottom: var(--spacing-lg);
+}
+
+/* Add gradient shadows for scroll-under effect */
+.widget-panel::before {
+    content: '';
+    position: fixed;
+    top: 70px;
+    right: 0;
+    width: 25%;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--dark-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
+}
+
+.widget-panel::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 25%;
+    height: 40px;
+    background: linear-gradient(to top, var(--dark-blue), transparent);
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Enhanced widget cards with better margins */
+.widget-card {
+    background: var(--widget-bg);
+    border: 1px solid var(--widget-border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 0 4px 0 0; /* Adjusted right margin */
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.widget-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* --- 7. Page Views --- */
+.page-view {
+    display: none;
+    width: 100%;
+    height: 100%;
+}
+
+.page-view.active {
+    display: block;
+}
+
+#dashboard-view {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px; /* Reduced gap for tighter, more even spacing */
+}
+
+#dashboard-view.active {
+    display: flex !important;
+}
+
+/* --- 8. Dashboard Components (FIXED STAT CARDS) --- */
+.stat-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* Force 4 equal columns */
+    gap: 20px; /* Reduced gap to help maintain layout */
+    margin-bottom: 32px;
+    min-width: 0; /* Allow grid to shrink */
+}
+
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 24px 20px; /* Reduced horizontal padding */
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    min-width: 0; /* Allow card to shrink */
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--primary-blue); /* Changed from accent-blue to match theme */
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    border-color: var(--primary-blue);
+}
+
+.stat-value {
+    font-size: 2rem; /* Reduced from 2.2rem */
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.8rem; /* Reduced from 0.85rem */
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Dashboard Cards (Better Spacing) */
+.dashboard-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 19px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-card);
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+}
+
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Market Trends Specific */
+.market-pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.pricing-card {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 16px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid var(--border-light);
+    transition: all 0.2s ease;
+}
+
+.pricing-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-2px);
+}
+
+.pricing-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.pricing-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.market-insights {
+    background: rgba(33, 150, 243, 0.1);
+    border: 1px solid rgba(33, 150, 243, 0.2);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+/* Quick Actions */
+.quick-actions-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.action-button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.action-button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
+    border-color: var(--accent-blue);
+}
+
+.action-button svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+}
+
+/* Activity Lists (Enhanced with white icons) */
+.activity-list-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.activity-list-wrapper {
+    display: flex;
+    transition: transform 0.3s ease-in-out;
+}
+
+.activity-page {
+    flex-shrink: 0;
+    width: 100%;
+    display: grid;
+    grid-template-rows: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateX(4px);
+}
+
+.activity-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.activity-content {
+    flex: 1;
+}
+
+.activity-text {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.activity-timestamp {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+/* UPDATED: Activity carousel navigation buttons positioning */
+.activity-navigation {
+    position: relative;
+    top: auto;
+    right: auto;
+    transform: translateY(0);
+    width: auto;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0;
+}
+
+.nav-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    top: 0;
+    padding-left: 3px; /* Increased from 2px for additional right shift */
+    left: 0;
+    z-index: 10;
+}
+
+.nav-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Tasks */
+.tasks-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.task-item {
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-light);
+    border-left: 3px solid #ffa726;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.task-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateX(4px);
+}
+
+.task-title {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.task-due-time {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+/* News Feed */
+.news-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.news-item {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-light);
+    border-left: 3px solid #4caf50;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.news-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-2px);
+}
+
+.news-title {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+
+.news-content {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+.news-time {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
+/* No Items State - Better centered for widgets */
+.no-items {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 32px;
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed var(--border-light);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    margin: 0 4px 0 0; /* Match widget card margins */
+}
+
+/* --- 9. Notification Dropdown --- */
+.notification-dropdown {
+    position: absolute;
+    top: 60px;
+    right: 24px;
+    width: 320px;
+    max-height: 400px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+    visibility: hidden;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-dropdown.active {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+
+.notification-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.notification-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.notification-count {
+    background: #ff4444;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.notification-list {
+    max-height: 300px;
+    overflow-y: auto;
+    list-style: none;
+    padding: 0;
+}
+
+.notification-item {
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notification-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-item .notification-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-blue);
+    flex-shrink: 0;
+}
+
+.notification-item .notification-text {
+    flex: 1;
+}
+
+.notification-item .notification-message {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.notification-item .notification-time {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.notification-empty {
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* --- 10. Modal Styles --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    padding: 32px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 480px;
+    border: 1px solid var(--border-light);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    transform: translateY(-20px);
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.active .modal-content {
+    transform: translateY(0);
+}
+
+.modal-header {
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 16px;
+}
+
+.modal-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modal-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.form-input::placeholder {
+    color: var(--text-muted);
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.btn {
+    padding: 12px 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: var(--accent-blue);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #1976d2;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+/* --- 11. Toast Notifications --- */
+.toast-container {
+    position: fixed;
+    top: 90px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.toast {
+    padding: 16px 20px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s ease;
+    max-width: 350px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toast-success { background: #4caf50; }
+.toast-error { background: #f44336; }
+.toast-warning { background: #ff9800; }
+.toast-info { background: var(--accent-blue); }
+
+/* --- 12. Responsive Design --- */
+@media (max-width: 1200px) {
+    .main-content-wrapper, #main-content-wrapper {
+        flex: 3;
+    }
+    .widget-panel {
+        flex: 1;
+    }
+    
+    /* Ensure stat cards stay in one row even on smaller screens */
+    .stat-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+    }
+    
+    .stat-card {
+        padding: 20px 16px;
+    }
+    
+    .stat-value {
+        font-size: 1.8rem;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 968px) {
+    /* Only on very small screens allow stat cards to wrap */
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .app-header {
+        padding: 0 16px;
+    }
+    
+    .header-center {
+        margin: 0 16px;
+    }
+    
+    .app-sidebar {
+        width: 50px;
+    }
+    
+    .app-sidebar:hover {
+        width: 200px;
+    }
+    
+    .main-content {
+        padding: 20px 16px 0 16px;
+    }
+    
+    .widget-panel {
+        padding: 20px 16px 0 16px;
+    }
+    
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-content-container {
+        flex-direction: column;
+    }
+    
+    .main-content {
+        flex: none;
+        height: 60%;
+    }
+    
+    .widget-panel {
+        flex: none;
+        height: 40%;
+        border-left: none;
+        border-top: 1px solid var(--border-light);
+    }
+    
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* --- Cold Calling Hub Specific Styles (Merged and Adapted) --- */
+
+/* Main Layout */
+.calls-hub-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 25px;
+    height: calc(100vh - 70px - 48px); /* Full height minus header and body padding */
+    padding: 24px 0; /* Add vertical padding to match main content */
+    overflow-y: auto; /* Allow scrolling for the entire layout */
+    box-sizing: border-box; /* Include padding in height calculation */
+}
+
+/* Main Script Area */
+.calls-hub-main {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: linear-gradient(135deg, var(--cch-dark-blue) 0%, var(--cch-bg-card) 100%);
+    border: 1px solid var(--cch-border-color);
+    border-radius: 15px;
+    padding: 30px;
+    position: relative;
+    overflow-y: hidden;
+    height: 100%; /* Ensure it takes full height of its container */
+}
+.calls-hub-main-inner {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    align-items: center; /* Center the entire main content block */
+    justify-content: center;
+}
+
+.script-display {
+    background: var(--cch-darker-blue);
+    padding: 24px;
+    border-radius: 12px;
+    font-size: 1.25rem;
+    line-height: 1.6;
+    min-height: 250px;
+    text-align: left; /* Default to left-aligned text */
+    border: 1px solid var(--cch-border-color);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    flex-grow: 1;
+    width: 100%;
+    overflow-y: auto;
+    color: var(--cch-text-primary);
+}
+
+.script-display.start {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+/* Mood-based borders for the script display */
+.script-display.mood-neutral { border-left: 4px solid var(--cch-text-secondary); }
+.script-display.mood-positive { border-left: 4px solid #10b981; }
+.script-display.mood-challenging { border-left: 4px solid var(--cch-accent-orange); }
+.script-display.mood-unsure { border-left: 4px solid #8b5cf6; }
+
+.script-display.ringing {
+    animation: ring-pulse 1.5s infinite;
+}
+
+@keyframes ring-pulse {
+    0% { box-shadow: 0 0 0 0 var(--cch-professional-blue); }
+    100% { box-shadow: 0 0 0 20px rgba(33, 150, 243, 0); } /* Adjusted to CRM accent-blue */
+}
+
+/* Styling for emphasis and highlight */
+.emphasis { 
+    font-weight: bold; 
+}
+.highlight-yellow { 
+    background-color: #e2b34a; /* New, sleeker yellow */
+    color: black; 
+    padding: 2px 5px; 
+    border-radius: 4px; 
+    font-weight: bold; 
+    display: inline-block;
+}
+.pause { 
+    font-style: italic; 
+    opacity: 0.7; 
+}
+
+.response-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-top: 25px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+.response-buttons.full-width {
+    grid-template-columns: 1fr;
+}
+
+.response-btn, .dial-button {
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.response-btn {
+    background: var(--cch-bg-hover);
+}
+
+.response-btn:hover {
+    background: var(--cch-professional-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+}
+
+.dial-button {
+    background: #10b981;
+    font-size: 1.1rem;
+    font-weight: 700;
+    width: 100%;
+}
+
+.dial-button:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+}
+
+.calls-hub-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+/* Updated button styles */
+.calls-hub-footer .action-btn {
+    background: var(--cch-bg-hover);
+    color: var(--cch-text-primary);
+    border-radius: 8px;
+    padding: 12px 15px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border: 1px solid var(--cch-border-color);
+}
+
+.calls-hub-footer .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #475569;
+}
+.calls-hub-footer .action-btn:hover:not(:disabled) {
+    background: var(--cch-professional-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+}
+
+/* New styling for the restart icon button */
+.restart-btn-icon {
+    background: var(--cch-bg-hover);
+    color: var(--cch-text-primary);
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border: 1px solid var(--cch-border-color);
+}
+
+.restart-btn-icon:hover {
+    background: var(--cch-professional-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+}
+
+.sidebar-actions button {
+    flex: 1;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    color: white;
+    border: 1px solid transparent;
+}
+
+.sidebar-actions .add-notes-btn {
+    background: var(--cch-professional-blue);
+    border-color: var(--cch-professional-blue);
+}
+.sidebar-actions .add-notes-btn:hover {
+    background: var(--cch-secondary-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+}
+.sidebar-actions .clear-btn {
+    background: #ef4444;
+    border-color: #ef4444;
+}
+.sidebar-actions .clear-btn:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+}
+
+/* Sidebar & Widgets */
+.calls-hub-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    min-width: 350px;
+    padding: 0 8px; /* For scrollbar padding */
+}
+
+.sidebar-card {
+    background: linear-gradient(135deg, var(--cch-dark-blue) 0%, var(--cch-bg-card) 100%);
+    border: 1px solid var(--cch-border-color);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    height: max-content; /* Ensure container matches content size */
+}
+
+.sidebar-card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--cch-text-primary);
+    margin-bottom: 15px;
+}
+
+.sidebar-input-group {
+    margin-bottom: 12px;
+}
+
+.sidebar-input-group label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--cch-text-secondary);
+    margin-bottom: 4px;
+}
+
+.sidebar-input-group input, .sidebar-input-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--cch-bg-hover);
+    border: 1px solid var(--cch-border-color);
+    color: var(--cch-text-primary);
+    font-size: 0.9rem;
+    transition: border-color 0.3s ease;
+}
+.sidebar-input-group input:disabled, .sidebar-input-group textarea:disabled { opacity: 0.7; }
+.sidebar-input-group input:focus, .sidebar-input-group textarea:focus { outline: none; border-color: var(--cch-professional-blue); box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2); } /* Adjusted to CRM accent-blue */
+.sidebar-input-group textarea { min-height: 120px; resize: vertical; }
+
+.list-item {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--cch-border-color);
+    font-size: 0.9rem;
+}
+.list-item:last-child { border-bottom: none; }
+
+.list-item strong {
+    color: var(--cch-text-primary);
+    font-weight: 600;
+}
+.list-item p {
+    color: var(--cch-text-secondary);
+    line-height: 1.4;
+}
+
+/* Energy Health Check Styles */
+.calculator-wrapper {
+    background: linear-gradient(135deg, var(--cch-dark-blue), var(--cch-header-blue));
+    border-radius: 15px;
+    padding: 24px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    border: 1px solid var(--cch-bg-hover);
+    transition: all 0.3s ease;
+}
+.calculator-wrapper.is-calculating { animation: pulse-border 1.5s infinite; }
+@keyframes pulse-border { 0% { border-color: var(--cch-bg-hover); } 50% { border-color: var(--cch-professional-blue); } 100% { border-color: var(--cch-bg-hover); } }
+.calculator-title, .section-title, .input-label { color: var(--cch-text-primary); }
+.calculator-subtitle { color: var(--cch-text-secondary); }
+.progress-bar { background: var(--cch-bg-hover); border-radius: 9999px; height: 6px; }
+.progress-fill { background: linear-gradient(90deg, var(--cch-professional-blue), var(--cch-secondary-blue)); border-radius: 9999px; }
+.form-section { background: var(--cch-bg-card); border-color: var(--cch-bg-hover); border-radius: 15px; padding: 24px; }
+.form-section.active { border-color: var(--cch-professional-blue); }
+.form-section.completed { border-color: #10b981; }
+.section-header-pill {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--cch-bg-hover);
+    border-radius: 9999px;
+    padding: 4px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cch-text-primary);
+    margin-bottom: 12px;
+    border: 1px solid var(--cch-border-color);
+    transition: all 0.3s ease;
+}
+.section-header-pill.active { background-color: var(--cch-professional-blue); border-color: var(--cch-secondary-blue); }
+.section-header-pill.completed { background-color: #10b981; border-color: #16a34a; }
+.section-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background-color: var(--cch-darker-blue); color: white; border-radius: 9999px; font-weight: 700; margin-right: 8px; }
+.form-input { background: var(--cch-bg-hover); border: 2px solid var(--cch-border-color); color: var(--cch-text-primary); border-radius: 12px; padding: 8px; font-size: 14px; width: 100%; }
+.form-input:focus { outline: none; border-color: var(--cch-professional-blue); box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2); } /* Adjusted to CRM accent-blue */
+.input-feedback { margin-top: 12px; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; text-align: center; }
+.feedback-danger { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); }
+.feedback-warning { background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4); }
+.feedback-success { background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.4); }
+.feedback-info { background: rgba(30,64,175,0.2); color: var(--cch-professional-blue); border: 1px solid rgba(30,64,175,0.4); }
+.usage-display { background: var(--cch-bg-card); border: 2px solid var(--cch-professional-blue); border-radius: 12px; padding: 12px; margin-top: 12px; }
+.usage-title { color: var(--cch-text-primary); font-size: 14px; }
+.usage-details { color: #cbd5e1; font-size: 12px; }
+.calculate-button { background: linear-gradient(135deg, var(--cch-professional-blue), var(--cch-secondary-blue)); color: white; opacity: 0.4; cursor: not-allowed; font-size: 1rem; font-weight: bold; border-radius: 12px; padding: 12px; margin-top: 16px; transition: all 0.3s ease; }
+.calculate-button.ready { opacity: 1; cursor: pointer; }
+.calculate-button.ready:hover { box-shadow: 0 12px 30px rgba(33, 150, 243, 0.4); transform: translateY(-3px); } /* Adjusted to CRM accent-blue */
+.results-section { background: linear-gradient(135deg, var(--cch-dark-blue), var(--cch-bg-card)); border: 1px solid var(--cch-bg-hover); border-radius: 15px; padding: 24px; margin-top: 24px; animation: fadeIn 0.5s ease-in-out; }
+.main-result.savings { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.2)); border-color: #10b981; }
+.main-result.increase { background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.2)); border-color: #ef4444; }
+.main-result.neutral { background: linear-gradient(135deg, rgba(30,64,175,0.1), rgba(30,64,175,0.2)); border-color: var(--cch-professional-blue); }
+.result-amount.positive { color: #10b981; }
+.result-amount.negative { color: #ef4444; }
+.result-amount.neutral { color: var(--cch-text-primary); }
+.result-label { color: var(--cch-text-primary); }
+.result-description, .analysis-text { color: var(--cch-text-secondary); }
+.loading-animation { display: none; flex-direction: column; justify-content: center; align-items: center; height: 200px; text-align: center;}
+.loading-animation.show { display: flex; }
+.spinner { width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--cch-professional-blue); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.detail-field { position: relative; cursor: pointer; padding: 5px 0; }
+.detail-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(33, 150, 243, 0.8); border-radius: 8px; display: flex; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease; } /* Adjusted to CRM accent-blue */
+.detail-field:hover .detail-overlay { opacity: 1; }
+.overlay-button { background: none; border: none; color: white; padding: 8px; transition: all 0.2s ease; }
+.overlay-button:hover { background: rgba(255,255,255,0.2); border-radius: 50%; }
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+.modal.open { display: flex; }
+.modal-content { background: linear-gradient(135deg, var(--cch-dark-blue), var(--cch-bg-card)); border-radius: 15px; padding: 30px; width: 90%; max-width: 400px; border: 1px solid var(--cch-bg-hover); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; overflow: hidden; height: max-content; display: flex; flex-direction: column; }
+.modal-card-container { display: flex; width: 100%; transition: transform 0.4s cubic-bezier(0.68,-0.55,0.27,1.55); }
+.modal-card { flex-shrink: 0; opacity: 1; transition: opacity 0.4s ease; padding-right: 20px; }
+.modal-card.fading-out { opacity: 0; }
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.calendar-header select { background: var(--cch-bg-hover); color: var(--cch-text-primary); border-radius: 8px; padding: 4px 8px; font-size: 14px; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 5px; text-align: center; }
+.calendar-day, .calendar-date { padding: 8px; border-radius: 8px; font-size: 14px; }
+.calendar-day { color: var(--cch-professional-blue); font-weight: 600; }
+.calendar-date { background: var(--cch-bg-hover); cursor: pointer; transition: all 0.2s ease; }
+.calendar-date:hover { background: var(--cch-professional-blue); }
+.calendar-date.selected { background: var(--cch-professional-blue); color: white; font-weight: 700; }
+.calendar-date.today { border: 2px solid var(--cch-accent-orange); }
+.date-input { width: 100%; padding: 10px; background: var(--cch-bg-hover); border: 1px solid var(--cch-border-color); border-radius: 8px; color: var(--cch-text-primary); cursor: pointer; }
+
+/* Responsive Design for Cold Calling Hub */
+@media (max-width: 1200px) {
+    .calls-hub-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+    .calls-hub-main {
+        max-width: 100%;
+        min-width: unset;
+        flex-grow: 1;
+    }
+    .calls-hub-sidebar {
+        min-width: unset;
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 20px;
+        flex-wrap: nowrap;
+    }
+    .calls-hub-sidebar .sidebar-card {
+        flex-shrink: 0;
+        min-width: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .script-display {
+        font-size: 1rem;
+    }
+    .sidebar-card-title {
+        font-size: 1.1rem;
+    }
+}
+
+/* Call Center Hub Specific Styles */
+/* Ensure the main view and sidebar scroll independently and have consistent padding. */
+#call-scripts-view, #cold-calling-widgets-container {
+    padding: var(--spacing-lg); /* Match home page padding */
+    height: calc(100vh - 70px); /* Remove the extra height reduction */
+    overflow-y: auto;
+}
+
+#call-scripts-view {
+    flex: 3;
+}
+
+#cold-calling-widgets-container {
+    flex: 1;
+}
+
+/* Custom scrollbar for a cleaner look in the call hub */
+#call-scripts-view::-webkit-scrollbar, 
+#cold-calling-widgets-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#call-scripts-view::-webkit-scrollbar-track, 
+#cold-calling-widgets-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#call-scripts-view::-webkit-scrollbar-thumb, 
+#cold-calling-widgets-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+#call-scripts-view::-webkit-scrollbar-thumb:hover, 
+#cold-calling-widgets-container::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.calls-hub-layout {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.calls-hub-main {
+    flex: 3;
+    /* Padding is now handled by the parent #call-scripts-view */
+}
+
+.calls-hub-sidebar {
+    flex: 1;
+    /* Padding is now handled by the parent #cold-calling-widgets-container */
+}
+
+
+
+.script-section {
+    margin-bottom: 1.5rem;
+}
+
+.call-script-container {
+    background-color: var(--cch-secondary-bg);
+    border-radius: var(--border-radius-large);
+    padding: 2rem;
+    text-align: center;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin-top: 1.5rem; /* Reduced top margin */
+    margin-bottom: 1.5rem;
+}
+
+.script-section {
+    margin-bottom: 1.5rem;
+}
+
+/* Call Center Hub Specific Styles */
+/* Ensure the main view and sidebar scroll independently and have consistent padding. */
+#call-scripts-view, #cold-calling-widgets-container {
+    padding: var(--spacing-lg); /* Match home page padding */
+    height: calc(100vh - 70px); /* Remove the extra height reduction */
+    overflow-y: auto;
+}
+
+#call-scripts-view {
+    flex: 3;
+}
+
+#cold-calling-widgets-container {
+    flex: 1;
+}
+
+/* Custom scrollbar for a cleaner look in the call hub */
+#call-scripts-view::-webkit-scrollbar, 
+#cold-calling-widgets-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#call-scripts-view::-webkit-scrollbar-track, 
+#cold-calling-widgets-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#call-scripts-view::-webkit-scrollbar-thumb, 
+#cold-calling-widgets-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+#call-scripts-view::-webkit-scrollbar-thumb:hover, 
+#cold-calling-widgets-container::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.calls-hub-layout {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.calls-hub-main {
+    flex: 3;
+    /* Padding is now handled by the parent #call-scripts-view */
+}
+
+.calls-hub-sidebar {
+    flex: 1;
+    /* Padding is now handled by the parent #cold-calling-widgets-container */
+}
+
+/* --- 10. Responsive Design --- */
+@media (max-width: 1200px) {
+    .app-main {
+        display: flex;
+        flex-direction: column;
+    }
+    .main-content {
+        flex: none;
+        height: 60%;
+    }
+    .widget-panel {
+        flex: none;
+        height: 40%;
+        border-left: none;
+        border-top: 1px solid var(--border-light);
+    }
+    .stat-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
