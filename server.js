@@ -35,6 +35,7 @@ const server = http.createServer((req, res) => {
     const allowed = new Set([...defaultAllowed, ...envList]);
     const isNgrok = /^(https?:\/\/)?[a-z0-9-]+\.(?:ngrok(?:-free)?\.app)$/i.test(origin);
     const isAllowed = allowed.has(origin) || isNgrok;
+    try { console.log(`[CORS] ${req.method} ${req.url} origin=${origin} isAllowed=${isAllowed}`); } catch (_) {}
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       // Only allow credentials when a specific origin is echoed back (not with '*')
@@ -49,6 +50,7 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, ngrok-skip-browser-warning');
     res.setHeader('Access-Control-Max-Age', '600');
     if (req.method === 'OPTIONS') {
+      try { console.log(`[CORS] Preflight OK for ${origin}`); } catch (_) {}
       res.writeHead(204);
       return res.end();
     }
