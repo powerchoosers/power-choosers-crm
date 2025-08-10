@@ -1,0 +1,140 @@
+Project Overview
+App: CRM dashboard with email client, contacts, accounts, sequences.
+Architecture: Global CRMApp object extended by modules (vanilla JS). Views are <div class="page-view" id="..."> inside 
+crm-dashboard.html
+.
+Data: Firebase/Firestore-backed (emails, contacts, templates, sequences). Contacts UI is dynamic.
+Key Files and Locations
+Main HTML: 
+c:/Users/Pete/Documents/Working Refractored Copy - Copy/crm-dashboard.html
+Contacts view container: #contacts-view (empty div; JS injects markup)
+Contacts Module: 
+js/modules/contacts.js
+ (extends CRMApp via Object.assign(CRMApp, { ... }))
+Renders and controls Contacts page
+Exposes actions like CRMApp.emailContact(id, options), CRMApp.callContact(id)
+Contacts Markup (injected): 
+contacts-content.html
+Defines contacts header, filters sidebar, table, pagination
+Contacts Styles: 
+contacts-styles.css
+Advanced dark theme layout, sticky header behavior
+Other references:
+crm-app.js
+ may manage view switching (CRMApp.showView('contacts-view'))
+Firebase config exists, Firestore used across modules (emails, contacts, templates)
+What We Built/FIxed This Session
+Restored All Contacts Page styling to match the injected HTML:
+Aligned CSS with 
+contacts-content.html
+ class names:
+.contacts-main-layout, .contacts-filters-sidebar, .filters-header, .filters-collapse-btn, .contacts-title-section, .contacts-actions, .contacts-table-wrapper, .filter-select
+Kept sticky header precise with --controls-h so table header sits flush under .table-controls
+Preserved zebra rows, pagination stickiness, compact spacing, column truncation/ellipsis
+Email contact plumbing is ready for sequences:
+CRMApp.emailContact(id, options = {}) sets CRMApp.pendingEmailContext containing:
+to
+, name, contactId, source (default 'contacts'), optional sequenceId, meta
+Respects silent to suppress notification
+Note: central compose opener not implemented yet (placeholder comment for future openCompose(ctx)).
+How Contacts Page Works (Important)
+Render flow:
+CRMApp.renderContactsPage() fetches 
+contacts-content.html
+ into #contacts-view, then calls 
+initContactsPage()
+.
+initContactsPage()
+ wires controls:
+Basic filters: #contact-search, #account-filter, #title-filter, #location-filter, #industry-filter, #date-filter
+Clear button: #clear-filters-btn
+Collapse: #filters-collapse-btn → 
+toggleContactsFilters()
+Column drag-and-drop: 
+initContactsColumnDnD()
+ + persisted order
+Data render: 
+renderContactsTableAdvanced()
+Uses 
+getFilteredContacts()
+, 
+buildContactRowCells(contact)
+, updates #contacts-count, #results-info
+Pagination: 
+renderContactsPagination(total, page, totalPages)
+ updates #prev-page-btn, #next-page-btn, #pagination-numbers, and #pagination-info
+DOM IDs/classes to know:
+Container: #contacts-view
+Filters Sidebar: #contacts-filters-sidebar
+Table: #contacts-table, #contacts-thead, #contacts-table-body
+Controls: .table-controls, #select-all-btn, #bulk-actions-btn, #results-info
+Pagination: #prev-page-btn, #next-page-btn, #pagination-numbers, #pagination-info
+Sequence-Driven Emailing: Current State and Next Steps
+Current:
+CRMApp.emailContact(id, options) accepts context from sequences:
+Example: CRMApp.emailContact(contactId, { source: 'sequence', sequenceId, meta, silent })
+Sets CRMApp.pendingEmailContext (for compose prefill), shows notification unless silent.
+Missing piece:
+A centralized compose opener (e.g., CRMApp.openCompose(ctx) or equivalent) that:
+Reads CRMApp.pendingEmailContext
+Opens compose modal prefilled with 
+to
+, sequenceId, and any sequence metadata
+Recommended next tasks:
+Implement CRMApp.openCompose(ctx) and call it from 
+emailContact(...)
+ when context is ready.
+Make compose UI read from CRMApp.pendingEmailContext on open.
+In sequences UI/module, wire “Email” or “Send step” actions to CRMApp.emailContact(contactId, { source: 'sequence', sequenceId, meta }).
+Optional: support silent: true to stage compose without toast (if invoked in bulk or background).
+Ensure sent emails record sequence linkage (store sequenceId in Firestore docs for analytics).
+How To Find Things Fast (Search Tips)
+Find Contacts page code paths:
+Search for render: "renderContactsPage(", "initContactsPage(", "renderContactsTableAdvanced("
+Look up filters and chips: "getFilteredContacts(", "renderActiveFilterChips(", "setOrReplaceFilterChip("
+Find actions:
+Email: "emailContact(" in 
+js/modules/contacts.js
+Call: "callContact("
+Row cell templating: "buildContactRowCells("
+Find the injected markup:
+"contacts-content.html"
+Find container and navigation:
+"contacts-view" across the repo confirms view switching and styles
+Notable Behaviors and Gotchas
+Sticky header math: Relies on --controls-h set in #contacts-view and used in th { top: var(--controls-h) }. If controls height changes, update the var in 
+contacts-styles.css
+ (#contacts-view { --controls-h: 36px; }).
+Injected HTML: The contacts view is injected; edit 
+contacts-content.html
+ for structure and 
+contacts-styles.css
+ for visuals.
+Column reorder persistence: Uses localStorage key contacts_column_order_v2.
+Avatars/favicons: Built via 
+getFaviconForContact()
+ / 
+getFaviconForAccount()
+ from domain derived from website/email.
+Exact Functions To Know
+CRMApp.renderContactsPage()
+CRMApp.initContactsPage()
+CRMApp.getFilteredContacts()
+CRMApp.renderContactsTableAdvanced()
+CRMApp.buildContactRowCells(contact)
+CRMApp.renderContactsPagination(total, page, totalPages)
+CRMApp.initContactsColumnDnD(), CRMApp.refreshContactsHeaderOrder()
+CRMApp.toggleContactsFilters()
+CRMApp.emailContact(id, options = {}) ← sequence entry point
+CRMApp.callContact(id)
+Paths Recap
+crm-dashboard.html
+contacts-content.html
+contacts-styles.css
+js/modules/contacts.js
+Status
+All Contacts page: layout restored and polished.
+Email-to-contact: context-ready (pendingEmailContext) for sequences; compose opener not yet implemented.
+Next: add compose opener, prefill from context, and wire sequences to call 
+emailContact()
+ with { source: 'sequence', sequenceId }.

@@ -1,0 +1,30 @@
+Country,Number,Price,Next billing date,Type,Features,Address
+US,14693518845,0.93000000,10 Sep 2025 01:11 GMT,Mobile,"[VOICE, MMS, SMS]",,
+API Key:1c9d4de5  
+API Secret: j0L1IPa8vlisVYoR
+API: Phone Number: 4693518845
+SIP information:powerchoosers-l-patterson.sip.vonage.com
+Example Voice API Request: 
+POST https://api.nexmo.com/v1/calls 
+
+{
+  "from": {
+    "type": "phone",
+    "number": "14693518845"
+  },
+  "to": [
+    {
+      "type": "phone",
+      "number": "19728342317"
+    }
+  ],
+  "ncco": [
+    {
+      "action": "talk",
+      "language": "en-US",
+      "style": "0",
+      "premium": false,
+      "text": "Hello from Voice API"
+    }
+  ]
+}      
