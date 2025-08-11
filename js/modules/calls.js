@@ -32,53 +32,81 @@
       ];
 
       container.innerHTML = `
-        <div class="calls-header">
-          <h3 class="card-title title-with-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-            </svg>
-            Calls
-          </h3>
-          <div class="calls-actions">
-            <button id="open-dialer-btn" class="btn btn-primary">New call</button>
+        <div class="calls-container">
+          <div class="calls-header">
+            <h3 class="card-title title-with-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+              Calls
+            </h3>
+            <div class="calls-actions">
+              <button id="open-dialer-btn" class="btn btn-primary">New call</button>
+            </div>
           </div>
-        </div>
 
-        <div class="calls-toolbar">
-          <div class="left">
-            <button id="calls-filters-btn" class="btn btn-secondary">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
-              Show Filters
-            </button>
+          <div class="calls-toolbar">
+            <div class="left">
+              <button id="calls-filters-btn" class="btn btn-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+                Show Filters
+              </button>
+            </div>
+            <div class="right">
+              <input id="calls-search" class="form-input calls-search" placeholder="Quick search" />
+            </div>
           </div>
-          <div class="right">
-            <input id="calls-search" class="form-input calls-search" placeholder="Quick search" />
-          </div>
-        </div>
 
-        <div class="calls-table-container">
-          <div class="calls-table-wrapper">
-            <table class="calls-table">
-              <thead>
-                <tr>
-                  <th>Contact</th>
-                  <th>Insights</th>
-                  <th>Company</th>
-                  <th>Direction</th>
-                  <th>Purpose</th>
-                  <th>Disposition</th>
-                  <th>Duration</th>
-                  <th>Note</th>
-                  <th>Date</th>
-                  <th>User</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="calls-tbody"></tbody>
-            </table>
-          </div>
-          <div class="calls-pagination">
-            <span id="calls-pagination-info" class="hint"></span>
+          <div class="calls-table-container">
+            <!-- Top controls: selection + compact pagination (now inside container) -->
+            <div class="table-controls">
+              <div class="table-controls-left">
+                <span class="selection-text" id="calls-select-all">Select All</span>
+              </div>
+              <div class="table-controls-right">
+                <span class="results-info" id="calls-results-info">Showing 0 of 0 calls</span>
+                <button class="pagination-btn" id="calls-top-prev" aria-label="Previous" title="Previous">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <button class="pagination-btn" id="calls-top-next" aria-label="Next" title="Next">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </div>
+            </div>
+            <div class="calls-table-wrapper">
+              <table class="calls-table">
+                <thead>
+                  <tr>
+                    <th class="col-number">#</th>
+                    <th class="col-checkbox"><input type="checkbox" id="calls-header-select-all" aria-label="Select all on page"></th>
+                    <th>Contact</th>
+                    <th>Insights</th>
+                    <th>Company</th>
+                    <th>Direction</th>
+                    <th>Purpose</th>
+                    <th>Disposition</th>
+                    <th>Duration</th>
+                    <th>Note</th>
+                    <th>Date</th>
+                    <th>User</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="calls-tbody"></tbody>
+              </table>
+            </div>
+            <div class="pagination-container">
+              <div class="pagination-info"><span id="calls-pagination-info2">Showing 0-0 of 0 calls</span></div>
+              <div class="pagination-controls">
+                <button class="pagination-btn" id="calls-prev" aria-label="Previous" title="Previous">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="pagination-numbers" id="calls-page-nums"></div>
+                <button class="pagination-btn" id="calls-next" aria-label="Next" title="Next">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -86,41 +114,166 @@
       // Bind actions
       document.getElementById('open-dialer-btn')?.addEventListener('click', () => this.openDialerWidget('crm'));
 
-      // Render rows
+      // State and helpers
+      this.callsPerPage = this.callsPerPage || 50;
+      this.callsCurrentPage = this.callsCurrentPage || 1;
+      this.callsSelectedIds = this.callsSelectedIds || new Set();
+      this.callsFilters = this.callsFilters || { accountId: '', title: '', date: '', search: '' };
+
       const tbody = container.querySelector('#calls-tbody');
       const search = container.querySelector('#calls-search');
-      const renderRows = (query = '') => {
-        const q = (query || '').toLowerCase();
-        const filtered = rows.filter(r => {
+
+      const getFiltered = () => {
+        const q = (this.callsFilters.search || '').toLowerCase();
+        // Derive title/account matching via global datasets when available
+        const accounts = Array.isArray(this.accounts) ? this.accounts : [];
+        const contacts = Array.isArray(this.contacts) ? this.contacts : [];
+
+        const selectedAccountId = this.callsFilters.accountId || '';
+        const selectedTitle = (this.callsFilters.title || '').toLowerCase();
+        const selectedDate = this.callsFilters.date || '';
+
+        return rows.filter(r => {
+          let ok = true;
           const hay = `${r.contact} ${r.company} ${r.purpose} ${r.disposition} ${r.note}`.toLowerCase();
-          return hay.includes(q);
+          if (q) ok = ok && hay.includes(q);
+
+          if (selectedAccountId) {
+            const acct = accounts.find(a => a.id === selectedAccountId);
+            if (acct) ok = ok && (r.company === acct.name || r.company === acct.accountName);
+          }
+
+          if (selectedTitle) {
+            const c = contacts.find(c0 => `${(c0.firstName||'').trim()} ${(c0.lastName||'').trim()}`.trim().toLowerCase() === (r.contact||'').toLowerCase());
+            if (c) ok = ok && ((c.title||'').toLowerCase() === selectedTitle);
+            else ok = ok && false; // if filtering by title but no match, exclude
+          }
+
+          if (selectedDate) {
+            // Basic relative date filter using r.date string (fallback heuristic)
+            const d = (r.date||'').toLowerCase();
+            if (selectedDate === 'today') ok = ok && d.includes('today');
+            else if (selectedDate === 'week') ok = ok && (d.includes('day') || d.includes('week'));
+            else if (selectedDate === 'month') ok = ok && (d.includes('week') || d.includes('month'));
+          }
+
+          return ok;
         });
-        tbody.innerHTML = filtered.map(r => `
-          <tr class="call-row" data-id="${r.id}">
-            <td class="contact">${r.contact}</td>
-            <td class="insights"><button class="link-btn insights-btn" data-id="${r.id}">Call insights</button></td>
-            <td class="company">${r.company}</td>
-            <td class="direction">${r.direction}</td>
-            <td class="purpose">${r.purpose}</td>
-            <td class="disposition">${r.disposition}</td>
-            <td class="duration">${r.duration}</td>
-            <td class="note">${r.note}</td>
-            <td class="date">${r.date}</td>
-            <td class="user">${r.user}</td>
-            <td class="row-actions">
-              <button class="icon-btn play-btn" title="Play recording" data-id="${r.id}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              </button>
-            </td>
-          </tr>
-        `).join('');
+      };
+
+      // Ensure header select-all reflects current page checkboxes
+      function updateHeaderSelectState() {
+        const headerSelectAll = document.getElementById('calls-header-select-all');
+        if (!headerSelectAll) return;
+        const boxes = tbody.querySelectorAll('.row-checkbox');
+        const allChecked = boxes.length > 0 && [...boxes].every(cb => cb.checked);
+        const someChecked = boxes.length > 0 && [...boxes].some(cb => cb.checked);
+        headerSelectAll.checked = allChecked;
+        headerSelectAll.indeterminate = !allChecked && someChecked;
+      }
+
+      const renderPagination = (total, page, totalPages) => {
+        const infoTop = document.getElementById('calls-results-info');
+        const prevTop = document.getElementById('calls-top-prev');
+        const nextTop = document.getElementById('calls-top-next');
+        const prev = document.getElementById('calls-prev');
+        const next = document.getElementById('calls-next');
+        const nums = document.getElementById('calls-page-nums');
+        const info2 = document.getElementById('calls-pagination-info2');
+        const from = total === 0 ? 0 : (page-1)*this.callsPerPage + 1;
+        const to = Math.min(page*this.callsPerPage, total);
+        if (infoTop) infoTop.textContent = `Showing ${total} of ${rows.length} calls`;
+        if (info2) info2.textContent = `Showing ${from}-${to} of ${total} calls`;
+
+        if (prevTop) {
+          prevTop.disabled = page <= 1;
+          prevTop.onclick = () => { if (this.callsCurrentPage>1){ this.callsCurrentPage--; renderRows(); } };
+        }
+        if (nextTop) {
+          nextTop.disabled = page >= totalPages;
+          nextTop.onclick = () => { if (this.callsCurrentPage<totalPages){ this.callsCurrentPage++; renderRows(); } };
+        }
+        if (prev) {
+          prev.disabled = page <= 1;
+          prev.onclick = () => { if (this.callsCurrentPage>1){ this.callsCurrentPage--; renderRows(); } };
+        }
+        if (next) {
+          next.disabled = page >= totalPages;
+          next.onclick = () => { if (this.callsCurrentPage<totalPages){ this.callsCurrentPage++; renderRows(); } };
+        }
+        if (nums) {
+          const maxButtons = Math.min(7, totalPages);
+          let start = Math.max(1, page - Math.floor(maxButtons/2));
+          let end = Math.min(totalPages, start + maxButtons - 1);
+          start = Math.max(1, end - maxButtons + 1);
+          nums.innerHTML = '';
+          for (let i=start; i<=end; i++) {
+            const b = document.createElement('button');
+            b.className = 'page-num' + (i===page ? ' active':'');
+            b.textContent = String(i);
+            b.onclick = () => { this.callsCurrentPage = i; renderRows(); };
+            nums.appendChild(b);
+          }
+        }
+      };
+
+      const renderRows = () => {
+        const all = getFiltered();
+        const total = all.length;
+        const per = this.callsPerPage;
+        const totalPages = Math.max(1, Math.ceil(total / per));
+        if (this.callsCurrentPage > totalPages) this.callsCurrentPage = totalPages;
+        const startIdx = (this.callsCurrentPage - 1) * per;
+        const pageItems = all.slice(startIdx, startIdx + per);
+
+        tbody.innerHTML = pageItems.map((r, idx) => {
+          const i = startIdx + idx + 1;
+          const checked = this.callsSelectedIds.has(r.id) ? 'checked' : '';
+          return `
+            <tr class="call-row" data-id="${r.id}">
+              <td class="col-number"><span class="row-number">${i}</span></td>
+              <td class="col-checkbox">
+                <div class="row-select">
+                  <input type="checkbox" class="row-checkbox" data-id="${r.id}" ${checked}>
+                </div>
+              </td>
+              <td class="contact">${r.contact}</td>
+              <td class="insights"><button class="link-btn insights-btn" data-id="${r.id}">Call insights</button></td>
+              <td class="company">${r.company}</td>
+              <td class="direction">${r.direction}</td>
+              <td class="purpose">${r.purpose}</td>
+              <td class="disposition">${r.disposition}</td>
+              <td class="duration">${r.duration}</td>
+              <td class="note">${r.note}</td>
+              <td class="date">${r.date}</td>
+              <td class="user">${r.user}</td>
+              <td class="row-actions">
+                <button class="icon-btn play-btn" title="Play recording" data-id="${r.id}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+              </td>
+            </tr>`;
+        }).join('');
+
+        // Checkbox wiring for current page
+        tbody.querySelectorAll('.row-checkbox').forEach(cb => {
+          cb.addEventListener('change', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            if (e.currentTarget.checked) this.callsSelectedIds.add(id);
+            else this.callsSelectedIds.delete(id);
+            updateHeaderSelectState();
+          });
+        });
+
+        renderPagination(total, this.callsCurrentPage, totalPages);
+        updateHeaderSelectState();
       };
 
       // Initial render and bindings
       renderRows();
       if (search && !search._calls_bound) {
         search._calls_bound = true;
-        search.addEventListener('input', (e) => renderRows((e.target && e.target.value) || ''));
+        search.addEventListener('input', (e) => { this.callsFilters.search = (e.target && e.target.value) || ''; this.callsCurrentPage = 1; renderRows(); });
       }
       if (tbody && !tbody._calls_bound) {
         tbody._calls_bound = true;
@@ -133,6 +286,130 @@
           if (row) this.openCallInsightsModal(row);
         });
       }
+
+      // Select all current page
+      const selectAllText = document.getElementById('calls-select-all');
+      const headerSelectAll = document.getElementById('calls-header-select-all');
+      const toggleSelectAll = () => {
+        const boxes = tbody.querySelectorAll('.row-checkbox');
+        const shouldSelect = [...boxes].some(cb => !cb.checked);
+        boxes.forEach(cb => { cb.checked = shouldSelect; const id = cb.getAttribute('data-id'); if (shouldSelect) this.callsSelectedIds.add(id); else this.callsSelectedIds.delete(id); });
+        updateHeaderSelectState();
+      };
+      if (selectAllText && !selectAllText._calls_bound) { selectAllText._calls_bound = true; selectAllText.addEventListener('click', toggleSelectAll); }
+      if (headerSelectAll && !headerSelectAll._calls_bound) { headerSelectAll._calls_bound = true; headerSelectAll.addEventListener('change', toggleSelectAll); }
+
+      // Filters sidebar wiring (populate from Contacts/Accounts when available)
+      const ensureFilters = () => {
+        if (document.getElementById('calls-filters-sidebar')) return;
+        const el = document.createElement('div');
+        el.id = 'calls-filters-sidebar';
+        el.className = 'filters-sidebar collapsed';
+        el.innerHTML = `
+          <div class="filters-header">
+            <div class="filters-title">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+              <h3>Filters</h3>
+            </div>
+            <button class="filters-collapse-btn" id="calls-filters-collapse-btn" title="Collapse filters">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+          </div>
+          <div class="filters-content">
+            <div class="filter-group">
+              <label class="filter-label">Search</label>
+              <input type="text" class="filter-input" id="calls-filter-search" placeholder="Search calls..." />
+            </div>
+            <div class="filter-group">
+              <label class="filter-label">Account</label>
+              <select class="filter-select" id="calls-account-filter"><option value="">All Accounts</option></select>
+            </div>
+            <div class="filter-group">
+              <label class="filter-label">Title</label>
+              <select class="filter-select" id="calls-title-filter"><option value="">All Titles</option></select>
+            </div>
+            <div class="filter-group">
+              <label class="filter-label">Created Date</label>
+              <select class="filter-select" id="calls-date-filter">
+                <option value="">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+              </select>
+            </div>
+            <div class="filter-actions"><button class="btn btn-secondary" id="calls-clear-filters">Clear All</button></div>
+          </div>`;
+        // Insert next to calls-view container
+        container.appendChild(el);
+      };
+
+      const populateFilters = () => {
+        const accounts = Array.isArray(this.accounts) ? this.accounts : [];
+        const contacts = Array.isArray(this.contacts) ? this.contacts : [];
+        const accountSel = document.getElementById('calls-account-filter');
+        if (accountSel) {
+          const seen = new Set();
+          accountSel.innerHTML = '<option value="">All Accounts</option>';
+          accounts.forEach(a => {
+            if (a.id && a.name && !seen.has(a.id)) {
+              seen.add(a.id);
+              const opt = document.createElement('option');
+              opt.value = a.id; opt.textContent = a.name; accountSel.appendChild(opt);
+            }
+          });
+          // If still empty, derive from rows
+          if (accountSel.children.length === 1) {
+            const names = [...new Set(rows.map(r => r.company).filter(Boolean))].sort();
+            names.forEach(n => { const opt = document.createElement('option'); opt.value=''; opt.textContent=n; accountSel.appendChild(opt); });
+          }
+        }
+        const titleSel = document.getElementById('calls-title-filter');
+        if (titleSel) {
+          const titles = [...new Set(contacts.map(c => (c.title||'').trim()).filter(Boolean))].sort();
+          titleSel.innerHTML = '<option value="">All Titles</option>' + titles.map(t=>`<option value="${t}">${t}</option>`).join('');
+        }
+      };
+
+      document.getElementById('calls-filters-btn')?.addEventListener('click', () => {
+        ensureFilters();
+        const sidebar = document.getElementById('calls-filters-sidebar');
+        if (!sidebar) return;
+        const open = !sidebar.classList.contains('collapsed');
+        if (open) sidebar.classList.add('collapsed'); else sidebar.classList.remove('collapsed');
+        populateFilters();
+      });
+
+      document.addEventListener('change', (e) => {
+        const t = e.target;
+        if (!t) return;
+        if (t.id === 'calls-filter-search') { this.callsFilters.search = t.value || ''; this.callsCurrentPage = 1; renderRows(); }
+        if (t.id === 'calls-account-filter') { this.callsFilters.accountId = t.value || ''; this.callsCurrentPage = 1; renderRows(); }
+        if (t.id === 'calls-title-filter') { this.callsFilters.title = t.value || ''; this.callsCurrentPage = 1; renderRows(); }
+        if (t.id === 'calls-date-filter') { this.callsFilters.date = t.value || ''; this.callsCurrentPage = 1; renderRows(); }
+        if (t.id === 'calls-header-select-all') { /* handled above */ }
+      });
+
+      // Click handlers for Clear/Collapse
+      document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (!t) return;
+        if (t.id === 'calls-clear-filters') {
+          this.callsFilters = { accountId: '', title: '', date: '', search: '' };
+          const fs = document.getElementById('calls-filters-sidebar');
+          if (fs) {
+            const selA = fs.querySelector('#calls-account-filter'); if (selA) selA.value = '';
+            const selT = fs.querySelector('#calls-title-filter'); if (selT) selT.value = '';
+            const selD = fs.querySelector('#calls-date-filter'); if (selD) selD.value = '';
+            const inpS = fs.querySelector('#calls-filter-search'); if (inpS) inpS.value = '';
+          }
+          const topSearch = document.getElementById('calls-search'); if (topSearch) topSearch.value = '';
+          this.callsCurrentPage = 1; renderRows();
+        }
+        if (t.id === 'calls-filters-collapse-btn') {
+          const sidebar = document.getElementById('calls-filters-sidebar');
+          if (sidebar) sidebar.classList.add('collapsed');
+        }
+      });
 
       // Ensure the standard widget panel shows the dialer and remains visible
       this.openDialerWidget('crm');
