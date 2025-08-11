@@ -13,9 +13,22 @@
 #emails-view {
   width: 100%;
   flex-direction: column;
+  /* Dark theme variable overrides scoped to Emails view */
+  --pc-bg: var(--widget-bg);
+  --pc-border: var(--widget-border);
+  --pc-text: #e2e8f0;
+  --pc-muted: #94a3b8;
 }
 
-.emails-layout { width: 100%; }
+.emails-layout {
+  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  min-height: calc(100% - 50px);
+  background: var(--widget-bg);
+  border: 1px solid var(--widget-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
 
 .emails-header {
   display: flex;
@@ -25,6 +38,9 @@
   border-bottom: 1px solid var(--pc-border);
   background: var(--pc-bg);
 }
+
+#emails-view .title-with-icon { display: flex; align-items: center; gap: 8px; color: var(--pc-text); }
+#emails-view .title-with-icon .title-icon { color: #ffffff; opacity: 0.95; }
 
 .emails-title {
   font-size: 20px;
@@ -40,6 +56,54 @@
   gap: 8px;
 }
 
+/* Header search input */
+#emails-view .emails-actions-right input[type="text"] {
+  height: 36px;
+  border: 1px solid #3a3a3a; /* match light grey controls */
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #2a2a2a; /* light grey */
+  color: #e2e8f0;
+}
+
+/* Scoped button styles for dark theme */
+#emails-view .btn {
+  background: #141414;
+  border: 1px solid var(--widget-border);
+  color: #e2e8f0;
+  border-radius: 8px;
+}
+#emails-view .btn:hover { background: #262626; }
+#emails-view .btn.btn-primary {
+  background: var(--pc-orange);
+  border-color: var(--pc-orange);
+  color: #0b1220;
+}
+#emails-view .btn.btn-primary:hover {
+  background: var(--pc-orange-strong);
+  border-color: var(--pc-orange-strong);
+}
+
+/* Iconic header/aside toggles */
+.folder-toggle-btn, .folders-collapse-btn {
+  height: 32px;
+  width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2a2a2a; /* match contacts/accounts light grey */
+  border: 1px solid #3a3a3a;
+  color: var(--pc-text);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.folder-toggle-btn:hover, .folders-collapse-btn:hover { background: #262626; }
+.folder-toggle-btn.active { outline: 2px solid var(--pc-orange); outline-offset: 0; }
+
+/* Flip collapse chevron when sidebar is collapsed */
+.folders-collapse-btn svg { transition: transform 160ms ease-in-out; }
+.emails-folders-sidebar.collapsed .folders-collapse-btn svg { transform: rotate(180deg); }
+
 /* Toolbar */
 .emails-toolbar {
   display: grid;
@@ -50,6 +114,25 @@
   background: var(--pc-bg);
 }
 
+/* Folders sidebar spacing: add a little separation from "Mailboxes" title */
+.emails-folders-sidebar .folders-list { margin-top: 6px; }
+
+/* Light grey search input to match Contacts/Accounts */
+.emails-search input#emails-search-input {
+  height: 32px;
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e2e8f0;
+}
+.emails-search input#emails-search-input::placeholder { color: #9ca3af; }
+.emails-search input#emails-search-input:focus {
+  outline: none;
+  border-color: var(--pc-orange);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
 .emails-toolbar .inbox-select { display: flex; align-items: center; gap: 8px; }
 .emails-toolbar select,
 .emails-toolbar input[type="text"] {
@@ -57,30 +140,108 @@
   border: 1px solid var(--pc-border);
   border-radius: 8px;
   padding: 0 10px;
+  background: #141414;
+  color: var(--pc-text);
 }
 
 .emails-view-options { display: flex; align-items: center; gap: 8px; }
 
+/* Main layout with folders sidebar */
+.emails-main-layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  min-height: 520px;
+}
+
+.emails-folders-sidebar {
+  width: 250px;
+  background: var(--revamp-surface);
+  border-right: 1px solid var(--revamp-border);
+  padding: 0;
+  overflow-y: auto;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  opacity: 0;
+  transform: translateX(-20px);
+  animation: slideInSidebar 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s forwards;
+}
+
+@keyframes slideInSidebar {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.emails-folders-sidebar.collapsed { width: 56px; padding-left: 8px; padding-right: 8px; }
+
+.folders-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.folders-header h3 { margin: 0; font-size: 13px; color: var(--pc-muted); font-weight: 600; transition: opacity 160ms ease-in-out; }
+.emails-folders-sidebar.collapsed .folders-header h3 { opacity: 0; width: 0; overflow: hidden; pointer-events: none; }
+
+.folders-list { display: flex; flex-direction: column; gap: 4px; }
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  border: 1px solid transparent;
+  color: var(--pc-text);
+  background: transparent;
+  border-radius: 10px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.folder-item:hover { background: #262626; }
+.folder-item.active { background: #262626; border-color: #27344900; box-shadow: inset 3px 0 0 0 var(--pc-orange); }
+.folder-item svg { color: var(--pc-text); opacity: 0.9; }
+.folder-item .label { white-space: nowrap; }
+.emails-folders-sidebar.collapsed .folder-item { justify-content: center; }
+.emails-folders-sidebar.collapsed .folder-item .label { display: none; }
+
+/* Table container area */
+.emails-table-container { display: flex; flex-direction: column; background: var(--pc-bg); overflow: auto; }
+
 /* Table */
-.emails-table-wrapper { width: 100%; overflow: auto; }
+.emails-table-wrapper { width: 100%; overflow-x: auto; overflow-y: auto; }
 
 .emails-table {
   width: 100%;
-  border-collapse: collapse;
-  background: var(--pc-bg);
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--revamp-surface);
+  border-radius: 0;
+  overflow: hidden;
+  opacity: 0;
+  animation: fadeInTable 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s forwards;
+}
+
+@keyframes fadeInTable {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .emails-table thead th {
   position: sticky;
   top: 0;
-  background: #f9fafb;
+  background: #1a1a1a; /* neutral dark header */
   border-bottom: 1px solid var(--pc-border);
   font-weight: 600;
   text-align: center; /* headers centered */
   padding: 10px 8px;
   font-size: 12px;
-  color: #374151;
+  color: #94a3b8; /* muted text */
   z-index: 1;
+  white-space: nowrap; /* keep headers on a single line */
 }
 
 .emails-table tbody td {
@@ -89,7 +250,30 @@
   font-size: 13px;
   color: var(--pc-text);
   text-align: center; /* default body center */
+  vertical-align: middle; /* keep borders aligned across cells */
 }
+
+/* Keep status icons on a single line and centered */
+.emails-table td.status {
+  /* keep as table-cell to avoid border misalignment */
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* Ensure actions cell remains a table cell (override global .row-actions flex) */
+.emails-table td.row-actions {
+  display: table-cell !important;
+  vertical-align: middle;
+  text-align: center;
+  padding: 12px 8px; /* match other cells */
+  border-bottom: 1px solid var(--pc-border);
+}
+
+/* Zebra and hover states (neutral greys) */
+.emails-table tbody tr { background: #1f1f1f; }
+.emails-table tbody tr:nth-child(even) { background: #222222; }
+.emails-table tbody tr:hover { background: #262626; }
 
 /* Recipient and message left-aligned to match avatar/text flows in CRM */
 .emails-table td.recipient,
@@ -99,26 +283,40 @@
 .emails-table td.recipient .email { color: var(--pc-muted); font-size: 12px; }
 
 .emails-table td.message .subject { font-weight: 500; }
+.emails-table td.message .subject,
+.emails-table td.message .preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .emails-table td.message .preview { color: var(--pc-muted); font-size: 12px; }
 
 /* Status icons */
 .st { display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 14px; }
+.st svg { display: block; }
 .st-delivered { opacity: 0.7; }
 .st-opened { color: #10b981; } /* green */
 .st-clicked { color: #3b82f6; } /* blue */
 .st-replied { color: var(--pc-orange-strong); }
 
 /* Row actions */
-.row-actions { white-space: nowrap; }
+.row-actions { white-space: nowrap; text-align: center; }
 .row-actions .icon-btn {
   background: transparent;
   border: none;
-  color: var(--pc-orange-strong);
+  color: var(--pc-orange);
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
+  padding: 0;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  width: 20px;
+  line-height: 0; /* avoid affecting cell height */
 }
-.row-actions .icon-btn:hover { background: #fff7ed; }
+.row-actions .icon-btn svg { width: 16px; height: 16px; display: block; }
+.row-actions .icon-btn:hover { background: rgba(245,158,11,0.12); }
 
 /* Pagination */
 .emails-pagination {
@@ -132,33 +330,84 @@
 .emails-pagination .left { display: flex; align-items: center; gap: 10px; }
 .emails-pagination .right { display: flex; gap: 6px; }
 .emails-pagination .hint { color: var(--pc-muted); font-size: 12px; }
+/* Force pagination info to white to match Accounts/Contacts */
+#emails-view #emails-pagination-info { color: #ffffff; }
+
+/* Dark theme select in pagination */
+.emails-pagination select#emails-bulk-select {
+  height: 32px;
+  border: 1px solid #3a3a3a; /* match light grey control border */
+  background: #2a2a2a; /* match contacts/accounts light grey */
+  color: var(--pc-text);
+  border-radius: 8px;
+}
+.emails-pagination select#emails-bulk-select:focus {
+  outline: none;
+  border-color: var(--pc-orange);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+.emails-pagination select#emails-bulk-select option { background: #2a2a2a; color: var(--pc-text); }
 
 .pager {
   height: 32px;
   border: 1px solid var(--pc-border);
-  background: white;
+  background: transparent;
   border-radius: 8px;
   padding: 0 10px;
   cursor: pointer;
+  color: var(--pc-text);
 }
+.pager:hover { background: #262626; }
+
+/* Contacts-style pagination controls for consistency */
+#emails-view .pagination-controls { display: flex; align-items: center; gap: 8px; }
+#emails-view .pagination-btn {
+  height: 32px;
+  width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #3a3a3a; /* match light grey control border */
+  background: #2a2a2a;       /* match contacts/accounts light grey */
+  color: #e2e8f0;            /* white-ish icon color */
+  border-radius: 8px;
+  cursor: pointer;
+}
+#emails-view .pagination-btn svg { width: 16px; height: 16px; pointer-events: none; }
+#emails-view .pagination-btn:disabled { opacity: 0.4; cursor: default; }
+#emails-view .pagination-btn:hover:not(:disabled) { background: #3a3a3a; }
+#emails-view .pagination-numbers { display: flex; gap: 6px; }
+#emails-view .pagination-numbers .page-num {
+  height: 32px;
+  min-width: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #3a3a3a; /* light grey border */
+  background: #2a2a2a;       /* light grey background */
+  color: #ffffff;            /* pure white number text */
+}
+#emails-view .pagination-numbers .page-num:hover { background: #3a3a3a; }
+#emails-view .pagination-numbers .page-num.active { background: var(--pc-orange); color: #ffffff; border-color: var(--pc-orange); }
 
 /* Compose drawer */
 .compose-drawer {
   position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: -100%;
-  background: var(--pc-bg);
-  border: 1px solid var(--pc-border);
+  bottom: 0;
+  right: 25px;
+  width: 500px;
+  max-height: 600px;
+  background: var(--revamp-surface);
+  border: 1px solid var(--revamp-border);
   border-bottom: none;
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-  box-shadow: 0 -10px 30px rgba(0,0,0,0.08);
-  transition: bottom 220ms ease-in-out, transform 220ms ease-in-out, height 220ms ease-in-out;
-  z-index: 9999;
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  transform: translateY(100%) scale(0.9);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 1000;
   display: flex;
   flex-direction: column;
-  max-height: calc(90vh);
+  opacity: 0;
 }
 
 .compose-drawer.open { bottom: 0; }
@@ -178,12 +427,13 @@
 .compose-body { padding: 10px 12px; overflow: auto; }
 .compose-body .row { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
 .compose-body label { color: var(--pc-muted); font-size: 12px; }
-.compose-body input[type="text"] { height: 34px; border: 1px solid var(--pc-border); border-radius: 8px; padding: 0 10px; }
+.compose-body input[type="text"] { height: 34px; border: 1px solid var(--pc-border); border-radius: 8px; padding: 0 10px; background: #141414; color: var(--pc-text); }
 
 .toolbar { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
-.toolbar .tbtn { height: 30px; border: 1px solid var(--pc-border); background: white; border-radius: 6px; padding: 0 8px; cursor: pointer; }
+.toolbar .tbtn { height: 30px; border: 1px solid var(--pc-border); background: #141414; color: var(--pc-text); border-radius: 6px; padding: 0 8px; cursor: pointer; }
+.toolbar .tbtn:hover { background: #262626; }
 
-.editor { min-height: 180px; border: 1px solid var(--pc-border); border-radius: 8px; padding: 10px; }
+.editor { min-height: 180px; border: 1px solid var(--pc-border); border-radius: 8px; padding: 10px; background: #141414; color: var(--pc-text); }
 
 .compose-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--pc-border); }
 .compose-footer .left { display: flex; gap: 8px; }
@@ -192,6 +442,8 @@
 /* Mobile tweaks */
 @media (max-width: 768px) {
   .emails-toolbar { grid-template-columns: 1fr; }
+  .emails-main-layout { grid-template-columns: 1fr; }
+  .emails-folders-sidebar { display: none; }
   .compose-body .row { grid-template-columns: 1fr; }
   .compose-drawer { left: 8px; right: 8px; }
 }

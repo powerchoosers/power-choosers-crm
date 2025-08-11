@@ -14,7 +14,15 @@ const mimeTypes = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.gif': 'image/gif',
-  '.ico': 'image/x-icon'
+  '.ico': 'image/x-icon',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.eot': 'application/vnd.ms-fontobject',
+  '.map': 'application/json'
 };
 
 const server = http.createServer((req, res) => {
@@ -226,15 +234,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  let filePath = '.' + req.url;
-  if (filePath === './') {
-    filePath = './index.html';
+  // Static file handler with query stripping and path sanitization
+  const urlObj = new URL(req.url, `http://localhost:${port}`);
+  let pathname = decodeURIComponent(urlObj.pathname || '/');
+  if (!pathname || pathname === '/') pathname = '/index.html';
+
+  // Ensure we join a relative path (strip leading slashes to avoid Windows absolute join)
+  const relativePath = pathname.replace(/^\/+/, '');
+  const absolutePath = path.resolve(__dirname, relativePath);
+  const rootDir = path.resolve(__dirname);
+  if (!absolutePath.startsWith(rootDir + path.sep)) {
+    res.writeHead(403);
+    return res.end('Forbidden');
   }
 
-  const extname = String(path.extname(filePath)).toLowerCase();
+  const extname = String(path.extname(relativePath)).toLowerCase();
   const mimeType = mimeTypes[extname] || 'application/octet-stream';
 
-  fs.readFile(filePath, (error, content) => {
+  fs.readFile(absolutePath, (error, content) => {
     if (error) {
       if (error.code === 'ENOENT') {
         res.writeHead(404);
@@ -250,22 +267,34 @@ const server = http.createServer((req, res) => {
   });
 });
 
+let hasStarted = false;
 function startServer(p, attemptsLeft = 10) {
-  server.listen(p, () => {
-    console.log(`Server running at http://localhost:${p}/`);
-  });
+  if (hasStarted) return;
+  const listenOn = (portToTry) => {
+    if (hasStarted) return;
+    server.listen(portToTry, () => {
+      if (hasStarted) return;
+      hasStarted = true;
+      console.log(`Server running at http://localhost:${portToTry}/`);
+    });
+  };
 
   server.on('error', (err) => {
+    if (hasStarted) return;
     if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
       console.warn(`Port ${p} in use, trying ${p + 1}...`);
-      try { server.close(); } catch {}
+      attemptsLeft -= 1;
       setTimeout(() => {
-        startServer(p + 1, attemptsLeft - 1);
+        if (hasStarted) return;
+        p = p + 1;
+        listenOn(p);
       }, 100);
     } else {
       console.error('Server failed to start:', err);
     }
   });
+
+  listenOn(p);
 }
 
 startServer(port);
