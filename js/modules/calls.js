@@ -16,63 +16,130 @@
   try { console.log('[Calls] API_BASE_URL:', apiBase() || '(relative)'); } catch (_) {}
 
   Object.assign(CRMApp, {
-    // Render the Calls page content
+    // Render the Calls page content (rebuilt)
     renderCallsPage() {
       const container = document.getElementById('calls-view');
       if (!container) return console.error('calls-view container not found');
 
-      // Basic layout for Calls hub
-      container.style.display = 'flex';
-      container.style.flexDirection = 'column';
-      container.style.gap = '16px';
+      // Ensure the Calls view is visible and behaves like other modules (single card inside a 25px-margined view)
+      container.style.display = 'block';
+
+      // Sample rows (stub). Replace with real data when backend wiring is ready.
+      const rows = [
+        { id: 'c1', contact: 'Belinda Palm', company: 'Ram Winch & Hoist Ltd.', direction: 'Outbound', purpose: '-', disposition: '-', duration: '01:10', note: '-', date: '4 months ago', user: 'LP' },
+        { id: 'c2', contact: 'Saadat Khan', company: 'Firehouse Subs', direction: 'Outbound', purpose: '-', disposition: '-', duration: '00:11', note: '-', date: '4 months ago', user: 'LP' },
+        { id: 'c3', contact: 'Joseph Badarack', company: "Jersey Mike's Subs", direction: 'Outbound', purpose: 'Prospecting Call', disposition: 'Left Voicemail', duration: '00:45', note: 'check on contract end dates no answer', date: '4 months ago', user: 'LP' },
+      ];
 
       container.innerHTML = `
-        <section class="dashboard-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <h3 class="card-title" style="margin:0;display:flex;align-items:center;gap:8px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-              </svg>
-              Calls Hub
-            </h3>
-            <div style="display:flex;gap:8px;">
-              <button id="open-dialer-btn" class="btn btn-primary">Open Dialer</button>
-              <button id="refresh-calls-btn" class="btn btn-secondary">Refresh</button>
-            </div>
+        <div class="calls-header">
+          <h3 class="card-title title-with-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            Calls
+          </h3>
+          <div class="calls-actions">
+            <button id="open-dialer-btn" class="btn btn-primary">New call</button>
           </div>
-        </section>
+        </div>
 
-        <section class="dashboard-card">
-          <h3 class="card-title" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2"/></svg>
-            Recent Calls
-          </h3>
-          <div id="recent-calls-list" class="list" style="display:flex;flex-direction:column;gap:8px;"></div>
-        </section>
+        <div class="calls-toolbar">
+          <div class="left">
+            <button id="calls-filters-btn" class="btn btn-secondary">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+              Show Filters
+            </button>
+          </div>
+          <div class="right">
+            <input id="calls-search" class="form-input calls-search" placeholder="Quick search" />
+          </div>
+        </div>
 
-        <section class="dashboard-card">
-          <h3 class="card-title" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M12 14h6"/><path d="M12 8h3"/><path d="M8 8l-4 4 4 4"/></svg>
-            AI Call Insights (placeholder)
-          </h3>
-          <div style="color:#cbd5e1;font-size:14px;">Transcripts, summaries, key moments and next steps will appear here after calls.</div>
-        </section>
+        <div class="calls-table-container">
+          <div class="calls-table-wrapper">
+            <table class="calls-table">
+              <thead>
+                <tr>
+                  <th>Contact</th>
+                  <th>Insights</th>
+                  <th>Company</th>
+                  <th>Direction</th>
+                  <th>Purpose</th>
+                  <th>Disposition</th>
+                  <th>Duration</th>
+                  <th>Note</th>
+                  <th>Date</th>
+                  <th>User</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="calls-tbody"></tbody>
+            </table>
+          </div>
+          <div class="calls-pagination">
+            <span id="calls-pagination-info" class="hint"></span>
+          </div>
+        </div>
       `;
 
-      // Populate dummy recent calls for now
-      this.renderRecentCalls();
+      // Bind actions
+      document.getElementById('open-dialer-btn')?.addEventListener('click', () => this.openDialerWidget('crm'));
 
-      // Wire buttons
-      document.getElementById('open-dialer-btn')?.addEventListener('click', () => {
-        this.openDialerWidget('cold');
-      });
-      document.getElementById('refresh-calls-btn')?.addEventListener('click', () => {
-        this.renderRecentCalls();
-        this.showNotification('Calls refreshed', 'success');
-      });
+      // Render rows
+      const tbody = container.querySelector('#calls-tbody');
+      const search = container.querySelector('#calls-search');
+      const renderRows = (query = '') => {
+        const q = (query || '').toLowerCase();
+        const filtered = rows.filter(r => {
+          const hay = `${r.contact} ${r.company} ${r.purpose} ${r.disposition} ${r.note}`.toLowerCase();
+          return hay.includes(q);
+        });
+        tbody.innerHTML = filtered.map(r => `
+          <tr class="call-row" data-id="${r.id}">
+            <td class="contact">${r.contact}</td>
+            <td class="insights"><button class="link-btn insights-btn" data-id="${r.id}">Call insights</button></td>
+            <td class="company">${r.company}</td>
+            <td class="direction">${r.direction}</td>
+            <td class="purpose">${r.purpose}</td>
+            <td class="disposition">${r.disposition}</td>
+            <td class="duration">${r.duration}</td>
+            <td class="note">${r.note}</td>
+            <td class="date">${r.date}</td>
+            <td class="user">${r.user}</td>
+            <td class="row-actions">
+              <button class="icon-btn play-btn" title="Play recording" data-id="${r.id}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      };
 
-      // Ensure the cold-calling widget area shows a dialer by default
-      this.openDialerWidget('cold');
+      // Initial render and bindings
+      renderRows();
+      if (search && !search._calls_bound) {
+        search._calls_bound = true;
+        search.addEventListener('input', (e) => renderRows((e.target && e.target.value) || ''));
+      }
+      if (tbody && !tbody._calls_bound) {
+        tbody._calls_bound = true;
+        tbody.addEventListener('click', (e) => {
+          const t = e.target;
+          const btn = t && t.closest ? t.closest('.insights-btn, .play-btn') : null;
+          if (!btn) return;
+          const id = btn.getAttribute('data-id');
+          const row = rows.find(r => r.id === id);
+          if (row) this.openCallInsightsModal(row);
+        });
+      }
+
+      // Ensure the standard widget panel shows the dialer and remains visible
+      this.openDialerWidget('crm');
+      const crm = document.getElementById('crm-widgets-container');
+      if (crm) crm.style.display = 'flex';
+      const cc = document.getElementById('cold-calling-widgets-container');
+      if (cc) cc.style.display = 'none';
     },
 
     // Render some placeholder recent calls
@@ -91,14 +158,14 @@
 
       const rows = (sample.length ? sample.map(a => ({ name: a.contactName || 'Unknown', number: a.phone || '—', when: new Date(a.createdAt || Date.now()).toLocaleString(), result: a.disposition || 'Completed' })) : fallback)
         .map(item => `
-          <div class="list-row" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
-            <div style="display:flex;flex-direction:column;">
-              <span style="font-weight:600;">${item.name}</span>
-              <span style="color:#94a3b8;font-size:12px;">${item.number}</span>
+          <div class="list-row">
+            <div class="list-main">
+              <span class="list-name">${item.name}</span>
+              <span class="list-sub">${item.number}</span>
             </div>
-            <div style="display:flex;gap:16px;align-items:center;">
-              <span style="color:#94a3b8;font-size:12px;">${item.when}</span>
-              <span style="font-size:12px;padding:2px 8px;border-radius:9999px;background:#1f2937;border:1px solid #334155;">${item.result}</span>
+            <div class="list-meta">
+              <span class="list-timestamp">${item.when}</span>
+              <span class="badge">${item.result}</span>
               <button class="btn btn-secondary" data-action="call" data-number="${item.number}" data-name="${item.name}">Call Back</button>
             </div>
           </div>
@@ -111,13 +178,55 @@
           const target = e.currentTarget;
           const number = target.getAttribute('data-number') || '';
           const name = target.getAttribute('data-name') || '';
-          this.openDialerWidget('cold');
+          this.openDialerWidget('crm');
           // Prefill number
           const input = document.getElementById('dialer-phone-input');
           if (input) input.value = number;
           this.showNotification(`Preparing call to ${name} ${number}`, 'info');
         });
       });
+    },
+
+    // Render a simple call queue with mock data
+    renderCallQueue() {
+      const list = document.getElementById('call-queue-list');
+      if (!list) return;
+      const items = [
+        { name: 'Jordan Blake', number: '(469) 555-0147', stage: 'New', priority: 'High' },
+        { name: 'Leslie Gomez', number: '(214) 555-9083', stage: 'Follow-up', priority: 'Medium' },
+        { name: 'Taylor Kim', number: '(972) 555-3321', stage: 'Demo', priority: 'Low' }
+      ];
+      const q = (document.getElementById('queue-search') || {}).value?.toLowerCase?.() || '';
+      const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q) || i.number.toLowerCase().includes(q)) : items;
+      list.innerHTML = filtered.map(i => `
+        <div class="list-row">
+          <div class="list-main">
+            <span class="list-name">${i.name}</span>
+            <span class="list-sub">${i.number}</span>
+          </div>
+          <div class="list-meta">
+            <span class="badge">${i.stage}</span>
+            <span class="badge">${i.priority}</span>
+            <button class="btn btn-primary" data-action="queue-call" data-number="${i.number}" data-name="${i.name}">Call</button>
+          </div>
+        </div>
+      `).join('');
+      list.querySelectorAll('button[data-action="queue-call"]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const t = e.currentTarget;
+          const number = t.getAttribute('data-number') || '';
+          const name = t.getAttribute('data-name') || '';
+          this.openDialerWidget('crm');
+          const input = document.getElementById('dialer-phone-input');
+          if (input) input.value = number;
+          this.showNotification(`Calling ${name} ${number}`, 'success');
+        });
+      });
+      const search = document.getElementById('queue-search');
+      if (search && !search._calls_bound) {
+        search._calls_bound = true;
+        search.addEventListener('input', () => this.renderCallQueue());
+      }
     },
 
     // Open the dialer widget in the right-hand widget panel.
@@ -128,9 +237,13 @@
       const target = targetPanel === 'cold' ? coldPanel : crmPanel;
       if (!target) return console.warn('Target widget panel not found:', targetPanel);
 
-      // Reuse existing dialer if present; else create
-      let dialer = target.querySelector('#dialer-widget');
-      if (!dialer) {
+      // Reuse existing dialer if present anywhere; otherwise create new
+      const existing = document.getElementById('dialer-widget');
+      let dialer = existing || null;
+      if (existing && existing.parentElement !== target) {
+        target.prepend(existing);
+      }
+      if (!dialer || dialer.parentElement !== target) {
         dialer = document.createElement('section');
         dialer.className = 'widget-card';
         dialer.id = 'dialer-widget';
@@ -207,11 +320,13 @@
         number = `+${digits || number}`;
       }
 
+      let callBtn = document.getElementById('dialer-call-btn');
+      let prevText = callBtn ? callBtn.textContent : '';
       try {
         this.showNotification(`Calling ${number}...`, 'info');
         // Disable the Call button while the request is in flight
-        const callBtn = document.getElementById('dialer-call-btn');
-        const prevText = callBtn ? callBtn.textContent : '';
+        callBtn = document.getElementById('dialer-call-btn');
+        prevText = callBtn ? callBtn.textContent : '';
         if (callBtn) {
           callBtn.disabled = true;
           callBtn.textContent = 'Calling...';
@@ -284,7 +399,7 @@
         if (id) id.textContent = `Caller: ${number} – Network error`;
       }
       finally {
-        const callBtn = document.getElementById('dialer-call-btn');
+        callBtn = document.getElementById('dialer-call-btn');
         if (callBtn) {
           callBtn.disabled = false;
           callBtn.textContent = prevText || 'Call';
@@ -313,6 +428,86 @@
       this.openDialerWidget('crm');
       const id = document.getElementById('dialer-caller-id');
       if (id) id.textContent = `Caller: ${display}`;
+    },
+
+    // --- Calls modal helpers ---
+    ensureCallsModalRoot() {
+      if (document.getElementById('call-insights-modal')) return;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `
+        <div id="call-insights-modal" class="calls-modal-overlay" aria-hidden="true">
+          <div class="calls-modal" role="dialog" aria-modal="true" aria-labelledby="calls-modal-title">
+            <div class="modal-header">
+              <h3 id="calls-modal-title" class="modal-title">Call insights</h3>
+              <button class="icon-btn modal-close" aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="modal-sections">
+                <section class="insights-section">
+                  <h4>AI Insights</h4>
+                  <div id="modal-insights-content" class="content">—</div>
+                </section>
+                <section class="transcription-section">
+                  <h4>Transcription</h4>
+                  <div id="modal-transcript" class="transcript"></div>
+                </section>
+                <section class="recording-section">
+                  <h4>Recording</h4>
+                  <audio id="modal-audio" controls preload="none"></audio>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(wrap.firstElementChild);
+      document.querySelector('#call-insights-modal .modal-close')?.addEventListener('click', () => this.closeCallInsightsModal());
+      document.getElementById('call-insights-modal')?.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'call-insights-modal') this.closeCallInsightsModal();
+      });
+      document.addEventListener('keydown', (e) => {
+        const modal = document.getElementById('call-insights-modal');
+        if (!modal || modal.getAttribute('aria-hidden') !== 'false') return;
+        if (e.key === 'Escape') this.closeCallInsightsModal();
+      });
+    },
+
+    openCallInsightsModal(row, opts = {}) {
+      this.ensureCallsModalRoot();
+      const modal = document.getElementById('call-insights-modal');
+      if (!modal) return;
+      // Populate content
+      const insights = document.getElementById('modal-insights-content');
+      const transcript = document.getElementById('modal-transcript');
+      const audio = document.getElementById('modal-audio');
+
+      if (insights) insights.innerHTML = `
+        <ul>
+          <li><strong>Contact:</strong> ${row.contact}</li>
+          <li><strong>Company:</strong> ${row.company}</li>
+          <li><strong>Summary:</strong> Prospect showed mild interest. Next step: send follow-up email and schedule a demo.</li>
+          <li><strong>Sentiment:</strong> Neutral → Positive</li>
+          <li><strong>Action items:</strong> Send pricing, book 30-min demo, confirm decision maker.</li>
+        </ul>`;
+
+      if (transcript) transcript.textContent = `00:00 Caller: Hi ${row.contact}, thanks for taking the call.\n00:08 Prospect: Sure, I have a few minutes.\n00:31 Caller: We help teams automate ...\n01:02 Prospect: Send the details and we can schedule.\n${row.duration} End.`;
+
+      if (audio) {
+        // Placeholder recording (none provided). Keep control visible without src.
+        audio.removeAttribute('src');
+      }
+
+      // Show modal
+      modal.setAttribute('aria-hidden', 'false');
+      modal.classList.add('open');
+    },
+
+    closeCallInsightsModal() {
+      const modal = document.getElementById('call-insights-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
     }
   });
 })();

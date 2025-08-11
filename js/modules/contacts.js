@@ -1013,8 +1013,8 @@ Object.assign(CRMApp, {
                         <span>Call</span>
                     </button>
                     <button class="btn-icon" title="Add to sequence" style="display:flex; align-items:center; gap:8px; background:#1f2430; border:1px solid #fb923c; color:#fff; padding:8px 12px; border-radius:8px; cursor:pointer;" onmouseover="this.style.background='#2a3144'; this.style.borderColor='#fb923c'" onmouseout="this.style.background='#1f2430'; this.style.borderColor='#fb923c'" onclick="CRMApp.addToSequence('${contact.id}')">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-                        <span>+ Add to sequence</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                        <span>Add to sequence</span>
                     </button>
                 </div>
             </div>
@@ -1148,9 +1148,9 @@ Object.assign(CRMApp, {
             height: calc(100vh - 120px) !important;
             background: #1a1a1a !important;
             color: #fff !important;
-            margin: 20px !important;
-            padding: 20px !important;
-            border-radius: 20px !important;
+            margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)) !important;
+            padding: var(--spacing-lg) !important;
+            border-radius: 25px !important;
             overflow: hidden !important;
         `;
     },
