@@ -162,13 +162,21 @@ Object.assign(CRMApp, {
             coldCallingWidgetsContainer.style.display = 'none';
         }
 
-        // Show the selected view
+        // Show the selected view with animation
         const targetView = document.getElementById(viewName);
         if (targetView) {
+            // Remove page-loaded class to trigger entrance animation
+            targetView.classList.remove('page-loaded');
+            
             targetView.style.display = 'flex';
             targetView.style.visibility = 'visible';
             targetView.style.position = 'static';
             targetView.style.left = 'auto';
+            
+            // Add page-loaded class after animation completes
+            setTimeout(() => {
+                targetView.classList.add('page-loaded');
+            }, 500);
         }
 
         // Handle special view logic

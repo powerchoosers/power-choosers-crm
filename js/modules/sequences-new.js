@@ -2,6 +2,10 @@
 const SequencesModule = {
     sequences: [],
     currentSequence: null,
+    // Pagination/search state for Sequences page (Apollo-like table)
+    currentSequencesPage: 1,
+    sequencesPageSize: 10,
+    currentSequencesSearch: '',
 
     // Initialize the sequences module
     init() {
@@ -46,172 +50,283 @@ const SequencesModule = {
 
         console.log("Creating new sequences page HTML");
         const sequencesHTML = `
-            <style>
-                .sequences-page-container {
-                    padding: 20px;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                }
-                .sequences-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                    margin-top: 20px;
-                }
-                .sequence-item {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    background: #2c3e50;
-                    border: 1px solid #34495e;
-                    border-radius: 8px;
-                    padding: 20px;
-                    transition: all 0.3s ease;
-                }
-                .sequence-item:hover {
-                    background: #34495e;
-                    border-color: #3498db;
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
-                }
-                .sequence-main {
-                    flex: 1;
-                }
-                .sequence-info h3 {
-                    color: #fff;
-                    margin: 0 0 8px 0;
-                    font-size: 1.2rem;
-                }
-                .sequence-info p {
-                    color: #bdc3c7;
-                    margin: 0 0 12px 0;
-                    font-size: 0.9rem;
-                }
-                .sequence-meta {
-                    display: flex;
-                    gap: 16px;
-                    font-size: 0.8rem;
-                    color: #95a5a6;
-                }
-                .sequence-status {
-                    display: flex;
-                    align-items: center;
-                    gap: 20px;
-                }
-                .sequence-actions {
-                    display: flex;
-                    gap: 8px;
-                }
-                .status-toggle {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                .status-label.active {
-                    color: #27ae60;
-                }
-                .status-label.inactive {
-                    color: #e74c3c;
-                }
-            </style>
-            <div class="sequences-page-container">
-                <!-- Header Section -->
-                <div class="sequences-header">
-                    <div class="header-left">
-                        <h1 class="page-title">Sequences</h1>
-                        <p class="page-subtitle">Manage your email sequences and automation</p>
-                    </div>
-                    <div class="header-right">
-                        <button id="create-sequence-btn" class="btn-primary">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                            New Sequence
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Stats Cards -->
-                <div class="sequences-stats">
-                    <div class="stat-card">
-                        <div class="stat-value">${this.sequences.length}</div>
-                        <div class="stat-label">Total Sequences</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${this.sequences.filter(s => s.isActive).length}</div>
-                        <div class="stat-label">Active</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${this.sequences.filter(s => !s.isActive).length}</div>
-                        <div class="stat-label">Inactive</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${this.sequences.reduce((sum, s) => sum + (s.activeContacts || 0), 0)}</div>
-                        <div class="stat-label">Total Contacts</div>
-                    </div>
-                </div>
-
-                <!-- Search and Filters -->
-                <div class="sequences-controls">
-                    <input type="text" id="sequence-search" placeholder="Search sequences..." class="search-input" />
-                    <div class="sequences-count">${this.sequences.length} sequences</div>
-                </div>
-
-                <!-- Sequences List -->
-                <div class="sequences-list">
-                    ${this.renderSequencesList()}
-                </div>
+          <div class="sequences-page-container">
+            <div class="seq-header">
+              <div>
+                <h2 class="page-title">Sequences</h2>
+                <div class="seq-sub">Automate your outreach with multi-step flows</div>
+              </div>
+              <button id="new-sequence-btn" class="seq-btn seq-btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M22 2L11 13"></path>
+                  <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                </svg>
+                <span>New Sequence</span>
+              </button>
             </div>
+
+            <div class="seq-toolbar">
+              <div class="left-tools" style="display:flex; align-items:center; gap:12px;">
+                <div class="seq-search"><input id="sequences-search-input" type="text" placeholder="Search sequences..." /></div>
+              </div>
+              <div class="right-tools" style="display:flex; align-items:center; gap:12px;">
+                <span class="seq-results"><span id="sequences-count">${this.sequences.length}</span> total</span>
+              </div>
+            </div>
+
+            <div class="sequences-table-container">
+              <table class="sequences-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40%">Name</th>
+                    <th>Steps</th>
+                    <th>Active Contacts</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="sequences-table-body"></tbody>
+              </table>
+            </div>
+
+            <div class="seq-footer">
+              <div class="seq-results" id="sequences-pagination-info"></div>
+              <div class="sequences-pagination" style="display:flex; align-items:center;">
+                <button id="sequences-prev-page" class="pagination-btn" title="Previous" aria-label="Previous">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <span id="sequences-pagination-numbers" style="display:inline-flex; align-items:center; margin: 0 6px;"></span>
+                <button id="sequences-next-page" class="pagination-btn" title="Next" aria-label="Next">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </div>
+            </div>
+          </div>
         `;
 
         sequencesView.innerHTML = sequencesHTML;
         
-        // Add event listener for create button
-        const createBtn = document.getElementById('create-sequence-btn');
-        if (createBtn) {
-            createBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Create sequence button clicked');
-                this.showCreateSequenceModal();
-            });
+        // Initialize the new table UI, search, and pagination
+        this.initSequencesUI();
+
+        console.log('Sequences page rendered (table with pagination)');
+        // Note: Don't call showView here - it creates infinite loop with utils.js
+    },
+
+    // Initialize Sequences page interactions (search, pagination, delegated actions)
+    initSequencesUI() {
+        // Initial render
+        this.renderSequencesTable(this.currentSequencesSearch);
+
+        // Search input
+        const searchInput = document.getElementById('sequences-search-input');
+        if (searchInput) {
+            searchInput.value = this.currentSequencesSearch || '';
+            searchInput.addEventListener('input', this.debounce((e) => {
+                this.currentSequencesSearch = e.target.value || '';
+                this.currentSequencesPage = 1;
+                this.renderSequencesTable(this.currentSequencesSearch);
+            }, 300));
         }
 
-        // Add event listeners for sequence items to make them clickable
-        const sequenceItems = document.querySelectorAll('.sequence-item');
-        sequenceItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                // Don't trigger if clicking on buttons or toggles
-                if (e.target.closest('button') || e.target.closest('.toggle-switch') || e.target.closest('input')) {
+        // New sequence button
+        const newBtn = document.getElementById('new-sequence-btn');
+        if (newBtn) newBtn.addEventListener('click', () => this.showCreateSequenceModal());
+
+        // Delegated table actions
+        const tbody = document.getElementById('sequences-table-body');
+        if (tbody) {
+            tbody.addEventListener('click', (e) => {
+                const target = e.target.closest('button, tr');
+                if (!target) return;
+                // Ignore row open when clicking the active toggle or its label
+                if (e.target.closest('.seq-active-toggle') || e.target.closest('label.toggle-switch')) {
+                    e.stopPropagation();
                     return;
                 }
-                
-                const sequenceId = item.dataset.sequenceId;
-                const sequence = this.sequences.find(s => s.id === sequenceId);
-                
-                if (sequence) {
-                    console.log('Opening sequence builder for existing sequence:', sequence.name);
-                    this.openSequenceBuilder(sequence);
-                } else {
-                    console.error('Sequence not found:', sequenceId);
+                const row = target.closest('tr');
+                const id = row?.getAttribute('data-sequence-id');
+                if (!id) return;
+                if (target.classList.contains('edit-sequence-btn')) { e.stopPropagation(); this.editSequence(id); return; }
+                if (target.classList.contains('delete-sequence-btn')) { e.stopPropagation(); this.deleteSequence(id); return; }
+                // Row click opens builder
+                const seq = (this.sequences || []).find(s => String(s.id ?? s._id ?? s.docId ?? s.docID ?? s.uid) === String(id));
+                if (seq) this.openSequenceBuilder(seq);
+            });
+            tbody.addEventListener('change', (e) => {
+                const input = e.target;
+                if (input && input.classList.contains('seq-active-toggle')) {
+                    const row = input.closest('tr');
+                    const id = row?.getAttribute('data-sequence-id');
+                    if (id) this.toggleSequenceStatus(id, input.checked);
+                    e.stopPropagation();
                 }
             });
-            
-            // Add hover effect
-            item.addEventListener('mouseenter', () => {
-                if (!item.querySelector(':hover')) {
-                    item.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+            // Keyboard support: Enter/Space on focused row opens builder (but not when focus is on toggle or action buttons)
+            tbody.addEventListener('keydown', (e) => {
+                const isEnter = e.key === 'Enter';
+                const isSpace = e.key === ' ' || e.key === 'Spacebar';
+                if (!isEnter && !isSpace) return;
+                // Do not hijack space/enter when focusing interactive controls inside the row
+                const active = document.activeElement;
+                if (active && (active.tagName === 'INPUT' || active.closest('button') || active.closest('label.toggle-switch'))) {
+                    return;
                 }
+                const row = (e.target.closest && e.target.closest('tr')) || (active && active.closest && active.closest('tr'));
+                if (!row) return;
+                const id = row.getAttribute('data-sequence-id');
+                if (!id) return;
+                e.preventDefault();
+                const seq = (this.sequences || []).find(s => String(s.id ?? s._id ?? s.docId ?? s.docID ?? s.uid) === String(id));
+                if (seq) this.openSequenceBuilder(seq);
             });
-            
-            item.addEventListener('mouseleave', () => {
-                item.style.backgroundColor = '';
-            });
-        });
+        }
+    },
 
-        console.log('New sequences page rendered with event listeners');
-        this.showView('sequences-view');
+    // Filter sequences by search term
+    getFilteredSequences(searchTerm = '') {
+        const term = (searchTerm || '').toLowerCase().trim();
+        if (!term) return this.sequences || [];
+        return (this.sequences || []).filter(s => {
+            const name = (s.name || '').toLowerCase();
+            const desc = (s.description || '').toLowerCase();
+            return name.includes(term) || desc.includes(term);
+        });
+    },
+
+    // Render the sequences table body with pagination
+    renderSequencesTable(searchTerm = '') {
+        const tableBody = document.getElementById('sequences-table-body');
+        const countEl = document.getElementById('sequences-count');
+        if (!tableBody) return;
+
+        const filtered = this.getFilteredSequences(searchTerm);
+        const total = filtered.length;
+        const pageSize = this.sequencesPageSize || 10;
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        if (!this.currentSequencesPage || this.currentSequencesPage < 1) this.currentSequencesPage = 1;
+        if (this.currentSequencesPage > pages) this.currentSequencesPage = pages;
+        const page = this.currentSequencesPage;
+        const start = (page - 1) * pageSize;
+        const end = Math.min(start + pageSize, total);
+        const pageItems = filtered.slice(start, end);
+
+        tableBody.innerHTML = '';
+        if (pageItems.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px;">No sequences found</td></tr>`;
+        } else {
+            tableBody.innerHTML = pageItems.map(seq => this.getSequenceRowHTML(seq)).join('');
+        }
+
+        if (countEl) countEl.textContent = String(total);
+        this.renderSequencesPagination(total, page, pageSize);
+    },
+
+    // Render pagination controls for sequences table
+    renderSequencesPagination(total, page, pageSize) {
+        const info = document.getElementById('sequences-pagination-info');
+        const numbers = document.getElementById('sequences-pagination-numbers');
+        const prevBtn = document.getElementById('sequences-prev-page');
+        const nextBtn = document.getElementById('sequences-next-page');
+        if (!info || !numbers || !prevBtn || !nextBtn) return;
+
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
+        const endItem = Math.min(page * pageSize, total);
+        info.textContent = `Showing ${startItem}–${endItem} of ${total}`;
+
+        // Page numbers
+        numbers.innerHTML = '';
+        const makeBtn = (p) => {
+            const b = document.createElement('button');
+            b.className = 'pagination-btn page-num' + (p === page ? ' active' : '');
+            b.textContent = String(p);
+            b.addEventListener('click', () => {
+                this.currentSequencesPage = p;
+                this.renderSequencesTable(document.getElementById('sequences-search-input')?.value || '');
+            });
+            return b;
+        };
+
+        const maxShown = 7;
+        if (pages <= maxShown) {
+            for (let p = 1; p <= pages; p++) numbers.appendChild(makeBtn(p));
+        } else {
+            const addEllipsis = () => {
+                const ell = document.createElement('span');
+                ell.textContent = '…';
+                ell.style.color = '#9aa5b1';
+                ell.style.padding = '0 6px';
+                numbers.appendChild(ell);
+            };
+            numbers.appendChild(makeBtn(1));
+            if (page > 3) addEllipsis();
+            const start = Math.max(2, page - 1);
+            const end = Math.min(pages - 1, page + 1);
+            for (let p = start; p <= end; p++) numbers.appendChild(makeBtn(p));
+            if (page < pages - 2) addEllipsis();
+            numbers.appendChild(makeBtn(pages));
+        }
+
+        // Prev/Next
+        prevBtn.disabled = page <= 1;
+        nextBtn.disabled = page >= pages;
+        prevBtn.onclick = () => {
+            if (this.currentSequencesPage > 1) {
+                this.currentSequencesPage--;
+                this.renderSequencesTable(document.getElementById('sequences-search-input')?.value || '');
+            }
+        };
+        nextBtn.onclick = () => {
+            if (this.currentSequencesPage < pages) {
+                this.currentSequencesPage++;
+                this.renderSequencesTable(document.getElementById('sequences-search-input')?.value || '');
+            }
+        };
+    },
+
+    // Build a single table row for a sequence
+    getSequenceRowHTML(sequence) {
+        const steps = Array.isArray(sequence.steps) ? sequence.steps.length : 0;
+        const active = sequence.activeContacts || 0;
+        const created = this.formatDate(sequence.createdAt || sequence.created || sequence.created_at);
+        const isActive = !!sequence.isActive;
+        const desc = sequence.description || '';
+        const name = sequence.name || 'Untitled';
+        // Support various id property names and normalize to string for dataset
+        const seqId = String(sequence.id ?? sequence._id ?? sequence.docId ?? sequence.docID ?? sequence.uid ?? '');
+        return `
+          <tr data-sequence-id="${seqId}" class="sequence-row" tabindex="0" role="button" aria-label="Open sequence builder for ${name}">
+            <td class="col-name">
+              <div class="name-with-toggle" style="display:flex; align-items:center; gap:10px;">
+                <label class="toggle-switch" title="Activate sequence">
+                  <input type="checkbox" class="seq-active-toggle" ${isActive ? 'checked' : ''} />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="title-wrap" style="display:flex; flex-direction:column; gap:2px;">
+                  <div class="name">${name}</div>
+                  ${desc ? `<div class=\"sub\">${desc}</div>` : ''}
+                </div>
+              </div>
+            </td>
+            <td class="col-steps">${steps}</td>
+            <td class="col-contacts">${active}</td>
+            <td class="col-created">${created}</td>
+            <td class="row-actions">
+              <button type="button" class="seq-btn-light edit-sequence-btn">Edit</button>
+              <button type="button" class="seq-btn-light delete-sequence-btn">Delete</button>
+            </td>
+          </tr>
+        `;
+    },
+
+    // Lightweight debounce utility bound to module context
+    debounce(func, wait = 300) {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
     },
 
     // Render the sequences list
@@ -328,10 +443,12 @@ const SequencesModule = {
         modalOverlay.innerHTML = `
             <div class="modal-content" style="
                 background: #2c3e50 !important; 
-                border-radius: 8px !important; 
+                border-radius: 16px !important; 
                 padding: 24px !important; 
                 width: 90% !important; 
                 max-width: 500px !important; 
+                max-height: 90vh !important;
+                overflow-y: auto !important;
                 position: relative !important;
                 box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
                 z-index: 100000 !important;
@@ -366,6 +483,9 @@ const SequencesModule = {
 
         // Add modal to body
         document.body.appendChild(modalOverlay);
+        
+        // Activate overlay to apply CSS animations and visibility
+        modalOverlay.classList.add('active');
         
         // Force the modal to be visible with additional checks
         setTimeout(() => {
@@ -495,20 +615,19 @@ const SequencesModule = {
 
     // Toggle sequence status
     toggleSequenceStatus(sequenceId, isActive) {
-        const sequence = this.sequences.find(s => s.id === sequenceId);
-        if (sequence) {
-            sequence.isActive = isActive;
-            console.log(`Toggled sequence ${sequenceId} to ${isActive ? 'active' : 'inactive'}`);
-            // Re-render to update stats
-            this.renderSequencesPage();
-            this.showNotification(`Sequence ${isActive ? 'activated' : 'deactivated'}`, 'success');
-        }
+        const sequence = (this.sequences || []).find(s => String(s.id ?? s._id ?? s.docId ?? s.docID ?? s.uid) === String(sequenceId));
+        if (!sequence) return;
+        sequence.isActive = isActive;
+        console.log(`Toggled sequence ${sequenceId} to ${isActive ? 'active' : 'inactive'}`);
+        // Re-render only the table to preserve pagination/search
+        this.renderSequencesTable(document.getElementById('sequences-search-input')?.value || '');
+        this.showNotification(`Sequence ${isActive ? 'activated' : 'deactivated'}`, 'success');
     },
 
     // Edit sequence
     editSequence(sequenceId) {
         console.log('Edit sequence:', sequenceId);
-        const sequence = this.sequences.find(s => s.id === sequenceId);
+        const sequence = (this.sequences || []).find(s => String(s.id ?? s._id ?? s.docId ?? s.docID ?? s.uid) === String(sequenceId));
         if (sequence) {
             console.log('Opening sequence builder for editing:', sequence.name);
             this.openSequenceBuilder(sequence);
@@ -520,43 +639,46 @@ const SequencesModule = {
 
     // Delete sequence
     deleteSequence(sequenceId) {
-        if (confirm('Are you sure you want to delete this sequence?')) {
-            this.sequences = this.sequences.filter(s => s.id !== sequenceId);
-            this.renderSequencesPage();
-            this.showNotification('Sequence deleted', 'success');
-        }
+        if (!confirm('Are you sure you want to delete this sequence?')) return;
+        // Find canonical id string to filter reliably regardless of id property type
+        const target = (this.sequences || []).find(s => String(s.id ?? s._id ?? s.docId ?? s.docID ?? s.uid) === String(sequenceId));
+        const canonicalId = target ? String(target.id ?? target._id ?? target.docId ?? target.docID ?? target.uid) : String(sequenceId);
+        this.sequences = (this.sequences || []).filter(s => String(s.id ?? s._id ?? s.docId ?? s.docID ?? s.uid) !== canonicalId);
+        // Keep current page within bounds after deletion
+        const total = (this.getFilteredSequences(this.currentSequencesSearch) || []).length;
+        const pages = Math.max(1, Math.ceil(total / this.sequencesPageSize));
+        if (this.currentSequencesPage > pages) this.currentSequencesPage = pages;
+        this.renderSequencesTable(document.getElementById('sequences-search-input')?.value || '');
+        this.showNotification('Sequence deleted', 'success');
     },
 
-    // Show view helper
+    // Use global showView method instead of custom one
     showView(viewId) {
-        console.log('Switching to view:', viewId);
+        console.log('SequencesModule: Delegating to global showView:', viewId);
         
-        // Hide all views (try both .view and .page-view classes)
+        // Clear any !important styles that might interfere with global navigation
         const views = document.querySelectorAll('.view, .page-view');
-        console.log('Found views to hide:', views.length);
         views.forEach(view => {
-            console.log('Hiding view:', view.id, view.className);
-            view.style.display = 'none';
+            // Remove any !important overrides that might block global navigation
+            view.style.removeProperty('display');
+            view.style.removeProperty('visibility');
+            view.style.removeProperty('opacity');
+            view.style.removeProperty('pointer-events');
+            view.style.removeProperty('position');
+            view.style.removeProperty('z-index');
+            view.style.removeProperty('left');
+            view.style.removeProperty('top');
+            view.style.removeProperty('transform');
         });
         
-        // Show target view
-        const targetView = document.getElementById(viewId);
-        if (targetView) {
-            targetView.style.display = 'flex';
-            targetView.style.visibility = 'visible';
-            targetView.style.opacity = '1';
-            targetView.style.position = 'static';
-            targetView.style.left = 'auto';
-            targetView.style.top = 'auto';
-            targetView.style.transform = 'none';
-            console.log('Successfully switched to view:', viewId);
-            console.log('Target view display:', targetView.style.display);
-            console.log('Target view computed display:', window.getComputedStyle(targetView).display);
+        // Use the global CRMApp showView method
+        if (window.CRMApp && window.CRMApp.showView) {
+            window.CRMApp.showView(viewId);
         } else {
-            console.error('Target view not found:', viewId);
-            console.log('Available elements with IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
+            console.error('Global CRMApp.showView not available');
         }
-    },
+    }
+,
 
     // Open sequence builder for a specific sequence
     openSequenceBuilder(sequence) {
@@ -586,89 +708,24 @@ const SequencesModule = {
         console.log('Builder view current display:', builderView.style.display);
         console.log('Builder view computed display:', window.getComputedStyle(builderView).display);
 
-        // Create the sequence builder HTML with tabs and Apollo.io-inspired design
+        // Create the sequence builder HTML with tabs and themed classes
         builderView.innerHTML = `
-            <div class="sequence-builder-container" style="
-                background: #1e2329;
-                min-height: 100vh;
-                width: 100%;
-                margin: 0;
-                padding: 20px;
-                box-sizing: border-box;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            ">
+            <div class="sequence-builder-container">
                 <!-- Header -->
-                <div class="builder-header" style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 30px;
-                    background: #2c3e50;
-                    padding: 20px;
-                    border-radius: 8px;
-                    border: 1px solid #34495e;
-                ">
+                <div class="builder-header">
                     <div class="header-left">
-                        <button id="back-to-sequences" style="
-                            background: #34495e;
-                            border: 1px solid #4a5568;
-                            color: #bdc3c7;
-                            padding: 8px 12px;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            margin-right: 15px;
-                            font-size: 14px;
-                            transition: all 0.3s ease;
-                        ">← Back</button>
-                        <h1 style="color: #fff; margin: 0; display: inline-block; font-size: 1.8rem; font-weight: 600;">${sequence.name}</h1>
+                        <button id="back-to-sequences" class="btn-back">← Back</button>
+                        <h1 class="builder-title">${sequence.name}</h1>
                     </div>
                     <div class="header-right">
-                        <button id="add-contacts-btn" style="
-                            background: #3498db;
-                            border: none;
-                            color: white;
-                            padding: 12px 24px;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-weight: 500;
-                            transition: all 0.3s ease;
-                        ">+ Add Contacts</button>
+                        <button id="add-contacts-btn" class="btn-primary">+ Add Contacts</button>
                     </div>
                 </div>
 
                 <!-- Tab System -->
-                <div class="builder-tabs" style="
-                    display: flex;
-                    background: #2c3e50;
-                    border-radius: 8px;
-                    padding: 6px;
-                    margin-bottom: 30px;
-                    border: 1px solid #34495e;
-                ">
-                    <button class="tab-btn active" data-tab="overview" style="
-                        flex: 1;
-                        padding: 12px 24px;
-                        border: none;
-                        background: #3498db;
-                        color: white;
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-weight: 500;
-                        margin-right: 6px;
-                        transition: all 0.3s ease;
-                    ">Overview</button>
-                    <button class="tab-btn" data-tab="contacts" style="
-                        flex: 1;
-                        padding: 12px 24px;
-                        border: none;
-                        background: transparent;
-                        color: #bdc3c7;
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-weight: 500;
-                        transition: all 0.3s ease;
-                    ">Contacts (${sequence.activeContacts || 0})</button>
+                <div class="builder-tabs">
+                    <button class="tab-btn active" data-tab="overview">Overview</button>
+                    <button class="tab-btn" data-tab="contacts">Contacts (${sequence.activeContacts || 0})</button>
                 </div>
 
                 <!-- Tab Content -->
@@ -676,7 +733,7 @@ const SequencesModule = {
                     ${this.renderOverviewTab(sequence)}
                 </div>
                 
-                <div id="contacts-tab" class="tab-content" style="display: none;">
+                <div id="contacts-tab" class="tab-content">
                     ${this.renderContactsTab(sequence)}
                 </div>
             </div>
@@ -693,95 +750,26 @@ const SequencesModule = {
         if (!hasSteps) {
             // Show inspirational content when no steps exist
             return `
-                <div class="inspirational-content" style="
-                    text-align: center;
-                    background: #2c3e50;
-                    border-radius: 12px;
-                    padding: 60px 40px;
-                    border: 1px solid #34495e;
-                    max-width: 600px;
-                    margin: 0 auto;
-                ">
-                    <div style="
-                        width: 120px;
-                        height: 120px;
-                        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
-                        border-radius: 50%;
-                        margin: 0 auto 30px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-                    ">
+                <div class="sequence-intro">
+                    <div class="intro-icon">
                         <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                         </svg>
                     </div>
-                    
-                    <h2 style="
-                        color: white;
-                        font-size: 2.2rem;
-                        font-weight: 700;
-                        margin: 0 0 20px 0;
-                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-                    ">⚡ AI-driven writing</h2>
-                    
-                    <h3 style="
-                        color: white;
-                        font-size: 1.6rem;
-                        font-weight: 600;
-                        margin: 0 0 15px 0;
-                        opacity: 0.95;
-                    ">Supercharge your workflow with sequences</h3>
-                    
-                    <p style="
-                        color: rgba(255, 255, 255, 0.9);
-                        font-size: 1.1rem;
-                        line-height: 1.6;
-                        margin: 0 0 40px 0;
-                        max-width: 500px;
-                        margin-left: auto;
-                        margin-right: auto;
-                    ">Harness the power of Power Choosers AI to create multi-step sequences that help you scale your outreach efforts, book more meetings, and close more deals.</p>
-                    
-                    <button id="add-step-btn" style="
-                        background: #3498db;
-                        border: none;
-                        color: white;
-                        padding: 16px 32px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-size: 16px;
-                        font-weight: 600;
-                        transition: all 0.3s ease;
-                        margin-top: 30px;
-                    ">⚡ Add Step</button>
+                    <h2 class="intro-title">⚡ AI-driven writing</h2>
+                    <h3 class="intro-subtitle">Supercharge your workflow with sequences</h3>
+                    <p class="intro-desc">Harness the power of Power Choosers AI to create multi-step sequences that help you scale your outreach efforts, book more meetings, and close more deals.</p>
+                    <button id="add-step-btn" class="btn-accent">⚡ Add Step</button>
                 </div>
             `;
         } else {
             // Show sequence steps when they exist
             return `
-                <div class="sequence-steps" style="
-                    background: rgba(255, 255, 255, 0.1);
-                    backdrop-filter: blur(10px);
-                    border-radius: 16px;
-                    padding: 30px;
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                ">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-                        <h3 style="color: white; margin: 0; font-size: 1.4rem; font-weight: 600;">Sequence Steps</h3>
-                        <button id="add-step-btn" style="
-                            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
-                            border: none;
-                            color: white;
-                            padding: 12px 24px;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-weight: 500;
-                        ">+ Add Step</button>
+                <div class="sequence-steps">
+                    <div class="steps-header">
+                        <h3 class="steps-title">Sequence Steps</h3>
+                        <button id="add-step-btn" class="btn-accent btn-sm">+ Add Step</button>
                     </div>
-                    
                     <div class="steps-list">
                         ${sequence.steps.map((step, index) => `
                             ${this.renderSequenceStep(step, index)}
@@ -807,56 +795,22 @@ const SequencesModule = {
         };
 
         return `
-            <div class="sequence-step" style="
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 12px;
-                padding: 20px;
-                margin-bottom: 15px;
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                display: flex;
-                align-items: center;
-                gap: 15px;
-            ">
-                <div style="
-                    width: 40px;
-                    height: 40px;
-                    background: rgba(255, 255, 255, 0.2);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 18px;
-                ">${stepIcons[step.type] || '⚡'}</div>
+            <div class="sequence-step">
+                <div class="step-icon">${stepIcons[step.type] || '⚡'}</div>
                 
-                <div style="flex: 1;">
-                    <h4 style="color: white; margin: 0 0 5px 0; font-size: 1.1rem; font-weight: 500;">
+                <div class="step-body">
+                    <h4 class="step-title">
                         Day ${index + 1}: ${step.name || this.getStepTypeName(step.type)}
                     </h4>
-                    <p style="color: rgba(255, 255, 255, 0.8); margin: 0; font-size: 0.9rem;">
+                    <p class="step-desc">
                         ${step.description || this.getStepTypeDescription(step.type)}
                     </p>
-                    ${step.note ? `<p style="color: rgba(255, 255, 255, 0.6); margin: 5px 0 0 0; font-size: 0.8rem; font-style: italic;">Note: ${step.note}</p>` : ''}
+                    ${step.note ? `<p class="step-note">Note: ${step.note}</p>` : ''}
                 </div>
                 
-                <div style="display: flex; gap: 10px;">
-                    <button class="edit-step-btn" data-step-index="${index}" style="
-                        background: rgba(255, 255, 255, 0.2);
-                        border: none;
-                        color: white;
-                        padding: 8px 12px;
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-size: 12px;
-                    ">Edit</button>
-                    <button class="delete-step-btn" data-step-index="${index}" style="
-                        background: rgba(255, 0, 0, 0.3);
-                        border: none;
-                        color: white;
-                        padding: 8px 12px;
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-size: 12px;
-                    ">Delete</button>
+                <div class="step-actions">
+                    <button class="edit-step-btn btn-secondary btn-sm" data-step-index="${index}">Edit</button>
+                    <button class="delete-step-btn btn-danger btn-sm" data-step-index="${index}">Delete</button>
                 </div>
             </div>
         `;
@@ -877,23 +831,10 @@ const SequencesModule = {
         }
 
         return `
-            <div class="step-interval" style="
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                margin: 8px 0 16px 56px; /* roughly aligns under content after the icon */
-            ">
-                <div style="flex: 1; height: 1px; background: rgba(255, 255, 255, 0.2);"></div>
-                <div style="
-                    background: rgba(52, 152, 219, 0.15);
-                    border: 1px dashed rgba(52, 152, 219, 0.5);
-                    color: #fff;
-                    font-size: 12px;
-                    padding: 6px 10px;
-                    border-radius: 6px;
-                    white-space: nowrap;
-                ">⏱ ${label}</div>
-                <div style="flex: 1; height: 1px; background: rgba(255, 255, 255, 0.2);"></div>
+            <div class="step-interval">
+                <div class="line"></div>
+                <div class="label">⏱ ${label}</div>
+                <div class="line"></div>
             </div>
         `;
     },
@@ -901,29 +842,10 @@ const SequencesModule = {
     // Render the contacts tab
     renderContactsTab(sequence) {
         return `
-            <div class="contacts-content" style="
-                background: rgba(255, 255, 255, 0.1);
-                backdrop-filter: blur(10px);
-                border-radius: 16px;
-                padding: 30px;
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                text-align: center;
-            ">
-                <h3 style="color: white; margin: 0 0 20px 0; font-size: 1.4rem; font-weight: 600;">Contacts in Sequence</h3>
-                <p style="color: rgba(255, 255, 255, 0.8); margin: 0 0 30px 0;">
-                    Currently ${sequence.activeContacts || 0} contacts in this sequence
-                </p>
-                
-                <button id="add-contacts-from-tab" style="
-                    background: #4CAF50;
-                    border: none;
-                    color: white;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    font-weight: 500;
-                ">+ Add Contacts</button>
+            <div class="contacts-content">
+                <h3 class="contacts-title">Contacts in Sequence</h3>
+                <p class="contacts-sub">Currently ${sequence.activeContacts || 0} contacts in this sequence</p>
+                <button id="add-contacts-from-tab" class="btn-accent">+ Add Contacts</button>
             </div>
         `;
     },
@@ -965,12 +887,8 @@ const SequencesModule = {
         tabBtns.forEach(btn => {
             if (btn.dataset.tab === tabName) {
                 btn.classList.add('active');
-                btn.style.background = 'rgba(255, 255, 255, 0.9)';
-                btn.style.color = '#333';
             } else {
                 btn.classList.remove('active');
-                btn.style.background = 'transparent';
-                btn.style.color = 'white';
             }
         });
 
@@ -978,10 +896,8 @@ const SequencesModule = {
         const tabContents = document.querySelectorAll('.tab-content');
         tabContents.forEach(content => {
             if (content.id === `${tabName}-tab`) {
-                content.style.display = 'block';
                 content.classList.add('active');
             } else {
-                content.style.display = 'none';
                 content.classList.remove('active');
             }
         });
@@ -1073,6 +989,9 @@ const SequencesModule = {
         modalOverlay.innerHTML = this.renderStepSelectionModal(sequence);
         
         document.body.appendChild(modalOverlay);
+        
+        // Activate overlay to apply CSS visibility/transform rules
+        modalOverlay.classList.add('active');
         
         // Add event listeners
         this.attachStepModalListeners(modalOverlay, sequence);

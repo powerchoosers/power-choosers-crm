@@ -14,7 +14,7 @@ Object.assign(CRMApp, {
 
         // Apply contacts-style CSS classes to accounts view
         accountsView.className = 'page-view';
-        accountsView.style.cssText = 'display: flex !important; flex-direction: column !important; height: calc(100vh - 70px) !important; background: #0f1419 !important; color: #e2e8f0 !important; padding: 0 !important; overflow: hidden !important;';
+        accountsView.style.cssText = 'display: flex !important; flex-direction: column !important; height: calc(100vh - 70px) !important; background: transparent !important; color: #e2e8f0 !important; padding: 0 !important; overflow: visible !important;';
 
         console.log("Creating accounts HTML with contacts design");
         const accountsHTML = `
@@ -765,9 +765,9 @@ Object.assign(CRMApp, {
             height: calc(100vh - 120px) !important;
             background: #1a1a1a !important;
             color: #fff !important;
-            margin: 20px !important;
-            padding: 20px !important;
-            border-radius: 20px !important;
+            margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)) !important;
+            padding: var(--spacing-lg) !important;
+            border-radius: 25px !important;
             overflow: hidden !important;
         `;
     },
