@@ -58,6 +58,12 @@
     --cch-bg-card: #1a1a1a; /* Matches CRM bg-card */
     --cch-bg-hover: #242424; /* Matches CRM bg-hover */
     --cch-border-color: #2a2a2a; /* Matches CRM border-light */
+
+    /* Page/card defaults used across modules (Calls, Emails, etc.) */
+    --pc-bg: var(--bg-card);
+    --pc-border: var(--widget-border);
+    --pc-text: var(--text-primary);
+    --pc-muted: #94a3b8;
 }
 
 * {
@@ -775,7 +781,11 @@ html, body {
 .main-content:has(#tasks-view)::before,
 .main-content:has(#sequences-view)::before,
 .main-content:has(#sequence-builder-view)::before {
-    height: 0; /* disable top gradient strip */
+    display: none;
+}
+
+.main-content:has(#calls-view) {
+    overflow-y: hidden !important;
 }
 
 /* Tasks view: align container spacing to 25px and remove default first-child padding */
@@ -2679,26 +2689,53 @@ html, body {
 /* --- Calls: Single-card Container --- */
 /* Turn the entire calls view into one card, consistent with Contacts/Accounts */
 #calls-view.page-view {
-  /* 25px visible gap on all sides regardless of parent padding */
-  margin: 25px;
-  /* Emails/Accounts-like container variables */
-  --pc-bg: var(--widget-bg);
-  --pc-border: var(--widget-border);
-  --pc-text: #e2e8f0;
-  --pc-muted: #94a3b8;
-  background: var(--pc-bg);
-  border: 1px solid var(--pc-border);
-  border-radius: 14px;
-  padding: var(--spacing-lg);
-  overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  /* Neutral wrapper like #contacts-view/#accounts-view */
+  margin: 0;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  overflow: visible;
+  position: relative;
+  box-shadow: none;
   /* Layout */
   display: flex;
   flex-direction: column;
   gap: 0;
   /* Keep static to avoid any jank */
   opacity: 1;
+  /* Fit within viewport; container inside manages margins */
+  height: calc(100% - 50px);
+  min-width: 0;     /* avoid causing horizontal page scroll */
+  box-sizing: border-box;
 }
+
+/* The inner 1px border should wrap ONLY the table area (including pagination),
+   not the entire Calls card. Mirror Accounts/Contacts behavior. */
+
+/* Calls main card container mirroring Contacts/Accounts `.contacts-container` */
+#calls-view .calls-container {
+  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  background: var(--widget-bg);
+  border: 1px solid var(--widget-border);
+  border-radius: 25px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* allow inner scrollers */
+}
+
+#calls-view .calls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--widget-bg);
+  border-bottom: 1px solid var(--widget-border);
+}
+
+#calls-view .calls-toolbar { padding: 12px 20px; }
 
 /* Neutralize inner dashboard-card sections inside the calls single-card */
 #calls-view.page-view > .dashboard-card {
@@ -2848,10 +2885,32 @@ html, body {
 }
 
 /* Calls page — table */
-#calls-view.page-view .calls-table-container { display: flex; flex-direction: column; background: var(--pc-bg); }
-#calls-view.page-view .calls-table-wrapper { width: 100%; overflow: auto; }
+#calls-view.page-view .calls-table-container {
+  display: flex;
+  flex-direction: column;
+  background: #141414;
+  flex: 1 1 auto;  /* fill remaining space inside the card */
+  min-height: 0;   /* allow inner scroller to actually scroll */
+  /* New: contain the lines inside this container */
+  border: 1px solid var(--pc-border);
+  border-radius: 14px;
+  overflow: hidden; /* clip sticky header corners and scrollbar to radius */
+  /* 25px visual inset within the main calls container */
+  margin: 25px;
+}
+#calls-view.page-view .calls-table-wrapper {
+  flex: 1 1 auto;
+  width: 100%;
+  overflow: auto;      /* both axes: horizontal for many columns, vertical for many rows */
+}
+/* Scrollbar styling inside the calls table wrapper (match Accounts) */
+#calls-view.page-view .calls-table-wrapper::-webkit-scrollbar { height: 10px; width: 10px; }
+#calls-view.page-view .calls-table-wrapper::-webkit-scrollbar-track { background: #2a2a2a; }
+#calls-view.page-view .calls-table-wrapper::-webkit-scrollbar-thumb { background: #8b8b8b; border-radius: 6px; }
+#calls-view.page-view .calls-table-wrapper::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
 #calls-view.page-view .calls-table {
   width: 100%;
+  min-width: 1200px;   /* ensure horizontal scroll instead of squeezing columns */
   border-collapse: separate;
   border-spacing: 0;
   background: var(--pc-bg);
@@ -2905,12 +2964,84 @@ html, body {
 }
 #calls-view.page-view .icon-btn:hover { background: #3a3a3a; }
 
+/* Calls page — table top controls (Select All + compact pagination) */
+#calls-view .table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--pc-border);
+  background: var(--pc-bg);
+}
+/* Ensure controls/pagination are visually inside the bordered table container */
+#calls-view.page-view .calls-table-container .table-controls { border-bottom: 1px solid var(--pc-border); background: var(--pc-bg); }
+#calls-view .table-controls-left { display: flex; align-items: center; gap: 12px; }
+#calls-view .table-controls-right { display: flex; align-items: center; gap: 8px; }
+#calls-view .selection-text { color: #ffffff; cursor: pointer; user-select: none; }
+#calls-view .results-info { color: #ffffff; font-size: 0.9rem; }
+
+/* Calls page — number and checkbox columns */
+#calls-view .calls-table th.col-number,
+#calls-view .calls-table td.col-number { width: 56px; text-align: left; }
+#calls-view .calls-table th.col-checkbox,
+#calls-view .calls-table td.col-checkbox { width: 48px; text-align: center; }
+#calls-view .calls-table .row-number { color: #94a3b8; }
+#calls-view .calls-table .row-select input[type="checkbox"] {
+  width: 16px; height: 16px; cursor: pointer;
+}
+
+/* Calls page — bottom pagination (numeric) */
+#calls-view .pagination-container {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--pc-border);
+  background: var(--pc-bg);
+  margin-top: auto; /* anchor to bottom of the table container */
+  flex-shrink: 0;   /* prevent collapsing when space is tight */
+}
+/* If pagination lives inside the calls-table-container, it will naturally sit at the bottom.
+   If it's outside in markup, this keeps visuals consistent but ideally it should be inside. */
+#calls-view.page-view .calls-table-container .pagination-container { border-top: 1px solid var(--pc-border); background: var(--pc-bg); }
+#calls-view .pagination-info { color: #ffffff; }
+#calls-view .pagination-numbers .page-num { background: #2a2a2a; border: 1px solid #3a3a3a; color: #ffffff; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+#calls-view .pagination-numbers .page-num:hover { background: #3a3a3a; }
+#calls-view .pagination-numbers .page-num.active { background: var(--accent-orange, #f59e0b); border-color: var(--accent-orange, #f59e0b); color: #ffffff; }
+
+/* Removed global main content padding to prevent page-level scroll on Calls */
+
+/* Calls page — Filters sidebar (overlay, collapsible) */
+#calls-view { position: relative; }
+#calls-view .filters-sidebar {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 280px;
+  background: #1a1a1a;
+  border-right: 1px solid var(--pc-border);
+  box-shadow: 6px 0 20px rgba(0,0,0,0.2);
+  overflow: hidden auto;
+  transition: width 220ms ease;
+  z-index: 5;
+}
+#calls-view .filters-sidebar.collapsed { width: 0; border-right: none; box-shadow: none; }
+#calls-view .filters-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--pc-border); background: #141414; }
+#calls-view .filters-title { display: flex; align-items: center; gap: 10px; color: #e2e8f0; }
+#calls-view .filters-title h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+#calls-view .filters-collapse-btn { background: #2a2a2a; border: 1px solid #3a3a3a; color: #e2e8f0; width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+#calls-view .filters-collapse-btn:hover { background: #3a3a3a; }
+#calls-view .filters-content { padding: 12px; display: grid; gap: 12px; }
+#calls-view .filter-group { display: grid; gap: 6px; }
+#calls-view .filter-label { color: #e2e8f0; font-size: 0.9rem; }
+#calls-view .filter-input, #calls-view .filter-select { background: #2a2a2a; color: #ffffff; border: 1px solid #3a3a3a; border-radius: 8px; padding: 8px 10px; }
+#calls-view .filter-actions { padding-top: 4px; }
+
 /* Calls page — pagination hint */
 #calls-view.page-view .calls-pagination {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 16px;
   border-top: 1px solid var(--pc-border);
   background: var(--pc-bg);
+  margin-top: auto; /* anchor to bottom of card */
+  flex-shrink: 0;   /* prevent collapsing when space is tight */
 }
 #calls-view.page-view #calls-pagination-info { color: #ffffff; }
 
