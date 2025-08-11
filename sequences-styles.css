@@ -6,7 +6,7 @@
     width: 100%;
     background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
     color: #fff;
-    margin: 0;
+    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
     padding: 32px;
     border-radius: 20px;
     overflow: hidden;
@@ -47,9 +47,9 @@
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-    border: 1px solid #28a745;
-    color: #fff;
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+    border: 1px solid #f59e0b;
+    color: #0f0f0f;
     padding: 12px 24px;
     border-radius: 8px;
     cursor: pointer;
@@ -63,7 +63,7 @@
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+    background: linear-gradient(135deg, #f59e0b 0%, #f59e0b 100%);
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
@@ -457,4 +457,177 @@ input:checked + .toggle-slider:before {
     padding: 24px;
     border-top: 1px solid #333;
     background: rgba(0, 0, 0, 0.2);
+}
+
+/* ========================= */
+/* Sequences Revamp (Apollo) */
+/* ========================= */
+
+/* Container aligns with global card spacing and rounding */
+#sequences-view .sequences-page-container {
+    margin: 25px;
+    background: var(--widget-bg, #141414);
+    border: 1px solid var(--widget-border, #1e293b);
+    border-radius: var(--card-radius, 20px);
+    padding: var(--spacing-xl, 24px);
+    color: var(--cch-text-primary, #fff);
+}
+
+.seq-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--widget-border, #1e293b); }
+.seq-sub { color: var(--cch-text-secondary, #cbd5e1); font-size: 13px; margin-top: 4px; }
+
+.seq-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.seq-divider { width: 1px; height: 28px; background: var(--widget-border, #1e293b); border-radius: 1px; }
+.seq-search input { background: #2a2a2a; border: 1px solid var(--widget-border, #1e293b); border-radius: 8px; color: #fff; padding: 8px 12px; width: 260px; }
+
+.seq-btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; border-radius: 10px; padding: 10px 14px; border: 1px solid transparent; cursor: pointer; }
+.seq-btn-primary { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+.seq-btn-primary:hover { background: #d97706; border-color: #d97706; }
+.seq-btn-light, .seq-filter-btn { background: #2a2a2a; color: #e5e7eb; border: 1px solid var(--widget-border, #1e293b); border-radius: 8px; padding: 8px 12px; }
+.seq-btn-light:hover, .seq-filter-btn:hover { background: var(--cch-bg-hover, #1f1f1f); }
+
+/* Table */
+.sequences-table-container { overflow: auto; border: 1px solid var(--widget-border, #1e293b); border-radius: 12px; background: var(--widget-bg, #141414); }
+.sequences-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--widget-bg, #1f1f1f);
+    border-radius: 0;
+    overflow: hidden;
+    opacity: 0;
+    animation: fadeInTable 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s forwards;
+}
+
+@keyframes fadeInTable {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.sequences-table th { position: sticky; top: 0; text-align: left; padding: 12px; font-weight: 700; color: var(--cch-text-primary, #fff); background: inherit; }
+.sequences-table thead th { border-bottom: 1px solid var(--widget-border, #1e293b); }
+.sequences-table td { padding: 10px 12px; color: var(--cch-text-secondary, #cbd5e1); vertical-align: middle; }
+#sequences-view .sequences-table tbody td { border-bottom: 1px solid var(--widget-border, #1e293b); }
+#sequences-view .sequences-table tbody tr:last-child td { border-bottom: none; }
+#sequences-view .sequences-table tbody tr:nth-child(even) { background: transparent; }
+#sequences-view .sequences-table tbody tr:hover { background: var(--cch-bg-hover, #1f1f1f) !important; }
+/* Make rows clearly clickable */
+#sequences-view .sequences-table tbody tr.sequence-row { cursor: pointer; }
+#sequences-view .sequences-table tbody tr.sequence-row:focus { outline: 2px solid var(--accent, #f59e0b); outline-offset: -2px; background: var(--cch-bg-hover, #1f1f1f); }
+#sequences-view .sequences-table tbody tr.sequence-row:active { transform: scale(0.999); }
+
+.col-name .name { color: var(--cch-text-primary, #fff); font-weight: 700; margin-bottom: 2px; }
+/* Title should also feel clickable */
+#sequences-view .sequences-table .col-name .name { cursor: pointer; transition: color 0.15s ease; }
+#sequences-view .sequences-table .col-name .name:hover { color: var(--accent, #f59e0b); text-decoration: underline; }
+.col-name .sub { color: #9aa5b1; font-size: 12px; }
+
+/* Footer */
+.seq-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 10px; }
+.bulk-select select { background: #2a2a2a; border: 1px solid var(--widget-border, #1e293b); color: #e5e7eb; border-radius: 8px; padding: 8px 12px; }
+.seq-results { color: var(--cch-text-secondary, #cbd5e1); font-size: 13px; }
+
+/* ============================= */
+/* Sequence Builder (New/Edit UI)*/
+/* ============================= */
+
+/* Container */
+.sequence-builder-container {
+  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  background: var(--widget-bg, #141414);
+  border: 1px solid var(--widget-border, #1e293b);
+  border-radius: var(--card-radius, 20px);
+  padding: var(--spacing-xl, 24px);
+  color: var(--cch-text-primary, #fff);
+}
+
+/* Header */
+.builder-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--widget-border, #1e293b); margin-bottom: 16px; }
+.builder-header .header-left { display: flex; align-items: center; gap: 12px; }
+.btn-back { background: transparent; color: #94a3b8; border: 1px solid var(--widget-border, #1e293b); padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.btn-back:hover { background: #1f2937; color: #e5e7eb; }
+.builder-title { margin: 0; font-size: 22px; font-weight: 800; color: var(--cch-text-primary, #fff); }
+
+/* Tabs */
+.builder-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.sequence-builder-container .tab-btn { background: #2a2a2a; color: #e5e7eb; border: 1px solid var(--widget-border, #1e293b); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-weight: 700; }
+.sequence-builder-container .tab-btn:hover { background: var(--cch-bg-hover, #1f1f1f); }
+.sequence-builder-container .tab-btn.active { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.sequence-builder-container .tab-content { display: none; }
+.sequence-builder-container .tab-content.active { display: block; }
+
+/* Intro empty state */
+.sequence-intro { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--widget-border, #1e293b); border-radius: 16px; padding: 36px; text-align: center; }
+.sequence-intro .intro-icon { width: 84px; height: 84px; margin: 0 auto 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(245,158,11,0.25) 0%, rgba(245,158,11,0.12) 55%, rgba(0,0,0,0) 70%); border: 1px solid rgba(245,158,11,0.35); }
+.sequence-intro .intro-title { margin: 8px 0 4px; font-size: 20px; font-weight: 800; color: #fff; }
+.sequence-intro .intro-subtitle { margin: 0 0 6px 0; font-size: 16px; font-weight: 700; color: #e5e7eb; }
+.sequence-intro .intro-desc { margin: 0 auto 16px; max-width: 680px; color: #cbd5e1; font-size: 14px; }
+
+/* Buttons */
+.btn-accent { background: #f59e0b; color: #fff; border: 1px solid #f59e0b; padding: 10px 16px; border-radius: 10px; font-weight: 800; cursor: pointer; transition: background .15s ease; }
+.btn-accent:hover { background: #d97706; border-color: #d97706; }
+.btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+
+/* Steps list */
+.sequence-steps { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--widget-border, #1e293b); border-radius: 16px; padding: 20px; }
+.sequence-steps .steps-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.sequence-steps .steps-title { margin: 0; font-size: 16px; font-weight: 800; color: #fff; }
+.steps-list { margin-top: 10px; }
+
+.sequence-step { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 12px; padding: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 14px; }
+.sequence-step .step-icon { width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.18); font-size: 18px; }
+.sequence-step .step-body { flex: 1; }
+.sequence-step .step-title { color: #fff; margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 700; }
+.sequence-step .step-desc { color: rgba(255, 255, 255, 0.8); margin: 0; font-size: 0.92rem; }
+.sequence-step .step-note { color: rgba(255, 255, 255, 0.65); margin: 6px 0 0; font-size: 0.82rem; font-style: italic; }
+.sequence-step .step-actions { display: flex; gap: 10px; }
+
+/* Visual interval between steps */
+.step-interval { display: flex; align-items: center; gap: 12px; margin: 8px 0 16px 56px; }
+.step-interval .line { flex: 1; height: 1px; background: rgba(255, 255, 255, 0.2); }
+.step-interval .label { background: rgba(245, 158, 11, 0.12); border: 1px dashed rgba(245, 158, 11, 0.5); color: #fff; font-size: 12px; padding: 6px 10px; border-radius: 6px; white-space: nowrap; }
+
+/* Contacts tab (scoped) */
+.sequence-builder-container .contacts-content { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--widget-border, #1e293b); border-radius: 16px; padding: 30px; text-align: center; }
+.sequence-builder-container .contacts-title { margin: 0 0 12px 0; color: #fff; font-size: 1.2rem; font-weight: 800; }
+.sequence-builder-container .contacts-sub { margin: 0 0 20px 0; color: rgba(255, 255, 255, 0.8); }
+
+/* Pagination relies on global styles (orange theme already applied); nudge spacing */
+.sequences-pagination .pagination-btn,
+.sequences-pagination .page-num { margin-left: 6px; }
+
+/* Force white page number text in Sequences pagination */
+#sequences-view .sequences-pagination .pagination-btn,
+#sequences-view .sequences-pagination .page-num { color: #fff !important; }
+
+#sequences-view .sequences-pagination .page-num.active {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff !important;
+}
+
+/* Make sure numeric buttons actually show digits (override global line-height:0 etc.) */
+#sequences-view .sequences-pagination .page-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: #2a2a2a;
+  border: 1px solid var(--widget-border, #1e293b);
+  line-height: 1.2 !important;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#sequences-view .sequences-pagination .page-num:hover {
+  background: #3a3a3a;
 }

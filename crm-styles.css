@@ -29,7 +29,7 @@
 :root {
     --primary-blue: #1a237e;
     --dark-blue: #0d1421;
-    --darker-blue: #0a0f1a;
+    --darker-blue: #141414;
     --header-blue: #1a237e;
     --text-primary: #ffffff;
     --text-secondary: #b0b0b0;
@@ -70,7 +70,7 @@ html, body {
     height: 100vh;
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: var(--darker-blue);
+    background: #141414;
     color: var(--text-primary);
     line-height: 1.5;
 }
@@ -97,13 +97,26 @@ html, body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    animation: fadeInApp 0.6s ease-out;
+}
+
+@keyframes fadeInApp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .app-main {
     display: flex;
-    height: calc(100vh - 70px);
-    position: relative;
+    flex: 1;
+    overflow: hidden;
     margin-top: 70px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Special handling for call scripts view to enable scroll-under effect */
@@ -155,8 +168,8 @@ html, body {
     left: 0;
     right: 0;
     height: 70px;
-    background: var(--dark-blue);
-    border-bottom: 2px solid var(--primary-blue);
+    background: #1a1a1a;
+    border-bottom: 1px solid var(--widget-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -368,11 +381,34 @@ html, body {
     color: var(--text-secondary);
     text-decoration: none;
     border-radius: 8px;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     position: relative;
     overflow: hidden;
     font-size: 1.05rem; /* Increased font size */
     font-weight: 500; /* Slightly bolder text */
+}
+
+.nav-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 3px;
+    background: var(--primary-blue);
+    transform: scaleY(0);
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.nav-item:hover::before,
+.nav-item.active::before {
+    transform: scaleY(1);
+}
+
+.nav-item:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(4px);
 }
 
 .app-sidebar:not(:hover) .nav-item {
@@ -641,10 +677,39 @@ html, body {
     position: relative;
     width: 100%;
     height: 100%;
+    opacity: 1;
+    transform: translateX(0);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .page-view:not([style*="display: flex"]):not([style*="display: block"]) {
     display: none !important;
+}
+
+/* Animate page entrance when becoming visible */
+.page-view[style*="display: flex"],
+.page-view[style*="display: block"] {
+    opacity: 1;
+    transform: translateX(0);
+    animation: slideInPage 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Initial state for page entrance animation */
+.page-view[style*="display: flex"]:not(.page-loaded),
+.page-view[style*="display: block"]:not(.page-loaded) {
+    opacity: 0;
+    transform: translateX(20px);
+}
+
+@keyframes slideInPage {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 /* --- 6. Main Content Area (3/4 width) - CONSISTENT 3:1 LAYOUT --- */
@@ -655,7 +720,7 @@ html, body {
 
 .main-content {
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: visible; /* allow negative-margin cards to render fully */
     padding: 0 var(--spacing-lg); /* Vertical padding removed */
     position: relative;
     display: flex;
@@ -669,7 +734,7 @@ html, body {
 }
 
 .main-content > *:last-child {
-    padding-bottom: var(--spacing-lg);
+    padding-bottom: 0; /* per-view containers control bottom spacing */
 }
 
 .main-content::before {
@@ -679,7 +744,7 @@ html, body {
     left: 60px;
     right: 25%;
     height: 20px;
-    background: linear-gradient(to bottom, var(--darker-blue), transparent);
+    background: linear-gradient(to bottom, var(--darker-blue), transparent); /* align with global page background */
     pointer-events: none;
     z-index: 100;
     transition: all 0.3s ease;
@@ -694,11 +759,94 @@ html, body {
     box-shadow: var(--shadow-scroll);
 }
 
+/* Remove scroll-under shadow and top gradient for Contacts/Accounts/Tasks views
+   so the outer gap matches the global dark-blue background exactly */
+.main-content:has(#contacts-view),
+.main-content:has(#accounts-view),
+.main-content:has(#calls-view),
+.main-content:has(#tasks-view),
+.main-content:has(#sequences-view),
+.main-content:has(#sequence-builder-view) {
+    box-shadow: none;
+}
+.main-content:has(#contacts-view)::before,
+.main-content:has(#accounts-view)::before,
+.main-content:has(#calls-view)::before,
+.main-content:has(#tasks-view)::before,
+.main-content:has(#sequences-view)::before,
+.main-content:has(#sequence-builder-view)::before {
+    height: 0; /* disable top gradient strip */
+}
+
+/* Tasks view: align container spacing to 25px and remove default first-child padding */
+#tasks-view {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 70px) !important; /* header is 70px */
+    background: transparent !important; /* let global dark blue show through */
+    padding: 0 !important; /* top spacing handled by .tasks-layout margin */
+    overflow: visible !important;
+    /* unify with Contacts/Accounts revamp neutrals */
+    --revamp-surface: #1a1a1a;
+    --revamp-border: #2d2d2d;
+}
+
+/* Sequences views: align container spacing to 25px and remove default padding */
+#sequences-view,
+#sequence-builder-view {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 70px) !important; /* header is 70px */
+    background: transparent !important; /* let global dark blue show through */
+    padding: 0 !important; /* child cards provide the 25px margin */
+    overflow: visible !important;
+}
+
+/* Calls view: align container spacing to 25px and remove default first-child padding */
+#calls-view {
+    display: flex !important;
+    flex-direction: column !important;
+    background: transparent !important; /* let global background show through */
+    padding: 0 !important; /* spacing handled by single-card margins */
+    overflow: visible !important;
+}
+
+/* Do not add extra padding on the scroll container; dashboard will render its own spacer */
+.main-content:has(#dashboard-view) {
+    padding-bottom: 0 !important;
+}
+
+/* Listing and emails views should not add extra container bottom padding */
+.main-content:has(#accounts-view),
+.main-content:has(#contacts-view),
+.main-content:has(#calls-view),
+.main-content:has(#emails-view),
+.main-content:has(#sequences-view),
+.main-content:has(#sequence-builder-view) {
+    padding-bottom: 0 !important;
+}
+
+/* Sequences pages: enforce 25px visible side gap and 25px card radius */
+#sequences-view > .sequences-page-container,
+#sequence-builder-view > .sequence-builder-container {
+  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)) !important;
+  border-radius: 25px !important;
+}
+
+/* Tasks view: keep standard parent padding; child uses compensated margins */
+
+/* Do not add extra visual gap at the end of list/detail pages */
+#accounts-view > .dashboard-card:last-of-type,
+#contacts-view > .dashboard-card:last-of-type,
+#emails-view > .dashboard-card:last-of-type {
+    margin-bottom: 0 !important;
+}
+
 /* --- 6. Right Widget Panel (Enhanced) --- */
 .widget-panel {
     flex: 1;
     height: 100%;
-    padding: 1.5rem;
+    padding: 25px 1.5rem 25px 1.5rem; /* exact 25px top and bottom gaps */
     border-left: 1px solid var(--border-light);
     overflow-y: auto;
     overflow-x: hidden;
@@ -711,7 +859,7 @@ html, body {
 }
 
 .widget-panel > *:first-child {
-    padding-top: var(--spacing-lg);
+    padding-top: 0; /* avoid compounding; container provides the full 25px */
 }
 
 .widget-panel > *:last-child {
@@ -750,13 +898,29 @@ html, body {
     border-radius: 12px;
     padding: 24px;
     margin: 0 4px 0 0; /* Adjusted right margin */
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transform: translateX(20px);
+    animation: slideInRight 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.widget-card:nth-child(1) { animation-delay: 0.2s; }
+.widget-card:nth-child(2) { animation-delay: 0.3s; }
+.widget-card:nth-child(3) { animation-delay: 0.4s; }
+.widget-card:nth-child(4) { animation-delay: 0.5s; }
+
+@keyframes slideInRight {
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .widget-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* --- 7. Page Views --- */
@@ -773,7 +937,7 @@ html, body {
 #dashboard-view {
     display: flex !important;
     flex-direction: column;
-    gap: 8px; /* Reduced gap for tighter, more even spacing */
+    gap: 0; /* spacing handled by explicit section margins */
 }
 
 #dashboard-view.active {
@@ -785,7 +949,7 @@ html, body {
     display: grid;
     grid-template-columns: repeat(4, 1fr); /* Force 4 equal columns */
     gap: 20px; /* Reduced gap to help maintain layout */
-    margin-bottom: 32px;
+    margin-bottom: 25px; /* exact vertical rhythm below stat panel */
     min-width: 0; /* Allow grid to shrink */
 }
 
@@ -795,11 +959,19 @@ html, body {
     border-radius: 12px;
     padding: 24px 20px; /* Reduced horizontal padding */
     text-align: center;
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     position: relative;
     overflow: hidden;
     min-width: 0; /* Allow card to shrink */
+    opacity: 0;
+    transform: translateY(15px);
+    animation: fadeInUp 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
+
+.stat-card:nth-child(1) { animation-delay: 0.1s; }
+.stat-card:nth-child(2) { animation-delay: 0.2s; }
+.stat-card:nth-child(3) { animation-delay: 0.3s; }
+.stat-card:nth-child(4) { animation-delay: 0.4s; }
 
 .stat-card::before {
     content: '';
@@ -809,11 +981,18 @@ html, body {
     right: 0;
     height: 3px;
     background: var(--primary-blue); /* Changed from accent-blue to match theme */
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover::before {
+    transform: scaleX(1);
 }
 
 .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    transform: translateY(-6px) scale(1.03);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
     border-color: var(--primary-blue);
 }
 
@@ -837,16 +1016,33 @@ html, body {
 .dashboard-card {
     background: var(--bg-card);
     border: 1px solid var(--border-light);
-    border-radius: 12px;
+    border-radius: 25px;
     padding: 28px;
-    margin-bottom: 19px;
-    transition: all 0.3s ease;
+    margin-bottom: 25px; /* standard vertical rhythm */
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     box-shadow: var(--shadow-card);
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.dashboard-card:nth-child(1) { animation-delay: 0.1s; }
+.dashboard-card:nth-child(2) { animation-delay: 0.2s; }
+.dashboard-card:nth-child(3) { animation-delay: 0.3s; }
+.dashboard-card:nth-child(4) { animation-delay: 0.4s; }
+.dashboard-card:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes fadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .dashboard-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .card-title {
@@ -925,14 +1121,34 @@ html, body {
     text-decoration: none;
     font-weight: 500;
     font-size: 0.9rem;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.action-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--primary-blue));
+    transition: width 0.3s ease;
+    z-index: -1;
+}
+
+.action-button:hover::before {
+    width: 100%;
 }
 
 .action-button:hover {
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateY(-1px);
+    background: transparent;
+    transform: translateY(-2px) scale(1.02);
     border-color: var(--accent-blue);
+    color: white;
+    box-shadow: 0 8px 25px rgba(33, 150, 243, 0.3);
 }
 
 .action-button svg {
@@ -1272,12 +1488,24 @@ html, body {
     justify-content: center;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .modal-overlay.active {
     opacity: 1;
     visibility: visible;
+    animation: modalFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(5px);
+    }
 }
 
 .modal-content {
@@ -1288,12 +1516,24 @@ html, body {
     max-width: 480px;
     border: 1px solid var(--border-light);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    transform: translateY(-20px);
-    transition: all 0.3s ease;
+    transform: translateY(-30px) scale(0.9);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modal-overlay.active .modal-content {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    animation: modalSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-50px) scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
 }
 
 .modal-header {
@@ -1334,18 +1574,25 @@ html, body {
     border-radius: 8px;
     color: var(--text-primary);
     font-size: 0.9rem;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
 }
 
 .form-input::placeholder {
     color: var(--text-muted);
+    transition: color 0.3s ease;
 }
 
 .form-input:focus {
     outline: none;
     border-color: var(--accent-blue);
     background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.15);
+    transform: translateY(-1px);
+}
+
+.form-input:focus::placeholder {
+    color: transparent;
 }
 
 .modal-actions {
@@ -1361,19 +1608,38 @@ html, body {
     font-weight: 600;
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     border: none;
     text-decoration: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn:hover::before {
+    left: 100%;
 }
 
 .btn-primary {
     background: var(--accent-blue);
     color: white;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
 }
 
 .btn-primary:hover {
     background: #1976d2;
-    transform: translateY(-1px);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
 }
 
 .btn-secondary {
@@ -1416,6 +1682,11 @@ html, body {
 .toast-error { background: #f44336; }
 .toast-warning { background: #ff9800; }
 .toast-info { background: var(--accent-blue); }
+
+/* Header logo: force white to match dark theme */
+.app-header .app-logo img {
+    filter: brightness(0) invert(1);
+}
 
 /* --- 12. Responsive Design --- */
 @media (max-width: 1200px) {
@@ -1879,6 +2150,316 @@ html, body {
 .calendar-date.today { border: 2px solid var(--cch-accent-orange); }
 .date-input { width: 100%; padding: 10px; background: var(--cch-bg-hover); border: 1px solid var(--cch-border-color); border-radius: 8px; color: var(--cch-text-primary); cursor: pointer; }
 
+/* --- Task Detail Bottom Drawer --- */
+.task-drawer {
+  position: fixed;
+  left: 0; /* JS will set exact left and width to match #main-content-wrapper */
+  bottom: 0;
+  width: 100vw; /* overwritten by JS */
+  max-height: 70vh;
+  background: linear-gradient(135deg, #1d1d1d 0%, #141414 100%);
+  border-top-left-radius: 25px;
+  border-top-right-radius: 25px;
+  border: 1px solid #333;
+  box-shadow: 0 -12px 30px rgba(0,0,0,0.4);
+  transform: translateY(100%);
+  transition: transform 0.28s ease;
+  z-index: 1100;
+  color: #fff;
+  overflow: hidden;
+}
+
+.task-drawer.open { transform: translateY(0); }
+
+.task-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #2c2c2c;
+  background: rgba(0,0,0,0.15);
+}
+
+.task-drawer-header .title-area { display: flex; align-items: center; gap: 12px; }
+.task-drawer-header h3 { margin: 0; font-size: 18px; font-weight: 700; color: #fff; }
+.task-drawer-header .pill {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.task-drawer .icon-btn {
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  color: #ddd;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.task-drawer .icon-btn:hover { background: #2a2a2a; color: #fff; }
+
+.task-drawer-body {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr;
+  gap: 16px;
+  padding: 16px 18px 18px;
+  overflow-y: auto;
+  max-height: calc(70vh - 60px);
+}
+
+.task-left, .task-right { min-height: 0; }
+
+.task-drawer .card {
+  background: linear-gradient(135deg, #202020 0%, #141414 100%);
+  border: 1px solid #333;
+  border-radius: 18px;
+  padding: 14px;
+}
+.task-drawer .section-title { font-weight: 700; color: #fff; margin-bottom: 10px; }
+.task-drawer .meta { color: #cbd5e1; font-size: 13px; display: grid; gap: 6px; margin-bottom: 12px; }
+
+.task-drawer .actions-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.task-drawer .row { display: grid; gap: 6px; margin-top: 8px; }
+.task-drawer select, .task-drawer textarea {
+  background: #1f1f1f;
+  color: #fff;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+}
+.task-drawer textarea.notes { width: 100%; min-height: 100px; resize: vertical; }
+
+.task-drawer .kv { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; color: #cbd5e1; }
+.task-drawer .kv span { color: #9aa5b1; }
+.task-drawer .kv a { color: #60a5fa; text-decoration: none; }
+.task-drawer .kv a:hover { text-decoration: underline; }
+
+.task-drawer .footer-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+
+.task-drawer .btn {
+  background: #2b2b2b;
+  border: 1px solid #3a3a3a;
+  color: #f3f4f6;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.task-drawer .btn:hover { background: #3a3a3a; }
+.task-drawer .btn-primary {
+  background: #f59e0b;
+  border-color: #ca8a04;
+  color: #1a1a1a;
+}
+.task-drawer .btn-primary:hover { background: #fbbf24; }
+
+/* --- Tasks Page Themed Styles --- */
+.tasks-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* Single-card container to match Emails/Contacts/Accounts */
+  /* Compensate for .main-content horizontal padding so the visible side gap is exactly 25px */
+  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  min-height: calc(100% - 50px);
+  background: var(--widget-bg);
+  border: 1px solid var(--widget-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.tasks-header {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--widget-bg);
+  border: none;
+  border-radius: 0;
+  padding: 12px 16px;
+  color: var(--cch-text-primary, #fff);
+  border-bottom: 1px solid var(--widget-border);
+}
+.tasks-header .title-with-icon,
+.tasks-header .title-with-icon span { color: #fff; }
+.title-with-icon { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+.title-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--cch-bg-hover, #222);
+  color: #fff; /* force white icon */
+  border: 1px solid var(--cch-border-color, #333);
+}
+.tasks-header .title-icon svg { color: inherit; }
+
+/* Force white page title icons across core views */
+#tasks-view .title-with-icon .title-icon,
+#contacts-view .title-with-icon .title-icon,
+#accounts-view .title-with-icon .title-icon,
+#emails-view .title-with-icon .title-icon,
+#calls-view .title-with-icon .title-icon,
+#sequences-view .title-with-icon .title-icon { color: #fff; }
+#tasks-view .title-with-icon .title-icon svg,
+#contacts-view .title-with-icon .title-icon svg,
+#accounts-view .title-with-icon .title-icon svg,
+#emails-view .title-with-icon .title-icon svg,
+#calls-view .title-with-icon .title-icon svg,
+#sequences-view .title-with-icon .title-icon svg,
+#tasks-view .title-with-icon .title-icon svg { color: inherit; }
+.tasks-actions-right { display: flex; gap: 8px; }
+
+.tasks-toolbar {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  background: var(--widget-bg);
+  border: none;
+  border-radius: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--widget-border);
+}
+.task-tabs { display: flex; gap: 6px; background: var(--cch-bg-hover, #202020); border: 1px solid var(--cch-border-color, #333); padding: 4px; border-radius: 9999px; }
+.task-tab { background: transparent; color: var(--cch-text-secondary, #cbd5e1); padding: 8px 14px; border-radius: 9999px; border: none; cursor: pointer; font-weight: 700; }
+.task-tab .tab-count { background: rgba(255,255,255,0.1); border-radius: 9999px; padding: 2px 8px; margin-left: 8px; font-size: 12px; }
+.task-tab.active { background: var(--accent-orange, #f59e0b); color: #ffffff; border: 1px solid var(--accent-orange, #f59e0b); }
+
+.tasks-search input {
+  width: 260px; max-width: 100%;
+  background: var(--cch-bg-hover, #222); color: var(--cch-text-primary, #fff);
+  border: 1px solid var(--cch-border-color, #333); border-radius: 10px; padding: 10px 12px;
+}
+.tasks-toolbar-actions { display: flex; align-items: center; gap: 10px; }
+.tasks-count { color: var(--cch-text-secondary, #cbd5e1); font-size: 0.9rem; }
+
+/* Tasks card wrapper: 25px visible margins and rounded outer container */
+#tasks-view > .tasks-layout {
+  border-radius: 25px;
+  border: 1px solid var(--widget-border);
+  overflow: hidden; /* clip children to rounded corners */
+  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  background: var(--widget-bg);
+}
+
+/* Tasks header styling to match card surfaces */
+.tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--widget-bg);
+  border-bottom: 1px solid var(--widget-border);
+}
+
+.tasks-table-container { background: var(--widget-bg); border: none; border-radius: 0; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.tasks-table-wrapper { overflow: auto; flex: 1 1 auto; min-height: 0; }
+.tasks-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.tasks-table thead tr { background: linear-gradient(135deg, var(--cch-bg-hover, #2a2a2a), #1f1f1f); }
+.tasks-table th { text-align: left; padding: 12px; color: var(--cch-text-primary, #fff); font-weight: 700; position: sticky; top: 0; background: inherit; }
+.tasks-table thead th { border-bottom: 1px solid var(--widget-border); }
+.tasks-table tbody tr { border-top: none; }
+.task-row { transition: background-color 0.2s ease; cursor: pointer; }
+.task-row:hover { background: var(--cch-bg-hover, #1f1f1f) !important; }
+
+/* Compact rows and zebra striping for Tasks */
+#tasks-view .tasks-table th { padding: 10px 12px; }
+#tasks-view .tasks-table td { padding: 8px 12px; vertical-align: middle; }
+#tasks-view .tasks-table tbody tr:nth-child(odd) { background: rgba(255, 255, 255, 0.02); }
+#tasks-view .tasks-table tbody tr:nth-child(even) { background: transparent; }
+#tasks-view .tasks-table tbody td { border-bottom: 1px solid var(--widget-border); }
+#tasks-view .tasks-table tbody tr:last-child td { border-bottom: none; }
+#tasks-view .col-task .title { margin-bottom: 2px; }
+.tasks-table td { padding: 14px; color: var(--cch-text-secondary, #cbd5e1); }
+.col-task .title { color: var(--cch-text-primary, #fff); font-weight: 700; margin-bottom: 4px; }
+.col-task .sub { font-size: 12px; color: #9aa5b1; }
+
+.badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+.priority-high { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.35); }
+.priority-medium { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
+.priority-low { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); }
+.status-pending { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
+.status-in-progress { background: rgba(33, 150, 243, 0.2); color: var(--accent-blue, #2196f3); border: 1px solid rgba(33, 150, 243, 0.35); }
+.status-completed { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); }
+
+.row-actions .btn-sm { padding: 6px 10px; font-size: 12px; }
+
+.tasks-pagination { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--revamp-border, #2d2d2d); background: var(--revamp-surface, #1a1a1a); padding: 12px 14px; }
+.tasks-pagination .left { color: var(--cch-text-secondary, #cbd5e1); font-size: 0.9rem; }
+.pagination-controls { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.pagination-btn { background: #2a2a2a; border: 1px solid #3a3a3a; color: #e5e7eb; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 0; overflow: visible; padding: 0; }
+.pagination-btn svg { display: block; pointer-events: none; }
+.tasks-pagination, .pagination-controls { overflow: visible; }
+.pagination-btn svg { width: 16px; height: 16px; stroke: currentColor; }
+.pagination-btn:hover:not(:disabled) { background: #3a3a3a; color: #ffffff; border-color: #3a3a3a; }
+.pagination-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5); }
+.pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; color: #7a7a7a; background: #1f1f1f; }
+.pagination-numbers { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.page-num { background: #2a2a2a; border: 1px solid #3a3a3a; color: #ffffff; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.page-num:hover { background: #3a3a3a; color: #ffffff; }
+.page-num.active { background: var(--accent-orange, #f59e0b); color: #ffffff; border-color: var(--accent-orange, #f59e0b); }
+.page-ellipsis { color: var(--cch-text-secondary, #cbd5e1); padding: 0 4px; }
+
+/* Enforce Contacts/Accounts orange pagination theme on Tasks view */
+#tasks-view .pagination-controls { gap: 8px; }
+#tasks-view .pagination-btn {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  color: #e5e7eb !important;
+}
+#tasks-view .pagination-btn:hover:not(:disabled) {
+  background: #3a3a3a !important;
+  color: #ffffff !important;
+  border-color: #3a3a3a !important;
+}
+#tasks-view .pagination-btn svg { color: inherit !important; stroke: currentColor !important; }
+#tasks-view .pagination-numbers .page-num {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  color: #ffffff !important;
+}
+#tasks-view .pagination-numbers .page-num:hover { background: #3a3a3a !important; }
+#tasks-view .pagination-numbers .page-num.active {
+  background: var(--accent-orange, #f59e0b) !important;
+  color: #ffffff !important;
+  border-color: var(--accent-orange, #f59e0b) !important;
+}
+
+/* Tasks view primary buttons: Add Task = orange, Complete = green */
+#tasks-view .btn.btn-primary[onclick*="CRMApp.openAddTaskModal"] {
+  background: var(--accent-orange, #f59e0b) !important;
+  border: 1px solid var(--accent-orange, #f59e0b) !important;
+  color: #ffffff !important;
+}
+#tasks-view .btn.btn-primary[onclick*="CRMApp.openAddTaskModal"]:hover {
+  background: #fbbf24 !important; /* lighter orange on hover */
+  border-color: #fbbf24 !important;
+  filter: brightness(1.02);
+}
+
+#tasks-view .btn.btn-primary[onclick*="CRMApp.completeTask"] {
+  background: var(--success-green, #22c55e) !important; /* green */
+  border: 1px solid var(--success-green, #22c55e) !important;
+  color: #ffffff !important;
+}
+#tasks-view .btn.btn-primary[onclick*="CRMApp.completeTask"]:hover {
+  background: #16a34a !important; /* darker green on hover */
+  border-color: #16a34a !important;
+  filter: brightness(1.02);
+}
+
+@media (max-width: 1100px) {
+  .tasks-toolbar { grid-template-columns: 1fr; }
+  .tasks-search { order: 2; }
+  .tasks-toolbar-actions { order: 3; justify-content: space-between; }
+}
+
+@media (max-width: 1100px) {
+  .task-drawer-body { grid-template-columns: 1fr; }
+}
+
 /* Responsive Design for Cold Calling Hub */
 @media (max-width: 1200px) {
     .calls-hub-layout {
@@ -2062,3 +2643,323 @@ html, body {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* Calls view spacing: ensure 25px visible gap above the first card and consistent side gaps */
+#calls-view > .dashboard-card:first-of-type {
+  margin-top: 25px;
+}
+
+/* If the parent uses --spacing-lg padding, this keeps the visible side gap at 25px */
+#calls-view > .dashboard-card {
+  border-radius: 25px;
+  margin-left: calc(25px - var(--spacing-lg));
+  margin-right: calc(25px - var(--spacing-lg));
+}
+
+/* Dashboard (home) view spacing: exact 25px from top bar to first content */
+#dashboard-view {
+  padding-top: 25px !important; /* override generic .main-content > *:first-child padding */
+  padding-bottom: 0; /* bottom gap comes from main-content padding */
+}
+#dashboard-view::after {
+  content: '';
+  display: block;
+  height: 25px; /* reliable bottom spacer */
+  flex: 0 0 25px; /* preserve in flex column */
+}
+
+#dashboard-view > .stat-cards-grid:first-of-type {
+  margin-top: 0; /* ensure no extra compounding beyond the 25px padding */
+}
+
+#dashboard-view > .dashboard-card:last-of-type {
+  margin-bottom: 0 !important; /* gap comes from main-content padding */
+}
+
+/* --- Calls: Single-card Container --- */
+/* Turn the entire calls view into one card, consistent with Contacts/Accounts */
+#calls-view.page-view {
+  /* 25px visible gap on all sides regardless of parent padding */
+  margin: 25px;
+  /* Emails/Accounts-like container variables */
+  --pc-bg: var(--widget-bg);
+  --pc-border: var(--widget-border);
+  --pc-text: #e2e8f0;
+  --pc-muted: #94a3b8;
+  background: var(--pc-bg);
+  border: 1px solid var(--pc-border);
+  border-radius: 14px;
+  padding: var(--spacing-lg);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  /* Layout */
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  /* Keep static to avoid any jank */
+  opacity: 1;
+}
+
+/* Neutralize inner dashboard-card sections inside the calls single-card */
+#calls-view.page-view > .dashboard-card {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Optional subtle dividers between sections */
+#calls-view.page-view > .dashboard-card + .dashboard-card {
+  border-top: 1px solid var(--widget-border);
+  padding-top: 16px;
+}
+
+@keyframes callsFadeInCard {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* --- Calls: Semantic structure styles (header, metrics, lists) --- */
+#calls-view.page-view .calls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 0 16px;
+  border-bottom: 1px solid var(--pc-border);
+  background: var(--pc-bg);
+}
+#calls-view.page-view .calls-header .card-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#calls-view.page-view .calls-actions { display: flex; gap: 8px; }
+/* Consistent spacing below section titles in Calls */
+#calls-view.page-view .section-title { margin-bottom: 8px; }
+
+#calls-view.page-view .calls-metrics {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+#calls-view.page-view .metric-tile {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--pc-border);
+  background: var(--pc-bg);
+  border-radius: 10px;
+  color: var(--pc-text);
+}
+#calls-view.page-view .metric-tile .label { font-size: 12px; color: #94a3b8; }
+#calls-view.page-view .metric-tile .value { font-size: 18px; font-weight: 700; }
+
+#calls-view.page-view .calls-queue-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+#calls-view.page-view .calls-queue-controls .form-input { flex: 1; }
+
+#calls-view.page-view .list { display: block; }
+#calls-view.page-view .list-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--pc-border);
+  background: transparent;
+}
+#calls-view.page-view .list-row:nth-child(even) { background: #222222; }
+#calls-view.page-view .list-row:hover { background: #262626; }
+#calls-view.page-view .list-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#calls-view.page-view .list-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#calls-view.page-view .list-sub { color: #94a3b8; font-size: 12px; }
+#calls-view.page-view .list-meta { display: flex; gap: 12px; align-items: center; }
+#calls-view.page-view .list-timestamp { color: #94a3b8; font-size: 12px; }
+#calls-view.page-view .badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--bg-hover);
+  border: 1px solid var(--widget-border);
+  color: #e2e8f0;
+}
+
+#calls-view.page-view .calls-ai-placeholder { color: #cbd5e1; font-size: 14px; }
+
+/* Generic inputs matching theme (used by Calls and Dialer) */
+.form-input {
+  background: #2a2a2a;
+  color: #fff;
+  border: 1px solid var(--widget-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+  height: 36px;
+}
+.form-input::placeholder { color: #94a3b8; }
+.form-input:focus { border-color: #4b5563; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15); }
+
+/* Calls page: use orange for primary actions */
+#calls-view .btn.btn-primary {
+  background: #f59e0b;
+  color: #fff;
+  border: 1px solid #f59e0b;
+}
+#calls-view .btn.btn-primary:hover {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+/* Ensure header icons in Calls are white */
+#calls-view.page-view .title-with-icon svg { color: #fff; }
+
+/* Calls page — toolbar */
+#calls-view.page-view .calls-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  margin: 0;
+  border-bottom: 1px solid var(--pc-border);
+  background: var(--pc-bg);
+}
+#calls-view.page-view .calls-toolbar .btn,
+#calls-view.page-view .calls-toolbar .form-input { margin: 0; }
+#calls-view.page-view .calls-toolbar .left { display: flex; gap: 8px; }
+#calls-view.page-view .calls-toolbar .right { display: flex; gap: 8px; }
+#calls-view.page-view .calls-toolbar .calls-search {
+  height: 32px;
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e2e8f0;
+}
+#calls-view.page-view .calls-toolbar .calls-search:focus {
+  outline: none;
+  border-color: var(--pc-orange);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+/* Calls page — table */
+#calls-view.page-view .calls-table-container { display: flex; flex-direction: column; background: var(--pc-bg); }
+#calls-view.page-view .calls-table-wrapper { width: 100%; overflow: auto; }
+#calls-view.page-view .calls-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--pc-bg);
+}
+#calls-view.page-view .calls-table thead th {
+  position: sticky;
+  top: 0;
+  background: #1a1a1a;
+  border-bottom: 1px solid var(--pc-border);
+  font-weight: 600;
+  text-align: center;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: #94a3b8;
+  z-index: 1;
+  white-space: nowrap;
+}
+#calls-view.page-view .calls-table tbody td {
+  border-bottom: 1px solid var(--pc-border);
+  padding: 12px 8px;
+  font-size: 13px;
+  color: var(--pc-text);
+  text-align: center;
+  vertical-align: middle;
+}
+#calls-view.page-view .calls-table tbody tr:nth-child(even) { background: #222222; }
+#calls-view.page-view .calls-table tbody tr:hover { background: #262626; }
+#calls-view.page-view .calls-table td.contact,
+#calls-view.page-view .calls-table td.note { text-align: left; }
+
+/* Calls page — buttons inside table */
+#calls-view.page-view .link-btn {
+  background: transparent;
+  border: none;
+  color: var(--pc-orange);
+  cursor: pointer;
+  padding: 0;
+}
+#calls-view.page-view .link-btn:hover { text-decoration: underline; }
+#calls-view.page-view .icon-btn {
+  height: 32px;
+  width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #3a3a3a;
+  background: #2a2a2a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#calls-view.page-view .icon-btn:hover { background: #3a3a3a; }
+
+/* Calls page — pagination hint */
+#calls-view.page-view .calls-pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--pc-border);
+  background: var(--pc-bg);
+}
+#calls-view.page-view #calls-pagination-info { color: #ffffff; }
+
+/* Calls page — insights modal */
+.calls-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+  z-index: 1000;
+}
+.calls-modal-overlay.open { opacity: 1; pointer-events: auto; }
+.calls-modal {
+  width: min(920px, 92vw);
+  max-height: 82vh;
+  overflow: auto;
+  background: var(--pc-bg);
+  border: 1px solid var(--pc-border);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+  transform: translateY(16px) scale(0.98);
+  opacity: 0;
+  transition: all 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.calls-modal-overlay.open .calls-modal { transform: translateY(0) scale(1); opacity: 1; }
+.calls-modal .modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--pc-border);
+}
+.calls-modal .modal-title { margin: 0; font-weight: 600; color: #e2e8f0; }
+.calls-modal .modal-body { padding: 12px 16px; }
+.calls-modal .modal-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.calls-modal section h4 { margin: 0 0 8px; color: #e2e8f0; }
+.calls-modal .content, .calls-modal .transcript { white-space: pre-wrap; color: #d1d5db; }
+@media (max-width: 900px) { .calls-modal .modal-sections { grid-template-columns: 1fr; } }
+
+/* Minimal icon button used in Dialer header */
+.icon-button {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid var(--widget-border);
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+}
+.icon-button:hover { background: #1f2937; color: #e5e7eb; }

@@ -3,26 +3,37 @@
     display: flex !important;
     flex-direction: column !important;
     height: calc(100vh - 70px) !important; /* header is 70px */
-    background: #0f1419 !important;
-    color: #e2e8f0 !important;
+    background: transparent !important; /* let global dark blue show through */
+    color: #ffffff !important;
     padding: 0 !important; /* top margin handled by contacts-container */
-    overflow: hidden !important;
+    overflow: visible !important;
     --controls-h: 52px; /* updated height for new controls */
     --sidebar-width: 280px;
     --border-color: #1e293b;
     --hover-bg: #1e293b;
     --accent-blue: #3b82f6;
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-primary: #ffffff;
+    --text-secondary: #ffffff;
+    --text-muted: #ffffff;
+    --page-bg: #141414; /* used by scroll shadow to match view background */
 }
 
 /* Strengthen borders on Accounts page specifically */
 #accounts-view {
-    /* Slightly brighter border so the card/table edges are clearly visible on dark bg */
-    --border-color: #273449;
+    /* Use same dark grey border as contacts page for consistent theme */
+    --border-color: #1e293b;
     /* Ensure sidebar animates width (avoid auto->0 which doesn't animate) */
     --sidebar-width: 280px;
+    /* Match contacts page background and colors */
+    background: transparent !important; /* let global dark blue show through */
+    color: #ffffff !important;
+    overflow: visible !important;
+    --hover-bg: #1e293b;
+    --accent-blue: #3b82f6;
+    --text-primary: #ffffff;
+    --text-secondary: #ffffff;
+    --text-muted: #ffffff;
+    --page-bg: #141414; /* used by scroll shadow to match view background */
 }
 
 /* Trim horizontal padding for Actions to reduce empty space */
@@ -31,10 +42,10 @@
 
 /* Card wrapper for entire contacts section */
 .contacts-container {
-    margin: 20px; /* even margins around the container */
-    background: var(--card-bg, #0f1419);
+    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)); /* 25px visible margins; compensate for inner padding */
+    background: var(--card-bg, #141414);
     border: 1px solid var(--border-color);
-    border-radius: 14px;
+    border-radius: 25px;
     overflow: hidden; /* show rounded corners */
     box-shadow: 0 8px 24px rgba(0,0,0,0.35); /* emphasize corners */
 }
@@ -120,7 +131,7 @@
 /* Modern Header Styles */
 .contacts-header {
     padding: 8px 32px 16px 32px; /* reduce top padding above title further */
-    background: #0f1419;
+    background: #141414;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
@@ -195,7 +206,7 @@
     flex: 1;
     overflow: auto;
     padding-right: 8px; /* keep last column fully visible within rounded card */
-    background: #0f1419;
+    background: #141414;
 }
 
 .contacts-table {
@@ -208,7 +219,7 @@
 }
 
 .contacts-table thead {
-    background: #0f1419;
+    background: #141414;
     position: sticky;
     top: 0;
     z-index: 2;
@@ -328,7 +339,7 @@
 /* Modern Filters Sidebar */
 .contacts-filters-sidebar {
     width: var(--sidebar-width);
-    background: #0f1419;
+    background: #141414;
     border-right: 1px solid var(--border-color);
     flex-shrink: 0;
     overflow-y: auto;
@@ -346,7 +357,7 @@
 /* Contacts Container */
 .contacts-container {
     padding: 24px 0 0 0;
-    height: calc(100% - 40px); /* account for 20px top + 20px bottom margins */
+    height: calc(100% - 50px); /* account for 25px top + 25px bottom margins */
     display: flex;
     flex-direction: column;
     gap: 24px;
@@ -443,11 +454,20 @@
 
 /* Contacts Table */
 .contacts-table {
-    width: max-content; /* grow to fit widest column */
-    border-collapse: collapse;
-    background: var(--card-bg);
-    min-width: 1280px; /* keep columns from being cramped */
-    table-layout: auto; /* let content define column widths */
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--revamp-surface);
+    border-radius: 0;
+    overflow: hidden;
+    opacity: 0;
+    animation: fadeInTableOpacity 0.45s ease-out 0.2s forwards;
+    will-change: opacity;
+}
+
+@keyframes fadeInTableOpacity {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .contacts-table thead {
@@ -682,9 +702,9 @@
 }
 
 .pagination-btn:hover:not(:disabled) {
-    background: var(--accent-blue);
+    background: var(--accent-orange, #f59e0b);
     color: white;
-    border-color: var(--accent-blue);
+    border-color: var(--accent-orange, #f59e0b);
 }
 
 .pagination-btn:disabled {
@@ -715,9 +735,41 @@
 }
 
 .page-number.active {
-    background: var(--accent-blue);
-    color: white;
-    border-color: var(--accent-blue);
+    background: var(--accent-orange, #f59e0b);
+    color: #ffffff;
+    border-color: var(--accent-orange, #f59e0b);
+}
+
+/* Orange theme for numeric pagination variant used by JS (.page-num) */
+#contacts-view .page-num.active,
+#accounts-view .page-num.active {
+    background: var(--accent-orange, #f59e0b) !important;
+    color: #ffffff !important;
+    border-color: var(--accent-orange, #f59e0b) !important;
+}
+
+/* Profile avatar background to orange */
+#profile-avatar {
+    background: var(--accent-orange, #f59e0b) !important;
+    color: #ffffff !important;
+}
+
+/* View toggle active state to orange */
+#contacts-view .view-options .view-toggle.active,
+#accounts-view .view-options .view-toggle.active {
+    background: var(--accent-orange, #f59e0b) !important;
+    color: #ffffff !important;
+    border-color: var(--accent-orange, #f59e0b) !important;
+}
+#contacts-view .view-options .view-toggle.active svg,
+#accounts-view .view-options .view-toggle.active svg {
+    color: #ffffff !important;
+    stroke: #ffffff !important;
+}
+
+/* Map any blue accent usage inside widget panel to orange */
+#widget-panel {
+    --accent-blue: var(--accent-orange, #f59e0b);
 }
 
 /* Modern Filters Header */
@@ -874,7 +926,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 24px;
-    background: #0f1419;
+    background: #141414;
     border-bottom: 1px solid var(--border-color);
     height: var(--controls-h);
     box-sizing: border-box;
@@ -1053,15 +1105,106 @@
     border-right: none;
 }
 
-/* Accounts-specific borders to ensure lines are visible around everything */
+/* Accounts-specific styling to match contacts theme */
+#accounts-view .contacts-container {
+    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+    background: var(--widget-bg);
+    border: 1px solid var(--widget-border);
+    border-radius: 25px;
+    opacity: 0;
+    animation: fadeInCard 0.35s ease-out forwards;
+    will-change: opacity;
+}
+
+#accounts-view .contacts-header {
+    background: var(--widget-bg);
+    border-bottom: 1px solid var(--widget-border);
+}
+
 #accounts-view .contacts-table-container {
     border: 1px solid var(--border-color);
     border-radius: 12px;
+    background: #141414;
 }
+
 #accounts-view .contacts-table {
     border-left: 1px solid var(--border-color);
     border-right: 1px solid var(--border-color);
+    background: transparent;
 }
+
+#accounts-view .contacts-table thead {
+    background: #1a1a1a;
+    border-bottom: 1px solid var(--widget-border);
+}
+
+#accounts-view .contacts-table-wrapper {
+    background: var(--widget-bg);
+}
+
+#accounts-view .view-options {
+    background: #1a202c;
+}
+/* Accounts: unify container/ancillary panel backgrounds with widgets */
+#accounts-view .contacts-filters-sidebar { background: var(--widget-bg); border-right: 1px solid var(--widget-border); }
+#accounts-view .table-controls { background: var(--widget-bg); border: 1px solid var(--widget-border); }
+#accounts-view .pagination-container { background: var(--widget-bg); border: 1px solid var(--widget-border); }
+
+/* Contacts: match Accounts widget/grey palette */
+#contacts-view .contacts-container {
+    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+    background: var(--widget-bg);
+    border: 1px solid var(--widget-border);
+    border-radius: 25px;
+    opacity: 0;
+    animation: fadeInCard 0.35s ease-out forwards;
+    will-change: opacity;
+}
+
+/* Local opacity-only fade for card containers to avoid sticky header/table jank */
+@keyframes fadeInCard {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#contacts-view .contacts-header {
+    background: var(--widget-bg);
+    border-bottom: 1px solid var(--widget-border);
+}
+
+#contacts-view .contacts-table-container {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: #141414;
+}
+
+#contacts-view .contacts-table {
+    border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    background: transparent;
+}
+
+#contacts-view .contacts-table thead {
+    background: #1a1a1a;
+    border-bottom: 1px solid var(--widget-border);
+}
+
+#contacts-view .contacts-table-wrapper {
+    background: var(--widget-bg);
+}
+
+#contacts-view .view-options {
+    background: #1a202c;
+}
+/* Contacts: unify ancillary panels with widgets */
+#contacts-view .contacts-filters-sidebar { background: var(--widget-bg); border-right: 1px solid var(--widget-border); }
+#contacts-view .table-controls { background: var(--widget-bg); border: 1px solid var(--widget-border); }
+#contacts-view .pagination-container { background: var(--widget-bg); border: 1px solid var(--widget-border); }
+
+/* Contacts view: neutral grey zebra + hover (match Accounts) */
+#contacts-view .contacts-table tbody tr { background-color: #1f1f1f; }
+#contacts-view .contacts-table tbody tr:nth-child(even) { background-color: #222222; }
+#contacts-view .contacts-table tbody tr:hover { background-color: #262626; }
 
 /* Zebra rows and hover state for data rows */
 .contacts-table tbody tr.contact-row:nth-child(even),
@@ -1072,6 +1215,11 @@
 .contacts-table tbody tr:hover {
     background-color: #1b2132;
 }
+
+/* Accounts view: neutral grey zebra + hover */
+#accounts-view .contacts-table tbody tr { background-color: #1f1f1f; }
+#accounts-view .contacts-table tbody tr:nth-child(even) { background-color: #222222; }
+#accounts-view .contacts-table tbody tr:hover { background-color: #262626; }
 
 /* Name cell with avatar and two-line stack */
 .contacts-table td.col-name .cell-name {
@@ -1337,7 +1485,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 24px;
-    background: #0f1419;
+    background: #141414;
     border-top: 1px solid var(--border-color);
 }
 
@@ -1414,3 +1562,283 @@
         min-width: 900px;
     }
 }
+
+/* =============================
+   Revamp: Accounts/Contacts UI
+   ============================= */
+
+/* Surfaces and borders (fallbacks provided) */
+#contacts-view, #accounts-view {
+  --revamp-surface: #1a1a1a;  /* fixed neutral grey to avoid dark blue bleed */
+  --revamp-elevated: #1a1a1a; /* keep wrapper same neutral */
+  --revamp-border: #2d2d2d;   /* light neutral grey for borders */
+  /* Override older blue-ish border variables within revamp scope */
+  --widget-border: #2d2d2d;
+  --border-color: #2d2d2d;
+}
+
+/* Containers: unify visuals and spacing */
+#contacts-view .contacts-container,
+#accounts-view .contacts-container {
+  background: var(--revamp-surface);
+  border: 1px solid var(--revamp-border);
+  border-radius: 25px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+
+#contacts-view .contacts-table-container,
+#accounts-view .contacts-table-container {
+  background: var(--revamp-elevated);
+  border: 1px solid var(--revamp-border);
+  border-radius: 14px;
+  overflow: hidden; /* keep inner sticky elements clipped */
+}
+
+/* Header/toolbar */
+#contacts-view .contacts-header,
+#accounts-view .contacts-header {
+  background: var(--revamp-surface);
+  border-bottom: 1px solid var(--revamp-border);
+}
+
+#contacts-view .table-controls,
+#accounts-view .table-controls {
+  background: var(--revamp-surface);
+  border-top: 1px solid var(--revamp-border);
+  border-bottom: 1px solid var(--revamp-border);
+}
+
+#contacts-view .contacts-table-wrapper,
+#accounts-view .contacts-table-wrapper {
+  background: var(--revamp-elevated);
+  position: relative;
+  overflow: auto;
+}
+
+/* Sticky table header for better scanning */
+#contacts-view .contacts-table thead th,
+#accounts-view .contacts-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #1a1a1a; /* matches established header grey */
+}
+
+/* Density and readability tweaks */
+#contacts-view .contacts-table th,
+#contacts-view .contacts-table td,
+#accounts-view .contacts-table th,
+#accounts-view .contacts-table td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+/* Zebra and hover (already set for Accounts; ensure parity) */
+#contacts-view .contacts-table tbody tr { background-color: #1f1f1f; }
+#contacts-view .contacts-table tbody tr:nth-child(even) { background-color: #222222; }
+#contacts-view .contacts-table tbody tr:hover { background-color: #262626; }
+
+/* Selected row state with subtle accent */
+#contacts-view .contacts-table tbody tr.selected,
+#accounts-view .contacts-table tbody tr.selected {
+  background-color: #20293a; /* slightly bluish to differentiate selection */
+  box-shadow: inset 3px 0 0 0 var(--accent-blue, #3b82f6);
+}
+
+/* Sticky checkbox column to keep selection visible */
+#contacts-view .contacts-table th.col-checkbox,
+#contacts-view .contacts-table td.col-checkbox,
+#accounts-view .contacts-table th.col-checkbox,
+#accounts-view .contacts-table td.col-checkbox {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: inherit; /* use current row/header bg */
+}
+
+/* Controls: inputs and buttons polish */
+#contacts-view .table-controls input[type="text"],
+#accounts-view .table-controls input[type="text"] {
+  background: #0e1421;
+  color: #e2e8f0;
+  border: 1px solid #2b3247;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+#contacts-view .table-controls .btn-primary,
+#accounts-view .table-controls .btn-primary {
+  background: var(--accent-blue, #3b82f6);
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+#contacts-view .table-controls .btn-primary:hover,
+#accounts-view .table-controls .btn-primary:hover { filter: brightness(1.05); }
+
+/* Pagination polish */
+#contacts-view .pagination-container,
+#accounts-view .pagination-container {
+  background: var(--revamp-surface);
+  border-top: 1px solid var(--revamp-border);
+}
+
+/* Force inner surfaces under the table to neutral grey */
+#contacts-view .contacts-table-container,
+#contacts-view .contacts-table-wrapper,
+#contacts-view .pagination-container,
+#accounts-view .contacts-table-container,
+#accounts-view .contacts-table-wrapper,
+#accounts-view .pagination-container {
+  background: #1a1a1a !important;
+}
+
+/* Scrollbar styling inside the table wrapper */
+#contacts-view .contacts-table-wrapper::-webkit-scrollbar,
+#accounts-view .contacts-table-wrapper::-webkit-scrollbar { height: 10px; width: 10px; }
+#contacts-view .contacts-table-wrapper::-webkit-scrollbar-track,
+#accounts-view .contacts-table-wrapper::-webkit-scrollbar-track { background: #2a2a2a; }
+#contacts-view .contacts-table-wrapper::-webkit-scrollbar-thumb,
+#accounts-view .contacts-table-wrapper::-webkit-scrollbar-thumb { background: #8b8b8b; border-radius: 6px; }
+#contacts-view .contacts-table-wrapper::-webkit-scrollbar-thumb:hover,
+#accounts-view .contacts-table-wrapper::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+
+/* Borders inside tables should match outer border (light grey) */
+#contacts-view .contacts-table,
+#contacts-view .contacts-table th,
+#contacts-view .contacts-table td,
+#accounts-view .contacts-table,
+#accounts-view .contacts-table th,
+#accounts-view .contacts-table td {
+  border-color: var(--revamp-border) !important;
+}
+/* Explicit horizontal separators */
+#contacts-view .contacts-table tbody tr td,
+#accounts-view .contacts-table tbody tr td { border-bottom: 1px solid var(--revamp-border) !important; }
+#contacts-view .contacts-table tbody tr:last-child td,
+#accounts-view .contacts-table tbody tr:last-child td { border-bottom: none !important; }
+
+/* View-level scrollbars (in case outer container scrolls) */
+#contacts-view, #accounts-view {
+  scrollbar-color: #8b8b8b #2a2a2a; /* thumb track */
+  scrollbar-width: thin;
+}
+#contacts-view::-webkit-scrollbar, #accounts-view::-webkit-scrollbar { height: 10px; width: 10px; }
+#contacts-view::-webkit-scrollbar-track, #accounts-view::-webkit-scrollbar-track { background: #2a2a2a; }
+#contacts-view::-webkit-scrollbar-thumb, #accounts-view::-webkit-scrollbar-thumb { background: #8b8b8b; border-radius: 6px; }
+#contacts-view::-webkit-scrollbar-thumb:hover, #accounts-view::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+
+/* Export buttons: white text and icon */
+#export-contacts-btn, #export-accounts-btn {
+  color: #ffffff !important;
+}
+#export-contacts-btn svg, #export-accounts-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Counts and Select All text: white */
+#contacts-view .contacts-count,
+#accounts-view .contacts-count,
+#contacts-view .selection-text,
+#accounts-view .selection-text {
+  color: #ffffff !important;
+}
+
+/* Pagination arrows/buttons: lighter neutral greys */
+#contacts-view .pagination-btn,
+#accounts-view .pagination-btn {
+  background: #2a2a2a !important;
+  color: #e5e7eb !important;
+  border: 1px solid var(--revamp-border) !important;
+}
+#contacts-view .pagination-btn:hover,
+#accounts-view .pagination-btn:hover {
+  background: #3a3a3a !important;
+  color: #ffffff !important;
+}
+/* Ensure pagination arrow icons follow button color */
+#contacts-view .pagination-btn svg,
+#accounts-view .pagination-btn svg {
+  color: inherit !important;
+  stroke: currentColor !important;
+}
+
+/* Force results/pagination info and table headers to white on both pages */
+#contacts-view .results-info,
+#contacts-view #results-info,
+#contacts-view #pagination-info,
+#contacts-view .pagination-info,
+#accounts-view .results-info,
+#accounts-view #accounts-results-info,
+#accounts-view #accounts-pagination-info,
+#accounts-view .pagination-info { color: #ffffff !important; }
+
+#contacts-view .contacts-table th,
+#accounts-view .contacts-table th { color: #ffffff !important; }
+
+/* Ensure header sort icons (if any) are white */
+#contacts-view .contacts-table th svg,
+#accounts-view .contacts-table th svg { color: #ffffff !important; stroke: currentColor !important; }
+
+/* Filters panel background: match underlying surface (slightly darker) */
+#contacts-view .filters-content,
+#accounts-view .filters-content {
+  background: #1a1a1a; /* match inner surface to blend */
+  border-radius: 12px;
+}
+
+/* Filters sidebar container and header use same darker surface */
+#contacts-view .contacts-filters-sidebar,
+#accounts-view .contacts-filters-sidebar {
+  background: #1a1a1a;
+  border-right: 1px solid var(--revamp-border);
+}
+#contacts-view .filters-header,
+#accounts-view .filters-header {
+  background: #1a1a1a;
+  border-bottom: 1px solid var(--revamp-border);
+}
+#contacts-view .filter-input,
+#contacts-view .filter-select,
+#accounts-view .filter-input,
+#accounts-view .filter-select {
+  background: #2a2a2a !important; /* slightly lighter to match sidebar grey */
+  border: 1px solid #3a3a3a !important;
+  color: #e2e8f0 !important;
+}
+#contacts-view .filter-input::placeholder,
+#accounts-view .filter-input::placeholder { color: #9ca3af; }
+
+/* Normalize select appearance and caret visibility on dark theme */
+#contacts-view .filter-select,
+#accounts-view .filter-select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: none; /* prevent native blue-tinted caret */
+}
+
+/* Primary action anchor (Add Account, etc.) */
+#contacts-view .action-button,
+#accounts-view .action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #2a2a2a;
+  color: #ffffff;
+  border: 1px solid #2d2d2d;
+  text-decoration: none;
+}
+#contacts-view .action-button svg,
+#accounts-view .action-button svg {
+  color: #ffffff;
+  stroke: #ffffff;
+}
+#contacts-view .action-button:hover,
+#accounts-view .action-button:hover {
+  background: #3a3a3a;
+}
+#contacts-view .action-button:focus,
+#accounts-view .action-button:focus { outline: none; box-shadow: 0 0 0 2px #3a3a3a; }
