@@ -3,10 +3,6 @@
 :root {
   --pc-orange: #f59e0b; /* soft orange */
   --pc-orange-strong: #f97316; /* stronger orange */
-  --pc-border: #e5e7eb; /* gray-200 */
-  --pc-text: #111827; /* gray-900 */
-  --pc-muted: #6b7280; /* gray-500 */
-  --pc-bg: #ffffff;
 }
 
 /* Layout */
