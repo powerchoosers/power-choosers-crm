@@ -20,7 +20,9 @@ const CRMApp = {
     // Application initialization
     async init() {
         try {
+            console.log('CRM App init started...');
             await this.loadInitialData();
+            console.log('Initial data loaded. Accounts:', this.accounts?.length, 'Contacts:', this.contacts?.length);
             this.setupEventListeners();
             this.showView('dashboard-view');
             this.updateNotifications();
@@ -118,6 +120,12 @@ const CRMApp = {
             { id: 'con5', firstName: 'Contact', lastName: '', title: '', accountId: '', accountName: '', email: 'N/A', phone: '', createdAt: new Date() },
             { id: 'con6', firstName: 'Lewis', lastName: 'Patterson', title: '', accountId: '', accountName: '', email: 'l.patterson@powerchooser.com', phone: '', createdAt: new Date() }
         ];
+        
+        console.log('Sample data loaded:');
+        console.log('- Accounts:', this.accounts.length, this.accounts);
+        console.log('- Contacts:', this.contacts.length, this.contacts);
+        
+        return true;
         this.activities = [
             { id: 'act1', type: 'call_note', description: 'Call with John Smith - Q1 Energy Contract', noteContent: 'Discussed renewal options', contactId: 'con1', contactName: 'John Smith', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
             { id: 'act2', type: 'email', description: 'Sent energy analysis to Sarah Johnson', contactId: 'con2', contactName: 'Sarah Johnson', accountId: 'acc1', accountName: 'ABC Manufacturing', createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },

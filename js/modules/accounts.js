@@ -9,6 +9,16 @@ Object.assign(CRMApp, {
         console.log("CRMApp.accounts:", CRMApp.accounts);
         console.log("this.accounts:", this.accounts);
         
+        // Check if data is loaded
+        if (!CRMApp.accounts || CRMApp.accounts.length === 0) {
+            console.warn('No accounts data available, waiting for data to load...');
+            // Wait a bit and try again
+            setTimeout(() => {
+                this.renderAccountsPage();
+            }, 500);
+            return;
+        }
+        
         const accountsView = document.getElementById('accounts-view');
         if (!accountsView) {
             console.error('accounts-view element not found');
