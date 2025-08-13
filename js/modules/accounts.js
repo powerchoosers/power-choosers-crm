@@ -6,6 +6,9 @@ Object.assign(CRMApp, {
     // Render the accounts page with contacts-style design
     renderAccountsPage() {
         console.log("renderAccountsPage called");
+        console.log("CRMApp.accounts:", CRMApp.accounts);
+        console.log("this.accounts:", this.accounts);
+        
         const accountsView = document.getElementById('accounts-view');
         if (!accountsView) {
             console.error('accounts-view element not found');
@@ -14,7 +17,7 @@ Object.assign(CRMApp, {
 
         // Apply contacts-style CSS classes to accounts view
         accountsView.className = 'page-view';
-        accountsView.style.cssText = 'display: flex !important; flex-direction: column !important; height: calc(100vh - 70px) !important; background: transparent !important; color: #e2e8f0 !important; padding: 0 !important; overflow: visible !important;';
+        accountsView.style.cssText = 'display: flex !important; flex-direction: column !important; height: 100% !important; background: transparent !important; color: #e2e8f0 !important; padding: 0 !important; overflow: hidden !important;';
 
         console.log("Creating accounts HTML with contacts design");
         const accountsHTML = `
@@ -189,15 +192,21 @@ Object.assign(CRMApp, {
         // Initialize pagination state
         this.accountsPerPage = 50;
         this.accountsCurrentPage = 1;
+        this.selectedAccountIds = new Set();
 
         // Initialize event listeners
         this.initAccountsEventListeners();
         
         // Load and render accounts data
-        this.renderAccountsTable();
-        
-        // Update accounts count
-        this.updateAccountsCount();
+        // Add a small delay to ensure data is loaded
+        setTimeout(() => {
+            this.renderAccountsTable();
+            this.updateAccountsCount();
+        }, 100);
+
+        // Wire select-all handler and bulk toolbar
+        this.attachSelectAllAccountsHandler();
+        this.updateAccountsBulkToolbar();
     },
 
     // Initialize event listeners for accounts page
@@ -278,14 +287,22 @@ Object.assign(CRMApp, {
             });
         });
 
-        // Select all checkbox
+        // Select all checkbox -> open selection scope popover like contacts
         const selectAll = document.getElementById('select-all-accounts-checkbox');
         if (selectAll) {
-            selectAll.addEventListener('change', (e) => {
-                document.querySelectorAll('#accounts-table-body .row-checkbox').forEach(cb => {
-                    cb.checked = e.target.checked;
-                });
-            });
+            selectAll.onchange = (e) => {
+                if (e.target.checked) {
+                    this.showSelectAllAccountsPopover();
+                } else {
+                    // Unselect only visible rows
+                    document.querySelectorAll('#accounts-table-body .row-checkbox').forEach(cb => {
+                        cb.checked = false;
+                        const id = cb.getAttribute('data-account-id');
+                        if (id) this.selectedAccountIds.delete(id);
+                    });
+                    this.updateAccountsBulkToolbar();
+                }
+            };
         }
 
         // Top pagination buttons
@@ -308,7 +325,7 @@ Object.assign(CRMApp, {
         const searchTerm = document.getElementById('account-search')?.value || '';
         const industryFilter = document.getElementById('industry-filter')?.value || '';
         
-        let filteredAccounts = this.accounts || [];
+        let filteredAccounts = CRMApp.accounts || [];
 
         // Apply search filter
         if (searchTerm) {
@@ -332,23 +349,34 @@ Object.assign(CRMApp, {
 
     // Render accounts table with contacts-style design and pagination
     renderAccountsTable(accountsToRender = null) {
+        console.log('renderAccountsTable called');
+        console.log('this.accounts:', this.accounts);
+        console.log('accountsToRender:', accountsToRender);
+        
         const tableBody = document.getElementById('accounts-table-body');
-        if (!tableBody) return;
+        if (!tableBody) {
+            console.error('accounts-table-body element not found');
+            return;
+        }
 
-        const all = accountsToRender || this.accounts || [];
+        const all = accountsToRender || CRMApp.accounts || [];
+        console.log('all accounts to render:', all);
+        
         const total = all.length;
         const per = this.accountsPerPage || 50;
         const totalPages = Math.max(1, Math.ceil(total / per));
         if ((this.accountsCurrentPage||1) > totalPages) this.accountsCurrentPage = totalPages;
         const startIdx = ((this.accountsCurrentPage||1) - 1) * per;
         const pageItems = all.slice(startIdx, startIdx + per);
+        
+        console.log('pageItems to render:', pageItems);
 
         // Update results info
         const resultsInfo = document.getElementById('accounts-results-info');
         if (resultsInfo) {
             const from = total === 0 ? 0 : startIdx + 1;
             const to = Math.min(startIdx + pageItems.length, total);
-            const totalAll = (this.accounts || []).length;
+            const totalAll = (CRMApp.accounts || []).length;
             resultsInfo.textContent = `Showing ${from}-${to} of ${totalAll} accounts`;
         }
 
@@ -358,6 +386,7 @@ Object.assign(CRMApp, {
         tableBody.innerHTML = '';
 
         pageItems.forEach((account, index) => {
+            console.log('Rendering account:', account);
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td class="col-number"><span class="row-number">${startIdx + index + 1}</span></td>
@@ -405,9 +434,301 @@ Object.assign(CRMApp, {
                 </td>
             `;
             tableBody.appendChild(row);
+            // Sync row checkbox with current selection and wire change
+            const cb = row.querySelector('.row-checkbox');
+            if (cb) {
+                cb.checked = this.selectedAccountIds.has(account.id);
+                cb.addEventListener('change', () => {
+                    if (cb.checked) this.selectedAccountIds.add(account.id); else this.selectedAccountIds.delete(account.id);
+                    this.updateAccountsBulkToolbar();
+                });
+            }
         });
 
         this.renderAccountsPagination(total, this.accountsCurrentPage || 1, totalPages);
+
+        // Ensure handlers and toolbar stay wired after render
+        this.attachSelectAllAccountsHandler();
+        this.updateAccountsBulkToolbar();
+    },
+
+    // Compute filtered accounts based on current UI controls
+    getFilteredAccounts() {
+        const searchTerm = (document.getElementById('account-search')?.value || '').trim().toLowerCase();
+        const industryFilter = (document.getElementById('industry-filter')?.value || '').trim();
+        let list = Array.isArray(CRMApp.accounts) ? [...CRMApp.accounts] : [];
+        if (searchTerm) {
+            list = list.filter(a => (
+                (a.name||'').toLowerCase().includes(searchTerm) ||
+                (a.industry||'').toLowerCase().includes(searchTerm) ||
+                (a.website||'').toLowerCase().includes(searchTerm)
+            ));
+        }
+        if (industryFilter) list = list.filter(a => a.industry === industryFilter);
+        return list;
+    },
+
+    // Show a lightweight popover near Select All to choose scope
+    showSelectAllAccountsPopover() {
+        const visibleRowCheckboxes = Array.from(document.querySelectorAll('#accounts-table-body .row-checkbox'));
+        const visibleCount = visibleRowCheckboxes.length;
+        const filteredAccounts = this.getFilteredAccounts();
+        const totalFiltered = filteredAccounts.length;
+
+        // Anchor near left controls in accounts table
+        const container = document.querySelector('#accounts-table-container .table-controls .table-controls-left');
+        const rect = container ? container.getBoundingClientRect() : { left: 40, top: 120, height: 20 };
+
+        // Remove existing
+        document.getElementById('select-all-accounts-popover')?.remove();
+
+        const pop = document.createElement('div');
+        pop.id = 'select-all-accounts-popover';
+        pop.style.cssText = `
+            position: absolute; left: ${Math.round(rect.left + 110)}px; top: ${Math.round(rect.top + rect.height + 10 + window.scrollY)}px;
+            background: #1a1a1a; border: 1px solid #2d2d2d; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+            color: #e5e7eb; z-index: 3000; width: 360px; max-width: calc(100vw - 40px);
+            opacity: 0; transform: translateY(-6px) scale(0.98); transition: opacity .18s ease, transform .18s ease; overflow:hidden;`;
+        pop.innerHTML = `
+            <div style="padding:14px 16px; border-bottom: 1px solid #2d2d2d; font-weight:600;">Select accounts</div>
+            <div style="padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+                <button id="accounts-select-current-page" style="text-align:left;background:#3a3a3a;border:1px solid #4a4a4a;border-radius:10px;color:#fff;padding:10px 12px;cursor:pointer;">Select this page (${visibleCount})</button>
+                <button id="accounts-select-all-filtered" style="text-align:left;background:#3a3a3a;border:1px solid #4a4a4a;border-radius:10px;color:#fff;padding:10px 12px;cursor:pointer;">Select all matching (${totalFiltered})</button>
+            </div>
+            <div style="display:flex;justify-content:flex-end;padding:0 16px 14px 16px;">
+                <button id="accounts-select-cancel" style="background:#f59e0b;border:1px solid #f59e0b;color:#ffffff;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;">Cancel</button>
+            </div>`;
+        document.body.appendChild(pop);
+        requestAnimationFrame(()=>{ pop.style.opacity = '1'; pop.style.transform = 'translateY(0) scale(1)'; });
+
+        const closePopover = () => {
+            pop.style.opacity = '0'; pop.style.transform = 'translateY(-6px) scale(0.98)';
+            setTimeout(()=>pop.remove(), 160);
+            const headerCb = document.getElementById('select-all-accounts-checkbox');
+            if (headerCb) headerCb.checked = false;
+            document.removeEventListener('click', outsideHandler, true);
+        };
+        const outsideHandler = (e) => { if (!pop.contains(e.target)) closePopover(); };
+        setTimeout(()=> document.addEventListener('click', outsideHandler, true), 0);
+
+        const cancelBtn = pop.querySelector('#accounts-select-cancel');
+        // Enforce colors to match contacts popover (override theme)
+        cancelBtn.style.setProperty('background', '#f59e0b', 'important');
+        cancelBtn.style.setProperty('border-color', '#f59e0b', 'important');
+        cancelBtn.style.setProperty('color', '#ffffff', 'important');
+        cancelBtn.onclick = closePopover;
+        cancelBtn.onmouseover = () => { cancelBtn.style.setProperty('background', '#e38b06', 'important'); cancelBtn.style.setProperty('border-color', '#e38b06', 'important'); };
+        cancelBtn.onmouseout  = () => { cancelBtn.style.setProperty('background', '#f59e0b', 'important'); cancelBtn.style.setProperty('border-color', '#f59e0b', 'important'); };
+        const selBtns = pop.querySelectorAll('#accounts-select-current-page, #accounts-select-all-filtered');
+        selBtns.forEach(b => {
+            b.style.setProperty('background', '#3a3a3a', 'important');
+            b.style.setProperty('border-color', '#4a4a4a', 'important');
+            b.style.setProperty('color', '#ffffff', 'important');
+            b.onmouseover = () => b.style.setProperty('background', '#4a4a4a', 'important');
+            b.onmouseout  = () => b.style.setProperty('background', '#3a3a3a', 'important');
+        });
+
+        pop.querySelector('#accounts-select-current-page').onclick = () => {
+            visibleRowCheckboxes.forEach(cb => {
+                cb.checked = true;
+                const id = cb.getAttribute('data-account-id');
+                if (id) this.selectedAccountIds.add(id);
+            });
+            this.updateAccountsBulkToolbar();
+            closePopover();
+        };
+        pop.querySelector('#accounts-select-all-filtered').onclick = () => {
+            filteredAccounts.forEach(a => { if (a && a.id) this.selectedAccountIds.add(a.id); });
+            this.renderAccountsTable(filteredAccounts);
+            closePopover();
+        };
+    },
+
+    // Create or return the bulk actions bar for accounts
+    ensureAccountsBulkActionsBar() {
+        const controlsLeft = document.querySelector('#accounts-table-container .table-controls .table-controls-left');
+        if (!controlsLeft) return null;
+        let bar = document.getElementById('accounts-bulk-actions');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'accounts-bulk-actions';
+            // Keep above table so tooltips/menus don't get clipped
+            bar.style.cssText = [
+                'display:none',
+                'align-items:center',
+                'gap:8px',
+                'margin-left:12px',
+                'background:#1a1a1a',
+                'border:1px solid #2d2d2d',
+                'border-radius:10px',
+                'padding:4px 6px',
+                'box-shadow:0 6px 16px rgba(0,0,0,0.35)',
+                'position:relative',
+                'z-index:3500',
+                'overflow:visible'
+            ].join(';');
+
+            const countSpan = document.createElement('span');
+            countSpan.id = 'accounts-bulk-selected-count';
+            countSpan.style.cssText = 'color:#e5e7eb;font-size:13px;white-space:nowrap;';
+            bar.appendChild(countSpan);
+
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = 'Clear';
+            clearBtn.title = 'Clear selection';
+            clearBtn.style.cssText = 'background:#2a2a2a;border:1px solid #3a3a3a;color:#ffffff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;';
+            clearBtn.onclick = () => this.clearSelectedAccounts();
+            bar.appendChild(clearBtn);
+
+            const mkIconBtn = (id, title, svg) => {
+                const b = document.createElement('button');
+                b.id = id; b.title = title; b.setAttribute('aria-label', title);
+                b.style.cssText = 'width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:#2a2a2a;border:1px solid #3a3a3a;color:#ffffff;border-radius:8px;padding:0;cursor:pointer;position:relative;';
+                b.innerHTML = svg;
+                // Ensure inner SVG is centered within the square
+                const iconEl = b.querySelector('svg');
+                if (iconEl) {
+                    iconEl.style.display = 'block';
+                    iconEl.style.margin = '0';
+                }
+                b.onmouseover = () => b.style.setProperty('background', '#3a3a3a', 'important');
+                b.onmouseout = () => b.style.setProperty('background', '#2a2a2a', 'important');
+                b.onfocus = () => b.style.setProperty('background', '#3a3a3a', 'important');
+                b.onblur = () => b.style.setProperty('background', '#2a2a2a', 'important');
+                return b;
+            };
+
+            // Cleaned icons (remove stray dots/lines)
+            // Magnifying glass only (no semicircle base)
+            const iconSearchUser = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+            // Clean list icon (no plus)
+            // Centered three-line list (6→18 to align within 24 viewbox)
+            const iconListPlus = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 7H18M6 12H18M6 17H18"/></svg>';
+            const iconExport = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="15"/></svg>';
+            const iconTrash = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>';
+
+            const findBtn = mkIconBtn('accounts-bulk-find-btn', 'Find people', iconSearchUser); findBtn.onclick = () => this.bulkFindPeopleForAccounts(); bar.appendChild(findBtn);
+            const addContactsBtn = mkIconBtn('accounts-bulk-add-contacts-btn', 'Add contacts to list', iconListPlus); addContactsBtn.onclick = () => this.bulkAddContactsToListForAccounts(); bar.appendChild(addContactsBtn);
+            const exportBtn = mkIconBtn('accounts-bulk-export-btn', 'Export accounts', iconExport); exportBtn.onclick = () => this.bulkExportSelectedAccounts(); bar.appendChild(exportBtn);
+            const deleteBtn = mkIconBtn('accounts-bulk-delete-btn', 'Delete accounts', iconTrash); deleteBtn.style.borderColor = '#7f1d1d'; deleteBtn.onclick = () => this.bulkDeleteSelectedAccounts(); bar.appendChild(deleteBtn);
+
+            // Tooltips
+            const addTooltip = (el, label) => {
+                const show = () => {
+                    const tip = document.createElement('div');
+                    tip.className = 'bulk-tip';
+                    tip.textContent = label;
+                    tip.style.cssText = 'position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;background:#0f172a;color:#e5e7eb;border:1px solid #2d2d2d;border-radius:6px;padding:4px 8px;font-size:12px;white-space:nowrap;z-index:4000;box-shadow:0 6px 16px rgba(0,0,0,0.3)';
+                    el.appendChild(tip);
+                };
+                const hide = () => { const tip = el.querySelector('.bulk-tip'); if (tip) tip.remove(); };
+                el.addEventListener('mouseenter', show); el.addEventListener('mouseleave', hide);
+                el.addEventListener('focus', show); el.addEventListener('blur', hide);
+            };
+            addTooltip(findBtn, 'Find people');
+            addTooltip(addContactsBtn, 'Add contacts to list');
+            addTooltip(exportBtn, 'Export');
+            addTooltip(deleteBtn, 'Delete');
+
+            controlsLeft.appendChild(bar);
+        }
+        // Enforce theme
+        const restyleButtons = () => {
+            const allButtons = bar.querySelectorAll('button');
+            allButtons.forEach(btn => {
+                btn.style.setProperty('background', '#2a2a2a', 'important');
+                btn.style.setProperty('border', '1px solid #3a3a3a', 'important');
+                btn.style.setProperty('color', '#ffffff', 'important');
+                btn.style.setProperty('border-radius', '8px', 'important');
+            });
+        };
+        restyleButtons();
+        return bar;
+    },
+
+    // Show/hide and update accounts bulk toolbar
+    updateAccountsBulkToolbar() {
+        const bar = this.ensureAccountsBulkActionsBar();
+        if (!bar) return;
+        const selectedCount = this.selectedAccountIds ? this.selectedAccountIds.size : 0;
+        const countSpan = document.getElementById('accounts-bulk-selected-count');
+        if (countSpan) countSpan.textContent = `Selected ${selectedCount}`;
+        const visible = bar.style.display !== 'none';
+        if (selectedCount > 0 && !visible) {
+            bar.style.display = 'inline-flex';
+            bar.style.opacity = '0'; bar.style.transform = 'translateY(-6px)';
+            bar.style.transition = 'opacity .18s ease, transform .18s ease';
+            requestAnimationFrame(()=>{ bar.style.opacity = '1'; bar.style.transform = 'translateY(0)'; });
+        } else if (selectedCount === 0 && visible) {
+            bar.style.transition = 'opacity .18s ease, transform .18s ease';
+            bar.style.opacity = '0'; bar.style.transform = 'translateY(-6px)';
+            setTimeout(()=>{ bar.style.display = 'none'; }, 180);
+        }
+        // Fade the right results info when bar is visible
+        const resultsInfo = document.getElementById('accounts-results-info');
+        if (resultsInfo) {
+            resultsInfo.style.transition = 'opacity 0.2s ease';
+            resultsInfo.style.opacity = selectedCount > 0 ? '0' : '1';
+        }
+    },
+
+    clearSelectedAccounts() {
+        if (this.selectedAccountIds) this.selectedAccountIds.clear();
+        const headerCb = document.getElementById('select-all-accounts-checkbox');
+        if (headerCb) headerCb.checked = false;
+        document.querySelectorAll('#accounts-table-body .row-checkbox').forEach(cb => { cb.checked = false; });
+        this.updateAccountsBulkToolbar();
+    },
+
+    attachSelectAllAccountsHandler() {
+        const selectAll = document.getElementById('select-all-accounts-checkbox');
+        if (!selectAll) return;
+        selectAll.onchange = (e) => {
+            if (e.target.checked) {
+                this.showSelectAllAccountsPopover();
+            } else {
+                this.clearSelectedAccounts();
+            }
+        };
+    },
+
+    // Bulk action handlers for accounts
+    bulkFindPeopleForAccounts() {
+        const count = this.selectedAccountIds ? this.selectedAccountIds.size : 0;
+        this.showNotification(`Find people for ${count} account(s) (coming soon)`, 'info');
+    },
+    bulkAddContactsToListForAccounts() {
+        const count = this.selectedAccountIds ? this.selectedAccountIds.size : 0;
+        this.showNotification(`Added contacts from ${count} account(s) to list (stub)`, 'info');
+    },
+    bulkExportSelectedAccounts() {
+        const ids = this.selectedAccountIds ? Array.from(this.selectedAccountIds) : [];
+        const map = new Map((this.accounts||[]).map(a=>[a.id,a]));
+        const accounts = ids.map(id=>map.get(id)).filter(Boolean);
+        if (accounts.length === 0) { this.showNotification('No accounts selected to export', 'warning'); return; }
+        const headers = ['Company','Industry','Website','Phone','Location','Created'];
+        const rows = accounts.map(a=>[
+            a.name||'', a.industry||'', a.website||'', a.phone||'', this.formatLocation(a), this.formatDate(a.createdAt)
+        ]);
+        const csv = [headers.join(','), ...rows.map(r=>r.map(x=>String(x).includes(',')?`"${String(x).replace(/"/g,'""')}"`:String(x)).join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `accounts_selected_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        this.showNotification('Exported selected accounts', 'success');
+    },
+    bulkDeleteSelectedAccounts() {
+        const ids = this.selectedAccountIds ? Array.from(this.selectedAccountIds) : [];
+        if (ids.length === 0) return;
+        const ok = window.confirm(`Delete ${ids.length} selected account(s)? This cannot be undone.`);
+        if (!ok) return;
+        this.accounts = (this.accounts||[]).filter(a => !ids.includes(a.id));
+        if (typeof db !== 'undefined') {
+            ids.forEach(id => { try { db.collection('accounts').doc(id).delete(); } catch(_){ } });
+        }
+        this.selectedAccountIds.clear();
+        this.renderAccountsPage();
+        this.showNotification('Deleted selected accounts', 'success');
     },
 
     // Render accounts pagination (top and bottom)
@@ -774,7 +1095,7 @@ Object.assign(CRMApp, {
 
     // Edit account functionality
     editAccount(accountId) {
-        const account = this.accounts.find(a => a.id === accountId);
+        const account = CRMApp.accounts.find(a => a.id === accountId);
         if (!account) {
             console.error('Account not found:', accountId);
             return;
@@ -849,9 +1170,9 @@ Object.assign(CRMApp, {
                 }
 
                 // Update local state
-                const idx = this.accounts.findIndex(a => a.id === accountId);
+                const idx = CRMApp.accounts.findIndex(a => a.id === accountId);
                 if (idx !== -1) {
-                    this.accounts[idx] = { ...this.accounts[idx], ...updated };
+                    CRMApp.accounts[idx] = { ...CRMApp.accounts[idx], ...updated };
                 }
 
                 this.showToast('Account saved successfully', 'success');

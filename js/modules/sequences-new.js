@@ -441,19 +441,7 @@ const SequencesModule = {
 
         // Create modal content
         modalOverlay.innerHTML = `
-            <div class="modal-content" style="
-                background: #2c3e50 !important; 
-                border-radius: 16px !important; 
-                padding: 24px !important; 
-                width: 90% !important; 
-                max-width: 500px !important; 
-                max-height: 90vh !important;
-                overflow-y: auto !important;
-                position: relative !important;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
-                z-index: 100000 !important;
-                margin: auto !important;
-            ">
+            <div class="modal-content crm-modal">
                 <div class="modal-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 20px !important;">
                     <h3 style="color: #fff !important; margin: 0 !important; font-size: 1.2rem !important;">Create New Sequence</h3>
                     <button class="modal-close" style="background: none !important; border: none !important; color: #bdc3c7 !important; font-size: 24px !important; cursor: pointer !important; padding: 0 !important; width: 30px !important; height: 30px !important; display: flex !important; align-items: center !important; justify-content: center !important;">&times;</button>
@@ -763,18 +751,20 @@ const SequencesModule = {
                 </div>
             `;
         } else {
-            // Show sequence steps when they exist
+            // Show sequence steps when they exist, with the Add Step button below the list
             return `
                 <div class="sequence-steps">
                     <div class="steps-header">
                         <h3 class="steps-title">Sequence Steps</h3>
-                        <button id="add-step-btn" class="btn-accent btn-sm">+ Add Step</button>
                     </div>
                     <div class="steps-list">
                         ${sequence.steps.map((step, index) => `
                             ${this.renderSequenceStep(step, index)}
                             ${index < sequence.steps.length - 1 ? this.renderStepInterval(sequence.steps[index], sequence.steps[index + 1], index) : ''}
                         `).join('')}
+                    </div>
+                    <div class="steps-footer">
+                        <button id="add-step-btn" class="btn-accent">+ Add Step</button>
                     </div>
                 </div>
             `;
@@ -983,6 +973,7 @@ const SequencesModule = {
             justify-content: center !important;
             visibility: visible !important;
             opacity: 1 !important;
+            overflow: auto !important; /* allow scrolling when content is taller */
         `;
 
         // Step 1: Step selection
@@ -1000,25 +991,15 @@ const SequencesModule = {
     // Render the step selection modal (Step 1)
     renderStepSelectionModal(sequence) {
         return `
-            <div class="modal-content" style="
-                background: #2c3e50 !important;
-                border-radius: 16px !important;
-                padding: 0 !important;
-                width: 90% !important;
-                max-width: 700px !important;
-                max-height: 90vh !important;
-                overflow-y: auto !important;
-                position: relative !important;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
-            ">
-                <!-- Header -->
-                <div style="
-                    padding: 24px 32px;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                ">
+            <div class="modal-content crm-modal">
+                 <!-- Header -->
+                 <div style="
+                     padding: 24px 32px;
+                     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                     display: flex;
+                     justify-content: space-between;
+                     align-items: center;
+                 ">
                     <div>
                         <h2 style="color: #fff; margin: 0 0 8px 0; font-size: 1.5rem; font-weight: 600;">Select a sequence step</h2>
                         <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.9rem;">Add a step for the sequence to follow and automate for you.</p>
@@ -1037,271 +1018,271 @@ const SequencesModule = {
                         border-radius: 4px;
                         transition: background 0.2s;
                     ">&times;</button>
-                </div>
+                 </div>
 
-                <!-- Content -->
-                <div style="padding: 32px;">
-                    <!-- Automatic Section -->
-                    <div style="margin-bottom: 32px;">
-                        <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">Automatic</h3>
-                        
-                        <div class="step-option" data-step-type="automatic-email" style="
-                            background: rgba(255, 255, 255, 0.05);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 12px;
-                            padding: 20px;
-                            margin-bottom: 12px;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 16px;
-                        ">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: linear-gradient(45deg, #3498db, #2980b9);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 20px;
-                            ">📧</div>
-                            <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                    <h4 style="color: #fff; margin: 0; font-size: 1rem; font-weight: 500;">Automatic email</h4>
-                                    <span style="
-                                        background: linear-gradient(45deg, #e74c3c, #c0392b);
-                                        color: white;
-                                        padding: 2px 8px;
-                                        border-radius: 12px;
-                                        font-size: 0.7rem;
-                                        font-weight: 500;
-                                        text-transform: uppercase;
-                                    ">AI available!</span>
-                                </div>
-                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Sends automatically to the prospect based on the schedule—no action needed.</p>
-                            </div>
-                        </div>
-                    </div>
+                 <!-- Content -->
+                 <div style="padding: 32px;">
+                     <!-- Automatic Section -->
+                     <div style="margin-bottom: 32px;">
+                         <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">Automatic</h3>
+                         
+                         <div class="step-option" data-step-type="automatic-email" style="
+                             background: rgba(255, 255, 255, 0.05);
+                             border: 1px solid rgba(255, 255, 255, 0.1);
+                             border-radius: 12px;
+                             padding: 20px;
+                             margin-bottom: 12px;
+                             cursor: pointer;
+                             transition: all 0.3s ease;
+                             display: flex;
+                             align-items: center;
+                             gap: 16px;
+                         ">
+                             <div style="
+                                 width: 48px;
+                                 height: 48px;
+                                 background: linear-gradient(45deg, #3498db, #2980b9);
+                                 border-radius: 12px;
+                                 display: flex;
+                                 align-items: center;
+                                 justify-content: center;
+                                 font-size: 20px;
+                             ">📧</div>
+                             <div style="flex: 1;">
+                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                     <h4 style="color: #fff; margin: 0; font-size: 1rem; font-weight: 500;">Automatic email</h4>
+                                     <span style="
+                                         background: linear-gradient(45deg, #e74c3c, #c0392b);
+                                         color: white;
+                                         padding: 2px 8px;
+                                         border-radius: 12px;
+                                         font-size: 0.7rem;
+                                         font-weight: 500;
+                                         text-transform: uppercase;
+                                     ">AI available!</span>
+                                 </div>
+                                 <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Sends automatically to the prospect based on the schedule—no action needed.</p>
+                             </div>
+                         </div>
+                     </div>
+                     
+                     <!-- Tasks Section -->
+                     <div style="margin-bottom: 32px;">
+                         <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">Tasks</h3>
+                         
+                         <div class="step-option" data-step-type="manual-email" style="
+                             background: rgba(255, 255, 255, 0.05);
+                             border: 1px solid rgba(255, 255, 255, 0.1);
+                             border-radius: 12px;
+                             padding: 20px;
+                             margin-bottom: 12px;
+                             cursor: pointer;
+                             transition: all 0.3s ease;
+                             display: flex;
+                             align-items: center;
+                             gap: 16px;
+                         ">
+                             <div style="
+                                 width: 48px;
+                                 height: 48px;
+                                 background: linear-gradient(45deg, #9b59b6, #8e44ad);
+                                 border-radius: 12px;
+                                 display: flex;
+                                 align-items: center;
+                                 justify-content: center;
+                                 font-size: 20px;
+                             ">✍️</div>
+                             <div style="flex: 1;">
+                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                     <h4 style="color: #fff; margin: 0; font-size: 1rem; font-weight: 500;">Manual email</h4>
+                                     <span style="
+                                         background: linear-gradient(45deg, #e74c3c, #c0392b);
+                                         color: white;
+                                         padding: 2px 8px;
+                                         border-radius: 12px;
+                                         font-size: 0.7rem;
+                                         font-weight: 500;
+                                         text-transform: uppercase;
+                                     ">AI available!</span>
+                                 </div>
+                                 <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Creates a draft for your review—you'll send it when ready.</p>
+                             </div>
+                         </div>
 
-                    <!-- Tasks Section -->
-                    <div style="margin-bottom: 32px;">
-                        <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">Tasks</h3>
-                        
-                        <div class="step-option" data-step-type="manual-email" style="
-                            background: rgba(255, 255, 255, 0.05);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 12px;
-                            padding: 20px;
-                            margin-bottom: 12px;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 16px;
-                        ">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: linear-gradient(45deg, #9b59b6, #8e44ad);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 20px;
-                            ">✍️</div>
-                            <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                    <h4 style="color: #fff; margin: 0; font-size: 1rem; font-weight: 500;">Manual email</h4>
-                                    <span style="
-                                        background: linear-gradient(45deg, #e74c3c, #c0392b);
-                                        color: white;
-                                        padding: 2px 8px;
-                                        border-radius: 12px;
-                                        font-size: 0.7rem;
-                                        font-weight: 500;
-                                        text-transform: uppercase;
-                                    ">AI available!</span>
-                                </div>
-                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Creates a draft for your review—you'll send it when ready.</p>
-                            </div>
-                        </div>
+                         <div class="step-option" data-step-type="phone-call" style="
+                             background: rgba(255, 255, 255, 0.05);
+                             border: 1px solid rgba(255, 255, 255, 0.1);
+                             border-radius: 12px;
+                             padding: 20px;
+                             margin-bottom: 12px;
+                             cursor: pointer;
+                             transition: all 0.3s ease;
+                             display: flex;
+                             align-items: center;
+                             gap: 16px;
+                         ">
+                             <div style="
+                                 width: 48px;
+                                 height: 48px;
+                                 background: linear-gradient(45deg, #e67e22, #d35400);
+                                 border-radius: 12px;
+                                 display: flex;
+                                 align-items: center;
+                                 justify-content: center;
+                                 font-size: 20px;
+                             ">📞</div>
+                             <div style="flex: 1;">
+                                 <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">Phone call</h4>
+                                 <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Task is created to call prospect.</p>
+                             </div>
+                         </div>
 
-                        <div class="step-option" data-step-type="phone-call" style="
-                            background: rgba(255, 255, 255, 0.05);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 12px;
-                            padding: 20px;
-                            margin-bottom: 12px;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 16px;
-                        ">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: linear-gradient(45deg, #e67e22, #d35400);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 20px;
-                            ">📞</div>
-                            <div style="flex: 1;">
-                                <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">Phone call</h4>
-                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Task is created to call prospect.</p>
-                            </div>
-                        </div>
+                         <div class="step-option" data-step-type="action-item" style="
+                             background: rgba(255, 255, 255, 0.05);
+                             border: 1px solid rgba(255, 255, 255, 0.1);
+                             border-radius: 12px;
+                             padding: 20px;
+                             margin-bottom: 12px;
+                             cursor: pointer;
+                             transition: all 0.3s ease;
+                             display: flex;
+                             align-items: center;
+                             gap: 16px;
+                         ">
+                             <div style="
+                                 width: 48px;
+                                 height: 48px;
+                                 background: linear-gradient(45deg, #f39c12, #e67e22);
+                                 border-radius: 12px;
+                                 display: flex;
+                                 align-items: center;
+                                 justify-content: center;
+                                 font-size: 20px;
+                             ">✅</div>
+                             <div style="flex: 1;">
+                                 <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">Action item</h4>
+                                 <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Task is created to perform custom action.</p>
+                             </div>
+                         </div>
+                     </div>
 
-                        <div class="step-option" data-step-type="action-item" style="
-                            background: rgba(255, 255, 255, 0.05);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 12px;
-                            padding: 20px;
-                            margin-bottom: 12px;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 16px;
-                        ">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: linear-gradient(45deg, #f39c12, #e67e22);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 20px;
-                            ">✅</div>
-                            <div style="flex: 1;">
-                                <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">Action item</h4>
-                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Task is created to perform custom action.</p>
-                            </div>
-                        </div>
-                    </div>
+                     <!-- LinkedIn Tasks Section -->
+                     <div>
+                         <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">LinkedIn tasks</h3>
+                         
+                         <div class="step-option" data-step-type="linkedin-connection" style="
+                             background: rgba(255, 255, 255, 0.05);
+                             border: 1px solid rgba(255, 255, 255, 0.1);
+                             border-radius: 12px;
+                             padding: 20px;
+                             margin-bottom: 12px;
+                             cursor: pointer;
+                             transition: all 0.3s ease;
+                             display: flex;
+                             align-items: center;
+                             gap: 16px;
+                         ">
+                             <div style="
+                                 width: 48px;
+                                 height: 48px;
+                                 background: linear-gradient(45deg, #0077b5, #005885);
+                                 border-radius: 12px;
+                                 display: flex;
+                                 align-items: center;
+                                 justify-content: center;
+                                 font-size: 20px;
+                             ">🔗</div>
+                             <div style="flex: 1;">
+                                 <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">LinkedIn - Send connection request</h4>
+                                 <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Send personalized invitations to connect with contacts for a positive first impression.</p>
+                             </div>
+                         </div>
 
-                    <!-- LinkedIn Tasks Section -->
-                    <div>
-                        <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">LinkedIn tasks</h3>
-                        
-                        <div class="step-option" data-step-type="linkedin-connection" style="
-                            background: rgba(255, 255, 255, 0.05);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 12px;
-                            padding: 20px;
-                            margin-bottom: 12px;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 16px;
-                        ">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: linear-gradient(45deg, #0077b5, #005885);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 20px;
-                            ">🔗</div>
-                            <div style="flex: 1;">
-                                <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">LinkedIn - Send connection request</h4>
-                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Send personalized invitations to connect with contacts for a positive first impression.</p>
-                            </div>
-                        </div>
+                         <div class="step-option" data-step-type="linkedin-message" style="
+                             background: rgba(255, 255, 255, 0.05);
+                             border: 1px solid rgba(255, 255, 255, 0.1);
+                             border-radius: 12px;
+                             padding: 20px;
+                             margin-bottom: 12px;
+                             cursor: pointer;
+                             transition: all 0.3s ease;
+                             display: flex;
+                             align-items: center;
+                             gap: 16px;
+                         ">
+                             <div style="
+                                 width: 48px;
+                                 height: 48px;
+                                 background: linear-gradient(45deg, #0077b5, #005885);
+                                 border-radius: 12px;
+                                 display: flex;
+                                 align-items: center;
+                                 justify-content: center;
+                                 font-size: 20px;
+                             ">💬</div>
+                             <div style="flex: 1;">
+                                 <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">LinkedIn - Send message</h4>
+                                 <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Send personalized direct messages to contacts you're connected with to build relationships.</p>
+                             </div>
+                         </div>
 
-                        <div class="step-option" data-step-type="linkedin-message" style="
-                            background: rgba(255, 255, 255, 0.05);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 12px;
-                            padding: 20px;
-                            margin-bottom: 12px;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 16px;
-                        ">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: linear-gradient(45deg, #0077b5, #005885);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 20px;
-                            ">💬</div>
-                            <div style="flex: 1;">
-                                <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">LinkedIn - Send message</h4>
-                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">Send personalized direct messages to contacts you're connected with to build relationships.</p>
-                            </div>
-                        </div>
+                         <div class="step-option" data-step-type="linkedin-profile" style="
+                             background: rgba(255, 255, 255, 0.05);
+                             border: 1px solid rgba(255, 255, 255, 0.1);
+                             border-radius: 12px;
+                             padding: 20px;
+                             margin-bottom: 12px;
+                             cursor: pointer;
+                             transition: all 0.3s ease;
+                             display: flex;
+                             align-items: center;
+                             gap: 16px;
+                         ">
+                             <div style="
+                                 width: 48px;
+                                 height: 48px;
+                                 background: linear-gradient(45deg, #0077b5, #005885);
+                                 border-radius: 12px;
+                                 display: flex;
+                                 align-items: center;
+                                 justify-content: center;
+                                 font-size: 20px;
+                             ">👤</div>
+                             <div style="flex: 1;">
+                                 <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">LinkedIn - View profile</h4>
+                                 <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">View a contact's LinkedIn profile to gather key information for more effective engagement.</p>
+                             </div>
+                         </div>
 
-                        <div class="step-option" data-step-type="linkedin-profile" style="
-                            background: rgba(255, 255, 255, 0.05);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 12px;
-                            padding: 20px;
-                            margin-bottom: 12px;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 16px;
-                        ">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: linear-gradient(45deg, #0077b5, #005885);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 20px;
-                            ">👤</div>
-                            <div style="flex: 1;">
-                                <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">LinkedIn - View profile</h4>
-                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">View a contact's LinkedIn profile to gather key information for more effective engagement.</p>
-                            </div>
-                        </div>
-
-                        <div class="step-option" data-step-type="linkedin-interact" style="
-                            background: rgba(255, 255, 255, 0.05);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 12px;
-                            padding: 20px;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 16px;
-                        ">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: linear-gradient(45deg, #0077b5, #005885);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 20px;
-                            ">👍</div>
-                            <div style="flex: 1;">
-                                <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">LinkedIn - Interact with post</h4>
-                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">View a contact's activities and interact with their recent posts to foster engagement and boost visibility.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                         <div class="step-option" data-step-type="linkedin-interact" style="
+                             background: rgba(255, 255, 255, 0.05);
+                             border: 1px solid rgba(255, 255, 255, 0.1);
+                             border-radius: 12px;
+                             padding: 20px;
+                             cursor: pointer;
+                             transition: all 0.3s ease;
+                             display: flex;
+                             align-items: center;
+                             gap: 16px;
+                         ">
+                             <div style="
+                                 width: 48px;
+                                 height: 48px;
+                                 background: linear-gradient(45deg, #0077b5, #005885);
+                                 border-radius: 12px;
+                                 display: flex;
+                                 align-items: center;
+                                 justify-content: center;
+                                 font-size: 20px;
+                             ">👍</div>
+                             <div style="flex: 1;">
+                                 <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500;">LinkedIn - Interact with post</h4>
+                                 <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">View a contact's activities and interact with their recent posts to foster engagement and boost visibility.</p>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+             </div>
         `;
     },
 
@@ -1312,25 +1293,15 @@ const SequencesModule = {
         const stepDescription = this.getStepTypeDescription(stepType);
         
         return `
-            <div class="modal-content" style="
-                background: #2c3e50 !important;
-                border-radius: 16px !important;
-                padding: 0 !important;
-                width: 90% !important;
-                max-width: 600px !important;
-                max-height: 90vh !important;
-                overflow-y: auto !important;
-                position: relative !important;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
-            ">
-                <!-- Header -->
-                <div style="
-                    padding: 24px 32px;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                ">
+            <div class="modal-content crm-modal">
+                 <!-- Header -->
+                 <div style="
+                     padding: 24px 32px;
+                     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                     display: flex;
+                     justify-content: space-between;
+                     align-items: flex-start;
+                 ">
                     <div style="flex: 1;">
                         <h2 style="color: #fff; margin: 0 0 8px 0; font-size: 1.5rem; font-weight: 600;">Select a sequence step</h2>
                         <div style="
@@ -1388,185 +1359,184 @@ const SequencesModule = {
                         margin-left: 16px;
                         transition: background 0.2s;
                     ">&times;</button>
-                </div>
+                 </div>
 
-                <!-- Content -->
-                <div style="padding: 32px;">
-                    <!-- When to start section -->
-                    <div style="margin-bottom: 32px;">
-                        <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">When to start this step:</h3>
+                 <!-- Content -->
+                 <div style="padding: 32px;">
+                     <!-- When to start section -->
+                     <div style="margin-bottom: 32px;">
+                         <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">When to start this step:</h3>
                         
-                        <div style="margin-bottom: 16px;">
-                            <label style="
-                                display: flex;
-                                align-items: center;
-                                gap: 12px;
-                                cursor: pointer;
-                                color: rgba(255, 255, 255, 0.9);
-                                font-size: 0.9rem;
-                            ">
-                                <input type="radio" name="start-timing" value="immediate" ${isFirstStep ? 'checked' : ''} style="
-                                    width: 16px;
-                                    height: 16px;
-                                    accent-color: #3498db;
-                                ">
-                                ${isFirstStep ? 'Immediately after the contact is added to sequence' : 'Immediately after the last step'}
-                            </label>
-                        </div>
+                         <div style="margin-bottom: 16px;">
+                             <label style="
+                                 display: flex;
+                                 align-items: center;
+                                 gap: 12px;
+                                 cursor: pointer;
+                                 color: rgba(255, 255, 255, 0.9);
+                                 font-size: 0.9rem;
+                             ">
+                                 <input type="radio" name="start-timing" value="immediate" ${isFirstStep ? 'checked' : ''} style="
+                                     width: 16px;
+                                     height: 16px;
+                                     accent-color: #3498db;
+                                 ">
+                                 ${isFirstStep ? 'Immediately after the contact is added to sequence' : 'Immediately after the last step'}
+                             </label>
+                         </div>
                         
-                        <div style="margin-bottom: 16px;">
-                            <label style="
-                                display: flex;
-                                align-items: center;
-                                gap: 12px;
-                                cursor: pointer;
-                                color: rgba(255, 255, 255, 0.9);
-                                font-size: 0.9rem;
-                            ">
-                                <input type="radio" name="start-timing" value="delayed" ${!isFirstStep ? 'checked' : ''} style="
-                                    width: 16px;
-                                    height: 16px;
-                                    accent-color: #3498db;
-                                ">
-                                <input type="number" id="delay-amount" value="30" min="1" style="
-                                    width: 60px;
-                                    padding: 8px;
-                                    border: 1px solid rgba(255, 255, 255, 0.2);
-                                    border-radius: 4px;
-                                    background: rgba(255, 255, 255, 0.1);
-                                    color: #fff;
-                                    text-align: center;
-                                ">
-                                <select id="delay-unit" style="
-                                    padding: 8px;
-                                    border: 1px solid rgba(255, 255, 255, 0.2);
-                                    border-radius: 4px;
-                                    background: rgba(255, 255, 255, 0.1);
-                                    color: #fff;
-                                ">
-                                    <option value="minutes">minutes</option>
-                                    <option value="hours">hours</option>
-                                    <option value="days">days</option>
-                                    <option value="weeks">weeks</option>
-                                </select>
-                                after the ${isFirstStep ? 'contact is added' : 'last step'}
-                            </label>
-                        </div>
-                    </div>
+                         <div style="margin-bottom: 16px;">
+                             <label style="
+                                 display: flex;
+                                 align-items: center;
+                                 gap: 12px;
+                                 cursor: pointer;
+                                 color: rgba(255, 255, 255, 0.9);
+                                 font-size: 0.9rem;
+                             ">
+                                 <input type="radio" name="start-timing" value="delayed" ${!isFirstStep ? 'checked' : ''} style="
+                                     width: 16px;
+                                     height: 16px;
+                                     accent-color: #3498db;
+                                 ">
+                                 <input type="number" id="delay-amount" value="30" min="1" style="
+                                     width: 60px;
+                                     padding: 8px;
+                                     border: 1px solid rgba(255, 255, 255, 0.2);
+                                     border-radius: 4px;
+                                     background: rgba(255, 255, 255, 0.1);
+                                     color: #fff;
+                                     text-align: center;
+                                 ">
+                                 <select id="delay-unit" style="
+                                     padding: 8px;
+                                     border: 1px solid rgba(255, 255, 255, 0.2);
+                                     border-radius: 4px;
+                                     background: rgba(255, 255, 255, 0.1);
+                                     color: #fff;
+                                 ">
+                                     <option value="minutes">minutes</option>
+                                     <option value="hours">hours</option>
+                                     <option value="days">days</option>
+                                     <option value="weeks">weeks</option>
+                                 </select>
+                                 after the ${isFirstStep ? 'contact is added' : 'last step'}
+                             </label>
+                         </div>
 
-                    <!-- Priority section -->
-                    <div style="margin-bottom: 32px;">
-                        <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">Assign task priority</h3>
-                        
-                        <div style="display: flex; gap: 12px;">
-                            <label style="
-                                flex: 1;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                gap: 8px;
-                                padding: 12px;
-                                border: 2px solid rgba(255, 255, 255, 0.2);
-                                border-radius: 8px;
-                                cursor: pointer;
-                                transition: all 0.3s ease;
-                                color: rgba(255, 255, 255, 0.9);
-                            ">
-                                <input type="radio" name="priority" value="high" style="
-                                    width: 16px;
-                                    height: 16px;
-                                    accent-color: #e74c3c;
-                                ">
-                                High priority
-                            </label>
+                        <!-- Priority section -->
+                        <div style="margin-bottom: 32px;">
+                            <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">Assign task priority</h3>
                             
-                            <label style="
-                                flex: 1;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                gap: 8px;
+                            <div style="display: flex; gap: 12px;">
+                                <label style="
+                                    flex: 1;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    gap: 8px;
+                                    padding: 12px;
+                                    border: 2px solid rgba(255, 255, 255, 0.2);
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    transition: all 0.3s ease;
+                                    color: rgba(255, 255, 255, 0.9);
+                                ">
+                                    <input type="radio" name="priority" value="high" style="
+                                        width: 16px;
+                                        height: 16px;
+                                        accent-color: #e74c3c;
+                                    ">
+                                    High priority
+                                </label>
+                                
+                                <label style="
+                                    flex: 1;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    gap: 8px;
+                                    padding: 12px;
+                                    border: 2px solid #3498db;
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    transition: all 0.3s ease;
+                                    color: #fff;
+                                    background: rgba(52, 152, 219, 0.1);
+                                ">
+                                    <input type="radio" name="priority" value="medium" checked style="
+                                        width: 16px;
+                                        height: 16px;
+                                        accent-color: #3498db;
+                                    ">
+                                    Medium priority
+                                </label>
+                                
+                                <label style="
+                                    flex: 1;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    gap: 8px;
+                                    padding: 12px;
+                                    border: 2px solid rgba(255, 255, 255, 0.2);
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    transition: all 0.3s ease;
+                                    color: rgba(255, 255, 255, 0.9);
+                                ">
+                                    <input type="radio" name="priority" value="low" style="
+                                        width: 16px;
+                                        height: 16px;
+                                        accent-color: #95a5a6;
+                                    ">
+                                    Low priority
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Note section -->
+                        <div style="margin-bottom: 32px;">
+                            <h3 style="color: #fff; margin: 0 0 8px 0; font-size: 1.1rem; font-weight: 500;">Add note</h3>
+                            <textarea id="step-note" placeholder="Add a description, purpose or goal for the task" style="
+                                width: 100%;
+                                height: 100px;
                                 padding: 12px;
-                                border: 2px solid #3498db;
+                                border: 1px solid rgba(255, 255, 255, 0.2);
                                 border-radius: 8px;
-                                cursor: pointer;
-                                transition: all 0.3s ease;
+                                background: rgba(255, 255, 255, 0.1);
                                 color: #fff;
-                                background: rgba(52, 152, 219, 0.1);
-                            ">
-                                <input type="radio" name="priority" value="medium" checked style="
-                                    width: 16px;
-                                    height: 16px;
-                                    accent-color: #3498db;
-                                ">
-                                Medium priority
-                            </label>
-                            
-                            <label style="
-                                flex: 1;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                gap: 8px;
-                                padding: 12px;
-                                border: 2px solid rgba(255, 255, 255, 0.2);
+                                font-family: inherit;
+                                font-size: 0.9rem;
+                                resize: vertical;
+                                box-sizing: border-box;
+                            "></textarea>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                            <button id="cancel-step-btn" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                                color: #fff;
+                                padding: 12px 24px;
                                 border-radius: 8px;
                                 cursor: pointer;
-                                transition: all 0.3s ease;
-                                color: rgba(255, 255, 255, 0.9);
-                            ">
-                                <input type="radio" name="priority" value="low" style="
-                                    width: 16px;
-                                    height: 16px;
-                                    accent-color: #95a5a6;
-                                ">
-                                Low priority
-                            </label>
+                                font-size: 0.9rem;
+                            ">Cancel</button>
+                            <button id="save-step-btn" style="
+                                background: linear-gradient(45deg, #3498db, #2980b9);
+                                border: none;
+                                color: white;
+                                padding: 12px 24px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 0.9rem;
+                                font-weight: 500;
+                            ">Add Step</button>
                         </div>
-                    </div>
-
-                    <!-- Note section -->
-                    <div style="margin-bottom: 32px;">
-                        <h3 style="color: #fff; margin: 0 0 8px 0; font-size: 1.1rem; font-weight: 500;">Add note</h3>
-                        <textarea id="step-note" placeholder="Add a description, purpose or goal for the task" style="
-                            width: 100%;
-                            height: 100px;
-                            padding: 12px;
-                            border: 1px solid rgba(255, 255, 255, 0.2);
-                            border-radius: 8px;
-                            background: rgba(255, 255, 255, 0.1);
-                            color: #fff;
-                            font-family: inherit;
-                            font-size: 0.9rem;
-                            resize: vertical;
-                            box-sizing: border-box;
-                        "></textarea>
-                    </div>
-
-                    <!-- Action buttons -->
-                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                        <button id="cancel-step-btn" style="
-                            background: rgba(255, 255, 255, 0.1);
-                            border: 1px solid rgba(255, 255, 255, 0.2);
-                            color: #fff;
-                            padding: 12px 24px;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            font-size: 0.9rem;
-                        ">Cancel</button>
-                        <button id="save-step-btn" style="
-                            background: linear-gradient(45deg, #3498db, #2980b9);
-                            border: none;
-                            color: white;
-                            padding: 12px 24px;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            font-size: 0.9rem;
-                            font-weight: 500;
-                        ">Add Step</button>
-                    </div>
-                </div>
-            </div>
+                 </div>
+             </div>
         `;
     },
 

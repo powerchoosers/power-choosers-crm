@@ -1,6 +1,54 @@
 // Power Choosers CRM Dashboard - Contacts Module
 // This module contains all contacts functionality
 
+// Add CSS animations for modals
+const modalStyles = document.createElement('style');
+modalStyles.textContent = `
+    @keyframes modalFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @keyframes modalSlideIn {
+        from { 
+            opacity: 0; 
+            transform: translateY(-20px) scale(0.95); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0) scale(1); 
+        }
+    }
+    
+    .modal-overlay {
+        animation: modalFadeIn 0.3s ease-out;
+    }
+    
+    .modal-content {
+        animation: modalSlideIn 0.3s ease-out;
+    }
+    
+    .modal-overlay {
+        transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .modal-content {
+        transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .sequence-option:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+        transform: translateY(-1px);
+    }
+    
+    .modal-close:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+    }
+`;
+document.head.appendChild(modalStyles);
+
 // Extend CRMApp with contacts functions
 Object.assign(CRMApp, {
     // Toggle contacts filters sidebar with modern design
@@ -36,8 +84,8 @@ Object.assign(CRMApp, {
 
     // Populate simple sidebar filters from current contacts/accounts
     populateContactsFilters() {
-        const contacts = Array.isArray(this.contacts) ? this.contacts : [];
-        const accounts = Array.isArray(this.accounts) ? this.accounts : [];
+        const contacts = Array.isArray(CRMApp.contacts) ? CRMApp.contacts : [];
+        const accounts = Array.isArray(CRMApp.accounts) ? CRMApp.accounts : [];
 
         // Account select (by id)
         const accountSel = document.getElementById('account-filter');
@@ -83,6 +131,7 @@ Object.assign(CRMApp, {
         this.contactsFilters = this.contactsFilters || [];
         this.contactsPerPage = 50;
         this.contactsCurrentPage = 1;
+        this.selectedContactIds = this.selectedContactIds || new Set();
         // Match header: [number, checkbox, name, title, account, email, phone, location, created, actions]
         this.contactsColumnOrder = ['number', 'checkbox', 'name', 'title', 'account', 'email', 'phone', 'location', 'created', 'actions'];
 
@@ -143,7 +192,10 @@ Object.assign(CRMApp, {
         this.renderContactsTableAdvanced();
         
         // Ensure contacts are loaded and displayed
-        console.log('Contacts data available:', this.contacts ? this.contacts.length : 0, 'contacts');
+        console.log('Contacts data available:', CRMApp.contacts ? CRMApp.contacts.length : 0, 'contacts');
+
+        // Wire select-all checkbox after first render
+        this.attachSelectAllHandler();
     },
 
     addFilterChip(chip) {
@@ -191,7 +243,7 @@ Object.assign(CRMApp, {
     },
 
     getFilteredContacts() {
-        let list = Array.isArray(this.contacts) ? [...this.contacts] : [];
+        let list = Array.isArray(CRMApp.contacts) ? [...CRMApp.contacts] : [];
 
         // DOM values
         const searchVal = (document.getElementById('contact-search')?.value || '').trim().toLowerCase();
@@ -202,7 +254,7 @@ Object.assign(CRMApp, {
         const dateVal = (document.getElementById('date-filter')?.value || '').trim();
 
         // Map accounts
-        const accountsById = new Map((this.accounts || []).map(a => [a.id, a]));
+        const accountsById = new Map((CRMApp.accounts || []).map(a => [a.id, a]));
 
         // Search over name + email
         if (searchVal) {
@@ -271,7 +323,7 @@ Object.assign(CRMApp, {
         // Update top-right results info (filtered vs total)
         const resultsInfo = document.getElementById('results-info');
         if (resultsInfo) {
-            const totalAll = Array.isArray(this.contacts) ? this.contacts.length : 0;
+            const totalAll = Array.isArray(CRMApp.contacts) ? CRMApp.contacts.length : 0;
             resultsInfo.textContent = `Showing ${total} of ${totalAll} contacts`;
         }
 
@@ -301,6 +353,15 @@ Object.assign(CRMApp, {
                 row.appendChild(td);
             });
             tbody.appendChild(row);
+            // Keep row checkbox in sync with selection
+            const cb = row.querySelector('.row-checkbox');
+            if (cb) {
+                cb.checked = this.selectedContactIds.has(c.id);
+                cb.addEventListener('change', () => {
+                    if (cb.checked) this.selectedContactIds.add(c.id); else this.selectedContactIds.delete(c.id);
+                    this.updateBulkToolbar();
+                });
+            }
             console.log('Added row to tbody');
         });
         
@@ -308,6 +369,929 @@ Object.assign(CRMApp, {
 
         this.renderContactsPagination(total, this.contactsCurrentPage, totalPages);
         this.refreshContactsHeaderOrder();
+
+        // Ensure select-all handler bound each render
+        this.attachSelectAllHandler();
+        this.updateBulkToolbar();
+    },
+
+    // Bind header Select All checkbox to open a modal with selection options
+    attachSelectAllHandler() {
+        const selectAllHeaderCheckbox = document.getElementById('select-all-checkbox');
+        if (!selectAllHeaderCheckbox) return;
+        // Use property assignment to avoid stacking multiple listeners across renders
+        selectAllHeaderCheckbox.onchange = (event) => {
+            const isChecked = !!event.target.checked;
+            if (isChecked) {
+                // Show modal to choose scope of selection
+                this.showSelectAllPickerModal();
+            } else {
+                // Unselect only currently visible rows when toggled off
+                const visibleRowCheckboxes = Array.from(document.querySelectorAll('#contacts-table-body .row-checkbox'));
+                visibleRowCheckboxes.forEach(cb => {
+                    cb.checked = false;
+                    const id = cb.getAttribute('data-id');
+                    if (id) this.selectedContactIds.delete(id);
+                });
+                if (typeof this.updateBulkToolbar === 'function') {
+                    this.updateBulkToolbar();
+                }
+            }
+        };
+    },
+
+    // Show a lightweight popover (less obtrusive) to select current page or all filtered contacts
+    showSelectAllPickerModal() {
+        const visibleRowCheckboxes = Array.from(document.querySelectorAll('#contacts-table-body .row-checkbox'));
+        const visibleCount = visibleRowCheckboxes.length;
+        const filteredContacts = this.getFilteredContacts();
+        const totalFiltered = filteredContacts.length;
+
+        // Anchor near "Select All" label
+        const anchor = document.querySelector('.contacts-table-container .table-controls .table-controls-left') || document.getElementById('select-all-checkbox');
+        const rect = anchor ? anchor.getBoundingClientRect() : { left: 40, top: 120, height: 20 };
+
+        // Remove existing popover if any
+        document.getElementById('select-all-popover')?.remove();
+
+        const pop = document.createElement('div');
+        pop.id = 'select-all-popover';
+        pop.style.cssText = `
+            position: absolute; left: ${Math.round(rect.left + 110)}px; top: ${Math.round(rect.top + rect.height + 10 + window.scrollY)}px;
+            background: #1a1a1a; border: 1px solid #2d2d2d; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+            color: #e5e7eb; z-index: 3000; width: 360px; max-width: calc(100vw - 40px);
+            opacity: 0; transform: translateY(-6px) scale(0.98); transition: opacity .18s ease, transform .18s ease; overflow:hidden;`;
+        pop.innerHTML = `
+            <div style="padding:14px 16px; border-bottom: 1px solid #2d2d2d; font-weight:600;">Select contacts</div>
+            <div style="padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+                <button id="select-current-page" style="text-align:left;background:#3a3a3a;border:1px solid #4a4a4a;border-radius:10px;color:#fff;padding:10px 12px;cursor:pointer;">Select this page (${visibleCount})</button>
+                <button id="select-all-filtered" style="text-align:left;background:#3a3a3a;border:1px solid #4a4a4a;border-radius:10px;color:#fff;padding:10px 12px;cursor:pointer;">Select all matching (${totalFiltered})</button>
+            </div>
+            <div style="display:flex;justify-content:flex-end;padding:0 16px 14px 16px;">
+                <button id="select-cancel" style="background:#f59e0b;border:1px solid #f59e0b;color:#ffffff;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;">Cancel</button>
+            </div>`;
+        document.body.appendChild(pop);
+        // animate in
+        requestAnimationFrame(()=>{ pop.style.opacity = '1'; pop.style.transform = 'translateY(0) scale(1)'; });
+
+        const closePopover = () => {
+            pop.style.opacity = '0'; pop.style.transform = 'translateY(-6px) scale(0.98)';
+            setTimeout(()=>pop.remove(), 160);
+            const headerCb = document.getElementById('select-all-checkbox');
+            if (headerCb) headerCb.checked = false;
+            document.removeEventListener('click', outsideHandler, true);
+        };
+        const outsideHandler = (e) => { if (!pop.contains(e.target)) closePopover(); };
+        setTimeout(()=> document.addEventListener('click', outsideHandler, true), 0);
+
+        const cancelBtn = pop.querySelector('#select-cancel');
+        // Force styles with !important to defeat global overrides
+        cancelBtn.style.setProperty('background', '#f59e0b', 'important');
+        cancelBtn.style.setProperty('border-color', '#f59e0b', 'important');
+        cancelBtn.style.setProperty('color', '#ffffff', 'important');
+        cancelBtn.onclick = closePopover;
+        cancelBtn.onmouseover = () => { cancelBtn.style.setProperty('background', '#e38b06', 'important'); cancelBtn.style.setProperty('border-color', '#e38b06', 'important'); };
+        cancelBtn.onmouseout  = () => { cancelBtn.style.setProperty('background', '#f59e0b', 'important'); cancelBtn.style.setProperty('border-color', '#f59e0b', 'important'); };
+        const selBtns = pop.querySelectorAll('#select-current-page, #select-all-filtered');
+        selBtns.forEach(b => {
+            b.style.setProperty('background', '#3a3a3a', 'important');
+            b.style.setProperty('border-color', '#4a4a4a', 'important');
+            b.style.setProperty('color', '#ffffff', 'important');
+            b.onmouseover = () => b.style.setProperty('background', '#4a4a4a', 'important');
+            b.onmouseout  = () => b.style.setProperty('background', '#3a3a3a', 'important');
+        });
+        pop.querySelector('#select-current-page').onclick = () => {
+            visibleRowCheckboxes.forEach(cb => {
+                cb.checked = true;
+                const id = cb.getAttribute('data-id');
+                if (id) this.selectedContactIds.add(id);
+            });
+            if (typeof this.updateBulkToolbar === 'function') this.updateBulkToolbar();
+            closePopover();
+        };
+        pop.querySelector('#select-all-filtered').onclick = () => {
+            filteredContacts.forEach(c => { if (c && c.id) this.selectedContactIds.add(c.id); });
+            this.renderContactsTableAdvanced();
+            closePopover();
+        };
+    },
+
+    // Ensure bulk actions bar exists and is placed to the right of "Select All"
+    ensureBulkActionsBar() {
+        // Root container: table controls left
+        const controlsLeft = document.querySelector('.contacts-table-container .table-controls .table-controls-left');
+        if (!controlsLeft) return null;
+
+        // Create wrapper if not present
+        let bar = document.getElementById('contacts-bulk-actions');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'contacts-bulk-actions';
+            // Ensure this container sits above the table for tooltips/menus
+            bar.style.cssText = [
+                'display:none',
+                'align-items:center',
+                'gap:8px',
+                'margin-left:12px',
+                'background:#1a1a1a',
+                'border:1px solid #2d2d2d',
+                'border-radius:10px',
+                'padding:4px 6px',
+                'box-shadow:0 6px 16px rgba(0,0,0,0.35)',
+                'position:relative',
+                'z-index:3500',
+                'overflow:visible'
+            ].join(';');
+
+            // Selected count + Clear
+            const countSpan = document.createElement('span');
+            countSpan.id = 'bulk-selected-count';
+            countSpan.style.cssText = 'color:#e5e7eb;font-size:13px;white-space:nowrap;';
+            bar.appendChild(countSpan);
+
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = 'Clear';
+            clearBtn.title = 'Clear selection';
+            clearBtn.style.cssText = 'background:#2a2a2a;border:1px solid #3a3a3a;color:#ffffff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;';
+            clearBtn.onclick = () => this.clearSelectedContacts();
+            bar.appendChild(clearBtn);
+
+            // Action buttons group
+            const mkIconBtn = (id, title, svg) => {
+                const b = document.createElement('button');
+                b.id = id;
+                b.title = title;
+                b.setAttribute('aria-label', title);
+                b.style.cssText = 'width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:#2a2a2a;border:1px solid #3a3a3a;color:#ffffff;border-radius:8px;padding:0;cursor:pointer;position:relative;';
+                b.innerHTML = svg;
+                // Ensure SVG is visually centered inside the square
+                const iconEl = b.querySelector('svg');
+                if (iconEl) {
+                    iconEl.style.display = 'block';
+                    iconEl.style.margin = '0';
+                }
+                b.onmouseover = () => b.style.setProperty('background', '#3a3a3a', 'important');
+                b.onmouseout = () => b.style.setProperty('background', '#2a2a2a', 'important');
+                b.onfocus = () => b.style.setProperty('background', '#3a3a3a', 'important');
+                b.onblur = () => b.style.setProperty('background', '#2a2a2a', 'important');
+                return b;
+            };
+
+            // Icons (inline SVG, 18x18)
+            const iconEmail = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>';
+            // Match left panel Sequences icon (paper plane)
+            const iconSequence = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+            const iconPhone = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.18 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.72l.57 3.2a2 2 0 0 1-.5 1.72L8.09 11a16 16 0 0 0 6 6l1.36-2.07a2 2 0 0 1 1.72-.5l3.2.57A2 2 0 0 1 22 16.92z"/></svg>';
+            // Clean list icon (no plus)
+            // Centered three-line list (6→18 to center on 12)
+            const iconListPlus = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 7H18M6 12H18M6 17H18"/></svg>';
+            const iconExport = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="15"/></svg>';
+            const iconSparkles = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 3.6L17 8l-3.4 1.4L12 13l-1.6-3.6L7 8l3.4-1.4L12 3z"/><path d="M19 16l.8 1.8L22 19l-2.2.9L19 22l-.8-2.1L16 19l2.2-.2L19 16z"/><path d="M5 14l.8 1.8L8 16l-2.2.9L5 19l-.8-2.1L2 16l2.2-.2L5 14z"/></svg>';
+            const iconTrash = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>';
+
+            const emailBtn = mkIconBtn('bulk-email-btn', 'Email selected', iconEmail);
+            emailBtn.onclick = () => this.bulkEmailSelected();
+            bar.appendChild(emailBtn);
+
+            const seqWrap = document.createElement('div');
+            seqWrap.style.cssText = 'position:relative;display:inline-block;';
+            const seqBtn = mkIconBtn('bulk-sequence-btn', 'Add to sequence', iconSequence + '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+            // Make sequence icon container a bit wider to accommodate glyph + caret
+            seqBtn.style.width = '42px';
+            seqBtn.onclick = (e) => {
+                console.log('Sequence button clicked!');
+                this.toggleSequenceMenu(e.currentTarget);
+            };
+            seqWrap.appendChild(seqBtn);
+            const menu = document.createElement('div');
+            menu.id = 'bulk-sequence-menu';
+            menu.style.cssText = 'display:none;position:absolute;top:100%;left:0;background:#1a1a1a;border:1px solid #2d2d2d;border-radius:8px;min-width:180px;box-shadow:0 8px 18px rgba(0,0,0,0.4);z-index:3600;overflow:visible;';
+            seqWrap.appendChild(menu);
+            bar.appendChild(seqWrap);
+
+            const callBtn = mkIconBtn('bulk-call-btn', 'Call selected', iconPhone);
+            callBtn.onclick = () => this.bulkCallSelected();
+            bar.appendChild(callBtn);
+
+            const addToListBtn = mkIconBtn('bulk-add-list-btn', 'Add to list', iconListPlus);
+            addToListBtn.onclick = () => this.bulkAddToList();
+            bar.appendChild(addToListBtn);
+
+            const exportBtn = mkIconBtn('bulk-export-btn', 'Export selected', iconExport);
+            exportBtn.onclick = () => this.bulkExportSelected();
+            bar.appendChild(exportBtn);
+
+            const researchBtn = mkIconBtn('bulk-research-btn', 'Research with AI', iconSparkles);
+            researchBtn.onclick = () => this.bulkResearchSelected();
+            bar.appendChild(researchBtn);
+
+            const deleteBtn = mkIconBtn('bulk-delete-btn', 'Delete selected', iconTrash);
+            deleteBtn.style.borderColor = '#7f1d1d';
+            deleteBtn.onclick = () => this.bulkDeleteSelected();
+            bar.appendChild(deleteBtn);
+
+            // Attach labeled tooltips for clarity (Apollo-like hover labels)
+            const addTooltip = (el, label) => {
+                const show = () => {
+                    const tip = document.createElement('div');
+                    tip.className = 'bulk-tip';
+                    tip.textContent = label;
+                    tip.style.cssText = 'position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;background:#0f172a;color:#e5e7eb;border:1px solid #2d2d2d;border-radius:6px;padding:4px 8px;font-size:12px;white-space:nowrap;z-index:4000;box-shadow:0 6px 16px rgba(0,0,0,0.3)';
+                    el.appendChild(tip);
+                };
+                const hide = () => {
+                    const tip = el.querySelector('.bulk-tip');
+                    if (tip) tip.remove();
+                };
+                el.addEventListener('mouseenter', show);
+                el.addEventListener('mouseleave', hide);
+                el.addEventListener('focus', show);
+                el.addEventListener('blur', hide);
+            };
+
+            addTooltip(emailBtn, 'Email');
+            addTooltip(seqBtn, 'Sequence');
+            addTooltip(callBtn, 'Call');
+            addTooltip(addToListBtn, 'Add to list');
+            addTooltip(exportBtn, 'Export');
+            addTooltip(researchBtn, 'Research with AI');
+            addTooltip(deleteBtn, 'Delete');
+
+            controlsLeft.appendChild(bar);
+        }
+        // Normalize button styles (handle upgrades across sessions)
+        const restyleButtons = () => {
+            const allButtons = bar.querySelectorAll('button');
+            allButtons.forEach(btn => {
+                btn.style.setProperty('background', '#2a2a2a', 'important');
+                btn.style.setProperty('border', '1px solid #3a3a3a', 'important');
+                btn.style.setProperty('color', '#ffffff', 'important');
+                btn.style.setProperty('border-radius', '8px', 'important');
+            });
+        };
+        restyleButtons();
+
+        // Also install a scoped style override with !important to force grey backgrounds
+        const styleId = 'bulk-actions-theme';
+        let styleEl = document.getElementById(styleId);
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = `
+            #contacts-bulk-actions button{background:#2a2a2a !important;border:1px solid #3a3a3a !important;color:#fff !important;}
+            #contacts-bulk-actions button:hover{background:#3a3a3a !important;}
+        `;
+        return bar;
+    },
+
+    // Update/show/hide bulk actions bar depending on selection size
+    updateBulkToolbar() {
+        const bar = this.ensureBulkActionsBar();
+        if (!bar) return;
+        const selectedCount = this.selectedContactIds ? this.selectedContactIds.size : 0;
+        const countSpan = document.getElementById('bulk-selected-count');
+        if (countSpan) countSpan.textContent = `Selected ${selectedCount}`;
+        // Animate show/hide of toolbar
+        const currentlyVisible = bar.style.display !== 'none';
+        if (selectedCount > 0 && !currentlyVisible) {
+            bar.style.display = 'inline-flex';
+            bar.style.opacity = '0';
+            bar.style.transform = 'translateY(-6px)';
+            bar.style.transition = 'opacity .18s ease, transform .18s ease';
+            requestAnimationFrame(()=>{ bar.style.opacity = '1'; bar.style.transform = 'translateY(0)'; });
+        } else if (selectedCount === 0 && currentlyVisible) {
+            bar.style.transition = 'opacity .18s ease, transform .18s ease';
+            bar.style.opacity = '0'; bar.style.transform = 'translateY(-6px)';
+            setTimeout(()=>{ bar.style.display = 'none'; }, 180);
+        }
+        // Fade the results info on the right when bar is visible
+        const resultsInfo = document.getElementById('results-info');
+        if (resultsInfo) {
+            resultsInfo.style.transition = 'opacity 0.2s ease';
+            resultsInfo.style.opacity = selectedCount > 0 ? '0' : '1';
+        }
+        // Refresh sequence menu items if visible
+        const menu = document.getElementById('bulk-sequence-menu');
+        if (menu && menu.style.display === 'block') this.populateSequenceMenu(menu);
+    },
+
+    clearSelectedContacts() {
+        if (this.selectedContactIds) this.selectedContactIds.clear();
+        const headerCb = document.getElementById('select-all-checkbox');
+        if (headerCb) headerCb.checked = false;
+        // Uncheck all visible
+        document.querySelectorAll('#contacts-table-body .row-checkbox').forEach(cb => { cb.checked = false; });
+        this.updateBulkToolbar();
+    },
+
+    // Sequence menu helpers - replaced with 2-step modal
+    toggleSequenceMenu(anchorBtn) {
+        console.log('toggleSequenceMenu called');
+        try {
+            this.showSequenceSelectionModal();
+        } catch (error) {
+            console.error('Error in toggleSequenceMenu:', error);
+        }
+    },
+
+    showSequenceSelectionModal() {
+        console.log('showSequenceSelectionModal called');
+        
+        try {
+            // Remove any existing modals
+            const existingModals = document.querySelectorAll('.modal-overlay');
+            existingModals.forEach(modal => modal.remove());
+            console.log('Existing modals removed');
+
+            // Create modal overlay
+            const modalOverlay = document.createElement('div');
+            modalOverlay.className = 'modal-overlay sequence-selection-modal';
+            modalOverlay.style.cssText = `
+                display: flex !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background: rgba(0, 0, 0, 0.8) !important;
+                z-index: 999999 !important;
+                backdrop-filter: blur(8px) !important;
+                align-items: center !important;
+                justify-content: center !important;
+                opacity: 0 !important;
+                transition: opacity 0.3s ease-out !important;
+                pointer-events: auto !important;
+                visibility: visible !important;
+            `;
+
+            console.log('Modal overlay created');
+
+            // Force refresh sequences from SequencesModule
+            if (window.SequencesModule && window.SequencesModule.loadSequences) {
+                window.SequencesModule.loadSequences();
+            }
+
+            // Get sequences from multiple sources with better fallback logic
+            let sequences = [];
+            
+            // Try SequencesModule first
+            if (window.SequencesModule && window.SequencesModule.sequences) {
+                sequences = window.SequencesModule.sequences;
+                console.log('Loaded sequences from SequencesModule:', sequences.length);
+            }
+            // Try CRMApp sequences
+            else if (window.CRMApp && window.CRMApp.sequences) {
+                sequences = window.CRMApp.sequences;
+                console.log('Loaded sequences from CRMApp:', sequences.length);
+            }
+            // Try this.sequences
+            else if (Array.isArray(this.sequences) && this.sequences.length > 0) {
+                sequences = this.sequences;
+                console.log('Loaded sequences from this.sequences:', sequences.length);
+            }
+            // Fallback to demo sequences
+            else {
+                sequences = [
+                    { id: 'seq_demo_1', name: 'Intro outreach', description: 'Initial contact sequence' },
+                    { id: 'seq_demo_2', name: 'Renewal cadence', description: 'Follow-up for renewals' }
+                ];
+                console.log('Using demo sequences:', sequences.length);
+            }
+
+            console.log('Sequences to display:', sequences);
+
+            // Step 1: Sequence selection
+            console.log('Creating modal HTML...');
+            modalOverlay.innerHTML = `
+                <div class="modal-content crm-modal" style="
+                    background: #1a1a1a !important;
+                    border-radius: 12px !important;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+                    max-width: 500px !important;
+                    width: 90% !important;
+                    max-height: 80vh !important;
+                    overflow: hidden !important;
+                    opacity: 0 !important;
+                    transform: translateY(-20px) scale(0.95) !important;
+                    transition: opacity 0.3s ease-out, transform 0.3s ease-out !important;
+                ">
+                    <!-- Header -->
+                    <div style="
+                        padding: 24px 32px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    ">
+                        <div>
+                            <h2 style="color: #fff; margin: 0 0 8px 0; font-size: 1.5rem; font-weight: 600;">Add to sequence</h2>
+                            <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.9rem;">Select a sequence to add ${this.selectedContactIds.size} contact${this.selectedContactIds.size !== 1 ? 's' : ''} to</p>
+                        </div>
+                        <button class="modal-close" style="
+                            background: #3a3a3a !important;
+                            border: 1px solid #4a4a4a !important;
+                            color: #bdc3c7 !important;
+                            font-size: 18px !important;
+                            cursor: pointer !important;
+                            width: 32px !important;
+                            height: 32px !important;
+                            display: flex !important;
+                            align-items: center !important;
+                            justify-content: center !important;
+                            border-radius: 6px !important;
+                            transition: all 0.2s ease !important;
+                            font-weight: 300 !important;
+                            line-height: 1 !important;
+                            padding: 0 !important;
+                        ">&times;</button>
+                    </div>
+
+                    <!-- Content -->
+                    <div style="padding: 32px; max-height: 400px; overflow-y: auto;">
+                        ${sequences.length === 0 ? `
+                            <div style="text-align: center; padding: 40px 20px;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">📧</div>
+                                <h3 style="color: #fff; margin: 0 0 8px 0;">No sequences yet</h3>
+                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0 0 24px 0;">Create your first sequence to get started</p>
+                                <button id="create-new-sequence-btn" style="
+                                    background: linear-gradient(45deg, #3498db, #2980b9);
+                                    border: none;
+                                    color: white;
+                                    padding: 12px 24px;
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    font-size: 0.9rem;
+                                    font-weight: 500;
+                                ">Create New Sequence</button>
+                            </div>
+                        ` : `
+                            <div style="margin-bottom: 24px;">
+                                <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">Select a sequence:</h3>
+                                
+                                ${sequences.map(seq => `
+                                    <div class="sequence-option" data-sequence-id="${seq.id}" style="
+                                        background: rgba(255, 255, 255, 0.05);
+                                        border: 1px solid rgba(255, 255, 255, 0.1);
+                                        border-radius: 12px;
+                                        padding: 20px;
+                                        margin-bottom: 12px;
+                                        cursor: pointer;
+                                        transition: all 0.3s ease;
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 16px;
+                                    ">
+                                        <div style="
+                                            width: 40px;
+                                            height: 40px;
+                                            background: linear-gradient(45deg, #3498db, #2980b9);
+                                            border-radius: 8px;
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            font-size: 14px;
+                                            font-weight: 600;
+                                            color: white;
+                                            flex-shrink: 0;
+                                        ">${seq.name ? seq.name.charAt(0).toUpperCase() : 'S'}</div>
+                                        <div style="flex: 1; min-width: 0;">
+                                            <h4 style="color: #fff; margin: 0 0 4px 0; font-size: 1rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${seq.name || 'Untitled Sequence'}</h4>
+                                            <div style="display: flex; align-items: center; gap: 12px; color: rgba(255, 255, 255, 0.6); font-size: 0.85rem;">
+                                                ${seq.steps ? `<span>${seq.steps.length} steps</span>` : '<span>0 steps</span>'}
+                                                ${seq.activeContacts ? `<span>• ${seq.activeContacts} contacts</span>` : ''}
+                                                ${seq.description ? `<span>• ${seq.description}</span>` : ''}
+                                            </div>
+                                        </div>
+                                        <div style="
+                                            width: 24px;
+                                            height: 24px;
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            color: rgba(255, 255, 255, 0.4);
+                                            flex-shrink: 0;
+                                        ">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="9 18 15 12 9 6"></polyline>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <div style="text-align: center; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                                <button id="create-new-sequence-btn" style="
+                                    background: rgba(255, 255, 255, 0.1);
+                                    border: 1px solid rgba(255, 255, 255, 0.2);
+                                    color: #fff;
+                                    padding: 12px 24px;
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    font-size: 0.9rem;
+                                    transition: all 0.2s ease;
+                                ">+ Create New Sequence</button>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+
+            console.log('Modal HTML created');
+
+            document.body.appendChild(modalOverlay);
+            
+            console.log('Modal added to DOM');
+            
+            // Smooth animation - trigger after DOM is ready
+            requestAnimationFrame(() => {
+                modalOverlay.style.opacity = '1';
+                const modalContent = modalOverlay.querySelector('.modal-content');
+                if (modalContent) {
+                    modalContent.style.opacity = '1';
+                    modalContent.style.transform = 'translateY(0) scale(1)';
+                }
+                console.log('Animation triggered');
+                
+                // Test if modal is visible
+                setTimeout(() => {
+                    const computedStyle = window.getComputedStyle(modalOverlay);
+                    console.log('Modal visibility check:', {
+                        display: computedStyle.display,
+                        opacity: computedStyle.opacity,
+                        zIndex: computedStyle.zIndex,
+                        position: computedStyle.position,
+                        visibility: computedStyle.visibility
+                    });
+                    
+                    // Add a bright border for debugging if needed
+                    if (computedStyle.opacity === '0') {
+                        modalOverlay.style.border = '5px solid red';
+                        modalOverlay.style.background = 'rgba(255, 0, 0, 0.3)';
+                        console.log('Modal appears to be invisible - added red border for debugging');
+                    }
+                }, 100);
+            });
+            
+            // Add event listeners
+            this.attachSequenceModalListeners(modalOverlay);
+            
+            console.log('showSequenceSelectionModal completed');
+            
+        } catch (error) {
+            console.error('Error in showSequenceSelectionModal:', error);
+            alert('Error creating modal: ' + error.message);
+        }
+    },
+
+    attachSequenceModalListeners(modalOverlay) {
+        // Close modal
+        const closeBtn = modalOverlay.querySelector('.modal-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modalOverlay.remove();
+            });
+        }
+
+        // Close on overlay click
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                modalOverlay.remove();
+            }
+        });
+
+        // Sequence option selection
+        const sequenceOptions = modalOverlay.querySelectorAll('.sequence-option');
+        sequenceOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const sequenceId = option.dataset.sequenceId;
+                this.showSequenceConfirmation(modalOverlay, sequenceId);
+            });
+
+            // Hover effects
+            option.addEventListener('mouseenter', () => {
+                option.style.background = 'rgba(255, 255, 255, 0.1)';
+                option.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+            });
+
+            option.addEventListener('mouseleave', () => {
+                option.style.background = 'rgba(255, 255, 255, 0.05)';
+                option.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            });
+        });
+
+        // Create new sequence button
+        const createBtn = modalOverlay.querySelector('#create-new-sequence-btn');
+        if (createBtn) {
+            createBtn.addEventListener('click', () => {
+                modalOverlay.remove();
+                // Open sequence creation modal
+                if (window.SequencesModule && window.SequencesModule.showCreateSequenceModal) {
+                    window.SequencesModule.showCreateSequenceModal();
+                } else {
+                    alert('Sequence creation not available');
+                }
+            });
+        }
+    },
+
+    showSequenceConfirmation(modalOverlay, sequenceId) {
+        // Get sequence details
+        const sequences = window.SequencesModule && window.SequencesModule.sequences ? 
+            window.SequencesModule.sequences : this.sequences || [];
+        const sequence = sequences.find(s => String(s.id) === String(sequenceId));
+        const sequenceName = sequence ? (sequence.name || 'Untitled Sequence') : 'Selected Sequence';
+
+        // Step 2: Confirmation
+        modalOverlay.innerHTML = `
+            <div class="modal-content crm-modal" style="
+                background: #1a1a1a !important;
+                border-radius: 12px !important;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+                max-width: 500px !important;
+                width: 90% !important;
+                animation: modalSlideIn 0.3s ease-out !important;
+            ">
+                <!-- Header -->
+                <div style="
+                    padding: 24px 32px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                ">
+                    <div style="flex: 1;">
+                        <h2 style="color: #fff; margin: 0 0 8px 0; font-size: 1.5rem; font-weight: 600;">Add to sequence</h2>
+                        <div style="
+                            background: rgba(255, 255, 255, 0.1);
+                            border-radius: 12px;
+                            padding: 16px;
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            margin-bottom: 8px;
+                        ">
+                            <div style="
+                                width: 32px;
+                                height: 32px;
+                                background: linear-gradient(45deg, #3498db, #2980b9);
+                                border-radius: 8px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-size: 16px;
+                            ">📧</div>
+                            <div>
+                                <h3 style="color: #fff; margin: 0; font-size: 1rem; font-weight: 500;">${sequenceName}</h3>
+                                <p style="color: rgba(255, 255, 255, 0.7); margin: 0; font-size: 0.85rem;">${sequence ? (sequence.description || 'No description') : ''}</p>
+                            </div>
+                        </div>
+                        <button id="change-sequence-btn" style="
+                            background: rgba(255, 255, 255, 0.08);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                            color: #fff;
+                            width: 80px;
+                            height: 36px;
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            transition: background 0.2s ease, border-color 0.2s ease;
+                            margin-top: 8px;
+                            font-size: 12px;
+                        " title="Change sequence" aria-label="Change sequence">Change</button>
+                    </div>
+                    <button class="modal-close" style="
+                        background: none;
+                        border: none;
+                        color: #bdc3c7;
+                        font-size: 24px;
+                        cursor: pointer;
+                        width: 36px;
+                        height: 36px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 4px;
+                        margin-left: 16px;
+                        transition: background 0.2s;
+                    ">&times;</button>
+                </div>
+
+                <!-- Content -->
+                <div style="padding: 32px;">
+                    <div style="margin-bottom: 32px;">
+                        <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 1.1rem; font-weight: 500;">Confirmation</h3>
+                        <p style="color: rgba(255, 255, 255, 0.9); margin: 0 0 16px 0; font-size: 0.95rem;">
+                            You're about to add <strong>${this.selectedContactIds.size} contact${this.selectedContactIds.size !== 1 ? 's' : ''}</strong> to the sequence "<strong>${sequenceName}</strong>".
+                        </p>
+                        <div style="
+                            background: rgba(52, 152, 219, 0.1);
+                            border: 1px solid rgba(52, 152, 219, 0.3);
+                            border-radius: 8px;
+                            padding: 16px;
+                            margin-bottom: 16px;
+                        ">
+                            <p style="color: #3498db; margin: 0; font-size: 0.9rem; font-weight: 500;">
+                                💡 Tip: Contacts will be added to the sequence and will receive the first step according to the sequence's timing settings.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button id="cancel-sequence-btn" style="
+                            background: rgba(255, 255, 255, 0.1);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                            color: #fff;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 0.9rem;
+                        ">Cancel</button>
+                        <button id="confirm-sequence-btn" style="
+                            background: linear-gradient(45deg, #3498db, #2980b9);
+                            border: none;
+                            color: white;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 0.9rem;
+                            font-weight: 500;
+                        ">Add to Sequence</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Attach confirmation listeners
+        this.attachSequenceConfirmationListeners(modalOverlay, sequenceId);
+    },
+
+    attachSequenceConfirmationListeners(modalOverlay, sequenceId) {
+        // Close modal
+        const closeBtn = modalOverlay.querySelector('.modal-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modalOverlay.remove();
+            });
+        }
+
+        // Change sequence button
+        const changeBtn = modalOverlay.querySelector('#change-sequence-btn');
+        if (changeBtn) {
+            changeBtn.addEventListener('click', () => {
+                // Go back to sequence selection
+                this.showSequenceSelectionModal();
+            });
+        }
+
+        // Cancel button
+        const cancelBtn = modalOverlay.querySelector('#cancel-sequence-btn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                modalOverlay.remove();
+            });
+        }
+
+        // Confirm button
+        const confirmBtn = modalOverlay.querySelector('#confirm-sequence-btn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                modalOverlay.remove();
+                this.bulkAddToSequence(sequenceId);
+            });
+        }
+    },
+
+    // Bulk actions implementations (lightweight)
+    getSelectedContactsArray() {
+        const ids = this.selectedContactIds ? Array.from(this.selectedContactIds) : [];
+        const map = new Map((this.contacts||[]).map(c=>[c.id, c]));
+        return ids.map(id=>map.get(id)).filter(Boolean);
+    },
+
+    bulkEmailSelected() {
+        const contacts = this.getSelectedContactsArray();
+        if (contacts.length === 0) return;
+        const toList = contacts.map(c=>c.email).filter(Boolean).join(', ');
+        if (typeof this.openCompose === 'function') {
+            this.openCompose({
+                to: toList,
+                name: `${contacts.length} recipients`,
+                source: 'contacts-bulk'
+            });
+        } else {
+            this.showNotification(`Opening email to ${contacts.length} contact(s)`, 'info');
+            try { window.location.href = `mailto:?bcc=${encodeURIComponent(toList)}`; } catch(_){}
+        }
+    },
+
+    bulkAddToSequence(sequenceId) {
+        const contacts = this.getSelectedContactsArray();
+        if (contacts.length === 0) {
+            this.showNotification('No contacts selected', 'warning');
+            return;
+        }
+
+        // Get sequence details from SequencesModule or fallback
+        const sequences = window.SequencesModule && window.SequencesModule.sequences ? 
+            window.SequencesModule.sequences : this.sequences || [];
+        const sequence = sequences.find(s => String(s.id) === String(sequenceId));
+        const sequenceName = sequence ? (sequence.name || 'Untitled Sequence') : 'Selected Sequence';
+
+        // Add contacts to sequence (integrate with existing sequence engine)
+        if (window.SequencesModule && window.SequencesModule.addContactsToSequence) {
+            // Use SequencesModule if available
+            window.SequencesModule.addContactsToSequence(sequenceId, contacts);
+        } else {
+            // Fallback implementation
+            if (sequence) {
+                // Update sequence with new contacts
+                if (!sequence.activeContacts) sequence.activeContacts = 0;
+                sequence.activeContacts += contacts.length;
+                
+                // Save to Firebase if available
+                if (typeof db !== 'undefined' && sequence.id) {
+                    db.collection('sequences').doc(sequence.id).update({
+                        activeContacts: sequence.activeContacts
+                    }).catch(error => {
+                        console.error('Error updating sequence:', error);
+                    });
+                }
+            }
+        }
+
+        // Show success notification
+        this.showNotification(`Added ${contacts.length} contact${contacts.length !== 1 ? 's' : ''} to "${sequenceName}"`, 'success');
+        
+        // Clear selection
+        this.clearContactSelection();
+        
+        // Refresh sequence data if SequencesModule is available
+        if (window.SequencesModule && window.SequencesModule.loadSequences) {
+            window.SequencesModule.loadSequences();
+        }
+    },
+
+    bulkCallSelected() {
+        const contacts = this.getSelectedContactsArray();
+        this.showNotification(`Starting call session for ${contacts.length} contact(s) (stub)`, 'info');
+    },
+
+    bulkAddToList() {
+        const contacts = this.getSelectedContactsArray();
+        this.showNotification(`Added ${contacts.length} contact(s) to list (stub)`, 'info');
+    },
+
+    bulkExportSelected() {
+        const contacts = this.getSelectedContactsArray();
+        if (contacts.length === 0) { this.showNotification('No contacts selected to export', 'warning'); return; }
+        const headers = ['First Name','Last Name','Title','Email','Phone','Account','Created'];
+        const rows = contacts.map(c=>[
+            c.firstName||'',
+            c.lastName||'',
+            c.title||'',
+            c.email||'',
+            c.phone||c.mobile||'',
+            c.accountName||'',
+            (c.createdAt && (c.createdAt.toDate? c.createdAt.toDate(): c.createdAt)) ? new Date(c.createdAt).toLocaleDateString(): ''
+        ]);
+        const csv = [headers.join(','), ...rows.map(r=>r.map(x=>String(x).includes(',')?`"${String(x).replace(/"/g,'""')}"`:String(x)).join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `contacts_selected_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        this.showNotification('Exported selected contacts', 'success');
+    },
+
+    bulkResearchSelected() {
+        const count = this.getSelectedContactsArray().length;
+        this.showNotification(`Research with AI on ${count} contact(s) (coming soon)`, 'info');
+    },
+
+    bulkDeleteSelected() {
+        const contacts = this.getSelectedContactsArray();
+        if (contacts.length === 0) return;
+        const ok = window.confirm(`Delete ${contacts.length} selected contact(s)? This cannot be undone.`);
+        if (!ok) return;
+        const ids = new Set(this.selectedContactIds);
+        // Remove from local
+        this.contacts = (this.contacts||[]).filter(c=>!ids.has(c.id));
+        // Attempt remote delete if Firebase available
+        if (typeof db !== 'undefined') {
+            contacts.forEach(c=>{ try { db.collection('contacts').doc(c.id).delete(); } catch(_){} });
+        }
+        this.selectedContactIds.clear();
+        this.renderContactsTableAdvanced();
+        this.showNotification('Deleted selected contacts', 'success');
     },
 
     buildContactRowCells(contact, index) {
@@ -355,7 +1339,7 @@ Object.assign(CRMApp, {
                 <div class="row-actions">
                     <button class="btn-icon" title="Call" onclick="CRMApp.callContact('${contact.id}')">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.18 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.72c.12.86.31 1.7.57 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.13a2 2 0 0 1 2.11-.45c.8.26 1.64.45 2.5.57A2 2 0 0 1 22 16.92z"></path>
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.18 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.72l.57 3.2a2 2 0 0 1-.5 1.72L8.09 11a16 16 0 0 0 6 6l1.58-1.13a2 2 0 0 1 2.11-.45c.8.26 1.64.45 2.5.57A2 2 0 0 1 22 16.92z"></path>
                         </svg>
                     </button>
                     <button class="btn-icon" title="Email" onclick="CRMApp.emailContact('${contact.id}')">
@@ -541,8 +1525,8 @@ Object.assign(CRMApp, {
     // Render the contacts page by injecting the external HTML and initializing behavior
     async renderContactsPage() {
         console.log('renderContactsPage: loading contacts-content.html');
-        console.log('Available contacts data:', this.contacts ? this.contacts.length : 'undefined', 'contacts');
-        console.log('Available accounts data:', this.accounts ? this.accounts.length : 'undefined', 'accounts');
+        console.log('Available contacts data:', CRMApp.contacts ? CRMApp.contacts.length : 'undefined', 'contacts');
+        console.log('Available accounts data:', CRMApp.accounts ? CRMApp.accounts.length : 'undefined', 'accounts');
         
         const container = document.getElementById('contacts-view');
         if (!container) {
@@ -623,16 +1607,17 @@ Object.assign(CRMApp, {
         }
 
         // Initialize advanced contacts UI
-        this.initContactsPage();
+        // Add a small delay to ensure data is loaded
+        setTimeout(() => {
+            this.initContactsPage();
+        }, 100);
         
         // If no contacts data is available, try to load it
-        if (!this.contacts || this.contacts.length === 0) {
+        if (!CRMApp.contacts || CRMApp.contacts.length === 0) {
             console.warn('No contacts data available, attempting to load...');
             // Try to get data from the main CRM app or load fallback data
             if (window.CRMApp && window.CRMApp.contacts) {
-                this.contacts = window.CRMApp.contacts;
-                this.accounts = window.CRMApp.accounts;
-                console.log('Loaded contacts from CRMApp:', this.contacts.length);
+                console.log('Loaded contacts from CRMApp:', CRMApp.contacts.length);
                 // Re-render with the loaded data
                 this.renderContactsTableAdvanced();
             }

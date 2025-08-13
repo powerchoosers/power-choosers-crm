@@ -173,6 +173,18 @@ Object.assign(CRMApp, {
             targetView.style.position = 'static';
             targetView.style.left = 'auto';
             
+            // Scroll content container to top so new view is not offset
+            const contentContainer = document.querySelector('.app-content-container');
+            if (contentContainer) {
+                contentContainer.scrollTop = 0;
+            }
+            const mainContent = document.getElementById('main-content-wrapper');
+            if (mainContent) {
+                mainContent.scrollTop = 0;
+            }
+            // Reset window scroll position as fallback
+            window.scrollTo(0, 0);
+            
             // Add page-loaded class after animation completes
             setTimeout(() => {
                 targetView.classList.add('page-loaded');
@@ -223,7 +235,7 @@ Object.assign(CRMApp, {
                 }
                 break;
             case 'calls-view':
-                // Render Calls page and show cold-calling widgets (dialer, insights, etc.)
+                console.log('Attempting to render calls page in showView. renderCallsPage defined:', !!this.renderCallsPage);
                 if (this.renderCallsPage) {
                     this.renderCallsPage();
                 } else {
@@ -231,6 +243,12 @@ Object.assign(CRMApp, {
                 }
                 if (coldCallingWidgetsContainer) {
                     coldCallingWidgetsContainer.style.display = 'flex';
+                }
+                break;
+            case 'sequence-builder-view':
+                // Ensure right widget panel content is visible on builder
+                if (crmWidgetsContainer) {
+                    crmWidgetsContainer.style.display = 'flex';
                 }
                 break;
         }

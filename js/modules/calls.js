@@ -33,78 +33,92 @@
 
       container.innerHTML = `
         <div class="calls-container">
-          <div class="calls-header">
-            <h3 class="card-title title-with-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-              </svg>
-              Calls
-            </h3>
-            <div class="calls-actions">
-              <button id="open-dialer-btn" class="btn btn-primary">New call</button>
+          <div class="calls-top-card">
+            <div class="calls-header">
+              <div class="title-with-icon">
+                <span class="title-icon-badge title-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                </span>
+                <h1 class="contacts-title">Calls</h1>
+              </div>
+            </div>
+            
+            <!-- Top tools row (inside the top card) -->
+            <div class="calls-toolbar">
+              <div class="left">
+                <button id="calls-filter-toggle-btn" class="filter-toggle-btn" title="Toggle filters">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                  </svg>
+                </button>
+                <input id="calls-search" class="form-input calls-search" placeholder="Quick search" />
+              </div>
             </div>
           </div>
 
-          <div class="calls-toolbar">
-            <div class="left">
-              <button id="calls-filters-btn" class="btn btn-secondary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
-                Show Filters
-              </button>
-            </div>
-            <div class="right">
-              <input id="calls-search" class="form-input calls-search" placeholder="Quick search" />
-            </div>
-          </div>
+          <div class="calls-main-layout">
+            <!-- Main content row: sidebar + table -->
+            <div class="calls-content">
+              <!-- Sidebar placeholder to be populated by ensureFilters() -->
+              <aside id="calls-filters-sidebar" class="calls-filters-sidebar collapsed"></aside>
 
-          <div class="calls-table-container">
-            <!-- Top controls: selection + compact pagination (now inside container) -->
-            <div class="table-controls">
-              <div class="table-controls-left">
-                <span class="selection-text" id="calls-select-all">Select All</span>
-              </div>
-              <div class="table-controls-right">
-                <span class="results-info" id="calls-results-info">Showing 0 of 0 calls</span>
-                <button class="pagination-btn" id="calls-top-prev" aria-label="Previous" title="Previous">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
-                <button class="pagination-btn" id="calls-top-next" aria-label="Next" title="Next">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </button>
-              </div>
-            </div>
-            <div class="calls-table-wrapper">
-              <table class="calls-table">
-                <thead>
-                  <tr>
-                    <th class="col-number">#</th>
-                    <th class="col-checkbox"><input type="checkbox" id="calls-header-select-all" aria-label="Select all on page"></th>
-                    <th>Contact</th>
-                    <th>Insights</th>
-                    <th>Company</th>
-                    <th>Direction</th>
-                    <th>Purpose</th>
-                    <th>Disposition</th>
-                    <th>Duration</th>
-                    <th>Note</th>
-                    <th>Date</th>
-                    <th>User</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="calls-tbody"></tbody>
-              </table>
-            </div>
-            <div class="pagination-container">
-              <div class="pagination-info"><span id="calls-pagination-info2">Showing 0-0 of 0 calls</span></div>
-              <div class="pagination-controls">
-                <button class="pagination-btn" id="calls-prev" aria-label="Previous" title="Previous">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
-                <div class="pagination-numbers" id="calls-page-nums"></div>
-                <button class="pagination-btn" id="calls-next" aria-label="Next" title="Next">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </button>
+              <!-- Table card (controls + table + bottom pagination) -->
+              <div class="calls-table-container" style="--controls-h: 44px;">
+                <!-- Top controls: selection + compact pagination -->
+                <div class="table-controls">
+                  <div class="table-controls-left">
+                    <span class="selection-text" id="calls-select-all">Select All</span>
+                  </div>
+                  <div class="table-controls-right">
+                    <span class="results-info" id="calls-results-info">Showing 0 of 0 calls</span>
+                    <button class="pagination-btn" id="calls-top-prev" aria-label="Previous" title="Previous">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <button class="pagination-btn" id="calls-top-next" aria-label="Next" title="Next">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Scrollable table area -->
+                <div class="calls-table-wrapper">
+                  <table class="calls-table">
+                    <thead>
+                      <tr>
+                        <th class="col-number">#</th>
+                        <th class="col-checkbox"><input type="checkbox" id="calls-header-select-all" aria-label="Select all on page"></th>
+                        <th>Contact</th>
+                        <th>Insights</th>
+                        <th>Company</th>
+                        <th>Direction</th>
+                        <th>Purpose</th>
+                        <th>Disposition</th>
+                        <th>Duration</th>
+                        <th>Note</th>
+                        <th>Date</th>
+                        <th>User</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="calls-tbody"></tbody>
+                  </table>
+                </div>
+
+                <!-- Bottom pagination (inside the card) -->
+                <div class="pagination-container">
+                  <div class="pagination-info"><span id="calls-pagination-info2">Showing 0-0 of 0 calls</span></div>
+                  <div class="pagination-controls">
+                    <button class="pagination-btn" id="calls-prev" aria-label="Previous" title="Previous">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div class="pagination-numbers" id="calls-page-nums"></div>
+                    <button class="pagination-btn" id="calls-next" aria-label="Next" title="Next">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -112,7 +126,7 @@
       `;
 
       // Bind actions
-      document.getElementById('open-dialer-btn')?.addEventListener('click', () => this.openDialerWidget('crm'));
+      // (Removed New call button)
 
       // State and helpers
       this.callsPerPage = this.callsPerPage || 50;
@@ -301,10 +315,15 @@
 
       // Filters sidebar wiring (populate from Contacts/Accounts when available)
       const ensureFilters = () => {
-        if (document.getElementById('calls-filters-sidebar')) return;
-        const el = document.createElement('div');
-        el.id = 'calls-filters-sidebar';
-        el.className = 'filters-sidebar collapsed';
+        let el = document.getElementById('calls-filters-sidebar');
+        if (!el) {
+          const contentRow = container.querySelector('.calls-content') || container.querySelector('.calls-main-layout') || container;
+          el = document.createElement('aside');
+          el.id = 'calls-filters-sidebar';
+          el.className = 'calls-filters-sidebar collapsed';
+          contentRow.insertBefore(el, contentRow.firstElementChild || null);
+        }
+        // Populate/refresh inner content
         el.innerHTML = `
           <div class="filters-header">
             <div class="filters-title">
@@ -339,8 +358,6 @@
             </div>
             <div class="filter-actions"><button class="btn btn-secondary" id="calls-clear-filters">Clear All</button></div>
           </div>`;
-        // Insert next to calls-view container
-        container.appendChild(el);
       };
 
       const populateFilters = () => {
@@ -370,12 +387,18 @@
         }
       };
 
-      document.getElementById('calls-filters-btn')?.addEventListener('click', () => {
+      document.getElementById('calls-filter-toggle-btn')?.addEventListener('click', (e) => {
         ensureFilters();
         const sidebar = document.getElementById('calls-filters-sidebar');
         if (!sidebar) return;
         const open = !sidebar.classList.contains('collapsed');
-        if (open) sidebar.classList.add('collapsed'); else sidebar.classList.remove('collapsed');
+        if (open) {
+          sidebar.classList.add('collapsed');
+          e.currentTarget.classList.remove('active');
+        } else {
+          sidebar.classList.remove('collapsed');
+          e.currentTarget.classList.add('active');
+        }
         populateFilters();
       });
 
@@ -405,7 +428,9 @@
           const topSearch = document.getElementById('calls-search'); if (topSearch) topSearch.value = '';
           this.callsCurrentPage = 1; renderRows();
         }
-        if (t.id === 'calls-filters-collapse-btn') {
+        // Make collapse work even when clicking the SVG or its children
+        const collapseBtn = t.closest ? t.closest('#calls-filters-collapse-btn') : null;
+        if (collapseBtn) {
           const sidebar = document.getElementById('calls-filters-sidebar');
           if (sidebar) sidebar.classList.add('collapsed');
         }

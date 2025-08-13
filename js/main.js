@@ -50,7 +50,8 @@
             
             console.log(`All ${loadedModules} modules loaded successfully`);
             
-            // Initialize Gmail integration first (non-blocking failure)
+            // Temporarily disable Gmail initialization to troubleshoot connection error
+            /*
             if (typeof GmailModule !== 'undefined' && GmailModule.init) {
                 try {
                     await GmailModule.init();
@@ -58,6 +59,7 @@
                     console.warn('GmailModule initialization failed:', e);
                 }
             }
+            */
 
             // Initialize the CRM app after all modules are loaded
             if (typeof CRMApp !== 'undefined' && CRMApp.init) {
