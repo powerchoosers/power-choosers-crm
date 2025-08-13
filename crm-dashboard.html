@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Choosers CRM Dashboard</title>
     <!-- Link to your main CRM stylesheet -->
-    <link rel="stylesheet" href="crm-styles.css?v=dev-5">
+    <link rel="stylesheet" href="crm-styles.css?v=dev-7">
     <!-- Contacts page styles -->
     <link rel="stylesheet" href="contacts-styles.css?v=dev-4">
     <!-- Calling scripts margin adjustments -->
@@ -13,7 +13,7 @@
     <!-- Sequences page styles -->
     <link rel="stylesheet" href="sequences-styles.css?v=dev-4">
     <!-- Emails page styles -->
-    <link rel="stylesheet" href="emails-styles.css?v=dev-4">
+    <link rel="stylesheet" href="emails-styles.css?v=dev-7">
     <!-- Tailwind CSS CDN (if not already part of crm-styles.css or main index.html) -->
     <!-- Assuming crm-styles.css handles all styling including Tailwind imports/directives -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -34,6 +34,8 @@
     <script>
       window.CRM_API_BASE_URL = 'https://9e096ecd82b8.ngrok-free.app';
     </script>
+    
+    <!-- Emergency CSS removed: layout now handled in crm-styles.css to avoid page-level scrolling -->
 </head>
 <body>
     <div class="app-wrapper">
@@ -378,8 +380,9 @@
             </div>
         </main>
 
-        <div id="add-account-modal" class="modal-overlay">
+        <div id="add-account-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('add-account-modal')">
             <div class="modal-content">
+                <button class="modal-close-btn" onclick="closeModal('add-account-modal')">✕</button>
                 <div class="modal-header">
                     <h3 class="modal-title">Add New Account</h3>
                     <p class="modal-subtitle">Enter the company details below.</p>
@@ -413,8 +416,9 @@
             </div>
         </div>
 
-        <div id="add-contact-modal" class="modal-overlay">
+        <div id="add-contact-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('add-contact-modal')">
             <div class="modal-content">
+                <button class="modal-close-btn" onclick="closeModal('add-contact-modal')">✕</button>
                 <div class="modal-header">
                     <h3 class="modal-title">Add New Contact</h3>
                     <p class="modal-subtitle">Enter the contact details below.</p>
@@ -454,8 +458,9 @@
             </div>
         </div>
         
-        <div id="bulk-import-modal" class="modal-overlay">
+        <div id="bulk-import-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('bulk-import-modal')">
             <div class="modal-content">
+                <button class="modal-close-btn" onclick="closeModal('bulk-import-modal')">✕</button>
                 <div class="modal-header">
                     <h3 class="modal-title">Bulk Import from CSV</h3>
                     <p class="modal-subtitle">Upload a CSV file to import contacts or accounts.</p>
@@ -477,6 +482,7 @@
                         <button type="submit" class="btn btn-primary">Import</button>
                     </div>
                 </form>
+            </div>
         </div>
 
         <div class="notification-dropdown" id="notification-dropdown">
