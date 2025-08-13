@@ -3,7 +3,6 @@
     display: flex !important;
     flex-direction: column !important;
     height: calc(100vh - 70px) !important; /* header is 70px */
-    background: transparent !important; /* let global dark blue show through */
     color: #ffffff !important;
     padding: 0 !important; /* top margin handled by contacts-container */
     overflow: visible !important;
@@ -25,7 +24,6 @@
     /* Ensure sidebar animates width (avoid auto->0 which doesn't animate) */
     --sidebar-width: 280px;
     /* Match contacts page background and colors */
-    background: transparent !important; /* let global dark blue show through */
     color: #ffffff !important;
     overflow: visible !important;
     --hover-bg: #1e293b;
@@ -34,6 +32,11 @@
     --text-secondary: #ffffff;
     --text-muted: #ffffff;
     --page-bg: #141414; /* used by scroll shadow to match view background */
+    /* Make the accounts view fill the content column height */
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 70px) !important; /* header is 70px */
+    padding: 0 !important;
 }
 
 /* Trim horizontal padding for Actions to reduce empty space */
@@ -42,7 +45,8 @@
 
 /* Card wrapper for entire contacts section */
 .contacts-container {
-    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)); /* 25px visible margins; compensate for inner padding */
+    /* Ensure exact 25px visible margin on all sides. Add +1px to compensate for card border. */
+    margin: 25px calc(25px - var(--spacing-lg) + 1px) 25px calc(25px - var(--spacing-lg) + 1px);
     background: var(--card-bg, #141414);
     border: 1px solid var(--border-color);
     border-radius: 25px;
@@ -206,7 +210,7 @@
     flex: 1;
     overflow: auto;
     padding-right: 8px; /* keep last column fully visible within rounded card */
-    background: #141414;
+    background: #1a1a1a;
 }
 
 .contacts-table {
@@ -219,7 +223,7 @@
 }
 
 .contacts-table thead {
-    background: #141414;
+    background: #1a1a1a;
     position: sticky;
     top: 0;
     z-index: 2;
@@ -1139,7 +1143,7 @@
 }
 
 #accounts-view .contacts-table-wrapper {
-    background: var(--widget-bg);
+    background: #1a1a1a;
 }
 
 #accounts-view .view-options {
@@ -1152,7 +1156,8 @@
 
 /* Contacts: match Accounts widget/grey palette */
 #contacts-view .contacts-container {
-    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+    /* Ensure exact 25px visible margin when nested in main-content (which has horizontal padding) */
+    margin: 25px calc(25px - var(--spacing-lg) + 1px) 25px calc(25px - var(--spacing-lg) + 1px);
     background: var(--widget-bg);
     border: 1px solid var(--widget-border);
     border-radius: 25px;
@@ -1190,7 +1195,7 @@
 }
 
 #contacts-view .contacts-table-wrapper {
-    background: var(--widget-bg);
+    background: #1a1a1a;
 }
 
 #contacts-view .view-options {
@@ -1436,6 +1441,33 @@
 .view-options .view-toggle[data-view="list"] svg { color: #ffffff; }
 /* Filters sidebar title icon */
 .filters-title svg { color: #ffffff; }
+
+/* ---- Accounts-specific layout overrides (fix bottom gap and hidden table) ---- */
+/* The base Contacts CSS sets fixed heights that don’t match Accounts.
+   For Accounts, switch to flex-based fill and remove calc heights. */
+#accounts-view .contacts-container {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;           /* override height: calc(100% - 50px) */
+  overflow: hidden !important;       /* outer card should not scroll */
+}
+#accounts-view .contacts-main-layout {
+  display: flex !important;
+  flex-direction: row !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;           /* override height: calc(100vh - 140px) */
+  overflow: hidden !important;       /* delegate scroll to inner wrapper */
+  gap: 24px;                         /* preserve spacing between sidebar and table */
+}
+#accounts-view .contacts-table-container,
+#accounts-view .contacts-table-wrapper {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+#accounts-view .contacts-table-wrapper { overflow: auto !important; }
 
 /* Center header titles, but left-align Name/Account cell contents (with avatars) */
 .contacts-table td.col-name .cell-name { display: flex; align-items: center; justify-content: flex-start; gap: 10px; }

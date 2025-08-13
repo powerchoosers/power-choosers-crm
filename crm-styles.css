@@ -133,9 +133,34 @@ html, body {
 
 .app-content-container {
     flex: 1;
+    /* Prevent page-level scroll; inner panes (tables, widget panel) manage their own scroll */
     overflow: hidden;
     display: flex;
     height: calc(100vh - 70px); /* Full height minus header */
+    min-height: 0;
+}
+
+/* Page view containers - main background color for contacts and accounts pages */
+.page-view {
+    background: #1a1a1a;
+    width: 100%;
+    height: 100%;
+    /* Avoid page-level scrolling; let inner wrappers (tables) scroll */
+    overflow: visible;
+    padding: 25px;
+}
+
+/* Page view overrides cleaned up */
+
+/* Adjust container width for pages to fit properly on screen */
+#contacts-view,
+#accounts-view,
+#calls-view,
+#tasks-view,
+#sequences-view,
+#sequence-builder-view {
+    width: 100% !important;
+    margin: 0 !important;
 }
 
 /* Card title and icon spacing */
@@ -226,7 +251,7 @@ html, body {
     padding: 0 16px 0 48px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--border-light);
-    border-radius: 21px;
+    border-radius: 20px; /* Changed from 21px to match icon-button rounded edges */
     color: var(--text-primary);
     font-size: 0.9rem;
     transition: all 0.3s ease;
@@ -248,7 +273,7 @@ html, body {
     left: 16px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--text-muted);
+    color: #ffffff; /* Changed from var(--text-muted) to white */
     background: none;
     border: none;
     cursor: pointer;
@@ -271,7 +296,7 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-primary);
+    color: #ffffff; /* Changed from var(--text-primary) to white */
     cursor: pointer;
     position: relative;
     transition: all 0.2s ease;
@@ -725,14 +750,17 @@ html, body {
 }
 
 .main-content {
-    overflow-y: auto;
+    height: 100%;
+    /* Stop scrolling on the main content column; inner table wrappers handle scroll */
+    overflow-y: visible;
     overflow-x: visible; /* allow negative-margin cards to render fully */
-    padding: 0 var(--spacing-lg); /* Vertical padding removed */
+    padding: 0; /* Horizontal padding removed; per-view containers provide exact 25px margins */
     position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
     min-width: 0; /* Allow flex shrinking */
+    background: #1a1a1a; /* Two-tone effect: lighter grey background for main content area */
 }
 
 .main-content > *:first-child {
@@ -765,40 +793,32 @@ html, body {
     box-shadow: var(--shadow-scroll);
 }
 
-/* Remove scroll-under shadow and top gradient for Contacts/Accounts/Tasks views
-   so the outer gap matches the global dark-blue background exactly */
-.main-content:has(#contacts-view),
-.main-content:has(#accounts-view),
-.main-content:has(#calls-view),
-.main-content:has(#tasks-view),
-.main-content:has(#sequences-view),
-.main-content:has(#sequence-builder-view) {
+/* Remove scroll-under shadow and top gradient for specific views that need it */
+.main-content:has(#emails-view) {
     box-shadow: none;
 }
-.main-content:has(#contacts-view)::before,
-.main-content:has(#accounts-view)::before,
-.main-content:has(#calls-view)::before,
-.main-content:has(#tasks-view)::before,
-.main-content:has(#sequences-view)::before,
-.main-content:has(#sequence-builder-view)::before {
+.main-content:has(#emails-view)::before {
     display: none;
 }
 
-.main-content:has(#calls-view) {
-    overflow-y: hidden !important;
-}
+
 
 /* Tasks view: align container spacing to 25px and remove default first-child padding */
 #tasks-view {
     display: flex !important;
     flex-direction: column !important;
     height: calc(100vh - 70px) !important; /* header is 70px */
-    background: transparent !important; /* let global dark blue show through */
     padding: 0 !important; /* top spacing handled by .tasks-layout margin */
     overflow: visible !important;
     /* unify with Contacts/Accounts revamp neutrals */
     --revamp-surface: #1a1a1a;
     --revamp-border: #2d2d2d;
+}
+
+/* --- Calls Page Bottom Spacing Fix -- */
+/* Add bottom padding to match the top spacing provided by the .main-content container */
+#calls-view {
+    padding-bottom: var(--spacing-lg);
 }
 
 /* Sequences views: align container spacing to 25px and remove default padding */
@@ -807,7 +827,6 @@ html, body {
     display: flex !important;
     flex-direction: column !important;
     height: calc(100vh - 70px) !important; /* header is 70px */
-    background: transparent !important; /* let global dark blue show through */
     padding: 0 !important; /* child cards provide the 25px margin */
     overflow: visible !important;
 }
@@ -816,32 +835,43 @@ html, body {
 #calls-view {
     display: flex !important;
     flex-direction: column !important;
-    background: transparent !important; /* let global background show through */
     padding: 0 !important; /* spacing handled by single-card margins */
     overflow: visible !important;
 }
 
-/* Do not add extra padding on the scroll container; dashboard will render its own spacer */
+/* Dashboard view: extend main content to fill space and align scrollbar with widget panel */
 .main-content:has(#dashboard-view) {
-    padding-bottom: 0 !important;
+    padding: 0 !important; /* Remove all padding to extend to edges */
+}
+
+/* Ensure dashboard content has proper margins */
+#dashboard-view {
+    padding: 0 var(--spacing-lg) 25px var(--spacing-lg) !important; /* Add horizontal and bottom padding to dashboard content */
+    height: auto !important;
+    min-height: calc(100vh - 95px) !important; /* Ensure full viewport height minus header */
 }
 
 /* Listing and emails views should not add extra container bottom padding */
-.main-content:has(#accounts-view),
 .main-content:has(#contacts-view),
-.main-content:has(#calls-view),
+.main-content:has(#accounts-view),
 .main-content:has(#emails-view),
 .main-content:has(#sequences-view),
 .main-content:has(#sequence-builder-view) {
     padding-bottom: 0 !important;
 }
 
-/* Sequences pages: enforce 25px visible side gap and 25px card radius */
-#sequences-view > .sequences-page-container,
-#sequence-builder-view > .sequence-builder-container {
-  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)) !important;
-  border-radius: 25px !important;
+/* Remove page-view padding for specific pages to prevent off-centering */
+#contacts-view,
+#accounts-view,
+#calls-view,
+#tasks-view,
+#emails-view,
+#sequences-view,
+#sequence-builder-view {
+    padding: 0 !important; /* Remove the 25px padding that's causing off-centering */
 }
+
+/* Remove sequences-specific overrides to use same rules as other pages */
 
 /* Tasks view: keep standard parent padding; child uses compensated margins */
 
@@ -851,6 +881,9 @@ html, body {
 #emails-view > .dashboard-card:last-of-type {
     margin-bottom: 0 !important;
 }
+
+/* Accounts view: prevent container-level bottom padding from adding extra gap */
+#accounts-view { padding-bottom: 0 !important; }
 
 /* --- 6. Right Widget Panel (Enhanced) --- */
 .widget-panel {
@@ -947,7 +980,8 @@ html, body {
 #dashboard-view {
     display: flex !important;
     flex-direction: column;
-    gap: 0; /* spacing handled by explicit section margins */
+    gap: 25px; /* Add consistent spacing between sections */
+    overflow-y: auto !important;
 }
 
 #dashboard-view.active {
@@ -1155,7 +1189,7 @@ html, body {
 
 .action-button:hover {
     background: transparent;
-    transform: translateY(-2px) scale(1.02);
+    transform: translateY(-2px);
     border-color: var(--accent-blue);
     color: white;
     box-shadow: 0 8px 25px rgba(33, 150, 243, 0.3);
@@ -1172,6 +1206,7 @@ html, body {
 .activity-list-container {
     position: relative;
     overflow: hidden;
+    height: 300px;
 }
 
 .activity-list-wrapper {
@@ -1597,7 +1632,7 @@ html, body {
     outline: none;
     border-color: var(--accent-blue);
     background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.15);
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3); /* Updated to match primary-blue */
     transform: translateY(-1px);
 }
 
@@ -1693,8 +1728,14 @@ html, body {
 .toast-warning { background: #ff9800; }
 .toast-info { background: var(--accent-blue); }
 
-/* Header logo: force white to match dark theme */
+/* Header logo: show original colors by default */
 .app-header .app-logo img {
+    filter: none;
+}
+
+/* Optional utility: add class 'invert' on .app-logo or use .logo-invert wrapper to force white logo */
+.app-header .app-logo.invert img,
+.logo-invert img {
     filter: brightness(0) invert(1);
 }
 
@@ -2278,8 +2319,7 @@ html, body {
   flex-direction: column;
   gap: 16px;
   /* Single-card container to match Emails/Contacts/Accounts */
-  /* Compensate for .main-content horizontal padding so the visible side gap is exactly 25px */
-  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  margin: 25px;
   min-height: calc(100% - 50px);
   background: var(--widget-bg);
   border: 1px solid var(--widget-border);
@@ -2350,7 +2390,7 @@ html, body {
   border-radius: 25px;
   border: 1px solid var(--widget-border);
   overflow: hidden; /* clip children to rounded corners */
-  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  margin: 25px;
   background: var(--widget-bg);
 }
 
@@ -2669,7 +2709,7 @@ html, body {
 /* Dashboard (home) view spacing: exact 25px from top bar to first content */
 #dashboard-view {
   padding-top: 25px !important; /* override generic .main-content > *:first-child padding */
-  padding-bottom: 0; /* bottom gap comes from main-content padding */
+  padding-bottom: 25px !important; /* ensure bottom spacing */
 }
 #dashboard-view::after {
   content: '';
@@ -2704,7 +2744,7 @@ html, body {
   /* Keep static to avoid any jank */
   opacity: 1;
   /* Fit within viewport; container inside manages margins */
-  height: calc(100% - 50px);
+  min-height: 100%;
   min-width: 0;     /* avoid causing horizontal page scroll */
   box-sizing: border-box;
 }
@@ -2714,7 +2754,7 @@ html, body {
 
 /* Calls main card container mirroring Contacts/Accounts `.contacts-container` */
 #calls-view .calls-container {
-  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  margin: 25px;
   background: var(--widget-bg);
   border: 1px solid var(--widget-border);
   border-radius: 25px;
@@ -2722,7 +2762,8 @@ html, body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* allow inner scrollers */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 #calls-view .calls-header {
@@ -2895,8 +2936,8 @@ html, body {
   border: 1px solid var(--pc-border);
   border-radius: 14px;
   overflow: hidden; /* clip sticky header corners and scrollbar to radius */
-  /* 25px visual inset within the main calls container */
-  margin: 25px;
+  /* reduced top margin, removed bottom margin to sit flush */
+  margin: 12px 25px 0 25px;
 }
 #calls-view.page-view .calls-table-wrapper {
   flex: 1 1 auto;
@@ -2971,10 +3012,10 @@ html, body {
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid var(--pc-border);
-  background: var(--pc-bg);
+  background: var(--widget-bg);
 }
 /* Ensure controls/pagination are visually inside the bordered table container */
-#calls-view.page-view .calls-table-container .table-controls { border-bottom: 1px solid var(--pc-border); background: var(--pc-bg); }
+#calls-view.page-view .calls-table-container .table-controls { border-bottom: 1px solid var(--pc-border); background: var(--widget-bg); }
 #calls-view .table-controls-left { display: flex; align-items: center; gap: 12px; }
 #calls-view .table-controls-right { display: flex; align-items: center; gap: 8px; }
 #calls-view .selection-text { color: #ffffff; cursor: pointer; user-select: none; }
@@ -2996,8 +3037,10 @@ html, body {
   padding: 12px 16px;
   border-top: 1px solid var(--pc-border);
   background: var(--pc-bg);
-  margin-top: auto; /* anchor to bottom of the table container */
-  flex-shrink: 0;   /* prevent collapsing when space is tight */
+  margin-top: 20px; /* Add consistent top margin */
+  position: sticky;
+  bottom: 0; /* sit flush with the bottom of the table container; outer 25px comes from container margin */
+  z-index: 2;
 }
 /* If pagination lives inside the calls-table-container, it will naturally sit at the bottom.
    If it's outside in markup, this keeps visuals consistent but ideally it should be inside. */
@@ -3009,7 +3052,146 @@ html, body {
 
 /* Removed global main content padding to prevent page-level scroll on Calls */
 
+/* Calls page — main layout (mirrors Contacts/Accounts pattern) */
+#calls-view .calls-container {
+  padding: 8px 0 0 0; /* reduce top spacing above header */
+  /* no explicit height; allow natural height so 25px outer margins render correctly */
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow: hidden;
+}
+
+#calls-view .calls-main-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0; /* we'll control spacing via table margins */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0; /* remove inner padding to avoid double spacing */
+}
+
+/* Top tools row (Filters button + search) */
+#calls-view .calls-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0; /* inside top card, card provides padding */
+}
+#calls-view .calls-toolbar .left { display: flex; gap: 8px; align-items: center; }
+#calls-view .calls-toolbar .calls-search { height: 32px; padding: 8px 12px; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 8px; color: #e2e8f0; }
+#calls-view .calls-toolbar .calls-search:focus { outline: none; border-color: var(--accent-orange, #f59e0b); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12); }
+
+/* Unified top card: header + toolbar */
+#calls-view .calls-top-card {
+  background: #1f1f1f !important;
+  border: none;
+  border-radius: 12px;
+  margin: 0; /* remove side margin to align with Contacts/Accounts */
+  padding: 8px 24px 8px 32px; /* match Contacts/Accounts left padding */
+  position: relative; /* anchor the divider */
+  display: grid;
+  gap: 8px; /* tighter spacing between header and toolbar */
+}
+#calls-view .calls-top-card .calls-header,
+#calls-view .calls-top-card .calls-toolbar { background: #1f1f1f !important; }
+#calls-view .calls-top-card::before,
+#calls-view .calls-top-card::after { display: none !important; content: none !important; }
+
+/* Calls header icon badge to mirror Contacts header icon treatment */
+#calls-view .title-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #2d2d2d);
+  background: #1a1a1a;
+  color: #ffffff;
+}
+#calls-view .title-icon-badge svg { width: 18px; height: 18px; color: inherit; }
+
+/* Edge-to-edge divider under the top section (overrides the generic ::after disable above) */
+#calls-view .calls-container .calls-top-card::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute;
+  left: 0; /* no side margin now; align to card edges */
+  right: 0;
+  bottom: 0;
+  height: 1px; /* per request: thinner divider */
+  background: var(--border-color, #2d2d2d) !important; /* match dividers elsewhere */
+  pointer-events: none;
+  /* solid 2px line to match other pages */
+}
+#calls-view .calls-top-card .calls-header,
+#calls-view .calls-top-card .calls-toolbar { border: 0 !important; box-shadow: none !important; }
+#calls-view .calls-top-card .calls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0; /* rely on top-card padding for outer spacing */
+}
+#calls-view .calls-top-card .calls-header .card-title { margin: 0; }
+#calls-view .calls-top-card .calls-actions { display: flex; align-items: center; gap: 10px; }
+#calls-view .calls-top-card .calls-toolbar { padding: 0; }
+
+/* Content row: sidebar + table */
+#calls-view .calls-content {
+  display: flex;
+  gap: 0; /* use margin on table for conditional 25px spacing */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  /* Ensure outer right and bottom spacing to the container; left = 0 to avoid double with table margin */
+  padding: 0 25px 25px 0;
+}
+
+/* Embedded filters sidebar (not overlay) */
+#calls-view .calls-filters-sidebar {
+  width: var(--sidebar-width, 280px);
+  background: var(--pc-bg); /* match lighter card grey */
+  border-right: 1px solid var(--pc-border);
+  flex-shrink: 0;
+  overflow-y: auto;
+  height: 100%;
+  transition: all 0.22s ease;
+  position: relative;
+}
+#calls-view .calls-filters-sidebar.collapsed {
+  width: 0;
+  border-right: none;
+  overflow: hidden;
+}
+
+/* Table card spacing: 25px to left/top; right/bottom handled by .calls-content padding */
+#calls-view .calls-table-container { margin: 25px 0 0 25px; }
+/* Keep 25px between sidebar and table when sidebar is open (margin already provides it) */
+/* When the sidebar is collapsed, margin remains 25px creating the required all-around spacing */
+
+/* Calls table container matches Contacts/Accounts card */
+#calls-view .calls-table-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--pc-bg);
+  border-radius: 12px;
+  border: 1px solid var(--pc-border);
+  overflow: hidden;
+  min-height: 0;
+}
+
+#calls-view .calls-table-wrapper {
+  flex: 1;
+  overflow: auto;
+  white-space: nowrap; /* allow horizontal scroll if needed */
+}
+
 /* Calls page — Filters sidebar (overlay, collapsible) */
+#calls-view .calls-content { padding: 0 !important; }
+#calls-view .calls-content > .calls-table-container { margin: 25px !important; }
 #calls-view { position: relative; }
 #calls-view .filters-sidebar {
   position: absolute;
@@ -3023,12 +3205,12 @@ html, body {
   z-index: 5;
 }
 #calls-view .filters-sidebar.collapsed { width: 0; border-right: none; box-shadow: none; }
-#calls-view .filters-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--pc-border); background: #141414; }
+#calls-view .calls-filters-sidebar .filters-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--pc-border); background: var(--pc-bg); }
 #calls-view .filters-title { display: flex; align-items: center; gap: 10px; color: #e2e8f0; }
 #calls-view .filters-title h3 { margin: 0; font-size: 1rem; font-weight: 600; }
 #calls-view .filters-collapse-btn { background: #2a2a2a; border: 1px solid #3a3a3a; color: #e2e8f0; width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 #calls-view .filters-collapse-btn:hover { background: #3a3a3a; }
-#calls-view .filters-content { padding: 12px; display: grid; gap: 12px; }
+#calls-view .calls-filters-sidebar .filters-content { padding: 12px; display: grid; gap: 12px; background: var(--pc-bg); }
 #calls-view .filter-group { display: grid; gap: 6px; }
 #calls-view .filter-label { color: #e2e8f0; font-size: 0.9rem; }
 #calls-view .filter-input, #calls-view .filter-select { background: #2a2a2a; color: #ffffff; border: 1px solid #3a3a3a; border-radius: 8px; padding: 8px 10px; }
@@ -3042,6 +3224,9 @@ html, body {
   background: var(--pc-bg);
   margin-top: auto; /* anchor to bottom of card */
   flex-shrink: 0;   /* prevent collapsing when space is tight */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 #calls-view.page-view #calls-pagination-info { color: #ffffff; }
 
@@ -3094,3 +3279,590 @@ html, body {
   cursor: pointer;
 }
 .icon-button:hover { background: #1f2937; color: #e5e7eb; }
+
+/* ---- Calls view spacing overrides (scoped, non-invasive) ---- */
+/* Ensure the Calls page shows an exact 25px gap above and below the main card
+   and compensates for `.main-content` horizontal padding so side gaps are 25px. */
+.main-content:has(#calls-view) { padding-bottom: 0 !important; }
+#calls-view { padding-bottom: 0 !important; }
+#calls-view .calls-container {
+  margin: 25px !important;
+}
+/* Keep inner table block inset 25px within the container */
+#calls-view.page-view .calls-table-container { margin: 25px !important; }
+
+#calls-view.page-view .calls-table-container {
+  display: flex;
+  flex-direction: column;
+  background: #141414;
+  flex: 1 1 auto;  /* fill remaining space inside the card */
+  min-height: 0;   /* allow inner scroller to actually scroll */
+  /* New: contain the lines inside this container */
+  border: 1px solid var(--pc-border);
+  border-radius: 14px;
+  overflow: hidden; /* clip sticky header corners and scrollbar to radius */
+  /* reduced top margin, removed bottom margin to sit flush */
+  margin: 8px 25px 0 25px;
+}
+
+/* ---- Calls table spacing: final scoped override ---- */
+#calls-view .calls-table-container { margin: 25px 25px 0 25px !important; }
+#calls-view .pagination-container { margin-top: 0 !important; bottom: 0 !important; }
+#calls-view .calls-container { gap: 0 !important; }
+
+/* Calls pagination bars: use lighter card grey */
+#calls-view .pagination-container,
+#calls-view.page-view .calls-pagination {
+  background: var(--widget-bg) !important;
+  border-top: 1px solid var(--widget-border) !important;
+}
+
+/* ---- Calls table color flip: light container, dark table ---- */
+#calls-view.page-view .calls-table-container {
+  background: var(--widget-bg) !important; /* lighter grey wrapper */
+}
+#calls-view.page-view .calls-table {
+  background: #141414 !important; /* darker inner table area */
+}
+#calls-view.page-view .calls-table thead th {
+  background: #141414 !important; /* match darker table */
+  border-bottom: 1px solid var(--pc-border) !important;
+}
+#calls-view.page-view .calls-table tbody tr {
+  background: #141414 !important; /* dark rows */
+}
+#calls-view.page-view .calls-table tbody tr:nth-child(even) {
+  background: #141414 !important; /* remove zebra striping */
+}
+#calls-view.page-view .calls-table tbody tr:hover {
+  background: #1a1a1a !important; /* subtle lighter hover */
+}
+
+/* ---- Calls table: force full light grey ---- */
+#calls-view.page-view .calls-table-container { background: var(--widget-bg) !important; }
+#calls-view.page-view .calls-table,
+#calls-view.page-view .calls-table thead th,
+#calls-view.page-view .calls-table tbody tr { background: var(--widget-bg) !important; }
+#calls-view.page-view .calls-table thead th { border-bottom: 1px solid var(--widget-border) !important; }
+#calls-view.page-view .calls-table tbody tr:hover { background: var(--widget-bg) !important; }
+
+/* ---- Calls table: subtle zebra striping (tuned) ---- */
+#calls-view.page-view .calls-table tbody tr { background: var(--widget-bg) !important; }
+#calls-view.page-view .calls-table tbody tr:nth-child(even) { background: #1b1b1b !important; } /* slightly darker than base */
+#calls-view.page-view .calls-table tbody tr:hover { background: #1d1d1d !important; }
+
+/* ---- Calls page: pagination buttons match Contacts ---- */
+#calls-view .pagination-controls { gap: 8px; }
+#calls-view .pagination-btn {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  color: #e5e7eb !important;
+  width: 36px; height: 36px; border-radius: 8px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+#calls-view .pagination-btn:hover { background: #3a3a3a !important; color: #ffffff !important; border-color: #3a3a3a !important; }
+#calls-view .pagination-btn svg { color: inherit !important; stroke: currentColor !important; width: 16px; height: 16px; }
+#calls-view .pagination-numbers .page-num {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  color: #ffffff !important;
+  border-radius: 8px; padding: 6px 10px;
+}
+#calls-view .pagination-numbers .page-num:hover { background: #3a3a3a !important; }
+#calls-view .pagination-numbers .page-num.active {
+  background: var(--accent-orange, #f59e0b) !important;
+  color: #ffffff !important;
+  border-color: var(--accent-orange, #f59e0b) !important;
+}
+
+/* Calls page filter toggle button to match Contacts */
+#calls-view .filter-toggle-btn,
+#calls-view #accounts-filter-toggle-btn, /* fallback if reused */
+#calls-view .filters-collapse-btn {
+  background: transparent !important;
+  border: 1px solid var(--widget-border) !important;
+  color: #e2e8f0 !important;
+  border-radius: 8px !important;
+  width: 36px; height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+#calls-view .filter-toggle-btn:hover,
+#calls-view .filters-collapse-btn:hover { background: #1f2937 !important; }
+/* Active (open) state: orange like Contacts */
+#calls-view .filter-toggle-btn.active {
+  background: var(--accent-orange, #f59e0b) !important;
+  border-color: var(--accent-orange, #f59e0b) !important;
+  color: #ffffff !important;
+}
+#calls-view .filter-toggle-btn.active svg { color: inherit !important; stroke: currentColor !important; }
+
+/* Calls filters sidebar: use light container grey */
+#calls-view .calls-filters-sidebar {
+  background: var(--widget-bg) !important;
+  border-right: 1px solid var(--widget-border) !important;
+}
+#calls-view .calls-filters-sidebar .filters-header {
+  background: var(--widget-bg) !important;
+  border-bottom: 1px solid var(--widget-border) !important;
+}
+#calls-view .calls-filters-sidebar .filters-content {
+  background: var(--widget-bg) !important;
+}
+
+/* Calls table header text color: white to match rest of UI */
+#calls-view .calls-table thead th { color: #ffffff !important; }
+
+/* Contacts and Accounts main container radius */
+#contacts-view .contacts-container,
+#accounts-view .contacts-container,
+#accounts-view .accounts-container {
+  border-radius: 12px !important;
+}
+/* Calls, Tasks, and Sequences main container radius */
+#calls-view .calls-container,
+#tasks-view > .tasks-layout,
+#sequences-view .sequences-page-container,
+#sequence-builder-view .sequence-builder-container {
+  border-radius: 12px !important;
+}
+
+/* Sequences: enforce outer margins and bottom spacing */
+#sequences-view,
+#sequence-builder-view {
+  display: flex !important;
+  flex-direction: column !important;
+}
+#sequences-view .sequences-page-container,
+#sequence-builder-view .sequence-builder-container {
+  margin: 25px !important;
+}
+
+/* Make widget panel visible on sequence builder like other pages */
+#sequence-builder-view ~ .widget-panel,
+#sequences-view ~ .widget-panel {
+  display: flex !important;
+}
+
+/* Sequence Builder: enforce 25px bottom spacing and visible widgets */
+#sequence-builder-view { padding-bottom: 25px !important; }
+.app-content-container:has(#sequence-builder-view) .widget-panel { display: flex !important; }
+
+/* Also apply to Sequences view */
+#sequences-view { padding-bottom: 25px !important; }
+.app-content-container:has(#sequences-view) .widget-panel { display: flex !important; }
+
+/* ---- Sequence Builder: enforce 25px bottom viewport gap (builder only) ---- */
+.main-content:has(#sequence-builder-view) { padding-bottom: 0 !important; }
+#sequence-builder-view { padding-bottom: 0 !important; }
+#sequence-builder-view .sequence-builder-container { margin-bottom: 25px !important; }
+
+/* ---- Sequence Builder: add bottom padding on scroll container for visible 25px gap ---- */
+.app-content-container:has(#sequence-builder-view) { padding-bottom: 0 !important; }
+
+/* ---- Sequence Builder: enforce equal 25px visible margins on all sides ---- */
+#sequence-builder-view > .sequence-builder-container {
+  /* left/right compensate for .main-content side padding via var(--spacing-lg) */
+  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)) !important;
+}
+
+/* --- Per-Page Targeted Margin Overrides (exact 25px) --- */
+/* Contacts */
+#contacts-view > .contacts-container { margin: 25px !important; }
+/* Fallback: if container class differs, apply to first child only */
+#contacts-view > *:first-child { margin: 25px !important; }
+
+/* Accounts */
+#accounts-view > .contacts-container { margin: 25px !important; }
+#accounts-view > .accounts-container { margin: 25px !important; }
+#accounts-view > *:first-child { margin: 25px !important; }
+
+/* Emails (several structures supported) */
+#emails-view > .emails-layout { margin: 25px !important; }
+#emails-view > .emails-container { margin: 25px !important; }
+#emails-view > .email-page { margin: 25px !important; }
+#emails-view > .email-page-container { margin: 25px !important; }
+#emails-view > *:first-child { margin: 25px !important; }
+
+/* Calls and Tasks already normalized but keep here for consistency */
+#calls-view > .calls-container { margin: 25px !important; }
+#tasks-view > .tasks-layout { margin: 25px !important; }
+
+/* Sequences */
+#sequences-view > .sequences-page-container { margin: 25px !important; }
+#sequence-builder-view > .sequence-builder-container { margin: 25px !important; }
+
+/* Accounts: ensure card fills height with exact 25px margins (flex fill) */
+#accounts-view { display: flex !important; flex-direction: column !important; min-height: 0 !important; }
+#accounts-view > .accounts-container,
+#accounts-view > .contacts-container {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important; /* fill remaining height */
+  min-height: 0 !important;  /* allow inner scrollers to take over */
+  overflow: hidden !important; /* outer container should not scroll */
+}
+#accounts-view > .accounts-container > *,
+#accounts-view > .contacts-container > * { min-height: 0; }
+
+/* Accounts: make main layout fill remaining height and delegate scroll to inner wrapper */
+#accounts-view .contacts-main-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* All Accounts page: use flex layout to fill available space */
+#accounts-view {
+  height: 100% !important; /* Fill available space from parent container */
+  padding: 0 !important; /* Remove default page-view padding */
+  overflow: hidden !important; /* Ensure no overflow issues */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Force accounts container to expand and manage its own margins */
+#accounts-view > .accounts-container,
+#accounts-view > .contacts-container {
+  flex: 1 !important; /* Fill remaining height */
+  margin: 25px !important; /* All-around 25px margin */
+  height: auto !important; /* Let flex handle the height */
+  max-height: none !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Additional fallback: target any container inside accounts-view */
+#accounts-view .contacts-container,
+#accounts-view .accounts-container {
+  flex: 1 !important; /* Fill remaining height instead of fixed calculations */
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
+/* Ensure the main content wrapper doesn't interfere */
+.main-content:has(#accounts-view) {
+  height: 100% !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+/* Override any conflicting page-view styles for accounts */
+#accounts-view.page-view {
+  height: 100% !important; /* Use flex parent height instead of viewport */
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #1a1a1a !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+#accounts-view .contacts-main-layout .accounts-table-container,
+#accounts-view .contacts-main-layout .accounts-table-wrapper,
+#accounts-view .contacts-main-layout .table-container,
+#accounts-view .contacts-main-layout .table-wrapper,
+#accounts-view .contacts-main-layout .contacts-content,
+#accounts-view .contacts-main-layout .accounts-content {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important; /* actual scroller */
+}
+/* Fallback: if inner wrappers have different names, make the last section the scroller */
+#accounts-view .contacts-header { flex: 0 0 auto !important; }
+#accounts-view .contacts-main-layout > * { min-height: 0 !important; }
+#accounts-view .contacts-main-layout > *:last-child { flex: 1 1 auto !important; overflow: auto !important; }
+
+/* Encourage inner data area to occupy remaining height and handle scrolling */
+#accounts-view .accounts-table-container,
+#accounts-view .accounts-table-wrapper,
+#accounts-view .table-container,
+#accounts-view .table-wrapper,
+#accounts-view .accounts-content {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Ensure only inner content scrolls; wrappers themselves do not scroll */
+#contacts-view > .contacts-container,
+#accounts-view > .contacts-container,
+#accounts-view > .accounts-container,
+#emails-view > .emails-layout,
+#emails-view > .emails-container,
+#emails-view > .email-page,
+#emails-view > .email-page-container,
+#calls-view > .calls-container,
+#tasks-view > .tasks-layout,
+#sequences-view > .sequences-page-container,
+#sequence-builder-view > .sequence-builder-container {
+  overflow: hidden !important;
+}
+
+/* --- CRM Modal Theme (shared) --- */
+.crm-modal {
+  background: var(--widget-bg, #141414) !important;
+  border: 1px solid var(--widget-border, #1e293b) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
+  width: 90% !important;
+  max-width: 720px !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  position: relative !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+}
+.crm-modal .modal-header { border-bottom: 1px solid var(--widget-border, #1e293b) !important; }
+.crm-modal h2, .crm-modal h3, .crm-modal h4, .crm-modal p, .crm-modal label { color: #e5e7eb !important; }
+.crm-modal input, .crm-modal textarea, .crm-modal select {
+  background: #1f2937 !important;
+  border: 1px solid var(--widget-border, #1e293b) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+}
+.crm-modal .btn-primary { background: #f59e0b !important; color: #fff !important; border: 1px solid #f59e0b !important; border-radius: 10px !important; }
+.crm-modal .btn-cancel { background: transparent !important; color: #cbd5e1 !important; border: 1px solid var(--widget-border, #1e293b) !important; border-radius: 10px !important; }
+
+/* Modal overlay/content scrolling behavior */
+.modal-overlay { overflow: auto !important; }
+.crm-modal { max-height: 90vh !important; overflow-y: auto !important; }
+
+/* Dashboard inline modals: apply CRM modal theme and scrolling */
+#add-contact-modal .modal-content,
+#bulk-import-modal .modal-content,
+#add-account-modal .modal-content {
+  background: var(--widget-bg, #141414) !important;
+  border: 1px solid var(--widget-border, #1e293b) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+}
+#add-contact-modal .modal-header,
+#bulk-import-modal .modal-header,
+#add-account-modal .modal-header { border-bottom: 1px solid var(--widget-border, #1e293b) !important; }
+#add-contact-modal .form-input,
+#bulk-import-modal .form-input,
+#add-account-modal .form-input {
+  background: #1f2937 !important;
+  border: 1px solid var(--widget-border, #1e293b) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+}
+#add-contact-modal .btn-primary,
+#bulk-import-modal .btn-primary,
+#add-account-modal .btn-primary { background: #f59e0b !important; color: #fff !important; border: 1px solid #f59e0b !important; border-radius: 10px !important; }
+#add-contact-modal .btn-secondary,
+#bulk-import-modal .btn-secondary,
+#add-account-modal .btn-secondary { background: transparent !important; color: #cbd5e1 !important; border: 1px solid var(--widget-border, #1e293b) !important; border-radius: 10px !important; }
+
+/* Dashboard modal inputs: grey theme */
+#add-contact-modal .form-input,
+#bulk-import-modal .form-input,
+#add-account-modal .form-input {
+  background: #2a2a2a !important;
+  border: 1px solid var(--widget-border, #1e293b) !important;
+  color: #e5e7eb !important;
+}
+
+/* Modal close X button */
+.modal-overlay .modal-close-btn {
+  position: absolute; top: 16px; right: 16px;
+  width: 36px; height: 36px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #2a2a2a; color: #e5e7eb; border: 1px solid #3a3a3a;
+  cursor: pointer;
+}
+.modal-overlay .modal-close-btn:hover { background: #3a3a3a; border-color: #4a4a4a; color: #ffffff; }
+
+/* Contacts select-scope popover (Apollo-like) */
+.contacts-popover {
+  position: absolute; z-index: 10000;
+  background: var(--widget-bg, #141414);
+  border: 1px solid var(--widget-border, #1e293b);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #e5e7eb;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+  min-width: 240px;
+  animation: popIn 140ms ease-out;
+}
+.contacts-popover .pop-item { display: block; padding: 8px 4px; cursor: pointer; }
+.contacts-popover input[type="radio"] { margin-right: 8px; accent-color: #f59e0b; }
+.contacts-popover .pop-input { background: #1f2937; border: 1px solid var(--widget-border, #1e293b); color: #fff; border-radius: 8px; padding: 6px 8px; }
+.contacts-popover .pop-apply { background: #f59e0b; color:#fff; border: 1px solid #f59e0b; border-radius: 8px; padding: 6px 12px; }
+@keyframes popIn { from { opacity:0; transform: translateY(-6px) scale(.98); } to { opacity:1; transform: translateY(0) scale(1); } }
+
+/* Bulk actions toolbar */
+.bulk-actions-toolbar {
+  position: absolute; z-index: 9999;
+  background: rgba(20,20,20,0.96);
+  border: 1px solid var(--widget-border, #1e293b);
+  border-radius: 12px; padding: 8px 10px; color: #e5e7eb;
+  display: flex; align-items: center; gap: 12px; box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+}
+.bulk-actions-toolbar .bar-left { padding-right: 8px; border-right: 1px solid #2c2c2c; }
+.bulk-actions-toolbar .link { background: transparent; border: none; color: #9aa5b1; cursor: pointer; }
+.bulk-actions-toolbar .bar-actions { display:flex; gap: 8px; }
+.bulk-actions-toolbar .bar-btn { background: #2a2a2a; border: 1px solid #3a3a3a; color: #e5e7eb; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.bulk-actions-toolbar .bar-btn:hover { background: #3a3a3a; color: #fff; }
+.bar-enter { animation: barIn 160ms ease-out; }
+@keyframes barIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
+
+/* Accounts View Layout */
+#accounts-view {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 70px); /* Full viewport height minus header */
+  width: 100%;
+  padding: 25px 25px 0 25px; /* Only top, left, right padding */
+  box-sizing: border-box;
+  overflow: hidden;
+  background: transparent;
+}
+
+#accounts-view .accounts-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-card);
+  border-radius: 8px 8px 0 0; /* Rounded corners only on top */
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: 0; /* Remove any bottom margin */
+}
+
+/* Ensure the table wrapper takes remaining space */
+#accounts-view .accounts-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 24px 24px;
+  position: relative;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+#accounts-view .accounts-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-card);
+  z-index: 2;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#accounts-view .accounts-main-layout,
+#accounts-view .contacts-main-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+#accounts-view .accounts-table-container,
+#accounts-view .contacts-table-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+#accounts-view .accounts-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 24px 24px;
+  position: relative;
+  width: 100%;
+}
+
+#accounts-view .accounts-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+#accounts-view .pagination-container {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-light);
+}
+
+/* ---- Contacts View: Targeted Layout Fix ---- */
+/* Ensure contacts view uses flex layout and fills available space */
+#contacts-view {
+  height: 100% !important; /* Fill available space from parent container */
+  padding: 0 !important; /* Remove default page-view padding */
+  overflow: hidden !important; /* Ensure no overflow issues */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Force contacts container to expand with proper margins */
+#contacts-view > .contacts-container {
+  flex: 1 !important; /* Fill remaining height */
+  margin: 20px !important; /* 20px margin on all sides as requested */
+  height: auto !important; /* Let flex handle the height */
+  max-height: none !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important; /* Prevent container scrolling */
+}
+
+/* Ensure the main content wrapper doesn't interfere */
+.main-content:has(#contacts-view) {
+  height: 100% !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+/* Override any conflicting page-view styles for contacts */
+#contacts-view.page-view {
+  height: 100% !important; /* Use flex parent height instead of viewport */
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #1a1a1a !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Ensure contacts main layout fills remaining height */
+#contacts-view .contacts-main-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Ensure contacts table container fills remaining height */
+#contacts-view .contacts-table-container {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Make the table wrapper the scrollable element */
+#contacts-view .contacts-table-wrapper {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: auto !important; /* Allow scrolling within the table area */
+}
+
+/* Ensure widget panel keeps its scrolling function */
+.widget-panel {
+  overflow-y: auto !important; /* Keep widget scrolling */
+  overflow-x: hidden !important;
+}
+
+/* ---- End Contacts View Layout Fix ---- */

@@ -1,0 +1,48 @@
+/* Targeted Fix for All Accounts Page - Full Height Layout */
+
+/* Override conflicting height calculations in main CSS */
+#accounts-view {
+  height: 100% !important; /* Use full available height from main-content */
+  min-height: 100% !important;
+  max-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Ensure accounts container fills the available space with proper margins */
+#accounts-view > .accounts-container {
+  height: auto !important; /* Remove fixed height calculations */
+  min-height: auto !important;
+  max-height: none !important;
+  flex: 1 !important; /* Fill available height */
+  margin: 25px !important; /* Maintain consistent margins */
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* Ensure the main layout and table container properly expand */
+#accounts-view .accounts-main-layout {
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  overflow: hidden !important;
+}
+
+#accounts-view .accounts-table-container {
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* Remove any bottom margins that might cause spacing issues */
+#accounts-view .accounts-table-wrapper {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  margin-bottom: 0 !important;
+}

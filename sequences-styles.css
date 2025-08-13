@@ -2,25 +2,19 @@
 .sequences-page-container {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 120px);
+    height: calc(100vh - 170px); /* Reduce height to prevent scrolling */
     width: 100%;
     background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
     color: #fff;
-    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
-    padding: 32px;
-    border-radius: 20px;
+    margin: 25px; /* Add 25px margins on all sides to match other pages */
+    padding: 16px; /* Add back some padding for content spacing */
+    border-radius: 20px; /* Add back border radius */
     overflow: hidden;
-    border: 1px solid #333;
+    border: 1px solid #333; /* Add back border */
     box-sizing: border-box;
 }
 
-/* Override the sequences-view to take full width */
-#sequences-view {
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
+/* Remove sequences-view override to use same rules as other pages */
 
 /* Header Section */
 .sequences-header {
@@ -463,14 +457,36 @@ input:checked + .toggle-slider:before {
 /* Sequences Revamp (Apollo) */
 /* ========================= */
 
-/* Container aligns with global card spacing and rounding */
+/* Use global CRM layout for #sequences-view; avoid fixed positioning and manual widths */
+#sequences-view {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    width: auto !important;
+    bottom: auto !important;
+    padding: 0 !important; /* outer spacing handled by child container margins */
+    margin: 0 !important;
+    box-sizing: border-box;
+    overflow-y: visible !important;
+    transition: none !important;
+}
+
+/* Sidebar hover should not alter #sequences-view metrics on this page */
+.app-sidebar:hover ~ .app-content-container #sequences-view {
+    left: auto !important;
+    width: auto !important;
+}
+
+/* Container uses fixed 25px outer margins for consistent spacing */
 #sequences-view .sequences-page-container {
-    margin: 25px;
+    margin: 25px !important;
+    height: auto !important; /* avoid clipping */
     background: var(--widget-bg, #141414);
     border: 1px solid var(--widget-border, #1e293b);
     border-radius: var(--card-radius, 20px);
     padding: var(--spacing-xl, 24px);
     color: var(--cch-text-primary, #fff);
+    box-sizing: border-box !important;
 }
 
 .seq-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--widget-border, #1e293b); }
@@ -630,4 +646,64 @@ input:checked + .toggle-slider:before {
 
 #sequences-view .sequences-pagination .page-num:hover {
   background: #3a3a3a;
+}
+
+/* Primary containers margins/bottom spacing */
+/* Limit to builder only to avoid affecting sequences list */
+.sequence-builder-container {
+    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)) !important;
+}
+
+/* Layout: show widget panel only on builder */
+#sequence-builder-view { display: flex !important; }
+#sequence-builder-view .sequence-builder-container { flex: 3 1 auto; height: auto !important; overflow: visible !important; }
+#sequence-builder-view ~ .widget-panel { display: flex !important; flex: 1 1 auto; }
+
+/* Builder: enforce 25px bottom space and show widgets in standard layout */
+.app-content-container > #sequence-builder-view {
+  display: flex !important;
+}
+.app-content-container > #sequence-builder-view .sequence-builder-container {
+  flex: 3 1 auto;
+  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)) !important;
+}
+.app-content-container > #sequence-builder-view ~ .widget-panel {
+  display: flex !important;
+}
+
+/* ---- Sequence Builder: enforce visible 25px bottom spacing ---- */
+.app-content-container > #sequence-builder-view { padding-bottom: 25px !important; }
+.app-content-container > #sequence-builder-view .sequence-builder-container { margin-bottom: 25px !important; }
+
+/* ---- Sequence Builder bottom margin: hard enforce 25px ---- */
+#sequence-builder-view > .sequence-builder-container { margin-bottom: 25px !important; }
+
+/* Steps footer: place Add Step below list, aligned right */
+.sequence-steps .steps-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.sequence-steps .steps-footer .btn-accent {
+  border-radius: 10px;
+}
+
+/* ===== SEQUENCES VIEW MARGIN FIX (neutralized to use global layout) ===== */
+/* Let global CRM rules control sizing; avoid local width/margins here */
+#sequences-view {
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    transition: none !important;
+}
+
+/* When sidebar is expanded (hovered), do not shift this page */
+.app-sidebar:hover ~ .app-content-container #sequences-view {
+    margin-left: 0 !important;
+}
+
+/* Ensure the inner container uses outer margins that net to 25px edges */
+#sequences-view .sequences-page-container {
+    margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg)) !important;
 }

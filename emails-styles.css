@@ -8,7 +8,12 @@
 /* Layout */
 #emails-view {
   width: 100%;
+  height: 100% !important; /* Use full container height */
   flex-direction: column;
+  /* Removed background here to allow site background to show through in margins */
+  padding: 0 !important; /* No padding - let the layout handle spacing */
+  margin: 0 !important;
+  overflow: hidden !important;
   /* Dark theme variable overrides scoped to Emails view */
   --pc-bg: var(--widget-bg);
   --pc-border: var(--widget-border);
@@ -17,9 +22,9 @@
 }
 
 .emails-layout {
-  margin: 25px calc(25px - var(--spacing-lg)) 25px calc(25px - var(--spacing-lg));
+  margin: 0;
   min-height: calc(100% - 50px);
-  background: var(--widget-bg);
+  background: #1a1a1a;
   border: 1px solid var(--widget-border);
   border-radius: 14px;
   overflow: hidden;
