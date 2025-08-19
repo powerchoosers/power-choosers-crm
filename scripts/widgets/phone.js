@@ -5,6 +5,42 @@
   // Exposes: window.Widgets.openPhone(), window.Widgets.closePhone(), window.Widgets.isPhoneOpen()
   if (!window.Widgets) window.Widgets = {};
 
+  // Simple singleton for Vonage Client SDK session
+  const RTC = (function() {
+    const state = { client: null, app: null, call: null, ready: false, connecting: false };
+    async function ensureSession() {
+      if (state.ready && state.app) return state.app;
+      if (state.connecting) {
+        // wait briefly for concurrent init
+        await new Promise(r => setTimeout(r, 500));
+        if (state.ready && state.app) return state.app;
+      }
+      if (typeof NexmoClient === 'undefined') {
+        try { window.crm?.showToast && window.crm.showToast('Vonage Client SDK not loaded'); } catch(_) {}
+        throw new Error('Browser calling SDK not loaded');
+      }
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      state.connecting = true;
+      try {
+        const resp = await fetch(`${base}/api/vonage/jwt?user=agent`);
+        const j = await resp.json().catch(() => ({}));
+        if (!resp.ok || !j?.token) throw new Error(j?.error || `JWT HTTP ${resp.status}`);
+        state.client = new NexmoClient();
+        state.app = await state.client.createSession(j.token);
+        // bind to call events once
+        state.app.on('member:call', (member, call) => {
+          state.call = call;
+          try { window.crm?.showToast && window.crm.showToast('Call connected'); } catch(_) {}
+        });
+        state.ready = true;
+        return state.app;
+      } finally {
+        state.connecting = false;
+      }
+    }
+    return { state, ensureSession };
+  })();
+
   const WIDGET_ID = 'phone-widget';
 
   function getPanelContentEl() {
@@ -183,6 +219,36 @@
 
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
+    async function placeBrowserCall(number) {
+      const app = await RTC.ensureSession();
+      if (!app || typeof app.callPhone !== 'function') {
+        throw new Error('Browser call not supported by SDK (callPhone unavailable)');
+      }
+      app.callPhone(number);
+    }
+    async function fallbackServerCall(number) {
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      const r = await fetch(`${base}/api/vonage/call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: number })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
+      try { window.crm?.showToast && window.crm.showToast('Fallback: ringing your phone now'); } catch(_) {}
+    }
+    function setInCallUI(inCall) {
+      if (!callBtn) return;
+      if (inCall) {
+        callBtn.textContent = 'Hang Up';
+        callBtn.classList.remove('btn-primary');
+        callBtn.classList.add('btn-danger');
+      } else {
+        callBtn.textContent = 'Call';
+        callBtn.classList.remove('btn-danger');
+        callBtn.classList.add('btn-primary');
+      }
+    }
     if (callBtn) callBtn.addEventListener('click', async () => {
       const raw = (input && input.value || '').trim();
       if (!raw) {
@@ -196,20 +262,26 @@
       }
       // update UI with normalized value
       if (input) { input.value = normalized.value; updateHint(); }
-      try { window.crm?.showToast && window.crm.showToast(`Placing call to ${normalized.value}...`); } catch (_) {}
-
+      // If already in a call, hangup
+      if (RTC.state.call) {
+        try { RTC.state.call.hangUp && RTC.state.call.hangUp(); } catch(_) {}
+        RTC.state.call = null;
+        setInCallUI(false);
+        try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
+        return;
+      }
+      try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
       try {
-        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        const r = await fetch(`${base}/api/vonage/call`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: normalized.value })
-        });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
-        try { window.crm?.showToast && window.crm.showToast('Call initiated. Your phone will ring.'); } catch (_) {}
+        await placeBrowserCall(normalized.value);
+        setInCallUI(true);
       } catch (e) {
-        try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e?.message || 'Error'}`); } catch (_) {}
+        // Fallback to server-initiated PSTN flow
+        try { window.crm?.showToast && window.crm.showToast(`Browser call error (${e?.message || 'SDK error'}). Falling back...`); } catch(_) {}
+        try {
+          await fallbackServerCall(normalized.value);
+        } catch (e2) {
+          try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+        }
       }
     });
     const backspaceBtn = card.querySelector('.backspace-btn');
