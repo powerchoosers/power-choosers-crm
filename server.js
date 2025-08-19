@@ -296,6 +296,10 @@ async function handleWebhookAnswer(req, res, parsedUrl) {
           endpoint: [ { type: 'phone', number: AGENT_NUMBER } ]
         }
       ];
+  try {
+    console.log('[answer] to=', to || '(none)', 'recUrl=', recUrl || '(none)');
+    console.log('[answer] NCCO=', JSON.stringify(ncco));
+  } catch (_) {}
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(ncco));
 }
