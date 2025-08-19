@@ -31,7 +31,10 @@ const VONAGE_NUMBER = process.env.VONAGE_NUMBER || '+14693518845'; // Your Vonag
 const AGENT_NUMBER = process.env.AGENT_NUMBER || '+19728342317';     // Number to ring first (your phone)
 const VONAGE_PRIVATE_KEY_PATH = process.env.VONAGE_PRIVATE_KEY_PATH || path.join(__dirname, 'private.key');
 // Public base URL of this server for Vonage webhooks (use ngrok for local dev)
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://powerchoosers.com';
+// For development, we need a URL that Vonage can reach
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || (
+  process.env.NODE_ENV === 'production' ? 'https://powerchoosers.com' : null
+);
 // Google AI Studio API key (Gemini). If present, enables transcription + summary.
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || null;
 // Recording controls

@@ -213,10 +213,77 @@ The system uses multiple field name variations to handle data inconsistencies:
 - Phones: `phone` → `primaryPhone` → `mainPhone`
 - Locations: `city` → `locationCity` → `town`
 - Employee counts: `employees` → `employeeCount` → `numEmployees`
-- Contract dates: `contractEndDate` → `contractEnd` → `contract_end_date`
+- Contract dates:  - `contractEndDate` → `contractEnd` → `contract_end_date`
+  
+## Telephony & Phone Dialer — Current State (as of 2025-08-19)
+
+* __Overview__
+  - Backend server: `server.js` (Node HTTP) on port `3000`.
+  - Webhooks/public URL: `PUBLIC_BASE_URL` = `https://powerchoosers.com` (set in `server.js`).
+  - Vonage App ID: `5b7c6b93-35aa-43d7-8223-53163f1e00c6`.
+  - Numbers: `VONAGE_NUMBER` = `+14693518845`, `AGENT_NUMBER` = `+19728342317`.
+  - Recording enabled by default (`RECORD_ENABLED=true`, split `conversation`, format `mp3`).
+  - Optional AI: `GOOGLE_API_KEY` enables Gemini transcript/summary when a recording is available.
+
+* __Key Files__
+  - Backend: `server.js` (routes, call flow, webhooks, CORS).
+  - Frontend widget: `scripts/widgets/phone.js` (dialer UI + browser calling).
+  - Dashboard shell: `crm-dashboard.html` (loads SDKs, sets `window.API_BASE_URL`).
+
+* __Current Call Flow (Agent-first)__
+  - Client initiates server call via `POST /api/vonage/call` with `{ to: "+E164" }`.
+  - Server dials `AGENT_NUMBER` first. `answer_url` is `https://powerchoosers.com/webhooks/answer?dst=<E164>` so when the agent answers, the NCCO connects the destination.
+  - `handleWebhookAnswer()` builds NCCO `[record?, connect]`. If `dst` is missing/invalid, it falls back to connecting the agent.
+  - Events (`/webhooks/event`) and recordings (`/webhooks/recording`) are accepted and stored in-memory (`CALL_STORE`). Recording webhook optionally triggers Gemini processing.
+
+* __Normalization Rules__
+  - Frontend `normalizeDialedNumber()` and backend `normalizeE164()` accept digits, `+`, `*`, `#`, and letters (letters map via T9 to digits) and normalize to E.164.
+  - US defaults: 10 digits -> `+1##########`; 11 digits starting with `1` -> `+###########`.
+
+* __Endpoints & Methods__
+  - `GET|POST /api/vonage/jwt?user=agent` → Client SDK JWT for browser.
+  - `GET|POST /api/vonage/ensure_user?user=agent` → idempotent create of SDK user in Vonage.
+  - `POST /api/vonage/call` → Places an outbound agent-first call. Returns 405 if not POST.
+  - `GET /webhooks/answer?dst=+E164` → Returns NCCO JSON.
+  - `POST /webhooks/event` → Accepts call lifecycle events; returns `{ ok: true }`.
+  - `POST /webhooks/recording` → Accepts recording events; triggers optional AI; returns `{ ok: true }`.
+  - `GET /api/calls` → Recent calls summary from `CALL_STORE`.
+  - `GET /api/calls_full` → Recent calls + last events for diagnostics.
+  - `GET /api/recording?url=<recording_url>` → Authenticated proxy fetch of Vonage recording via app JWT.
+
+* __Browser Dialer Widget (`scripts/widgets/phone.js`)__
+  - Input + dialpad UI with Call, Backspace, Clear.
+  - T9 hint UI removed (no extra text under the input).
+  - Keyboard support: digits `0-9`, `*`, `#`, letters map via T9; Enter places a call; Backspace deletes.
+  - Paste support: Ctrl/Cmd+V into input or card; letters in pasted text are mapped via T9; `+` allowed once at the front.
+  - On Call: tries Vonage Client SDK browser call (`app.callPhone`). On error, falls back to server PSTN call via `POST /api/vonage/call`.
+  - Session: `RTC.ensureSession()` fetches JWT from `/api/vonage/jwt?user=agent` and creates a Client SDK session.
+
+* __Frontend Config__
+  - `window.API_BASE_URL` is read in the browser. Set via localStorage for dev/prod:
+    - Dev: `localStorage.setItem('API_BASE_URL', 'http://localhost:3000')`.
+    - Prod: `localStorage.setItem('API_BASE_URL', 'https://powerchoosers.com')`.
+  - Page must be a secure origin for microphone access (HTTPS or `http://localhost`). Check `window.isSecureContext` and `navigator.permissions.query({ name: 'microphone' })`.
+
+* __Testing Cheatsheet__
+  - Start server: `node server.js` (runs on `http://localhost:3000`). Ensure `private.key` exists and matches the Vonage app.
+  - Webhooks: open `https://powerchoosers.com/webhooks/answer?dst=+19202683260` to see NCCO; POST any JSON to `https://powerchoosers.com/webhooks/event` to get `{ ok: true }`.
+  - API: `curl -X POST http://localhost:3000/api/vonage/call -H 'Content-Type: application/json' -d '{"to":"+19202683260"}'`.
+  - Diagnostics: `GET /api/calls_full` to view recent event flow.
+
+* __Common Pitfalls__
+  - 405 on `/api/vonage/call`: this route is POST-only; browser GETs (e.g., visiting the URL) will return 405.
+  - Microphone not prompting: ensure HTTPS (or localhost), and the site has mic permission. IDE previews on non-secure hosts will fail.
+  - `PUBLIC_BASE_URL` mismatch: Vonage must be configured to use `https://powerchoosers.com/*` for webhooks; the server uses this base to generate `answer_url`/`event_url`.
+
+* __Next Steps (suggested)__
+  - Optional per-call strategy toggle (agent-first vs destination-first) via a parameter on `/api/vonage/call`.
+  - Display live call state in the widget (ringing/answered/timer) and add hangup UI for PSTN fallback.
+  - Inbound call routing UI/logic to surface calls in the widget.
+  - Persist calls to a database instead of the in-memory `CALL_STORE`.
 
 ## Current Goal
-Debug People page filtering and bulk selection
+  Debug People page filtering and bulk selection
 
 ## Page Switching Pattern (How navigation works and how to add new pages)
 

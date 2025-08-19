@@ -1105,20 +1105,45 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="scripts/firebase.js"></script>
-    <!-- API Base URL (global) -->
-    <script>
-      (function(){
-        try {
-          // Prefer same-origin backend automatically; no manual localStorage needed
-          const sameOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-          const chosen = (sameOrigin || '').replace(/\/$/, '');
-          window.API_BASE_URL = chosen;
-          console.log('API_BASE_URL:', window.API_BASE_URL);
-        } catch (e) {
-          console.warn('API_BASE_URL init error:', e);
-        }
-      })();
-    </script>
+      <!-- API Base URL (global) -->
+      <script>
+        (function(){
+          try {
+            // Check for localhost/development vs production
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const isDevelopment = isLocalhost || window.location.hostname.includes('localhost');
+            
+            let apiBase = '';
+            
+            if (isDevelopment) {
+              // Local development - use localhost:3000
+              apiBase = 'http://localhost:3000';
+            } else {
+              // Production - check localStorage for custom API endpoint, fallback to ngrok or same origin
+              const customApi = localStorage.getItem('API_BASE_URL');
+              if (customApi) {
+                apiBase = customApi;
+              } else {
+                // Default to same origin for production
+                apiBase = (window.location && window.location.origin) ? window.location.origin : '';
+              }
+            }
+            
+            window.API_BASE_URL = apiBase.replace(/\/$/, '');
+            console.log('API_BASE_URL:', window.API_BASE_URL, '(development:', isDevelopment, ')');
+            
+            // Display current config in console for debugging
+            console.log('🔧 Phone calling config:', {
+              hostname: window.location.hostname,
+              isDevelopment,
+              apiBase: window.API_BASE_URL,
+              customEndpoint: localStorage.getItem('API_BASE_URL')
+            });
+          } catch (e) {
+            console.warn('API_BASE_URL init error:', e);
+          }
+        })();
+      </script>
     <script src="scripts/pages/contact-detail.js"></script>
     <script src="scripts/pages/account-detail.js"></script>
     <script src="scripts/pages/people.js"></script>

@@ -117,11 +117,8 @@
   }
 
   function formatT9Hint(number) {
-    // Returns a compact hint like: 2(ABC) 3(DEF) for the last few digits
-    if (!number) return 'T9: 2(ABC) 3(DEF) 4(GHI) 5(JKL) 6(MNO) 7(PQRS) 8(TUV) 9(WXYZ)';
-    const tail = number.replace(/[^2-9]/g, '').slice(-6); // only show last up to 6 meaningful digits
-    if (!tail) return 'T9: 2(ABC) 3(DEF) 4(GHI) 5(JKL) 6(MNO) 7(PQRS) 8(TUV) 9(WXYZ)';
-    return tail.split('').map(d => `${d}(${T9_MAP[d] || ''})`).join('  ');
+    // T9 hint UI removed
+    return '';
   }
 
   // Normalize a dialed number to E.164.
@@ -168,7 +165,6 @@
       </div>
       <div class="phone-body" style="display:flex; flex-direction:column; gap: 12px;">
         <input type="text" class="input-dark phone-display" placeholder="Enter number" inputmode="tel" autocomplete="off" style="font-size: 20px; text-align: center; padding: 10px; letter-spacing: 1px;" />
-        <div class="t9-hint" style="font-size: 12px; color: var(--text-muted); text-align:center;">T9: 2(ABC) 3(DEF) 4(GHI) 5(JKL) 6(MNO) 7(PQRS) 8(TUV) 9(WXYZ)</div>
         <div class="dialpad" style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
           ${[
             {d:'1', l:''}, {d:'2', l:'ABC'}, {d:'3', l:'DEF'},
@@ -191,11 +187,7 @@
     `;
 
     const input = card.querySelector('.phone-display');
-    const t9HintEl = card.querySelector('.t9-hint');
-
-    const updateHint = () => {
-      if (t9HintEl) t9HintEl.textContent = formatT9Hint(input ? input.value : '');
-    };
+    // T9 hint removed
 
     // Focus ring preference
     if (input) {
@@ -206,7 +198,6 @@
     const appendChar = (ch) => {
       if (!input) return;
       input.value = (input.value || '') + ch;
-      updateHint();
       try { input.focus(); } catch (_) {}
     };
 
@@ -214,16 +205,33 @@
       if (!input) return;
       const v = input.value || '';
       input.value = v.slice(0, -1);
-      updateHint();
       try { input.focus(); } catch (_) {}
     };
 
     const clearAll = () => {
       if (!input) return;
       input.value = '';
-      updateHint();
       try { input.focus(); } catch (_) {}
     };
+
+    // Handle paste (from input or card) and keep only allowed characters
+    const onPaste = (e) => {
+      if (!input) return;
+      const clip = (e.clipboardData || window.clipboardData);
+      if (!clip) return;
+      const text = (clip.getData && (clip.getData('text') || clip.getData('Text'))) || '';
+      if (!text) return;
+      e.preventDefault();
+      // Map letters to T9 digits; allow digits, *, #, and a single leading +
+      const mapped = String(text).replace(/[A-Za-z]/g, (c) => letterToDigit(c) || '');
+      const cleaned = mapped.replace(/[^0-9*#\+]/g, '');
+      const existing = input.value || '';
+      const next = existing ? (existing + cleaned.replace(/\+/g, '')) : cleaned.replace(/(.*?)(\+)(.*)/, '+$1$3');
+      input.value = next;
+      try { input.focus(); } catch (_) {}
+    };
+    if (input) input.addEventListener('paste', onPaste);
+    card.addEventListener('paste', onPaste);
 
     // Dialpad clicks
     card.querySelectorAll('.dial-key').forEach(btn => {
@@ -277,7 +285,7 @@
         return;
       }
       // update UI with normalized value
-      if (input) { input.value = normalized.value; updateHint(); }
+      if (input) { input.value = normalized.value; }
       // If already in a call, hangup
       if (RTC.state.call) {
         try { RTC.state.call.hangUp && RTC.state.call.hangUp(); } catch(_) {}
@@ -312,6 +320,8 @@
     // Keyboard input support: digits, *, #, and letter->T9 digit mapping
     card.addEventListener('keydown', (e) => {
       const { key } = e;
+      // Do not intercept common shortcuts (paste/copy/select-all, etc.)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (/^[0-9*#]$/.test(key)) {
         appendChar(key);
         e.preventDefault();
