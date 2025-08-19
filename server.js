@@ -357,8 +357,19 @@ async function handleApiVonageCall(req, res, parsedUrl) {
       res.end(JSON.stringify({ error: 'Missing to number' }));
       return;
     }
-    // Normalize to E.164 digits
-    const to = toRaw.replace(/[^0-9+]/g, '');
+    // Normalize to E.164 (US default): keep '+', else add +1 for 10-digit NANP or '+' for 11-digit starting with 1
+    let to = toRaw.replace(/[^0-9+]/g, '');
+    if (!to.startsWith('+')) {
+      const digits = to.replace(/\D/g, '');
+      if (digits.length === 10) {
+        to = '+1' + digits;
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        to = '+' + digits;
+      } else if (digits.length > 0) {
+        // Fallback: prefix '+' to whatever digits we have
+        to = '+' + digits;
+      }
+    }
 
     const jwt = createVonageAppJwt();
     if (!jwt) throw new Error('Failed to create Vonage JWT');

@@ -406,4 +406,36 @@
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };
   // Expose for console diagnostics
   try { window.RTC = RTC; } catch(_) {}
+
+  // Console helpers for manual dialing from DevTools
+  try {
+    // Server-initiated PSTN call via backend fallback
+    window.callPSTN = async function(number) {
+      const n = (number || '').trim();
+      if (!n) throw new Error('Missing number');
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base) throw new Error('Missing API_BASE_URL');
+      const r = await fetch(`${base}/api/vonage/call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: n })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
+      return data;
+    };
+
+    // Attempt browser-based call using Client SDK if supported
+    window.callBrowser = async function(number) {
+      const n = (number || '').trim();
+      if (!n) throw new Error('Missing number');
+      const app = await RTC.ensureSession();
+      if (!app || typeof app.callPhone !== 'function') throw new Error('Browser call not supported by SDK');
+      return app.callPhone(n);
+    };
+
+    // Grouped helper
+    window.Call = { pstn: window.callPSTN, browser: window.callBrowser, ensureSession: RTC.ensureSession };
+  } catch (_) {}
+
 })();
