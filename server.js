@@ -161,6 +161,62 @@ async function handleApiVonageJwt(req, res, parsedUrl) {
   }
 }
 
+// Ensure a Vonage Client SDK user exists (idempotent create)
+async function handleApiVonageEnsureUser(req, res, parsedUrl) {
+  const method = req.method || 'GET';
+  const q = parsedUrl.query || {};
+  let user = (q.user || '').toString().trim();
+  if (method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      if (!user && body && typeof body.user === 'string') user = body.user.trim();
+    } catch (_) { /* ignore body parse errors */ }
+  }
+  if (!user) user = 'agent';
+  if (!VONAGE_PRIVATE_KEY) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Server not configured: Vonage private key not found' }));
+    return;
+  }
+  try {
+    const jwt = createVonageAppJwt(60);
+    if (!jwt) throw new Error('Failed to create Vonage app JWT');
+    const payload = JSON.stringify({ name: user, display_name: user });
+    const options = {
+      method: 'POST',
+      hostname: 'api.nexmo.com',
+      path: '/v1/users',
+      headers: {
+        'Authorization': `Bearer ${jwt}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+    const resp = await httpsRequestJson(options, payload);
+    const status = resp.status || 0;
+    // 201 Created or 200 OK -> created/ok
+    if (status >= 200 && status < 300) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, user, created: status === 201 }));
+      return;
+    }
+    // 409 Conflict -> user already exists, treat as success
+    if (status === 409) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, user, created: false, note: 'exists' }));
+      return;
+    }
+    // Other errors: bubble up limited detail
+    let detail = '';
+    try { detail = (resp.text || '').slice(0, 400); } catch (_) { detail = ''; }
+    res.writeHead(status || 502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Vonage Users API error', status, detail }));
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: e?.message || 'Internal error' }));
+  }
+}
+
 // ---- Gemini integration helpers ----
 async function fetchVonageRecordingBuffer(srcUrl) {
   const u = new URL(srcUrl);
@@ -517,6 +573,31 @@ async function handleApiListCalls(req, res) {
   res.end(JSON.stringify({ ok: true, calls }));
 }
 
+// Full call list with raw webhook events (read-only, diagnostics)
+async function handleApiListCallsFull(req, res) {
+  const base = Array.from(CALL_STORE.values());
+  const calls = base
+    .sort((a,b)=>{
+      const ta = a.endTime || a.startTime || 0; const tb = b.endTime || b.startTime || 0;
+      return String(tb).localeCompare(String(ta));
+    })
+    .slice(0, 50) // limit for safety
+    .map(r => ({
+      id: r.id,
+      to: r.to || '',
+      from: r.from || '',
+      callTime: r.startTime || r.endTime || new Date().toISOString(),
+      durationSec: r.durationSec || 0,
+      outcome: r.status || '',
+      audioUrl: r.recordingUrl || '',
+      transcript: r.transcript || '',
+      aiSummary: r.aiSummary || '',
+      events: (r.events || []).slice(-30) // last up to 30 events per call
+    }));
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: true, calls }));
+}
+
 async function handleApiProxyRecording(req, res, parsedUrl) {
   try {
     if (!VONAGE_PRIVATE_KEY) {
@@ -571,8 +652,10 @@ const server = http.createServer(async (req, res) => {
     // Preflight for API and webhook routes
     if (req.method === 'OPTIONS' && (
       pathname === '/api/vonage/call' ||
+      pathname === '/api/vonage/ensure_user' ||
       pathname === '/api/vonage/jwt' ||
       pathname === '/api/calls' ||
+      pathname === '/api/calls_full' ||
       pathname === '/api/recording' ||
       pathname === '/webhooks/answer' ||
       pathname === '/webhooks/event' ||
@@ -587,11 +670,17 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/vonage/jwt') {
         return handleApiVonageJwt(req, res, parsedUrl);
     }
+    if (pathname === '/api/vonage/ensure_user') {
+        return handleApiVonageEnsureUser(req, res, parsedUrl);
+    }
     if (pathname === '/api/vonage/call') {
         return handleApiVonageCall(req, res, parsedUrl);
     }
     if (pathname === '/api/calls') {
         return handleApiListCalls(req, res);
+    }
+    if (pathname === '/api/calls_full') {
+        return handleApiListCallsFull(req, res);
     }
     if (pathname === '/webhooks/answer') {
         return handleWebhookAnswer(req, res, parsedUrl);
