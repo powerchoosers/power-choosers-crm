@@ -234,7 +234,7 @@ async function handleApiVonageCall(req, res, parsedUrl) {
     const jwt = createVonageAppJwt();
     if (!jwt) throw new Error('Failed to create Vonage JWT');
 
-    const answerUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/answer?to=${encodeURIComponent(to)}`;
+    const answerUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/answer?dst=${encodeURIComponent(to)}`;
     const eventUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/event`;
 
     const payload = {
@@ -305,8 +305,13 @@ function normalizeE164(raw) {
 
 async function handleWebhookAnswer(req, res, parsedUrl) {
   const q = parsedUrl.query || {};
-  const toRaw = (q.to || '').toString();
-  const to = normalizeE164(toRaw);
+  // Prefer our custom 'dst' param to avoid collisions with Vonage's own 'to'
+  const rawParam = (q.dst || q.to || '').toString();
+  // Some providers may append multiple values (e.g., "customer,agent"). Take the first non-agent.
+  const candidates = rawParam.split(',').map(s => s.trim()).filter(Boolean);
+  const pick = candidates.find(n => n && n !== AGENT_NUMBER) || candidates[0] || '';
+  const to = normalizeE164(pick);
+  const toRaw = rawParam;
   const host = (req.headers && req.headers.host) ? req.headers.host : '';
   const base = (PUBLIC_BASE_URL && PUBLIC_BASE_URL.replace(/\/$/, '')) || (host ? `https://${host}` : '');
   const recUrl = base ? `${base}/webhooks/recording` : '';
