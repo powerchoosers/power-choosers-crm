@@ -307,7 +307,9 @@ async function handleWebhookAnswer(req, res, parsedUrl) {
   const q = parsedUrl.query || {};
   const toRaw = (q.to || '').toString();
   const to = normalizeE164(toRaw);
-  const recUrl = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/recording` : '';
+  const host = (req.headers && req.headers.host) ? req.headers.host : '';
+  const base = (PUBLIC_BASE_URL && PUBLIC_BASE_URL.replace(/\/$/, '')) || (host ? `https://${host}` : '');
+  const recUrl = base ? `${base}/webhooks/recording` : '';
   const ncco = to
     ? [
         // Start recording the conversation and send recording events to our webhook
@@ -328,7 +330,7 @@ async function handleWebhookAnswer(req, res, parsedUrl) {
         }
       ];
   try {
-    console.log('[answer] toRaw=', toRaw || '(none)', 'normalized=', to || '(invalid)', 'recUrl=', recUrl || '(none)');
+    console.log('[answer] toRaw=', toRaw || '(none)', 'normalized=', to || '(invalid)', 'recUrl=', recUrl || '(none)', 'base=', base || '(none)');
     console.log('[answer] NCCO=', JSON.stringify(ncco));
   } catch (_) {}
   res.writeHead(200, { 'Content-Type': 'application/json' });
