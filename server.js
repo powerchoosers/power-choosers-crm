@@ -244,6 +244,13 @@ async function handleApiVonageCall(req, res, parsedUrl) {
       event_url: [ eventUrl ]
     };
 
+    try {
+      console.log('[api/vonage/call] toRaw=', toRaw, 'toNormalized=', to);
+      console.log('[api/vonage/call] answer_url=', answerUrl);
+      console.log('[api/vonage/call] event_url=', eventUrl);
+      console.log('[api/vonage/call] agent=', AGENT_NUMBER, 'from(Vonage)=', VONAGE_NUMBER);
+    } catch (_) {}
+
     const bodyStr = JSON.stringify(payload);
     const options = {
       method: 'POST',
@@ -256,6 +263,9 @@ async function handleApiVonageCall(req, res, parsedUrl) {
       }
     };
     const resp = await httpsRequestJson(options, bodyStr);
+    try {
+      console.log('[api/vonage/call] Vonage response status=', resp.status, 'bytes=', (resp.text||'').length);
+    } catch (_) {}
     const ct = (resp.headers['content-type'] || '').toString();
     const isJson = ct.includes('application/json');
     const data = isJson ? JSON.parse(resp.text || '{}') : { raw: resp.text };
@@ -273,9 +283,30 @@ async function handleApiVonageCall(req, res, parsedUrl) {
   }
 }
 
+function normalizeE164(raw) {
+  let s = (raw || '').trim();
+  if (!s) return '';
+  const hasPlus = s.startsWith('+');
+  const digits = s.replace(/\D/g, '');
+  let e164 = '';
+  if (hasPlus) {
+    e164 = '+' + digits;
+  } else if (digits.length === 11 && digits.startsWith('1')) {
+    e164 = '+1' + digits.slice(1);
+  } else if (digits.length === 10) {
+    e164 = '+1' + digits;
+  } else if (digits.length >= 8 && digits.length <= 15) {
+    e164 = '+' + digits;
+  } else {
+    return '';
+  }
+  return /^\+\d{8,15}$/.test(e164) ? e164 : '';
+}
+
 async function handleWebhookAnswer(req, res, parsedUrl) {
   const q = parsedUrl.query || {};
-  const to = (q.to || '').toString().replace(/[^0-9+]/g, '');
+  const toRaw = (q.to || '').toString();
+  const to = normalizeE164(toRaw);
   const recUrl = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/recording` : '';
   const ncco = to
     ? [
@@ -297,7 +328,7 @@ async function handleWebhookAnswer(req, res, parsedUrl) {
         }
       ];
   try {
-    console.log('[answer] to=', to || '(none)', 'recUrl=', recUrl || '(none)');
+    console.log('[answer] toRaw=', toRaw || '(none)', 'normalized=', to || '(invalid)', 'recUrl=', recUrl || '(none)');
     console.log('[answer] NCCO=', JSON.stringify(ncco));
   } catch (_) {}
   res.writeHead(200, { 'Content-Type': 'application/json' });
