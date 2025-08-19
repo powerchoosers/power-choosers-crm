@@ -163,6 +163,41 @@
   function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=>N(x)===N(t))) { arr.push(t); const d = chips.find(x=>x.k===k); if (d) renderChips(d); } }
 
   async function loadData() {
+    // 1) Try to load real calls from backend if API_BASE_URL is set
+    try {
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (base) {
+        const r = await fetch(`${base}/api/calls`, { method: 'GET' });
+        const j = await r.json().catch(()=>({}));
+        if (r.ok && j && j.ok && Array.isArray(j.calls)) {
+          const rows = j.calls.map((c, idx) => ({
+            id: c.id || `call_${Date.now()}_${idx}`,
+            contactName: c.to || '',
+            contactTitle: '',
+            company: '',
+            contactEmail: '',
+            contactPhone: c.to || '',
+            contactCity: '',
+            contactState: '',
+            accountEmployees: null,
+            industry: '',
+            visitorDomain: '',
+            callTime: c.callTime || new Date().toISOString(),
+            durationSec: c.durationSec || 0,
+            outcome: c.outcome || '',
+            transcript: c.transcript || '',
+            aiSummary: c.aiSummary || '',
+            audioUrl: c.audioUrl ? `${base}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
+          }));
+          if (rows.length) {
+            state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
+            return;
+          }
+        }
+      }
+    } catch (_) { /* fall back to demo data */ }
+
+    // 2) Fallback: demo data
     const cos = ['Acme Manufacturing','Metro Industries','Johnson Electric','Downtown Office','Northwind Traders'];
     const cities = ['Austin','Dallas','Houston','San Antonio','Fort Worth'];
     const states = ['TX','TX','TX','TX','TX'];
@@ -236,9 +271,9 @@
       <div class="insights" style="display:flex; gap:25px;">
         <div style="flex:2;">
           <div style="font-weight:600; margin-bottom:8px;">AI Summary</div>
-          <div style="color:#374151;">${r.aiSummary}</div>
+          <div style="color:#374151;">${escapeHtml(r.aiSummary || '')}</div>
           <div style="font-weight:600; margin:15px 0 8px;">Transcript</div>
-          <div style="color:#4b5563; max-height:160px; overflow:auto; border:1px solid var(--pc-border,#e5e7eb); padding:12px; border-radius:8px;">${r.transcript}</div>
+          <div style="color:#4b5563; max-height:160px; overflow:auto; border:1px solid var(--pc-border,#e5e7eb); padding:12px; border-radius:8px;">${escapeHtml(r.transcript || '')}</div>
         </div>
         <div style="flex:1;">
           <div style="font-weight:600; margin-bottom:8px;">Audio</div>
