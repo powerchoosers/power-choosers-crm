@@ -1109,13 +1109,10 @@
     <script>
       (function(){
         try {
-          const saved = (localStorage.getItem('API_BASE_URL') || '').trim();
-          const hardcoded = 'https://d6df1ca4c9a7.ngrok-free.app'; // current ngrok base URL
-          const chosen = (saved || hardcoded).replace(/\/$/, '');
+          // Prefer same-origin backend automatically; no manual localStorage needed
+          const sameOrigin = (window.location && window.location.origin) ? window.location.origin : '';
+          const chosen = (sameOrigin || '').replace(/\/$/, '');
           window.API_BASE_URL = chosen;
-          if (!saved) {
-            try { localStorage.setItem('API_BASE_URL', chosen); } catch(_) {}
-          }
           console.log('API_BASE_URL:', window.API_BASE_URL);
         } catch (e) {
           console.warn('API_BASE_URL init error:', e);
