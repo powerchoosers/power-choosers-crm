@@ -330,21 +330,84 @@
     const callBtn = card.querySelector('.call-btn-start');
     async function placeBrowserCall(number) {
       const app = await RTC.ensureSession();
-      if (!app || typeof app.callPhone !== 'function') {
-        throw new Error('Browser call not supported by SDK (callPhone unavailable)');
+      
+      // Check available methods for debugging
+      console.debug('[Phone] Available app methods:', Object.getOwnPropertyNames(app).filter(name => typeof app[name] === 'function'));
+      
+      // Try different Vonage SDK calling methods
+      if (typeof app.callPhone === 'function') {
+        console.debug('[Phone] Using app.callPhone method');
+        return app.callPhone(number);
+      } else if (typeof app.callServer === 'function') {
+        console.debug('[Phone] Using app.callServer method');
+        return app.callServer(number);
+      } else if (typeof app.call === 'function') {
+        console.debug('[Phone] Using app.call method');
+        return app.call(number);
+      } else if (app.calls && typeof app.calls.createCall === 'function') {
+        console.debug('[Phone] Using app.calls.createCall method');
+        return app.calls.createCall({ type: 'phone', to: { type: 'phone', number: number } });
+      } else {
+        // List all available methods for debugging
+        const methods = [];
+        for (const prop in app) {
+          if (typeof app[prop] === 'function') {
+            methods.push(prop);
+          }
+        }
+        console.warn('[Phone] Available methods on app:', methods);
+        throw new Error(`Browser calling not supported - available methods: ${methods.slice(0, 10).join(', ')}`);
       }
-      app.callPhone(number);
     }
     async function fallbackServerCall(number) {
-      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      const r = await fetch(`${base}/api/vonage/call`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: number })
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
-      try { window.crm?.showToast && window.crm.showToast('Fallback: ringing your phone now'); } catch(_) {}
+      // Check if we're on main website vs CRM
+      const isMainWebsite = window.location.hostname === 'powerchoosers.com' || 
+                            window.location.hostname === 'www.powerchoosers.com' ||
+                            !window.API_BASE_URL;
+      
+      if (isMainWebsite) {
+        // On main website - actually initiate the call
+        console.debug('[Phone] Main website call - initiating call to:', number);
+        
+        try {
+          // Create a tel: link and simulate clicking it to trigger the phone system
+          const telLink = document.createElement('a');
+          telLink.href = `tel:${number}`;
+          telLink.style.display = 'none';
+          document.body.appendChild(telLink);
+          telLink.click();
+          document.body.removeChild(telLink);
+          
+          // Show success message
+          try { window.crm?.showToast && window.crm.showToast('Call initiated - check your phone/dialer'); } catch(_) {}
+          
+          // Optional: Track the call attempt (for analytics)
+          if (typeof gtag !== 'undefined') {
+            gtag('event', 'phone_call', {
+              'phone_number': number,
+              'source': 'phone_widget'
+            });
+          }
+          
+          return { success: true, message: 'Call initiated via tel: link' };
+        } catch (error) {
+          console.error('[Phone] Error creating tel link:', error);
+          try { window.crm?.showToast && window.crm.showToast('Call initiation failed'); } catch(_) {}
+          throw error;
+        }
+      } else {
+        // On CRM - use the API
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const r = await fetch(`${base}/api/vonage/call`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: number })
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
+        try { window.crm?.showToast && window.crm.showToast('Fallback: ringing your phone now'); } catch(_) {}
+        return data;
+      }
     }
     function setInCallUI(inCall) {
       if (!callBtn) return;
@@ -379,30 +442,65 @@
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
         return;
       }
-      // Check microphone permission before attempting browser call
-      const hasMicPermission = await checkMicrophonePermission();
-      if (hasMicPermission) {
-        try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
-        try {
-          await placeBrowserCall(normalized.value);
-          setInCallUI(true);
-        } catch (e) {
-          // Fallback to server-initiated PSTN flow
-          try { window.crm?.showToast && window.crm.showToast(`Browser call error (${e?.message || 'SDK error'}). Falling back...`); } catch(_) {}
+      try {
+        // Check if we're on the main website vs CRM dashboard
+        const isMainWebsite = window.location.hostname === 'powerchoosers.com' || 
+                              window.location.hostname === 'www.powerchoosers.com' ||
+                              !window.API_BASE_URL; // No API configured means main website
+        
+        if (isMainWebsite) {
+          // On main website - skip browser calling and go straight to fallback
+          console.debug('[Phone] On main website, using fallback call directly');
+          try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value}...`); } catch (_) {}
           try {
             await fallbackServerCall(normalized.value);
           } catch (e2) {
+            console.error('[Phone] Fallback call failed:', e2?.message || e2);
+            try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+          }
+          return;
+        }
+        
+        // Check microphone permission before attempting browser call (CRM only)
+        let hasMicPermission = false;
+        try {
+          hasMicPermission = await checkMicrophonePermission(card);
+          console.debug('[Phone] Microphone permission check result:', hasMicPermission);
+        } catch (permError) {
+          console.warn('[Phone] Permission check failed, using fallback:', permError?.message || permError);
+          hasMicPermission = false;
+        }
+        
+        if (hasMicPermission) {
+          try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
+          try {
+            await placeBrowserCall(normalized.value);
+            setInCallUI(true);
+          } catch (e) {
+            // Fallback to server-initiated PSTN flow
+            console.warn('[Phone] Browser call failed, falling back to server call:', e?.message || e);
+            try { window.crm?.showToast && window.crm.showToast(`Browser call error (${e?.message || 'SDK error'}). Falling back...`); } catch(_) {}
+            try {
+              await fallbackServerCall(normalized.value);
+            } catch (e2) {
+              console.error('[Phone] Fallback call also failed:', e2?.message || e2);
+              try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+            }
+          }
+        } else {
+          // No microphone permission - go straight to fallback
+          console.debug('[Phone] No microphone access, using fallback call');
+          try { window.crm?.showToast && window.crm.showToast(`No microphone access - calling ${normalized.value} via fallback...`); } catch (_) {}
+          try {
+            await fallbackServerCall(normalized.value);
+          } catch (e2) {
+            console.error('[Phone] Fallback call failed:', e2?.message || e2);
             try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
           }
         }
-      } else {
-        // No microphone permission - go straight to fallback
-        try { window.crm?.showToast && window.crm.showToast(`No microphone access - calling ${normalized.value} via fallback...`); } catch (_) {}
-        try {
-          await fallbackServerCall(normalized.value);
-        } catch (e2) {
-          try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
-        }
+      } catch (generalError) {
+        console.error('[Phone] General call error:', generalError?.message || generalError);
+        try { window.crm?.showToast && window.crm.showToast(`Call error: ${generalError?.message || 'Unknown error'}`); } catch (_) {}
       }
     });
     const backspaceBtn = card.querySelector('.backspace-btn');
