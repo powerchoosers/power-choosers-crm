@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
+const { URL } = require('url');
 
 // MIME types for different file extensions
 const mimeTypes = {
@@ -31,6 +32,8 @@ const AGENT_NUMBER = process.env.AGENT_NUMBER || '+14693518845';     // Number t
 const VONAGE_PRIVATE_KEY_PATH = process.env.VONAGE_PRIVATE_KEY_PATH || path.join(__dirname, 'vonage.private.key');
 // Public base URL of this server for Vonage webhooks (use ngrok for local dev)
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
+// Google AI Studio API key (Gemini). If present, enables transcription + summary.
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || null;
 
 // Read private key (PEM) once if available
 let VONAGE_PRIVATE_KEY = null;
@@ -83,6 +86,104 @@ function createVonageAppJwt(ttlSeconds = 60 * 10) {
     jti: crypto.randomBytes(8).toString('hex'),
   };
   return signJwtRS256(payload, VONAGE_PRIVATE_KEY);
+}
+
+// ---- Gemini integration helpers ----
+async function fetchVonageRecordingBuffer(srcUrl) {
+  const u = new URL(srcUrl);
+  const jwt = createVonageAppJwt(60);
+  if (!jwt) throw new Error('Missing Vonage JWT for recording fetch');
+  return new Promise((resolve, reject) => {
+    const options = {
+      method: 'GET',
+      hostname: u.hostname,
+      path: u.pathname + (u.search || ''),
+      headers: { 'Authorization': `Bearer ${jwt}` }
+    };
+    const req = https.request(options, (resp) => {
+      if ((resp.statusCode || 0) >= 400) {
+        let errData = '';
+        resp.on('data', (c) => { errData += c; });
+        resp.on('end', () => reject(new Error(`Recording fetch failed ${resp.statusCode}: ${errData?.slice?.(0,200)}`)));
+        return;
+      }
+      const chunks = [];
+      resp.on('data', (c) => chunks.push(c));
+      resp.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function geminiGenerateJsonFromAudioMp3(apiKey, audioBuffer) {
+  const base64Audio = audioBuffer.toString('base64');
+  const payload = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: [
+              'You are a helpful assistant that produces JSON only. The input is a phone sales call recording.',
+              'Transcribe the call and provide a concise business summary.',
+              'Return strictly JSON with keys: "transcript" (full plain text transcript) and "summary" (3-6 bullet sentences).'
+            ].join(' ')
+          },
+          {
+            inlineData: { mimeType: 'audio/mpeg', data: base64Audio }
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      responseMimeType: 'application/json'
+    }
+  };
+
+  const bodyStr = JSON.stringify(payload);
+  const options = {
+    method: 'POST',
+    hostname: 'generativelanguage.googleapis.com',
+    path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(bodyStr)
+    }
+  };
+  const resp = await httpsRequestJson(options, bodyStr);
+  if (!resp || (resp.status < 200 || resp.status >= 300)) {
+    throw new Error(`Gemini API error ${resp?.status}: ${resp?.text?.slice?.(0,200)}`);
+  }
+  let data = {};
+  try { data = JSON.parse(resp.text || '{}'); } catch (_) {}
+  const cand = (data.candidates && data.candidates[0]) || null;
+  const parts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : [];
+  const text = parts.map(p => p.text || '').join('').trim();
+  let parsed = null;
+  try { parsed = text ? JSON.parse(text) : null; } catch (_) { parsed = null; }
+  return parsed || { transcript: '', summary: text || '' };
+}
+
+async function transcribeAndSummarizeForCall(callId, recordingUrl) {
+  if (!GOOGLE_API_KEY) return;
+  if (!recordingUrl) return;
+  try {
+    const audio = await fetchVonageRecordingBuffer(recordingUrl);
+    // Basic guard: limit to ~25MB
+    if (audio.length > 25 * 1024 * 1024) throw new Error('Recording too large for inline request');
+    const result = await geminiGenerateJsonFromAudioMp3(GOOGLE_API_KEY, audio);
+    const rec = CALL_STORE.get(callId);
+    if (rec) {
+      if (result.transcript && typeof result.transcript === 'string') rec.transcript = result.transcript;
+      if (result.summary && typeof result.summary === 'string') rec.aiSummary = result.summary;
+      CALL_STORE.set(callId, rec);
+      console.log('Gemini processed call', callId, { hasTranscript: !!rec.transcript, hasSummary: !!rec.aiSummary });
+    }
+  } catch (e) {
+    console.warn('Gemini processing error:', e?.message || e);
+  }
 }
 
 function readJsonBody(req) {
@@ -175,8 +276,11 @@ async function handleApiVonageCall(req, res, parsedUrl) {
 async function handleWebhookAnswer(req, res, parsedUrl) {
   const q = parsedUrl.query || {};
   const to = (q.to || '').toString().replace(/[^0-9+]/g, '');
+  const recUrl = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/recording` : '';
   const ncco = to
     ? [
+        // Start recording the conversation and send recording events to our webhook
+        { action: 'record', eventUrl: recUrl ? [ recUrl ] : undefined, split: 'conversation', format: 'mp3' },
         {
           action: 'connect',
           from: VONAGE_NUMBER,
@@ -184,6 +288,7 @@ async function handleWebhookAnswer(req, res, parsedUrl) {
         }
       ]
     : [
+        { action: 'record', eventUrl: recUrl ? [ recUrl ] : undefined, split: 'conversation', format: 'mp3' },
         // If inbound to your Vonage number without a target, route to your agent number
         {
           action: 'connect',
@@ -195,13 +300,143 @@ async function handleWebhookAnswer(req, res, parsedUrl) {
   res.end(JSON.stringify(ncco));
 }
 
+// --- In-memory call store for dev/demo ---
+// Keyed by conversation_uuid when available, else by uuid
+const CALL_STORE = new Map();
+
+function upsertCallFromEvent(evt) {
+  const id = evt.conversation_uuid || evt.conversation_uuid_from || evt.uuid || evt.call_uuid || evt.session_uuid || `unk_${Date.now()}`;
+  const rec = CALL_STORE.get(id) || { id, events: [], to: null, from: null, startTime: null, endTime: null, durationSec: null, status: null, recordingUrl: null, transcript: '', aiSummary: '' };
+  rec.events.push(evt);
+  if (evt.to) rec.to = evt.to;
+  if (evt.from) rec.from = evt.from;
+  if (evt.timestamp && !rec.startTime && (evt.status === 'answered' || evt.status === 'started')) rec.startTime = evt.timestamp;
+  if (evt.timestamp && (evt.status === 'completed' || evt.status === 'hangup' || evt.status === 'failed')) {
+    rec.endTime = evt.timestamp;
+  }
+  if (rec.startTime && rec.endTime && !rec.durationSec) {
+    try {
+      const s = new Date(rec.startTime).getTime();
+      const e = new Date(rec.endTime).getTime();
+      if (!isNaN(s) && !isNaN(e) && e >= s) rec.durationSec = Math.round((e - s) / 1000);
+    } catch (_) {}
+  }
+  if (evt.status) rec.status = evt.status;
+  CALL_STORE.set(id, rec);
+  return rec;
+}
+
 async function handleWebhookEvent(req, res) {
   try {
     const body = await readJsonBody(req);
-    console.log('Vonage event:', body);
-  } catch (_) {}
+    // Body may be a single event or already parsed
+    if (body && typeof body === 'object') {
+      upsertCallFromEvent(body);
+      console.log('Vonage event:', body.event || body.status || 'event', 'id=', body.conversation_uuid || body.uuid);
+    }
+  } catch (e) {
+    console.warn('Event webhook parse error:', e?.message || e);
+  }
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ ok: true }));
+}
+
+async function handleWebhookRecording(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    // Typical payload includes: recording_url, conversation_uuid, start_time, end_time
+    const id = body.conversation_uuid || body.uuid || `rec_${Date.now()}`;
+    const rec = CALL_STORE.get(id) || { id, events: [], transcript: '', aiSummary: '' };
+    if (body.recording_url) rec.recordingUrl = body.recording_url;
+    if (body.start_time) rec.startTime = rec.startTime || body.start_time;
+    if (body.end_time) rec.endTime = body.end_time;
+    if (!rec.durationSec && body.start_time && body.end_time) {
+      try {
+        const s = new Date(body.start_time).getTime();
+        const e = new Date(body.end_time).getTime();
+        if (!isNaN(s) && !isNaN(e) && e >= s) rec.durationSec = Math.round((e - s) / 1000);
+      } catch (_) {}
+    }
+    CALL_STORE.set(id, rec);
+    console.log('Recording webhook:', { id, recordingUrl: rec.recordingUrl });
+    // Kick off async transcription + summary with Gemini, if configured
+    if (rec.recordingUrl) {
+      if (GOOGLE_API_KEY) {
+        setImmediate(() => transcribeAndSummarizeForCall(id, rec.recordingUrl).catch(err => {
+          console.warn('Gemini async task error:', err?.message || err);
+        }));
+      } else {
+        console.log('Gemini disabled: GOOGLE_API_KEY not set');
+      }
+    }
+  } catch (e) {
+    console.warn('Recording webhook parse error:', e?.message || e);
+  }
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: true }));
+}
+
+async function handleApiListCalls(req, res) {
+  const base = Array.from(CALL_STORE.values());
+  const calls = base
+    .sort((a,b)=>{
+      const ta = a.endTime || a.startTime || 0; const tb = b.endTime || b.startTime || 0;
+      return String(tb).localeCompare(String(ta));
+    })
+    .slice(0, 200)
+    .map(r => ({
+      id: r.id,
+      to: r.to || '',
+      from: r.from || '',
+      callTime: r.startTime || r.endTime || new Date().toISOString(),
+      durationSec: r.durationSec || 0,
+      outcome: r.status || '',
+      audioUrl: r.recordingUrl || '',
+      transcript: r.transcript || '',
+      aiSummary: r.aiSummary || ''
+    }));
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: true, calls }));
+}
+
+async function handleApiProxyRecording(req, res, parsedUrl) {
+  try {
+    if (!VONAGE_PRIVATE_KEY) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Server not configured for Vonage auth' }));
+      return;
+    }
+    const q = parsedUrl.query || {};
+    const src = (q.url || '').toString();
+    if (!src) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing url' }));
+      return;
+    }
+    const u = new URL(src);
+    const jwt = createVonageAppJwt(60);
+    const options = {
+      method: 'GET',
+      hostname: u.hostname,
+      path: u.pathname + (u.search || ''),
+      headers: { 'Authorization': `Bearer ${jwt}` }
+    };
+    const upstream = https.request(options, (resp) => {
+      const status = resp.statusCode || 500;
+      const headers = resp.headers || {};
+      const contentType = headers['content-type'] || 'audio/mpeg';
+      res.writeHead(status, { 'Content-Type': contentType });
+      resp.pipe(res);
+    });
+    upstream.on('error', (err) => {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Upstream error', detail: err?.message || String(err) }));
+    });
+    upstream.end();
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: e?.message || 'Internal error' }));
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -218,8 +453,11 @@ const server = http.createServer(async (req, res) => {
     // Preflight for API and webhook routes
     if (req.method === 'OPTIONS' && (
       pathname === '/api/vonage/call' ||
+      pathname === '/api/calls' ||
+      pathname === '/api/recording' ||
       pathname === '/webhooks/answer' ||
-      pathname === '/webhooks/event'
+      pathname === '/webhooks/event' ||
+      pathname === '/webhooks/recording'
     )) {
       res.writeHead(204);
       res.end();
@@ -230,11 +468,20 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/vonage/call') {
         return handleApiVonageCall(req, res, parsedUrl);
     }
+    if (pathname === '/api/calls') {
+        return handleApiListCalls(req, res);
+    }
     if (pathname === '/webhooks/answer') {
         return handleWebhookAnswer(req, res, parsedUrl);
     }
     if (pathname === '/webhooks/event') {
         return handleWebhookEvent(req, res);
+    }
+    if (pathname === '/webhooks/recording') {
+        return handleWebhookRecording(req, res);
+    }
+    if (pathname === '/api/recording') {
+        return handleApiProxyRecording(req, res, parsedUrl);
     }
 
     // Default to crm-dashboard.html for root requests
