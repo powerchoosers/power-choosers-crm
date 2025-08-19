@@ -34,6 +34,10 @@ const VONAGE_PRIVATE_KEY_PATH = process.env.VONAGE_PRIVATE_KEY_PATH || path.join
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
 // Google AI Studio API key (Gemini). If present, enables transcription + summary.
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || null;
+// Recording controls
+const RECORD_ENABLED = process.env.RECORD_ENABLED !== 'false';
+const RECORD_SPLIT = process.env.RECORD_SPLIT || 'conversation';
+const RECORD_FORMAT = process.env.RECORD_FORMAT || 'mp3';
 
 // Read private key (PEM) once if available
 let VONAGE_PRIVATE_KEY = null;
@@ -315,25 +319,18 @@ async function handleWebhookAnswer(req, res, parsedUrl) {
   const host = (req.headers && req.headers.host) ? req.headers.host : '';
   const base = (PUBLIC_BASE_URL && PUBLIC_BASE_URL.replace(/\/$/, '')) || (host ? `https://${host}` : '');
   const recUrl = base ? `${base}/webhooks/recording` : '';
-  const ncco = to
-    ? [
-        // Start recording the conversation and send recording events to our webhook
-        { action: 'record', eventUrl: recUrl ? [ recUrl ] : undefined, split: 'conversation', format: 'mp3' },
-        {
-          action: 'connect',
-          from: VONAGE_NUMBER,
-          endpoint: [ { type: 'phone', number: to } ]
-        }
-      ]
-    : [
-        { action: 'record', eventUrl: recUrl ? [ recUrl ] : undefined, split: 'conversation', format: 'mp3' },
-        // If inbound to your Vonage number without a target, route to your agent number
-        {
-          action: 'connect',
-          from: VONAGE_NUMBER,
-          endpoint: [ { type: 'phone', number: AGENT_NUMBER } ]
-        }
-      ];
+  // Build actions dynamically so recording can be disabled
+  const actions = [];
+  if (RECORD_ENABLED) {
+    actions.push({ action: 'record', eventUrl: recUrl ? [ recUrl ] : undefined, split: RECORD_SPLIT, format: RECORD_FORMAT });
+  }
+  if (to) {
+    actions.push({ action: 'connect', from: VONAGE_NUMBER, endpoint: [ { type: 'phone', number: to } ] });
+  } else {
+    // Inbound to Vonage number without target: route to agent
+    actions.push({ action: 'connect', from: VONAGE_NUMBER, endpoint: [ { type: 'phone', number: AGENT_NUMBER } ] });
+  }
+  const ncco = actions;
   try {
     console.log('[answer] toRaw=', toRaw || '(none)', 'normalized=', to || '(invalid)', 'recUrl=', recUrl || '(none)', 'base=', base || '(none)');
     console.log('[answer] NCCO=', JSON.stringify(ncco));
@@ -374,7 +371,12 @@ async function handleWebhookEvent(req, res) {
     // Body may be a single event or already parsed
     if (body && typeof body === 'object') {
       upsertCallFromEvent(body);
-      console.log('Vonage event:', body.event || body.status || 'event', 'id=', body.conversation_uuid || body.uuid);
+      const label = body.event || body.status || 'event';
+      const id = body.conversation_uuid || body.uuid || body.call_uuid;
+      console.log('Vonage event:', label, 'id=', id);
+      if (label === 'failed' || body.status === 'failed') {
+        try { console.log('Vonage fail detail:', JSON.stringify(body)); } catch (_) {}
+      }
     }
   } catch (e) {
     console.warn('Event webhook parse error:', e?.message || e);
