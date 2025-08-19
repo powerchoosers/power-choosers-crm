@@ -7,7 +7,7 @@
 
   // Simple singleton for Vonage Client SDK session
   const RTC = (function() {
-    const state = { client: null, app: null, call: null, ready: false, connecting: false };
+    const state = { client: null, app: null, call: null, ready: false, connecting: false, micPermissionGranted: false, micPermissionChecked: false };
     async function ensureSession() {
       if (state.ready && state.app) return state.app;
       if (state.connecting) {
@@ -58,6 +58,87 @@
   })();
 
   const WIDGET_ID = 'phone-widget';
+
+  // Update microphone status UI
+  function updateMicrophoneStatusUI(card, status) {
+    const micStatus = card.querySelector('.mic-status');
+    const micIcon = card.querySelector('.mic-icon');
+    const micText = card.querySelector('.mic-text');
+    
+    if (!micStatus || !micIcon || !micText) return;
+    
+    switch (status) {
+      case 'granted':
+        micIcon.textContent = '🎤';
+        micText.textContent = 'Browser calls enabled';
+        micStatus.style.color = 'var(--green-400, #10b981)';
+        break;
+      case 'denied':
+        micIcon.textContent = '🚫';
+        micText.textContent = 'Will use phone fallback - click address bar mic to enable';
+        micStatus.style.color = 'var(--amber-400, #f59e0b)';
+        break;
+      case 'checking':
+        micIcon.textContent = '🎤';
+        micText.textContent = 'Checking microphone access...';
+        micStatus.style.color = 'var(--text-secondary)';
+        break;
+      case 'error':
+        micIcon.textContent = '⚠️';
+        micText.textContent = 'Cannot check microphone - will use fallback';
+        micStatus.style.color = 'var(--text-secondary)';
+        break;
+    }
+  }
+
+  // Microphone permission handling
+  async function checkMicrophonePermission(card) {
+    if (RTC.state.micPermissionChecked && RTC.state.micPermissionGranted) {
+      return true;
+    }
+    
+    try {
+      // Check current permission status
+      if (navigator.permissions && navigator.permissions.query) {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+        if (permissionStatus.state === 'granted') {
+          RTC.state.micPermissionGranted = true;
+          RTC.state.micPermissionChecked = true;
+          return true;
+        } else if (permissionStatus.state === 'denied') {
+          RTC.state.micPermissionGranted = false;
+          RTC.state.micPermissionChecked = true;
+          return false;
+        }
+      }
+      
+      // Request microphone permission explicitly
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        // Stop the stream immediately as we only need permission
+        stream.getTracks().forEach(track => track.stop());
+        RTC.state.micPermissionGranted = true;
+        RTC.state.micPermissionChecked = true;
+        try { window.crm?.showToast && window.crm.showToast('Microphone access granted - browser calls enabled'); } catch(_) {}
+        return true;
+      } catch (micError) {
+        console.warn('[Phone] Microphone permission denied:', micError?.message || micError);
+        RTC.state.micPermissionGranted = false;
+        RTC.state.micPermissionChecked = true;
+        
+        // Show helpful message to user
+        try { 
+          window.crm?.showToast && window.crm.showToast('Microphone access needed for browser calls. Click the microphone icon in your address bar to allow.'); 
+        } catch(_) {}
+        return false;
+      }
+    } catch (error) {
+      console.warn('[Phone] Permission check failed:', error?.message || error);
+      RTC.state.micPermissionGranted = false;
+      RTC.state.micPermissionChecked = true;
+      return false;
+    }
+  }
 
   function getPanelContentEl() {
     const panel = document.getElementById('widget-panel');
@@ -165,6 +246,10 @@
       </div>
       <div class="phone-body" style="display:flex; flex-direction:column; gap: 12px;">
         <input type="text" class="input-dark phone-display" placeholder="Enter number" inputmode="tel" autocomplete="off" style="font-size: 20px; text-align: center; padding: 10px; letter-spacing: 1px;" />
+        <div class="mic-status" style="text-align: center; font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 16px;">
+          <span class="mic-icon" style="font-size: 12px;">🎤</span>
+          <span class="mic-text">Checking microphone access...</span>
+        </div>
         <div class="dialpad" style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
           ${[
             {d:'1', l:''}, {d:'2', l:'ABC'}, {d:'3', l:'DEF'},
@@ -294,13 +379,25 @@
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
         return;
       }
-      try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
-      try {
-        await placeBrowserCall(normalized.value);
-        setInCallUI(true);
-      } catch (e) {
-        // Fallback to server-initiated PSTN flow
-        try { window.crm?.showToast && window.crm.showToast(`Browser call error (${e?.message || 'SDK error'}). Falling back...`); } catch(_) {}
+      // Check microphone permission before attempting browser call
+      const hasMicPermission = await checkMicrophonePermission();
+      if (hasMicPermission) {
+        try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
+        try {
+          await placeBrowserCall(normalized.value);
+          setInCallUI(true);
+        } catch (e) {
+          // Fallback to server-initiated PSTN flow
+          try { window.crm?.showToast && window.crm.showToast(`Browser call error (${e?.message || 'SDK error'}). Falling back...`); } catch(_) {}
+          try {
+            await fallbackServerCall(normalized.value);
+          } catch (e2) {
+            try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+          }
+        }
+      } else {
+        // No microphone permission - go straight to fallback
+        try { window.crm?.showToast && window.crm.showToast(`No microphone access - calling ${normalized.value} via fallback...`); } catch (_) {}
         try {
           await fallbackServerCall(normalized.value);
         } catch (e2) {
@@ -407,6 +504,18 @@
       const panel = document.getElementById('widget-panel');
       if (panel) panel.scrollTop = 0;
     } catch (_) { /* noop */ }
+
+    // Check microphone permission when widget opens
+    setTimeout(async () => {
+      try {
+        updateMicrophoneStatusUI(card, 'checking');
+        const hasPermission = await checkMicrophonePermission(card);
+        updateMicrophoneStatusUI(card, hasPermission ? 'granted' : 'denied');
+      } catch (error) {
+        console.warn('[Phone] Error checking mic permission:', error);
+        updateMicrophoneStatusUI(card, 'error');
+      }
+    }, 100);
 
     try { window.crm?.showToast && window.crm.showToast('Phone opened'); } catch (_) {}
   }

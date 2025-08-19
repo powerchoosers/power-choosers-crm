@@ -31,10 +31,7 @@ const VONAGE_NUMBER = process.env.VONAGE_NUMBER || '+14693518845'; // Your Vonag
 const AGENT_NUMBER = process.env.AGENT_NUMBER || '+19728342317';     // Number to ring first (your phone)
 const VONAGE_PRIVATE_KEY_PATH = process.env.VONAGE_PRIVATE_KEY_PATH || path.join(__dirname, 'private.key');
 // Public base URL of this server for Vonage webhooks (use ngrok for local dev)
-// For development, we need a URL that Vonage can reach
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || (
-  process.env.NODE_ENV === 'production' ? 'https://powerchoosers.com' : null
-);
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://powerchoosers.com';
 // Google AI Studio API key (Gemini). If present, enables transcription + summary.
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || null;
 // Recording controls
@@ -374,8 +371,11 @@ async function handleApiVonageCall(req, res, parsedUrl) {
 
     let payload;
     
-    if (PUBLIC_BASE_URL) {
-      // Use webhooks if PUBLIC_BASE_URL is available
+    // Try to determine if we can reach the webhook URL
+    const canUseWebhooks = PUBLIC_BASE_URL && !PUBLIC_BASE_URL.includes('powerchoosers.com');
+    
+    if (canUseWebhooks) {
+      // Use webhooks if PUBLIC_BASE_URL is available and accessible
       const answerUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/answer?dst=${encodeURIComponent(to)}`;
       const eventUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/event`;
       
@@ -414,9 +414,9 @@ async function handleApiVonageCall(req, res, parsedUrl) {
 
     try {
       console.log('[api/vonage/call] toRaw=', toRaw, 'toNormalized=', to);
-      if (PUBLIC_BASE_URL) {
-        console.log('[api/vonage/call] answer_url=', answerUrl);
-        console.log('[api/vonage/call] event_url=', eventUrl);
+      if (canUseWebhooks) {
+        console.log('[api/vonage/call] Using webhooks - answer_url=', payload.answer_url?.[0]);
+        console.log('[api/vonage/call] Using webhooks - event_url=', payload.event_url?.[0]);
       } else {
         console.log('[api/vonage/call] Using inline NCCO (no webhooks)');
       }
