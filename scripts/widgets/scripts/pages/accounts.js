@@ -1,0 +1,1005 @@
+'use strict';
+
+// Accounts page module: filtering + table render, Firestore-backed (client-side filtering initially)
+(function () {
+  const state = {
+    data: [], // raw accounts
+    filtered: [],
+    loaded: false,
+    selected: new Set(), // ids of selected accounts
+    pageSize: 50,
+    currentPage: 1,
+    errorMsg: ''
+  };
+
+  // Column order for Accounts table headers (draggable)
+  const DEFAULT_ACCOUNTS_COL_ORDER = ['select','name','industry','domain','phone','contractEnd','electricitySupplier','benefits','painPoints','sqft','occupancy','employees','location','actions','updated'];
+  const ACCOUNTS_COL_STORAGE_KEY = 'accounts_column_order_v1';
+  let accountsColumnOrder = DEFAULT_ACCOUNTS_COL_ORDER.slice();
+  function loadAccountsColumnOrder() {
+    try {
+      const raw = localStorage.getItem(ACCOUNTS_COL_STORAGE_KEY);
+      if (!raw) return DEFAULT_ACCOUNTS_COL_ORDER.slice();
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return DEFAULT_ACCOUNTS_COL_ORDER.slice();
+      const seen = new Set();
+      const ordered = [];
+      for (const k of arr) if (DEFAULT_ACCOUNTS_COL_ORDER.includes(k) && !seen.has(k)) { seen.add(k); ordered.push(k); }
+      for (const k of DEFAULT_ACCOUNTS_COL_ORDER) if (!seen.has(k)) ordered.push(k);
+      return ordered;
+    } catch (e) {
+      return DEFAULT_ACCOUNTS_COL_ORDER.slice();
+    }
+  }
+  function persistAccountsColumnOrder(order) { try { localStorage.setItem(ACCOUNTS_COL_STORAGE_KEY, JSON.stringify(order)); } catch (e) { /* noop */ } }
+
+  const els = {};
+
+  // Ensure selection set exists to avoid runtime errors if it was clobbered
+  function ensureSelected() {
+    if (!state || !(state.selected instanceof Set)) {
+      state.selected = new Set();
+    }
+  }
+
+  function qs(id) { return document.getElementById(id); }
+
+  function initDomRefs() {
+    els.page = document.getElementById('accounts-page');
+    if (!els.page) return false;
+
+    els.table = els.page.querySelector('#accounts-table');
+    els.thead = els.page.querySelector('#accounts-table thead');
+    els.headerRow = els.thead ? els.thead.querySelector('tr') : null;
+    els.tbody = els.page.querySelector('#accounts-table tbody');
+    els.tableContainer = els.page.querySelector('.table-container');
+    els.selectAll = qs('select-all-accounts');
+    els.pagination = qs('accounts-pagination');
+    els.paginationSummary = qs('accounts-pagination-summary');
+    els.toggleBtn = qs('toggle-accounts-filters');
+    els.filterPanel = qs('accounts-filters');
+    els.filterText = els.toggleBtn ? els.toggleBtn.querySelector('.filter-text') : null;
+    els.filterBadge = qs('accounts-filter-count');
+    els.quickSearch = qs('accounts-quick-search');
+
+    // fields
+    els.fName = qs('filter-acct-name');
+    els.fIndustry = qs('filter-industry');
+    els.fDomain = qs('filter-domain');
+    els.fHasPhone = qs('filter-acct-has-phone');
+
+    els.applyBtn = qs('apply-accounts-filters');
+    els.clearBtn = qs('clear-accounts-filters');
+
+    // Add Account button (creates a minimal doc with new fields)
+    const addBtn = document.getElementById('add-account-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', async () => {
+        try {
+          if (window.crm && typeof window.crm.showModal === 'function') {
+            window.crm.showModal('add-account');
+          } else {
+            console.warn('CRM modal not available');
+          }
+        } catch (e) {
+          console.error('Open Add Account modal failed', e);
+        }
+      });
+    }
+
+    // Listen for account creation events from Add Account modal
+    if (els.page && !els.page._accountCreatedHandler) {
+      els.page._accountCreatedHandler = function (ev) {
+        try {
+          const detail = ev && ev.detail ? ev.detail : {};
+          const id = detail.id;
+          const doc = detail.doc || {};
+          if (!id) return;
+          // Deduplicate, prepend, and refresh filters/render
+          state.data = (Array.isArray(state.data) ? state.data : []).filter((a) => a && a.id !== id);
+          state.data.unshift({ id, ...doc });
+          applyFilters();
+        } catch (_) { /* noop */ }
+      };
+      document.addEventListener('pc:account-created', els.page._accountCreatedHandler);
+    }
+
+    return true;
+  }
+
+  // Ensure header <th> elements are annotated with data-col keys and draggable
+  function ensureAccountsHeaderColMeta() {
+    if (!els.headerRow) return;
+    const ths = Array.from(els.headerRow.querySelectorAll('th'));
+    if (ths.length === 0) return;
+    for (let i = 0; i < ths.length && i < DEFAULT_ACCOUNTS_COL_ORDER.length; i++) {
+      const th = ths[i];
+      const key = th.getAttribute('data-col') || DEFAULT_ACCOUNTS_COL_ORDER[i];
+      th.setAttribute('data-col', key);
+      th.setAttribute('draggable', 'true');
+    }
+  }
+
+  // Reorder header DOM to match accountsColumnOrder
+  function refreshAccountsHeaderOrder() {
+    if (!els.headerRow) return;
+    const current = Array.from(els.headerRow.querySelectorAll('th'));
+    if (current.length === 0) return;
+    const byKey = new Map();
+    for (const th of current) byKey.set(th.getAttribute('data-col'), th);
+    const frag = document.createDocumentFragment();
+    for (const k of accountsColumnOrder) {
+      const th = byKey.get(k);
+      if (th) frag.appendChild(th);
+    }
+    for (const th of current) if (!frag.contains(th)) frag.appendChild(th);
+    els.headerRow.appendChild(frag);
+  }
+
+  function getAccountsHeaderOrderFromDom() {
+    if (!els.headerRow) return DEFAULT_ACCOUNTS_COL_ORDER.slice();
+    return Array.from(els.headerRow.querySelectorAll('th')).map((th) => th.getAttribute('data-col')).filter(Boolean);
+  }
+
+  function attachAccountsHeaderDnDHooks() {
+    if (!els.thead) return;
+    const handler = () => {
+      setTimeout(() => {
+        const ord = getAccountsHeaderOrderFromDom();
+        if (ord.length) {
+          const a = ord.join(',');
+          const b = accountsColumnOrder.join(',');
+          if (a !== b) {
+            accountsColumnOrder = ord;
+            persistAccountsColumnOrder(ord);
+            render();
+          }
+        }
+      }, 0);
+    };
+    els.thead.addEventListener('drop', handler, true);
+    els.thead.addEventListener('dragend', handler, true);
+  }
+
+  // Lightweight built-in DnD for headers (fallback/general)
+  function initAccountsHeaderDnD() {
+    if (!els.headerRow) return;
+    let dragSrcTh = null;
+    const ths = Array.from(els.headerRow.querySelectorAll('th'));
+    ths.forEach((th) => {
+      th.setAttribute('draggable', 'true');
+      th.addEventListener('dragstart', (e) => {
+        dragSrcTh = th;
+        const key = th.getAttribute('data-col') || '';
+        try { e.dataTransfer?.setData('text/plain', key); } catch (_) { /* noop */ }
+        th.classList.add('dragging');
+      });
+      th.addEventListener('dragenter', () => th.classList.add('drag-over'));
+      th.addEventListener('dragleave', () => th.classList.remove('drag-over'));
+      th.addEventListener('dragover', (e) => { e.preventDefault(); });
+      th.addEventListener('drop', (e) => {
+        e.preventDefault();
+        th.classList.remove('drag-over');
+        if (!dragSrcTh || dragSrcTh === th) return;
+        const rect = th.getBoundingClientRect();
+        const before = e.clientX < rect.left + rect.width / 2;
+        if (before) els.headerRow.insertBefore(dragSrcTh, th);
+        else els.headerRow.insertBefore(dragSrcTh, th.nextSibling);
+      });
+      th.addEventListener('dragend', () => {
+        th.classList.remove('dragging');
+        dragSrcTh = null;
+      });
+    });
+  }
+
+  function attachEvents() {
+    if (els.toggleBtn && els.filterPanel) {
+      els.toggleBtn.addEventListener('click', () => {
+        const isHidden = els.filterPanel.hasAttribute('hidden');
+        if (isHidden) {
+          els.filterPanel.removeAttribute('hidden');
+          if (els.filterText) els.filterText.textContent = 'Hide Filters';
+        } else {
+          els.filterPanel.setAttribute('hidden', '');
+          if (els.filterText) els.filterText.textContent = 'Show Filters';
+        }
+      });
+    }
+
+    const reFilter = debounce(applyFilters, 200);
+
+    [els.fName, els.fIndustry, els.fDomain].forEach((inp) => {
+      if (inp) inp.addEventListener('input', reFilter);
+    });
+    [els.fHasPhone].forEach((chk) => {
+      if (chk) chk.addEventListener('change', reFilter);
+    });
+
+    if (els.applyBtn) els.applyBtn.addEventListener('click', () => { state.currentPage = 1; applyFilters(); });
+    if (els.clearBtn) els.clearBtn.addEventListener('click', () => { clearFilters(); state.currentPage = 1; });
+    if (els.quickSearch) els.quickSearch.addEventListener('input', reFilter);
+
+    // Select-all
+    if (els.selectAll) {
+      // Only handle UNCHECK in change; opening popover is handled by click to avoid re-entrancy
+      els.selectAll.addEventListener('change', () => {
+        if (!els.selectAll.checked) {
+          // Clear any selection and close UIs
+          state.selected.clear();
+          render();
+          closeBulkSelectPopover();
+          hideBulkActionsBar();
+        }
+      });
+      // Click opens the popover when becoming checked
+      els.selectAll.addEventListener('click', () => {
+        // Defer to ensure the checked state has settled
+        setTimeout(() => {
+          if (els.selectAll.checked) {
+            openBulkSelectPopover();
+          }
+        }, 0);
+      });
+    } else {
+      
+    }
+
+    // Row selection via event delegation
+    if (els.tbody) {
+      els.tbody.addEventListener('change', (e) => {
+        const cb = e.target;
+        if (cb && cb.classList.contains('row-select')) {
+          const id = cb.getAttribute('data-id');
+          if (!id) return;
+          if (cb.checked) state.selected.add(id); else state.selected.delete(id);
+          const tr = cb.closest('tr');
+          if (tr) tr.classList.toggle('row-selected', cb.checked);
+          updateSelectAllState();
+          updateBulkActionsBar();
+        }
+      });
+      // Quick actions delegation
+      els.tbody.addEventListener('click', (e) => {
+        const btn = e.target.closest && e.target.closest('.qa-btn');
+        if (!btn) return;
+        e.preventDefault();
+        handleQuickAction(btn);
+      });
+      // Account name click -> open Account Detail
+      els.tbody.addEventListener('click', (e) => {
+        const link = e.target.closest && e.target.closest('.acct-link');
+        if (!link) return;
+        e.preventDefault();
+        const id = link.getAttribute('data-id');
+        if (id && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          window.AccountDetail.show(id);
+        }
+      });
+    }
+
+    // Pagination click handling
+    if (els.pagination) {
+      els.pagination.addEventListener('click', (e) => {
+        const btn = e.target.closest('button.page-btn');
+        if (!btn || btn.disabled) return;
+        const rel = btn.dataset.rel;
+        const total = getTotalPages();
+        let next = state.currentPage;
+        if (rel === 'prev') next = Math.max(1, state.currentPage - 1);
+        else if (rel === 'next') next = Math.min(total, state.currentPage + 1);
+        else if (btn.dataset.page) next = Math.min(total, Math.max(1, parseInt(btn.dataset.page, 10)));
+        if (next !== state.currentPage) { state.currentPage = next; render(); }
+      });
+    }
+  }
+
+  function debounce(fn, ms) { let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), ms); }; }
+
+  async function loadDataOnce() {
+    if (state.loaded) return;
+    try {
+      if (!window.firebaseDB) {
+        state.data = [];
+        state.filtered = [];
+        state.loaded = true;
+        render();
+        return;
+      }
+      const snap = await window.firebaseDB.collection('accounts').limit(200).get();
+      state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      state.filtered = state.data.slice();
+      state.loaded = true;
+      state.errorMsg = '';
+      state.currentPage = 1;
+      render();
+    } catch (e) {
+      state.data = [];
+      state.filtered = [];
+      state.loaded = true;
+      state.errorMsg = (e && (e.message || e.code)) ? String(e.message || e.code) : 'Unknown error';
+      state.currentPage = 1;
+      render();
+    }
+  }
+
+  function normalize(s) { return (s || '').toString().trim().toLowerCase(); }
+
+  function applyFilters() {
+    const q = normalize(els.quickSearch ? els.quickSearch.value : '');
+
+    const nameQ = normalize(els.fName ? els.fName.value : '');
+    const industryQ = normalize(els.fIndustry ? els.fIndustry.value : '');
+    const domainQ = normalize(els.fDomain ? els.fDomain.value : '');
+    const mustPhone = !!(els.fHasPhone && els.fHasPhone.checked);
+
+    let count = 0;
+    const hasFieldFilters = [nameQ, industryQ, domainQ].some((v) => v) || mustPhone;
+    if (els.filterBadge) {
+      count = [nameQ, industryQ, domainQ].filter(Boolean).length + (mustPhone ? 1 : 0);
+      if (count > 0) { els.filterBadge.textContent = String(count); els.filterBadge.removeAttribute('hidden'); }
+      else { els.filterBadge.setAttribute('hidden', ''); }
+    }
+
+    const qMatch = (str) => !q || normalize(str).includes(q);
+    const contains = (needle) => (str) => !needle || normalize(str).includes(needle);
+
+    const nameMatch = contains(nameQ);
+    const industryMatch = contains(industryQ);
+    const domainMatch = contains(domainQ);
+    
+
+    state.filtered = state.data.filter((a) => {
+      const acctName = a.accountName || a.name || a.companyName || '';
+      const hasPhone = !!(a.phone || a.primaryPhone || a.mainPhone);
+      const domain = a.domain || a.website || a.site || '';
+
+      return (
+        qMatch(acctName) || qMatch(a.industry) || qMatch(domain) || qMatch(a.phone) || qMatch(a.electricitySupplier) || qMatch(a.benefits) || qMatch(a.painPoints)
+      ) && nameMatch(acctName) && industryMatch(a.industry) && domainMatch(domain) && (!mustPhone || hasPhone);
+    });
+
+    state.currentPage = 1;
+    render();
+  }
+
+  function clearFilters() {
+    if (els.fName) els.fName.value = '';
+    if (els.fIndustry) els.fIndustry.value = '';
+    if (els.fDomain) els.fDomain.value = '';
+    
+    if (els.fHasPhone) els.fHasPhone.checked = false;
+    if (els.quickSearch) els.quickSearch.value = '';
+    applyFilters();
+  }
+
+  function render() {
+    if (!els.tbody) return;
+    ensureSelected();
+    const pageItems = getPageItems();
+    const rows = pageItems.map((a) => rowHtml(a)).join('');
+    els.tbody.innerHTML = rows || emptyHtml();
+    updateRowsCheckedState();
+    updateSelectAllState();
+    renderPagination();
+    updateBulkActionsBar();
+  }
+
+  function safe(val) { return (val == null ? '' : String(val)); }
+
+  function coerceDate(val) {
+    if (!val) return null;
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+    if (typeof val === 'object' && typeof val.toDate === 'function') { const d = val.toDate(); return isNaN(d.getTime()) ? null : d; }
+    if (val && typeof val.seconds === 'number') { const ms = val.seconds * 1000 + (typeof val.nanoseconds === 'number' ? Math.floor(val.nanoseconds / 1e6) : 0); const d = new Date(ms); return isNaN(d.getTime()) ? null : d; }
+    if (typeof val === 'number') { const d = new Date(val > 1e12 ? val : val * 1000); return isNaN(d.getTime()) ? null : d; }
+    if (typeof val === 'string') { const d = new Date(val); return isNaN(d.getTime()) ? null : d; }
+    return null;
+  }
+
+  function formatDateOrNA() {
+    for (let i = 0; i < arguments.length; i++) { const d = coerceDate(arguments[i]); if (d) return d.toLocaleDateString(); }
+    return 'N/A';
+  }
+
+  function svgIcon(name) {
+    switch (name) {
+      case 'clear':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l14 14M19 5L5 19"/></svg>';
+      case 'email':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" fill="none"></path><polyline points="22,6 12,13 2,6" fill="none"></polyline></svg>';
+      case 'sequence':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg>';
+      case 'call':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.5v2a3 3 0 0 1-3.3 3 a19 19 0 0 1-8.3-3.2 19 19 0 0 1-6-6A19 19 0 0 1 1.5 4.3 3 3 0 0 1 4.5 1h2a2 2 0 0 1 2 1.7l.4 2.3a2 2 0 0 1-.5 1.8L7 8a16 16 0 0 0 9 9l1.2-1.3a2 2 0 0 1 1.8-.5l2.3.4A2 2 0 0 1 22 16.5z"/></svg>';
+      case 'addlist':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>';
+      case 'export':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+      case 'ai':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="display:block"><text x="12" y="12" dy="-0.12em" text-anchor="middle" dominant-baseline="central" fill="currentColor" font-size="18" font-weight="800" letter-spacing="0.05" font-family="Inter, system-ui, -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif">AI</text></svg>';
+      case 'delete':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+      default:
+        return '';
+    }
+  }
+
+  // Additional icons
+  (function extendIcons() {
+    const _orig = svgIcon;
+    svgIcon = function(name){
+      switch(name){
+        case 'linkedin':
+          return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5z" transform="translate(4 4)"/><path d="M2 8h4v10H2z" transform="translate(4 4)"/><path d="M9 8h3v1.7c.6-1 1.6-1.7 3.2-1.7 3 0 4.8 2 4.8 5.6V18h-4v-3.7c0-1.4-.5-2.4-1.7-2.4-1 0-1.5.7-1.8 1.4-.1.2-.1.6-.1.9V18H9z" transform="translate(4 4)"/></svg>';
+        case 'link':
+          return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20"/></svg>';
+        default:
+          return _orig(name);
+      }
+    }
+  })();
+
+  // Inject CRM-themed styles for bulk popover and actions bar (Accounts)
+  function injectAccountsBulkStyles() {
+    const id = 'accounts-bulk-styles';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.type = 'text/css';
+    style.textContent = `
+      /* Bulk selection backdrop */
+      .bulk-select-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 800;
+      }
+
+      /* Bulk selection popover - match app greys */
+      .bulk-select-popover {
+        position: absolute;
+        z-index: 900;
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius);
+        box-shadow: var(--elevation-card);
+        padding: var(--spacing-md);
+        min-width: 320px;
+        max-width: 480px;
+      }
+      .bulk-select-popover .option { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); }
+      .bulk-select-popover .option:last-of-type { margin-bottom: 0; }
+      .bulk-select-popover label { font-weight: 600; color: var(--text-primary); }
+      .bulk-select-popover .hint { color: var(--text-secondary); font-size: 12px; }
+      .bulk-select-popover input[type="number"] {
+        width: 120px;
+        height: 32px;
+        padding: 0 10px;
+        background: var(--grey-700);
+        color: var(--text-inverse);
+        border: 1px solid var(--grey-600);
+        border-radius: var(--border-radius-sm);
+      }
+      .bulk-select-popover .actions { display: flex; justify-content: flex-end; gap: var(--spacing-sm); margin-top: var(--spacing-md); }
+      .bulk-select-popover .btn-text {
+        height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm);
+        background: transparent; color: var(--text-secondary);
+        border: 1px solid transparent;
+      }
+      .bulk-select-popover .btn-text:hover { background: var(--grey-700); border-color: var(--border-light); color: var(--text-inverse); }
+      .bulk-select-popover .btn-primary {
+        height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm);
+        background: var(--grey-700);
+        color: var(--text-inverse);
+        border: 1px solid var(--grey-600);
+        font-weight: 600;
+      }
+      .bulk-select-popover .btn-primary:hover { background: var(--grey-600); border-color: var(--grey-500); }
+
+      /* Ensure container is a positioning context and not clipping */
+      #accounts-page .table-container { position: relative; overflow: visible; }
+
+      /* Bulk actions bar inside table container, centered above header */
+      #accounts-bulk-actions.bulk-actions-modal {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 8px;
+        width: max-content;
+        max-width: none; /* allow full content width so end buttons aren't clipped */
+        padding: 8px 12px; /* skinnier bar */
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--elevation-card);
+        z-index: 850;
+      }
+      #accounts-bulk-actions .bar { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: nowrap; white-space: nowrap; width: auto; overflow: visible; }
+      #accounts-bulk-actions .spacer { display:none; }
+      #accounts-bulk-actions .action-btn-sm {
+        display: inline-flex; align-items: center; gap: 6px;
+        height: 30px; padding: 0 10px;
+        background: var(--bg-item);
+        color: var(--text-inverse);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius-sm);
+        font-size: 0.85rem;
+        flex: 0 0 auto; /* prevent shrinking to keep labels on one line */
+      }
+      #accounts-bulk-actions .action-btn-sm:hover { background: var(--grey-700); }
+      #accounts-bulk-actions .action-btn-sm.danger { background: var(--red-muted); border-color: var(--red-subtle); color: var(--text-inverse); }
+      #accounts-bulk-actions .action-btn-sm svg { display: block; }
+      #accounts-bulk-actions .action-btn-sm span { display: inline-block; white-space: nowrap; }
+      /* Slight vertical nudge for AI icon to center with label */
+      #accounts-bulk-actions #bulk-ai svg { transform: translateY(2px); }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function rowHtml(a) {
+    if (!a) return '';
+    const name = safe(a.accountName || a.name || a.companyName);
+    const industry = safe(a.industry);
+    const domain = safe(a.domain || a.website || a.site);
+    const phone = safe(a.phone || a.primaryPhone || a.mainPhone);
+    const contractEnd = formatDateOrNA(a.contractEndDate, a.contractEnd, a.contract_end_date);
+    const sqftNum = a.squareFootage ?? a.sqft ?? a.square_feet;
+    const sqft = (typeof sqftNum === 'number' && isFinite(sqftNum)) ? sqftNum.toLocaleString() : safe(sqftNum);
+    const occVal = a.occupancyPct ?? a.occupancy ?? a.occupancy_percentage;
+    const occupancy = (typeof occVal === 'number' && isFinite(occVal)) ? (Math.round(occVal * (occVal > 1 ? 1 : 100)) + '%') : safe(occVal);
+    const employeesNum = a.employees ?? a.employeeCount ?? a.numEmployees;
+    const employees = (typeof employeesNum === 'number' && isFinite(employeesNum)) ? employeesNum.toLocaleString() : safe(employeesNum);
+    const city = safe(a.city || a.locationCity || a.town || '');
+    const stateVal = safe(a.state || a.locationState || a.region || '');
+    const location = (city || stateVal) ? `${escapeHtml(city)}${city && stateVal ? ', ' : ''}${escapeHtml(stateVal)}` : '';
+    const linkedin = safe(a.linkedin || a.linkedinUrl || a.linkedin_url || '');
+    const website = safe(a.website || a.site || (domain ? (domain.startsWith('http') ? domain : ('https://' + domain)) : ''));
+    // Compute favicon domain (mirror People page logic)
+    const favDomain = (() => {
+      let d = String(domain || '').trim();
+      // If domain includes protocol, parse hostname
+      if (/^https?:\/\//i.test(d)) {
+        try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
+      }
+      if (!d && website) {
+        try { d = new URL(website).hostname; } catch (_) { d = String(website).replace(/^https?:\/\//i, '').split('/')[0]; }
+      }
+      return d ? d.replace(/^www\./i, '') : '';
+    })();
+    const updatedStr = formatDateOrNA(a.updatedAt, a.createdAt);
+
+    const isSelected = !!(state && state.selected && typeof state.selected.has === 'function' && state.selected.has(a.id));
+    const checked = isSelected ? ' checked' : '';
+    const rowClass = isSelected ? ' class="row-selected"' : '';
+    const aid = escapeHtml(a.id);
+
+    const electricitySupplier = safe(a.electricitySupplier || '');
+    const benefits = safe(a.benefits || '');
+    const painPoints = safe(a.painPoints || '');
+
+    const cells = {
+      select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${aid}" aria-label="Select account"${checked}></td>`,
+      name: `<td class="name-cell"><a href="#account-details" class="acct-link" data-id="${aid}" title="View account details"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : ''}<span class="name-text">${escapeHtml(name || 'Unknown Account')}</span></span></a></td>`,
+      industry: `<td>${escapeHtml(industry)}</td>`,
+      domain: `<td>${escapeHtml(domain)}</td>`,
+      phone: `<td>${escapeHtml(phone)}</td>`,
+      contractEnd: `<td>${escapeHtml(contractEnd)}</td>`,
+      electricitySupplier: `<td>${escapeHtml(electricitySupplier)}</td>`,
+      benefits: `<td>${escapeHtml(benefits)}</td>`,
+      painPoints: `<td>${escapeHtml(painPoints)}</td>`,
+      sqft: `<td>${escapeHtml(sqft)}</td>`,
+      occupancy: `<td>${escapeHtml(occupancy)}</td>`,
+      employees: `<td>${escapeHtml(employees)}</td>`,
+      location: `<td>${location}</td>`,
+      actions: `<td class="qa-cell"><div class="qa-actions">
+        <button type="button" class="qa-btn" data-action="call" data-id="${aid}" data-phone="${escapeHtml(phone)}" aria-label="Call" title="Call">${svgIcon('call')}</button>
+        <button type="button" class="qa-btn" data-action="addlist" data-id="${aid}" aria-label="Add to list" title="Add to list">${svgIcon('addlist')}</button>
+        <button type="button" class="qa-btn" data-action="ai" data-id="${aid}" aria-label="Research with AI" title="Research with AI">${svgIcon('ai')}</button>
+        <button type="button" class="qa-btn" data-action="linkedin" data-id="${aid}" data-linkedin="${escapeHtml(linkedin)}" data-name="${escapeHtml(name)}" aria-label="LinkedIn page" title="LinkedIn page">${svgIcon('linkedin')}</button>
+        <button type="button" class="qa-btn" data-action="website" data-id="${aid}" data-website="${escapeHtml(website)}" aria-label="Company website" title="Company website">${svgIcon('link')}</button>
+      </div></td>`,
+      updated: `<td>${escapeHtml(updatedStr)}</td>`,
+    };
+
+    const tds = [];
+    const order = (accountsColumnOrder && accountsColumnOrder.length) ? accountsColumnOrder : DEFAULT_ACCOUNTS_COL_ORDER;
+    for (const key of order) if (cells[key]) tds.push(cells[key]);
+    return `\n<tr${rowClass}>\n  ${tds.join('\n  ')}\n</tr>`;
+  }
+
+  function emptyHtml() {
+    const msg = state && state.errorMsg ? `Error loading accounts: ${escapeHtml(state.errorMsg)}` : 'No accounts found.';
+    const colCount = (accountsColumnOrder && accountsColumnOrder.length) ? accountsColumnOrder.length : DEFAULT_ACCOUNTS_COL_ORDER.length;
+    return `\n<tr>\n  <td colspan="${colCount}" style="opacity:.75">${msg}</td>\n</tr>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function init() {
+    if (!initDomRefs()) return;
+    // Load saved order and prep header
+    accountsColumnOrder = loadAccountsColumnOrder();
+    ensureAccountsHeaderColMeta();
+    refreshAccountsHeaderOrder();
+    initAccountsHeaderDnD();
+    attachAccountsHeaderDnDHooks();
+    // Now wire events and load data
+    attachEvents();
+    // Ensure styles for bulk popover and actions bar match CRM theme
+    injectAccountsBulkStyles();
+    loadDataOnce();
+  }
+
+  function handleQuickAction(btn) {
+    const action = btn.getAttribute('data-action');
+    const id = btn.getAttribute('data-id');
+    switch (action) {
+      case 'call': {
+        const phone = btn.getAttribute('data-phone') || '';
+        if (phone) {
+          try { window.open(`tel:${encodeURIComponent(phone)}`); } catch (e) { /* noop */ }
+        }
+        console.log('Call account', { id, phone });
+        break;
+      }
+      case 'addlist': {
+        console.log('Add to list', { id });
+        break;
+      }
+      case 'ai': {
+        console.log('Research with AI', { id });
+        break;
+      }
+      case 'linkedin': {
+        let url = btn.getAttribute('data-linkedin') || '';
+        const name = btn.getAttribute('data-name') || '';
+        if (!url && name) url = `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(name)}`;
+        if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
+        console.log('Open LinkedIn', { id, url });
+        break;
+      }
+      case 'website': {
+        let url = btn.getAttribute('data-website') || '';
+        if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+        if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
+        console.log('Open website', { id, url });
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  function updateRowsCheckedState() {
+    if (!els.tbody) return;
+    els.tbody.querySelectorAll('input.row-select').forEach((cb) => {
+      const id = cb.getAttribute('data-id');
+      const isSel = id && state.selected.has(id);
+      cb.checked = !!isSel;
+      const tr = cb.closest('tr');
+      if (tr) tr.classList.toggle('row-selected', !!isSel);
+    });
+  }
+
+  function updateSelectAllState() {
+    if (!els.selectAll) return;
+    const total = getPageItems().length;
+    if (total === 0) { els.selectAll.checked = false; els.selectAll.indeterminate = false; return; }
+    let selectedVisible = 0;
+    for (const a of getPageItems()) if (state.selected.has(a.id)) selectedVisible++;
+    if (selectedVisible === 0) { els.selectAll.checked = false; els.selectAll.indeterminate = false; }
+    else if (selectedVisible === total) { els.selectAll.checked = true; els.selectAll.indeterminate = false; }
+    else { els.selectAll.checked = false; els.selectAll.indeterminate = true; }
+  }
+
+  // ===== Bulk selection popover (Step 1) =====
+  function openBulkSelectPopover() {
+    if (!els.tableContainer) { return; }
+    closeBulkSelectPopover();
+    // Add backdrop
+    const backdrop = document.createElement('div');
+    backdrop.className = 'bulk-select-backdrop';
+    backdrop.addEventListener('click', () => {
+      if (els.selectAll) els.selectAll.checked = state.selected.size > 0;
+      closeBulkSelectPopover();
+    });
+    document.body.appendChild(backdrop);
+    const totalFiltered = state.filtered.length;
+    const pageCount = getPageItems().length;
+    const pop = document.createElement('div');
+    pop.id = 'accounts-bulk-popover';
+    pop.className = 'bulk-select-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Bulk selection');
+    pop.innerHTML = `
+      <div class="option">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="radio" name="bulk-mode" value="custom" checked>
+          <span>Select number of accounts</span>
+        </label>
+        <input type="number" min="1" step="1" value="${Math.max(1, pageCount)}" id="bulk-custom-count">
+      </div>
+      <div class="option">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="radio" name="bulk-mode" value="page">
+          <span>Select this page</span>
+        </label>
+        <span class="hint">${pageCount}</span>
+      </div>
+      <div class="option">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="radio" name="bulk-mode" value="all">
+          <span>Select all</span>
+        </label>
+        <span class="hint">${totalFiltered}</span>
+      </div>
+      <div class="actions">
+        <button class="btn-text" id="bulk-cancel">Cancel</button>
+        <button class="btn-primary" id="bulk-apply">Apply</button>
+      </div>
+    `;
+
+    els.tableContainer.appendChild(pop);
+
+    // Prevent outside mousedown handler from closing while interacting inside
+    pop.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+    });
+
+    function positionPopover() {
+      if (!els.selectAll) return;
+      const cbRect = els.selectAll.getBoundingClientRect();
+      const contRect = els.tableContainer.getBoundingClientRect();
+      let left = cbRect.left - contRect.left;
+      let top = cbRect.bottom - contRect.top + 6;
+      const maxLeft = contRect.width - pop.offsetWidth - 8;
+      left = Math.max(8, Math.min(left, Math.max(8, maxLeft)));
+      top = Math.max(8, top);
+      pop.style.left = left + 'px';
+      pop.style.top = top + 'px';
+    }
+
+    positionPopover();
+    const reposition = () => positionPopover();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    if (els.page) {
+      if (els.page._bulkPopoverCleanup) els.page._bulkPopoverCleanup();
+      els.page._bulkPopoverCleanup = () => {
+        window.removeEventListener('resize', reposition);
+        window.removeEventListener('scroll', reposition, true);
+      };
+    }
+
+    const firstInput = pop.querySelector('#bulk-custom-count') || pop.querySelector('input,button');
+    if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+
+    // Wire events
+    const cancelBtn = pop.querySelector('#bulk-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        els.selectAll.checked = false;
+        closeBulkSelectPopover();
+      });
+    }
+    const applyBtn = pop.querySelector('#bulk-apply');
+    let appliedOnce = false;
+    const runApply = () => {
+      if (appliedOnce) { return; }
+      appliedOnce = true;
+      try {
+        const mode = pop.querySelector('input[name="bulk-mode"]:checked')?.value;
+        if (mode === 'custom') {
+          const n = Math.max(1, parseInt(pop.querySelector('#bulk-custom-count').value || '0', 10));
+          selectFirstNFiltered(n);
+        } else if (mode === 'page') {
+          const pageIds = getPageItems().map((a) => a.id).filter(Boolean);
+          selectIds(pageIds);
+        } else if (mode === 'all') {
+          const allIds = state.filtered.map((a) => a.id).filter(Boolean);
+          selectIds(allIds);
+        } else {
+          const pageIds = getPageItems().map((a) => a.id).filter(Boolean);
+          selectIds(pageIds);
+        }
+        closeBulkSelectPopover();
+        // Single render is sufficient; render() already calls updateBulkActionsBar()
+        render();
+      } catch (err) {
+        console.error('[accounts][bulk] Apply handler error:', err);
+      }
+    };
+    if (applyBtn) {
+      // Use pointerdown so it happens before any outside-close mousedown
+      applyBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); runApply(); });
+      applyBtn.addEventListener('click', (e) => { e.preventDefault(); runApply(); });
+    }
+    // Delegated safety net: capture clicks anywhere inside popover
+    pop.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!target) return;
+      if (target.closest && target.closest('#bulk-apply')) {
+        e.preventDefault();
+        runApply();
+      } else if (target.closest && target.closest('#bulk-cancel')) {
+        e.preventDefault();
+        if (els.selectAll) els.selectAll.checked = false;
+        closeBulkSelectPopover();
+      }
+    });
+
+    // Also wire cancel on pointerdown to preempt outside-close
+    const cancelBtn2 = pop.querySelector('#bulk-cancel');
+    if (cancelBtn2) {
+      cancelBtn2.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (els.selectAll) els.selectAll.checked = false; closeBulkSelectPopover(); });
+    }
+
+    // Close on outside click
+    setTimeout(() => {
+      function outside(e) {
+        if (!pop.contains(e.target) && e.target !== els.selectAll) {
+          document.removeEventListener('mousedown', outside);
+          els.selectAll.checked = state.selected.size > 0;
+          closeBulkSelectPopover();
+        }
+      }
+      document.addEventListener('mousedown', outside);
+    }, 0);
+  }
+
+  function closeBulkSelectPopover() {
+    const existing = document.querySelector('#accounts-bulk-popover');
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    if (els.page && typeof els.page._bulkPopoverCleanup === 'function') {
+      els.page._bulkPopoverCleanup();
+      delete els.page._bulkPopoverCleanup;
+    }
+    // Remove backdrop if present
+    const backdrop = document.querySelector('.bulk-select-backdrop');
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+  }
+
+  function selectIds(ids) {
+    state.selected.clear();
+    for (const id of ids) if (id) state.selected.add(id);
+  }
+  function selectFirstNFiltered(n) {
+    const ids = state.filtered.slice(0, n).map((a) => a.id).filter(Boolean);
+    selectIds(ids);
+  }
+
+  // ===== Bulk actions bar (Step 2) =====
+  function showBulkActionsBar() { updateBulkActionsBar(true); }
+  function hideBulkActionsBar() { const bar = els.page.querySelector('#accounts-bulk-actions'); if (bar && bar.parentNode) bar.parentNode.removeChild(bar); }
+
+  function updateBulkActionsBar(forceShow = false) {
+    if (!els.tableContainer) { return; }
+    const count = state.selected.size;
+    const shouldShow = forceShow || count > 0;
+    const existing = els.page ? els.page.querySelector('#accounts-bulk-actions') : null;
+    if (!shouldShow) {
+      if (existing) { existing.remove(); }
+      return;
+    }
+    const html = `
+      <div class="bar">
+        <button class="action-btn-sm" id="bulk-clear">${svgIcon('clear')}<span>Clear ${count} selected</span></button>
+        <span class="spacer"></span>
+        <button class="action-btn-sm" id="bulk-email">${svgIcon('email')}<span>Email</span></button>
+        <button class="action-btn-sm" id="bulk-sequence">${svgIcon('sequence')}<span>Sequence ▾</span></button>
+        <button class="action-btn-sm" id="bulk-call">${svgIcon('call')}<span>Call</span></button>
+        <button class="action-btn-sm" id="bulk-addlist">${svgIcon('addlist')}<span>Add to list</span></button>
+        <button class="action-btn-sm" id="bulk-export">${svgIcon('export')}<span>Export</span></button>
+        <button class="action-btn-sm" id="bulk-ai">${svgIcon('ai')}<span>Research with AI</span></button>
+        <button class="action-btn-sm danger" id="bulk-delete">${svgIcon('delete')}<span>Delete</span></button>
+      </div>
+    `;
+    let container = existing;
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'accounts-bulk-actions';
+      container.className = 'bulk-actions-modal';
+      els.tableContainer.appendChild(container);
+    }
+    container.innerHTML = html;
+
+    const clearBtn = container.querySelector('#bulk-clear');
+    clearBtn.addEventListener('click', () => {
+      state.selected.clear();
+      render();
+      hideBulkActionsBar();
+      if (els.selectAll) { els.selectAll.checked = false; els.selectAll.indeterminate = false; }
+    });
+    container.querySelector('#bulk-email').addEventListener('click', () => console.log('Bulk email', Array.from(state.selected)));
+    container.querySelector('#bulk-sequence').addEventListener('click', () => console.log('Bulk add to sequence', Array.from(state.selected)));
+    container.querySelector('#bulk-call').addEventListener('click', () => console.log('Bulk call', Array.from(state.selected)));
+    container.querySelector('#bulk-addlist').addEventListener('click', () => console.log('Bulk add to list', Array.from(state.selected)));
+    container.querySelector('#bulk-export').addEventListener('click', () => console.log('Bulk export', Array.from(state.selected)));
+    container.querySelector('#bulk-ai').addEventListener('click', () => console.log('Bulk research with AI', Array.from(state.selected)));
+    container.querySelector('#bulk-delete').addEventListener('click', () => console.log('Bulk delete', Array.from(state.selected)));
+  }
+
+  function toggleSelectAll(checked) {
+    const pageItems = getPageItems();
+    if (checked) pageItems.forEach((a) => state.selected.add(a.id));
+    else pageItems.forEach((a) => state.selected.delete(a.id));
+    updateRowsCheckedState();
+    updateSelectAllState();
+  }
+
+  function getTotalPages() { return Math.max(1, Math.ceil(state.filtered.length / state.pageSize)); }
+
+  function getPageItems() {
+    const total = state.filtered.length;
+    const totalPages = getTotalPages();
+    if (state.currentPage > totalPages) state.currentPage = totalPages;
+    const start = (state.currentPage - 1) * state.pageSize;
+    const end = Math.min(total, start + state.pageSize);
+    return state.filtered.slice(start, end);
+  }
+
+  function renderPagination() {
+    if (!els.pagination) return;
+    const totalPages = getTotalPages();
+    const current = Math.min(state.currentPage, totalPages);
+    state.currentPage = current;
+    const total = state.filtered.length;
+    const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
+    const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
+
+    const parts = [];
+    parts.push(`<button class="page-btn" data-rel="prev" ${current === 1 ? 'disabled' : ''} aria-label="Previous page">Prev</button>`);
+
+    const windowSize = 1;
+    const addBtn = (p) => { parts.push(`<button class="page-btn ${p === current ? 'active' : ''}" data-page="${p}" aria-label="Page ${p}">${p}</button>`); };
+    const addEllipsis = () => parts.push(`<span class="page-ellipsis">…</span>`);
+
+    if (totalPages <= 7) { for (let p = 1; p <= totalPages; p++) addBtn(p); }
+    else {
+      addBtn(1);
+      if (current - windowSize > 2) addEllipsis();
+      const startIdx = Math.max(2, current - windowSize);
+      const endIdx = Math.min(totalPages - 1, current + windowSize);
+      for (let p = startIdx; p <= endIdx; p++) addBtn(p);
+      if (current + windowSize < totalPages - 1) addEllipsis();
+      addBtn(totalPages);
+    }
+
+    parts.push(`<button class="page-btn" data-rel="next" ${current === totalPages ? 'disabled' : ''} aria-label="Next page">Next</button>`);
+
+    els.pagination.innerHTML = parts.join('');
+
+    if (els.paginationSummary) {
+      const label = total === 1 ? 'account' : 'accounts';
+      els.paginationSummary.textContent = `Showing ${start}\u2013${end} of ${total} ${label}`;
+    }
+  }
+
+  // Expose minimal global API for other modules (e.g., AccountDetail)
+  window.getAccountsData = function () {
+    try { return Array.isArray(state.data) ? state.data : []; } catch (_) { return []; }
+  };
+  window.accountsModule = {
+    rebindDynamic: function () {
+      try {
+        if (!els.page) initDomRefs();
+        // Reattach dynamic handlers that might be removed during detail view
+        attachEvents();
+      } catch (e) { /* noop */ }
+    },
+    init
+  };
+
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+  else { init(); }
+})();
