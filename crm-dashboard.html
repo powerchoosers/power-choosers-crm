@@ -1111,7 +1111,11 @@
         try {
           const saved = (localStorage.getItem('API_BASE_URL') || '').trim();
           const hardcoded = 'https://d6df1ca4c9a7.ngrok-free.app'; // current ngrok base URL
-          window.API_BASE_URL = (saved || hardcoded).replace(/\/$/, '');
+          const chosen = (saved || hardcoded).replace(/\/$/, '');
+          window.API_BASE_URL = chosen;
+          if (!saved) {
+            try { localStorage.setItem('API_BASE_URL', chosen); } catch(_) {}
+          }
           console.log('API_BASE_URL:', window.API_BASE_URL);
         } catch (e) {
           console.warn('API_BASE_URL init error:', e);
