@@ -26,12 +26,12 @@ const mimeTypes = {
 
 // --- Minimal config for Vonage Voice ---
 // Provide these via env vars for security in production.
-const VONAGE_APPLICATION_ID = process.env.VONAGE_APPLICATION_ID || 'e29347ed-7cb3-4d58-b461-6f47647760bf';
+const VONAGE_APPLICATION_ID = process.env.VONAGE_APPLICATION_ID || '5b7c6b93-35aa-43d7-8223-53163f1e00c6';
 const VONAGE_NUMBER = process.env.VONAGE_NUMBER || '+14693518845'; // Your Vonage virtual number (E.164)
-const AGENT_NUMBER = process.env.AGENT_NUMBER || '+14693518845';     // Number to ring first (your phone)
-const VONAGE_PRIVATE_KEY_PATH = process.env.VONAGE_PRIVATE_KEY_PATH || path.join(__dirname, 'vonage.private.key');
+const AGENT_NUMBER = process.env.AGENT_NUMBER || '+19728342317';     // Number to ring first (your phone)
+const VONAGE_PRIVATE_KEY_PATH = process.env.VONAGE_PRIVATE_KEY_PATH || path.join(__dirname, 'private.key');
 // Public base URL of this server for Vonage webhooks (use ngrok for local dev)
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://d6df1ca4c9a7.ngrok-free.app';
 // Google AI Studio API key (Gemini). If present, enables transcription + summary.
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || null;
 // Recording controls
@@ -47,6 +47,11 @@ try {
   }
 } catch (e) {
   console.warn('Vonage private key not loaded:', e?.message || e);
+}
+
+// Warn loudly if private key is missing (calls and JWT will fail)
+if (!VONAGE_PRIVATE_KEY) {
+  console.warn('WARNING: Vonage private key not loaded. Set VONAGE_PRIVATE_KEY_PATH and ensure the PEM exists.');
 }
 
 function httpsRequestJson(options, payloadString) {
@@ -90,6 +95,70 @@ function createVonageAppJwt(ttlSeconds = 60 * 10) {
     jti: crypto.randomBytes(8).toString('hex'),
   };
   return signJwtRS256(payload, VONAGE_PRIVATE_KEY);
+}
+
+// Create a Client SDK (user) JWT for browser login
+function createVonageClientJwt(username, ttlSeconds = 60 * 60) {
+  if (!VONAGE_PRIVATE_KEY) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    application_id: VONAGE_APPLICATION_ID,
+    sub: username || 'agent',
+    iat: now,
+    exp: now + ttlSeconds,
+    jti: crypto.randomBytes(8).toString('hex'),
+    acl: {
+      paths: {
+        '/*/users/**': {},
+        '/*/conversations/**': {},
+        '/*/sessions/**': {},
+        '/*/devices/**': {},
+        '/*/image/**': {},
+        '/*/media/**': {},
+        '/*/applications/**': {},
+        '/*/push/**': {},
+        '/*/knocking/**': {},
+        '/*/rtc/**': {},
+        '/*/legs/**': {}
+      }
+    }
+  };
+  return signJwtRS256(payload, VONAGE_PRIVATE_KEY);
+}
+
+async function handleApiVonageJwt(req, res, parsedUrl) {
+  const method = req.method || 'GET';
+  if (method !== 'GET' && method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+  if (!VONAGE_PRIVATE_KEY) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Server not configured: Vonage private key not found' }));
+    return;
+  }
+  const q = parsedUrl.query || {};
+  let user = (q.user || '').toString().trim();
+  let ttl = parseInt(q.ttl, 10);
+  if (method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      if (!user && body && typeof body.user === 'string') user = body.user.trim();
+      if ((!ttl || isNaN(ttl)) && body && (typeof body.ttl === 'number' || typeof body.ttl === 'string')) ttl = parseInt(body.ttl, 10);
+    } catch (_) { /* ignore body parse errors */ }
+  }
+  if (!user) user = 'agent';
+  if (!ttl || isNaN(ttl) || ttl <= 0) ttl = 60 * 60;
+  try {
+    const token = createVonageClientJwt(user, ttl);
+    if (!token) throw new Error('Failed to create JWT');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, user, ttl, token }));
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: e?.message || 'Internal error' }));
+  }
 }
 
 // ---- Gemini integration helpers ----
@@ -255,6 +324,10 @@ async function handleApiVonageCall(req, res, parsedUrl) {
       console.log('[api/vonage/call] agent=', AGENT_NUMBER, 'from(Vonage)=', VONAGE_NUMBER);
     } catch (_) {}
 
+    if (AGENT_NUMBER === VONAGE_NUMBER) {
+      try { console.warn('[api/vonage/call] WARNING: AGENT_NUMBER equals VONAGE_NUMBER. This can cause immediate hangup.'); } catch(_) {}
+    }
+
     const bodyStr = JSON.stringify(payload);
     const options = {
       method: 'POST',
@@ -374,8 +447,9 @@ async function handleWebhookEvent(req, res) {
       const label = body.event || body.status || 'event';
       const id = body.conversation_uuid || body.uuid || body.call_uuid;
       console.log('Vonage event:', label, 'id=', id);
-      if (label === 'failed' || body.status === 'failed') {
-        try { console.log('Vonage fail detail:', JSON.stringify(body)); } catch (_) {}
+      const severe = ['failed','rejected','busy','timeout','unanswered','hangup'];
+      if (severe.includes(String(label).toLowerCase()) || severe.includes(String(body.status || '').toLowerCase())) {
+        try { console.log('Vonage event detail:', JSON.stringify(body)); } catch (_) {}
       }
     }
   } catch (e) {
@@ -497,6 +571,7 @@ const server = http.createServer(async (req, res) => {
     // Preflight for API and webhook routes
     if (req.method === 'OPTIONS' && (
       pathname === '/api/vonage/call' ||
+      pathname === '/api/vonage/jwt' ||
       pathname === '/api/calls' ||
       pathname === '/api/recording' ||
       pathname === '/webhooks/answer' ||
@@ -509,6 +584,9 @@ const server = http.createServer(async (req, res) => {
     }
     
     // API routes (Vonage integration)
+    if (pathname === '/api/vonage/jwt') {
+        return handleApiVonageJwt(req, res, parsedUrl);
+    }
     if (pathname === '/api/vonage/call') {
         return handleApiVonageCall(req, res, parsedUrl);
     }
@@ -652,6 +730,26 @@ server.listen(PORT, HOST, () => {
     console.log('⏰ Server started at:', new Date().toLocaleString());
     console.log('\n✨ Ready to serve your Power Choosers CRM!');
     console.log('💡 Press Ctrl+C to stop the server');
+    // Telephony config summary
+    try {
+      const base = (PUBLIC_BASE_URL || '').replace(/\/$/, '');
+      console.log('--- Vonage Telephony Config ---');
+      console.log('Application ID:', VONAGE_APPLICATION_ID);
+      console.log('Vonage Number:', VONAGE_NUMBER);
+      console.log('Agent Number  :', AGENT_NUMBER);
+      console.log('PUBLIC_BASE_URL:', PUBLIC_BASE_URL || '(unset)');
+      console.log('Private Key Path:', VONAGE_PRIVATE_KEY_PATH);
+      console.log('Private Key Loaded:', !!VONAGE_PRIVATE_KEY);
+      console.log('Recording Enabled:', RECORD_ENABLED, 'Split:', RECORD_SPLIT, 'Format:', RECORD_FORMAT);
+      if (PUBLIC_BASE_URL) {
+        console.log('Answer Webhook  :', `${base}/webhooks/answer?dst=+1XXXXXXXXXX`);
+        console.log('Event Webhook   :', `${base}/webhooks/event`);
+        console.log('Recording Hook  :', `${base}/webhooks/recording`);
+      }
+      if (AGENT_NUMBER === VONAGE_NUMBER) {
+        console.warn('WARNING: AGENT_NUMBER equals VONAGE_NUMBER. Update AGENT_NUMBER to your personal device.');
+      }
+    } catch (_) {}
 });
 
 // Handle server errors
