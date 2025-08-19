@@ -72,6 +72,38 @@
     return tail.split('').map(d => `${d}(${T9_MAP[d] || ''})`).join('  ');
   }
 
+  // Normalize a dialed number to E.164.
+  // Rules:
+  // - Accept letters (convert via T9), punctuation, spaces.
+  // - If it starts with '+', keep country code and digits.
+  // - If 10 digits, assume US and prefix +1.
+  // - If 11 digits starting with 1, normalize to +1##########.
+  // - Otherwise, if digits 8-15 long without '+', prefix '+' and validate.
+  // Returns { ok: boolean, value: string }
+  function normalizeDialedNumber(raw) {
+    let s = (raw || '').trim();
+    if (!s) return { ok: false, value: '' };
+    // map letters to digits
+    s = s.replace(/[A-Za-z]/g, (c) => letterToDigit(c) || '');
+    const hasPlus = s.startsWith('+');
+    const digits = s.replace(/\D/g, '');
+    let e164 = '';
+    if (hasPlus) {
+      e164 = '+' + digits;
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+      e164 = '+1' + digits.slice(1);
+    } else if (digits.length === 10) {
+      e164 = '+1' + digits;
+    } else if (digits.length >= 8 && digits.length <= 15) {
+      // Assume user included country code without '+'
+      e164 = '+' + digits;
+    } else {
+      return { ok: false, value: '' };
+    }
+    if (/^\+\d{8,15}$/.test(e164)) return { ok: true, value: e164 };
+    return { ok: false, value: '' };
+  }
+
   function makeCard() {
     const card = document.createElement('div');
     card.className = 'widget-card phone-card';
@@ -152,18 +184,26 @@
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
     if (callBtn) callBtn.addEventListener('click', async () => {
-      const num = (input && input.value || '').trim();
-      if (!num) {
+      const raw = (input && input.value || '').trim();
+      if (!raw) {
         try { window.crm?.showToast && window.crm.showToast('Enter a number to call'); } catch (_) {}
         return;
       }
-      try { window.crm?.showToast && window.crm.showToast(`Placing call to ${num}...`); } catch (_) {}
+      const normalized = normalizeDialedNumber(raw);
+      if (!normalized.ok) {
+        try { window.crm?.showToast && window.crm.showToast('Invalid number. Use 10-digit US or +countrycode number.'); } catch (_) {}
+        return;
+      }
+      // update UI with normalized value
+      if (input) { input.value = normalized.value; updateHint(); }
+      try { window.crm?.showToast && window.crm.showToast(`Placing call to ${normalized.value}...`); } catch (_) {}
 
       try {
-        const r = await fetch('/api/vonage/call', {
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const r = await fetch(`${base}/api/vonage/call`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: num })
+          body: JSON.stringify({ to: normalized.value })
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
