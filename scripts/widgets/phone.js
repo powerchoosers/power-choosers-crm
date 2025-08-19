@@ -20,18 +20,34 @@
         throw new Error('Browser calling SDK not loaded');
       }
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base) {
+        try { window.crm?.showToast && window.crm.showToast('API base URL not configured'); } catch(_) {}
+        throw new Error('Missing API_BASE_URL');
+      }
+      try { console.debug('[RTC] ensureSession: API base =', base); } catch(_) {}
       state.connecting = true;
       try {
         const resp = await fetch(`${base}/api/vonage/jwt?user=agent`);
+        try { console.debug('[RTC] JWT fetch status =', resp.status); } catch(_) {}
         const j = await resp.json().catch(() => ({}));
-        if (!resp.ok || !j?.token) throw new Error(j?.error || `JWT HTTP ${resp.status}`);
+        if (!resp.ok || !j?.token) {
+          try { window.crm?.showToast && window.crm.showToast(`JWT error: ${j?.error || ('HTTP ' + resp.status)}`); } catch(_) {}
+          throw new Error(j?.error || `JWT HTTP ${resp.status}`);
+        }
         state.client = new NexmoClient();
-        state.app = await state.client.createSession(j.token);
+        try {
+          state.app = await state.client.createSession(j.token);
+        } catch (e) {
+          try { console.warn('[RTC] createSession error:', e?.message || e); } catch(_) {}
+          try { window.crm?.showToast && window.crm.showToast(`RTC session error: ${e?.message || 'createSession failed'}`); } catch(_) {}
+          throw e;
+        }
         // bind to call events once
         state.app.on('member:call', (member, call) => {
           state.call = call;
           try { window.crm?.showToast && window.crm.showToast('Call connected'); } catch(_) {}
         });
+        try { console.debug('[RTC] Session ready'); } catch(_) {}
         state.ready = true;
         return state.app;
       } finally {
@@ -388,4 +404,6 @@
   window.Widgets.openPhone = openPhone;
   window.Widgets.closePhone = closePhoneWidget;
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };
+  // Expose for console diagnostics
+  try { window.RTC = RTC; } catch(_) {}
 })();
