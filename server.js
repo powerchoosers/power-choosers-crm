@@ -205,9 +205,26 @@ async function handleWebhookEvent(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // CORS headers (adjust origin as needed)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Vary', 'Origin');
+
   // Parse the URL
   const parsedUrl = url.parse(req.url, true);
   let pathname = parsedUrl.pathname;
+
+    // Preflight for API and webhook routes
+    if (req.method === 'OPTIONS' && (
+      pathname === '/api/vonage/call' ||
+      pathname === '/webhooks/answer' ||
+      pathname === '/webhooks/event'
+    )) {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
     
     // API routes (Vonage integration)
     if (pathname === '/api/vonage/call') {
