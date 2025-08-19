@@ -341,11 +341,6 @@ async function handleApiVonageCall(req, res, parsedUrl) {
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-  if (!PUBLIC_BASE_URL) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Server not configured: PUBLIC_BASE_URL is required for Vonage webhooks' }));
-    return;
-  }
   if (!VONAGE_PRIVATE_KEY) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Server not configured: Vonage private key not found. Set VONAGE_PRIVATE_KEY_PATH.' }));
@@ -377,20 +372,54 @@ async function handleApiVonageCall(req, res, parsedUrl) {
     const jwt = createVonageAppJwt();
     if (!jwt) throw new Error('Failed to create Vonage JWT');
 
-    const answerUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/answer?dst=${encodeURIComponent(to)}`;
-    const eventUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/event`;
-
-    const payload = {
-      to: [ { type: 'phone', number: AGENT_NUMBER } ], // ring the agent first
-      from: { type: 'phone', number: VONAGE_NUMBER },
-      answer_url: [ answerUrl ],
-      event_url: [ eventUrl ]
-    };
+    let payload;
+    
+    if (PUBLIC_BASE_URL) {
+      // Use webhooks if PUBLIC_BASE_URL is available
+      const answerUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/answer?dst=${encodeURIComponent(to)}`;
+      const eventUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/event`;
+      
+      payload = {
+        to: [ { type: 'phone', number: AGENT_NUMBER } ], // ring the agent first
+        from: { type: 'phone', number: VONAGE_NUMBER },
+        answer_url: [ answerUrl ],
+        event_url: [ eventUrl ]
+      };
+    } else {
+      // Use inline NCCO for direct calling (no webhooks needed)
+      const ncco = [
+        {
+          action: 'talk',
+          text: 'Connecting your call, please hold.',
+          voiceName: 'Amy'
+        },
+        {
+          action: 'connect',
+          from: VONAGE_NUMBER,
+          endpoint: [
+            {
+              type: 'phone',
+              number: to
+            }
+          ]
+        }
+      ];
+      
+      payload = {
+        to: [ { type: 'phone', number: AGENT_NUMBER } ], // ring the agent first
+        from: { type: 'phone', number: VONAGE_NUMBER },
+        ncco: ncco
+      };
+    }
 
     try {
       console.log('[api/vonage/call] toRaw=', toRaw, 'toNormalized=', to);
-      console.log('[api/vonage/call] answer_url=', answerUrl);
-      console.log('[api/vonage/call] event_url=', eventUrl);
+      if (PUBLIC_BASE_URL) {
+        console.log('[api/vonage/call] answer_url=', answerUrl);
+        console.log('[api/vonage/call] event_url=', eventUrl);
+      } else {
+        console.log('[api/vonage/call] Using inline NCCO (no webhooks)');
+      }
       console.log('[api/vonage/call] agent=', AGENT_NUMBER, 'from(Vonage)=', VONAGE_NUMBER);
     } catch (_) {}
 
