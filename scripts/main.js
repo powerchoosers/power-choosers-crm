@@ -533,14 +533,16 @@ class PowerChoosersCRM {
         };
 
         const handleEnter = (e) => {
-            const el = e.target && (e.target.closest('[title]') || e.target.closest('[data-pc-title]'));
+            const t = e && e.target ? (e.target.nodeType === 1 ? e.target : e.target.parentElement) : null;
+            const el = t && (t.closest('[title]') || t.closest('[data-pc-title]'));
             if (!el) return;
             clearTimeout(hideTimer);
             showTooltip(el);
         };
 
         const handleLeave = (e) => {
-            const el = e.target && (e.target.closest('[data-pc-title]'));
+            const t = e && e.target ? (e.target.nodeType === 1 ? e.target : e.target.parentElement) : null;
+            const el = t && t.closest('[data-pc-title]');
             if (!el) return;
             hideTimer = setTimeout(hideTooltip, 60);
         };
