@@ -370,91 +370,9 @@
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
     async function placeBrowserCall(number) {
-      console.debug('[Phone] Attempting browser-to-phone call using Twilio Voice SDK');
-      
-      // Check if Twilio Voice SDK is available
-      if (typeof Twilio === 'undefined' || !Twilio.Device) {
-        throw new Error('Twilio Voice SDK not loaded. Add this to your HTML: <script src="https://sdk.twilio.com/js/voice/releases/2.11.0/twilio.min.js"></script>');
-      }
-      
-      try {
-        // Get access token from your backend
-        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        const tokenResp = await fetch(`${base}/api/twilio/token?identity=agent`);
-        
-        if (!tokenResp.ok) {
-          throw new Error(`Failed to get Twilio token: HTTP ${tokenResp.status}`);
-        }
-        
-        const tokenData = await tokenResp.json();
-        if (!tokenData.token) {
-          throw new Error('No Twilio token received from server');
-        }
-        
-        console.debug('[Phone] Got Twilio token, setting up device');
-        
-        // Initialize Twilio Device
-        const device = new Twilio.Device(tokenData.token, {
-          codecPreferences: ['opus', 'pcmu'],
-          fakeLocalDTMF: true,
-          enableImprovedSignalingErrorPrecision: true
-        });
-        
-        // Set up device event handlers
-        device.on('registered', () => {
-          console.debug('[Phone] Twilio device registered and ready');
-        });
-        
-        device.on('error', (error) => {
-          console.error('[Phone] Twilio device error:', error);
-          throw error;
-        });
-        
-        device.on('incoming', (conn) => {
-          console.debug('[Phone] Incoming call:', conn);
-          // Handle incoming calls if needed
-        });
-        
-        // Register the device
-        await device.register();
-        
-        console.debug('[Phone] Making outbound call to:', number);
-        
-        // Make the call
-        const connection = await device.connect({
-          params: {
-            To: number,
-            From: BUSINESS_PHONE // Your Twilio phone number
-          }
-        });
-        
-        console.debug('[Phone] Call connected:', connection);
-        
-        // Set up call event handlers
-        connection.on('accept', () => {
-          console.debug('[Phone] Call accepted');
-          try { window.crm?.showToast && window.crm.showToast('Call connected via browser'); } catch(_) {}
-        });
-        
-        connection.on('disconnect', () => {
-          console.debug('[Phone] Call disconnected');
-          try { window.crm?.showToast && window.crm.showToast('Browser call ended'); } catch(_) {}
-        });
-        
-        connection.on('error', (error) => {
-          console.error('[Phone] Call error:', error);
-          throw error;
-        });
-        
-        // Store connection for hang up functionality
-        window.currentTwilioConnection = connection;
-        
-        return connection;
-        
-      } catch (error) {
-        console.error('[Phone] Browser call failed:', error);
-        throw error;
-      }
+      // Browser calling disabled due to CDN blocking issues
+      // Fall back to server calling immediately
+      throw new Error('Browser calling unavailable - using server calling instead');
     }
     async function fallbackServerCall(number) {
       // Check if we're on main website vs CRM

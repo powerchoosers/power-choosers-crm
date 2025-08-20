@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Twilio API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+        button { padding: 10px 15px; margin: 5px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Twilio API Integration Test</h1>
+    
+    <div class="test-section">
+        <h3>1. Test Token Endpoint</h3>
+        <button onclick="testToken()">Test Token API</button>
+        <div id="token-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Test Call Endpoint</h3>
+        <button onclick="testCall()">Test Call API</button>
+        <div id="call-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. Test CORS Headers</h3>
+        <button onclick="testCORS()">Test CORS</button>
+        <div id="cors-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://power-choosers-crm.vercel.app';
+        
+        async function testToken() {
+            const result = document.getElementById('token-result');
+            result.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/twilio/token?identity=test`);
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    result.innerHTML = `<div class="success">✓ Token endpoint working</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<div class="error">✗ Token endpoint failed</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">✗ Token endpoint error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testCall() {
+            const result = document.getElementById('call-result');
+            result.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/twilio/call`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: '+15551234567', from: '+18176630380' })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `<div class="success">✓ Call endpoint working</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<div class="error">✗ Call endpoint failed (${response.status})</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">✗ Call endpoint error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testCORS() {
+            const result = document.getElementById('cors-result');
+            result.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/twilio/token`, { method: 'OPTIONS' });
+                const corsHeaders = {
+                    'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+                    'access-control-allow-methods': response.headers.get('access-control-allow-methods'),
+                    'access-control-allow-headers': response.headers.get('access-control-allow-headers')
+                };
+                
+                if (corsHeaders['access-control-allow-origin']) {
+                    result.innerHTML = `<div class="success">✓ CORS headers present</div><pre>${JSON.stringify(corsHeaders, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<div class="error">✗ CORS headers missing</div><pre>${JSON.stringify(corsHeaders, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">✗ CORS test error: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-run tests on page load
+        window.onload = function() {
+            setTimeout(testToken, 500);
+            setTimeout(testCORS, 1000);
+        };
+    </script>
+</body>
+</html>
