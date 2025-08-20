@@ -1,63 +1,104 @@
 (function () {
   'use strict';
 
-  // Phone Widget (Dialer)
+  // Phone Widget (Dialer) - Fully migrated to Twilio
   // Exposes: window.Widgets.openPhone(), window.Widgets.closePhone(), window.Widgets.isPhoneOpen()
+  // Global call function: window.Widgets.callNumber(number, name)
   if (!window.Widgets) window.Widgets = {};
 
-  // Simple singleton for Vonage Client SDK session
-  const RTC = (function() {
-    const state = { client: null, app: null, call: null, ready: false, connecting: false, micPermissionGranted: false, micPermissionChecked: false };
-    async function ensureSession() {
-      if (state.ready && state.app) return state.app;
+  // Business phone number for fallback calls
+  const BUSINESS_PHONE = '9728342317'; // Your business number without formatting
+
+  // Twilio Device state management
+  const TwilioRTC = (function() {
+    const state = { 
+      device: null, 
+      connection: null, 
+      ready: false, 
+      connecting: false, 
+      micPermissionGranted: false, 
+      micPermissionChecked: false 
+    };
+
+    async function ensureDevice() {
+      if (state.ready && state.device) return state.device;
       if (state.connecting) {
-        // wait briefly for concurrent init
+        // Wait briefly for concurrent init
         await new Promise(r => setTimeout(r, 500));
-        if (state.ready && state.app) return state.app;
+        if (state.ready && state.device) return state.device;
       }
-      if (typeof NexmoClient === 'undefined') {
-        try { window.crm?.showToast && window.crm.showToast('Vonage Client SDK not loaded'); } catch(_) {}
-        throw new Error('Browser calling SDK not loaded');
+
+      if (typeof Twilio === 'undefined' || !Twilio.Device) {
+        try { window.crm?.showToast && window.crm.showToast('Twilio Voice SDK not loaded'); } catch(_) {}
+        throw new Error('Twilio Voice SDK not loaded. Add script tag to HTML.');
       }
+
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base) {
         try { window.crm?.showToast && window.crm.showToast('API base URL not configured'); } catch(_) {}
         throw new Error('Missing API_BASE_URL');
       }
-      try { console.debug('[RTC] ensureSession: API base =', base); } catch(_) {}
+
+      try { console.debug('[TwilioRTC] ensureDevice: API base =', base); } catch(_) {}
       state.connecting = true;
+
       try {
-        const resp = await fetch(`${base}/api/vonage/jwt?user=agent`);
-        try { console.debug('[RTC] JWT fetch status =', resp.status); } catch(_) {}
+        // Get Twilio access token
+        const resp = await fetch(`${base}/api/twilio/token?identity=agent`);
+        try { console.debug('[TwilioRTC] Token fetch status =', resp.status); } catch(_) {}
+        
         const j = await resp.json().catch(() => ({}));
         if (!resp.ok || !j?.token) {
-          try { window.crm?.showToast && window.crm.showToast(`JWT error: ${j?.error || ('HTTP ' + resp.status)}`); } catch(_) {}
-          throw new Error(j?.error || `JWT HTTP ${resp.status}`);
+          try { window.crm?.showToast && window.crm.showToast(`Token error: ${j?.error || ('HTTP ' + resp.status)}`); } catch(_) {}
+          throw new Error(j?.error || `Token HTTP ${resp.status}`);
         }
-        state.client = new NexmoClient();
-        try {
-          state.app = await state.client.createSession(j.token);
-        } catch (e) {
-          try { console.warn('[RTC] createSession error:', e?.message || e); } catch(_) {}
-          try { window.crm?.showToast && window.crm.showToast(`RTC session error: ${e?.message || 'createSession failed'}`); } catch(_) {}
-          throw e;
-        }
-        // bind to call events once
-        state.app.on('member:call', (member, call) => {
-          state.call = call;
-          try { window.crm?.showToast && window.crm.showToast('Call connected'); } catch(_) {}
+
+        // Initialize Twilio Device
+        state.device = new Twilio.Device(j.token, {
+          codecPreferences: ['opus', 'pcmu'],
+          fakeLocalDTMF: true,
+          enableImprovedSignalingErrorPrecision: true
         });
-        try { console.debug('[RTC] Session ready'); } catch(_) {}
+
+        // Set up device event handlers
+        state.device.on('registered', () => {
+          console.debug('[TwilioRTC] Device registered and ready');
+          try { window.crm?.showToast && window.crm.showToast('Browser calling ready'); } catch(_) {}
+        });
+
+        state.device.on('error', (error) => {
+          console.error('[TwilioRTC] Device error:', error);
+          try { window.crm?.showToast && window.crm.showToast(`Device error: ${error?.message || 'Unknown error'}`); } catch(_) {}
+        });
+
+        state.device.on('incoming', (conn) => {
+          console.debug('[TwilioRTC] Incoming call:', conn);
+          state.connection = conn;
+          // Handle incoming calls if needed
+        });
+
+        // Register the device
+        await state.device.register();
+        
+        try { console.debug('[TwilioRTC] Device ready'); } catch(_) {}
         state.ready = true;
-        return state.app;
+        return state.device;
       } finally {
         state.connecting = false;
       }
     }
-    return { state, ensureSession };
+
+    return { state, ensureDevice };
   })();
 
   const WIDGET_ID = 'phone-widget';
+
+  // Current call context
+  let currentCallContext = {
+    number: '',
+    name: '',
+    isActive: false
+  };
 
   // Update microphone status UI
   function updateMicrophoneStatusUI(card, status) {
@@ -70,12 +111,12 @@
     switch (status) {
       case 'granted':
         micIcon.textContent = '🎤';
-        micText.textContent = 'Browser calls enabled';
+        micText.textContent = 'Browser calls enabled - will try browser first';
         micStatus.style.color = 'var(--green-400, #10b981)';
         break;
       case 'denied':
         micIcon.textContent = '🚫';
-        micText.textContent = 'Will use phone fallback - click address bar mic to enable';
+        micText.textContent = 'Will call your phone - click address bar mic for browser calls';
         micStatus.style.color = 'var(--amber-400, #f59e0b)';
         break;
       case 'checking':
@@ -85,7 +126,7 @@
         break;
       case 'error':
         micIcon.textContent = '⚠️';
-        micText.textContent = 'Cannot check microphone - will use fallback';
+        micText.textContent = 'Will call your phone (browser calls unavailable)';
         micStatus.style.color = 'var(--text-secondary)';
         break;
     }
@@ -93,7 +134,7 @@
 
   // Microphone permission handling
   async function checkMicrophonePermission(card) {
-    if (RTC.state.micPermissionChecked && RTC.state.micPermissionGranted) {
+    if (TwilioRTC.state.micPermissionChecked && TwilioRTC.state.micPermissionGranted) {
       return true;
     }
     
@@ -102,12 +143,12 @@
       if (navigator.permissions && navigator.permissions.query) {
         const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
         if (permissionStatus.state === 'granted') {
-          RTC.state.micPermissionGranted = true;
-          RTC.state.micPermissionChecked = true;
+          TwilioRTC.state.micPermissionGranted = true;
+          TwilioRTC.state.micPermissionChecked = true;
           return true;
         } else if (permissionStatus.state === 'denied') {
-          RTC.state.micPermissionGranted = false;
-          RTC.state.micPermissionChecked = true;
+          TwilioRTC.state.micPermissionGranted = false;
+          TwilioRTC.state.micPermissionChecked = true;
           return false;
         }
       }
@@ -117,14 +158,14 @@
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         // Stop the stream immediately as we only need permission
         stream.getTracks().forEach(track => track.stop());
-        RTC.state.micPermissionGranted = true;
-        RTC.state.micPermissionChecked = true;
+        TwilioRTC.state.micPermissionGranted = true;
+        TwilioRTC.state.micPermissionChecked = true;
         try { window.crm?.showToast && window.crm.showToast('Microphone access granted - browser calls enabled'); } catch(_) {}
         return true;
       } catch (micError) {
         console.warn('[Phone] Microphone permission denied:', micError?.message || micError);
-        RTC.state.micPermissionGranted = false;
-        RTC.state.micPermissionChecked = true;
+        TwilioRTC.state.micPermissionGranted = false;
+        TwilioRTC.state.micPermissionChecked = true;
         
         // Show helpful message to user
         try { 
@@ -134,8 +175,8 @@
       }
     } catch (error) {
       console.warn('[Phone] Permission check failed:', error?.message || error);
-      RTC.state.micPermissionGranted = false;
-      RTC.state.micPermissionChecked = true;
+      TwilioRTC.state.micPermissionGranted = false;
+      TwilioRTC.state.micPermissionChecked = true;
       return false;
     }
   }
@@ -329,34 +370,90 @@
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
     async function placeBrowserCall(number) {
-      const app = await RTC.ensureSession();
+      console.debug('[Phone] Attempting browser-to-phone call using Twilio Voice SDK');
       
-      // Check available methods for debugging
-      console.debug('[Phone] Available app methods:', Object.getOwnPropertyNames(app).filter(name => typeof app[name] === 'function'));
+      // Check if Twilio Voice SDK is available
+      if (typeof Twilio === 'undefined' || !Twilio.Device) {
+        throw new Error('Twilio Voice SDK not loaded. Add this to your HTML: <script src="https://sdk.twilio.com/js/voice/releases/2.11.0/twilio.min.js"></script>');
+      }
       
-      // Try different Vonage SDK calling methods
-      if (typeof app.callPhone === 'function') {
-        console.debug('[Phone] Using app.callPhone method');
-        return app.callPhone(number);
-      } else if (typeof app.callServer === 'function') {
-        console.debug('[Phone] Using app.callServer method');
-        return app.callServer(number);
-      } else if (typeof app.call === 'function') {
-        console.debug('[Phone] Using app.call method');
-        return app.call(number);
-      } else if (app.calls && typeof app.calls.createCall === 'function') {
-        console.debug('[Phone] Using app.calls.createCall method');
-        return app.calls.createCall({ type: 'phone', to: { type: 'phone', number: number } });
-      } else {
-        // List all available methods for debugging
-        const methods = [];
-        for (const prop in app) {
-          if (typeof app[prop] === 'function') {
-            methods.push(prop);
-          }
+      try {
+        // Get access token from your backend
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const tokenResp = await fetch(`${base}/api/twilio/token?identity=agent`);
+        
+        if (!tokenResp.ok) {
+          throw new Error(`Failed to get Twilio token: HTTP ${tokenResp.status}`);
         }
-        console.warn('[Phone] Available methods on app:', methods);
-        throw new Error(`Browser calling not supported - available methods: ${methods.slice(0, 10).join(', ')}`);
+        
+        const tokenData = await tokenResp.json();
+        if (!tokenData.token) {
+          throw new Error('No Twilio token received from server');
+        }
+        
+        console.debug('[Phone] Got Twilio token, setting up device');
+        
+        // Initialize Twilio Device
+        const device = new Twilio.Device(tokenData.token, {
+          codecPreferences: ['opus', 'pcmu'],
+          fakeLocalDTMF: true,
+          enableImprovedSignalingErrorPrecision: true
+        });
+        
+        // Set up device event handlers
+        device.on('registered', () => {
+          console.debug('[Phone] Twilio device registered and ready');
+        });
+        
+        device.on('error', (error) => {
+          console.error('[Phone] Twilio device error:', error);
+          throw error;
+        });
+        
+        device.on('incoming', (conn) => {
+          console.debug('[Phone] Incoming call:', conn);
+          // Handle incoming calls if needed
+        });
+        
+        // Register the device
+        await device.register();
+        
+        console.debug('[Phone] Making outbound call to:', number);
+        
+        // Make the call
+        const connection = await device.connect({
+          params: {
+            To: number,
+            From: BUSINESS_PHONE // Your Twilio phone number
+          }
+        });
+        
+        console.debug('[Phone] Call connected:', connection);
+        
+        // Set up call event handlers
+        connection.on('accept', () => {
+          console.debug('[Phone] Call accepted');
+          try { window.crm?.showToast && window.crm.showToast('Call connected via browser'); } catch(_) {}
+        });
+        
+        connection.on('disconnect', () => {
+          console.debug('[Phone] Call disconnected');
+          try { window.crm?.showToast && window.crm.showToast('Browser call ended'); } catch(_) {}
+        });
+        
+        connection.on('error', (error) => {
+          console.error('[Phone] Call error:', error);
+          throw error;
+        });
+        
+        // Store connection for hang up functionality
+        window.currentTwilioConnection = connection;
+        
+        return connection;
+        
+      } catch (error) {
+        console.error('[Phone] Browser call failed:', error);
+        throw error;
       }
     }
     async function fallbackServerCall(number) {
@@ -396,16 +493,31 @@
           throw error;
         }
       } else {
-        // On CRM - use the API
+        // On CRM - use Twilio API to call your phone and connect to target
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        const r = await fetch(`${base}/api/vonage/call`, {
+        const callData = {
+          from: BUSINESS_PHONE, // Your business number
+          to: number, // Target number to call
+          agent_phone: '+19728342317' // Your personal phone that will ring first
+        };
+        
+        console.debug('[Phone] Making CRM API call:', callData);
+        
+        const r = await fetch(`${base}/api/twilio/call`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: number })
+          body: JSON.stringify(callData)
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
-        try { window.crm?.showToast && window.crm.showToast('Fallback: ringing your phone now'); } catch(_) {}
+        
+        // Show appropriate message based on call context
+        const contactName = currentCallContext.name;
+        const message = contactName ? 
+          `Calling ${contactName} - your phone will ring first` : 
+          'Your phone will ring first, then we\'ll connect the call';
+        
+        try { window.crm?.showToast && window.crm.showToast(message); } catch(_) {}
         return data;
       }
     }
@@ -435,9 +547,9 @@
       // update UI with normalized value
       if (input) { input.value = normalized.value; }
       // If already in a call, hangup
-      if (RTC.state.call) {
-        try { RTC.state.call.hangUp && RTC.state.call.hangUp(); } catch(_) {}
-        RTC.state.call = null;
+      if (TwilioRTC.state.connection) {
+        try { TwilioRTC.state.connection.disconnect(); } catch(_) {}
+        TwilioRTC.state.connection = null;
         setInCallUI(false);
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
         return;
@@ -471,6 +583,7 @@
           hasMicPermission = false;
         }
         
+        // Try browser calling first if microphone permission is available
         if (hasMicPermission) {
           try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
           try {
@@ -488,9 +601,9 @@
             }
           }
         } else {
-          // No microphone permission - go straight to fallback
-          console.debug('[Phone] No microphone access, using fallback call');
-          try { window.crm?.showToast && window.crm.showToast(`No microphone access - calling ${normalized.value} via fallback...`); } catch (_) {}
+          // Using server-based calling (browser calling disabled)
+          console.debug('[Phone] Using server-based calling');
+          try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
           try {
             await fallbackServerCall(normalized.value);
           } catch (e2) {
@@ -618,41 +731,137 @@
     try { window.crm?.showToast && window.crm.showToast('Phone opened'); } catch (_) {}
   }
 
+  // Global call function for CRM integration
+  window.Widgets.callNumber = function(number, contactName = '') {
+    console.debug('[Phone] Global call function:', { number, contactName });
+    
+    // Set current call context
+    currentCallContext = {
+      number: number,
+      name: contactName,
+      isActive: false
+    };
+    
+    // Open phone widget if not already open
+    if (!document.getElementById(WIDGET_ID)) {
+      openPhone();
+    }
+    
+    // Wait for widget to be ready, then populate number
+    setTimeout(() => {
+      const card = document.getElementById(WIDGET_ID);
+      if (card) {
+        const input = card.querySelector('.phone-display');
+        if (input) {
+          input.value = number;
+        }
+        
+        // Update widget header to show contact name
+        if (contactName) {
+          const title = card.querySelector('.widget-title');
+          if (title) {
+            title.innerHTML = `Phone - ${contactName}`;
+          }
+        }
+        
+        // Auto-trigger call if we have both number and name (click-to-call scenario)
+        if (number && contactName) {
+          const callBtn = card.querySelector('.call-btn-start');
+          if (callBtn) {
+            setTimeout(() => callBtn.click(), 100);
+          }
+        }
+      }
+    }, 50);
+    
+    return true;
+  };
+
   window.Widgets.openPhone = openPhone;
   window.Widgets.closePhone = closePhoneWidget;
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };
+  
   // Expose for console diagnostics
-  try { window.RTC = RTC; } catch(_) {}
+  try { window.TwilioRTC = TwilioRTC; } catch(_) {}
 
   // Console helpers for manual dialing from DevTools
   try {
-    // Server-initiated PSTN call via backend fallback
-    window.callPSTN = async function(number) {
+    // Server-initiated call via Twilio backend
+    window.callServer = async function(number) {
       const n = (number || '').trim();
       if (!n) throw new Error('Missing number');
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base) throw new Error('Missing API_BASE_URL');
-      const r = await fetch(`${base}/api/vonage/call`, {
+      const r = await fetch(`${base}/api/twilio/call`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: n })
+        body: JSON.stringify({ to: n, from: BUSINESS_PHONE })
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
       return data;
     };
 
-    // Attempt browser-based call using Client SDK if supported
+    // Attempt browser-based call using Twilio Voice SDK
     window.callBrowser = async function(number) {
       const n = (number || '').trim();
       if (!n) throw new Error('Missing number');
-      const app = await RTC.ensureSession();
-      if (!app || typeof app.callPhone !== 'function') throw new Error('Browser call not supported by SDK');
-      return app.callPhone(n);
+      const device = await TwilioRTC.ensureDevice();
+      const connection = await device.connect({
+        params: { To: n, From: BUSINESS_PHONE }
+      });
+      return connection;
     };
 
     // Grouped helper
-    window.Call = { pstn: window.callPSTN, browser: window.callBrowser, ensureSession: RTC.ensureSession };
+    window.Call = { server: window.callServer, browser: window.callBrowser, ensureDevice: TwilioRTC.ensureDevice };
+    
+    // Debug helper to check Twilio configuration
+    window.debugTwilio = async function() {
+      try {
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        console.log('API Base URL:', base);
+        
+        // Check token endpoint
+        const resp = await fetch(`${base}/api/twilio/token?identity=agent`);
+        console.log('Token Response Status:', resp.status);
+        
+        if (resp.ok) {
+          const data = await resp.json();
+          console.log('Token Data:', data);
+          
+          if (data.token) {
+            // Decode JWT to see what's in it (just the payload, not validating signature)
+            try {
+              const parts = data.token.split('.');
+              const payload = JSON.parse(atob(parts[1]));
+              console.log('JWT Payload:', payload);
+            } catch (e) {
+              console.warn('Could not decode JWT:', e);
+            }
+          }
+        } else {
+          const error = await resp.text();
+          console.error('Token Error Response:', error);
+        }
+        
+        // Try to create a device
+        if (typeof Twilio !== 'undefined' && Twilio.Device) {
+          console.log('Twilio Voice SDK available');
+          try {
+            const device = await TwilioRTC.ensureDevice();
+            console.log('Device created:', device);
+          } catch (e) {
+            console.error('Device creation error:', e);
+          }
+        } else {
+          console.error('Twilio Voice SDK not loaded');
+        }
+        
+      } catch (error) {
+        console.error('Debug error:', error);
+      }
+    };
   } catch (_) {}
 
 })();
