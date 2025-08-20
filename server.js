@@ -22,7 +22,7 @@ const mimeTypes = {
 };
 
 // Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm.vercel.app';
 
@@ -132,7 +132,9 @@ const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
     'https://powerchoosers.com',
     'https://www.powerchoosers.com'
   ];
