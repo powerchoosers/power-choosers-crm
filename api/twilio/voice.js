@@ -2,15 +2,19 @@ const twilio = require('twilio');
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default function handler(req, res) {
-    // Only allow POST requests
-    if (req.method !== 'POST') {
+    // Allow GET or POST (Twilio Console may be configured for either)
+    if (req.method !== 'POST' && req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
     
     try {
-        const { To, From, CallSid } = req.body;
+        // Read params from body (POST) or query (GET)
+        const src = req.method === 'POST' ? (req.body || {}) : (req.query || {});
+        const To = src.To || src.to;
+        const From = src.From || src.from;
+        const CallSid = src.CallSid || src.callSid;
         
-        console.log(`[Voice Webhook] Outbound call to ${To} from ${From}, CallSid: ${CallSid}`);
+        console.log(`[Voice Webhook] Outbound call to ${To} from ${From || 'N/A'}, CallSid: ${CallSid || 'N/A'} (method: ${req.method})`);
         
         // Your business phone number for caller ID
         const callerId = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
@@ -37,7 +41,12 @@ export default function handler(req, res) {
             action: `${base}/api/twilio/status`
         });
         
-        dial.number(To);
+        if (To) {
+            dial.number(To);
+        } else {
+            // If no To provided, respond with a helpful message to avoid 31000
+            twiml.say('Missing destination number.');
+        }
         
         console.log(`[Voice] TwiML generated for call to ${To}`);
         

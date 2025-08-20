@@ -57,7 +57,8 @@
         state.device = new Twilio.Device(j.token, {
           codecPreferences: ['opus', 'pcmu'],
           fakeLocalDTMF: true,
-          enableImprovedSignalingErrorPrecision: true
+          enableImprovedSignalingErrorPrecision: true,
+          logLevel: 'debug'
         });
 
         // Set up device event handlers
@@ -70,6 +71,13 @@
           console.error('[TwilioRTC] Device error:', error);
           try { window.crm?.showToast && window.crm.showToast(`Device error: ${error?.message || 'Unknown error'}`); } catch(_) {}
         });
+
+        // Capture SDK warnings for diagnostics (e.g., ICE issues, media errors)
+        try {
+          state.device.on('warning', (name, data) => {
+            console.warn('[TwilioRTC] Device warning:', name, data || {});
+          });
+        } catch (_) {}
 
         state.device.on('incoming', (conn) => {
           console.debug('[TwilioRTC] Incoming call:', conn);
@@ -431,11 +439,9 @@
       }
     }
     async function fallbackServerCall(number) {
-      // Check if we're on main website vs CRM
-      const isMainWebsite = window.location.hostname === 'powerchoosers.com' || 
-                            window.location.hostname === 'www.powerchoosers.com' ||
-                            !window.API_BASE_URL;
-      
+      // Determine website mode: if no API base configured, treat as marketing site
+      const isMainWebsite = !window.API_BASE_URL;
+
       if (isMainWebsite) {
         // On main website - actually initiate the call
         console.debug('[Phone] Main website call - initiating call to:', number);
@@ -602,10 +608,8 @@
         return;
       }
       try {
-        // Check if we're on the main website vs CRM dashboard
-        const isMainWebsite = window.location.hostname === 'powerchoosers.com' || 
-                              window.location.hostname === 'www.powerchoosers.com' ||
-                              !window.API_BASE_URL; // No API configured means main website
+        // Determine website mode: if no API base configured, treat as marketing site
+        const isMainWebsite = !window.API_BASE_URL; // No API configured means main website
         
         if (isMainWebsite) {
           // On main website - skip browser calling and go straight to fallback
