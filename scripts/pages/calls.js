@@ -144,6 +144,16 @@
       #calls-bulk-actions .action-btn-sm svg { display: block; }
       #calls-bulk-actions .action-btn-sm span { display: inline-block; white-space: nowrap; }
       #calls-bulk-actions #bulk-ai svg { transform: translateY(2px); }
+
+      /* Company link styling (match People page hover behavior) */
+      #calls-page a.company-link { color: var(--text-inverse); text-decoration: none; }
+      #calls-page a.company-link:hover { color: #ffffff; text-decoration: none; }
+      #calls-page .company-cell__wrap { display: inline-flex; align-items: center; gap: 6px; }
+      #calls-page img.company-favicon { width: 16px; height: 16px; border-radius: 3px; }
+
+      /* Click-to-call number styling */
+      #calls-page .phone-click { color: var(--text-secondary); cursor: pointer; }
+      #calls-page .phone-click:hover { color: var(--text-inverse); }
     `;
     document.head.appendChild(style);
   }
@@ -188,7 +198,7 @@
   function showSuggest(d, q) { if (!d.se) return; const items = (pool[d.k] || []).filter(v => N(v).includes(N(q))).slice(0, 8); if (!items.length) { hideSuggest(d); return; } d.se.innerHTML = items.map(v => `<div class="suggest-item" data-v="${v.replace(/"/g,'&quot;')}">${v}</div>`).join(''); d.se.removeAttribute('hidden'); d.se.querySelectorAll('.suggest-item').forEach(it => it.addEventListener('mousedown', (e) => { e.preventDefault(); addToken(d.k, it.getAttribute('data-v')); if (d.ie) d.ie.value = ''; hideSuggest(d); applyFilters(); })); }
   function hideSuggest(d) { if (d.se) { d.se.setAttribute('hidden', ''); d.se.innerHTML = ''; } }
   function renderChips(d) { if (!d.ce) return; const arr = state.tokens[d.k] || []; d.ce.innerHTML = arr.map((t,i)=>`<span class="chip" data-idx="${i}"><span class="chip-label">${t}</span><button type="button" class="chip-remove" aria-label="Remove">&times;</button></span>`).join(''); d.ce.querySelectorAll('.chip-remove').forEach((b,i)=>b.addEventListener('click',()=>{ arr.splice(i,1); renderChips(d); applyFilters(); })); if (d.xe) { if (arr.length) d.xe.removeAttribute('hidden'); else d.xe.setAttribute('hidden',''); } updateFilterCount(); }
-  function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=eN(x)===N(t))) { arr.push(t); const d = chips.find(x=ex.k===k); if (d) renderChips(d); } }
+  function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=>N(x)===N(t))) { arr.push(t); const d = chips.find(x=>x.k===k); if (d) renderChips(d); } }
 
   // Enrich rows missing contact info using any local contacts cache
   async function enrichUnknowns() {
@@ -266,7 +276,9 @@
               audioUrl: c.audioUrl ? `${base}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
               // Add contact metadata for better display
               contactId: pick(c.contactId, c.contact_id, ''),
-              contactType: pick(c.contactType, c.contact_type, '')
+              contactType: pick(c.contactType, c.contact_type, ''),
+              companyDomain: pick(c.companyDomain, c.domain, ''),
+              website: pick(c.website, c.companyWebsite, '')
             };
             row.isRecognizedContact = computeIsRecognizedContact(row);
             return row;
@@ -356,6 +368,14 @@
     // row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
     els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',()=>openInsightsModal(btn.getAttribute('data-id'))));
+    // click-to-call on number under contact name
+    els.tbody.querySelectorAll('.phone-click').forEach(el=> el.addEventListener('click', () => {
+      const num = el.getAttribute('data-number') || '';
+      const name = el.getAttribute('data-name') || '';
+      try { if (window.Widgets && typeof window.Widgets.callNumber === 'function') { window.Widgets.callNumber(num, name); return; } } catch(_) {}
+      // Fallback to tel: link
+      const a = document.createElement('a'); a.href = 'tel:' + num; a.style.display='none'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }));
     // header select state
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
@@ -371,7 +391,7 @@
     if (computeIsRecognizedContact(r) && r.contactName) {
       // Show contact name with phone number as subtext
       displayName = escapeHtml(r.contactName);
-      displaySubtext = `<div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(r.contactPhone || '')}</div>`;
+      displaySubtext = `\n      <div class="phone-click" data-number="${escapeHtml(r.contactPhone || r.to || '')}" data-name="${escapeHtml(r.contactName || '')}" style="font-size: 0.8em; margin-top: 2px;">${escapeHtml(r.contactPhone || '')}</div>`;
     } else {
       // Show phone number only (unrecognized contact)
       displayName = escapeHtml(r.contactPhone || r.to || '');
@@ -402,7 +422,11 @@
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
       <td>${nameWithSubtext}</td>
       <td>${title}</td>
-      <td>${company}</td>
+      <td>${(function(){
+        const domain = (r.companyDomain || (r.website||'').replace(/^https?:\/\//,'').split('/')[0] || '').trim();
+        const fav = domain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(domain)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : '';
+        return company ? `<a href="#account-details" class="company-link" data-company="${company}" data-domain="${escapeHtml(domain)}"><span class="company-cell__wrap">${fav}<span class="company-name">${company}</span></span></a>` : '';
+      })()}</td>
       <td>${callTimeStr}</td>
       <td>${dur}</td>
       <td><span class="outcome-badge outcome-${outcome.toLowerCase().replace(' ', '-')}">${outcome}</span></td>
