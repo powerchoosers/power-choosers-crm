@@ -369,89 +369,94 @@
 
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
-    async function placeBrowserCall(number) {
-      console.debug('[Phone] Attempting browser-to-phone call using Twilio Voice SDK');
+    // Global device instance for reuse
+    let globalDevice = null;
+    let currentCall = null;
+    
+    async function ensureDevice() {
+      if (globalDevice && globalDevice.state === 'registered') {
+        return globalDevice;
+      }
       
-      // Check if Twilio Voice SDK is available
       if (typeof Twilio === 'undefined' || !Twilio.Device) {
         throw new Error('Twilio Voice SDK not loaded. Please refresh the page.');
       }
       
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      const tokenResp = await fetch(`${base}/api/twilio/token?identity=agent`);
+      
+      if (!tokenResp.ok) {
+        const errorData = await tokenResp.json().catch(() => ({}));
+        throw new Error(`Failed to get Twilio token: ${errorData.error || `HTTP ${tokenResp.status}`}`);
+      }
+      
+      const tokenData = await tokenResp.json();
+      if (!tokenData.token) {
+        throw new Error('No Twilio token received from server');
+      }
+      
+      console.debug('[Phone] Setting up Twilio device');
+      
+      globalDevice = new Twilio.Device(tokenData.token, {
+        codecPreferences: ['opus', 'pcmu'],
+        fakeLocalDTMF: true,
+        enableRingingState: true,
+        allowIncomingWhileBusy: false
+      });
+      
+      globalDevice.on('registered', () => {
+        console.debug('[Phone] Device registered and ready');
+      });
+      
+      globalDevice.on('error', (error) => {
+        console.error('[Phone] Device error:', error);
+        globalDevice = null;
+      });
+      
+      await globalDevice.register();
+      return globalDevice;
+    }
+
+    async function placeBrowserCall(number) {
+      console.debug('[Phone] Attempting browser call to:', number);
+      
       try {
-        // Get access token from backend
-        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        const tokenResp = await fetch(`${base}/api/twilio/token?identity=agent`);
-        
-        if (!tokenResp.ok) {
-          const errorData = await tokenResp.json().catch(() => ({}));
-          throw new Error(`Failed to get Twilio token: ${errorData.error || `HTTP ${tokenResp.status}`}`);
-        }
-        
-        const tokenData = await tokenResp.json();
-        if (!tokenData.token) {
-          throw new Error('No Twilio token received from server');
-        }
-        
-        console.debug('[Phone] Got Twilio token, setting up device');
-        
-        // Initialize Twilio Device
-        const device = new Twilio.Device(tokenData.token, {
-          codecPreferences: ['opus', 'pcmu'],
-          fakeLocalDTMF: true,
-          enableRingingState: true,
-          allowIncomingWhileBusy: false
-        });
-        
-        // Set up device event handlers
-        device.on('registered', () => {
-          console.debug('[Phone] Twilio device registered and ready');
-        });
-        
-        device.on('error', (error) => {
-          console.error('[Phone] Twilio device error:', error);
-          throw error;
-        });
-        
-        device.on('incoming', (conn) => {
-          console.debug('[Phone] Incoming call:', conn);
-        });
-        
-        // Register the device
-        await device.register();
-        
-        console.debug('[Phone] Making outbound call to:', number);
+        const device = await ensureDevice();
         
         // Make the call
-        const call = await device.connect({
+        currentCall = await device.connect({
           params: {
             To: number
           }
         });
         
-        console.debug('[Phone] Call initiated:', call);
+        console.debug('[Phone] Call initiated');
+        
+        // Set UI immediately for responsiveness
+        setInCallUI(true);
         
         // Handle call events
-        call.on('accept', () => {
-          console.debug('[Phone] Call accepted');
-          setInCallUI(true);
+        currentCall.on('accept', () => {
+          console.debug('[Phone] Call connected');
         });
         
-        call.on('disconnect', () => {
+        currentCall.on('disconnect', () => {
           console.debug('[Phone] Call disconnected');
+          currentCall = null;
           setInCallUI(false);
         });
         
-        call.on('error', (error) => {
+        currentCall.on('error', (error) => {
           console.error('[Phone] Call error:', error);
+          currentCall = null;
           setInCallUI(false);
-          throw error;
         });
         
-        // Don't call setInCallUI here - wait for call.on('accept')
-        return call;
+        return currentCall;
         
       } catch (error) {
         console.error('[Phone] Browser call failed:', error);
+        setInCallUI(false);
         throw error;
       }
     }
@@ -520,6 +525,29 @@
         return data;
       }
     }
+    
+    async function logCall(phoneNumber, callType) {
+      try {
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        if (!base) return;
+        
+        await fetch(`${base}/api/calls`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            to: phoneNumber,
+            from: '+18176630380', // Your business number
+            status: 'initiated',
+            callType: callType,
+            timestamp: new Date().toISOString()
+          })
+        });
+      } catch (error) {
+        console.error('[Phone] Failed to log call:', error);
+      }
+    }
     function setInCallUI(inCall) {
       if (!callBtn) return;
       if (inCall) {
@@ -546,9 +574,12 @@
       // update UI with normalized value
       if (input) { input.value = normalized.value; }
       // If already in a call, hangup
-      if (TwilioRTC.state.connection) {
-        try { TwilioRTC.state.connection.disconnect(); } catch(_) {}
-        TwilioRTC.state.connection = null;
+      if (currentCall) {
+        try { 
+          currentCall.disconnect(); 
+          console.debug('[Phone] Hanging up current call');
+        } catch(_) {}
+        currentCall = null;
         setInCallUI(false);
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
         return;
@@ -588,7 +619,14 @@
           try {
             const call = await placeBrowserCall(normalized.value);
             console.debug('[Phone] Browser call successful, no fallback needed');
-            // Don't call setInCallUI here - the call events will handle it
+            
+            // Log the call to the backend
+            try {
+              await logCall(normalized.value, 'browser');
+            } catch (logError) {
+              console.warn('[Phone] Failed to log call:', logError);
+            }
+            
             return; // Exit early - browser call succeeded
           } catch (e) {
             // Fallback to server-initiated PSTN flow
