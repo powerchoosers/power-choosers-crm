@@ -433,21 +433,21 @@
         // Handle call events
         call.on('accept', () => {
           console.debug('[Phone] Call accepted');
-          updateCallStatus('connected');
+          setInCallUI(true);
         });
         
         call.on('disconnect', () => {
           console.debug('[Phone] Call disconnected');
-          updateCallStatus('idle');
+          setInCallUI(false);
         });
         
         call.on('error', (error) => {
           console.error('[Phone] Call error:', error);
-          updateCallStatus('idle');
+          setInCallUI(false);
           throw error;
         });
         
-        updateCallStatus('calling');
+        // Don't call setInCallUI here - wait for call.on('accept')
         return call;
         
       } catch (error) {
@@ -586,8 +586,10 @@
         if (hasMicPermission) {
           try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
           try {
-            await placeBrowserCall(normalized.value);
-            setInCallUI(true);
+            const call = await placeBrowserCall(normalized.value);
+            console.debug('[Phone] Browser call successful, no fallback needed');
+            // Don't call setInCallUI here - the call events will handle it
+            return; // Exit early - browser call succeeded
           } catch (e) {
             // Fallback to server-initiated PSTN flow
             console.warn('[Phone] Browser call failed, falling back to server call:', e?.message || e);

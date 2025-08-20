@@ -22,6 +22,10 @@ export default function handler(req, res) {
         twiml.dial({
             callerId: callerId,
             timeout: 30,
+            // Anti-spam configurations
+            answerOnBridge: true,
+            hangupOnStar: false,
+            timeLimit: 14400, // 4 hours max call duration
             // Optional: record calls (uncomment if needed)
             // record: 'record-from-answer'
         }, To);
