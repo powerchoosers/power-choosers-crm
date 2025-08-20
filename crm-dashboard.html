@@ -6,7 +6,18 @@
     <title>Power Choosers CRM</title>
     <link rel="stylesheet" href="styles/main.css">
     <link rel="icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" type="image/png">
-    <!-- Server-only Twilio integration - no browser SDK needed -->
+    <!-- Twilio Voice SDK for browser calling -->
+    <script src="https://unpkg.com/@twilio/voice-sdk@2.11.0/dist/twilio.min.js"></script>
+    <script>
+        // Verify SDK loading
+        window.addEventListener('load', () => {
+            if (typeof Twilio !== 'undefined' && Twilio.Device) {
+                console.log('[Twilio] SDK loaded successfully from unpkg CDN');
+            } else {
+                console.error('[Twilio] SDK failed to load from unpkg CDN');
+            }
+        });
+    </script>
 </head>
 <body>
     <div class="app-container">
