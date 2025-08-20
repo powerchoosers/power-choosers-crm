@@ -369,61 +369,15 @@
 
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
-    // Global device instance for reuse
-    let globalDevice = null;
     let currentCall = null;
-    
-    async function ensureDevice() {
-      if (globalDevice && globalDevice.state === 'registered') {
-        return globalDevice;
-      }
-      
-      if (typeof Twilio === 'undefined' || !Twilio.Device) {
-        throw new Error('Twilio Voice SDK not loaded. Please refresh the page.');
-      }
-      
-      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      const tokenResp = await fetch(`${base}/api/twilio/token?identity=agent`);
-      
-      if (!tokenResp.ok) {
-        const errorData = await tokenResp.json().catch(() => ({}));
-        throw new Error(`Failed to get Twilio token: ${errorData.error || `HTTP ${tokenResp.status}`}`);
-      }
-      
-      const tokenData = await tokenResp.json();
-      if (!tokenData.token) {
-        throw new Error('No Twilio token received from server');
-      }
-      
-      console.debug('[Phone] Setting up Twilio device');
-      
-      globalDevice = new Twilio.Device(tokenData.token, {
-        codecPreferences: ['opus', 'pcmu'],
-        fakeLocalDTMF: true,
-        enableRingingState: true,
-        allowIncomingWhileBusy: false
-      });
-      
-      globalDevice.on('registered', () => {
-        console.debug('[Phone] Device registered and ready');
-      });
-      
-      globalDevice.on('error', (error) => {
-        console.error('[Phone] Device error:', error);
-        globalDevice = null;
-      });
-      
-      await globalDevice.register();
-      return globalDevice;
-    }
 
     async function placeBrowserCall(number) {
       console.debug('[Phone] Attempting browser call to:', number);
       
       try {
-        const device = await ensureDevice();
+        const device = await TwilioRTC.ensureDevice();
         
-        // Make the call
+        // Make the call with recording enabled via TwiML app
         currentCall = await device.connect({
           params: {
             To: number
@@ -435,19 +389,35 @@
         // Set UI immediately for responsiveness
         setInCallUI(true);
         
+        // Track call start time and generate consistent call ID
+        const callStartTime = Date.now();
+        const callId = `call_${callStartTime}_${number.replace(/\D/g, '')}`;
+        
+        // Log initial call
+        await logCall(number, 'browser', callId);
+        
         // Handle call events
         currentCall.on('accept', () => {
           console.debug('[Phone] Call connected');
+          // Update call status to connected using same call ID
+          updateCallStatus(number, 'connected', callStartTime, 0, callId);
         });
         
         currentCall.on('disconnect', () => {
           console.debug('[Phone] Call disconnected');
+          const callEndTime = Date.now();
+          const duration = Math.floor((callEndTime - callStartTime) / 1000);
+          // Update call with final status and duration using same call ID
+          updateCallStatus(number, 'completed', callStartTime, duration, callId);
           currentCall = null;
           setInCallUI(false);
         });
         
         currentCall.on('error', (error) => {
           console.error('[Phone] Call error:', error);
+          const callEndTime = Date.now();
+          const duration = Math.floor((callEndTime - callStartTime) / 1000);
+          updateCallStatus(number, 'failed', callStartTime, duration, callId);
           currentCall = null;
           setInCallUI(false);
         });
@@ -526,10 +496,45 @@
       }
     }
     
-    async function logCall(phoneNumber, callType) {
+    async function logCall(phoneNumber, callType, callId = null) {
       try {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         if (!base) return;
+        
+        const callSid = callId || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const timestamp = new Date().toISOString();
+        
+        const response = await fetch(`${base}/api/calls`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            callSid: callSid,
+            to: phoneNumber,
+            from: '+18176630380', // Your business number
+            status: 'initiated',
+            callType: callType,
+            callTime: timestamp,
+            timestamp: timestamp
+          })
+        });
+        
+        const data = await response.json();
+        return data.call?.id || callSid; // Return call ID for tracking
+      } catch (error) {
+        console.error('[Phone] Failed to log call:', error);
+        return null;
+      }
+    }
+    
+    async function updateCallStatus(phoneNumber, status, startTime, duration = 0, callId = null) {
+      try {
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        if (!base) return;
+        
+        const callSid = callId || `call_${startTime}_${phoneNumber.replace(/\D/g, '')}`;
+        const timestamp = new Date(startTime).toISOString();
         
         await fetch(`${base}/api/calls`, {
           method: 'POST',
@@ -537,15 +542,27 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
+            callSid: callSid,
             to: phoneNumber,
-            from: '+18176630380', // Your business number
-            status: 'initiated',
-            callType: callType,
-            timestamp: new Date().toISOString()
+            from: '+18176630380',
+            status: status,
+            duration: duration,
+            durationSec: duration,
+            callTime: timestamp,
+            timestamp: timestamp
           })
         });
+        
+        // Refresh calls page if it's open
+        setTimeout(() => {
+          if (window.callsModule && typeof window.callsModule.loadData === 'function') {
+            window.callsModule.loadData();
+            console.debug('[Phone] Refreshed calls page data');
+          }
+        }, 1000);
+        
       } catch (error) {
-        console.error('[Phone] Failed to log call:', error);
+        console.error('[Phone] Failed to update call status:', error);
       }
     }
     function setInCallUI(inCall) {
@@ -619,14 +636,7 @@
           try {
             const call = await placeBrowserCall(normalized.value);
             console.debug('[Phone] Browser call successful, no fallback needed');
-            
-            // Log the call to the backend
-            try {
-              await logCall(normalized.value, 'browser');
-            } catch (logError) {
-              console.warn('[Phone] Failed to log call:', logError);
-            }
-            
+            // Note: initial call logging is already done in placeBrowserCall()
             return; // Exit early - browser call succeeded
           } catch (e) {
             // Fallback to server-initiated PSTN flow

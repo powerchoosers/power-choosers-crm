@@ -1028,16 +1028,12 @@
 
                         <!-- Energy News -->
                         <div class="widget-card">
-                            <h4 class="widget-title">Energy News</h4>
+                            <div class="widget-card-header">
+                                <h4 class="widget-title">Energy News</h4>
+                                <div class="news-time" id="news-last-refreshed">Last updated: —</div>
+                            </div>
                             <div class="news-list">
-                                <div class="news-item">
-                                    <div class="news-title">Texas Grid Sees Record Demand</div>
-                                    <div class="news-time">2 hours ago</div>
-                                </div>
-                                <div class="news-item">
-                                    <div class="news-title">New Renewable Energy Incentives</div>
-                                    <div class="news-time">5 hours ago</div>
-                                </div>
+                                <!-- Populated by loadEnergyNews() -->
                             </div>
                         </div>
 
@@ -1121,14 +1117,19 @@
     <script>
       (function(){
         try {
-          // Use Vercel deployment for Twilio serverless functions
-          const vercelUrl = 'https://power-choosers-crm.vercel.app';
-          // Fallback to same-origin if needed
-          const sameOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-          // Prioritize Vercel deployment for Twilio functions
-          const chosen = (vercelUrl || sameOrigin || '').replace(/\/$/, '');
-          window.API_BASE_URL = chosen;
-          console.log('API_BASE_URL (Twilio backend):', window.API_BASE_URL);
+          // Detect if running locally
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          
+          if (isLocal) {
+            // Use local server for API calls when running locally
+            window.API_BASE_URL = window.location.origin;
+            console.log('API_BASE_URL (Local server):', window.API_BASE_URL);
+          } else {
+            // Use Vercel deployment for Twilio serverless functions when deployed
+            const vercelUrl = 'https://power-choosers-crm.vercel.app';
+            window.API_BASE_URL = vercelUrl;
+            console.log('API_BASE_URL (Vercel backend):', window.API_BASE_URL);
+          }
         } catch (e) {
           console.warn('API_BASE_URL init error:', e);
         }

@@ -1,4 +1,4 @@
-export default function handler(req, res) {
+export default async function handler(req, res) {
     // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -49,21 +49,27 @@ export default function handler(req, res) {
                 console.log(`  ℹ️ Status: ${CallStatus}`);
         }
         
-        // Optional: Save call data to your database (Firestore)
-        // This is perfect for updating your CRM's call history
-        /*
-        if (typeof saveCallToFirestore !== 'undefined') {
-            await saveCallToFirestore({
+        // Upsert into central /api/calls so the UI stays in sync
+        try {
+            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+            const body = {
                 callSid: CallSid,
-                status: CallStatus,
-                from: From,
                 to: To,
-                duration: Duration || CallDuration,
-                recordingUrl: RecordingUrl,
-                timestamp: new Date()
-            });
+                from: From,
+                status: CallStatus,
+                duration: parseInt((Duration || CallDuration || '0'), 10)
+            };
+            if (RecordingUrl) {
+                body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
+            }
+            await fetch(`${base}/api/calls`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).catch(() => {});
+        } catch (e) {
+            console.warn('[Status] Failed posting to /api/calls:', e?.message);
         }
-        */
         
         // Always respond with 200 OK
         res.status(200).send('OK');
