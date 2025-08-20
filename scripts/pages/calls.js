@@ -607,7 +607,7 @@
     container.querySelector('#bulk-delete').addEventListener('click', () => console.log('Bulk delete', Array.from(state.selected)));
   }
 
-  function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); addRefreshButton(); }
+  function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); }
   
   // Manual refresh only - no auto-refresh to prevent UI disruption
   let refreshInterval = null;
@@ -633,25 +633,11 @@
     }
   });
   
-  // Add manual refresh button to calls page
-  function addRefreshButton() {
-    const header = document.querySelector('#calls-page .page-header');
-    if (header && !header.querySelector('.refresh-btn')) {
-      const refreshBtn = document.createElement('button');
-      refreshBtn.className = 'btn btn-secondary refresh-btn';
-      refreshBtn.innerHTML = '🔄 Refresh';
-      refreshBtn.style.marginLeft = 'auto';
-      refreshBtn.addEventListener('click', loadData);
-      header.appendChild(refreshBtn);
-    }
-  }
-  
   // Expose loadData and controls for external use
   window.callsModule = { 
     loadData, 
     startAutoRefresh, 
-    stopAutoRefresh,
-    addRefreshButton
+    stopAutoRefresh
   };
   
   document.addEventListener('DOMContentLoaded', init);
