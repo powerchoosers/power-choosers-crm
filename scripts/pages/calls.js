@@ -187,12 +187,12 @@
             outcome: c.outcome || '',
             transcript: c.transcript || '',
             aiSummary: c.aiSummary || '',
+            aiInsights: c.aiInsights || null,
             audioUrl: c.audioUrl ? `${base}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
           }));
-          if (rows.length) {
-            state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
-            return;
-          }
+          // Always use API data, even if empty
+          state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
+          return;
         }
       }
     } catch (_) { /* fall back to demo data */ }
@@ -229,7 +229,7 @@
   function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
     // row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
-    els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',()=>toggleInsights(btn.getAttribute('data-id'))));
+    els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',()=>openInsightsModal(btn.getAttribute('data-id'))));
     // header select state
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
@@ -276,60 +276,82 @@
         <button type="button" class="qa-btn" data-action="website" data-id="${id}" data-website="${website}" data-company="${company}" aria-label="Company website" title="Company website">${svgIcon('link')}</button>
       </div></td>
       <td>${updatedStr}</td>
-    </tr>
-    <tr id="insights-${r.id}" class="insights-row" style="display:none;"><td colspan="10">
-      <div class="insights-container" style="background:var(--bg-item); border-radius:var(--border-radius); padding:20px; margin:10px 0;">
+    </tr>`; }
+
+  // Insights modal
+  function injectInsightsModalStyles(){
+    const id='calls-insights-modal-styles'; if(document.getElementById(id)) return;
+    const style=document.createElement('style'); style.id=id; style.type='text/css';
+    style.textContent=`
+      .pc-insights-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200}
+      .pc-insights-modal{position:fixed;inset:auto;left:50%;top:50%;transform:translate(-50%,-50%);width:min(1000px,92vw);max-height:86vh;overflow:auto;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border-light);border-radius:12px;box-shadow:var(--elevation-card);z-index:1210}
+      .pc-insights-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border-light)}
+      .pc-insights-title{font-weight:700}
+      .pc-insights-body{padding:16px}
+      .pc-insights-close{background:transparent;border:1px solid var(--border-light);border-radius:8px;color:var(--text-secondary);height:30px;padding:0 10px}
+      .pc-insights-close:hover{background:var(--bg-item);}
+    `; document.head.appendChild(style);
+  }
+  function closeInsightsModal(){
+    const bd=document.querySelector('.pc-insights-backdrop'); if(bd&&bd.parentNode) bd.parentNode.removeChild(bd);
+    const md=document.querySelector('.pc-insights-modal'); if(md&&md.parentNode) md.parentNode.removeChild(md);
+    document.removeEventListener('keydown', escClose);
+  }
+  function escClose(e){ if(e.key==='Escape') closeInsightsModal(); }
+  function openInsightsModal(id){
+    injectInsightsModalStyles();
+    const r = (state.filtered||[]).find(x=>x.id===id) || (state.data||[]).find(x=>x.id===id); if(!r) return;
+    const bd=document.createElement('div'); bd.className='pc-insights-backdrop'; bd.addEventListener('click', closeInsightsModal);
+    const md=document.createElement('div'); md.className='pc-insights-modal';
+    md.innerHTML = `
+      <div class="pc-insights-header">
+        <div class="pc-insights-title">Call insights for ${escapeHtml(r.contactName || r.to || '')}</div>
+        <button type="button" class="pc-insights-close" aria-label="Close">Close</button>
+      </div>
+      <div class="pc-insights-body">${insightsContentHtml(r)}</div>
+    `;
+    document.body.appendChild(bd); document.body.appendChild(md);
+    md.querySelector('.pc-insights-close').addEventListener('click', closeInsightsModal);
+    document.addEventListener('keydown', escClose);
+  }
+  function insightsContentHtml(r){
+    const aiInsights = r.aiInsights || {}; const sentiment = aiInsights.sentiment || 'Unknown';
+    const keyTopics = (aiInsights.keyTopics || []).join(', ');
+    const nextSteps = (aiInsights.nextSteps || []).join(', ');
+    const painPoints = (aiInsights.painPoints || []).join(', ');
+    const budget = aiInsights.budget || 'Not discussed';
+    const timeline = aiInsights.timeline || 'Not specified';
+    return `
+      <div class="insights-container" style="background:var(--bg-item); border-radius:var(--border-radius); padding:20px;">
         <div style="display:flex; gap:25px;">
           <div style="flex:2;">
             <div class="insights-section">
               <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">📋 AI Call Summary</h4>
               <div style="color:var(--text-secondary); margin-bottom:15px; line-height:1.4;">${escapeHtml(r.aiSummary || 'No summary available')}</div>
             </div>
-            
             <div class="insights-section">
               <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">💬 Call Transcript</h4>
-              <div style="color:var(--text-secondary); max-height:200px; overflow-y:auto; border:1px solid var(--border-light); padding:12px; border-radius:6px; background:var(--bg-card); font-family:monospace; font-size:13px; line-height:1.3;">${escapeHtml(r.transcript || 'Transcript not available')}</div>
+              <div style="color:var(--text-secondary); max-height:300px; overflow-y:auto; border:1px solid var(--border-light); padding:12px; border-radius:6px; background:var(--bg-card); font-family:monospace; font-size:13px; line-height:1.3;">${escapeHtml(r.transcript || 'Transcript not available')}</div>
             </div>
           </div>
-          
           <div style="flex:1;">
             <div class="insights-section">
               <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">🎵 Call Recording</h4>
-              ${r.audioUrl ? `<audio controls style="width:100%; margin-bottom:15px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : '<div style="color:var(--text-secondary); font-style:italic;">No recording available</div>'}
+              <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
+              ${r.audioUrl ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
             </div>
-            
             <div class="insights-grid" style="display:grid; gap:10px;">
-              <div class="insight-item">
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">😊 Sentiment:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${sentiment}</span>
-              </div>
-              <div class="insight-item">
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">🏷️ Key Topics:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${keyTopics || 'None identified'}</span>
-              </div>
-              <div class="insight-item">
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">⏭️ Next Steps:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${nextSteps || 'None identified'}</span>
-              </div>
-              <div class="insight-item">
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">⚠️ Pain Points:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${painPoints || 'None mentioned'}</span>
-              </div>
-              <div class="insight-item">
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">💰 Budget:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${budget}</span>
-              </div>
-              <div class="insight-item">
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">⏰ Timeline:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${timeline}</span>
-              </div>
+              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">😊 Sentiment:</span><span style="color:var(--text-secondary); font-size:12px;"> ${sentiment}</span></div>
+              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">🏷️ Key Topics:</span><span style="color:var(--text-secondary); font-size:12px;"> ${keyTopics || 'None identified'}</span></div>
+              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">⏭️ Next Steps:</span><span style="color:var(--text-secondary); font-size:12px;"> ${nextSteps || 'None identified'}</span></div>
+              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">⚠️ Pain Points:</span><span style="color:var(--text-secondary); font-size:12px;"> ${painPoints || 'None mentioned'}</span></div>
+              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">💰 Budget:</span><span style="color:var(--text-secondary); font-size:12px;"> ${budget}</span></div>
+              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">⏰ Timeline:</span><span style="color:var(--text-secondary); font-size:12px;"> ${timeline}</span></div>
             </div>
           </div>
         </div>
-      </div>
-    </td></tr>`; }
-
-  function toggleInsights(id){ const row=document.getElementById('insights-'+id); if(!row) return; row.style.display = row.style.display==='none'?'table-row':'none'; }
+      </div>`;
+  }
 
   // Bulk selection popover (refined with backdrop and cleanup)
   function openBulkPopover(){
@@ -443,6 +465,52 @@
     container.querySelector('#bulk-delete').addEventListener('click', () => console.log('Bulk delete', Array.from(state.selected)));
   }
 
-  function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); }
+  function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); addRefreshButton(); }
+  
+  // Manual refresh only - no auto-refresh to prevent UI disruption
+  let refreshInterval = null;
+  
+  function startAutoRefresh() {
+    // Disabled auto-refresh to prevent insights from closing
+    return;
+  }
+  
+  function stopAutoRefresh() {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+  }
+  
+  // Start auto-refresh when calls page becomes active
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+  });
+  
+  // Add manual refresh button to calls page
+  function addRefreshButton() {
+    const header = document.querySelector('#calls-page .page-header');
+    if (header && !header.querySelector('.refresh-btn')) {
+      const refreshBtn = document.createElement('button');
+      refreshBtn.className = 'btn btn-secondary refresh-btn';
+      refreshBtn.innerHTML = '🔄 Refresh';
+      refreshBtn.style.marginLeft = 'auto';
+      refreshBtn.addEventListener('click', loadData);
+      header.appendChild(refreshBtn);
+    }
+  }
+  
+  // Expose loadData and controls for external use
+  window.callsModule = { 
+    loadData, 
+    startAutoRefresh, 
+    stopAutoRefresh,
+    addRefreshButton
+  };
+  
   document.addEventListener('DOMContentLoaded', init);
 })();

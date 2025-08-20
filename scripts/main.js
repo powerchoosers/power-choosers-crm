@@ -289,51 +289,57 @@ class PowerChoosersCRM {
     }
 
     navigateToPage(pageName) {
-        // Resolve target nav item and page element; fallback to dashboard only if page element missing
-        let target = pageName;
-        let navItem = document.querySelector(`[data-page="${target}"]`);
-        let pageEl = document.getElementById(`${target}-page`);
-
-        if (!pageEl) {
-            console.warn(`Page "${target}" not found; redirecting to dashboard.`);
-            target = 'dashboard';
-            navItem = document.querySelector(`[data-page="${target}"]`);
-            pageEl = document.getElementById(`${target}-page`);
-            if (typeof this.showToast === 'function') {
-                this.showToast('Page not built yet. Coming soon.');
-            }
-        }
-
-        // Update active nav item
-        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-        if (navItem) navItem.classList.add('active');
-
+        // Hide all pages
+        document.querySelectorAll('.page').forEach(page => {
+            page.classList.remove('active');
+        });
+        
+        // Remove active class from all nav items
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
         // Show target page
-        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-        if (pageEl) pageEl.classList.add('active');
-
-        // Ensure People page behaviors are (re)bound when navigating to it
-        if (target === 'people' && window.peopleModule) {
-            if (typeof window.peopleModule.rebindDynamic === 'function') {
-                try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
-            } else if (typeof window.peopleModule.init === 'function') {
-                // Fallback if rebindDynamic is not available
-                try { window.peopleModule.init(); } catch (e) { /* noop */ }
-            }
+        const targetPage = document.getElementById(`${pageName}-page`);
+        if (targetPage) {
+            targetPage.classList.add('active');
         }
-
-        // Ensure Accounts page behaviors are (re)bound when navigating to it
-        if (target === 'accounts' && window.accountsModule) {
-            if (typeof window.accountsModule.rebindDynamic === 'function') {
-                try { window.accountsModule.rebindDynamic(); } catch (e) { /* noop */ }
-            } else if (typeof window.accountsModule.init === 'function') {
-                // Fallback if rebindDynamic is not available
-                try { window.accountsModule.init(); } catch (e) { /* noop */ }
-            }
+        
+        // Activate corresponding nav item
+        const targetNav = document.querySelector(`[data-page="${pageName}"]`);
+        if (targetNav) {
+            targetNav.classList.add('active');
         }
-
-        this.currentPage = target;
-        this.updateWidgetPanel(target);
+        
+        // Special handling for specific pages
+        if (pageName === 'people' && window.peopleModule) {
+            setTimeout(() => {
+                if (typeof window.peopleModule.rebindDynamic === 'function') {
+                    window.peopleModule.rebindDynamic();
+                }
+            }, 50);
+        }
+        
+        if (pageName === 'accounts' && window.accountsModule) {
+            setTimeout(() => {
+                if (typeof window.accountsModule.init === 'function') {
+                    window.accountsModule.init();
+                }
+            }, 50);
+        }
+        
+        if (pageName === 'calls' && window.callsModule) {
+            setTimeout(() => {
+                if (typeof window.callsModule.startAutoRefresh === 'function') {
+                    window.callsModule.startAutoRefresh();
+                }
+            }, 50);
+        } else if (window.callsModule && typeof window.callsModule.stopAutoRefresh === 'function') {
+            window.callsModule.stopAutoRefresh();
+        }
+        
+        this.currentPage = pageName;
+        this.updateWidgetPanel(pageName);
     }
 
     // Sidebar Hover Effects
@@ -686,6 +692,29 @@ class PowerChoosersCRM {
         // TODO: Implement edit modal
     }
 
+    // Format relative time like "2 hours ago"
+    formatTimeAgo(input) {
+        try {
+            const date = typeof input === 'string' ? new Date(input) : input;
+            const now = new Date();
+            const diffMs = now - date;
+            const sec = Math.floor(diffMs / 1000);
+            const min = Math.floor(sec / 60);
+            const hr = Math.floor(min / 60);
+            const day = Math.floor(hr / 24);
+            if (sec < 45) return 'just now';
+            if (min < 2) return '1 minute ago';
+            if (min < 60) return `${min} minutes ago`;
+            if (hr < 2) return '1 hour ago';
+            if (hr < 24) return `${hr} hours ago`;
+            if (day < 2) return '1 day ago';
+            if (day < 7) return `${day} days ago`;
+            return date.toLocaleDateString();
+        } catch (_) {
+            return '';
+        }
+    }
+
     // Load Initial Data
     loadInitialData() {
         this.updateLivePrice();
@@ -696,6 +725,12 @@ class PowerChoosersCRM {
         setInterval(() => {
             this.updateLivePrice();
         }, 300000);
+
+        // Auto-refresh Energy News every 3 hours, starting immediately
+        if (this.newsRefreshTimer) clearInterval(this.newsRefreshTimer);
+        this.newsRefreshTimer = setInterval(() => {
+            this.loadEnergyNews();
+        }, 3 * 60 * 60 * 1000);
     }
 
     updateLivePrice() {
@@ -749,22 +784,75 @@ class PowerChoosersCRM {
         }
     }
 
-    loadEnergyNews() {
-        // Simulate energy news updates
-        const newsData = [
-            { title: 'Texas Grid Sees Record Demand', time: '2 hours ago' },
-            { title: 'New Renewable Energy Incentives', time: '5 hours ago' },
-            { title: 'ERCOT Issues Conservation Alert', time: '1 day ago' }
-        ];
-
+    async loadEnergyNews() {
         const newsList = document.querySelector('.news-list');
-        if (newsList) {
-            newsList.innerHTML = newsData.map(news => `
-                <div class="news-item">
-                    <div class="news-title">${news.title}</div>
-                    <div class="news-time">${news.time}</div>
-                </div>
-            `).join('');
+        const lastRef = document.getElementById('news-last-refreshed');
+
+        const escapeHtml = (str) => {
+            if (window.escapeHtml) return window.escapeHtml(str);
+            return String(str)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;');
+        };
+
+        try {
+            const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+            const urls = [`${base}/api/energy-news`];
+            if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
+                urls.push('https://power-choosers-crm.vercel.app/api/energy-news');
+            }
+
+            let data = null;
+            let lastError = null;
+            for (const u of urls) {
+                try {
+                    const resp = await fetch(u, { cache: 'no-store' });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    data = await resp.json();
+                    break;
+                } catch (e) {
+                    lastError = e;
+                }
+            }
+            if (!data) throw lastError || new Error('No response');
+
+            const items = (Array.isArray(data.items) ? data.items : []).slice(0, 4);
+
+            if (lastRef && data.lastRefreshed) {
+                const dt = new Date(data.lastRefreshed);
+                lastRef.textContent = `Last updated: ${dt.toLocaleString()}`;
+            }
+
+            if (newsList) {
+                newsList.innerHTML = items.map(it => {
+                    const title = escapeHtml(it.title || '');
+                    const url = (it.url || '').trim();
+                    const when = it.publishedAt ? this.formatTimeAgo(it.publishedAt) : '';
+                    const time = when || (it.publishedAt ? new Date(it.publishedAt).toLocaleString() : '');
+                    const safeHref = escapeHtml(url);
+                    return `
+                        <a class="news-item" href="${safeHref}" target="_blank" rel="noopener noreferrer">
+                            <div class="news-title">${title}</div>
+                            <div class="news-time">${escapeHtml(time)}</div>
+                        </a>
+                    `;
+                }).join('');
+            }
+        } catch (err) {
+            console.error('Failed to load energy news', err);
+            if (lastRef) lastRef.textContent = 'Last updated: failed to refresh';
+            if (newsList) {
+                newsList.innerHTML = `
+                  <div class="news-item">
+                    <div class="news-title">Unable to load energy news right now.</div>
+                    <div class="news-time">Please try again later.</div>
+                  </div>
+                `;
+            }
+            this.showToast('Failed to refresh Energy News');
         }
     }
 }

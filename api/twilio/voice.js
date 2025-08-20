@@ -15,11 +15,14 @@ export default function handler(req, res) {
         // Your business phone number for caller ID
         const callerId = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
         
+        // Ensure absolute base URL for Twilio callbacks
+        const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+
         // Create TwiML response
         const twiml = new VoiceResponse();
         
         // Dial the target number with your business number as caller ID
-        twiml.dial({
+        const dial = twiml.dial({
             callerId: callerId,
             timeout: 30,
             // Anti-spam configurations
@@ -27,9 +30,14 @@ export default function handler(req, res) {
             hangupOnStar: false,
             timeLimit: 14400, // 4 hours max call duration
             // Enable call recording for AI insights
-            record: 'record-from-answer',
-            recordingStatusCallback: `${process.env.VERCEL_URL || 'https://power-choosers-crm.vercel.app'}/api/twilio/recording`
-        }, To);
+            record: 'record-from-ringing-dual',
+            recordingStatusCallback: `${base}/api/twilio/recording`,
+            recordingStatusCallbackEvent: 'in-progress completed',
+            // Add action URL to track call completion
+            action: `${base}/api/twilio/status`
+        });
+        
+        dial.number(To);
         
         console.log(`[Voice] TwiML generated for call to ${To}`);
         

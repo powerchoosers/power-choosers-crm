@@ -100,11 +100,26 @@ async function handleApiCalls(req, res) {
   const proxyUrl = `${API_BASE_URL}/api/calls`;
   
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    if (req.method === 'POST') {
+      // Handle POST requests (logging calls)
+      const body = await readJsonBody(req);
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await response.json();
+      
+      res.writeHead(response.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } else {
+      // Handle GET requests (fetching calls)
+      const response = await fetch(proxyUrl);
+      const data = await response.json();
+      
+      res.writeHead(response.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    }
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
@@ -141,7 +156,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS' && (
     pathname === '/api/twilio/token' ||
     pathname === '/api/twilio/call' ||
-    pathname === '/api/calls'
+    pathname === '/api/calls' ||
+    pathname === '/api/energy-news'
   )) {
     res.writeHead(204);
     res.end();
@@ -157,6 +173,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/calls') {
     return handleApiCalls(req, res);
+  }
+  if (pathname === '/api/energy-news') {
+    return handleApiEnergyNews(req, res);
   }
 
   // Default to crm-dashboard.html for root requests
@@ -286,3 +305,50 @@ server.on('error', (err) => {
     console.error('[Server] Server error:', err);
   }
 });
+
+// Energy News endpoint: fetch Google News RSS for Texas energy topics, parse minimal fields
+async function handleApiEnergyNews(req, res) {
+  if (req.method !== 'GET') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const rssUrl = 'https://news.google.com/rss/search?q=%28Texas+energy%29+OR+ERCOT+OR+%22Texas+electricity%22&hl=en-US&gl=US&ceid=US:en';
+    const response = await fetch(rssUrl, { headers: { 'User-Agent': 'PowerChoosersCRM/1.0' } });
+    const xml = await response.text();
+
+    // Basic XML parsing without external deps: extract <item> blocks and inner fields
+    const items = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
+    while ((match = itemRegex.exec(xml)) && items.length < 4) {
+      const block = match[1];
+      const getTag = (name) => {
+        const r = new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`, 'i');
+        const m = r.exec(block);
+        return m ? m[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
+      };
+      const title = getTag('title');
+      const link = getTag('link');
+      const pubDate = getTag('pubDate');
+      let publishedAt = '';
+      try { publishedAt = new Date(pubDate).toISOString(); } catch (_) { publishedAt = ''; }
+      // Skip if missing essentials
+      if (!title || !link) continue;
+      items.push({ title, url: link, publishedAt });
+    }
+
+    const payload = {
+      lastRefreshed: new Date().toISOString(),
+      items
+    };
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(payload));
+  } catch (error) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to fetch energy news', message: error.message }));
+  }
+}

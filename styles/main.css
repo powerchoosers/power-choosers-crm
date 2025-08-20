@@ -3806,6 +3806,13 @@ html, body {
     transition: var(--transition-fast);
 }
 
+/* Ensure anchor-based news items render like cards */
+.news-item {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
 .task-item:hover, .news-item:hover, .lead-item:hover, .activity-item:hover {
     background: var(--grey-600);
 }

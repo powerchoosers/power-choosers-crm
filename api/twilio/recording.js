@@ -41,23 +41,43 @@ export default async function handler(req, res) {
         });
         
         if (RecordingStatus === 'completed' && RecordingUrl) {
-            // Store call data
+            // Ensure we have a direct mp3 URL for playback
+            const recordingMp3Url = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
+
+            // Store call data in local memory (best-effort)
             const callData = {
                 id: CallSid,
                 recordingSid: RecordingSid,
-                recordingUrl: RecordingUrl,
+                recordingUrl: recordingMp3Url,
                 duration: parseInt(RecordingDuration) || 0,
                 status: 'completed',
                 timestamp: new Date().toISOString(),
                 transcript: null,
                 aiInsights: null
             };
-            
+
             callStore.set(CallSid, callData);
-            
+
+            // Upsert into central /api/calls so the UI can see the recording immediately
+            try {
+                const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+                await fetch(`${base}/api/calls`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        callSid: CallSid,
+                        status: 'completed',
+                        duration: parseInt(RecordingDuration) || 0,
+                        recordingUrl: recordingMp3Url
+                    })
+                }).catch(() => {});
+            } catch (e) {
+                console.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
+            }
+
             // Trigger transcription and AI analysis
             try {
-                await processRecording(RecordingUrl, CallSid);
+                await processRecording(recordingMp3Url, CallSid);
             } catch (error) {
                 console.error('[Recording] Processing error:', error);
             }
@@ -92,6 +112,22 @@ async function processRecording(recordingUrl, callSid) {
             callStore.set(callSid, callData);
         }
         
+        // Also upsert transcript and insights into /api/calls for the UI
+        try {
+            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+            await fetch(`${base}/api/calls`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    callSid: callSid,
+                    transcript,
+                    aiInsights
+                })
+            }).catch(() => {});
+        } catch (e) {
+            console.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
+        }
+        
         console.log('[Recording] AI processing completed for:', callSid);
         
     } catch (error) {
@@ -101,11 +137,24 @@ async function processRecording(recordingUrl, callSid) {
 
 async function transcribeAudio(recordingUrl) {
     try {
-        // Simple transcription using Google Speech-to-Text
-        const response = await fetch('https://speech.googleapis.com/v1/speech:recognize', {
+        // 1) Download the recording (mp3) from Twilio using basic auth
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        if (!accountSid || !authToken) {
+            console.warn('[Transcribe] Missing Twilio credentials');
+        }
+
+        const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        const recResp = await fetch(recordingUrl, { headers: { Authorization: authHeader } });
+        if (!recResp.ok) throw new Error(`Failed to fetch recording: ${recResp.status}`);
+        const arrayBuf = await recResp.arrayBuffer();
+        const base64Audio = Buffer.from(arrayBuf).toString('base64');
+
+        // 2) Transcribe using Google Speech-to-Text (API key via query param)
+        const sttUrl = `https://speech.googleapis.com/v1/speech:recognize?key=${encodeURIComponent(process.env.GOOGLE_API_KEY || '')}`;
+        const response = await fetch(sttUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${process.env.GOOGLE_API_KEY}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -117,19 +166,19 @@ async function transcribeAudio(recordingUrl) {
                     model: 'phone_call'
                 },
                 audio: {
-                    uri: recordingUrl
+                    content: base64Audio
                 }
             })
         });
-        
-        const data = await response.json();
-        
+
+        const data = await response.json().catch(() => ({}));
+
         if (data.results && data.results.length > 0) {
             return data.results
                 .map(result => result.alternatives[0].transcript)
                 .join(' ');
         }
-        
+
         return 'Transcription not available';
         
     } catch (error) {
