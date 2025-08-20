@@ -27,13 +27,19 @@ module.exports = allowCors(async (req, res) => {
       const accountSid = process.env.TWILIO_ACCOUNT_SID;
       const apiKeySid = process.env.TWILIO_API_KEY_SID;
       const apiKeySecret = process.env.TWILIO_API_KEY_SECRET;
-      const appSid = process.env.TWILIO_TWIML_APP_SID || 'AP20de2f36d77ff97669eb6ce8cb7d3820';
+      const appSid = process.env.TWILIO_TWIML_APP_SID;
       
       // Validate required environment variables
       if (!accountSid || !apiKeySid || !apiKeySecret) {
           return res.status(500).json({ 
               error: 'Missing Twilio credentials',
               message: 'Please configure TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, and TWILIO_API_KEY_SECRET environment variables'
+          });
+      }
+      if (!appSid) {
+          return res.status(500).json({
+              error: 'Missing TwiML App SID',
+              message: 'Please configure TWILIO_TWIML_APP_SID in your environment to match the TwiML App with the correct Voice URL.'
           });
       }
       

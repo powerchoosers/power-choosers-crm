@@ -108,35 +108,190 @@
     isActive: false
   };
 
+  // Phone number lookup cache
+  let contactsCache = null;
+  let accountsCache = null;
+  let cacheExpiry = 0;
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  // Normalize phone number for comparison (remove all non-digits)
+  function normalizePhoneForComparison(phone) {
+    if (!phone) return '';
+    return phone.replace(/\D/g, '');
+  }
+
+  // Check if two phone numbers match (handles various formats)
+  function phoneNumbersMatch(phone1, phone2) {
+    const clean1 = normalizePhoneForComparison(phone1);
+    const clean2 = normalizePhoneForComparison(phone2);
+    if (!clean1 || !clean2) return false;
+    
+    // Handle US numbers with/without country code
+    const normalize = (num) => {
+      if (num.length === 11 && num.startsWith('1')) {
+        return num.slice(1); // Remove leading 1
+      }
+      return num;
+    };
+    
+    return normalize(clean1) === normalize(clean2);
+  }
+
+  // Load contacts and accounts for phone lookup
+  async function loadContactsForLookup() {
+    const now = Date.now();
+    if (contactsCache && accountsCache && now < cacheExpiry) {
+      return { contacts: contactsCache, accounts: accountsCache };
+    }
+
+    try {
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base) {
+        console.debug('[Phone] No API base URL configured, skipping contact lookup');
+        return { contacts: [], accounts: [] };
+      }
+
+      // Load contacts from Firebase if available
+      let contacts = [];
+      let accounts = [];
+
+      if (window.firebaseDB) {
+        try {
+          // Load contacts
+          const contactsSnapshot = await window.firebaseDB.collection('contacts').get();
+          contacts = contactsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            name: `${doc.data().firstName || ''} ${doc.data().lastName || ''}`.trim() || 'Unknown Contact'
+          }));
+
+          // Load accounts  
+          const accountsSnapshot = await window.firebaseDB.collection('accounts').get();
+          accounts = accountsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            name: doc.data().accountName || 'Unknown Account'
+          }));
+
+          console.debug(`[Phone] Loaded ${contacts.length} contacts and ${accounts.length} accounts for lookup`);
+        } catch (firebaseError) {
+          console.warn('[Phone] Failed to load from Firebase:', firebaseError);
+        }
+      }
+
+      // Cache the results
+      contactsCache = contacts;
+      accountsCache = accounts;
+      cacheExpiry = now + CACHE_DURATION;
+
+      return { contacts, accounts };
+    } catch (error) {
+      console.error('[Phone] Failed to load contacts for lookup:', error);
+      return { contacts: [], accounts: [] };
+    }
+  }
+
+  // Lookup contact/account by phone number
+  async function lookupContactByPhone(phoneNumber) {
+    if (!phoneNumber) return null;
+    
+    const { contacts, accounts } = await loadContactsForLookup();
+    
+    // First check contacts
+    for (const contact of contacts) {
+      if (contact.phone && phoneNumbersMatch(contact.phone, phoneNumber)) {
+        return {
+          type: 'contact',
+          id: contact.id,
+          name: contact.name,
+          phone: contact.phone,
+          email: contact.email || '',
+          company: contact.companyName || ''
+        };
+      }
+    }
+    
+    // Then check accounts
+    for (const account of accounts) {
+      if (account.phone && phoneNumbersMatch(account.phone, phoneNumber)) {
+        return {
+          type: 'account', 
+          id: account.id,
+          name: account.name,
+          phone: account.phone,
+          email: '',
+          company: account.name
+        };
+      }
+    }
+    
+    return null;
+  }
+
+  // Update widget title and call context based on phone lookup
+  async function updateContactAssociation(card, phoneNumber) {
+    if (!card || !phoneNumber) return;
+    
+    const contact = await lookupContactByPhone(phoneNumber);
+    const title = card.querySelector('.widget-title');
+    
+    if (contact && title) {
+      // Update widget title to show contact name
+      title.innerHTML = `Phone - ${contact.name}`;
+      
+      // Update call context
+      currentCallContext.name = contact.name;
+      currentCallContext.number = phoneNumber;
+      
+      console.debug('[Phone] Associated number with contact:', contact);
+      
+      // Show a subtle notification
+      try { 
+        window.crm?.showToast && window.crm.showToast(`📞 Recognized ${contact.name}`);
+      } catch(_) {}
+    } else if (title) {
+      // Reset to default title if no contact found
+      title.innerHTML = 'Phone';
+      currentCallContext.name = '';
+    }
+  }
+
   // Update microphone status UI
   function updateMicrophoneStatusUI(card, status) {
     const micStatus = card.querySelector('.mic-status');
-    const micIcon = card.querySelector('.mic-icon');
     const micText = card.querySelector('.mic-text');
-    
-    if (!micStatus || !micIcon || !micText) return;
-    
+    if (!micStatus || !micText) return;
+
+    micStatus.classList.remove('ok', 'warn', 'error', 'checking');
     switch (status) {
       case 'granted':
-        micIcon.textContent = '🎤';
+        micStatus.classList.add('ok');
         micText.textContent = 'Browser calls enabled - will try browser first';
-        micStatus.style.color = 'var(--green-400, #10b981)';
         break;
       case 'denied':
-        micIcon.textContent = '🚫';
+        micStatus.classList.add('warn');
         micText.textContent = 'Will call your phone - click address bar mic for browser calls';
-        micStatus.style.color = 'var(--amber-400, #f59e0b)';
         break;
       case 'checking':
-        micIcon.textContent = '🎤';
+        micStatus.classList.add('checking');
         micText.textContent = 'Checking microphone access...';
-        micStatus.style.color = 'var(--text-secondary)';
         break;
       case 'error':
-        micIcon.textContent = '⚠️';
+        micStatus.classList.add('error');
         micText.textContent = 'Will call your phone (browser calls unavailable)';
-        micStatus.style.color = 'var(--text-secondary)';
         break;
+    }
+  }
+
+  // If the card is mid-animation (inline height set), bump the height to fit content
+  function adjustHeightIfAnimating(card) {
+    if (!card) return;
+    const h = card && card.style && card.style.height;
+    if (!h) return; // no inline height means we're done animating
+    const current = parseFloat(h) || 0;
+    const needed = card.scrollHeight;
+    if (needed > current) {
+      card.style.height = needed + 'px';
     }
   }
 
@@ -224,14 +379,21 @@
     card.style.opacity = '0';
     card.style.transform = 'translateY(-6px)';
     const pending = new Set(['height', 'padding-top', 'padding-bottom']);
+    let safetyTimer = null;
+    const finalize = () => {
+      card.removeEventListener('transitionend', onEnd);
+      if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+      if (card.parentElement) card.parentElement.removeChild(card);
+    };
     const onEnd = (e) => {
       if (!e) return;
       if (pending.has(e.propertyName)) pending.delete(e.propertyName);
       if (pending.size > 0) return;
-      card.removeEventListener('transitionend', onEnd);
-      if (card.parentElement) card.parentElement.removeChild(card);
+      finalize();
     };
     card.addEventListener('transitionend', onEnd);
+    // Safety: in case transitions are interrupted (e.g., parent hidden)
+    safetyTimer = setTimeout(finalize, 900);
   }
 
   const T9_MAP = {
@@ -293,28 +455,28 @@
         <h4 class="widget-title">Phone</h4>
         <button type="button" class="btn-text notes-close phone-close" aria-label="Close" data-pc-title="Close" aria-describedby="pc-tooltip">×</button>
       </div>
-      <div class="phone-body" style="display:flex; flex-direction:column; gap: 12px;">
-        <input type="text" class="input-dark phone-display" placeholder="Enter number" inputmode="tel" autocomplete="off" style="font-size: 20px; text-align: center; padding: 10px; letter-spacing: 1px;" />
-        <div class="mic-status" style="text-align: center; font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 16px;">
-          <span class="mic-icon" style="font-size: 12px;">🎤</span>
+      <div class="phone-body">
+        <input type="text" class="input-dark phone-display" placeholder="Enter number" inputmode="tel" autocomplete="off" />
+        <div class="mic-status checking">
+          <span class="status-dot" aria-hidden="true"></span>
           <span class="mic-text">Checking microphone access...</span>
         </div>
-        <div class="dialpad" style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+        <div class="dialpad">
           ${[
             {d:'1', l:''}, {d:'2', l:'ABC'}, {d:'3', l:'DEF'},
             {d:'4', l:'GHI'}, {d:'5', l:'JKL'}, {d:'6', l:'MNO'},
             {d:'7', l:'PQRS'}, {d:'8', l:'TUV'}, {d:'9', l:'WXYZ'},
             {d:'*', l:''}, {d:'0', l:'+'}, {d:'#', l:''}
           ].map(k => `
-            <button type="button" class="dial-key" data-key="${k.d}" style="padding: 10px 0; border-radius: 10px; background: var(--grey-850); color: var(--text); border: 1px solid var(--grey-700); box-shadow: var(--shadow-sm);">
-              <div style="font-size:18px; line-height:1;">${k.d}</div>
-              <div style="font-size:10px; opacity:0.7;">${k.l}</div>
+            <button type="button" class="dial-key" data-key="${k.d}">
+              <div class="dial-digit">${k.d}</div>
+              <div class="dial-letters">${k.l}</div>
             </button>
           `).join('')}
         </div>
-        <div class="dial-actions" style="display:flex; gap: 8px; justify-content:center;">
-          <button type="button" class="btn-primary call-btn-start" title="Call" style="min-width:120px">Call</button>
-          <button type="button" class="btn-secondary backspace-btn" title="Backspace">⌫</button>
+        <div class="dial-actions">
+          <button type="button" class="btn-primary call-btn-start" title="Call">Call</button>
+          <button type="button" class="btn-secondary backspace-btn" title="Backspace">Backspace</button>
           <button type="button" class="btn-text clear-btn" title="Clear">Clear</button>
         </div>
       </div>
@@ -327,12 +489,44 @@
     if (input) {
       input.addEventListener('focus', () => input.classList.add('focus-orange'));
       input.addEventListener('blur', () => input.classList.remove('focus-orange'));
+      
+      // Add input event listener for manual typing (not just dialpad)
+      input.addEventListener('input', async (e) => {
+        const value = e.target.value.trim();
+        
+        // Clear any existing timeout
+        clearTimeout(input.lookupTimeout);
+        
+        if (value.length >= 10) {
+          // Debounce the lookup to avoid too many requests
+          input.lookupTimeout = setTimeout(async () => {
+            await updateContactAssociation(card, value);
+          }, 500);
+        } else if (value.length === 0) {
+          // Clear contact association when input is empty
+          const title = card.querySelector('.widget-title');
+          if (title) {
+            title.innerHTML = 'Phone';
+          }
+          currentCallContext.name = '';
+          currentCallContext.number = '';
+        }
+      });
     }
 
     const appendChar = (ch) => {
       if (!input) return;
       input.value = (input.value || '') + ch;
       try { input.focus(); } catch (_) {}
+      
+      // Debounced contact lookup on input change
+      clearTimeout(input.lookupTimeout);
+      input.lookupTimeout = setTimeout(async () => {
+        const currentValue = input.value.trim();
+        if (currentValue.length >= 10) { // Only lookup for complete numbers
+          await updateContactAssociation(card, currentValue);
+        }
+      }, 500);
     };
 
     const backspace = () => {
@@ -345,10 +539,19 @@
     const clearAll = () => {
       if (!input) return;
       input.value = '';
+      
+      // Clear contact association when clearing input
+      const title = card.querySelector('.widget-title');
+      if (title) {
+        title.innerHTML = 'Phone';
+      }
+      currentCallContext.name = '';
+      currentCallContext.number = '';
+      
       try { input.focus(); } catch (_) {}
     };
 
-    // Handle paste (from input or card) and keep only allowed characters
+    // Handle paste on input only and keep only allowed characters
     const onPaste = (e) => {
       if (!input) return;
       const clip = (e.clipboardData || window.clipboardData);
@@ -356,16 +559,24 @@
       const text = (clip.getData && (clip.getData('text') || clip.getData('Text'))) || '';
       if (!text) return;
       e.preventDefault();
+      try { e.stopPropagation(); } catch (_) {}
       // Map letters to T9 digits; allow digits, *, #, and a single leading +
       const mapped = String(text).replace(/[A-Za-z]/g, (c) => letterToDigit(c) || '');
       const cleaned = mapped.replace(/[^0-9*#\+]/g, '');
       const existing = input.value || '';
       const next = existing ? (existing + cleaned.replace(/\+/g, '')) : cleaned.replace(/(.*?)(\+)(.*)/, '+$1$3');
       input.value = next;
+      
+      // Trigger contact lookup after paste
+      setTimeout(async () => {
+        if (input.value.trim().length >= 10) {
+          await updateContactAssociation(card, input.value.trim());
+        }
+      }, 100);
+      
       try { input.focus(); } catch (_) {}
     };
     if (input) input.addEventListener('paste', onPaste);
-    card.addEventListener('paste', onPaste);
 
     // Dialpad clicks
     card.querySelectorAll('.dial-key').forEach(btn => {
@@ -419,6 +630,13 @@
           updateCallStatus(number, 'completed', callStartTime, duration, callId);
           currentCall = null;
           setInCallUI(false);
+          
+          // Clear the call context to prevent auto-redial
+          currentCallContext = {
+            number: '',
+            name: '',
+            isActive: false
+          };
         });
         
         currentCall.on('error', (error) => {
@@ -428,6 +646,13 @@
           updateCallStatus(number, 'failed', callStartTime, duration, callId);
           currentCall = null;
           setInCallUI(false);
+          
+          // Clear the call context to prevent auto-redial
+          currentCallContext = {
+            number: '',
+            name: '',
+            isActive: false
+          };
         });
         
         return currentCall;
@@ -510,27 +735,81 @@
         const callSid = callId || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = new Date().toISOString();
         
+        // Get contact association for better call logging
+        const contact = await lookupContactByPhone(phoneNumber);
+        const contextName = currentCallContext.name || '';
+        const contactName = contact ? contact.name : contextName;
+        
+        console.debug('[Phone] Logging call with contact data:', {
+          phoneNumber,
+          contact: contact,
+          contextName: contextName,
+          finalContactName: contactName
+        });
+        
+        const callData = {
+          callSid: callSid,
+          to: phoneNumber,
+          from: '+18176630380', // Your business number
+          status: 'initiated',
+          callType: callType,
+          callTime: timestamp,
+          timestamp: timestamp
+        };
+        
+        // Add contact information if available
+        if (contact) {
+          callData.contactId = contact.id;
+          callData.contactType = contact.type; // 'contact' or 'account'
+          callData.contactName = contact.name;
+          callData.contactCompany = contact.company;
+          console.debug('[Phone] Adding contact data from lookup:', contact);
+        } else if (contextName) {
+          callData.contactName = contextName;
+          console.debug('[Phone] Adding contact name from context:', contextName);
+        }
+        
+        console.debug('[Phone] Final call data being sent:', callData);
+        
         const response = await fetch(`${base}/api/calls`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            callSid: callSid,
-            to: phoneNumber,
-            from: '+18176630380', // Your business number
-            status: 'initiated',
-            callType: callType,
-            callTime: timestamp,
-            timestamp: timestamp
-          })
+          body: JSON.stringify(callData)
         });
         
         const data = await response.json();
+        console.debug('[Phone] Call logged successfully:', {
+          callSid,
+          contactName: callData.contactName,
+          response: data
+        });
+        
         return data.call?.id || callSid; // Return call ID for tracking
       } catch (error) {
-        console.error('[Phone] Failed to log call:', error);
-        return null;
+        console.error('[Phone] Failed to log call to API:', error);
+        
+        // Fallback: Store call data locally for now
+        const localCallData = {
+          ...callData,
+          timestamp: new Date().toISOString(),
+          stored: 'local_fallback'
+        };
+        
+        // Try to store in localStorage as backup
+        try {
+          const existingCalls = JSON.parse(localStorage.getItem('crm_calls') || '[]');
+          existingCalls.unshift(localCallData);
+          // Keep only last 50 calls
+          existingCalls.splice(50);
+          localStorage.setItem('crm_calls', JSON.stringify(existingCalls));
+          console.debug('[Phone] Call stored locally as backup:', localCallData);
+        } catch (localError) {
+          console.error('[Phone] Failed to store call locally:', localError);
+        }
+        
+        return callSid;
       }
     }
     
@@ -604,8 +883,27 @@
         } catch(_) {}
         currentCall = null;
         setInCallUI(false);
+        
+        // Clear the call context to prevent auto-redial
+        currentCallContext = {
+          number: '',
+          name: '',
+          isActive: false
+        };
+        
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
         return;
+      }
+      
+      // Ensure we have the latest contact association before making the call
+      if (!currentCallContext.name) {
+        console.debug('[Phone] No contact name in context, attempting lookup for:', normalized.value);
+        try {
+          await updateContactAssociation(card, normalized.value);
+          console.debug('[Phone] Contact context after lookup:', currentCallContext);
+        } catch (error) {
+          console.warn('[Phone] Failed to lookup contact before call:', error);
+        }
       }
       try {
         // Determine website mode: if no API base configured, treat as marketing site
@@ -715,7 +1013,15 @@
       return;
     }
 
-    removeExistingWidget();
+    // If already open, bring into view and focus instead of re-creating
+    const existingCard = document.getElementById(WIDGET_ID);
+    if (existingCard) {
+      try { existingCard.parentElement && existingCard.parentElement.prepend(existingCard); } catch (_) {}
+      try { existingCard.focus(); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Phone already open'); } catch (_) {}
+      return;
+    }
+
     const card = makeCard();
 
     // Smooth expand-in animation
@@ -725,33 +1031,42 @@
       card.style.transform = 'translateY(-6px)';
     }
 
+    // Insert hidden to measure natural height without flashing
     if (content.firstChild) content.insertBefore(card, content.firstChild);
     else content.appendChild(card);
 
     if (!prefersReduce) {
+      // Temporarily hide but keep in flow to get accurate width/height
+      card.style.visibility = 'hidden';
       const cs = window.getComputedStyle(card);
       const pt = parseFloat(cs.paddingTop) || 0;
       const pb = parseFloat(cs.paddingBottom) || 0;
+      const target = card.scrollHeight; // content + padding
+
+      // Collapse to start state now that we've measured
+      card.classList.add('phone-anim');
       card.style.overflow = 'hidden';
       card.style.height = '0px';
       card.style.paddingTop = '0px';
       card.style.paddingBottom = '0px';
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-6px)';
+      // Reveal for the animation frame
+      card.style.visibility = '';
 
       requestAnimationFrame(() => {
-        const target = card.scrollHeight;
         card.style.transition = 'height 360ms ease-out, opacity 360ms ease-out, transform 360ms ease-out, padding-top 360ms ease-out, padding-bottom 360ms ease-out';
+        // Animate to measured target height and original paddings
         card.style.height = target + 'px';
         card.style.paddingTop = pt + 'px';
         card.style.paddingBottom = pb + 'px';
         card.style.opacity = '1';
         card.style.transform = 'translateY(0)';
         const pending = new Set(['height', 'padding-top', 'padding-bottom']);
-        const onEnd = (e) => {
-          if (!e) return;
-          if (pending.has(e.propertyName)) pending.delete(e.propertyName);
-          if (pending.size > 0) return;
-          card.removeEventListener('transitionend', onEnd);
-          // Cleanup inline styles
+        let safetyTimer = null;
+
+        const cleanup = () => {
+          card.classList.remove('phone-anim');
           card.style.transition = '';
           card.style.height = '';
           card.style.overflow = '';
@@ -760,7 +1075,32 @@
           card.style.paddingTop = '';
           card.style.paddingBottom = '';
         };
+
+        const onEnd = (e) => {
+          if (!e) return;
+          if (pending.has(e.propertyName)) pending.delete(e.propertyName);
+          if (pending.size > 0) return;
+          card.removeEventListener('transitionend', onEnd);
+          if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+          cleanup();
+        };
         card.addEventListener('transitionend', onEnd);
+
+        // Safety: if transitionend doesn't fire (edge cases), force cleanup
+        safetyTimer = setTimeout(() => {
+          card.removeEventListener('transitionend', onEnd);
+          cleanup();
+        }, 900);
+
+        // Re-measure a few times as content stabilizes (fonts, mic text, etc.)
+        const bumps = [120, 260, 420];
+        bumps.forEach(ms => setTimeout(() => {
+          try {
+            const h = parseFloat(card.style.height) || 0;
+            const needed = card.scrollHeight;
+            if (needed > h) card.style.height = needed + 'px';
+          } catch(_) {}
+        }, ms));
       });
     }
 
@@ -773,11 +1113,14 @@
     setTimeout(async () => {
       try {
         updateMicrophoneStatusUI(card, 'checking');
+        adjustHeightIfAnimating(card);
         const hasPermission = await checkMicrophonePermission(card);
         updateMicrophoneStatusUI(card, hasPermission ? 'granted' : 'denied');
+        adjustHeightIfAnimating(card);
       } catch (error) {
         console.warn('[Phone] Error checking mic permission:', error);
         updateMicrophoneStatusUI(card, 'error');
+        adjustHeightIfAnimating(card);
       }
     }, 100);
 
@@ -818,7 +1161,9 @@
         }
         
         // Auto-trigger call if we have both number and name (click-to-call scenario)
-        if (number && contactName) {
+        // Only auto-dial if this is a fresh call context (not a redial after hangup)
+        if (number && contactName && !currentCallContext.isActive) {
+          currentCallContext.isActive = true;
           const callBtn = card.querySelector('.call-btn-start');
           if (callBtn) {
             setTimeout(() => callBtn.click(), 100);

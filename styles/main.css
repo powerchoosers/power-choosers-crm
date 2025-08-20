@@ -3704,6 +3704,8 @@ html, body {
     background: var(--bg-widget);
     border-left: 1px solid var(--border-light);
     overflow-y: auto;
+    /* Prevent scroll position jumps when widgets expand/collapse */
+    overflow-anchor: none;
 }
 
 .widget-content {
@@ -3719,6 +3721,103 @@ html, body {
     border-radius: var(--border-radius);
     padding: var(--spacing-md);
     box-shadow: var(--elevation-card);
+}
+
+/* === PHONE WIDGET === */
+.phone-card {
+  /* Slightly increase bottom padding to avoid clipping the action buttons */
+  padding-bottom: calc(var(--spacing-md) + 10px);
+}
+
+/* Phone widget mount animation helper */
+.phone-anim {
+  will-change: height, opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .phone-anim { will-change: auto; }
+}
+
+.phone-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.phone-display {
+  font-size: 20px;
+  text-align: center;
+  padding: 10px;
+  letter-spacing: 1px;
+}
+
+.mic-status {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 16px;
+}
+
+.mic-status .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--grey-500);
+}
+
+.mic-status.ok { color: var(--green-400, #10b981); }
+.mic-status.ok .status-dot { background: var(--green-400, #10b981); }
+.mic-status.warn { color: var(--amber-400, #f59e0b); }
+.mic-status.warn .status-dot { background: var(--amber-400, #f59e0b); }
+.mic-status.error { color: var(--red-400, #ef4444); }
+.mic-status.error .status-dot { background: var(--red-400, #ef4444); }
+.mic-status.checking { color: var(--text-secondary); }
+
+.dialpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.dial-key {
+  padding: 10px 0;
+  border-radius: 10px;
+  background: var(--bg-item);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--elevation-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.dial-key:hover {
+  background: var(--grey-600);
+  transform: translateY(-1px);
+}
+
+.dial-key:active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+}
+
+.dial-digit { font-size: 18px; line-height: 1; }
+.dial-letters { font-size: 10px; opacity: 0.7; }
+
+.dial-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.dial-actions { padding-bottom: 4px; }
+.dial-actions .call-btn-start {
+  min-width: 120px;
 }
 
 /* Notes widget structure */
