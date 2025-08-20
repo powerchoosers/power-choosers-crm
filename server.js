@@ -31,7 +31,11 @@ const VONAGE_NUMBER = process.env.VONAGE_NUMBER || '+14693518845'; // Your Vonag
 const AGENT_NUMBER = process.env.AGENT_NUMBER || '+19728342317';     // Number to ring first (your phone)
 const VONAGE_PRIVATE_KEY_PATH = process.env.VONAGE_PRIVATE_KEY_PATH || path.join(__dirname, 'private.key');
 // Public base URL of this server for Vonage webhooks (use ngrok for local dev)
+// For local development, set PUBLIC_BASE_URL to your ngrok URL
+// For production, this should be set to your actual domain
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://powerchoosers.com';
+const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
+const NGROK_URL = process.env.NGROK_URL || null; // Set this to your ngrok URL when developing locally
 // Google AI Studio API key (Gemini). If present, enables transcription + summary.
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || null;
 // Recording controls
@@ -372,12 +376,15 @@ async function handleApiVonageCall(req, res, parsedUrl) {
     let payload;
     
     // Try to determine if we can reach the webhook URL
-    const canUseWebhooks = PUBLIC_BASE_URL && !PUBLIC_BASE_URL.includes('powerchoosers.com');
+    // Use webhooks if we have ngrok URL or if running in production
+    const webhookUrl = NGROK_URL || (LOCAL_DEV_MODE ? null : PUBLIC_BASE_URL);
+    const canUseWebhooks = webhookUrl && webhookUrl !== 'https://powerchoosers.com';
     
     if (canUseWebhooks) {
-      // Use webhooks if PUBLIC_BASE_URL is available and accessible
-      const answerUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/answer?dst=${encodeURIComponent(to)}`;
-      const eventUrl = `${PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/event`;
+      // Use webhooks if webhook URL is available and accessible
+      const baseUrl = webhookUrl.replace(/\/$/, '');
+      const answerUrl = `${baseUrl}/webhooks/answer?dst=${encodeURIComponent(to)}`;
+      const eventUrl = `${baseUrl}/webhooks/event`;
       
       payload = {
         to: [ { type: 'phone', number: AGENT_NUMBER } ], // ring the agent first
@@ -489,7 +496,11 @@ async function handleWebhookAnswer(req, res, parsedUrl) {
   const to = normalizeE164(pick);
   const toRaw = rawParam;
   const host = (req.headers && req.headers.host) ? req.headers.host : '';
-  const base = (PUBLIC_BASE_URL && PUBLIC_BASE_URL.replace(/\/$/, '')) || (host ? `https://${host}` : '');
+  // Determine the best base URL for webhooks
+  const base = NGROK_URL || 
+               (LOCAL_DEV_MODE && host ? `http://${host}` : '') ||
+               (PUBLIC_BASE_URL && PUBLIC_BASE_URL.replace(/\/$/, '')) || 
+               (host ? `https://${host}` : '');
   const recUrl = base ? `${base}/webhooks/recording` : '';
   // Build actions dynamically so recording can be disabled
   const actions = [];
@@ -682,10 +693,29 @@ async function handleApiProxyRecording(req, res, parsedUrl) {
 }
 
 const server = http.createServer(async (req, res) => {
-  // CORS headers (adjust origin as needed)
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Enhanced CORS headers for both local development and production
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://powerchoosers.com',
+    'https://www.powerchoosers.com'
+  ];
+  
+  // Add ngrok URL to allowed origins if available
+  if (NGROK_URL) {
+    allowedOrigins.push(NGROK_URL);
+  }
+  
+  if (allowedOrigins.includes(origin) || LOCAL_DEV_MODE) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Fallback for development
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Vary', 'Origin');
 
   // Parse the URL
@@ -854,12 +884,21 @@ const server = http.createServer(async (req, res) => {
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || 'localhost';
 
+// Detect if we're running in a development environment
+const isDev = LOCAL_DEV_MODE || HOST === 'localhost' || HOST === '127.0.0.1';
+
 server.listen(PORT, HOST, () => {
     console.log('🚀 Power Choosers CRM Server Started!');
     console.log(`📍 Server running at: http://${HOST}:${PORT}`);
     console.log(`🎯 CRM Dashboard: http://${HOST}:${PORT}/crm-dashboard.html`);
     console.log('📁 Serving files from:', __dirname);
+    console.log('🏠 Current directory:', process.cwd());
     console.log('⏰ Server started at:', new Date().toLocaleString());
+    console.log(`🔧 Environment: ${isDev ? 'Development' : 'Production'}`);
+    if (NGROK_URL) {
+        console.log(`🌐 Ngrok URL: ${NGROK_URL}`);
+        console.log(`🌐 Public Dashboard: ${NGROK_URL}/crm-dashboard.html`);
+    }
     console.log('\n✨ Ready to serve your Power Choosers CRM!');
     console.log('💡 Press Ctrl+C to stop the server');
     // Telephony config summary
@@ -870,13 +909,23 @@ server.listen(PORT, HOST, () => {
       console.log('Vonage Number:', VONAGE_NUMBER);
       console.log('Agent Number  :', AGENT_NUMBER);
       console.log('PUBLIC_BASE_URL:', PUBLIC_BASE_URL || '(unset)');
+      console.log('NGROK_URL:', NGROK_URL || '(unset - set this for local development)');
       console.log('Private Key Path:', VONAGE_PRIVATE_KEY_PATH);
       console.log('Private Key Loaded:', !!VONAGE_PRIVATE_KEY);
       console.log('Recording Enabled:', RECORD_ENABLED, 'Split:', RECORD_SPLIT, 'Format:', RECORD_FORMAT);
-      if (PUBLIC_BASE_URL) {
-        console.log('Answer Webhook  :', `${base}/webhooks/answer?dst=+1XXXXXXXXXX`);
-        console.log('Event Webhook   :', `${base}/webhooks/event`);
-        console.log('Recording Hook  :', `${base}/webhooks/recording`);
+      const webhookBase = NGROK_URL || PUBLIC_BASE_URL;
+      if (webhookBase) {
+        console.log('Webhook Base:', webhookBase);
+        console.log('Answer Webhook  :', `${webhookBase}/webhooks/answer?dst=+1XXXXXXXXXX`);
+        console.log('Event Webhook   :', `${webhookBase}/webhooks/event`);
+        console.log('Recording Hook  :', `${webhookBase}/webhooks/recording`);
+      }
+      if (isDev && !NGROK_URL) {
+        console.log('\n⚠️  For local development with Vonage webhooks:');
+        console.log('   1. Install ngrok: npm install -g ngrok');
+        console.log('   2. Run: ngrok http 3000');
+        console.log('   3. Set environment variable: NGROK_URL=https://your-ngrok-url.ngrok.io');
+        console.log('   4. Restart this server');
       }
       if (AGENT_NUMBER === VONAGE_NUMBER) {
         console.warn('WARNING: AGENT_NUMBER equals VONAGE_NUMBER. Update AGENT_NUMBER to your personal device.');
