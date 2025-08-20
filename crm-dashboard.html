@@ -1151,21 +1151,6 @@
     <script src="scripts/widgets/notes.js"></script>
     <script src="scripts/widgets/phone.js"></script>
     <script src="scripts/click-to-call.js"></script>
-    <script>
-      // Connect header call button to phone widget
-      document.addEventListener('DOMContentLoaded', function() {
-        const callBtn = document.getElementById('header-call-btn');
-        if (callBtn) {
-          callBtn.addEventListener('click', function() {
-            if (window.Widgets && typeof window.Widgets.openPhone === 'function') {
-              window.Widgets.openPhone();
-            } else {
-              console.warn('Phone widget not available');
-            }
-          });
-        }
-      });
-    </script>
     <script src="scripts/main.js"></script>
 </body>
 </html>
