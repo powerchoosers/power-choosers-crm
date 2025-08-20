@@ -1111,11 +1111,14 @@
     <script>
       (function(){
         try {
-          // Prefer same-origin backend automatically; no manual localStorage needed
+          // Use Vercel deployment for Twilio serverless functions
+          const vercelUrl = 'https://power-choosers-crm.vercel.app';
+          // Fallback to same-origin if needed
           const sameOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-          const chosen = (sameOrigin || '').replace(/\/$/, '');
+          // Prioritize Vercel deployment for Twilio functions
+          const chosen = (vercelUrl || sameOrigin || '').replace(/\/$/, '');
           window.API_BASE_URL = chosen;
-          console.log('API_BASE_URL:', window.API_BASE_URL);
+          console.log('API_BASE_URL (Twilio backend):', window.API_BASE_URL);
         } catch (e) {
           console.warn('API_BASE_URL init error:', e);
         }

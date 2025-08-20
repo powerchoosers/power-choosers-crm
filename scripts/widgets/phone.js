@@ -7,7 +7,7 @@
   if (!window.Widgets) window.Widgets = {};
 
   // Business phone number for fallback calls
-  const BUSINESS_PHONE = '9728342317'; // Your business number without formatting
+  const BUSINESS_PHONE = '8176630380'; // Your Twilio number without formatting
 
   // Twilio Device state management
   const TwilioRTC = (function() {
