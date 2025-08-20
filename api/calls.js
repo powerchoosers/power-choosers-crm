@@ -39,14 +39,23 @@ export default async function handler(req, res) {
                 transcript: call.transcript || '',
                 aiSummary: call.aiInsights?.summary || '',
                 aiInsights: call.aiInsights || null,
-                audioUrl: call.recordingUrl || ''
+                audioUrl: call.recordingUrl || '',
+                // Include contact association data
+                contactId: call.contactId || '',
+                contactType: call.contactType || '',
+                contactName: call.contactName || '',
+                contactCompany: call.contactCompany || ''
             }))
         });
     }
     
     if (req.method === 'POST') {
         // Log a new call or update existing call
-        const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl } = req.body;
+        const { 
+            callSid, to, from, status, duration, transcript, aiInsights, recordingUrl,
+            // Contact association fields
+            contactId, contactType, contactName, contactCompany
+        } = req.body;
         
         const callId = callSid || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
@@ -63,7 +72,12 @@ export default async function handler(req, res) {
             timestamp: existingCall.timestamp || new Date().toISOString(),
             transcript: transcript || existingCall.transcript,
             aiInsights: aiInsights || existingCall.aiInsights,
-            recordingUrl: recordingUrl || existingCall.recordingUrl
+            recordingUrl: recordingUrl || existingCall.recordingUrl,
+            // Store contact association data
+            contactId: contactId || existingCall.contactId,
+            contactType: contactType || existingCall.contactType,
+            contactName: contactName || existingCall.contactName,
+            contactCompany: contactCompany || existingCall.contactCompany
         };
         
         callStore.set(callId, callData);

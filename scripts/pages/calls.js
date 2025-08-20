@@ -14,6 +14,34 @@
   const pool = { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [] };
   const N = s => (s == null ? '' : String(s)).trim().toLowerCase();
 
+  // Helpers to recognize when we truly have an associated contact
+  function normalizePhone(p) {
+    return (p || '').replace(/[^0-9]/g, '');
+  }
+  function looksLikePhone(s) {
+    const d = normalizePhone(s);
+    return d.length >= 7; // treat as phone if mostly digits
+  }
+  function computeIsRecognizedContact(c) {
+    const name = (c.contactName || '').trim();
+    const phone = (c.contactPhone || c.to || '').trim();
+    // Recognized if backend provided an identifier or a type, or a non-phone-like name
+    if (c.contactId || c.contactType) return true;
+    if (!name) return false;
+    // If name equals phone after normalization, it's not a real name
+    if (normalizePhone(name) && normalizePhone(name) === normalizePhone(phone)) return false;
+    // If the name doesn't look like a phone, assume it's a real contact name
+    return !looksLikePhone(name);
+  }
+  function pick(...vals) {
+    for (const v of vals) {
+      if (v === undefined || v === null) continue;
+      const s = String(v).trim();
+      if (s !== '') return v;
+    }
+    return '';
+  }
+
   // Small inline SVG icons (inherit currentColor -> white on dark)
   function svgIcon(name) {
     switch (name) {
@@ -160,7 +188,52 @@
   function showSuggest(d, q) { if (!d.se) return; const items = (pool[d.k] || []).filter(v => N(v).includes(N(q))).slice(0, 8); if (!items.length) { hideSuggest(d); return; } d.se.innerHTML = items.map(v => `<div class="suggest-item" data-v="${v.replace(/"/g,'&quot;')}">${v}</div>`).join(''); d.se.removeAttribute('hidden'); d.se.querySelectorAll('.suggest-item').forEach(it => it.addEventListener('mousedown', (e) => { e.preventDefault(); addToken(d.k, it.getAttribute('data-v')); if (d.ie) d.ie.value = ''; hideSuggest(d); applyFilters(); })); }
   function hideSuggest(d) { if (d.se) { d.se.setAttribute('hidden', ''); d.se.innerHTML = ''; } }
   function renderChips(d) { if (!d.ce) return; const arr = state.tokens[d.k] || []; d.ce.innerHTML = arr.map((t,i)=>`<span class="chip" data-idx="${i}"><span class="chip-label">${t}</span><button type="button" class="chip-remove" aria-label="Remove">&times;</button></span>`).join(''); d.ce.querySelectorAll('.chip-remove').forEach((b,i)=>b.addEventListener('click',()=>{ arr.splice(i,1); renderChips(d); applyFilters(); })); if (d.xe) { if (arr.length) d.xe.removeAttribute('hidden'); else d.xe.setAttribute('hidden',''); } updateFilterCount(); }
-  function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=>N(x)===N(t))) { arr.push(t); const d = chips.find(x=>x.k===k); if (d) renderChips(d); } }
+  function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=eN(x)===N(t))) { arr.push(t); const d = chips.find(x=ex.k===k); if (d) renderChips(d); } }
+
+  // Enrich rows missing contact info using any local contacts cache
+  async function enrichUnknowns() {
+    try {
+      const cacheRaw = localStorage.getItem('crm_contacts') || localStorage.getItem('contacts_cache') || localStorage.getItem('contacts');
+      if (!cacheRaw) return;
+      const contacts = JSON.parse(cacheRaw);
+      if (!Array.isArray(contacts) || contacts.length === 0) return;
+      const index = new Map();
+      const addIdx = (p, c) => { const k = normalizePhone(p); if (k) index.set(k, c); };
+      for (const c of contacts) {
+        const entry = {
+          name: c.name || c.fullName || c.contactName || '',
+          company: c.company || c.companyName || '',
+          id: c.id || c.contactId || '',
+          type: c.type || c.contactType || 'contact'
+        };
+        const phones = [];
+        if (c.phone) phones.push(c.phone);
+        if (c.phoneNumber) phones.push(c.phoneNumber);
+        if (Array.isArray(c.phones)) phones.push(...c.phones);
+        if (Array.isArray(c.phoneNumbers)) phones.push(...c.phoneNumbers);
+        if (!phones.length && c.primaryPhone) phones.push(c.primaryPhone);
+        phones.forEach(p => addIdx(p, entry));
+      }
+      let enriched = 0;
+      for (const r of state.data) {
+        if (!r || !r.contactPhone || computeIsRecognizedContact(r)) continue;
+        const hit = index.get(normalizePhone(r.contactPhone));
+        if (hit && hit.name) {
+          r.contactName = hit.name;
+          r.company = r.company || hit.company || '';
+          r.contactId = r.contactId || hit.id || '';
+          r.contactType = r.contactType || hit.type || 'contact';
+          r.isRecognizedContact = computeIsRecognizedContact(r);
+          enriched++;
+        }
+      }
+      if (enriched) {
+        console.debug(`[Calls] Enriched ${enriched} calls from local contacts cache`);
+      }
+    } catch (e) {
+      console.warn('[Calls] Enrich failed:', e);
+    }
+  }
 
   async function loadData() {
     // 1) Try to load real calls from backend if API_BASE_URL is set
@@ -168,36 +241,89 @@
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (base) {
         const r = await fetch(`${base}/api/calls`, { method: 'GET' });
-        const j = await r.json().catch(()=>({}));
-        if (r.ok && j && j.ok && Array.isArray(j.calls)) {
-          const rows = j.calls.map((c, idx) => ({
-            id: c.id || `call_${Date.now()}_${idx}`,
-            contactName: c.to || '',
-            contactTitle: '',
-            company: '',
-            contactEmail: '',
-            contactPhone: c.to || '',
+        const j = await r.json().catch(()=>( {}));
+        const arr = Array.isArray(j) ? j : (Array.isArray(j.calls) ? j.calls : (Array.isArray(j.data) ? j.data : []));
+        if (r.ok && Array.isArray(arr)) {
+          const rows = arr.map((c, idx) => {
+            const row = {
+              id: pick(c.id, c.callId, `call_${Date.now()}_${idx}`),
+              contactName: pick(c.contactName, c.contact_name, c.name, ''),
+              contactTitle: pick(c.contactTitle, c.title, ''),
+              company: pick(c.contactCompany, c.company, c.companyName, ''),
+              contactEmail: pick(c.contactEmail, c.email, ''),
+              contactPhone: pick(c.contactPhone, c.to, c.phone, ''),
+              contactCity: '',
+              contactState: '',
+              accountEmployees: null,
+              industry: '',
+              visitorDomain: '',
+              callTime: pick(c.callTime, c.timestamp, new Date().toISOString()),
+              durationSec: pick(c.durationSec, c.duration, 0),
+              outcome: pick(c.outcome, c.status, ''),
+              transcript: c.transcript || '',
+              aiSummary: c.aiSummary || '',
+              aiInsights: c.aiInsights || null,
+              audioUrl: c.audioUrl ? `${base}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
+              // Add contact metadata for better display
+              contactId: pick(c.contactId, c.contact_id, ''),
+              contactType: pick(c.contactType, c.contact_type, '')
+            };
+            row.isRecognizedContact = computeIsRecognizedContact(row);
+            return row;
+          });
+          // Always use API data, even if empty
+          if (rows.length) {
+            console.debug('[Calls] Loaded from API:', rows.slice(0, 3).map(r => ({ contactName: r.contactName, contactId: r.contactId, contactType: r.contactType, contactPhone: r.contactPhone })));
+          }
+          state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); await enrichUnknowns(); render();
+          return;
+        }
+      }
+    } catch (_) { /* fall back to local storage or demo data */ }
+
+    // 2) Try localStorage backup
+    try {
+      const localCalls = JSON.parse(localStorage.getItem('crm_calls') || '[]');
+      if (localCalls.length > 0) {
+        console.log(`[Calls] Found ${localCalls.length} local backup calls`);
+        const rows = localCalls.map((c, idx) => {
+          const row = {
+            id: pick(c.callSid, c.id, `local_call_${Date.now()}_${idx}`),
+            contactName: pick(c.contactName, c.contact_name, c.name, ''),
+            contactTitle: pick(c.contactTitle, c.title, ''),
+            company: pick(c.contactCompany, c.company, c.companyName, ''),
+            contactEmail: pick(c.contactEmail, c.email, ''),
+            contactPhone: pick(c.contactPhone, c.to, c.phone, ''),
             contactCity: '',
             contactState: '',
             accountEmployees: null,
             industry: '',
             visitorDomain: '',
-            callTime: c.callTime || new Date().toISOString(),
-            durationSec: c.durationSec || 0,
-            outcome: c.outcome || '',
+            callTime: pick(c.callTime, c.timestamp, new Date().toISOString()),
+            durationSec: pick(c.durationSec, c.duration, 0),
+            outcome: (() => { const s = (pick(c.outcome, c.status, '')||'').toLowerCase(); if (s==='completed') return 'Connected'; if (s==='failed') return 'Failed'; if (s==='busy') return 'Busy'; if (s==='no-answer' || s==='no_answer') return 'No Answer'; return s || 'Connected'; })(),
             transcript: c.transcript || '',
             aiSummary: c.aiSummary || '',
             aiInsights: c.aiInsights || null,
-            audioUrl: c.audioUrl ? `${base}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
-          }));
-          // Always use API data, even if empty
-          state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
-          return;
+            audioUrl: '',
+            // Add contact metadata for better display
+            contactId: pick(c.contactId, c.contact_id, ''),
+            contactType: pick(c.contactType, c.contact_type, '')
+          };
+          row.isRecognizedContact = computeIsRecognizedContact(row);
+          return row;
+        });
+        if (rows.length) {
+          console.debug('[Calls] Loaded from local backup:', rows.slice(0, 3).map(r => ({ contactName: r.contactName, contactId: r.contactId, contactType: r.contactType, contactPhone: r.contactPhone })));
         }
+        state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); await enrichUnknowns(); render();
+        return;
       }
-    } catch (_) { /* fall back to demo data */ }
+    } catch (localError) {
+      console.warn('[Calls] Failed to load local backup calls:', localError);
+    }
 
-    // 2) Fallback: demo data
+    // 3) Final fallback: demo data
     const cos = ['Acme Manufacturing','Metro Industries','Johnson Electric','Downtown Office','Northwind Traders'];
     const cities = ['Austin','Dallas','Houston','San Antonio','Fort Worth'];
     const states = ['TX','TX','TX','TX','TX'];
@@ -237,7 +363,23 @@
   function rowHtml(r){
     const dur = `${Math.floor(r.durationSec/60)}m ${r.durationSec%60}s`;
     const id = escapeHtml(r.id);
-    const name = escapeHtml(r.contactName || r.to || '');
+    
+    // Determine what to display in the contact column
+    let displayName = '';
+    let displaySubtext = '';
+    
+    if (computeIsRecognizedContact(r) && r.contactName) {
+      // Show contact name with phone number as subtext
+      displayName = escapeHtml(r.contactName);
+      displaySubtext = `<div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(r.contactPhone || '')}</div>`;
+    } else {
+      // Show phone number only (unrecognized contact)
+      displayName = escapeHtml(r.contactPhone || r.to || '');
+      displaySubtext = '';
+    }
+    
+    const name = displayName;
+    const nameWithSubtext = displayName + displaySubtext;
     const title = escapeHtml(r.contactTitle || '');
     const company = escapeHtml(r.company || '');
     const callTimeStr = new Date(r.callTime).toLocaleString();
@@ -258,7 +400,7 @@
     return `
     <tr>
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
-      <td>${name}</td>
+      <td>${nameWithSubtext}</td>
       <td>${title}</td>
       <td>${company}</td>
       <td>${callTimeStr}</td>
