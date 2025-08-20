@@ -370,9 +370,90 @@
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
     async function placeBrowserCall(number) {
-      // Browser calling disabled due to CDN blocking issues
-      // Fall back to server calling immediately
-      throw new Error('Browser calling unavailable - using server calling instead');
+      console.debug('[Phone] Attempting browser-to-phone call using Twilio Voice SDK');
+      
+      // Check if Twilio Voice SDK is available
+      if (typeof Twilio === 'undefined' || !Twilio.Device) {
+        throw new Error('Twilio Voice SDK not loaded. Please refresh the page.');
+      }
+      
+      try {
+        // Get access token from backend
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const tokenResp = await fetch(`${base}/api/twilio/token?identity=agent`);
+        
+        if (!tokenResp.ok) {
+          const errorData = await tokenResp.json().catch(() => ({}));
+          throw new Error(`Failed to get Twilio token: ${errorData.error || `HTTP ${tokenResp.status}`}`);
+        }
+        
+        const tokenData = await tokenResp.json();
+        if (!tokenData.token) {
+          throw new Error('No Twilio token received from server');
+        }
+        
+        console.debug('[Phone] Got Twilio token, setting up device');
+        
+        // Initialize Twilio Device
+        const device = new Twilio.Device(tokenData.token, {
+          codecPreferences: ['opus', 'pcmu'],
+          fakeLocalDTMF: true,
+          enableRingingState: true,
+          allowIncomingWhileBusy: false
+        });
+        
+        // Set up device event handlers
+        device.on('registered', () => {
+          console.debug('[Phone] Twilio device registered and ready');
+        });
+        
+        device.on('error', (error) => {
+          console.error('[Phone] Twilio device error:', error);
+          throw error;
+        });
+        
+        device.on('incoming', (conn) => {
+          console.debug('[Phone] Incoming call:', conn);
+        });
+        
+        // Register the device
+        await device.register();
+        
+        console.debug('[Phone] Making outbound call to:', number);
+        
+        // Make the call
+        const call = await device.connect({
+          params: {
+            To: number
+          }
+        });
+        
+        console.debug('[Phone] Call initiated:', call);
+        
+        // Handle call events
+        call.on('accept', () => {
+          console.debug('[Phone] Call accepted');
+          updateCallStatus('connected');
+        });
+        
+        call.on('disconnect', () => {
+          console.debug('[Phone] Call disconnected');
+          updateCallStatus('idle');
+        });
+        
+        call.on('error', (error) => {
+          console.error('[Phone] Call error:', error);
+          updateCallStatus('idle');
+          throw error;
+        });
+        
+        updateCallStatus('calling');
+        return call;
+        
+      } catch (error) {
+        console.error('[Phone] Browser call failed:', error);
+        throw error;
+      }
     }
     async function fallbackServerCall(number) {
       // Check if we're on main website vs CRM
