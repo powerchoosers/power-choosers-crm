@@ -25,7 +25,7 @@
     --blue-subtle: #1e3a8a;
     --orange-muted: rgba(255, 107, 53, 0.1);
     --blue-muted: rgba(30, 58, 138, 0.1);
-    /* Additional subtle colors for badges on dark backgrounds */
+    /* Call outcome badges */
     --green-subtle: #28a745;
     --green-muted: rgba(40, 167, 69, 0.15);
     --red-subtle: #dc3545;

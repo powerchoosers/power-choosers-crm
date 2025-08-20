@@ -237,7 +237,7 @@
   function rowHtml(r){
     const dur = `${Math.floor(r.durationSec/60)}m ${r.durationSec%60}s`;
     const id = escapeHtml(r.id);
-    const name = escapeHtml(r.contactName || '');
+    const name = escapeHtml(r.contactName || r.to || '');
     const title = escapeHtml(r.contactTitle || '');
     const company = escapeHtml(r.company || '');
     const callTimeStr = new Date(r.callTime).toLocaleString();
@@ -245,6 +245,16 @@
     const outcome = escapeHtml(r.outcome || '');
     const website = '';
     const linkedin = '';
+    
+    // Enhanced AI insights display
+    const aiInsights = r.aiInsights || {};
+    const sentiment = aiInsights.sentiment || 'Unknown';
+    const keyTopics = (aiInsights.keyTopics || []).join(', ');
+    const nextSteps = (aiInsights.nextSteps || []).join(', ');
+    const painPoints = (aiInsights.painPoints || []).join(', ');
+    const budget = aiInsights.budget || 'Not discussed';
+    const timeline = aiInsights.timeline || 'Not specified';
+    
     return `
     <tr>
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
@@ -253,9 +263,9 @@
       <td>${company}</td>
       <td>${callTimeStr}</td>
       <td>${dur}</td>
-      <td>${outcome}</td>
+      <td><span class="outcome-badge outcome-${outcome.toLowerCase().replace(' ', '-')}">${outcome}</span></td>
       <td class="qa-cell"><div class="qa-actions">
-        <button type="button" class="qa-btn insights-btn" data-id="${id}" aria-label="View insights" title="View insights">${svgIcon('insights')}</button>
+        <button type="button" class="qa-btn insights-btn" data-id="${id}" aria-label="View insights" title="View AI insights">${svgIcon('insights')}</button>
       </div></td>
       <td class="qa-cell"><div class="qa-actions">
         <button type="button" class="qa-btn" data-action="addlist" data-id="${id}" aria-label="Add to list" title="Add to list">${svgIcon('addlist')}</button>
@@ -268,16 +278,53 @@
       <td>${updatedStr}</td>
     </tr>
     <tr id="insights-${r.id}" class="insights-row" style="display:none;"><td colspan="10">
-      <div class="insights" style="display:flex; gap:25px;">
-        <div style="flex:2;">
-          <div style="font-weight:600; margin-bottom:8px;">AI Summary</div>
-          <div style="color:#374151;">${escapeHtml(r.aiSummary || '')}</div>
-          <div style="font-weight:600; margin:15px 0 8px;">Transcript</div>
-          <div style="color:#4b5563; max-height:160px; overflow:auto; border:1px solid var(--pc-border,#e5e7eb); padding:12px; border-radius:8px;">${escapeHtml(r.transcript || '')}</div>
-        </div>
-        <div style="flex:1;">
-          <div style="font-weight:600; margin-bottom:8px;">Audio</div>
-          <audio controls style="width:100%"><source src="${r.audioUrl}" type="audio/mpeg"></audio>
+      <div class="insights-container" style="background:var(--bg-item); border-radius:var(--border-radius); padding:20px; margin:10px 0;">
+        <div style="display:flex; gap:25px;">
+          <div style="flex:2;">
+            <div class="insights-section">
+              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">📋 AI Call Summary</h4>
+              <div style="color:var(--text-secondary); margin-bottom:15px; line-height:1.4;">${escapeHtml(r.aiSummary || 'No summary available')}</div>
+            </div>
+            
+            <div class="insights-section">
+              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">💬 Call Transcript</h4>
+              <div style="color:var(--text-secondary); max-height:200px; overflow-y:auto; border:1px solid var(--border-light); padding:12px; border-radius:6px; background:var(--bg-card); font-family:monospace; font-size:13px; line-height:1.3;">${escapeHtml(r.transcript || 'Transcript not available')}</div>
+            </div>
+          </div>
+          
+          <div style="flex:1;">
+            <div class="insights-section">
+              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">🎵 Call Recording</h4>
+              ${r.audioUrl ? `<audio controls style="width:100%; margin-bottom:15px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : '<div style="color:var(--text-secondary); font-style:italic;">No recording available</div>'}
+            </div>
+            
+            <div class="insights-grid" style="display:grid; gap:10px;">
+              <div class="insight-item">
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">😊 Sentiment:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${sentiment}</span>
+              </div>
+              <div class="insight-item">
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">🏷️ Key Topics:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${keyTopics || 'None identified'}</span>
+              </div>
+              <div class="insight-item">
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">⏭️ Next Steps:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${nextSteps || 'None identified'}</span>
+              </div>
+              <div class="insight-item">
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">⚠️ Pain Points:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${painPoints || 'None mentioned'}</span>
+              </div>
+              <div class="insight-item">
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">💰 Budget:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${budget}</span>
+              </div>
+              <div class="insight-item">
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">⏰ Timeline:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${timeline}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </td></tr>`; }

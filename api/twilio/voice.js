@@ -26,8 +26,9 @@ export default function handler(req, res) {
             answerOnBridge: true,
             hangupOnStar: false,
             timeLimit: 14400, // 4 hours max call duration
-            // Optional: record calls (uncomment if needed)
-            // record: 'record-from-answer'
+            // Enable call recording for AI insights
+            record: 'record-from-answer',
+            recordingStatusCallback: `${process.env.VERCEL_URL || 'https://power-choosers-crm.vercel.app'}/api/twilio/recording`
         }, To);
         
         console.log(`[Voice] TwiML generated for call to ${To}`);
