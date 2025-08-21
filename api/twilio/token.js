@@ -57,7 +57,7 @@ module.exports = allowCors(async (req, res) => {
       // Grant voice capabilities
       const voiceGrant = new VoiceGrant({
           outgoingApplicationSid: appSid,
-          incomingAllow: false // Set to true if you want to receive calls
+          incomingAllow: true // Allow browser to receive incoming calls
       });
       
       token.addGrant(voiceGrant);
