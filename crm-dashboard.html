@@ -1109,6 +1109,192 @@
         </div>
     </div>
 
+    <!-- Bulk Import CSV Modal -->
+    <div id="modal-bulk-import" class="pc-modal" hidden>
+        <div class="pc-modal__backdrop" data-close="bulk-import"></div>
+        <div class="pc-modal__dialog csv-import-modal" role="dialog" aria-modal="true" aria-labelledby="bulk-import-title">
+            <div class="pc-modal__header">
+                <h3 id="bulk-import-title">Bulk Import CSV</h3>
+                <button class="pc-modal__close" data-close="bulk-import" aria-label="Close">×</button>
+            </div>
+            
+            <!-- Step Indicator -->
+            <div class="csv-steps-indicator">
+                <div class="csv-step active" data-step="1">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Upload File</div>
+                </div>
+                <div class="csv-step" data-step="2">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Map Fields</div>
+                </div>
+                <div class="csv-step" data-step="3">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Review & Import</div>
+                </div>
+            </div>
+
+            <!-- Step 1: File Upload -->
+            <div class="csv-step-content" id="csv-step-1">
+                <div class="pc-modal__body">
+                    <div class="csv-upload-section">
+                        <div class="upload-type-selector">
+                            <h4>What would you like to import?</h4>
+                            <div class="type-options">
+                                <label class="type-option">
+                                    <input type="radio" name="importType" value="contacts" checked>
+                                    <div class="option-content">
+                                        <div class="option-icon">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                                <circle cx="9" cy="7" r="4"></circle>
+                                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="option-text">
+                                            <div class="option-title">Contacts</div>
+                                            <div class="option-desc">People and their information</div>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="type-option">
+                                    <input type="radio" name="importType" value="accounts">
+                                    <div class="option-content">
+                                        <div class="option-icon">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                                <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="option-text">
+                                            <div class="option-title">Accounts</div>
+                                            <div class="option-desc">Companies and organizations</div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="csv-drop-zone" id="csv-drop-zone">
+                            <div class="drop-zone-content">
+                                <div class="upload-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="12" y1="11" x2="12" y2="17"></line>
+                                        <polyline points="9 14 12 11 15 14"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="upload-text">
+                                    <h4>Drop your CSV file here</h4>
+                                    <p>or <button type="button" class="btn-link" id="csv-browse-btn">browse to upload</button></p>
+                                </div>
+                                <div class="file-requirements">
+                                    <small>Supported format: .csv (max 10MB)</small>
+                                </div>
+                            </div>
+                            <input type="file" id="csv-file-input" accept=".csv" hidden>
+                        </div>
+                        
+                        <div class="csv-file-info" id="csv-file-info" hidden>
+                            <div class="file-details">
+                                <div class="file-name" id="csv-file-name"></div>
+                                <div class="file-stats">
+                                    <span id="csv-file-size"></span> • 
+                                    <span id="csv-row-count"></span> rows detected
+                                </div>
+                            </div>
+                            <button type="button" class="btn-text" id="csv-remove-file">Remove file</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-secondary" data-close="bulk-import">Cancel</button>
+                    <button type="button" class="btn-primary" id="csv-next-step-1" disabled>Next: Map Fields</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Field Mapping -->
+            <div class="csv-step-content" id="csv-step-2" hidden>
+                <div class="pc-modal__body">
+                    <div class="csv-mapping-section">
+                        <div class="mapping-header">
+                            <h4>Map your CSV columns to CRM fields</h4>
+                            <p>Match the columns from your CSV file to the appropriate fields in your CRM.</p>
+                        </div>
+                        
+                        <div class="csv-preview">
+                            <h5>CSV Preview (first 3 rows)</h5>
+                            <div class="preview-table" id="csv-preview-table">
+                                <!-- Preview table will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="field-mapping">
+                            <h5>Field Mapping</h5>
+                            <div class="mapping-list" id="csv-field-mapping">
+                                <!-- Field mapping controls will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="mapping-options">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="csv-update-existing" checked>
+                                Update existing records if found
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-secondary" id="csv-back-step-2">Back</button>
+                    <button type="button" class="btn-primary" id="csv-next-step-2">Next: Review</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Review & Import -->
+            <div class="csv-step-content" id="csv-step-3" hidden>
+                <div class="pc-modal__body">
+                    <div class="csv-review-section">
+                        <div class="review-header">
+                            <h4>Review your import</h4>
+                            <p>Please review the details below before importing your data.</p>
+                        </div>
+                        
+                        <div class="review-summary" id="csv-review-summary">
+                            <!-- Summary will be populated by JavaScript -->
+                        </div>
+                        
+                        <div class="review-data">
+                            <h5>Data Preview</h5>
+                            <div class="preview-table" id="csv-final-preview">
+                                <!-- Final preview will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="import-progress" id="csv-import-progress" hidden>
+                            <div class="progress-header">
+                                <h5>Importing data...</h5>
+                                <div class="progress-stats" id="csv-progress-stats"></div>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="csv-progress-fill"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="import-results" id="csv-import-results" hidden>
+                            <div class="results-summary" id="csv-results-summary"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-secondary" id="csv-back-step-3">Back</button>
+                    <button type="button" class="btn-primary" id="csv-start-import">Start Import</button>
+                    <button type="button" class="btn-primary" id="csv-finish-import" hidden>Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase SDK (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>

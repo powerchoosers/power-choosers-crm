@@ -13,8 +13,23 @@
   };
 
   // Column order for Accounts table headers (draggable)
-  const DEFAULT_ACCOUNTS_COL_ORDER = ['select','name','industry','domain','phone','contractEnd','electricitySupplier','benefits','painPoints','sqft','occupancy','employees','location','actions','updated'];
-  const ACCOUNTS_COL_STORAGE_KEY = 'accounts_column_order_v1';
+  // Must match the headers in crm-dashboard.html (#accounts-table thead)
+  const DEFAULT_ACCOUNTS_COL_ORDER = [
+    'select',
+    'name',
+    'industry',
+    'domain',
+    'phone',
+    'contractEnd',
+    'sqft',
+    'occupancy',
+    'employees',
+    'location',
+    'actions',
+    'updated'
+  ];
+  // Bump storage key to reset any previously saved order that included non-existent columns
+  const ACCOUNTS_COL_STORAGE_KEY = 'accounts_column_order_v2';
   let accountsColumnOrder = DEFAULT_ACCOUNTS_COL_ORDER.slice();
   function loadAccountsColumnOrder() {
     try {
@@ -306,7 +321,7 @@
         render();
         return;
       }
-      const snap = await window.firebaseDB.collection('accounts').limit(200).get();
+      const snap = await window.firebaseDB.collection('accounts').get();
       state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       state.filtered = state.data.slice();
       state.loaded = true;
@@ -535,6 +550,66 @@
       #accounts-bulk-actions .action-btn-sm span { display: inline-block; white-space: nowrap; }
       /* Slight vertical nudge for AI icon to center with label */
       #accounts-bulk-actions #bulk-ai svg { transform: translateY(2px); }
+
+      /* Bulk delete confirmation popover, centered with pointer */
+      .bulk-delete-popover {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 960;
+        min-width: 320px;
+        max-width: 520px;
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius);
+        box-shadow: var(--elevation-card);
+        padding: var(--spacing-md);
+      }
+      .bulk-delete-popover .bulk-delete-message { font-weight: 600; margin-bottom: 8px; }
+      .bulk-delete-popover .bulk-delete-note { font-size: 12px; opacity: .85; margin-bottom: 12px; }
+      .bulk-delete-popover .bulk-delete-actions { display: flex; gap: var(--spacing-sm); justify-content: flex-end; }
+      .bulk-delete-popover .btn-text {
+        height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm);
+        background: transparent; color: var(--text-secondary);
+        border: 1px solid transparent;
+      }
+      .bulk-delete-popover .btn-text:hover { background: var(--grey-700); border-color: var(--border-light); color: var(--text-inverse); }
+      .bulk-delete-popover .btn-danger {
+        height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm);
+        background: var(--red-muted);
+        color: var(--text-inverse);
+        border: 1px solid var(--red-subtle);
+        font-weight: 600;
+        display: inline-flex; align-items: center; gap: 6px;
+      }
+      .bulk-delete-popover .btn-danger:hover { filter: brightness(1.05); }
+      /* Pointer arrow: position controlled by --arrow-left in px, relative to popover's left */
+      .bulk-delete-popover::before {
+        content: '';
+        position: absolute;
+        top: -8px;
+        left: var(--arrow-left, 50%);
+        transform: translateX(-50%);
+        width: 0; height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-bottom: 8px solid var(--bg-card);
+        z-index: -1;
+      }
+      .bulk-delete-popover::after {
+        content: '';
+        position: absolute;
+        top: -9px;
+        left: var(--arrow-left, 50%);
+        transform: translateX(-50%);
+        width: 0; height: 0;
+        border-left: 9px solid transparent;
+        border-right: 9px solid transparent;
+        border-bottom: 9px solid var(--border-light);
+        z-index: -2;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -936,7 +1011,123 @@
     container.querySelector('#bulk-addlist').addEventListener('click', () => console.log('Bulk add to list', Array.from(state.selected)));
     container.querySelector('#bulk-export').addEventListener('click', () => console.log('Bulk export', Array.from(state.selected)));
     container.querySelector('#bulk-ai').addEventListener('click', () => console.log('Bulk research with AI', Array.from(state.selected)));
-    container.querySelector('#bulk-delete').addEventListener('click', () => console.log('Bulk delete', Array.from(state.selected)));
+    const delBtn = container.querySelector('#bulk-delete');
+    if (delBtn) delBtn.addEventListener('click', () => openBulkDeleteConfirm());
+  }
+
+  // ===== Bulk delete confirm popover and deletion =====
+  let _onAcctDelKeydown = null;
+  let _onAcctDelOutside = null;
+
+  function closeBulkDeleteConfirm() {
+    const pop = document.getElementById('accounts-delete-popover');
+    const backdrop = document.getElementById('accounts-delete-backdrop');
+    if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    if (_onAcctDelKeydown) { document.removeEventListener('keydown', _onAcctDelKeydown); _onAcctDelKeydown = null; }
+    if (_onAcctDelOutside) { document.removeEventListener('mousedown', _onAcctDelOutside, true); _onAcctDelOutside = null; }
+  }
+
+  function openBulkDeleteConfirm() {
+    if (document.getElementById('accounts-delete-popover')) return;
+    const bar = els.page && els.page.querySelector('#accounts-bulk-actions');
+    if (!bar) return;
+    const delBtn = bar.querySelector('#bulk-delete');
+
+    // Backdrop for click-away
+    const backdrop = document.createElement('div');
+    backdrop.id = 'accounts-delete-backdrop';
+    backdrop.style.position = 'fixed';
+    backdrop.style.inset = '0';
+    backdrop.style.background = 'transparent';
+    backdrop.style.zIndex = '955';
+    document.body.appendChild(backdrop);
+
+    // Popover content (centered)
+    const pop = document.createElement('div');
+    pop.id = 'accounts-delete-popover';
+    pop.className = 'bulk-delete-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Confirm delete accounts');
+    pop.innerHTML = `
+      <div class="bulk-delete-message">Delete ${state.selected.size} ${state.selected.size === 1 ? 'account' : 'accounts'}?</div>
+      <div class="bulk-delete-note">This action cannot be undone.</div>
+      <div class="bulk-delete-actions">
+        <button class="btn-text" id="acct-del-cancel">Cancel</button>
+        <button class="btn-danger" id="acct-del-confirm">${svgIcon('delete')}<span>Delete</span></button>
+      </div>`;
+
+    // Add to body to allow centered fixed positioning
+    document.body.appendChild(pop);
+
+    // Compute pointer position to point towards the Delete button
+    try {
+      const btnRect = delBtn ? delBtn.getBoundingClientRect() : null;
+      const popRect = pop.getBoundingClientRect();
+      if (btnRect && popRect && popRect.width > 0) {
+        const btnCenterX = btnRect.left + btnRect.width / 2;
+        const leftWithinPop = Math.max(12, Math.min(popRect.width - 12, btnCenterX - popRect.left));
+        pop.style.setProperty('--arrow-left', leftWithinPop + 'px');
+      }
+    } catch (_) { /* noop */ }
+
+    const cancel = pop.querySelector('#acct-del-cancel');
+    const confirm = pop.querySelector('#acct-del-confirm');
+    if (cancel) cancel.addEventListener('click', () => closeBulkDeleteConfirm());
+    if (confirm) confirm.addEventListener('click', async () => {
+      closeBulkDeleteConfirm();
+      await deleteSelectedAccounts();
+    });
+
+    const f = confirm || cancel;
+    f && f.focus && f.focus();
+    _onAcctDelKeydown = (e) => { if (e.key === 'Escape') { e.preventDefault(); closeBulkDeleteConfirm(); } };
+    document.addEventListener('keydown', _onAcctDelKeydown);
+    _onAcctDelOutside = (e) => { const t = e.target; if (!pop.contains(t)) closeBulkDeleteConfirm(); };
+    document.addEventListener('mousedown', _onAcctDelOutside, true);
+  }
+
+  // Delete selected accounts from Firestore and local state
+  async function deleteSelectedAccounts() {
+    const ids = Array.from(state.selected || []);
+    if (!ids.length) return;
+    let failed = 0;
+    try {
+      if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+        const ops = ids.map(async (id) => {
+          try {
+            await window.firebaseDB.collection('accounts').doc(id).delete();
+          } catch (e) {
+            failed++;
+            console.warn('Account delete failed for id', id, e);
+          }
+        });
+        await Promise.all(ops);
+      }
+    } catch (err) {
+      console.warn('Bulk account delete error', err);
+    } finally {
+      // Update local state
+      if (Array.isArray(state.data) && state.data.length) {
+        const idSet = new Set(ids);
+        state.data = state.data.filter((a) => a && !idSet.has(a.id));
+      }
+      if (Array.isArray(state.filtered) && state.filtered.length) {
+        const idSet = new Set(ids);
+        state.filtered = state.filtered.filter((a) => a && !idSet.has(a.id));
+      }
+      state.selected.clear();
+      render();
+      hideBulkActionsBar();
+      if (els.selectAll) { els.selectAll.checked = false; els.selectAll.indeterminate = false; }
+      const successCount = Math.max(0, ids.length - failed);
+      if (successCount > 0) {
+        try { window.crm?.showToast && window.crm.showToast(`Deleted ${successCount} ${successCount === 1 ? 'account' : 'accounts'}`); } catch (_) {}
+      }
+      if (failed > 0) {
+        try { window.crm?.showToast && window.crm.showToast(`Failed to delete ${failed} ${failed === 1 ? 'account' : 'accounts'}`); } catch (_) {}
+      }
+    }
   }
 
   function toggleSelectAll(checked) {

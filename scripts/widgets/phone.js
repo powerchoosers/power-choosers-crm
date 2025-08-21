@@ -111,13 +111,26 @@
           // Update UI with new device list if needed
         });
         
-        // Set default speaker device for output
+        // Set speaker device for output - use first available if 'default' doesn't exist
         if (state.device.audio.isOutputSelectionSupported) {
           try {
-            state.device.audio.speakerDevices.set('default');
-            console.debug('[TwilioRTC] Default speaker device set');
+            const outputDevices = state.device.audio.availableOutputDevices;
+            let outputDeviceId = 'default';
+            
+            if (outputDevices && outputDevices.size > 0) {
+              const deviceIds = Array.from(outputDevices.keys());
+              console.debug('[TwilioRTC] Available output devices during init:', deviceIds);
+              
+              if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                outputDeviceId = deviceIds[0];
+                console.debug('[TwilioRTC] Using first available output device during init:', outputDeviceId);
+              }
+            }
+            
+            state.device.audio.speakerDevices.set(outputDeviceId);
+            console.debug('[TwilioRTC] Output device set during init:', outputDeviceId);
           } catch (e) {
-            console.warn('[TwilioRTC] Failed to set default speaker device:', e);
+            console.warn('[TwilioRTC] Failed to set output device during init:', e);
           }
         }
 
@@ -134,14 +147,39 @@
           
           // Set input device before accepting the call according to Twilio best practices
           if (state.device.audio) {
-            await state.device.audio.setInputDevice('default');
+            try {
+              // Get available input devices and use the first one if 'default' doesn't exist
+              const inputDevices = state.device.audio.availableInputDevices;
+              let inputDeviceId = 'default';
+              
+              if (inputDevices && inputDevices.size > 0) {
+                const deviceIds = Array.from(inputDevices.keys());
+                if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                  inputDeviceId = deviceIds[0];
+                }
+              }
+              
+              await state.device.audio.setInputDevice(inputDeviceId);
+            } catch (e) {
+              console.warn('[TwilioRTC] Failed to set input device for incoming call:', e);
+            }
             
             // Set speaker device for output according to Twilio best practices
             if (state.device.audio.isOutputSelectionSupported) {
               try {
-                state.device.audio.speakerDevices.set('default');
+                const outputDevices = state.device.audio.availableOutputDevices;
+                let outputDeviceId = 'default';
+                
+                if (outputDevices && outputDevices.size > 0) {
+                  const deviceIds = Array.from(outputDevices.keys());
+                  if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                    outputDeviceId = deviceIds[0];
+                  }
+                }
+                
+                state.device.audio.speakerDevices.set(outputDeviceId);
               } catch (e) {
-                console.warn('[TwilioRTC] Failed to set default speaker device for incoming call:', e);
+                console.warn('[TwilioRTC] Failed to set output device for incoming call:', e);
               }
             }
           }
@@ -220,7 +258,7 @@
     switch (status) {
       case 'granted':
         micStatus.classList.add('ok');
-        micText.textContent = 'Browser calls enabled - will try browser first';
+        micText.textContent = 'Browser calls enabled';
         break;
       case 'denied':
         micStatus.classList.add('warn');
@@ -255,29 +293,68 @@
 
   // Microphone permission handling
   async function checkMicrophonePermission(card) {
+    console.log('[Phone] checkMicrophonePermission called');
+    console.log('[Phone] Current state:', {
+      checked: TwilioRTC.state.micPermissionChecked,
+      granted: TwilioRTC.state.micPermissionGranted,
+      isSecureContext: window.isSecureContext,
+      protocol: window.location.protocol,
+      hasUserGesture: document.hasStoredUserActivation || 'unknown'
+    });
+    
     if (TwilioRTC.state.micPermissionChecked && TwilioRTC.state.micPermissionGranted) {
+      console.log('[Phone] Permission already granted, returning true');
       return true;
     }
     
+    // Check if we're in a secure context (HTTPS or localhost)
+    if (!window.isSecureContext) {
+      console.error('[Phone] Not in secure context - microphone access requires HTTPS or localhost');
+      try { 
+        window.crm?.showToast && window.crm.showToast('Microphone access requires HTTPS or localhost'); 
+      } catch(_) {}
+      return false;
+    }
+    
+    // Check if getUserMedia is available
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error('[Phone] getUserMedia not available');
+      try { 
+        window.crm?.showToast && window.crm.showToast('Microphone access not supported in this browser'); 
+      } catch(_) {}
+      return false;
+    }
+    
     try {
+      console.log('[Phone] Requesting microphone permission...');
       // Always attempt to request microphone permission directly
       // This will trigger the browser permission dialog if needed
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        console.log('[Phone] Microphone permission granted!');
         // Stop the stream immediately as we only need permission
         stream.getTracks().forEach(track => track.stop());
         TwilioRTC.state.micPermissionGranted = true;
         TwilioRTC.state.micPermissionChecked = true;
-        try { window.crm?.showToast && window.crm.showToast('Microphone access granted - browser calls enabled'); } catch(_) {}
+        try { window.crm?.showToast && window.crm.showToast('Browser calls enabled'); } catch(_) {}
         return true;
       } catch (micError) {
-        console.warn('[Phone] Microphone permission denied:', micError?.message || micError);
+        console.warn('[Phone] Microphone permission denied:', micError?.name, micError?.message);
         TwilioRTC.state.micPermissionGranted = false;
         TwilioRTC.state.micPermissionChecked = true;
         
-        // Show helpful message to user
+        // Show helpful message based on error type
+        let message = 'Microphone access needed for browser calls.';
+        if (micError?.name === 'NotAllowedError') {
+          message += ' Click the microphone icon in your address bar to allow.';
+        } else if (micError?.name === 'NotFoundError') {
+          message = 'No microphone found. Please check your audio devices.';
+        } else if (micError?.name === 'NotReadableError') {
+          message = 'Microphone is being used by another application.';
+        }
+        
         try { 
-          window.crm?.showToast && window.crm.showToast('Microphone access needed for browser calls. Click the microphone icon in your address bar to allow.'); 
+          window.crm?.showToast && window.crm.showToast(message); 
         } catch(_) {}
         return false;
       }
@@ -428,7 +505,6 @@
         </div>
         <div class="dial-actions">
           <button type="button" class="btn-primary call-btn-start" title="Call">Call</button>
-          <button type="button" class="btn-secondary backspace-btn" title="Backspace">Backspace</button>
           <button type="button" class="btn-text clear-btn" title="Clear">Clear</button>
         </div>
       </div>
@@ -446,13 +522,6 @@
     const appendChar = (ch) => {
       if (!input) return;
       input.value = (input.value || '') + ch;
-      try { input.focus(); } catch (_) {}
-    };
-
-    const backspace = () => {
-      if (!input) return;
-      const v = input.value || '';
-      input.value = v.slice(0, -1);
       try { input.focus(); } catch (_) {}
     };
 
@@ -502,14 +571,52 @@
         // Set input device before making the call according to Twilio best practices
         // This ensures proper audio device selection for the call
         if (device.audio) {
-          await device.audio.setInputDevice('default');
+          try {
+            // Get available input devices and use the first one if 'default' doesn't exist
+            const inputDevices = device.audio.availableInputDevices;
+            let inputDeviceId = 'default';
+            
+            if (inputDevices && inputDevices.size > 0) {
+              const deviceIds = Array.from(inputDevices.keys());
+              console.log('[Phone] Available input devices:', deviceIds);
+              
+              // Try 'default' first, fallback to first available device
+              if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                inputDeviceId = deviceIds[0];
+                console.log('[Phone] Using first available input device:', inputDeviceId);
+              }
+            }
+            
+            await device.audio.setInputDevice(inputDeviceId);
+            console.log('[Phone] Input device set to:', inputDeviceId);
+          } catch (e) {
+            console.warn('[Phone] Failed to set input device:', e);
+            // Continue without setting input device - Twilio will use browser default
+          }
           
           // Set speaker device for output according to Twilio best practices
           if (device.audio.isOutputSelectionSupported) {
             try {
-              device.audio.speakerDevices.set('default');
+              // Get available output devices and use the first one if 'default' doesn't exist
+              const outputDevices = device.audio.availableOutputDevices;
+              let outputDeviceId = 'default';
+              
+              if (outputDevices && outputDevices.size > 0) {
+                const deviceIds = Array.from(outputDevices.keys());
+                console.log('[Phone] Available output devices:', deviceIds);
+                
+                // Try 'default' first, fallback to first available device
+                if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                  outputDeviceId = deviceIds[0];
+                  console.log('[Phone] Using first available output device:', outputDeviceId);
+                }
+              }
+              
+              device.audio.speakerDevices.set(outputDeviceId);
+              console.log('[Phone] Output device set to:', outputDeviceId);
             } catch (e) {
-              console.warn('[Phone] Failed to set default speaker device:', e);
+              console.warn('[Phone] Failed to set output device:', e);
+              // Continue without setting output device - Twilio will use browser default
             }
           }
         }
@@ -547,10 +654,23 @@
           const callEndTime = Date.now();
           const duration = Math.floor((callEndTime - callStartTime) / 1000);
           
+          // IMMEDIATELY set cooldown and clear context to prevent auto-redial
+          const disconnectTime = Date.now();
+          lastCallCompleted = disconnectTime;
+          lastCalledNumber = number;
+          isCallInProgress = false;
+          
+          // Clear current call context IMMEDIATELY to prevent auto-callback
+          console.debug('[Phone] IMMEDIATE: Clearing call context after disconnect to prevent redial');
+          currentCallContext = {
+            number: '',
+            name: '',
+            isActive: false
+          };
+          
           // Update call with final status and duration using same call ID
           updateCallStatus(number, 'completed', callStartTime, duration, callId);
           currentCall = null;
-          isCallInProgress = false;
           setInCallUI(false);
           
           // Release the input device to avoid the red recording symbol
@@ -564,19 +684,8 @@
             }
           }
           
-          // Clear current call context to prevent auto-callback
-          console.debug('[Phone] Clearing call context after disconnect');
-          currentCallContext = {
-            number: '',
-            name: '',
-            isActive: false
-          };
-          
-          // Set cooldown timer to prevent immediate auto-callbacks
-          lastCallCompleted = Date.now();
-          lastCalledNumber = number;
-          
-          console.debug('[Phone] Call cleanup complete - cooldowns set');
+          console.debug('[Phone] Call cleanup complete - aggressive anti-redial protection active');
+          console.debug('[Phone] Cooldown set:', { lastCallCompleted: disconnectTime, lastCalledNumber: number });
         });
         
         currentCall.on('error', (error) => {
@@ -788,6 +897,13 @@
         lastCalledNumber = normalized.value;
         
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
+        
+        // Additional protection against auto-redial
+        // Clear the input to prevent accidental redial
+        if (input) {
+          input.value = '';
+        }
+        
         return;
       }
       try {
@@ -832,7 +948,7 @@
           } catch (e) {
             // Fallback to server-initiated PSTN flow
             console.warn('[Phone] Browser call failed, falling back to server call:', e?.message || e);
-            try { window.crm?.showToast && window.crm.showToast(`Browser call error (${e?.message || 'SDK error'}). Falling back...`); } catch(_) {}
+            try { window.crm?.showToast && window.crm.showToast(`Browser call failed. Falling back...`); } catch(_) {}
             try {
               await fallbackServerCall(normalized.value);
             } catch (e2) {
@@ -856,8 +972,7 @@
         try { window.crm?.showToast && window.crm.showToast(`Call error: ${generalError?.message || 'Unknown error'}`); } catch (_) {}
       }
     });
-    const backspaceBtn = card.querySelector('.backspace-btn');
-    if (backspaceBtn) backspaceBtn.addEventListener('click', backspace);
+    // Backspace button removed
     const clearBtn = card.querySelector('.clear-btn');
     if (clearBtn) clearBtn.addEventListener('click', clearAll);
 
@@ -1025,11 +1140,20 @@
       if (panel) panel.scrollTop = 0;
     } catch (_) { /* noop */ }
 
-    // Initialize microphone status without requesting permission yet
-    setTimeout(() => {
-      updateMicrophoneStatusUI(card, 'ready');
-      adjustHeightIfAnimating(card);
-    }, 100);
+    // Automatically request microphone permission on open.
+    // If permission was already granted before, checkMicrophonePermission will short-circuit.
+    setTimeout(async () => {
+      try {
+        updateMicrophoneStatusUI(card, 'checking');
+        const granted = await checkMicrophonePermission(card);
+        updateMicrophoneStatusUI(card, granted ? 'granted' : 'denied');
+      } catch (e) {
+        console.warn('[Phone] Mic permission on-open check failed:', e?.message || e);
+        updateMicrophoneStatusUI(card, 'error');
+      } finally {
+        adjustHeightIfAnimating(card);
+      }
+    }, 50);
 
     try { window.crm?.showToast && window.crm.showToast('Phone opened'); } catch (_) {}
   }
@@ -1086,6 +1210,13 @@
       return false; // Return early, don't even open the widget
     }
     
+    // EXTRA PROTECTION: Block auto-trigger if we just disconnected ANY call recently
+    if (autoTrigger && now - lastCallCompleted < 5000) {
+      console.error('[Phone] EXTRA PROTECTION: Blocking auto-trigger due to recent call disconnect');
+      console.error('[Phone] Time since last disconnect:', now - lastCallCompleted, 'ms');
+      autoTrigger = false; // Don't return false, just disable auto-trigger
+    }
+    
     // Additional safety: never auto-trigger if called within 2 seconds of previous call
     const timeSinceLastCall = now - (window.lastCallNumberTime || 0);
     if (autoTrigger && timeSinceLastCall < 2000) {
@@ -1106,49 +1237,43 @@
       openPhone();
     }
     
-    // Wait for widget to be ready, then populate number
-    setTimeout(() => {
-      const card = document.getElementById(WIDGET_ID);
-      if (card) {
-        const input = card.querySelector('.phone-display');
-        if (input) {
-          input.value = number;
-        }
-        
-        // Update widget header to show contact name
-        if (contactName) {
-          const title = card.querySelector('.widget-title');
-          if (title) {
-            title.innerHTML = `Phone - ${contactName}`;
-          }
-        }
-        
-        // Auto-trigger call only if explicitly requested and conditions are met
-        if (number && contactName && autoTrigger) {
-          const callBtn = card.querySelector('.call-btn-start');
-          if (callBtn && !isCallInProgress) {
-            // Final safety check before auto-triggering
-            const finalCheck = now - lastCallCompleted;
-            if (finalCheck < CALLBACK_COOLDOWN) {
-              console.error('[Phone] FINAL SAFETY BLOCK: Refusing auto-trigger due to recent call');
-              console.error('[Phone] Time since last call:', finalCheck, 'ms, required:', CALLBACK_COOLDOWN, 'ms');
-              return false;
-            }
-            
-            console.debug('[Phone] Auto-triggering call for:', contactName);
-            isCallInProgress = true; // Set flag before triggering
-            setTimeout(() => {
-              console.debug('[Phone] Executing auto-triggered call');
-              callBtn.click();
-            }, 100);
-          } else {
-            console.warn('[Phone] Auto-trigger blocked - call already in progress or button not found');
-          }
-        } else {
-          console.debug('[Phone] Not auto-triggering call - user must click Call button');
+    // Populate number immediately and optionally auto-trigger call within user gesture
+    const card = document.getElementById(WIDGET_ID);
+    if (card) {
+      const input = card.querySelector('.phone-display');
+      if (input) {
+        input.value = number;
+      }
+      // Update widget header to show contact name
+      if (contactName) {
+        const title = card.querySelector('.widget-title');
+        if (title) {
+          title.innerHTML = `Phone - ${contactName}`;
         }
       }
-    }, 50);
+      // Auto-trigger call only if explicitly requested and conditions are met
+      // Do NOT require contactName for auto-trigger (some contexts may not provide it)
+      if (number && autoTrigger) {
+        const callBtn = card.querySelector('.call-btn-start');
+        if (callBtn && !isCallInProgress) {
+          // Final safety check before auto-triggering
+          const finalCheck = now - lastCallCompleted;
+          if (finalCheck < CALLBACK_COOLDOWN) {
+            console.error('[Phone] FINAL SAFETY BLOCK: Refusing auto-trigger due to recent call');
+            console.error('[Phone] Time since last call:', finalCheck, 'ms, required:', CALLBACK_COOLDOWN, 'ms');
+            return false;
+          }
+          console.debug('[Phone] Auto-triggering call');
+          isCallInProgress = true; // Set flag before triggering
+          // Click immediately to preserve user gesture for mic permission
+          callBtn.click();
+        } else {
+          console.warn('[Phone] Auto-trigger blocked - call already in progress or button not found');
+        }
+      } else {
+        console.debug('[Phone] Not auto-triggering call - user must click Call button');
+      }
+    }
     
     return true;
   };

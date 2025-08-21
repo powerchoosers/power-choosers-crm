@@ -66,7 +66,8 @@
       
       // Use the phone widget to make the call (manual click, not auto-trigger)
       if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
-        window.Widgets.callNumber(cleanPhone, contactName, false); // false = manual click, don't auto-trigger
+        // One-click dialing: pass true to auto-trigger the call button
+        window.Widgets.callNumber(cleanPhone, contactName, true);
       } else {
         console.warn('Phone widget not available');
         // Fallback to tel: link
@@ -81,7 +82,7 @@
   }
 
   function findContactName(phoneElement) {
-    // Try to find the contact name from the table row
+    // Try to find the contact/account name from the table row
     const row = phoneElement.closest('tr');
     if (row) {
       const cells = row.querySelectorAll('td');
@@ -94,7 +95,25 @@
         }
       }
     }
-    
+
+    // Contact detail view header name
+    try {
+      if (document.getElementById('contact-detail-view') && document.getElementById('contact-detail-header')) {
+        const n = document.getElementById('contact-name');
+        const txt = (n && n.textContent || '').trim();
+        if (txt) return txt;
+      }
+    } catch (_) { /* noop */ }
+
+    // Account detail view header name
+    try {
+      if (document.getElementById('account-detail-view') && document.getElementById('account-detail-header')) {
+        const n = document.querySelector('#account-detail-header .page-title.contact-page-title');
+        const txt = (n && n.textContent || '').trim();
+        if (txt) return txt;
+      }
+    } catch (_) { /* noop */ }
+
     return '';
   }
 
@@ -177,7 +196,12 @@
       '.phone-cell',
       '.contact-phone',
       '.phone-number',
-      '.phone-value'
+      '.phone-value',
+      // Contact detail view phone fields
+      '#contact-detail-view .info-row[data-field="phone"] .info-value-text',
+      '#contact-detail-view .info-row[data-field="mobile"] .info-value-text',
+      // Account detail view phone field
+      '#account-detail-view .info-value-wrap[data-field="phone"] .info-value-text'
     ];
     
     specificSelectors.forEach(selector => {

@@ -312,4 +312,4 @@ How to add a new page (e.g., Contact Details or Lists variant):
 Notes for Lists page duplication:
 
 - Keep `.page-title` and `.page-actions` consistent with other pages.
-- Use `window.ListsView.open({ id, name, kind })` to enter list detail. Header actions like `#add-contact-btn` are shown only in detail mode for People lists.
+- Use `window.ListsView.open({ id, name, kind })` to enter list detail. Header actions like `#add-contact-btn` are shown only in detail mode for People lists.co

@@ -3830,7 +3830,7 @@ html, body {
 
 .dial-actions { padding-bottom: 4px; }
 .dial-actions .call-btn-start {
-  min-width: 120px;
+  min-width: 200px;
 }
 
 /* Notes widget structure */
@@ -4535,6 +4535,14 @@ html, body {
     letter-spacing: 0.5px;
 }
 
+/* Account header favicon (fallback to initials avatar if image fails) */
+.contact-header-profile .avatar-favicon {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px; /* subtle rounding suits square favicons */
+    display: block;
+}
+
 .contact-header-text {
     display: flex;
     flex-direction: column;
@@ -4743,24 +4751,29 @@ margin-bottom: var(--spacing-md);
 }
 
 /* Account Detail: links inside info values */
-#account-detail-view .info-value a {
+#account-detail-view .info-value a,
+#account-detail-view .info-value-wrap a {
     color: var(--text-primary);
     text-decoration: none;
     outline: none;
     transition: color var(--transition-fast), text-decoration-color var(--transition-fast), text-underline-offset var(--transition-fast), text-decoration-thickness var(--transition-fast), text-shadow var(--transition-fast);
 }
-#account-detail-view .info-value a:visited {
+#account-detail-view .info-value a:visited,
+#account-detail-view .info-value-wrap a:visited {
     color: var(--text-primary); /* avoid default visited purple */
 }
-#account-detail-view .info-value a:hover {
+#account-detail-view .info-value a:hover,
+#account-detail-view .info-value-wrap a:hover {
     color: var(--text-inverse);
     text-decoration: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 3px;
     text-shadow: 0 0 6px rgba(255, 255, 255, 0.25);
 }
-#account-detail-view .info-value a:focus { outline: none; }
-#account-detail-view .info-value a:focus-visible {
+#account-detail-view .info-value a:focus,
+#account-detail-view .info-value-wrap a:focus { outline: none; }
+#account-detail-view .info-value a:focus-visible,
+#account-detail-view .info-value-wrap a:focus-visible {
     color: var(--text-inverse);
     text-decoration: underline;
     text-decoration-thickness: 2px;
@@ -4785,9 +4798,11 @@ margin-bottom: var(--spacing-md);
 .info-value-text {
     cursor: pointer; /* click-to-copy */
 }
-/* Contact detail: keep long values (like email) on one line with ellipsis */
 #contact-detail-view .info-value-wrap { max-width: 100%; display: flex; width: 100%; padding-right: 0; align-items: center; min-height: 24px; }
-#contact-detail-view .info-value .info-value-text {
+#account-detail-view .info-value-wrap { max-width: 100%; display: flex; width: 100%; padding-right: 0; align-items: center; min-height: 24px; }
+#contact-detail-view .info-value .info-value-text,
+#account-detail-view .info-value .info-value-text,
+#account-detail-view .info-value-wrap .info-value-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4797,8 +4812,34 @@ margin-bottom: var(--spacing-md);
 }
 /* Keep consistent line height to avoid vertical jump on hover */
 #contact-detail-view .info-value { line-height: 24px; }
-/* In contact detail, show actions to the right without overlapping text */
-#contact-detail-view .info-actions {
+#account-detail-view .info-value-wrap { line-height: 24px; }
+/* Keep edit input and Save/Cancel on the same line for account details */
+#account-detail-view .info-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    min-width: 0; /* allow children to shrink inside grid cell */
+}
+#account-detail-view .info-input-wrap .info-edit-input {
+    width: auto; /* override global width:100% to keep actions inline */
+    flex: 1 1 0%; /* allow input to shrink so actions never wrap */
+    min-width: 0;
+}
+#account-detail-view .info-input-wrap .info-actions {
+    display: inline-flex;
+    margin-left: 6px;
+    flex: 0 0 auto; /* prevent wrapping */
+    white-space: nowrap;
+}
+#account-detail-view .info-value-wrap.editing .info-actions {
+    display: inline-flex; /* ensure visible while editing */
+}
+/* In contact and account detail, show actions to the right without overlapping text */
+#contact-detail-view .info-actions,
+#account-detail-view .info-actions {
     position: static;
     right: auto;
     top: auto;
@@ -4807,8 +4848,40 @@ margin-bottom: var(--spacing-md);
     display: none; /* do not reserve space until hover */
 }
 #contact-detail-view .info-value-wrap:hover .info-actions,
-#contact-detail-view .info-value-wrap:focus-within .info-actions {
+#contact-detail-view .info-value-wrap:focus-within .info-actions,
+#account-detail-view .info-value-wrap:hover .info-actions,
+#account-detail-view .info-value-wrap:focus-within .info-actions {
     display: inline-flex;
+}
+
+/* Keep account detail grid stable to avoid vertical reflow when side panel toggles */
+#account-detail-view .info-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  #account-detail-view .info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  #account-detail-view .info-grid { grid-template-columns: 1fr; }
+}
+/* Full-width row (e.g., Short Description) */
+#account-detail-view .info-row--full { grid-column: 1 / -1; }
+/* Multiline value display */
+#account-detail-view .info-value-wrap--multiline { align-items: flex-start; }
+#account-detail-view .info-value-text--multiline {
+  white-space: pre-wrap; /* preserve newlines */
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+  line-height: 1.4;
+}
+/* Multiline edit layout */
+#account-detail-view .info-input-wrap--multiline { display: flex; align-items: flex-start; gap: 6px; width: 100%; }
+#account-detail-view .info-input-wrap--multiline .info-edit-textarea { flex: 1 1 auto; min-height: 96px; }
+#account-detail-view .info-input-wrap--multiline .info-actions {
+  position: static; /* override absolute */
+  transform: none;
+  top: auto; right: auto;
+  margin-top: 0;
+  flex: 0 0 auto;
 }
 .info-actions {
     position: absolute;
@@ -4856,10 +4929,14 @@ margin-bottom: var(--spacing-md);
     width: 100%;
     max-width: 100%;
     border: 1px solid var(--border-medium);
-    background: var(--bg-input, #171717);
+    background: var(--bg-item);
     color: var(--text-primary);
     border-radius: var(--border-radius);
-    padding: 6px 8px;
+    /* Keep input the same visual height as static row (24px) */
+    box-sizing: border-box;
+    height: 24px;
+    line-height: 24px;
+    padding: 0 8px;
     outline: none;
 }
 .info-edit-input:focus {
@@ -5582,4 +5659,585 @@ input.row-select[type="checkbox"]:focus-visible {
 input.contact-name-input.input-dark:focus {
   outline: none;
   box-shadow: 0 0 0 2px var(--orange-muted);
+}
+
+/* === CSV IMPORT MODAL STYLES === */
+
+/* Larger modal dialog for CSV import */
+.csv-import-modal {
+    max-width: 800px;
+    width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+}
+
+/* Step indicator */
+.csv-steps-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-base);
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-card);
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.csv-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    opacity: 0.5;
+    transition: opacity var(--transition-smooth);
+}
+
+.csv-step.active {
+    opacity: 1;
+}
+
+.csv-step.completed {
+    opacity: 0.8;
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-item);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border: 2px solid var(--border-light);
+    transition: all var(--transition-smooth);
+}
+
+.csv-step.active .step-number {
+    background: var(--orange-subtle);
+    color: white;
+    border-color: var(--orange-subtle);
+}
+
+.csv-step.completed .step-number {
+    background: var(--green-subtle);
+    color: white;
+    border-color: var(--green-subtle);
+}
+
+.step-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.csv-step.active .step-label {
+    color: var(--text-primary);
+}
+
+/* Step content containers */
+.csv-step-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.csv-step-content[hidden] {
+    display: none;
+}
+
+/* Upload section */
+.csv-upload-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-base);
+}
+
+.upload-type-selector h4 {
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.type-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-base);
+}
+
+.type-option {
+    display: block;
+    cursor: pointer;
+    border: 2px solid var(--border-light);
+    border-radius: var(--border-radius);
+    background: var(--bg-item);
+    transition: all var(--transition-fast);
+    position: relative;
+}
+
+.type-option:hover {
+    border-color: var(--orange-subtle);
+    box-shadow: var(--shadow-sm);
+}
+
+.type-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.type-option input[type="radio"]:checked + .option-content {
+    border-color: var(--orange-subtle);
+}
+
+.type-option:has(input[type="radio"]:checked) {
+    border-color: var(--orange-subtle);
+    background: var(--orange-muted);
+}
+
+.option-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+}
+
+.option-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.option-text {
+    flex: 1;
+}
+
+.option-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.option-desc {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+/* Drop zone */
+.csv-drop-zone {
+    border: 2px dashed var(--border-medium);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    text-align: center;
+    background: var(--bg-item);
+    transition: all var(--transition-fast);
+    position: relative;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.csv-drop-zone.dragover {
+    border-color: var(--orange-subtle);
+    background: var(--orange-muted);
+    transform: scale(1.02);
+}
+
+.drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.upload-icon {
+    font-size: 3rem;
+    opacity: 0.5;
+}
+
+.upload-text h4 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--text-primary);
+    font-size: 1.125rem;
+}
+
+.upload-text p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--orange-subtle);
+    cursor: pointer;
+    text-decoration: underline;
+    font: inherit;
+    padding: 0;
+}
+
+.btn-link:hover {
+    color: var(--orange-subtle);
+    text-decoration: none;
+}
+
+.file-requirements {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+/* File info display */
+.csv-file-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    gap: var(--spacing-md);
+}
+
+.file-details {
+    flex: 1;
+}
+
+.file-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.file-stats {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+/* Field mapping section */
+.csv-mapping-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-base);
+}
+
+.mapping-header h4 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.mapping-header p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.csv-preview h5,
+.field-mapping h5,
+.review-data h5 {
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.preview-table {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    overflow: auto;
+    max-height: 200px;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+.preview-table table {
+    min-width: 100%;
+    width: max-content;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.preview-table th,
+.preview-table td {
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-light);
+    border-right: 1px solid var(--border-light);
+    white-space: nowrap;
+    min-width: 100px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-table th {
+    background: var(--bg-card);
+    font-weight: 600;
+    color: var(--text-primary);
+    height: 28px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    font-size: 0.85rem;
+}
+
+.preview-table td {
+    color: var(--text-secondary);
+    height: 24px;
+    vertical-align: middle;
+    font-size: 0.8rem;
+}
+
+.preview-table th:last-child,
+.preview-table td:last-child {
+    border-right: none;
+}
+
+/* Field mapping list */
+.mapping-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    max-height: 300px;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.mapping-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.8rem;
+    min-height: 28px;
+    max-height: 32px;
+}
+
+.mapping-source {
+    flex: 1;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.mapping-arrow {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.mapping-target {
+    flex: 1;
+}
+
+.mapping-target select {
+    width: 100%;
+    background: var(--bg-card);
+    border: none;
+    color: var(--text-primary);
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    height: 22px;
+    font-size: 0.8rem;
+}
+
+.mapping-target select:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
+}
+
+/* Mapping options */
+.mapping-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin: 0;
+    accent-color: var(--orange-subtle);
+}
+
+/* Review section */
+.csv-review-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-base);
+}
+
+.review-header h4 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.review-header p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.review-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.summary-item {
+    text-align: center;
+}
+
+.summary-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--orange-subtle);
+    margin-bottom: 4px;
+}
+
+.summary-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Progress bar */
+.import-progress {
+    padding: var(--spacing-md);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.progress-header h5 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.progress-stats {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-card);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--orange-subtle), var(--green-subtle));
+    width: 0%;
+    transition: width var(--transition-smooth);
+    border-radius: 4px;
+}
+
+/* Import results */
+.import-results {
+    padding: var(--spacing-md);
+    background: var(--green-muted);
+    border: 1px solid var(--green-subtle);
+    border-radius: var(--border-radius);
+}
+
+.results-summary {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Modal body scrolling for long content */
+.csv-import-modal .pc-modal__body {
+    max-height: calc(80vh - 200px);
+    overflow-y: auto;
+}
+
+/* Focus styles for accessibility */
+.csv-import-modal input:focus,
+.csv-import-modal select:focus,
+.csv-import-modal button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .csv-import-modal {
+        max-width: calc(100vw - 16px);
+        margin: 8px;
+    }
+    
+    .type-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .csv-steps-indicator {
+        gap: var(--spacing-md);
+        padding: var(--spacing-md);
+    }
+    
+    .step-number {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+    }
+    
+    .step-label {
+        font-size: 0.75rem;
+    }
+    
+    .mapping-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+    }
+    
+    .mapping-arrow {
+        text-align: center;
+        transform: rotate(90deg);
+    }
 }
