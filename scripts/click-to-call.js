@@ -64,10 +64,13 @@
       e.preventDefault();
       e.stopPropagation();
       
-      // Use the phone widget to make the call (manual click, not auto-trigger)
+      // Use the phone widget to make the call
       if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
-        // One-click dialing: pass true to auto-trigger the call button
-        window.Widgets.callNumber(cleanPhone, contactName, true);
+        // Mark the exact time of the user click to prove a fresh gesture
+        try { window.Widgets._lastClickToCallAt = Date.now(); } catch(_) {}
+        // Always auto-trigger for click-to-call, but mark it as a user-initiated click
+        console.debug('[ClickToCall] User clicked phone number - auto-triggering call');
+        window.Widgets.callNumber(cleanPhone, contactName, true, 'click-to-call');
       } else {
         console.warn('Phone widget not available');
         // Fallback to tel: link
@@ -207,6 +210,11 @@
     specificSelectors.forEach(selector => {
       document.querySelectorAll(selector).forEach(element => {
         if (element.classList.contains('clickable-phone')) return;
+        
+        // Skip phone widget input field to prevent interference
+        if (element.closest('#phone-widget') || element.classList.contains('phone-display')) {
+          return;
+        }
         
         const text = element.textContent.trim();
         if (isValidPhoneNumber(text)) {

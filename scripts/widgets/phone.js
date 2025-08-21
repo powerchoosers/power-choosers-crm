@@ -145,46 +145,75 @@
           console.debug('[TwilioRTC] Incoming call:', conn);
           state.connection = conn;
           
-          // Set input device before accepting the call according to Twilio best practices
+          // Set input/output devices before accepting the call
           if (state.device.audio) {
             try {
-              // Get available input devices and use the first one if 'default' doesn't exist
               const inputDevices = state.device.audio.availableInputDevices;
               let inputDeviceId = 'default';
-              
               if (inputDevices && inputDevices.size > 0) {
                 const deviceIds = Array.from(inputDevices.keys());
                 if (!deviceIds.includes('default') && deviceIds.length > 0) {
                   inputDeviceId = deviceIds[0];
                 }
               }
-              
               await state.device.audio.setInputDevice(inputDeviceId);
             } catch (e) {
               console.warn('[TwilioRTC] Failed to set input device for incoming call:', e);
             }
-            
-            // Set speaker device for output according to Twilio best practices
             if (state.device.audio.isOutputSelectionSupported) {
               try {
                 const outputDevices = state.device.audio.availableOutputDevices;
                 let outputDeviceId = 'default';
-                
                 if (outputDevices && outputDevices.size > 0) {
                   const deviceIds = Array.from(outputDevices.keys());
                   if (!deviceIds.includes('default') && deviceIds.length > 0) {
                     outputDeviceId = deviceIds[0];
                   }
                 }
-                
                 state.device.audio.speakerDevices.set(outputDeviceId);
               } catch (e) {
                 console.warn('[TwilioRTC] Failed to set output device for incoming call:', e);
               }
             }
           }
-          
-          // Handle incoming calls if needed
+
+          try {
+            console.debug('[TwilioRTC] Accepting incoming call');
+            conn.accept();
+            isCallInProgress = true;
+            currentCallContext = { number: conn.parameters?.From || '', name: '', isActive: true };
+            setInCallUI(true);
+
+            const callStartTime = Date.now();
+            const number = conn.parameters?.From || '';
+            const callId = `call_${callStartTime}_${(number || '').replace(/\D/g, '')}`;
+            updateCallStatus(number, 'connected', callStartTime, 0, callId);
+
+            conn.on('disconnect', async () => {
+              console.debug('[TwilioRTC] Incoming call disconnected');
+              const callEndTime = Date.now();
+              const duration = Math.floor((callEndTime - callStartTime) / 1000);
+              lastCallCompleted = callEndTime;
+              lastCalledNumber = number;
+              isCallInProgress = false;
+              currentCallContext = { number: '', name: '', isActive: false };
+              setInCallUI(false);
+              if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
+                try { await TwilioRTC.state.device.audio.unsetInputDevice(); } catch (_) {}
+              }
+              updateCallStatus(number, 'completed', callStartTime, duration, callId);
+            });
+
+            conn.on('error', (error) => {
+              console.error('[TwilioRTC] Incoming call error:', error);
+              isCallInProgress = false;
+              currentCallContext = { number: '', name: '', isActive: false };
+              setInCallUI(false);
+              lastCallCompleted = Date.now();
+            });
+          } catch (e) {
+            console.error('[TwilioRTC] Failed to accept incoming call:', e);
+          }
         });
 
         // Register the device
@@ -531,6 +560,13 @@
       try { input.focus(); } catch (_) {}
     };
 
+    const backspace = () => {
+      if (!input) return;
+      const current = input.value || '';
+      input.value = current.slice(0, -1);
+      try { input.focus(); } catch (_) {}
+    };
+
     // Handle paste on input only and keep only allowed characters
     const onPaste = (e) => {
       if (!input) return;
@@ -550,13 +586,25 @@
     };
     if (input) input.addEventListener('paste', onPaste);
 
+    // Track user input activity
+    const trackUserInput = () => {
+      lastUserTypingTime = Date.now();
+    };
+    
     // Dialpad clicks
     card.querySelectorAll('.dial-key').forEach(btn => {
       btn.addEventListener('click', () => {
         const k = btn.getAttribute('data-key') || '';
         appendChar(k);
+        trackUserInput();
       });
     });
+    
+    // Track typing in input field
+    if (input) {
+      input.addEventListener('input', trackUserInput);
+      input.addEventListener('keydown', trackUserInput);
+    }
 
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
@@ -1165,62 +1213,100 @@
   const CALLBACK_COOLDOWN = 8000; // 8 seconds cooldown
   const SAME_NUMBER_COOLDOWN = 15000; // 15 seconds for same number
   
+  // Track user typing activity in phone widget
+  let lastUserTypingTime = 0;
+  const USER_TYPING_COOLDOWN = 2000; // 2 seconds after user stops typing
+  
   // Global call function for CRM integration
-  window.Widgets.callNumber = function(number, contactName = '', autoTrigger = true) {
+  window.Widgets.callNumber = function(number, contactName = '', autoTrigger = true, source = 'unknown') {
     // Add stack trace to debug who's calling this function
     const stack = new Error().stack;
     console.debug('[Phone] ═══ CALLNUMBER INVOKED ═══');
-    console.debug('[Phone] Parameters:', { number, contactName, autoTrigger, isCallInProgress });
+    console.debug('[Phone] Parameters:', { number, contactName, autoTrigger, source, isCallInProgress });
     console.debug('[Phone] Current call context:', currentCallContext);
     console.debug('[Phone] Cooldowns:', { lastCallCompleted: new Date(lastCallCompleted || 0), lastCalledNumber });
     console.debug('[Phone] Call stack:', stack?.split('\n').slice(0, 8).join('\n')); // More stack trace
     
     const now = Date.now();
     
-    // Block ALL auto-triggers if a call is currently in progress
-    if (isCallInProgress) {
-      console.warn('[Phone] BLOCKED: Call already in progress');
+    // Allow click-to-call to bypass most restrictions (user-initiated action)
+    const isClickToCall = (source === 'click-to-call');
+
+    // If this is click-to-call, require a very fresh user gesture timestamp
+    if (isClickToCall) {
+      const lastClick = (window.Widgets && window.Widgets._lastClickToCallAt) || 0;
+      if (!lastClick || (now - lastClick) > 1500) {
+        console.warn('[Phone] Stale or missing click gesture - disabling autoTrigger for click-to-call');
+        autoTrigger = false;
+      }
+    }
+    
+    // Block ALL auto-triggers if a call is currently in progress (except click-to-call)
+    if (isCallInProgress && !isClickToCall) {
+      console.warn('[Phone] BLOCKED: Call already in progress (non-click-to-call)');
       autoTrigger = false;
     }
     
-    // Aggressive cooldown check - if we just completed a call, block ALL auto-triggers
-    if (now - lastCallCompleted < CALLBACK_COOLDOWN) {
-      console.warn('[Phone] BLOCKED: Auto-call blocked due to recent call completion cooldown');
+    // Aggressive cooldown check - if we just completed a call, block auto-triggers (but allow click-to-call)
+    if (now - lastCallCompleted < CALLBACK_COOLDOWN && !isClickToCall) {
+      console.warn('[Phone] BLOCKED: Auto-call blocked due to recent call completion cooldown (non-click-to-call)');
       console.warn('[Phone] Time since last call:', now - lastCallCompleted, 'ms, cooldown:', CALLBACK_COOLDOWN, 'ms');
       autoTrigger = false;
     }
     
-    // Extra protection for the same number
-    if (lastCalledNumber === number && now - lastCallCompleted < SAME_NUMBER_COOLDOWN) {
-      console.warn('[Phone] BLOCKED: Same number called too recently');
+    // Extra protection for the same number (but allow click-to-call after shorter cooldown)
+    const sameNumberCooldown = isClickToCall ? 3000 : SAME_NUMBER_COOLDOWN; // 3s for clicks, 15s for auto
+    if (lastCalledNumber === number && now - lastCallCompleted < sameNumberCooldown) {
+      if (isClickToCall) {
+        console.warn('[Phone] BLOCKED: Same number clicked too recently (3s cooldown for clicks)');
+      } else {
+        console.warn('[Phone] BLOCKED: Same number called too recently (15s cooldown for auto)');
+      }
       console.warn('[Phone] Last called number:', lastCalledNumber, 'Current number:', number);
       autoTrigger = false;
     }
     
-    // Don't auto-trigger if the same number/contact is already in context
-    if (currentCallContext.number === number && currentCallContext.name === contactName && currentCallContext.isActive) {
-      console.warn('[Phone] BLOCKED: Same number/contact already active in context');
+    // Don't auto-trigger if the same number/contact is already in context (but allow click-to-call)
+    if (currentCallContext.number === number && currentCallContext.name === contactName && currentCallContext.isActive && !isClickToCall) {
+      console.warn('[Phone] BLOCKED: Same number/contact already active in context (non-click-to-call)');
       autoTrigger = false;
     }
     
-    // ABSOLUTE BLOCK: If the exact same number/contact was just called with autoTrigger
-    if (autoTrigger && lastCalledNumber === number && now - lastCallCompleted < 30000) {
+    // Extra protection: Don't auto-trigger if user has manually entered a different number (but allow click-to-call)
+    const widget = document.getElementById(WIDGET_ID);
+    if (widget && autoTrigger && !isClickToCall) {
+      const input = widget.querySelector('.phone-display');
+      if (input && input.value && input.value.trim() !== '' && input.value.replace(/\D/g, '') !== number.replace(/\D/g, '')) {
+        console.warn('[Phone] BLOCKED: User has manually entered a different number:', input.value, 'vs', number);
+        autoTrigger = false;
+      }
+    }
+    
+    // ABSOLUTE BLOCK: Only applies to non-click-to-call to prevent loops
+    if (!isClickToCall && autoTrigger && lastCalledNumber === number && now - lastCallCompleted < 30000) {
       console.error('[Phone] ABSOLUTE BLOCK: Preventing potential callback loop for number:', number);
       console.error('[Phone] Time since last call to this number:', now - lastCallCompleted, 'ms');
       return false; // Return early, don't even open the widget
     }
     
-    // EXTRA PROTECTION: Block auto-trigger if we just disconnected ANY call recently
-    if (autoTrigger && now - lastCallCompleted < 5000) {
-      console.error('[Phone] EXTRA PROTECTION: Blocking auto-trigger due to recent call disconnect');
+    // EXTRA PROTECTION: Block auto-trigger if we just disconnected ANY call recently (but allow click-to-call)
+    if (autoTrigger && now - lastCallCompleted < 5000 && !isClickToCall) {
+      console.error('[Phone] EXTRA PROTECTION: Blocking auto-trigger due to recent call disconnect (non-click-to-call)');
       console.error('[Phone] Time since last disconnect:', now - lastCallCompleted, 'ms');
       autoTrigger = false; // Don't return false, just disable auto-trigger
     }
     
-    // Additional safety: never auto-trigger if called within 2 seconds of previous call
+    // CRITICAL: Block auto-trigger if user has been actively typing recently (but allow click-to-call)
+    if (autoTrigger && now - lastUserTypingTime < USER_TYPING_COOLDOWN && !isClickToCall) {
+      console.error('[Phone] BLOCKED: User has been typing recently - preventing auto-trigger (non-click-to-call)');
+      console.error('[Phone] Time since last typing:', now - lastUserTypingTime, 'ms, cooldown:', USER_TYPING_COOLDOWN, 'ms');
+      autoTrigger = false;
+    }
+    
+    // Additional safety: never auto-trigger if called within 2 seconds of previous call (but allow click-to-call)
     const timeSinceLastCall = now - (window.lastCallNumberTime || 0);
-    if (autoTrigger && timeSinceLastCall < 2000) {
-      console.warn('[Phone] BLOCKED: Called too quickly after previous callNumber call');
+    if (autoTrigger && timeSinceLastCall < 2000 && !isClickToCall) {
+      console.warn('[Phone] BLOCKED: Called too quickly after previous callNumber call (non-click-to-call)');
       autoTrigger = false;
     }
     window.lastCallNumberTime = now;
@@ -1256,10 +1342,10 @@
       if (number && autoTrigger) {
         const callBtn = card.querySelector('.call-btn-start');
         if (callBtn && !isCallInProgress) {
-          // Final safety check before auto-triggering
+          // Final safety check before auto-triggering for non-click-to-call only
           const finalCheck = now - lastCallCompleted;
-          if (finalCheck < CALLBACK_COOLDOWN) {
-            console.error('[Phone] FINAL SAFETY BLOCK: Refusing auto-trigger due to recent call');
+          if (!isClickToCall && finalCheck < CALLBACK_COOLDOWN) {
+            console.error('[Phone] FINAL SAFETY BLOCK: Refusing auto-trigger due to recent call (non-click-to-call)');
             console.error('[Phone] Time since last call:', finalCheck, 'ms, required:', CALLBACK_COOLDOWN, 'ms');
             return false;
           }

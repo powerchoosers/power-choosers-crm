@@ -10,45 +10,61 @@ export default function handler(req, res) {
     try {
         // Read params from body (POST) or query (GET)
         const src = req.method === 'POST' ? (req.body || {}) : (req.query || {});
-        const To = src.To || src.to;
-        const From = src.From || src.from;
+        const To = src.To || src.to; // For inbound, this is typically your Twilio number
+        const From = src.From || src.from; // For inbound, this is the caller's number
         const CallSid = src.CallSid || src.callSid;
         
-        console.log(`[Voice Webhook] Outbound call to ${To} from ${From || 'N/A'}, CallSid: ${CallSid || 'N/A'} (method: ${req.method})`);
-        
         // Your business phone number for caller ID
-        const callerId = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
+        const businessNumber = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
         
         // Ensure absolute base URL for Twilio callbacks
         const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
 
+        const digits = (s) => (s || '').toString().replace(/\D/g, '');
+        const toDigits = digits(To);
+        const businessDigits = digits(businessNumber);
+
+        const isInboundToBusiness = toDigits && businessDigits && toDigits === businessDigits;
+        console.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness}`);
+
         // Create TwiML response
         const twiml = new VoiceResponse();
-        
-        // Dial the target number with your business number as caller ID
-        const dial = twiml.dial({
-            callerId: callerId,
-            timeout: 30,
-            // Anti-spam configurations
-            answerOnBridge: true,
-            hangupOnStar: false,
-            timeLimit: 14400, // 4 hours max call duration
-            // Recording disabled temporarily to fix voice transmission issue
-            // record: 'record-from-answer-dual',  // Use this instead if you need recording
-            // recordingStatusCallback: `${base}/api/twilio/recording`,
-            // recordingStatusCallbackEvent: 'completed',
-            // Add action URL to track call completion
-            action: `${base}/api/twilio/status`
-        });
-        
-        if (To) {
+
+        if (isInboundToBusiness) {
+            // INBOUND CALL: Ring the browser client (identity: agent)
+            // Requires client token with incomingAllow: true and a connected browser
+            const dial = twiml.dial({
+                callerId: businessNumber,
+                timeout: 30,
+                answerOnBridge: true,
+                hangupOnStar: false,
+                timeLimit: 14400,
+                action: `${base}/api/twilio/status`
+            });
+            dial.client('agent');
+            console.log('[Voice] Generated TwiML to dial <Client>agent</Client>');
+        } else if (To) {
+            // OUTBOUND CALLBACK SCENARIO: Dial specific number provided
+            const dial = twiml.dial({
+                callerId: businessNumber,
+                timeout: 30,
+                answerOnBridge: true,
+                hangupOnStar: false,
+                timeLimit: 14400,
+                action: `${base}/api/twilio/status`
+            });
             dial.number(To);
+            console.log(`[Voice] Generated TwiML to dial number: ${To}`);
         } else {
-            // If no To provided, respond with a helpful message to avoid 31000
-            twiml.say('Missing destination number.');
+            // Fallback: no specific target
+            twiml.say('Please hold while we try to connect you.');
+            const dial = twiml.dial({
+                callerId: businessNumber,
+                timeout: 30,
+                answerOnBridge: true
+            });
+            dial.client('agent');
         }
-        
-        console.log(`[Voice] TwiML generated for call to ${To}`);
         
         // Send TwiML response
         res.setHeader('Content-Type', 'text/xml');
