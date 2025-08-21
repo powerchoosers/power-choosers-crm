@@ -33,6 +33,19 @@
     --yellow-subtle: #ffc107;
     --yellow-muted: rgba(255, 193, 7, 0.15);
     
+    /* Additional color mappings for search components */
+    --color-text-primary: var(--text-primary);
+    --color-text-secondary: var(--text-secondary);
+    --color-text-tertiary: var(--text-muted);
+    --color-bg-primary: var(--bg-main);
+    --color-bg-secondary: var(--bg-card);
+    --color-bg-hover: var(--bg-hover);
+    --color-primary: var(--orange-subtle);
+    --color-border: var(--border-light);
+    --color-border-light: var(--border-light);
+    --color-border-strong: var(--border-medium);
+    --color-success: var(--green-subtle);
+    
     /* Background Colors - Two-tone system */
     --bg-main: var(--grey-780);   /* Main content slightly lighter than before */
     --bg-widget: var(--grey-800); /* Widget panel background (slightly darker) */
@@ -4124,15 +4137,21 @@ html, body {
 .search-result-item {
     padding: 12px 20px;
     border-bottom: 1px solid var(--color-border-light);
-    cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition: all 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
-.search-result-item:hover {
+.search-result-item.clickable {
+    cursor: pointer;
+}
+
+.search-result-item:hover,
+.search-result-item.clickable:hover {
     background: var(--color-bg-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .search-result-item:last-child {
@@ -4165,9 +4184,9 @@ html, body {
 
 .result-actions {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     margin-left: 12px;
-    opacity: 0;
+    opacity: 1;
     transition: opacity 0.15s ease;
 }
 
@@ -4179,18 +4198,40 @@ html, body {
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: 4px;
-    padding: 4px 8px;
+    padding: 6px;
     font-size: 11px;
     color: var(--color-text-secondary);
     cursor: pointer;
     transition: all 0.15s ease;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    min-height: 28px;
+}
+
+.result-action-btn.icon-btn {
+    padding: 4px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-primary);
 }
 
 .result-action-btn:hover {
     background: var(--color-primary);
     color: white;
     border-color: var(--color-primary);
+    transform: translateY(-1px);
+}
+
+.result-action-btn.icon-btn svg {
+    color: var(--color-text-secondary);
+    transition: color 0.15s ease;
+    stroke-width: 2;
+}
+
+.result-action-btn.icon-btn:hover svg {
+    color: white;
 }
 
 .search-empty {

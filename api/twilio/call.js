@@ -30,15 +30,19 @@ const handler = async function handler(req, res) {
         
         const client = twilio(accountSid, authToken);
         
-        // Create a conference-style call that connects agent phone to target
-        // This will call your phone first, then connect to the target
+        // Improved call bridging approach
+        // This will call your phone first, then connect to the target with proper audio handling
         const call = await client.calls.create({
             from: twilioPhone,
             to: agentPhone, // Call your phone first
             url: `${req.headers.host ? `https://${req.headers.host}` : 'https://power-choosers-crm.vercel.app'}/api/twilio/bridge?target=${encodeURIComponent(to)}`,
             method: 'POST',
             statusCallback: `${req.headers.host ? `https://${req.headers.host}` : 'https://power-choosers-crm.vercel.app'}/api/twilio/status`,
-            statusCallbackMethod: 'POST'
+            statusCallbackMethod: 'POST',
+            // Add timeout to prevent hanging calls
+            timeout: 30,
+            // Ensure proper call handling
+            machineDetection: 'Enable'
         });
         
         console.log(`[Call API] Call initiated: ${call.sid}`);

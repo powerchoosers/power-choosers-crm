@@ -1117,10 +1117,19 @@
     <script>
       (function(){
         try {
-          // Always use the deployed API for consistency across local and production
-          const vercelUrl = 'https://power-choosers-crm.vercel.app';
-          window.API_BASE_URL = vercelUrl;
-          console.log('API_BASE_URL:', window.API_BASE_URL);
+          // Detect if running locally
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          
+          if (isLocal) {
+            // Use local server for API calls when running locally
+            window.API_BASE_URL = window.location.origin;
+            console.log('API_BASE_URL (Local server):', window.API_BASE_URL);
+          } else {
+            // Use Vercel deployment for Twilio serverless functions when deployed
+            const vercelUrl = 'https://power-choosers-crm.vercel.app';
+            window.API_BASE_URL = vercelUrl;
+            console.log('API_BASE_URL (Vercel backend):', window.API_BASE_URL);
+          }
         } catch (e) {
           console.warn('API_BASE_URL init error:', e);
         }

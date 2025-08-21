@@ -462,6 +462,8 @@ class PowerChoosersCRM {
         let tooltipEl = null;
         let anchorEl = null;
         let hideTimer = null;
+        // Track input modality to avoid showing tooltips on mouse-initiated focus/clicks
+        let lastFocusByKeyboard = false;
 
         const createTooltip = () => {
             if (tooltipEl) return tooltipEl;
@@ -539,6 +541,11 @@ class PowerChoosersCRM {
         };
 
         const handleEnter = (e) => {
+            // Do not show tooltips while a popover/dialog like the Add-to-List panel is open
+            if (document.getElementById('contact-lists-panel')) return;
+            // Only show on mouse hover, or keyboard-initiated focus. Ignore mouse/touch focus.
+            const isFocus = e.type === 'focusin';
+            if (isFocus && !lastFocusByKeyboard) return;
             const t = e && e.target ? (e.target.nodeType === 1 ? e.target : e.target.parentElement) : null;
             const el = t && (t.closest('[title]') || t.closest('[data-pc-title]'));
             if (!el) return;
@@ -552,6 +559,24 @@ class PowerChoosersCRM {
             if (!el) return;
             hideTimer = setTimeout(hideTooltip, 60);
         };
+
+        // Input-modality tracking and suppression on clicks
+        const onKeyForModality = (e) => {
+            // Consider Tab/Arrow navigation as keyboard-driven focus
+            const k = e.key || '';
+            if (k === 'Tab' || k.startsWith('Arrow')) {
+                lastFocusByKeyboard = true;
+            }
+        };
+        const onPointerStart = () => {
+            lastFocusByKeyboard = false;
+            // Hide any visible tooltip immediately on mouse/touch down
+            hideTooltip();
+        };
+
+        document.addEventListener('keydown', onKeyForModality, true);
+        document.addEventListener('mousedown', onPointerStart, true);
+        document.addEventListener('touchstart', onPointerStart, { passive: true, capture: true });
 
         // Use delegation so dynamically-added nodes are handled automatically
         document.addEventListener('mouseenter', handleEnter, true);

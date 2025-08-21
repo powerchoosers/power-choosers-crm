@@ -7,6 +7,8 @@
   let loadingStartAt = 0;
   const SEARCH_DELAY = 300; // ms delay for debouncing
   const MIN_LOADING_MS = 200; // ensure spinner is visible briefly
+  // Cache last search results for quick lookups (e.g., direct navigation)
+  let lastResults = null;
 
   const elements = {
     searchInput: null,
@@ -160,6 +162,9 @@
         showEmptyState();
         return;
       }
+
+      // Cache for later lookups (navigateToItem -> findItemById)
+      lastResults = results;
 
       // Remove extra padding/margins for compact results
       elements.searchResults.style.padding = '0';
@@ -478,17 +483,13 @@
     const actions = getActionsForType(item.type);
     
     return `
-      <div class="search-result-item" data-id="${item.id}" data-type="${item.type}">
+      <div class="search-result-item clickable" data-id="${item.id}" data-type="${item.type}" title="Click to view ${item.title}">
         <div class="result-main">
           <div class="result-title">${escapeHtml(item.title)}</div>
           <div class="result-subtitle">${escapeHtml(item.subtitle)}</div>
         </div>
-        <div class="result-actions">
-          ${actions.map(action => `
-            <button class="result-action-btn" data-action="${action.key}" data-id="${item.id}" data-type="${item.type}">
-              ${action.label}
-            </button>
-          `).join('')}
+        <div class="result-actions" onclick="event.stopPropagation()">
+          ${actions.filter(action => action.key !== 'view').map(action => renderActionButton(action, item)).join('')}
         </div>
       </div>
     `;
@@ -497,28 +498,24 @@
   function getActionsForType(type) {
     const actions = {
       person: [
-        { key: 'view', label: 'View' },
-        { key: 'email', label: 'Email' },
-        { key: 'call', label: 'Call' }
+        { key: 'email', label: 'Email', icon: getEmailIcon() },
+        { key: 'call', label: 'Call', icon: getCallIcon() }
       ],
       account: [
-        { key: 'view', label: 'View' },
-        { key: 'add-contact', label: 'Add Contact' },
-        { key: 'create-deal', label: 'Create Deal' }
+        { key: 'add-contact', label: 'Add Contact', icon: getAddContactIcon() },
+        { key: 'create-deal', label: 'Create Deal', icon: getDealIcon() }
       ],
       sequence: [
-        { key: 'view', label: 'View' },
-        { key: 'edit', label: 'Edit' },
-        { key: 'clone', label: 'Clone' }
+        { key: 'edit', label: 'Edit', icon: getEditIcon() },
+        { key: 'clone', label: 'Clone', icon: getCloneIcon() }
       ],
       deal: [
-        { key: 'view', label: 'View' },
-        { key: 'edit', label: 'Edit' },
-        { key: 'move-stage', label: 'Move Stage' }
+        { key: 'edit', label: 'Edit', icon: getEditIcon() },
+        { key: 'move-stage', label: 'Move Stage', icon: getMoveIcon() }
       ]
     };
 
-    return actions[type] || [{ key: 'view', label: 'View' }];
+    return actions[type] || [];
   }
 
   function bindResultActions() {
@@ -527,9 +524,18 @@
       btn.addEventListener('click', handleActionClick);
     });
 
-    const resultItems = elements.searchResults.querySelectorAll('.search-result-item');
+    const resultItems = elements.searchResults.querySelectorAll('.search-result-item.clickable');
     resultItems.forEach(item => {
       item.addEventListener('click', handleResultClick);
+      // Add hover effect
+      item.addEventListener('mouseenter', () => {
+        item.style.transform = 'translateY(-1px)';
+        item.style.boxShadow = 'var(--elevation-card-hover)';
+      });
+      item.addEventListener('mouseleave', () => {
+        item.style.transform = '';
+        item.style.boxShadow = '';
+      });
     });
   }
 
@@ -558,30 +564,60 @@
         break;
       case 'email':
         if (type === 'person') {
-          // Navigate to emails page and compose to this person
-          window.showToast && window.showToast('Opening email composer...', 'info');
-          navigateToPage('emails');
+          // Get person data and trigger email compose
+          const item = findItemById(id, type);
+          if (item && item.data && item.data.email) {
+            // Navigate to emails and compose
+            navigateToPage('emails');
+            setTimeout(() => {
+              if (window.crm && typeof window.crm.showToast === 'function') {
+                window.crm.showToast(`Composing email to ${item.title}`);
+              }
+            }, 100);
+          } else {
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast('No email address found for this contact');
+            }
+          }
         }
         break;
       case 'call':
         if (type === 'person') {
-          // Navigate to calls page and log call for this person
-          window.showToast && window.showToast('Opening call logger...', 'info');
-          navigateToPage('calls');
+          // Get person data and trigger phone widget
+          const item = findItemById(id, type);
+          if (item && item.data && item.data.phone) {
+            // Trigger phone widget with contact info
+            if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
+              window.Widgets.callNumber(item.data.phone, item.title, false);
+              if (window.crm && typeof window.crm.showToast === 'function') {
+                window.crm.showToast(`Phone opened for ${item.title}`);
+              }
+            }
+          } else {
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast('No phone number found for this contact');
+            }
+          }
         }
         break;
       case 'add-contact':
         if (type === 'account') {
-          // Navigate to people page and add contact for this account
-          window.showToast && window.showToast('Opening add contact form...', 'info');
           navigateToPage('people');
+          setTimeout(() => {
+            if (window.crm && typeof window.crm.showModal === 'function') {
+              window.crm.showModal('add-contact');
+            }
+          }, 100);
         }
         break;
       case 'create-deal':
         if (type === 'account') {
-          // Navigate to deals page and create deal for this account
-          window.showToast && window.showToast('Opening deal creator...', 'info');
           navigateToPage('deals');
+          setTimeout(() => {
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast('Deal creator opened');
+            }
+          }, 100);
         }
         break;
       case 'edit':
@@ -589,14 +625,22 @@
         break;
       case 'clone':
         if (type === 'sequence') {
-          window.showToast && window.showToast('Cloning sequence...', 'info');
           navigateToPage('sequences');
+          setTimeout(() => {
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast('Sequence cloned');
+            }
+          }, 100);
         }
         break;
       case 'move-stage':
         if (type === 'deal') {
-          window.showToast && window.showToast('Opening deal stage editor...', 'info');
           navigateToPage('deals');
+          setTimeout(() => {
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast('Deal stage editor opened');
+            }
+          }, 100);
         }
         break;
       default:
@@ -605,19 +649,86 @@
   }
 
   function navigateToItem(type, id) {
-    const pageMap = {
-      person: 'people',
-      account: 'accounts',
-      sequence: 'sequences',
-      deal: 'deals'
-    };
+    switch (type) {
+      case 'person':
+        // Try to show contact detail directly if available
+        if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+          // Navigate to people page and show detail immediately
+          navigateToPage('people');
+          // Use requestAnimationFrame to ensure the page has started loading
+          requestAnimationFrame(() => {
+            window.ContactDetail.show(id);
+          });
+        } else {
+          // Fallback to old behavior if ContactDetail is not available
+          window._globalSearchDirectNavigation = { type: 'contact', id: id };
+          navigateToPage('people');
+        }
+        break;
+      case 'account':
+        // For accounts, we have a dedicated detail page, so navigate directly
+        if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          window.AccountDetail.show(id);
+        } else {
+          // Fallback to accounts page
+          navigateToPage('accounts');
+        }
+        break;
+      case 'sequence': {
+        // Directly open the Sequence Builder for this sequence
+        const fallbackToList = () => { navigateToPage('sequences'); };
 
-    const page = pageMap[type];
-    if (page) {
-      navigateToPage(page);
-      // Store the ID for the page to potentially highlight or focus on
-      sessionStorage.setItem('highlightItem', id);
+        // If builder is available, show it with cached or fetched data
+        if (window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
+          // Try cached search result first
+          const cached = findItemById(id, 'sequence');
+          if (cached && cached.data && cached.data.id) {
+            try { window.SequenceBuilder.show(cached.data); } catch (_) { fallbackToList(); }
+            return;
+          }
+          // Fetch from Firestore as a fallback
+          try {
+            const db = (typeof window !== 'undefined') ? window.firebaseDB : null;
+            if (db && db.collection) {
+              db.collection('sequences').doc(id).get().then((doc) => {
+                if (doc && doc.exists) {
+                  const seq = { id: doc.id || id, ...(doc.data ? doc.data() : {}) };
+                  try { window.SequenceBuilder.show(seq); } catch (_) { fallbackToList(); }
+                } else {
+                  fallbackToList();
+                }
+              }).catch(() => fallbackToList());
+            } else {
+              fallbackToList();
+            }
+          } catch (_) {
+            fallbackToList();
+          }
+          return;
+        }
+        // Builder not available, fallback to list
+        fallbackToList();
+        return;
+      }
+      case 'deal':
+        // For deals, navigate to deals page (detail view coming soon)
+        navigateToPage('deals');
+        if (window.showDealDetail && typeof window.showDealDetail === 'function') {
+          requestAnimationFrame(() => {
+            window.showDealDetail(id);
+          });
+        } else {
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Deal detail view coming soon');
+          }
+        }
+        break;
+      default:
+        console.warn('Unknown item type:', type);
     }
+    
+    // Store the ID for the page to potentially highlight or focus on
+    sessionStorage.setItem('highlightItem', id);
   }
 
   function navigateToPage(page) {
@@ -633,6 +744,111 @@
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // Helper function to render action buttons with icons
+  function renderActionButton(action, item) {
+    return `
+      <button class="result-action-btn icon-btn" data-action="${action.key}" data-id="${item.id}" data-type="${item.type}" title="${action.label}">
+        ${action.icon}
+      </button>
+    `;
+  }
+
+  // Helper function to find item data by ID (for actions that need it)
+  function findItemById(id, type) {
+    // Prefer cached data from the last search
+    if (lastResults && type) {
+      const groups = Object.values(lastResults).filter(Array.isArray);
+      for (const arr of groups) {
+        for (const item of arr) {
+          if (item && item.id === id && item.type === type) {
+            return item;
+          }
+        }
+      }
+    }
+    // Fallback: derive minimal info from DOM (no full data)
+    const resultItems = elements.searchResults.querySelectorAll(`[data-id="${CSS.escape(id)}"][data-type="${CSS.escape(type)}"]`);
+    if (resultItems.length > 0) {
+      return {
+        id,
+        type,
+        title: resultItems[0].querySelector('.result-title')?.textContent,
+        subtitle: resultItems[0].querySelector('.result-subtitle')?.textContent,
+        data: null
+      };
+    }
+    return null;
+  }
+
+  // Icon functions matching the sidebar style
+  function getEmailIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+        <polyline points="22,6 12,13 2,6"></polyline>
+      </svg>
+    `;
+  }
+
+  function getCallIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+      </svg>
+    `;
+  }
+
+  function getAddContactIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="8.5" cy="7" r="4"></circle>
+        <line x1="20" y1="8" x2="20" y2="14"></line>
+        <line x1="23" y1="11" x2="17" y2="11"></line>
+      </svg>
+    `;
+  }
+
+  function getDealIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="1" x2="12" y2="23"></line>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+      </svg>
+    `;
+  }
+
+  function getEditIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+        <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+      </svg>
+    `;
+  }
+
+  function getCloneIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    `;
+  }
+
+  function getMoveIcon() {
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="5 9 2 12 5 15"></polyline>
+        <polyline points="9 5 12 2 15 5"></polyline>
+        <polyline points="15 19 12 22 9 19"></polyline>
+        <polyline points="19 9 22 12 19 15"></polyline>
+        <line x1="2" y1="12" x2="22" y2="12"></line>
+        <line x1="12" y1="2" x2="12" y2="22"></line>
+      </svg>
+    `;
   }
 
   // Initialize when DOM is ready

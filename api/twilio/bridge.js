@@ -26,13 +26,13 @@ export default function handler(req, res) {
         // Create TwiML to bridge the call
         const twiml = new VoiceResponse();
         
-        // Optional: Play a brief message to agent
-        twiml.say('Connecting your call...');
-        
-        // Dial the target number
+        // Dial the target number immediately without any intro message
         const dial = twiml.dial({
             callerId: process.env.TWILIO_PHONE_NUMBER || '+18176630380',
-            timeout: 30
+            timeout: 30,
+            answerOnBridge: true,  // This ensures proper audio bridging
+            hangupOnStar: false,
+            timeLimit: 14400       // 4 hours max call duration
         });
         dial.number(target);
         
