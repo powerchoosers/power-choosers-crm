@@ -17,7 +17,8 @@
       ready: false, 
       connecting: false, 
       micPermissionGranted: false, 
-      micPermissionChecked: false 
+      micPermissionChecked: false,
+      tokenRefreshTimer: null 
     };
 
     async function ensureDevice() {
@@ -69,6 +70,27 @@
 
         state.device.on('error', (error) => {
           console.error('[TwilioRTC] Device error:', error);
+          
+          // If it's a token-related error, try to refresh immediately
+          if (error.code === 20101 || error.code === 31204) {
+            console.debug('[TwilioRTC] Token error detected, attempting immediate refresh...');
+            setTimeout(async () => {
+              try {
+                const refreshResp = await fetch(`${base}/api/twilio/token?identity=agent`);
+                const refreshData = await refreshResp.json().catch(() => ({}));
+                
+                if (refreshResp.ok && refreshData?.token && state.device) {
+                  state.device.updateToken(refreshData.token);
+                  console.debug('[TwilioRTC] Emergency token refresh successful');
+                } else {
+                  console.error('[TwilioRTC] Emergency token refresh failed');
+                }
+              } catch (refreshError) {
+                console.error('[TwilioRTC] Emergency token refresh error:', refreshError);
+              }
+            }, 1000);
+          }
+          
           try { window.crm?.showToast && window.crm.showToast(`Device error: ${error?.message || 'Unknown error'}`); } catch(_) {}
         });
 
@@ -88,7 +110,29 @@
         // Register the device
         await state.device.register();
         
-        try { console.debug('[TwilioRTC] Device ready'); } catch(_) {}
+        // Set up automatic token refresh (refresh every 50 minutes, tokens expire after 1 hour)
+        if (state.tokenRefreshTimer) {
+          clearInterval(state.tokenRefreshTimer);
+        }
+        
+        state.tokenRefreshTimer = setInterval(async () => {
+          try {
+            console.debug('[TwilioRTC] Refreshing access token...');
+            const refreshResp = await fetch(`${base}/api/twilio/token?identity=agent`);
+            const refreshData = await refreshResp.json().catch(() => ({}));
+            
+            if (refreshResp.ok && refreshData?.token && state.device) {
+              state.device.updateToken(refreshData.token);
+              console.debug('[TwilioRTC] Token refreshed successfully');
+            } else {
+              console.warn('[TwilioRTC] Token refresh failed:', refreshData?.error || 'No token received');
+            }
+          } catch (refreshError) {
+            console.error('[TwilioRTC] Token refresh error:', refreshError);
+          }
+        }, 50 * 60 * 1000); // 50 minutes
+        
+        try { console.debug('[TwilioRTC] Device ready with token refresh enabled'); } catch(_) {}
         state.ready = true;
         return state.device;
       } finally {
@@ -96,7 +140,23 @@
       }
     }
 
-    return { state, ensureDevice };
+    // Clean shutdown function
+    const shutdown = () => {
+      if (state.tokenRefreshTimer) {
+        clearInterval(state.tokenRefreshTimer);
+        state.tokenRefreshTimer = null;
+      }
+      if (state.device) {
+        try {
+          state.device.destroy();
+        } catch(_) {}
+        state.device = null;
+      }
+      state.ready = false;
+      state.connecting = false;
+    };
+    
+    return { state, ensureDevice, shutdown };
   })();
 
   const WIDGET_ID = 'phone-widget';
@@ -107,154 +167,6 @@
     name: '',
     isActive: false
   };
-
-  // Phone number lookup cache
-  let contactsCache = null;
-  let accountsCache = null;
-  let cacheExpiry = 0;
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-  // Normalize phone number for comparison (remove all non-digits)
-  function normalizePhoneForComparison(phone) {
-    if (!phone) return '';
-    return phone.replace(/\D/g, '');
-  }
-
-  // Check if two phone numbers match (handles various formats)
-  function phoneNumbersMatch(phone1, phone2) {
-    const clean1 = normalizePhoneForComparison(phone1);
-    const clean2 = normalizePhoneForComparison(phone2);
-    if (!clean1 || !clean2) return false;
-    
-    // Handle US numbers with/without country code
-    const normalize = (num) => {
-      if (num.length === 11 && num.startsWith('1')) {
-        return num.slice(1); // Remove leading 1
-      }
-      return num;
-    };
-    
-    return normalize(clean1) === normalize(clean2);
-  }
-
-  // Load contacts and accounts for phone lookup
-  async function loadContactsForLookup() {
-    const now = Date.now();
-    if (contactsCache && accountsCache && now < cacheExpiry) {
-      return { contacts: contactsCache, accounts: accountsCache };
-    }
-
-    try {
-      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      if (!base) {
-        console.debug('[Phone] No API base URL configured, skipping contact lookup');
-        return { contacts: [], accounts: [] };
-      }
-
-      // Load contacts from Firebase if available
-      let contacts = [];
-      let accounts = [];
-
-      if (window.firebaseDB) {
-        try {
-          // Load contacts
-          const contactsSnapshot = await window.firebaseDB.collection('contacts').get();
-          contacts = contactsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            name: `${doc.data().firstName || ''} ${doc.data().lastName || ''}`.trim() || 'Unknown Contact'
-          }));
-
-          // Load accounts  
-          const accountsSnapshot = await window.firebaseDB.collection('accounts').get();
-          accounts = accountsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            name: doc.data().accountName || 'Unknown Account'
-          }));
-
-          console.debug(`[Phone] Loaded ${contacts.length} contacts and ${accounts.length} accounts for lookup`);
-        } catch (firebaseError) {
-          console.warn('[Phone] Failed to load from Firebase:', firebaseError);
-        }
-      }
-
-      // Cache the results
-      contactsCache = contacts;
-      accountsCache = accounts;
-      cacheExpiry = now + CACHE_DURATION;
-
-      return { contacts, accounts };
-    } catch (error) {
-      console.error('[Phone] Failed to load contacts for lookup:', error);
-      return { contacts: [], accounts: [] };
-    }
-  }
-
-  // Lookup contact/account by phone number
-  async function lookupContactByPhone(phoneNumber) {
-    if (!phoneNumber) return null;
-    
-    const { contacts, accounts } = await loadContactsForLookup();
-    
-    // First check contacts
-    for (const contact of contacts) {
-      if (contact.phone && phoneNumbersMatch(contact.phone, phoneNumber)) {
-        return {
-          type: 'contact',
-          id: contact.id,
-          name: contact.name,
-          phone: contact.phone,
-          email: contact.email || '',
-          company: contact.companyName || ''
-        };
-      }
-    }
-    
-    // Then check accounts
-    for (const account of accounts) {
-      if (account.phone && phoneNumbersMatch(account.phone, phoneNumber)) {
-        return {
-          type: 'account', 
-          id: account.id,
-          name: account.name,
-          phone: account.phone,
-          email: '',
-          company: account.name
-        };
-      }
-    }
-    
-    return null;
-  }
-
-  // Update widget title and call context based on phone lookup
-  async function updateContactAssociation(card, phoneNumber) {
-    if (!card || !phoneNumber) return;
-    
-    const contact = await lookupContactByPhone(phoneNumber);
-    const title = card.querySelector('.widget-title');
-    
-    if (contact && title) {
-      // Update widget title to show contact name
-      title.innerHTML = `Phone - ${contact.name}`;
-      
-      // Update call context
-      currentCallContext.name = contact.name;
-      currentCallContext.number = phoneNumber;
-      
-      console.debug('[Phone] Associated number with contact:', contact);
-      
-      // Show a subtle notification
-      try { 
-        window.crm?.showToast && window.crm.showToast(`📞 Recognized ${contact.name}`);
-      } catch(_) {}
-    } else if (title) {
-      // Reset to default title if no contact found
-      title.innerHTML = 'Phone';
-      currentCallContext.name = '';
-    }
-  }
 
   // Update microphone status UI
   function updateMicrophoneStatusUI(card, status) {
@@ -489,44 +401,12 @@
     if (input) {
       input.addEventListener('focus', () => input.classList.add('focus-orange'));
       input.addEventListener('blur', () => input.classList.remove('focus-orange'));
-      
-      // Add input event listener for manual typing (not just dialpad)
-      input.addEventListener('input', async (e) => {
-        const value = e.target.value.trim();
-        
-        // Clear any existing timeout
-        clearTimeout(input.lookupTimeout);
-        
-        if (value.length >= 10) {
-          // Debounce the lookup to avoid too many requests
-          input.lookupTimeout = setTimeout(async () => {
-            await updateContactAssociation(card, value);
-          }, 500);
-        } else if (value.length === 0) {
-          // Clear contact association when input is empty
-          const title = card.querySelector('.widget-title');
-          if (title) {
-            title.innerHTML = 'Phone';
-          }
-          currentCallContext.name = '';
-          currentCallContext.number = '';
-        }
-      });
     }
 
     const appendChar = (ch) => {
       if (!input) return;
       input.value = (input.value || '') + ch;
       try { input.focus(); } catch (_) {}
-      
-      // Debounced contact lookup on input change
-      clearTimeout(input.lookupTimeout);
-      input.lookupTimeout = setTimeout(async () => {
-        const currentValue = input.value.trim();
-        if (currentValue.length >= 10) { // Only lookup for complete numbers
-          await updateContactAssociation(card, currentValue);
-        }
-      }, 500);
     };
 
     const backspace = () => {
@@ -539,15 +419,6 @@
     const clearAll = () => {
       if (!input) return;
       input.value = '';
-      
-      // Clear contact association when clearing input
-      const title = card.querySelector('.widget-title');
-      if (title) {
-        title.innerHTML = 'Phone';
-      }
-      currentCallContext.name = '';
-      currentCallContext.number = '';
-      
       try { input.focus(); } catch (_) {}
     };
 
@@ -566,14 +437,6 @@
       const existing = input.value || '';
       const next = existing ? (existing + cleaned.replace(/\+/g, '')) : cleaned.replace(/(.*?)(\+)(.*)/, '+$1$3');
       input.value = next;
-      
-      // Trigger contact lookup after paste
-      setTimeout(async () => {
-        if (input.value.trim().length >= 10) {
-          await updateContactAssociation(card, input.value.trim());
-        }
-      }, 100);
-      
       try { input.focus(); } catch (_) {}
     };
     if (input) input.addEventListener('paste', onPaste);
@@ -618,6 +481,8 @@
         // Handle call events
         currentCall.on('accept', () => {
           console.debug('[Phone] Call connected');
+          isCallInProgress = true;
+          currentCallContext.isActive = true;
           // Update call status to connected using same call ID
           updateCallStatus(number, 'connected', callStartTime, 0, callId);
         });
@@ -626,17 +491,26 @@
           console.debug('[Phone] Call disconnected');
           const callEndTime = Date.now();
           const duration = Math.floor((callEndTime - callStartTime) / 1000);
+          
           // Update call with final status and duration using same call ID
           updateCallStatus(number, 'completed', callStartTime, duration, callId);
           currentCall = null;
+          isCallInProgress = false;
           setInCallUI(false);
           
-          // Clear the call context to prevent auto-redial
+          // Clear current call context to prevent auto-callback
+          console.debug('[Phone] Clearing call context after disconnect');
           currentCallContext = {
             number: '',
             name: '',
             isActive: false
           };
+          
+          // Set cooldown timer to prevent immediate auto-callbacks
+          lastCallCompleted = Date.now();
+          lastCalledNumber = number;
+          
+          console.debug('[Phone] Call cleanup complete - cooldowns set');
         });
         
         currentCall.on('error', (error) => {
@@ -645,14 +519,19 @@
           const duration = Math.floor((callEndTime - callStartTime) / 1000);
           updateCallStatus(number, 'failed', callStartTime, duration, callId);
           currentCall = null;
+          isCallInProgress = false;
           setInCallUI(false);
           
-          // Clear the call context to prevent auto-redial
+          // Clear context on error too
           currentCallContext = {
             number: '',
             name: '',
             isActive: false
           };
+          
+          // Set cooldown after error
+          lastCallCompleted = Date.now();
+          lastCalledNumber = number;
         });
         
         return currentCall;
@@ -735,81 +614,27 @@
         const callSid = callId || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = new Date().toISOString();
         
-        // Get contact association for better call logging
-        const contact = await lookupContactByPhone(phoneNumber);
-        const contextName = currentCallContext.name || '';
-        const contactName = contact ? contact.name : contextName;
-        
-        console.debug('[Phone] Logging call with contact data:', {
-          phoneNumber,
-          contact: contact,
-          contextName: contextName,
-          finalContactName: contactName
-        });
-        
-        const callData = {
-          callSid: callSid,
-          to: phoneNumber,
-          from: '+18176630380', // Your business number
-          status: 'initiated',
-          callType: callType,
-          callTime: timestamp,
-          timestamp: timestamp
-        };
-        
-        // Add contact information if available
-        if (contact) {
-          callData.contactId = contact.id;
-          callData.contactType = contact.type; // 'contact' or 'account'
-          callData.contactName = contact.name;
-          callData.contactCompany = contact.company;
-          console.debug('[Phone] Adding contact data from lookup:', contact);
-        } else if (contextName) {
-          callData.contactName = contextName;
-          console.debug('[Phone] Adding contact name from context:', contextName);
-        }
-        
-        console.debug('[Phone] Final call data being sent:', callData);
-        
         const response = await fetch(`${base}/api/calls`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(callData)
+          body: JSON.stringify({
+            callSid: callSid,
+            to: phoneNumber,
+            from: '+18176630380', // Your business number
+            status: 'initiated',
+            callType: callType,
+            callTime: timestamp,
+            timestamp: timestamp
+          })
         });
         
         const data = await response.json();
-        console.debug('[Phone] Call logged successfully:', {
-          callSid,
-          contactName: callData.contactName,
-          response: data
-        });
-        
         return data.call?.id || callSid; // Return call ID for tracking
       } catch (error) {
-        console.error('[Phone] Failed to log call to API:', error);
-        
-        // Fallback: Store call data locally for now
-        const localCallData = {
-          ...callData,
-          timestamp: new Date().toISOString(),
-          stored: 'local_fallback'
-        };
-        
-        // Try to store in localStorage as backup
-        try {
-          const existingCalls = JSON.parse(localStorage.getItem('crm_calls') || '[]');
-          existingCalls.unshift(localCallData);
-          // Keep only last 50 calls
-          existingCalls.splice(50);
-          localStorage.setItem('crm_calls', JSON.stringify(existingCalls));
-          console.debug('[Phone] Call stored locally as backup:', localCallData);
-        } catch (localError) {
-          console.error('[Phone] Failed to store call locally:', localError);
-        }
-        
-        return callSid;
+        console.error('[Phone] Failed to log call:', error);
+        return null;
       }
     }
     
@@ -879,31 +704,25 @@
       if (currentCall) {
         try { 
           currentCall.disconnect(); 
-          console.debug('[Phone] Hanging up current call');
+          console.debug('[Phone] Manual hangup - hanging up current call');
         } catch(_) {}
         currentCall = null;
+        isCallInProgress = false;
         setInCallUI(false);
         
-        // Clear the call context to prevent auto-redial
+        // Clear context on manual hangup
         currentCallContext = {
           number: '',
           name: '',
           isActive: false
         };
         
+        // Set aggressive cooldown on manual hangup
+        lastCallCompleted = Date.now();
+        lastCalledNumber = normalized.value;
+        
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
         return;
-      }
-      
-      // Ensure we have the latest contact association before making the call
-      if (!currentCallContext.name) {
-        console.debug('[Phone] No contact name in context, attempting lookup for:', normalized.value);
-        try {
-          await updateContactAssociation(card, normalized.value);
-          console.debug('[Phone] Contact context after lookup:', currentCallContext);
-        } catch (error) {
-          console.warn('[Phone] Failed to lookup contact before call:', error);
-        }
       }
       try {
         // Determine website mode: if no API base configured, treat as marketing site
@@ -1127,15 +946,71 @@
     try { window.crm?.showToast && window.crm.showToast('Phone opened'); } catch (_) {}
   }
 
+  // Track last call completion to prevent auto-callbacks
+  let lastCallCompleted = 0;
+  let lastCalledNumber = '';
+  let isCallInProgress = false;
+  const CALLBACK_COOLDOWN = 8000; // 8 seconds cooldown
+  const SAME_NUMBER_COOLDOWN = 15000; // 15 seconds for same number
+  
   // Global call function for CRM integration
-  window.Widgets.callNumber = function(number, contactName = '') {
-    console.debug('[Phone] Global call function:', { number, contactName });
+  window.Widgets.callNumber = function(number, contactName = '', autoTrigger = true) {
+    // Add stack trace to debug who's calling this function
+    const stack = new Error().stack;
+    console.debug('[Phone] ═══ CALLNUMBER INVOKED ═══');
+    console.debug('[Phone] Parameters:', { number, contactName, autoTrigger, isCallInProgress });
+    console.debug('[Phone] Current call context:', currentCallContext);
+    console.debug('[Phone] Cooldowns:', { lastCallCompleted: new Date(lastCallCompleted || 0), lastCalledNumber });
+    console.debug('[Phone] Call stack:', stack?.split('\n').slice(0, 8).join('\n')); // More stack trace
+    
+    const now = Date.now();
+    
+    // Block ALL auto-triggers if a call is currently in progress
+    if (isCallInProgress) {
+      console.warn('[Phone] BLOCKED: Call already in progress');
+      autoTrigger = false;
+    }
+    
+    // Aggressive cooldown check - if we just completed a call, block ALL auto-triggers
+    if (now - lastCallCompleted < CALLBACK_COOLDOWN) {
+      console.warn('[Phone] BLOCKED: Auto-call blocked due to recent call completion cooldown');
+      console.warn('[Phone] Time since last call:', now - lastCallCompleted, 'ms, cooldown:', CALLBACK_COOLDOWN, 'ms');
+      autoTrigger = false;
+    }
+    
+    // Extra protection for the same number
+    if (lastCalledNumber === number && now - lastCallCompleted < SAME_NUMBER_COOLDOWN) {
+      console.warn('[Phone] BLOCKED: Same number called too recently');
+      console.warn('[Phone] Last called number:', lastCalledNumber, 'Current number:', number);
+      autoTrigger = false;
+    }
+    
+    // Don't auto-trigger if the same number/contact is already in context
+    if (currentCallContext.number === number && currentCallContext.name === contactName && currentCallContext.isActive) {
+      console.warn('[Phone] BLOCKED: Same number/contact already active in context');
+      autoTrigger = false;
+    }
+    
+    // ABSOLUTE BLOCK: If the exact same number/contact was just called with autoTrigger
+    if (autoTrigger && lastCalledNumber === number && now - lastCallCompleted < 30000) {
+      console.error('[Phone] ABSOLUTE BLOCK: Preventing potential callback loop for number:', number);
+      console.error('[Phone] Time since last call to this number:', now - lastCallCompleted, 'ms');
+      return false; // Return early, don't even open the widget
+    }
+    
+    // Additional safety: never auto-trigger if called within 2 seconds of previous call
+    const timeSinceLastCall = now - (window.lastCallNumberTime || 0);
+    if (autoTrigger && timeSinceLastCall < 2000) {
+      console.warn('[Phone] BLOCKED: Called too quickly after previous callNumber call');
+      autoTrigger = false;
+    }
+    window.lastCallNumberTime = now;
     
     // Set current call context
     currentCallContext = {
       number: number,
       name: contactName,
-      isActive: false
+      isActive: autoTrigger // Mark as active only if we're auto-triggering
     };
     
     // Open phone widget if not already open
@@ -1160,14 +1035,29 @@
           }
         }
         
-        // Auto-trigger call if we have both number and name (click-to-call scenario)
-        // Only auto-dial if this is a fresh call context (not a redial after hangup)
-        if (number && contactName && !currentCallContext.isActive) {
-          currentCallContext.isActive = true;
+        // Auto-trigger call only if explicitly requested and conditions are met
+        if (number && contactName && autoTrigger) {
           const callBtn = card.querySelector('.call-btn-start');
-          if (callBtn) {
-            setTimeout(() => callBtn.click(), 100);
+          if (callBtn && !isCallInProgress) {
+            // Final safety check before auto-triggering
+            const finalCheck = now - lastCallCompleted;
+            if (finalCheck < CALLBACK_COOLDOWN) {
+              console.error('[Phone] FINAL SAFETY BLOCK: Refusing auto-trigger due to recent call');
+              console.error('[Phone] Time since last call:', finalCheck, 'ms, required:', CALLBACK_COOLDOWN, 'ms');
+              return false;
+            }
+            
+            console.debug('[Phone] Auto-triggering call for:', contactName);
+            isCallInProgress = true; // Set flag before triggering
+            setTimeout(() => {
+              console.debug('[Phone] Executing auto-triggered call');
+              callBtn.click();
+            }, 100);
+          } else {
+            console.warn('[Phone] Auto-trigger blocked - call already in progress or button not found');
           }
+        } else {
+          console.debug('[Phone] Not auto-triggering call - user must click Call button');
         }
       }
     }, 50);

@@ -294,6 +294,8 @@
     const city = contact.city || contact.locationCity || '';
     const stateVal = contact.state || contact.locationState || '';
     const industry = contact.industry || contact.companyIndustry || '';
+    // Ensure header styles (divider, layout) are present
+    injectContactHeaderStyles();
 
     // Header (styled same as page header)
     const headerHtml = `
@@ -323,6 +325,17 @@
                   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
                   <rect x="2" y="9" width="4" height="12"/>
                   <circle cx="4" cy="4" r="2"/>
+                </svg>
+              </button>
+              <span class="header-action-divider" aria-hidden="true"></span>
+              <button class="quick-action-btn list-header-btn" id="add-contact-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <circle cx="4" cy="6" r="1"></circle>
+                  <circle cx="4" cy="12" r="1"></circle>
+                  <circle cx="4" cy="18" r="1"></circle>
+                  <line x1="8" y1="6" x2="20" y2="6"></line>
+                  <line x1="8" y1="12" x2="20" y2="12"></line>
+                  <line x1="8" y1="18" x2="20" y2="18"></line>
                 </svg>
               </button>
             </div>
@@ -551,6 +564,13 @@
       compLink.addEventListener('click', (e) => { e.preventDefault(); navigateToAccountFromContact(); });
       compLink.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigateToAccountFromContact(); } });
       compLink._bound = '1';
+    }
+
+    // Add-to-List button
+    const addToListBtn = document.getElementById('add-contact-to-list');
+    if (addToListBtn && !addToListBtn._bound) {
+      addToListBtn.addEventListener('click', (e) => { e.preventDefault(); openContactListsPanel(); });
+      addToListBtn._bound = '1';
     }
 
     // Title actions: edit/copy/clear contact name
@@ -820,6 +840,388 @@
     }
     wrap.classList.remove('editing');
     wrap.setAttribute('data-has-value', (value && String(value).trim()) ? '1' : '0');
+  }
+
+  // Minimal header styles for divider and layout
+  function injectContactHeaderStyles() {
+    if (document.getElementById('contact-detail-header-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'contact-detail-header-styles';
+    style.textContent = `
+      /* Contact Detail: header action divider and alignment */
+      #contact-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: 8px; }
+      #contact-detail-header .header-action-divider { width: 1px; height: 20px; background: var(--grey-700); display: inline-block; }
+      #contact-detail-header .list-header-btn svg { display: block; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // ===== Lists integration (Add to List) =====
+  let _onContactListsKeydown = null;
+  let _positionContactListsPanel = null;
+  let _onContactListsOutside = null;
+
+  function injectContactListsStyles() {
+    if (document.getElementById('contact-detail-lists-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'contact-detail-lists-styles';
+    style.textContent = `
+      /* Contact Detail: Add to List panel */
+      #contact-lists-panel { position: fixed; z-index: 1200; width: min(560px, 92vw);
+        background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light);
+        border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
+        transform: translateY(-8px); opacity: 0; transition: transform .16s ease, opacity .16s ease;
+        /* Avoid clipping the pointer arrow */
+        --arrow-size: 10px; }
+      #contact-lists-panel.--show { transform: translateY(0); opacity: 1; }
+      #contact-lists-panel .list-header { padding: 14px 16px; border-bottom: 1px solid var(--border-light); font-weight: 700; background: var(--bg-card); }
+      #contact-lists-panel .list-body { max-height: min(70vh, 720px); overflow: auto; background: var(--bg-card); }
+      #contact-lists-panel .list-body::-webkit-scrollbar { width: 10px; }
+      #contact-lists-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
+      #contact-lists-panel .list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; cursor:pointer; background: var(--bg-card); border-top: 1px solid var(--border-light); }
+      #contact-lists-panel .list-item:first-child { border-top: 0; }
+      #contact-lists-panel .list-item:hover { background: var(--bg-hover); }
+      #contact-lists-panel .list-item[aria-disabled="true"] { opacity: .6; cursor: default; }
+      #contact-lists-panel .list-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; }
+      #contact-lists-panel .list-name { font-weight: 600; }
+      #contact-lists-panel .list-meta { color: var(--text-muted); font-size: .85rem; }
+      #contact-lists-panel .list-footer { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top: 1px solid var(--border-light); background: var(--bg-card); }
+      #contact-lists-panel .btn { border: 1px solid var(--border-light); background: var(--bg-item); color: var(--text-primary); border-radius: var(--border-radius-sm); padding:6px 10px; }
+      #contact-lists-panel .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35); }
+      #contact-lists-panel .btn-primary { background: var(--orange-subtle); border-color: var(--orange-subtle); color: #fff; }
+
+      /* Pointer arrow (reuse delete-popover pattern) */
+      #contact-lists-panel::before,
+      #contact-lists-panel::after {
+        content: "";
+        position: absolute;
+        width: var(--arrow-size);
+        height: var(--arrow-size);
+        transform: rotate(45deg);
+        pointer-events: none;
+      }
+      /* Bottom placement (arrow on top edge) */
+      #contact-lists-panel[data-placement="bottom"]::before {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        top: calc(-1 * var(--arrow-size) / 2 + 1px);
+        background: var(--border-light);
+      }
+      #contact-lists-panel[data-placement="bottom"]::after {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        top: calc(-1 * var(--arrow-size) / 2 + 2px);
+        background: var(--bg-card);
+      }
+      /* Top placement (arrow on bottom edge) */
+      #contact-lists-panel[data-placement="top"]::before {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        bottom: calc(-1 * var(--arrow-size) / 2 + 1px);
+        background: var(--border-light);
+      }
+      #contact-lists-panel[data-placement="top"]::after {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        bottom: calc(-1 * var(--arrow-size) / 2 + 2px);
+        background: var(--bg-card);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function closeContactListsPanel() {
+    const panel = document.getElementById('contact-lists-panel');
+    const cleanup = () => {
+      if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
+      try { document.removeEventListener('mousedown', _onContactListsOutside, true); } catch(_) {}
+      // Reset trigger state and restore focus
+      try {
+        const trigger = document.getElementById('add-contact-to-list');
+        if (trigger) {
+          trigger.setAttribute('aria-expanded', 'false');
+          trigger.focus();
+        }
+      } catch(_) {}
+    };
+    if (panel) panel.classList.remove('--show');
+    setTimeout(cleanup, 120);
+
+    try { document.removeEventListener('keydown', _onContactListsKeydown, true); } catch(_) {}
+    try { window.removeEventListener('resize', _positionContactListsPanel, true); } catch(_) {}
+    try { window.removeEventListener('scroll', _positionContactListsPanel, true); } catch(_) {}
+    _onContactListsKeydown = null; _positionContactListsPanel = null; _onContactListsOutside = null;
+  }
+
+  function openContactListsPanel() {
+    if (document.getElementById('contact-lists-panel')) return;
+    injectContactListsStyles();
+    const panel = document.createElement('div');
+    panel.id = 'contact-lists-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Add to list');
+    const c = state.currentContact || {};
+    const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'this contact';
+    panel.innerHTML = `
+      <div class="list-header">Add ${escapeHtml(fullName)} to list</div>
+      <div class="list-body" id="contact-lists-body">
+        <div class="list-item" tabindex="0" data-action="create">
+          <div>
+            <div class="list-name">Create new list…</div>
+            <div class="list-meta">Create a people list</div>
+          </div>
+        </div>
+      </div>
+      <div class="list-footer">
+        <button type="button" class="btn" id="contact-lists-cancel">Cancel</button>
+      </div>`;
+    document.body.appendChild(panel);
+
+    // Position anchored to the Add-to-List icon with pointer
+    _positionContactListsPanel = function position() {
+      const btn = document.getElementById('add-contact-to-list');
+      const rect = btn ? btn.getBoundingClientRect() : null;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pad = 8;  // viewport padding
+      const gap = 8;  // space between button and panel
+      let placement = 'bottom';
+      let top = Math.max(pad, 72);
+      let left = Math.max(pad, (vw - panel.offsetWidth) / 2);
+
+      if (rect) {
+        const panelW = panel.offsetWidth;
+        const panelH = panel.offsetHeight || 320; // fallback before content paints
+        const fitsBottom = rect.bottom + gap + panelH + pad <= vh;
+        const fitsTop = rect.top - gap - panelH - pad >= 0;
+        placement = fitsBottom || !fitsTop ? 'bottom' : 'top';
+
+        if (placement === 'bottom') {
+          top = Math.min(vh - panelH - pad, rect.bottom + gap);
+        } else {
+          top = Math.max(pad, rect.top - gap - panelH);
+        }
+
+        // Prefer centering under the icon while keeping within viewport
+        left = Math.round(
+          Math.min(
+            Math.max(pad, rect.left + (rect.width / 2) - (panelW / 2)),
+            vw - panelW - pad
+          )
+        );
+
+        // Arrow horizontal offset relative to panel's left edge
+        const arrowLeft = Math.round(rect.left + rect.width / 2 - left);
+        panel.style.setProperty('--arrow-left', `${arrowLeft}px`);
+        panel.setAttribute('data-placement', placement);
+      }
+
+      panel.style.top = `${Math.round(top)}px`;
+      panel.style.left = `${Math.round(left)}px`;
+    };
+    _positionContactListsPanel();
+    window.addEventListener('resize', _positionContactListsPanel, true);
+    window.addEventListener('scroll', _positionContactListsPanel, true);
+
+    // Animate in
+    requestAnimationFrame(() => { panel.classList.add('--show'); });
+
+    // Mark trigger expanded
+    try { document.getElementById('add-contact-to-list')?.setAttribute('aria-expanded', 'true'); } catch(_) {}
+
+    // Load lists and memberships
+    Promise.resolve(populateContactListsPanel(panel.querySelector('#contact-lists-body')))
+      .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch(_) {} });
+
+    // Footer
+    panel.querySelector('#contact-lists-cancel')?.addEventListener('click', () => closeContactListsPanel());
+
+    // Focus behavior
+    setTimeout(() => { const first = panel.querySelector('.list-item, .btn'); if (first) first.focus(); }, 0);
+    _onContactListsKeydown = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeContactListsPanel(); return; }
+      if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.classList?.contains('list-item')) {
+        e.preventDefault();
+        const el = document.activeElement; handleListChoose(el);
+      }
+    };
+    document.addEventListener('keydown', _onContactListsKeydown, true);
+
+    // Click-away
+    _onContactListsOutside = (e) => {
+      const inside = panel.contains(e.target);
+      const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-list'));
+      if (!inside && !isTrigger) closeContactListsPanel();
+    };
+    document.addEventListener('mousedown', _onContactListsOutside, true);
+
+    function handleListChoose(el) {
+      const action = el.getAttribute('data-action');
+      if (action === 'create') {
+        const name = window.prompt('New list name');
+        if (!name) return;
+        createContactListThenAdd(name.trim());
+        return;
+      }
+      const id = el.getAttribute('data-id');
+      const name = el.getAttribute('data-name') || 'List';
+      const memberDocId = el.getAttribute('data-member-id');
+      if (memberDocId) {
+        // Already a member -> remove from list
+        removeCurrentContactFromList(memberDocId, name);
+      } else {
+        addCurrentContactToList(id, name);
+      }
+    }
+  }
+
+  async function populateContactListsPanel(container) {
+    if (!container) return;
+    // Loading row
+    container.innerHTML += `<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">Loading lists…</div><div class="list-meta">Please wait</div></div></div>`;
+    try {
+      const db = window.firebaseDB;
+      const contactId = state.currentContact?.id;
+      let lists = [];
+      let existing = new Set();
+      const existingMap = new Map(); // listId -> listMemberDocId
+      if (db && typeof db.collection === 'function') {
+        // Load lists (people kind)
+        let q = db.collection('lists');
+        if (q.where) q = q.where('kind', '==', 'people');
+        const snap = await (q.limit ? q.limit(200).get() : q.get());
+        lists = (snap && snap.docs) ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+
+        // Load current memberships to disable duplicates
+        if (contactId) {
+          let mq = db.collection('listMembers');
+          if (mq.where) {
+            mq = mq.where('targetId', '==', contactId);
+            try { mq = mq.where('targetType', '==', 'people'); } catch(_) {}
+          }
+          try {
+            const msnap = await (mq.limit ? mq.limit(500).get() : mq.get());
+            const rows = (msnap && msnap.docs) ? msnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            existing = new Set(rows.map(r => String(r.listId || '')));
+            rows.forEach(r => { if (r.listId) existingMap.set(String(r.listId), r.id); });
+          } catch (_) { /* noop */ }
+        }
+      }
+
+      // Sort by updatedAt/createdAt desc
+      lists.sort((a, b) => {
+        const ad = (a.updatedAt || a.createdAt || 0);
+        const bd = (b.updatedAt || b.createdAt || 0);
+        const av = toMillis(ad), bv = toMillis(bd);
+        return bv - av;
+      });
+
+      const listHtml = lists.slice(0, 100).map(it => {
+        const count = (typeof it.count === 'number') ? it.count : (it.recordCount || 0);
+        const already = existing.has(String(it.id || ''));
+        const memberId = existingMap.get(String(it.id || '')) || '';
+        const removeHint = already ? ' • Currently a member — click to remove' : '';
+        return `<div class="list-item" tabindex="0" data-id="${escapeHtml(it.id || '')}" data-name="${escapeHtml(it.name || 'List')}" ${memberId ? `data-member-id="${escapeHtml(memberId)}"` : ''}>
+          <div>
+            <div class="list-name">${escapeHtml(it.name || 'Untitled')}</div>
+            <div class="list-meta">${count} member${count === 1 ? '' : 's'}${removeHint}</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      // Replace loading row but keep the create row first
+      const createRow = container.querySelector('.list-item[data-action="create"]');
+      container.innerHTML = '';
+      if (createRow) container.appendChild(createRow);
+      container.insertAdjacentHTML('beforeend', listHtml || `<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No lists found</div><div class="list-meta">Create a new list</div></div></div>`);
+
+      // Click handlers
+      container.querySelectorAll('.list-item').forEach(el => {
+        el.addEventListener('click', () => {
+          el.focus();
+          const evt = new KeyboardEvent('keydown', { key: 'Enter' });
+          document.dispatchEvent(evt);
+        });
+      });
+    } catch (err) {
+      console.warn('Failed to load lists', err);
+    }
+
+    function toMillis(val) {
+      try {
+        if (!val) return 0;
+        if (val instanceof Date) return val.getTime();
+        if (typeof val === 'object' && typeof val.toDate === 'function') return val.toDate().getTime();
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') return new Date(val).getTime();
+        if (val && typeof val.seconds === 'number') return val.seconds * 1000;
+      } catch {}
+      return 0;
+    }
+  }
+
+  async function createContactListThenAdd(name) {
+    try {
+      const db = window.firebaseDB;
+      let newId = null;
+      if (db && typeof db.collection === 'function') {
+        const payload = { name, kind: 'people', recordCount: 0 };
+        if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+          payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        } else {
+          payload.createdAt = new Date();
+          payload.updatedAt = new Date();
+        }
+        const ref = await db.collection('lists').add(payload);
+        newId = ref.id;
+      }
+      if (newId) {
+        await addCurrentContactToList(newId, name);
+      } else {
+        window.crm?.showToast && window.crm.showToast(`Created list "${name}" (offline)`);
+        closeContactListsPanel();
+      }
+    } catch (err) {
+      console.warn('Create list failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to create list');
+    }
+  }
+
+  async function addCurrentContactToList(listId, listName) {
+    try {
+      const contactId = state.currentContact?.id;
+      if (!contactId) { closeContactListsPanel(); return; }
+      const db = window.firebaseDB;
+      if (db && typeof db.collection === 'function') {
+        const doc = { listId, targetId: contactId, targetType: 'people' };
+        if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+          doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        } else {
+          doc.createdAt = new Date();
+          doc.updatedAt = new Date();
+        }
+        await db.collection('listMembers').add(doc);
+      }
+      window.crm?.showToast && window.crm.showToast(`Added to "${listName}"`);
+    } catch (err) {
+      console.warn('Add to list failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to add to list');
+    } finally {
+      closeContactListsPanel();
+    }
+  }
+
+  async function removeCurrentContactFromList(memberDocId, listName) {
+    try {
+      const db = window.firebaseDB;
+      if (db && typeof db.collection === 'function' && memberDocId) {
+        await db.collection('listMembers').doc(memberDocId).delete();
+      }
+      window.crm?.showToast && window.crm.showToast(`Removed from "${listName}"`);
+    } catch (err) {
+      console.warn('Remove from list failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to remove from list');
+    } finally {
+      closeContactListsPanel();
+    }
   }
 
   function handleQuickAction(action, btn) {

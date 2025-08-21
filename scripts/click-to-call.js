@@ -64,9 +64,9 @@
       e.preventDefault();
       e.stopPropagation();
       
-      // Use the phone widget to make the call
+      // Use the phone widget to make the call (manual click, not auto-trigger)
       if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
-        window.Widgets.callNumber(cleanPhone, contactName);
+        window.Widgets.callNumber(cleanPhone, contactName, false); // false = manual click, don't auto-trigger
       } else {
         console.warn('Phone widget not available');
         // Fallback to tel: link
