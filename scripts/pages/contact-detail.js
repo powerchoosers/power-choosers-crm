@@ -328,16 +328,23 @@
                 </svg>
               </button>
               <span class="header-action-divider" aria-hidden="true"></span>
-              <button class="quick-action-btn list-header-btn" id="add-contact-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <circle cx="4" cy="6" r="1"></circle>
-                  <circle cx="4" cy="12" r="1"></circle>
-                  <circle cx="4" cy="18" r="1"></circle>
-                  <line x1="8" y1="6" x2="20" y2="6"></line>
-                  <line x1="8" y1="12" x2="20" y2="12"></line>
-                  <line x1="8" y1="18" x2="20" y2="18"></line>
-                </svg>
-              </button>
+              <div class="list-seq-group">
+                <button class="quick-action-btn list-header-btn" id="add-contact-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="4" cy="6" r="1"></circle>
+                    <circle cx="4" cy="12" r="1"></circle>
+                    <circle cx="4" cy="18" r="1"></circle>
+                    <line x1="8" y1="6" x2="20" y2="6"></line>
+                    <line x1="8" y1="12" x2="20" y2="12"></line>
+                    <line x1="8" y1="18" x2="20" y2="18"></line>
+                  </svg>
+                </button>
+                <button class="quick-action-btn list-header-btn" id="add-contact-to-sequences" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="7 4 20 12 7 20 7 4"></polygon>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           <div class="page-actions">
@@ -571,6 +578,13 @@
     if (addToListBtn && !addToListBtn._bound) {
       addToListBtn.addEventListener('click', (e) => { e.preventDefault(); openContactListsPanel(); });
       addToListBtn._bound = '1';
+    }
+
+    // Sequences button
+    const addToSequencesBtn = document.getElementById('add-contact-to-sequences');
+    if (addToSequencesBtn && !addToSequencesBtn._bound) {
+      addToSequencesBtn.addEventListener('click', (e) => { e.preventDefault(); openContactSequencesPanel(); });
+      addToSequencesBtn._bound = '1';
     }
 
     // Title actions: edit/copy/clear contact name
@@ -849,50 +863,189 @@
     style.id = 'contact-detail-header-styles';
     style.textContent = `
       /* Contact Detail: header action divider and alignment */
-      #contact-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: 8px; }
-      #contact-detail-header .header-action-divider { width: 1px; height: 20px; background: var(--grey-700); display: inline-block; }
+      #contact-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+      /* Reset margin added globally so spacing is controlled here */
+      #contact-detail-header .linkedin-header-btn { margin-left: 0; }
+      /* Vertical divider between LinkedIn and the List/Sequence group */
+      #contact-detail-header .header-action-divider {
+        width: 1px;
+        height: 24px;
+        background: var(--border-light);
+        opacity: 0.9;
+        display: inline-block;
+        margin: 0 var(--spacing-sm);
+        border-radius: 1px;
+      }
       #contact-detail-header .list-header-btn svg { display: block; }
+      #contact-detail-header .list-seq-group { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
     `;
+    // Append to head so rules actually apply
     document.head.appendChild(style);
   }
 
-  // ===== Lists integration (Add to List) =====
+  // ===== Sequences integration (Add to Sequence) =====
+  let _onContactSequencesKeydown = null;
+  let _positionContactSequencesPanel = null;
+  let _onContactSequencesOutside = null;
+
+function closeContactSequencesPanel() {
+  const panel = document.getElementById('contact-sequences-panel');
+  const cleanup = () => {
+    if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
+    try { document.removeEventListener('mousedown', _onContactSequencesOutside, true); } catch(_) {}
+    // Reset trigger state and restore focus
+    try {
+      const trigger = document.getElementById('add-contact-to-sequences');
+      if (trigger) {
+        trigger.setAttribute('aria-expanded', 'false');
+        // Only restore focus if closed by keyboard (Escape), not by pointer
+        if (document.activeElement === trigger) {
+          trigger.focus();
+        }
+      }
+    } catch(_) {}
+  };
+  if (panel) panel.classList.remove('--show');
+  setTimeout(cleanup, 120);
+
+  try { document.removeEventListener('keydown', _onContactSequencesKeydown, true); } catch(_) {}
+  try { window.removeEventListener('resize', _positionContactSequencesPanel, true); } catch(_) {}
+  try { window.removeEventListener('scroll', _positionContactSequencesPanel, true); } catch(_) {}
+  _onContactSequencesKeydown = null; _positionContactSequencesPanel = null; _onContactSequencesOutside = null;
+}
+
+function openContactSequencesPanel() {
+  if (document.getElementById('contact-sequences-panel')) return;
+  // Reuse styles from lists modal
+  injectContactListsStyles();
+  const panel = document.createElement('div');
+  panel.id = 'contact-sequences-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', 'Add to sequence');
+  const c = state.currentContact || {};
+  const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'this contact';
+  panel.innerHTML = `
+    <div class="list-header">Add ${escapeHtml(fullName)} to sequence</div>
+    <div class="list-body" id="contact-sequences-body">
+      <div class="list-item" tabindex="0" data-action="create">
+        <div>
+          <div class="list-name">Create new sequence…</div>
+          <div class="list-meta">Create a sequence</div>
+        </div>
+      </div>
+    </div>
+    <div class="list-footer">
+      <button type="button" class="btn" id="contact-sequences-cancel">Cancel</button>
+    </div>`;
+  document.body.appendChild(panel);
+
+  // Position anchored to the Sequences button
+  _positionContactSequencesPanel = function position() {
+    const btn = document.getElementById('add-contact-to-sequences');
+    const rect = btn ? btn.getBoundingClientRect() : null;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const pad = 8;
+    const gap = 8;
+    let placement = 'bottom';
+    let top = Math.max(pad, 72);
+    let left = Math.max(pad, (vw - panel.offsetWidth) / 2);
+    if (rect) {
+      const panelW = panel.offsetWidth;
+      const panelH = panel.offsetHeight || 320;
+      const fitsBottom = rect.bottom + gap + panelH + pad <= vh;
+      const fitsTop = rect.top - gap - panelH - pad >= 0;
+      placement = fitsBottom || !fitsTop ? 'bottom' : 'top';
+      if (placement === 'bottom') {
+        top = Math.min(vh - panelH - pad, rect.bottom + gap);
+      } else {
+        top = Math.max(pad, rect.top - gap - panelH);
+      }
+      left = Math.round(
+        Math.min(
+          Math.max(pad, rect.left + (rect.width / 2) - (panelW / 2)),
+          vw - panelW - pad
+        )
+      );
+      const arrowLeft = Math.round(rect.left + rect.width / 2 - left);
+      panel.style.setProperty('--arrow-left', `${arrowLeft}px`);
+      panel.setAttribute('data-placement', placement);
+    }
+    panel.style.top = `${Math.round(top)}px`;
+    panel.style.left = `${Math.round(left)}px`;
+  };
+  _positionContactSequencesPanel();
+  window.addEventListener('resize', _positionContactSequencesPanel, true);
+  window.addEventListener('scroll', _positionContactSequencesPanel, true);
+  requestAnimationFrame(() => { panel.classList.add('--show'); });
+  try { document.getElementById('add-contact-to-sequences')?.setAttribute('aria-expanded', 'true'); } catch(_) {}
+  // TODO: Populate sequences list here if needed
+  panel.querySelector('#contact-sequences-cancel')?.addEventListener('click', () => closeContactSequencesPanel());
+  setTimeout(() => { const first = panel.querySelector('.list-item, .btn'); if (first) first.focus(); }, 0);
+  _onContactSequencesKeydown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); closeContactSequencesPanel(); return; }
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.classList?.contains('list-item')) {
+      e.preventDefault();
+      // Implement sequence choose logic if needed
+    }
+  };
+  document.addEventListener('keydown', _onContactSequencesKeydown, true);
+  _onContactSequencesOutside = (e) => {
+    const inside = panel.contains(e.target);
+    const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-sequences'));
+    const isSearchBar = e.target.classList && e.target.classList.contains('search-input');
+    if (!inside && !isTrigger) {
+      closeContactSequencesPanel();
+      if (isSearchBar && typeof e.target.focus === 'function') {
+        setTimeout(() => e.target.focus(), 120);
+      }
+    }
+  };
+  document.addEventListener('mousedown', _onContactSequencesOutside, true);
+}
+
+// ===== Lists integration (Add to List) =====
   let _onContactListsKeydown = null;
   let _positionContactListsPanel = null;
   let _onContactListsOutside = null;
 
   function injectContactListsStyles() {
-    if (document.getElementById('contact-detail-lists-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'contact-detail-lists-styles';
+    let style = document.getElementById('contact-detail-lists-styles');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'contact-detail-lists-styles';
+      document.head.appendChild(style);
+    }
     style.textContent = `
-      /* Contact Detail: Add to List panel */
-      #contact-lists-panel { position: fixed; z-index: 1200; width: min(560px, 92vw);
+      /* Contact Detail: Add to List/Sequence panel */
+      #contact-lists-panel, #contact-sequences-panel { position: fixed; z-index: 1200; width: min(560px, 92vw);
         background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light);
         border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
         transform: translateY(-8px); opacity: 0; transition: transform .16s ease, opacity .16s ease;
         /* Avoid clipping the pointer arrow */
         --arrow-size: 10px; }
-      #contact-lists-panel.--show { transform: translateY(0); opacity: 1; }
-      #contact-lists-panel .list-header { padding: 14px 16px; border-bottom: 1px solid var(--border-light); font-weight: 700; background: var(--bg-card); }
-      #contact-lists-panel .list-body { max-height: min(70vh, 720px); overflow: auto; background: var(--bg-card); }
-      #contact-lists-panel .list-body::-webkit-scrollbar { width: 10px; }
-      #contact-lists-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
-      #contact-lists-panel .list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; cursor:pointer; background: var(--bg-card); border-top: 1px solid var(--border-light); }
-      #contact-lists-panel .list-item:first-child { border-top: 0; }
-      #contact-lists-panel .list-item:hover { background: var(--bg-hover); }
-      #contact-lists-panel .list-item[aria-disabled="true"] { opacity: .6; cursor: default; }
-      #contact-lists-panel .list-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; }
-      #contact-lists-panel .list-name { font-weight: 600; }
-      #contact-lists-panel .list-meta { color: var(--text-muted); font-size: .85rem; }
-      #contact-lists-panel .list-footer { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top: 1px solid var(--border-light); background: var(--bg-card); }
-      #contact-lists-panel .btn { border: 1px solid var(--border-light); background: var(--bg-item); color: var(--text-primary); border-radius: var(--border-radius-sm); padding:6px 10px; }
-      #contact-lists-panel .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35); }
-      #contact-lists-panel .btn-primary { background: var(--orange-subtle); border-color: var(--orange-subtle); color: #fff; }
+      #contact-lists-panel.--show, #contact-sequences-panel.--show { transform: translateY(0); opacity: 1; }
+      #contact-lists-panel .list-header, #contact-sequences-panel .list-header { padding: 14px 16px; border-bottom: 1px solid var(--border-light); font-weight: 700; background: var(--bg-card); }
+      #contact-lists-panel .list-body, #contact-sequences-panel .list-body { max-height: min(70vh, 720px); overflow: auto; background: var(--bg-card); }
+      #contact-lists-panel .list-body::-webkit-scrollbar, #contact-sequences-panel .list-body::-webkit-scrollbar { width: 10px; }
+      #contact-lists-panel .list-body::-webkit-scrollbar-thumb, #contact-sequences-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
+      #contact-lists-panel .list-item, #contact-sequences-panel .list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; cursor:pointer; background: var(--bg-card); border-top: 1px solid var(--border-light); }
+      #contact-lists-panel .list-item:first-child, #contact-sequences-panel .list-item:first-child { border-top: 0; }
+      #contact-lists-panel .list-item:hover, #contact-sequences-panel .list-item:hover { background: var(--bg-hover); }
+      #contact-lists-panel .list-item[aria-disabled="true"], #contact-sequences-panel .list-item[aria-disabled="true"] { opacity: .6; cursor: default; }
+      #contact-lists-panel .list-item:focus-visible, #contact-sequences-panel .list-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; }
+      #contact-lists-panel .list-name, #contact-sequences-panel .list-name { font-weight: 600; }
+      #contact-lists-panel .list-meta, #contact-sequences-panel .list-meta { color: var(--text-muted); font-size: .85rem; }
+      #contact-lists-panel .list-footer, #contact-sequences-panel .list-footer { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top: 1px solid var(--border-light); background: var(--bg-card); }
+      #contact-lists-panel .btn, #contact-sequences-panel .btn { border: 1px solid var(--border-light); background: var(--bg-item); color: var(--text-primary); border-radius: var(--border-radius-sm); padding:6px 10px; }
+      #contact-lists-panel .btn:focus-visible, #contact-sequences-panel .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35); }
+      #contact-lists-panel .btn-primary, #contact-sequences-panel .btn-primary { background: var(--orange-subtle); border-color: var(--orange-subtle); color: #fff; }
 
       /* Pointer arrow (reuse delete-popover pattern) */
       #contact-lists-panel::before,
-      #contact-lists-panel::after {
+      #contact-lists-panel::after,
+      #contact-sequences-panel::before,
+      #contact-sequences-panel::after {
         content: "";
         position: absolute;
         width: var(--arrow-size);
@@ -901,23 +1054,27 @@
         pointer-events: none;
       }
       /* Bottom placement (arrow on top edge) */
-      #contact-lists-panel[data-placement="bottom"]::before {
+      #contact-lists-panel[data-placement="bottom"]::before,
+      #contact-sequences-panel[data-placement="bottom"]::before {
         left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         top: calc(-1 * var(--arrow-size) / 2 + 1px);
         background: var(--border-light);
       }
-      #contact-lists-panel[data-placement="bottom"]::after {
+      #contact-lists-panel[data-placement="bottom"]::after,
+      #contact-sequences-panel[data-placement="bottom"]::after {
         left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         top: calc(-1 * var(--arrow-size) / 2 + 2px);
         background: var(--bg-card);
       }
       /* Top placement (arrow on bottom edge) */
-      #contact-lists-panel[data-placement="top"]::before {
+      #contact-lists-panel[data-placement="top"]::before,
+      #contact-sequences-panel[data-placement="top"]::before {
         left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         bottom: calc(-1 * var(--arrow-size) / 2 + 1px);
         background: var(--border-light);
       }
-      #contact-lists-panel[data-placement="top"]::after {
+      #contact-lists-panel[data-placement="top"]::after,
+      #contact-sequences-panel[data-placement="top"]::after {
         left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
         bottom: calc(-1 * var(--arrow-size) / 2 + 2px);
         background: var(--bg-card);
@@ -936,7 +1093,10 @@
         const trigger = document.getElementById('add-contact-to-list');
         if (trigger) {
           trigger.setAttribute('aria-expanded', 'false');
-          trigger.focus();
+          // Only restore focus if closed by keyboard (Escape), not by pointer
+          if (document.activeElement === trigger) {
+            trigger.focus();
+          }
         }
       } catch(_) {}
     };
@@ -1047,7 +1207,15 @@
     _onContactListsOutside = (e) => {
       const inside = panel.contains(e.target);
       const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-list'));
-      if (!inside && !isTrigger) closeContactListsPanel();
+      // Allow clicking on global search bar (class 'search-input') to close the modal and allow focus
+      const isSearchBar = e.target.classList && e.target.classList.contains('search-input');
+      if (!inside && !isTrigger) {
+        closeContactListsPanel();
+        // If search bar, focus it after closing modal
+        if (isSearchBar && typeof e.target.focus === 'function') {
+          setTimeout(() => e.target.focus(), 120);
+        }
+      }
     };
     document.addEventListener('mousedown', _onContactListsOutside, true);
 

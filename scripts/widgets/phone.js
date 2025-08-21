@@ -61,6 +61,16 @@
           enableImprovedSignalingErrorPrecision: true,
           logLevel: 'debug'
         });
+        
+        // Set audio constraints for better audio quality
+        state.device.audio.setAudioConstraints({
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        });
+        
+        // Set default input device
+        state.device.audio.setInputDevice('default');
 
         // Set up device event handlers
         state.device.on('registered', () => {
@@ -93,6 +103,23 @@
           
           try { window.crm?.showToast && window.crm.showToast(`Device error: ${error?.message || 'Unknown error'}`); } catch(_) {}
         });
+        
+        // Handle device changes (e.g., headset plugged in/out)
+        // According to Twilio best practices
+        state.device.audio.on('deviceChange', () => {
+          console.debug('[TwilioRTC] Audio devices changed');
+          // Update UI with new device list if needed
+        });
+        
+        // Set default speaker device for output
+        if (state.device.audio.isOutputSelectionSupported) {
+          try {
+            state.device.audio.speakerDevices.set('default');
+            console.debug('[TwilioRTC] Default speaker device set');
+          } catch (e) {
+            console.warn('[TwilioRTC] Failed to set default speaker device:', e);
+          }
+        }
 
         // Capture SDK warnings for diagnostics (e.g., ICE issues, media errors)
         try {
@@ -101,9 +128,24 @@
           });
         } catch (_) {}
 
-        state.device.on('incoming', (conn) => {
+        state.device.on('incoming', async (conn) => {
           console.debug('[TwilioRTC] Incoming call:', conn);
           state.connection = conn;
+          
+          // Set input device before accepting the call according to Twilio best practices
+          if (state.device.audio) {
+            await state.device.audio.setInputDevice('default');
+            
+            // Set speaker device for output according to Twilio best practices
+            if (state.device.audio.isOutputSelectionSupported) {
+              try {
+                state.device.audio.speakerDevices.set('default');
+              } catch (e) {
+                console.warn('[TwilioRTC] Failed to set default speaker device for incoming call:', e);
+              }
+            }
+          }
+          
           // Handle incoming calls if needed
         });
 
@@ -174,7 +216,7 @@
     const micText = card.querySelector('.mic-text');
     if (!micStatus || !micText) return;
 
-    micStatus.classList.remove('ok', 'warn', 'error', 'checking');
+    micStatus.classList.remove('ok', 'warn', 'error', 'checking', 'ready');
     switch (status) {
       case 'granted':
         micStatus.classList.add('ok');
@@ -182,15 +224,19 @@
         break;
       case 'denied':
         micStatus.classList.add('warn');
-        micText.textContent = 'Will call your phone - click address bar mic for browser calls';
+        micText.textContent = 'Will call your phone - click here to retry microphone access';
         break;
       case 'checking':
         micStatus.classList.add('checking');
-        micText.textContent = 'Checking microphone access...';
+        micText.textContent = 'Requesting microphone access...';
         break;
       case 'error':
         micStatus.classList.add('error');
-        micText.textContent = 'Will call your phone (browser calls unavailable)';
+        micText.textContent = 'Will call your phone - click here to retry microphone access';
+        break;
+      case 'ready':
+        micStatus.classList.add('ready');
+        micText.textContent = 'Click here to enable browser calls (requires microphone access)';
         break;
     }
   }
@@ -214,21 +260,8 @@
     }
     
     try {
-      // Check current permission status
-      if (navigator.permissions && navigator.permissions.query) {
-        const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-        if (permissionStatus.state === 'granted') {
-          TwilioRTC.state.micPermissionGranted = true;
-          TwilioRTC.state.micPermissionChecked = true;
-          return true;
-        } else if (permissionStatus.state === 'denied') {
-          TwilioRTC.state.micPermissionGranted = false;
-          TwilioRTC.state.micPermissionChecked = true;
-          return false;
-        }
-      }
-      
-      // Request microphone permission explicitly
+      // Always attempt to request microphone permission directly
+      // This will trigger the browser permission dialog if needed
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         // Stop the stream immediately as we only need permission
@@ -254,6 +287,13 @@
       TwilioRTC.state.micPermissionChecked = true;
       return false;
     }
+  }
+
+  // Reset microphone permission state to force re-check
+  function resetMicrophonePermission() {
+    TwilioRTC.state.micPermissionGranted = false;
+    TwilioRTC.state.micPermissionChecked = false;
+    console.debug('[Phone] Microphone permission state reset');
   }
 
   function getPanelContentEl() {
@@ -369,7 +409,7 @@
       </div>
       <div class="phone-body">
         <input type="text" class="input-dark phone-display" placeholder="Enter number" inputmode="tel" autocomplete="off" />
-        <div class="mic-status checking">
+        <div class="mic-status checking" role="button" tabindex="0" title="Click to retry microphone permission">
           <span class="status-dot" aria-hidden="true"></span>
           <span class="mic-text">Checking microphone access...</span>
         </div>
@@ -459,6 +499,21 @@
       try {
         const device = await TwilioRTC.ensureDevice();
         
+        // Set input device before making the call according to Twilio best practices
+        // This ensures proper audio device selection for the call
+        if (device.audio) {
+          await device.audio.setInputDevice('default');
+          
+          // Set speaker device for output according to Twilio best practices
+          if (device.audio.isOutputSelectionSupported) {
+            try {
+              device.audio.speakerDevices.set('default');
+            } catch (e) {
+              console.warn('[Phone] Failed to set default speaker device:', e);
+            }
+          }
+        }
+        
         // Make the call with recording enabled via TwiML app
         currentCall = await device.connect({
           params: {
@@ -487,7 +542,7 @@
           updateCallStatus(number, 'connected', callStartTime, 0, callId);
         });
         
-        currentCall.on('disconnect', () => {
+        currentCall.on('disconnect', async () => {
           console.debug('[Phone] Call disconnected');
           const callEndTime = Date.now();
           const duration = Math.floor((callEndTime - callStartTime) / 1000);
@@ -497,6 +552,17 @@
           currentCall = null;
           isCallInProgress = false;
           setInCallUI(false);
+          
+          // Release the input device to avoid the red recording symbol
+          // According to Twilio best practices
+          if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
+            try {
+              await TwilioRTC.state.device.audio.unsetInputDevice();
+              console.debug('[Phone] Audio input device released');
+            } catch (e) {
+              console.warn('[Phone] Failed to release audio input device:', e);
+            }
+          }
           
           // Clear current call context to prevent auto-callback
           console.debug('[Phone] Clearing call context after disconnect');
@@ -742,12 +808,16 @@
         }
         
         // Check microphone permission before attempting browser call (CRM only)
+        // This will now trigger the permission dialog since it's in response to user click
         let hasMicPermission = false;
         try {
+          updateMicrophoneStatusUI(card, 'checking');
           hasMicPermission = await checkMicrophonePermission(card);
+          updateMicrophoneStatusUI(card, hasMicPermission ? 'granted' : 'denied');
           console.debug('[Phone] Microphone permission check result:', hasMicPermission);
         } catch (permError) {
           console.warn('[Phone] Permission check failed, using fallback:', permError?.message || permError);
+          updateMicrophoneStatusUI(card, 'error');
           hasMicPermission = false;
         }
         
@@ -794,6 +864,33 @@
     // Close button
     const closeBtn = card.querySelector('.phone-close');
     if (closeBtn) closeBtn.addEventListener('click', () => closePhoneWidget());
+
+    // Microphone status click handler for retry
+    const micStatus = card.querySelector('.mic-status');
+    if (micStatus) {
+      const handleMicRetry = async () => {
+        resetMicrophonePermission();
+        updateMicrophoneStatusUI(card, 'checking');
+        adjustHeightIfAnimating(card);
+        try {
+          const hasPermission = await checkMicrophonePermission(card);
+          updateMicrophoneStatusUI(card, hasPermission ? 'granted' : 'denied');
+          adjustHeightIfAnimating(card);
+        } catch (error) {
+          console.warn('[Phone] Error retrying mic permission:', error);
+          updateMicrophoneStatusUI(card, 'error');
+          adjustHeightIfAnimating(card);
+        }
+      };
+      
+      micStatus.addEventListener('click', handleMicRetry);
+      micStatus.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleMicRetry();
+        }
+      });
+    }
 
     // Keyboard input support: digits, *, #, and letter->T9 digit mapping
     card.addEventListener('keydown', (e) => {
@@ -928,19 +1025,10 @@
       if (panel) panel.scrollTop = 0;
     } catch (_) { /* noop */ }
 
-    // Check microphone permission when widget opens
-    setTimeout(async () => {
-      try {
-        updateMicrophoneStatusUI(card, 'checking');
-        adjustHeightIfAnimating(card);
-        const hasPermission = await checkMicrophonePermission(card);
-        updateMicrophoneStatusUI(card, hasPermission ? 'granted' : 'denied');
-        adjustHeightIfAnimating(card);
-      } catch (error) {
-        console.warn('[Phone] Error checking mic permission:', error);
-        updateMicrophoneStatusUI(card, 'error');
-        adjustHeightIfAnimating(card);
-      }
+    // Initialize microphone status without requesting permission yet
+    setTimeout(() => {
+      updateMicrophoneStatusUI(card, 'ready');
+      adjustHeightIfAnimating(card);
     }, 100);
 
     try { window.crm?.showToast && window.crm.showToast('Phone opened'); } catch (_) {}
@@ -1068,6 +1156,7 @@
   window.Widgets.openPhone = openPhone;
   window.Widgets.closePhone = closePhoneWidget;
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };
+  window.Widgets.resetMicrophonePermission = resetMicrophonePermission;
   
   // Expose for console diagnostics
   try { window.TwilioRTC = TwilioRTC; } catch(_) {}
