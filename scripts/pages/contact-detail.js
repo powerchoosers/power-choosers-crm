@@ -442,6 +442,7 @@
       els.mainContent.prepend(bodyEl);
     }
     attachContactDetailEvents();
+    try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
   }
 
   function svgPencil() {
@@ -655,8 +656,11 @@
         const delBtn = e.target.closest('.info-delete');
         if (delBtn) {
           e.preventDefault();
-          await saveField(field, '');
-          updateFieldText(wrap, '');
+          // Open confirmation popover anchored to the delete icon
+          openDeleteConfirmPopover(delBtn, async () => {
+            await saveField(field, '');
+            updateFieldText(wrap, '');
+          });
           return;
         }
       });
@@ -856,6 +860,105 @@
     wrap.setAttribute('data-has-value', (value && String(value).trim()) ? '1' : '0');
   }
 
+  // ===== Inline delete confirmation popover =====
+  let _onDeletePopoverOutside = null;
+  let _onDeletePopoverKeydown = null;
+  let _positionDeletePopover = null;
+
+  function closeDeleteConfirmPopover() {
+    const pop = document.getElementById('delete-confirm-popover');
+    const cleanup = () => { if (pop && pop.parentElement) pop.parentElement.removeChild(pop); };
+    if (pop) pop.classList.remove('--show');
+    setTimeout(cleanup, 100);
+    try { document.removeEventListener('mousedown', _onDeletePopoverOutside, true); } catch(_) {}
+    try { document.removeEventListener('keydown', _onDeletePopoverKeydown, true); } catch(_) {}
+    try { window.removeEventListener('resize', _positionDeletePopover, true); } catch(_) {}
+    try { window.removeEventListener('scroll', _positionDeletePopover, true); } catch(_) {}
+    _onDeletePopoverOutside = null; _onDeletePopoverKeydown = null; _positionDeletePopover = null;
+  }
+
+  function openDeleteConfirmPopover(anchorEl, onConfirm) {
+    // If already open, close it first
+    closeDeleteConfirmPopover();
+    const pop = document.createElement('div');
+    pop.className = 'delete-popover';
+    pop.id = 'delete-confirm-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Confirm clear');
+    pop.innerHTML = `
+      <div class="delete-popover-inner">
+        <div class="message">Clear this field?</div>
+        <div class="btn-row">
+          <button type="button" class="btn-cancel">Cancel</button>
+          <button type="button" class="btn-danger">Clear</button>
+        </div>
+      </div>`;
+    document.body.appendChild(pop);
+
+    // Position relative to the anchor icon
+    function position() {
+      const rect = anchorEl?.getBoundingClientRect?.();
+      const vw = window.innerWidth; const vh = window.innerHeight;
+      const pad = 8; const gap = 8;
+      let top = Math.max(pad, 72);
+      let left = Math.max(pad, (vw - pop.offsetWidth) / 2);
+      let placement = 'bottom';
+      if (rect) {
+        const pw = pop.offsetWidth || 260;
+        const ph = pop.offsetHeight || 100;
+        const fitsBottom = rect.bottom + gap + ph + pad <= vh;
+        const fitsTop = rect.top - gap - ph - pad >= 0;
+        placement = fitsBottom || !fitsTop ? 'bottom' : 'top';
+        if (placement === 'bottom') {
+          top = Math.min(vh - ph - pad, rect.bottom + gap);
+        } else {
+          top = Math.max(pad, rect.top - gap - ph);
+        }
+        left = Math.round(Math.min(Math.max(pad, rect.left + rect.width/2 - pw/2), vw - pw - pad));
+        const arrowLeft = Math.round(rect.left + rect.width/2 - left);
+        pop.style.setProperty('--arrow-left', `${arrowLeft}px`);
+        pop.setAttribute('data-placement', placement);
+      }
+      pop.style.top = `${Math.round(top)}px`;
+      pop.style.left = `${Math.round(left)}px`;
+    }
+    _positionDeletePopover = position;
+    position();
+    requestAnimationFrame(() => pop.classList.add('--show'));
+
+    // Wire buttons
+    const btnCancel = pop.querySelector('.btn-cancel');
+    const btnDanger = pop.querySelector('.btn-danger');
+    btnCancel?.addEventListener('click', () => closeDeleteConfirmPopover());
+    btnDanger?.addEventListener('click', async () => {
+      try { await onConfirm?.(); } finally { closeDeleteConfirmPopover(); }
+    });
+
+    // Keyboard: Escape closes, Enter on danger when focused confirms
+    _onDeletePopoverKeydown = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeDeleteConfirmPopover(); }
+      if ((e.key === 'Enter' || e.key === ' ') && document.activeElement === btnDanger) {
+        e.preventDefault(); btnDanger.click();
+      }
+    };
+    document.addEventListener('keydown', _onDeletePopoverKeydown, true);
+
+    // Click-away
+    _onDeletePopoverOutside = (e) => {
+      const inside = pop.contains(e.target);
+      const onAnchor = !!(e.target.closest && anchorEl && e.target.closest('.info-delete') === anchorEl.closest('.info-delete'));
+      if (!inside && !onAnchor) closeDeleteConfirmPopover();
+    };
+    document.addEventListener('mousedown', _onDeletePopoverOutside, true);
+
+    // Reposition on viewport changes
+    try { window.addEventListener('resize', _positionDeletePopover, true); } catch(_) {}
+    try { window.addEventListener('scroll', _positionDeletePopover, true); } catch(_) {}
+
+    // Focus the Cancel button initially for safer default
+    setTimeout(() => { try { btnCancel?.focus(); } catch(_) {} }, 0);
+  }
+
   // Minimal header styles for divider and layout
   function injectContactHeaderStyles() {
     if (document.getElementById('contact-detail-header-styles')) return;
@@ -930,16 +1033,25 @@ function openContactSequencesPanel() {
       <div class="list-item" tabindex="0" data-action="create">
         <div>
           <div class="list-name">Create new sequence…</div>
-          <div class="list-meta">Create a sequence</div>
+          <div class="list-meta">Create a contact sequence</div>
         </div>
       </div>
+      <div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">Loading sequences…</div><div class="list-meta">Please wait</div></div></div>
     </div>
     <div class="list-footer">
       <button type="button" class="btn" id="contact-sequences-cancel">Cancel</button>
     </div>`;
   document.body.appendChild(panel);
 
-  // Position anchored to the Sequences button
+  // Cancel closes
+  const cancelBtn = panel.querySelector('#contact-sequences-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => closeContactSequencesPanel());
+
+  // Populate data
+  const container = panel.querySelector('#contact-sequences-body');
+  populateContactSequencesPanel(container);
+
+  // Position and show
   _positionContactSequencesPanel = function position() {
     const btn = document.getElementById('add-contact-to-sequences');
     const rect = btn ? btn.getBoundingClientRect() : null;
@@ -954,8 +1066,7 @@ function openContactSequencesPanel() {
       const panelW = panel.offsetWidth;
       const panelH = panel.offsetHeight || 320;
       const fitsBottom = rect.bottom + gap + panelH + pad <= vh;
-      const fitsTop = rect.top - gap - panelH - pad >= 0;
-      placement = fitsBottom || !fitsTop ? 'bottom' : 'top';
+      placement = fitsBottom ? 'bottom' : 'top';
       if (placement === 'bottom') {
         top = Math.min(vh - panelH - pad, rect.bottom + gap);
       } else {
@@ -975,18 +1086,23 @@ function openContactSequencesPanel() {
     panel.style.left = `${Math.round(left)}px`;
   };
   _positionContactSequencesPanel();
-  window.addEventListener('resize', _positionContactSequencesPanel, true);
-  window.addEventListener('scroll', _positionContactSequencesPanel, true);
-  requestAnimationFrame(() => { panel.classList.add('--show'); });
-  try { document.getElementById('add-contact-to-sequences')?.setAttribute('aria-expanded', 'true'); } catch(_) {}
-  // TODO: Populate sequences list here if needed
-  panel.querySelector('#contact-sequences-cancel')?.addEventListener('click', () => closeContactSequencesPanel());
-  setTimeout(() => { const first = panel.querySelector('.list-item, .btn'); if (first) first.focus(); }, 0);
+  setTimeout(() => panel.classList.add('--show'), 0);
+  try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
+  try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
+
+  // Interactions
+  panel.addEventListener('click', (e) => {
+    const item = e.target.closest?.('.list-item');
+    if (!item || item.getAttribute('aria-disabled') === 'true') return;
+    handleSequenceChoose(item);
+  });
+
+  // Define keyboard handler before registering
   _onContactSequencesKeydown = (e) => {
     if (e.key === 'Escape') { e.preventDefault(); closeContactSequencesPanel(); return; }
     if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.classList?.contains('list-item')) {
       e.preventDefault();
-      // Implement sequence choose logic if needed
+      handleSequenceChoose(document.activeElement);
     }
   };
   document.addEventListener('keydown', _onContactSequencesKeydown, true);
@@ -1002,6 +1118,201 @@ function openContactSequencesPanel() {
     }
   };
   document.addEventListener('mousedown', _onContactSequencesOutside, true);
+}
+
+// Populate sequences into the contact sequences panel
+async function populateContactSequencesPanel(container) {
+  if (!container) return;
+  try {
+    const db = window.firebaseDB;
+    const contactId = state.currentContact?.id;
+    let sequences = [];
+    const membership = new Map(); // sequenceId -> memberDocId
+    if (db && typeof db.collection === 'function') {
+      // Load sequences (newest first if createdAt available)
+      let q = db.collection('sequences');
+      try { q = q.orderBy('createdAt', 'desc'); } catch(_) {}
+      const snap = await q.get();
+      sequences = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+
+      // Load membership for this contact
+      if (contactId) {
+        let mq = db.collection('sequenceMembers').where('targetId', '==', contactId);
+        try { mq = mq.where('targetType', '==', 'people'); } catch(_) {}
+        const msnap = await mq.get();
+        msnap.docs.forEach(md => {
+          const m = md.data() || {};
+          if (m.sequenceId) membership.set(String(m.sequenceId), md.id);
+        });
+      }
+    }
+
+    // Render
+    // Keep the create row and replace only the loading row
+    const createRow = container.querySelector('.list-item[data-action="create"]');
+    const loadingRow = container.querySelector('.list-item[aria-disabled="true"]');
+  
+    if (!sequences.length) {
+      if (loadingRow) {
+        loadingRow.innerHTML = '<div><div class="list-name">No sequences</div><div class="list-meta">Create a sequence first</div></div>';
+      }
+      return;
+    }
+
+    // Remove loading row if it exists
+    if (loadingRow) {
+      loadingRow.remove();
+    }
+
+    const frag = document.createDocumentFragment();
+    sequences.forEach(seq => {
+      const isMember = membership.has(String(seq.id));
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      item.tabIndex = 0;
+      item.setAttribute('data-id', String(seq.id));
+      item.setAttribute('data-name', String(seq.name || 'Sequence'));
+      if (isMember) item.setAttribute('data-member-id', membership.get(String(seq.id)));
+      // Show member count
+      const memberCount = seq.stats?.active || 0;
+      const metaBits = [];
+      if (seq.isActive === false) metaBits.push('Inactive');
+      metaBits.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
+      if (seq.stats && typeof seq.stats.delivered === 'number') metaBits.push(`${seq.stats.delivered} steps`);
+      const meta = metaBits.join(' • ');
+      item.innerHTML = `
+        <div>
+          <div class="list-name">${escapeHtml(seq.name || 'Sequence')}</div>
+          <div class="list-meta">${escapeHtml(meta || '')}</div>
+        </div>
+        <div class="list-check" aria-hidden="true">${isMember ? '✓' : ''}</div>`;
+      frag.appendChild(item);
+    });
+    container.appendChild(frag);
+  } catch (err) {
+    console.warn('Failed to load sequences', err);
+  }
+}
+
+function handleSequenceChoose(el) {
+  const action = el.getAttribute('data-action');
+  if (action === 'create') {
+    const name = window.prompt('New sequence name');
+    if (!name) return;
+    createContactSequenceThenAdd(name.trim());
+    return;
+  }
+  const id = el.getAttribute('data-id');
+  const name = el.getAttribute('data-name') || 'Sequence';
+  const memberDocId = el.getAttribute('data-member-id');
+  if (memberDocId) {
+    removeCurrentContactFromSequence(memberDocId, name);
+  } else {
+    addCurrentContactToSequence(id, name);
+  }
+}
+
+async function addCurrentContactToSequence(sequenceId, sequenceName) {
+  try {
+    const contactId = state.currentContact?.id;
+    if (!contactId) { closeContactSequencesPanel(); return; }
+    const db = window.firebaseDB;
+    if (db && typeof db.collection === 'function') {
+      const doc = { sequenceId, targetId: contactId, targetType: 'people' };
+      if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+        doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+      } else {
+        doc.createdAt = new Date();
+        doc.updatedAt = new Date();
+      }
+      await db.collection('sequenceMembers').add(doc);
+      
+      // Increment sequence stats.active count
+      if (window.firebase?.firestore?.FieldValue) {
+        await db.collection('sequences').doc(sequenceId).update({
+          "stats.active": window.firebase.firestore.FieldValue.increment(1)
+        });
+      }
+    }
+    window.crm?.showToast && window.crm.showToast(`Added to "${sequenceName}"`);
+  } catch (err) {
+    console.warn('Add to sequence failed', err);
+    window.crm?.showToast && window.crm.showToast('Failed to add to sequence');
+  } finally {
+    closeContactSequencesPanel();
+  }
+}
+
+async function removeCurrentContactFromSequence(memberDocId, sequenceName) {
+  try {
+    const db = window.firebaseDB;
+    if (db && typeof db.collection === 'function' && memberDocId) {
+      // First get the sequenceId from the member document before deleting it
+      const memberDoc = await db.collection('sequenceMembers').doc(memberDocId).get();
+      const memberData = memberDoc.data();
+      const sequenceId = memberData?.sequenceId;
+      
+      await db.collection('sequenceMembers').doc(memberDocId).delete();
+      
+      // Decrement sequence stats.active count if we have the sequenceId
+      if (sequenceId && window.firebase?.firestore?.FieldValue) {
+        await db.collection('sequences').doc(sequenceId).update({
+          "stats.active": window.firebase.firestore.FieldValue.increment(-1)
+        });
+      }
+    }
+    window.crm?.showToast && window.crm.showToast(`Removed from "${sequenceName}"`);
+  } catch (err) {
+    console.warn('Remove from sequence failed', err);
+    window.crm?.showToast && window.crm.showToast('Failed to remove from sequence');
+  } finally {
+    closeContactSequencesPanel();
+  }
+}
+
+async function createContactSequenceThenAdd(name) {
+  try {
+    const db = window.firebaseDB;
+    let newId = null;
+    if (db && typeof db.collection === 'function') {
+      const payload = { name, stats: { active: 1, paused: 0, notSent: 0, bounced: 0, spamBlocked: 0, finished: 0, scheduled: 0, delivered: 0, replyPct: 0, interestedPct: 0 } };
+      if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+        payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+      } else {
+        payload.createdAt = new Date();
+        payload.updatedAt = new Date();
+      }
+      const ref = await db.collection('sequences').add(payload);
+      newId = ref.id;
+    }
+    if (newId) {
+      // We've already set recordCount to 1, so we don't need to increment it in addCurrentContactToSequence
+      // We'll directly add the member document
+      const contactId = state.currentContact?.id;
+      if (contactId) {
+        const doc = { sequenceId: newId, targetId: contactId, targetType: 'people' };
+        if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+          doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        } else {
+          doc.createdAt = new Date();
+          doc.updatedAt = new Date();
+        }
+        await db.collection('sequenceMembers').add(doc);
+      }
+      window.crm?.showToast && window.crm.showToast(`Created sequence "${name}"`);
+    } else {
+      window.crm?.showToast && window.crm.showToast(`Created sequence "${name}" (offline)`);
+      closeContactSequencesPanel();
+    }
+  } catch (err) {
+    console.warn('Create sequence failed', err);
+    window.crm?.showToast && window.crm.showToast('Failed to create sequence');
+  } finally {
+    closeContactSequencesPanel();
+  }
 }
 
 // ===== Lists integration (Add to List) =====
@@ -1284,12 +1595,12 @@ function openContactSequencesPanel() {
         const count = (typeof it.count === 'number') ? it.count : (it.recordCount || 0);
         const already = existing.has(String(it.id || ''));
         const memberId = existingMap.get(String(it.id || '')) || '';
-        const removeHint = already ? ' • Currently a member — click to remove' : '';
         return `<div class="list-item" tabindex="0" data-id="${escapeHtml(it.id || '')}" data-name="${escapeHtml(it.name || 'List')}" ${memberId ? `data-member-id="${escapeHtml(memberId)}"` : ''}>
           <div>
             <div class="list-name">${escapeHtml(it.name || 'Untitled')}</div>
-            <div class="list-meta">${count} member${count === 1 ? '' : 's'}${removeHint}</div>
+            <div class="list-meta">${count} member${count === 1 ? '' : 's'}</div>
           </div>
+          <div class="list-check" aria-hidden="true">${already ? '✓' : ''}</div>
         </div>`;
       }).join('');
 
