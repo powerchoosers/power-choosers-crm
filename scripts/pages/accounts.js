@@ -646,10 +646,20 @@
     switch (action) {
       case 'call': {
         const phone = btn.getAttribute('data-phone') || '';
+        const name = btn.closest('tr').querySelector('.account-name')?.textContent || 'Unknown Account';
         if (phone) {
-          try { window.open(`tel:${encodeURIComponent(phone)}`); } catch (e) { /* noop */ }
+          // Use phone widget instead of tel: link
+          if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
+            window.Widgets.callNumber(phone, name, false);
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast(`Calling ${name}...`);
+            }
+          } else {
+            // Fallback to tel: link if widget not available
+            try { window.open(`tel:${encodeURIComponent(phone)}`); } catch (e) { /* noop */ }
+          }
         }
-        console.log('Call account', { id, phone });
+        console.log('Call account', { id, phone, name });
         break;
       }
       case 'addlist': {
