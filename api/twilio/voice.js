@@ -64,7 +64,7 @@ export default function handler(req, res) {
                 answerOnBridge: true,
                 hangupOnStar: false,
                 timeLimit: 14400,
-                action: `${base}/api/twilio/status`
+                action: `${base}/api/twilio/dial-complete`
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -74,7 +74,8 @@ export default function handler(req, res) {
             const dial = twiml.dial({
                 callerId: businessNumber,
                 timeout: 30,
-                answerOnBridge: true
+                answerOnBridge: true,
+                action: `${base}/api/twilio/dial-complete`
             });
             dial.client('agent');
         }
