@@ -14,9 +14,9 @@ class EmailManager {
         
         // Google API configuration
         this.CLIENT_ID = '448802258090-re0u5rtja879t4tkej22rnedmo1jt3lp.apps.googleusercontent.com';
-        this.API_KEY = 'AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE'; // From plan.md Firebase config
+        this.API_KEY = 'AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE'; // From Firebase config
         this.DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest';
-        this.SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send';
+        this.SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
         
         this.init();
     }
@@ -59,6 +59,8 @@ class EmailManager {
                             discoveryDocs: [this.DISCOVERY_DOC],
                             scope: this.SCOPES
                         });
+                        
+                        console.log('Google API client initialized successfully');
                         
                         const authInstance = this.gapi.auth2.getAuthInstance();
                         this.isAuthenticated = authInstance.isSignedIn.get();
@@ -145,41 +147,37 @@ class EmailManager {
         // Check if we're on a secure context (HTTPS or localhost)
         const isSecure = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
         
-        if (!isSecure) {
-            emailList.innerHTML = `
-                <div class="email-auth-prompt">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    <h3>HTTPS Required for Gmail Integration</h3>
-                    <p>Google API requires HTTPS or localhost for authentication. Please:</p>
-                    <ul style="text-align: left; margin: 16px 0; color: var(--text-secondary);">
-                        <li>Deploy to GitHub Pages/Netlify (HTTPS), or</li>
-                        <li>Run locally on localhost, or</li>
-                        <li>Use a development server with HTTPS</li>
-                    </ul>
-                    <p><strong>Current URL:</strong> ${window.location.href}</p>
-                </div>
-            `;
-        } else {
-            emailList.innerHTML = `
-                <div class="email-auth-prompt">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M9 12l2 2 4-4"/>
-                        <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c2.39 0 4.68.94 6.36 2.64"/>
-                    </svg>
-                    <h3>Connect Your Gmail Account</h3>
-                    <p>Sign in with Google to access your emails in the CRM</p>
-                    <button class="btn-primary" onclick="window.emailManager?.authenticate()">
+        emailList.innerHTML = `
+            <div class="email-auth-prompt">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 12l2 2 4-4"/>
+                    <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c2.39 0 4.68.94 6.36 2.64"/>
+                </svg>
+                <h3>Gmail Integration Setup Required</h3>
+                <p>To use Gmail with this CRM, you need to:</p>
+                <ol style="text-align: left; margin: 16px 0; color: var(--text-secondary);">
+                    <li><strong>Enable Gmail API</strong> in Google Cloud Console</li>
+                    <li><strong>Add authorized origins:</strong> ${window.location.origin}</li>
+                    <li><strong>Configure OAuth consent screen</strong></li>
+                </ol>
+                <p style="margin-top: 20px;">
+                    <strong>Current status:</strong> ${isSecure ? 'Secure context ✓' : 'Requires HTTPS'}<br>
+                    <strong>URL:</strong> ${window.location.href}
+                </p>
+                <div style="margin-top: 20px;">
+                    <button class="btn-primary" onclick="window.emailManager?.authenticate()" style="margin-right: 10px;">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M9 12l2 2 4-4"/>
                             <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c2.39 0 4.68.94 6.36 2.64"/>
                         </svg>
-                        Sign in with Google
+                        Try Sign In
+                    </button>
+                    <button class="btn-secondary" onclick="window.emailManager?.showSetupInstructions()">
+                        Setup Instructions
                     </button>
                 </div>
-            `;
-        }
+            </div>
+        `;
     }
 
     async authenticate() {
@@ -189,15 +187,83 @@ class EmailManager {
         }
 
         try {
+            console.log('Starting Google authentication...');
             const authInstance = this.gapi.auth2.getAuthInstance();
-            await authInstance.signIn();
+            
+            if (!authInstance) {
+                throw new Error('Google Auth instance not available');
+            }
+            
+            const user = await authInstance.signIn();
+            console.log('Authentication successful:', user);
+            
             this.isAuthenticated = true;
             await this.loadEmails();
             window.crm?.showToast('Successfully connected to Gmail!');
         } catch (error) {
             console.error('Authentication failed:', error);
-            window.crm?.showToast('Failed to authenticate with Google. Please try again.');
+            
+            let errorMessage = 'Failed to authenticate with Google.';
+            if (error.error === 'popup_blocked_by_browser') {
+                errorMessage = 'Popup blocked. Please allow popups and try again.';
+            } else if (error.error === 'access_denied') {
+                errorMessage = 'Access denied. Please grant permissions to continue.';
+            } else if (error.error === 'invalid_client') {
+                errorMessage = 'Invalid client configuration. Check Google API setup.';
+            }
+            
+            window.crm?.showToast(errorMessage);
+            this.showSetupInstructions();
         }
+    }
+
+    showSetupInstructions() {
+        const emailList = document.getElementById('email-list');
+        if (!emailList) return;
+
+        emailList.innerHTML = `
+            <div class="email-auth-prompt">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <h3>Google API Setup Instructions</h3>
+                <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+                    <h4>1. Google Cloud Console Setup</h4>
+                    <ul style="color: var(--text-secondary); margin-bottom: 20px;">
+                        <li>Go to <a href="https://console.cloud.google.com" target="_blank" style="color: var(--orange-subtle);">Google Cloud Console</a></li>
+                        <li>Select project: <strong>power-choosers-crm-468420</strong></li>
+                        <li>Enable <strong>Gmail API</strong> in APIs & Services</li>
+                    </ul>
+                    
+                    <h4>2. OAuth Consent Screen</h4>
+                    <ul style="color: var(--text-secondary); margin-bottom: 20px;">
+                        <li>Configure OAuth consent screen</li>
+                        <li>Add your email as a test user</li>
+                        <li>Set application type to <strong>Web application</strong></li>
+                    </ul>
+                    
+                    <h4>3. Authorized JavaScript Origins</h4>
+                    <p style="color: var(--text-secondary);">Add these URLs to your OAuth client:</p>
+                    <div style="background: var(--bg-item); padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0;">
+                        ${window.location.origin}<br>
+                        http://localhost:3000<br>
+                        https://powerchoosers.com
+                    </div>
+                    
+                    <h4>4. Current Configuration</h4>
+                    <div style="background: var(--bg-item); padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px;">
+                        Client ID: ${this.CLIENT_ID}<br>
+                        Current Origin: ${window.location.origin}
+                    </div>
+                </div>
+                
+                <div style="margin-top: 30px;">
+                    <button class="btn-primary" onclick="window.emailManager?.showAuthPrompt()">
+                        ← Back to Sign In
+                    </button>
+                </div>
+            </div>
+        `;
     }
 
     async loadEmails() {
