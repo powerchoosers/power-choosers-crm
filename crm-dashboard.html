@@ -1027,132 +1027,149 @@
                             </div>
                             <div class="page-content lists-grid">
                                 <div id="lists-empty-state" class="empty-state">
-                                        <div class="empty-title">No lists added</div>
-                                        <div class="empty-desc">Get started by creating your first list to organize people or companies. Click the "Create List" button above or use the button below.</div>
-                                        <div class="empty-actions">
-                                            <button class="btn-primary" id="create-first-list-btn">Create your first list</button>
-                                        </div>
-                                    </div>
-                                    <!-- List Detail View -->
-                                    <div id="lists-detail" hidden>
-                                        <div id="lists-filters" class="filter-panel" hidden>
-                                            <div class="filter-tabs-row">
-                                                <button class="filter-tab active" data-mode="simple" aria-selected="true">Simple</button>
-                                                <button class="filter-tab" data-mode="advanced" aria-selected="false">Advanced</button>
-                                            </div>
-                                            <div id="lists-people-filters-grid" class="filter-grid" data-mode="simple">
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-p-state">State</label>
-                                                    <div class="chip-input" id="lists-filter-p-state-chip">
-                                                        <div class="chip-list" id="lists-filter-p-state-chips"></div>
-                                                        <input type="text" id="lists-filter-p-state" class="chip-input-field" placeholder="e.g., TX, CA" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-p-state-clear" aria-label="Clear state filters" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-p-state-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-p-employees">Employees</label>
-                                                    <div class="chip-input" id="lists-filter-p-employees-chip">
-                                                        <div class="chip-list" id="lists-filter-p-employees-chips"></div>
-                                                        <input type="text" id="lists-filter-p-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-p-employees-clear" aria-label="Clear employees filters" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-p-employees-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-title">Job title</label>
-                                                    <div class="chip-input" id="lists-filter-title-chip">
-                                                        <div class="chip-list" id="lists-filter-title-chips"></div>
-                                                        <input type="text" id="lists-filter-title" class="chip-input-field" placeholder="e.g., manager, director" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-title-clear" aria-label="Clear title filters" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-title-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-company">Company</label>
-                                                    <div class="chip-input" id="lists-filter-company-chip">
-                                                        <div class="chip-list" id="lists-filter-company-chips"></div>
-                                                        <input type="text" id="lists-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-company-clear" aria-label="Clear company filters" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-company-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-p-industry">Industry</label>
-                                                    <div class="chip-input" id="lists-filter-p-industry-chip">
-                                                        <div class="chip-list" id="lists-filter-p-industry-chips"></div>
-                                                        <input type="text" id="lists-filter-p-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-p-industry-clear" aria-label="Clear industry filters" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-p-industry-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-p-domain">Website visitors (domain)</label>
-                                                    <div class="chip-input" id="lists-filter-p-domain-chip">
-                                                        <div class="chip-list" id="lists-filter-p-domain-chips"></div>
-                                                        <input type="text" id="lists-filter-p-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-p-domain-clear" aria-label="Clear website visitor domains" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-p-domain-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field checkbox">
-                                                    <label><input type="checkbox" id="lists-filter-has-email" /> Has email</label>
-                                                </div>
-                                                <div class="filter-field checkbox">
-                                                    <label><input type="checkbox" id="lists-filter-has-phone" /> Has phone</label>
-                                                </div>
-                                            </div>
-                                            <div id="lists-accounts-filters-grid" class="filter-grid" hidden>
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-acct-name">Account name</label>
-                                                    <div class="chip-input" id="lists-filter-acct-name-chip">
-                                                        <div class="chip-list" id="lists-filter-acct-name-chips"></div>
-                                                        <input type="text" id="lists-filter-acct-name" class="chip-input-field" placeholder="e.g., Acme, Metro" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-acct-name-clear" aria-label="Clear account filters" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-acct-name-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-industry">Industry</label>
-                                                    <div class="chip-input" id="lists-filter-industry-chip">
-                                                        <div class="chip-list" id="lists-filter-industry-chips"></div>
-                                                        <input type="text" id="lists-filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-industry-clear" aria-label="Clear industry filters" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-industry-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field">
-                                                    <label for="lists-filter-domain">Domain</label>
-                                                    <div class="chip-input" id="lists-filter-domain-chip">
-                                                        <div class="chip-list" id="lists-filter-domain-chips"></div>
-                                                        <input type="text" id="lists-filter-domain" class="chip-input-field" placeholder="example.com" />
-                                                        <button type="button" class="chip-clear" id="lists-filter-domain-clear" aria-label="Clear domain filters" hidden>×</button>
-                                                        <div class="chip-suggest" id="lists-filter-domain-suggest" hidden></div>
-                                                    </div>
-                                                </div>
-                                                <div class="filter-field checkbox">
-                                                    <label><input type="checkbox" id="lists-filter-acct-has-phone" /> Has phone</label>
-                                                </div>
-                                            </div>
-                                            <div class="filter-actions-row">
-                                                <button class="btn-secondary" id="clear-lists-filters">Clear all</button>
-                                                <button class="btn-primary" id="apply-lists-filters">Apply</button>
-                                            </div>
-                                        </div>
-                                        <div class="table-scroll">
-                                            <table class="data-table" id="lists-table" aria-label="List members">
-                                                <thead>
-                                                    <tr></tr>
-                                                </thead>
-                                                <tbody></tbody>
-                                            </table>
-                                        </div>
-                                        <div class="table-footer">
-                                            <div id="lists-pagination-summary" class="pagination-summary" aria-live="polite"></div>
-                                            <div id="lists-pagination" class="table-pagination" aria-label="List pagination"></div>
-                                        </div>
+                                    <div class="empty-title">No lists added</div>
+                                    <div class="empty-desc">Get started by creating your first list to organize people or companies. Click the "Create List" button above or use the button below.</div>
+                                    <div class="empty-actions">
+                                        <button class="btn-primary" id="create-first-list-btn">Create your first list</button>
                                     </div>
                                 </div>
+                                <!-- List cards will be rendered here by lists-overview.js -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- List Detail Page -->
+                    <div class="page" id="list-detail-page" data-page="list-detail">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <button class="back-btn back-btn--icon" id="list-detail-back-btn" aria-label="Back to Lists">
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                                      </svg>
+                                    </button>
+                                    <h2 class="page-title" id="list-detail-title">List Details</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="list-detail-contacts-btn">Contacts</button>
+                                    </div>
+                                </div>
+                                <div class="people-toolbar" id="list-detail-header-toolbar">
+                                    <button class="action-btn" id="list-detail-filters-btn">
+                                        <span class="filter-icon" aria-hidden="true">&#9881;</span>
+                                        <span class="filter-text">Show Filters</span>
+                                    </button>
+                                    <div class="view-toggle" id="list-detail-view-toggle">
+                                        <button class="toggle-btn filter-tab active" data-view="people" aria-selected="true">People</button>
+                                        <button class="toggle-btn filter-tab" data-view="accounts" aria-selected="false">Accounts</button>
+                                    </div>
+                                    <input type="text" id="list-detail-contact-search" class="search-input-small" placeholder="Search contacts to add..." aria-label="Search contacts to add" />
+                                </div>
+                            </div>
+                            
+                            <div class="page-content">
+                                <div class="table-container">
+                                    <div class="table-toolbar">
+                                        <div class="table-toolbar-left"></div>
+                                        <div class="table-toolbar-right"></div>
+                                    </div>
+                            
+                                    <div id="list-detail-filters" class="filter-panel" hidden>
+                                        <div class="filter-tabs-row">
+                                            <button class="filter-tab active" data-mode="simple" aria-selected="true">Simple</button>
+                                            <button class="filter-tab" data-mode="advanced" aria-selected="false">Advanced</button>
+                                        </div>
+                                        <div id="list-detail-people-filters-grid" class="filter-grid" data-mode="simple">
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-city">City</label>
+                                                <div class="chip-input" id="list-detail-filter-city-chip">
+                                                    <div class="chip-list" id="list-detail-filter-city-chips"></div>
+                                                    <input type="text" id="list-detail-filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-city-clear" aria-label="Clear city filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-city-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-title">Job title</label>
+                                                <div class="chip-input" id="list-detail-filter-title-chip">
+                                                    <div class="chip-list" id="list-detail-filter-title-chips"></div>
+                                                    <input type="text" id="list-detail-filter-title" class="chip-input-field" placeholder="e.g., manager, director" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-title-clear" aria-label="Clear title filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-title-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-company">Company</label>
+                                                <div class="chip-input" id="list-detail-filter-company-chip">
+                                                    <div class="chip-list" id="list-detail-filter-company-chips"></div>
+                                                    <input type="text" id="list-detail-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-company-clear" aria-label="Clear company filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-company-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-state">State</label>
+                                                <div class="chip-input" id="list-detail-filter-state-chip">
+                                                    <div class="chip-list" id="list-detail-filter-state-chips"></div>
+                                                    <input type="text" id="list-detail-filter-state" class="chip-input-field" placeholder="e.g., TX, CA" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-state-clear" aria-label="Clear state filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-state-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-employees">Employees</label>
+                                                <div class="chip-input" id="list-detail-filter-employees-chip">
+                                                    <div class="chip-list" id="list-detail-filter-employees-chips"></div>
+                                                    <input type="text" id="list-detail-filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-employees-clear" aria-label="Clear employees filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-employees-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-industry">Industry</label>
+                                                <div class="chip-input" id="list-detail-filter-industry-chip">
+                                                    <div class="chip-list" id="list-detail-filter-industry-chips"></div>
+                                                    <input type="text" id="list-detail-filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-industry-clear" aria-label="Clear industry filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-industry-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-visitor-domain">Website visitors (domain)</label>
+                                                <div class="chip-input" id="list-detail-filter-visitor-domain-chip">
+                                                    <div class="chip-list" id="list-detail-filter-visitor-domain-chips"></div>
+                                                    <input type="text" id="list-detail-filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-visitor-domain-clear" aria-label="Clear website visitor domains">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-visitor-domain-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field checkbox">
+                                                <label><input type="checkbox" id="list-detail-filter-has-email" /> Has email</label>
+                                            </div>
+                                            <div class="filter-field checkbox">
+                                                <label><input type="checkbox" id="list-detail-filter-has-phone" /> Has phone</label>
+                                            </div>
+                                        </div>
+                                        <div class="filter-actions-row">
+                                            <button class="btn-secondary" id="list-detail-clear-filters">Clear all</button>
+                                            <button class="btn-primary" id="list-detail-apply-filters">Apply</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="table-scroll">
+                                        <table class="data-table" id="list-detail-table" aria-label="List members">
+                                            <thead>
+                                                <tr></tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <div class="table-footer">
+                                        <div id="list-detail-pagination-summary" class="pagination-summary" aria-live="polite"></div>
+                                        <div id="list-detail-pagination" class="table-pagination" aria-label="List pagination"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1492,7 +1509,6 @@
     <script src="scripts/pages/accounts.js"></script>
     <script src="scripts/pages/calls.js"></script>
     <script src="scripts/pages/lists-overview.js"></script>
-    <script src="scripts/pages/lists.js"></script>
     <script src="scripts/pages/emails.js"></script>
     <script src="scripts/pages/sequence-builder.js"></script>
     <script src="scripts/pages/sequences.js"></script>
@@ -1504,7 +1520,6 @@
     <script src="scripts/notifications.js"></script>
     <script src="scripts/click-to-call.js"></script>
     <script src="scripts/main.js"></script>
-    <script src="scripts/firebase.js"></script>
     <script>
       (function(){
         function formatUsdPerKwh(n){
@@ -1544,5 +1559,9 @@
         });
       })();
     </script>
+
+    <!-- Load List Detail Page Script -->
+    <script src="scripts/pages/list-detail.js"></script>
+    <script src="debug-lists.js"></script>
 </body>
 </html>
