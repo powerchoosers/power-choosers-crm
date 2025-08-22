@@ -263,16 +263,20 @@
                   console.debug('[TwilioRTC] Incoming call disconnected - cleaning up UI');
                   const callEndTime = Date.now();
                   const duration = Math.floor((callEndTime - callStartTime) / 1000);
-                  lastCallCompleted = callEndTime;
+                  
+                  // IMMEDIATE state clearing to prevent issues
+                  const disconnectTime = Date.now();
+                  lastCallCompleted = disconnectTime;
                   lastCalledNumber = number;
                   isCallInProgress = false;
-                  autoTriggerBlockUntil = Date.now() + 10000; // 10s hard block after call
+                  autoTriggerBlockUntil = Date.now() + 15000; // Increased to 15s hard block after call
                   currentCallContext = { number: '', name: '', isActive: false };
                   
-                  // Clear ALL connection state
+                  // Clear ALL connection state IMMEDIATELY
                   TwilioRTC.state.pendingIncoming = null;
                   TwilioRTC.state.connection = null;
                   
+                  // Force UI cleanup
                   const card2 = document.getElementById(WIDGET_ID);
                   if (card2) {
                     const btn2 = card2.querySelector('.call-btn-start');
@@ -280,6 +284,9 @@
                       btn2.textContent = 'Call';
                       btn2.classList.remove('btn-danger');
                       btn2.classList.add('btn-primary');
+                      // Disable button briefly to prevent accidental clicks
+                      btn2.disabled = true;
+                      setTimeout(() => { btn2.disabled = false; }, 2000);
                     }
                     // Clear input and reset title
                     const input2 = card2.querySelector('.phone-display');
@@ -287,17 +294,28 @@
                     const title2 = card2.querySelector('.widget-title');
                     if (title2) title2.innerHTML = 'Phone';
                   }
+                  
                   // Stop live timer and restore banner
                   stopLiveCallTimer(card2);
+                  
+                  // Release audio devices with error handling
                   if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
-                    try { await TwilioRTC.state.device.audio.unsetInputDevice(); } catch (_) {}
+                    try { 
+                      await TwilioRTC.state.device.audio.unsetInputDevice();
+                      console.debug('[TwilioRTC] Audio input device released after incoming call disconnect');
+                    } catch (e) {
+                      console.warn('[TwilioRTC] Failed to release audio input device:', e);
+                    }
                   }
+                  
                   updateCallStatus(number, 'completed', callStartTime, duration, callId, number, 'incoming');
                   
                   // Add call completed notification
                   if (window.Notifications && typeof window.Notifications.addCallCompleted === 'function') {
                     window.Notifications.addCallCompleted(number, meta?.name || meta?.account, duration);
                   }
+                  
+                  console.debug('[TwilioRTC] Incoming call cleanup complete - anti-redial protection active');
                 });
 
                 conn.on('error', (error) => {
@@ -1017,7 +1035,7 @@
           lastCallCompleted = disconnectTime;
           lastCalledNumber = number;
           isCallInProgress = false;
-          autoTriggerBlockUntil = Date.now() + 10000; // 10s hard block
+          autoTriggerBlockUntil = Date.now() + 15000; // Increased to 15s hard block
           
           // Clear current call context IMMEDIATELY to prevent auto-callback
           console.debug('[Phone] IMMEDIATE: Clearing call context after disconnect to prevent redial');
@@ -1027,12 +1045,32 @@
             isActive: false
           };
           
+          // Clear ALL Twilio state to prevent ghost connections
+          TwilioRTC.state.connection = null;
+          TwilioRTC.state.pendingIncoming = null;
+          
           // Update call with final status and duration using same call ID
           updateCallStatus(number, 'completed', callStartTime, duration, callId);
           currentCall = null;
           setInCallUI(false);
+          
           // Stop live timer and restore banner
-          stopLiveCallTimer(document.getElementById(WIDGET_ID));
+          const widget = document.getElementById(WIDGET_ID);
+          stopLiveCallTimer(widget);
+          
+          // Clear UI state completely
+          if (widget) {
+            const btn = widget.querySelector('.call-btn-start');
+            if (btn) {
+              btn.textContent = 'Call';
+              btn.classList.remove('btn-danger');
+              btn.classList.add('btn-primary');
+            }
+            const input = widget.querySelector('.phone-display');
+            if (input) input.value = '';
+            const title = widget.querySelector('.widget-title');
+            if (title) title.innerHTML = 'Phone';
+          }
           
           // Release the input device to avoid the red recording symbol
           // According to Twilio best practices
@@ -1053,12 +1091,35 @@
           console.error('[Phone] Call error:', error);
           const callEndTime = Date.now();
           const duration = Math.floor((callEndTime - callStartTime) / 1000);
+          
+          // IMMEDIATE cleanup on error
           updateCallStatus(number, 'failed', callStartTime, duration, callId);
           currentCall = null;
           isCallInProgress = false;
+          
+          // Clear ALL Twilio state
+          TwilioRTC.state.connection = null;
+          TwilioRTC.state.pendingIncoming = null;
+          
           setInCallUI(false);
+          
           // Stop live timer and restore banner
-          stopLiveCallTimer(document.getElementById(WIDGET_ID));
+          const widget = document.getElementById(WIDGET_ID);
+          stopLiveCallTimer(widget);
+          
+          // Force UI reset
+          if (widget) {
+            const btn = widget.querySelector('.call-btn-start');
+            if (btn) {
+              btn.textContent = 'Call';
+              btn.classList.remove('btn-danger');
+              btn.classList.add('btn-primary');
+            }
+            const input = widget.querySelector('.phone-display');
+            if (input) input.value = '';
+            const title = widget.querySelector('.widget-title');
+            if (title) title.innerHTML = 'Phone';
+          }
           
           // Clear context on error too
           currentCallContext = {
@@ -1067,10 +1128,20 @@
             isActive: false
           };
           
-          // Set cooldown after error
+          // Set longer cooldown after error
           lastCallCompleted = Date.now();
           lastCalledNumber = number;
-          autoTriggerBlockUntil = Date.now() + 10000;
+          autoTriggerBlockUntil = Date.now() + 15000;
+          
+          // Release audio devices
+          if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
+            try {
+              TwilioRTC.state.device.audio.unsetInputDevice();
+              console.debug('[Phone] Audio input device released after error');
+            } catch (e) {
+              console.warn('[Phone] Failed to release audio input device after error:', e);
+            }
+          }
         });
         
         return currentCall;
@@ -1262,37 +1333,79 @@
       if (currentCall || isCallInProgress || TwilioRTC.state?.connection) {
         console.debug('[Phone] Hanging up active call - currentCall:', !!currentCall, 'isCallInProgress:', isCallInProgress, 'deviceConnection:', !!TwilioRTC.state?.connection);
         
-        // Try to disconnect all possible connections
+        // IMMEDIATE state clearing to prevent double-clicks and ensure proper hangup
+        const wasInCall = isCallInProgress;
+        isCallInProgress = false;
+        
+        // Try to disconnect all possible connections with retry logic
+        const disconnectPromises = [];
+        
         try {
           // Disconnect outbound call
           if (currentCall) {
-            currentCall.disconnect();
-            console.debug('[Phone] Manual hangup - disconnected outbound call');
+            disconnectPromises.push(
+              new Promise((resolve) => {
+                try {
+                  currentCall.disconnect();
+                  console.debug('[Phone] Manual hangup - disconnected outbound call');
+                  resolve();
+                } catch(e) {
+                  console.warn('[Phone] Error disconnecting outbound call:', e);
+                  resolve();
+                }
+              })
+            );
           }
           
           // Disconnect inbound call (most important for your issue)
           if (TwilioRTC.state?.connection) {
-            TwilioRTC.state.connection.disconnect();
-            console.debug('[Phone] Manual hangup - disconnected inbound call');
+            disconnectPromises.push(
+              new Promise((resolve) => {
+                try {
+                  TwilioRTC.state.connection.disconnect();
+                  console.debug('[Phone] Manual hangup - disconnected inbound call');
+                  resolve();
+                } catch(e) {
+                  console.warn('[Phone] Error disconnecting inbound call:', e);
+                  resolve();
+                }
+              })
+            );
           }
           
           // Also try pending incoming
           if (TwilioRTC.state?.pendingIncoming) {
-            try {
-              TwilioRTC.state.pendingIncoming.reject();
-              console.debug('[Phone] Manual hangup - rejected pending incoming');
-            } catch(_) {}
+            disconnectPromises.push(
+              new Promise((resolve) => {
+                try {
+                  TwilioRTC.state.pendingIncoming.reject();
+                  console.debug('[Phone] Manual hangup - rejected pending incoming');
+                  resolve();
+                } catch(e) {
+                  console.warn('[Phone] Error rejecting pending incoming:', e);
+                  resolve();
+                }
+              })
+            );
           }
+          
+          // Wait for all disconnections to complete (with timeout)
+          await Promise.race([
+            Promise.all(disconnectPromises),
+            new Promise(resolve => setTimeout(resolve, 2000)) // 2 second timeout
+          ]);
+          
         } catch(e) {
           console.error('[Phone] Error during manual hangup:', e);
         }
         
-        // Force clear ALL state
+        // Force clear ALL state immediately
         currentCall = null;
         isCallInProgress = false;
         TwilioRTC.state.connection = null;
         TwilioRTC.state.pendingIncoming = null;
         
+        // Clear UI state
         setInCallUI(false);
         stopLiveCallTimer(card);
         
@@ -1305,7 +1418,17 @@
         
         // Set aggressive cooldown on manual hangup
         lastCallCompleted = Date.now();
-        autoTriggerBlockUntil = Date.now() + 10000;
+        autoTriggerBlockUntil = Date.now() + 15000; // Increased to 15 seconds
+        
+        // Release audio devices to ensure proper cleanup
+        if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
+          try {
+            await TwilioRTC.state.device.audio.unsetInputDevice();
+            console.debug('[Phone] Audio input device released after manual hangup');
+          } catch (e) {
+            console.warn('[Phone] Failed to release audio input device:', e);
+          }
+        }
         
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
         
@@ -1595,7 +1718,7 @@
   const USER_TYPING_COOLDOWN = 2000; // 2 seconds after user stops typing
   
   // Global call function for CRM integration
-  window.Widgets.callNumber = function(number, contactName = '', autoTrigger = true, source = 'unknown') {
+  window.Widgets.callNumber = function(number, contactName = '', autoTrigger = false, source = 'unknown') {
     // Add stack trace to debug who's calling this function
     const stack = new Error().stack;
     console.debug('[Phone] ═══ CALLNUMBER INVOKED ═══');
@@ -1611,6 +1734,13 @@
 
     const lastClickTs = (window.Widgets && window.Widgets._lastClickToCallAt) || 0;
     const isFreshClick = isClickToCall && (now - lastClickTs) <= 1500;
+
+    // Enforce: only click-to-call with a fresh user gesture may auto-trigger
+    if (autoTrigger && !isClickToCall) {
+      console.warn('[Phone] FORCING autoTrigger=false for non click-to-call source', { source });
+      console.debug('[Phone] Non-click autoTrigger attempt stack:', stack?.split('\n').slice(0, 8).join('\n'));
+      autoTrigger = false;
+    }
 
     // Global hard block unless there is a fresh explicit click
     if (now < autoTriggerBlockUntil && !isFreshClick) {
