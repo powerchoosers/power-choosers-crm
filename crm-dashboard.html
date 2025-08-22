@@ -52,13 +52,28 @@
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                     </svg>
                 </button>
-                <button class="icon-btn" id="notifications-btn" title="Notifications">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                    </svg>
-                    <span class="notification-badge">3</span>
-                </button>
+                <div class="notification-container">
+                    <button class="icon-btn" id="notifications-btn" title="Notifications">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span class="notification-badge" id="notification-badge">0</span>
+                    </button>
+                    <!-- Notification Dropdown -->
+                    <div class="notification-dropdown" id="notification-dropdown" hidden>
+                        <div class="notification-header">
+                            <h3>Notifications</h3>
+                            <button class="mark-all-read" id="mark-all-read">Mark all as read</button>
+                        </div>
+                        <div class="notification-list" id="notification-list">
+                            <!-- Notifications will be populated here -->
+                        </div>
+                        <div class="notification-footer">
+                            <button class="view-all-btn" id="view-all-notifications">View all notifications</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="profile-container">
                     <div class="profile-avatar">LP</div>
                 </div>
@@ -1334,9 +1349,11 @@
     <script src="scripts/pages/deals.js"></script>
     <script src="scripts/pages/tasks.js"></script>
     <script src="scripts/global-search.js"></script>
-    <script src="scripts/widgets/notes.js"></script>
     <script src="scripts/widgets/phone.js"></script>
+    <script src="scripts/widgets/notes.js"></script>
+    <script src="scripts/notifications.js"></script>
     <script src="scripts/click-to-call.js"></script>
     <script src="scripts/main.js"></script>
+    <script src="scripts/firebase.js"></script>
 </body>
 </html>

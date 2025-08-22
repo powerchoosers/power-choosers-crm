@@ -157,7 +157,8 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/token' ||
     pathname === '/api/twilio/call' ||
     pathname === '/api/calls' ||
-    pathname === '/api/energy-news'
+    pathname === '/api/energy-news' ||
+    pathname === '/api/search'
   )) {
     res.writeHead(204);
     res.end();
@@ -176,6 +177,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/energy-news') {
     return handleApiEnergyNews(req, res);
+  }
+  if (pathname === '/api/search') {
+    return handleApiSearch(req, res, parsedUrl);
   }
 
   // Default to crm-dashboard.html for root requests
@@ -305,6 +309,28 @@ server.on('error', (err) => {
     console.error('[Server] Server error:', err);
   }
 });
+
+// Search endpoint: proxy to production for phone number lookups
+async function handleApiSearch(req, res, parsedUrl) {
+  if (req.method !== 'GET') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  const proxyUrl = `${API_BASE_URL}/api/search${parsedUrl.search || ''}`;
+  
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
 
 // Energy News endpoint: fetch Google News RSS for Texas energy topics, parse minimal fields
 async function handleApiEnergyNews(req, res) {

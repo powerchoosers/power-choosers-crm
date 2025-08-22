@@ -36,16 +36,26 @@ export default function handler(req, res) {
         if (isInboundToBusiness) {
             // INBOUND CALL: Ring the browser client (identity: agent)
             // Requires client token with incomingAllow: true and a connected browser
+            // Pass original caller number as custom parameter since Twilio client always shows business number as "From"
             const dial = twiml.dial({
-                callerId: businessNumber,
+                callerId: From || businessNumber, // Use caller's number, fallback to business number
                 timeout: 30,
                 answerOnBridge: true,
                 hangupOnStar: false,
                 timeLimit: 14400,
                 action: `${base}/api/twilio/status`
             });
-            dial.client('agent');
-            console.log('[Voice] Generated TwiML to dial <Client>agent</Client>');
+            
+            // Pass the original caller's number as a custom parameter
+            const client = dial.client('agent');
+            if (From && From !== businessNumber) {
+                client.parameter({
+                    name: 'originalCaller',
+                    value: From
+                });
+            }
+            
+            console.log(`[Voice] Generated TwiML to dial <Client>agent</Client> with callerId: ${From || businessNumber}, originalCaller: ${From}`);
         } else if (To) {
             // OUTBOUND CALLBACK SCENARIO: Dial specific number provided
             const dial = twiml.dial({
