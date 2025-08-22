@@ -2,13 +2,26 @@
 // Uses compat SDK to keep simple script include usage
 (function () {
   if (window.firebase && !window.firebase.apps.length) {
-    const firebaseConfig = {
+    // Allow override via global or localStorage for your own Firebase project
+    let override = null;
+    try { override = window.__FIREBASE_CONFIG || null; } catch (_) {}
+    if (!override) {
+      try {
+        const raw = localStorage.getItem('PC_FIREBASE_CONFIG');
+        if (raw) override = JSON.parse(raw);
+      } catch (_) {}
+    }
+
+    const fallbackConfig = {
       apiKey: 'AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE',
       projectId: 'power-choosers-crm'
-      // For local/dev we only need apiKey + projectId for Firestore
     };
+    const firebaseConfig = Object.assign({}, fallbackConfig, override || {});
+
     try {
       window.firebase.initializeApp(firebaseConfig);
+      console.log('[Firebase] Initialized', { projectId: firebaseConfig.projectId });
+      window.firebaseProjectId = firebaseConfig.projectId;
     } catch (e) {
       console.warn('Firebase init warning:', e);
     }
@@ -18,6 +31,18 @@
   try {
     if (window.firebase) {
       window.firebaseDB = window.firebase.firestore();
+      // Quick connectivity smoke test (non-blocking)
+      try {
+        const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        window.firebaseDB.collection('lists').limit(1).get()
+          .then(snap => {
+            const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            console.log('[Firebase] Firestore reachable', { projectId: window.firebaseProjectId, listsSample: snap?.size || 0, tookMs: Math.round(t1 - t0) });
+          })
+          .catch(err => {
+            console.warn('[Firebase] Firestore lists read failed', err);
+          });
+      } catch (_) {}
     }
   } catch (e) {
     console.warn('Firestore init warning:', e);

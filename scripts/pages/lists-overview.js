@@ -20,11 +20,26 @@
     if (!els.page) return false;
 
     els.switchBtn = qs('lists-switch-btn');
-    els.listContainer = els.page.querySelector('.page-content');
+    els.pageContent = els.page.querySelector('.page-content');
     els.emptyState = qs('lists-empty-state');
+
+    // Ensure a dedicated grid container exists and contains the empty state
+    let grid = els.page.querySelector('#lists-grid');
+    if (!grid) {
+      grid = document.createElement('div');
+      grid.id = 'lists-grid';
+      // Insert the grid as the last child of page content
+      els.pageContent?.appendChild(grid);
+    }
+    // Move empty state into the grid so layout applies consistently
+    if (els.emptyState && els.emptyState.parentElement !== grid) {
+      grid.appendChild(els.emptyState);
+    }
+    // Render into the grid container
+    els.listContainer = grid;
     els.headerCreateBtn = qs('add-list-btn');
     els.createFirstBtn = qs('create-first-list-btn');
-    els.tableContainer = els.page.querySelector('.page-content');
+    els.tableContainer = els.pageContent;
 
     return true;
   }
@@ -220,18 +235,62 @@
   async function loadLists(kind) {
     // Try to load from Firestore if available, otherwise keep empty
     try {
+      console.time(`[ListsOverview] loadLists ${kind}`);
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
-        // Use a single 'lists' collection with a 'kind' field if present
+        // Primary query: filter by kind on server if available
         let query = window.firebaseDB.collection('lists');
         if (query.where) query = query.where('kind', '==', kind);
-        const snap = await (query.limit ? query.limit(200).get() : query.get());
-        const items = (snap && snap.docs) ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+        let snap = await (query.limit ? query.limit(200).get() : query.get());
+        let items = (snap && snap.docs) ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+
+        // Fallback: if nothing returned, fetch recent docs without server-side kind filter
+        // and filter client-side using flexible field names: kind | type | listType.
+        if (!items.length) {
+          try {
+            const altSnap = await window.firebaseDB.collection('lists').limit(200).get();
+            const all = (altSnap && altSnap.docs) ? altSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            const want = (v) => (v || '').toString().trim().toLowerCase();
+            items = all.filter(doc => {
+              const k = want(doc.kind || doc.type || doc.listType || doc.category);
+              if (!k) return kind === 'people' ? (want(doc.people) === 'true') : (want(doc.accounts) === 'true');
+              return (kind === 'people') ? (k === 'people' || k === 'person' || k === 'contacts' || k === 'contact')
+                                         : (k === 'accounts' || k === 'account' || k === 'companies' || k === 'company');
+            });
+            console.debug('[ListsOverview] fallback fetched without where', { total: all.length, matched: items.length, forKind: kind });
+          } catch (e) {
+            console.debug('[ListsOverview] fallback fetch failed', e);
+          }
+        }
+
+        // Ensure global cache exists
+        try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
+
+        // Preload members for all lists in this kind and compute counts
+        if (typeof window.__preloadListMembers === 'function') {
+          await window.__preloadListMembers(items);
+        } else {
+          console.warn('[ListsOverview] Preloader not available, skipping member count loading');
+        }
+        console.debug('[ListsOverview] lists loaded', { kind, count: items.length });
+
+        // After preloading, set count per item based on its declared kind
+        for (const item of items) {
+          const cache = window.listMembersCache?.[item.id];
+          const k = (item.kind || kind || 'people').toLowerCase();
+          if (cache) {
+            item.count = k === 'accounts' ? (cache.accounts?.size || 0) : (cache.people?.size || 0);
+          } else {
+            item.count = typeof item.count === 'number' ? item.count : 0;
+          }
+        }
+
         if (kind === 'people') { state.peopleLists = items; state.loadedPeople = true; }
         else { state.accountLists = items; state.loadedAccounts = true; }
       } else {
         // No Firestore: remain empty but mark as loaded
         if (kind === 'people') state.loadedPeople = true; else state.loadedAccounts = true;
       }
+      console.timeEnd(`[ListsOverview] loadLists ${kind}`);
     } catch (err) {
       console.warn('Failed to load lists for kind', kind, err);
       if (kind === 'people') state.loadedPeople = true; else state.loadedAccounts = true;
@@ -259,29 +318,106 @@
       return;
     }
 
-    // Render grid of list cards
+    // Preserve empty state element
     const emptyStateEl = els.listContainer.querySelector('#lists-empty-state');
-    els.listContainer.innerHTML = items.map(listCardHtml).join('');
-    // Re-append empty state element so it's available for next render
-    if (emptyStateEl) {
+    
+    // Get existing cards for comparison
+    const existingCards = els.listContainer.querySelectorAll('.list-card');
+    const existingIds = Array.from(existingCards).map(card => card.getAttribute('data-id'));
+    const newIds = items.map(item => item.id);
+    
+    // Remove cards that no longer exist
+    existingCards.forEach(card => {
+      const id = card.getAttribute('data-id');
+      if (!newIds.includes(id)) {
+        card.remove();
+      }
+    });
+    
+    // Add or update cards
+    items.forEach((item, index) => {
+      let existingCard = els.listContainer.querySelector(`.list-card[data-id="${item.id}"]`);
+      const cardHtml = listCardHtml(item);
+      
+      if (!existingCard) {
+        // Create new card
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = cardHtml;
+        const newCard = tempDiv.firstElementChild;
+        
+        // Insert at correct position
+        const nextCard = els.listContainer.children[index];
+        if (nextCard && nextCard.classList.contains('list-card')) {
+          els.listContainer.insertBefore(newCard, nextCard);
+        } else {
+          // Insert before empty state if it exists
+          if (emptyStateEl) {
+            els.listContainer.insertBefore(newCard, emptyStateEl);
+          } else {
+            els.listContainer.appendChild(newCard);
+          }
+        }
+        
+        // Attach event listeners for new card
+        attachCardListeners(newCard);
+      } else {
+        // Update existing card content only if needed
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = cardHtml;
+        const newCardContent = tempDiv.firstElementChild;
+        
+        // Compare and update only if content changed
+        if (existingCard.innerHTML !== newCardContent.innerHTML) {
+          existingCard.innerHTML = newCardContent.innerHTML;
+          // Re-attach event listeners after content update
+          attachCardListeners(existingCard);
+        }
+      }
+    });
+    
+    // Ensure empty state is at the end
+    if (emptyStateEl && emptyStateEl.parentElement === els.listContainer) {
       els.listContainer.appendChild(emptyStateEl);
     }
-
-    // Attach per-card actions
-    els.listContainer.querySelectorAll('[data-action]')?.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const action = btn.getAttribute('data-action');
-        const id = btn.getAttribute('data-id');
-        const kind = btn.getAttribute('data-kind');
+  }
+  
+  // Helper function to attach event listeners to a card
+  function attachCardListeners(card) {
+    card.querySelectorAll('[data-action]')?.forEach(btn => {
+      // Remove existing listeners by cloning
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+      
+      newBtn.addEventListener('click', (e) => {
+        const action = newBtn.getAttribute('data-action');
+        const id = newBtn.getAttribute('data-id');
+        const kind = newBtn.getAttribute('data-kind');
         console.log('[Lists] action', action, { id, kind });
         if (action === 'Open') {
           const listArr = kind === 'people' ? state.peopleLists : state.accountLists;
           const item = (listArr || []).find(x => x.id === id);
           const name = item?.name || 'List';
-          if (window.ListsView && typeof window.ListsView.open === 'function') {
-            window.ListsView.open({ id, kind: kind === 'people' ? 'people' : 'accounts', name });
+          try {
+            const cache = window.listMembersCache?.[id];
+            console.debug('[ListsOverview] Open clicked cache status', {
+              id,
+              loaded: !!cache?.loaded,
+              people: cache?.people instanceof Set ? cache.people.size : (Array.isArray(cache?.people) ? cache.people.length : 0),
+              accounts: cache?.accounts instanceof Set ? cache.accounts.size : (Array.isArray(cache?.accounts) ? cache.accounts.length : 0)
+            });
+          } catch (_) {}
+          // Store context for the list detail page
+          window.listDetailContext = {
+            listId: id,
+            listName: name,
+            listKind: kind === 'people' ? 'people' : 'accounts'
+          };
+          
+          // Navigate to the list detail page
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('list-detail');
           } else {
-            alert('List detail module not loaded yet.');
+            console.warn('Navigation not available');
           }
           return;
         }
@@ -446,6 +582,20 @@
     deleteModalEl = null;
   }
 
+  async function refreshCounts() {
+    // Reload list data and refresh counts
+    console.time('[ListsOverview] refreshCounts');
+    state.loadedPeople = false;
+    state.loadedAccounts = false;
+    await ensureLoadedThenRender();
+    console.timeEnd('[ListsOverview] refreshCounts');
+  }
+
+  // Expose API for other modules
+  window.ListsOverview = {
+    refreshCounts: refreshCounts
+  };
+
   // Initialize
   if (!initDom()) return;
   try {
@@ -455,4 +605,75 @@
   attachEvents();
   updateSwitchLabel();
   ensureLoadedThenRender();
+})();
+
+// ===== Preloader: cache members for instant detail opening =====
+(function () {
+  function toSafeLower(s) { return (s || '').toString().trim().toLowerCase(); }
+
+  async function fetchMembersForList(listId) {
+    const out = { people: new Set(), accounts: new Set(), loaded: false };
+    console.time(`[ListsOverview] preload fetch ${listId}`);
+    if (!listId || !window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return out;
+    let gotAny = false;
+    // Prefer subcollection lists/{id}/members
+    try {
+      const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
+      if (subSnap && subSnap.docs && subSnap.docs.length) {
+        gotAny = true;
+        subSnap.docs.forEach(d => {
+          const m = d.data() || {};
+          const t = toSafeLower(m.targetType || m.type);
+          const id = m.targetId || m.id || d.id;
+          if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
+          else if (t === 'accounts' || t === 'account') out.accounts.add(id);
+        });
+        console.debug('[ListsOverview] preload subcollection', { listId, docs: subSnap.docs.length, people: out.people.size, accounts: out.accounts.size });
+      }
+    } catch (_) {}
+    // Fallback top-level listMembers
+    if (!gotAny) {
+      try {
+        const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
+        lmSnap?.docs?.forEach(d => {
+          const m = d.data() || {};
+          const t = toSafeLower(m.targetType || m.type);
+          const id = m.targetId || m.id || d.id;
+          if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
+          else if (t === 'accounts' || t === 'account') out.accounts.add(id);
+        });
+        console.debug('[ListsOverview] preload top-level', { listId, docs: lmSnap?.docs?.length || 0, people: out.people.size, accounts: out.accounts.size });
+      } catch (_) {}
+    }
+    out.loaded = true;
+    console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
+    return out;
+  }
+
+  async function preloadMembersForLists(items) {
+    console.time('[ListsOverview] preloadMembersForLists');
+    try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
+    const tasks = [];
+    for (const it of (items || [])) {
+      if (!it?.id) continue;
+      // Skip if already cached
+      if (window.listMembersCache && window.listMembersCache[it.id] && window.listMembersCache[it.id].loaded) continue;
+      tasks.push(
+        fetchMembersForList(it.id).then((res) => {
+          try { window.listMembersCache[it.id] = res; } catch (_) {}
+        })
+      );
+    }
+    if (tasks.length) {
+      console.debug('[ListsOverview] preload starting', { lists: tasks.length });
+      try { await Promise.all(tasks); } catch (_) {}
+      console.debug('[ListsOverview] preload done', { cached: Object.keys(window.listMembersCache || {}).length });
+    }
+    console.timeEnd('[ListsOverview] preloadMembersForLists');
+  }
+
+  // Expose for debugging/tests
+  try {
+    window.__preloadListMembers = preloadMembersForLists;
+  } catch (_) {}
 })();

@@ -280,6 +280,10 @@ class PowerChoosersCRM {
         this.setupWidgetInteractions();
         this.installCustomTooltips();
         this.loadInitialData();
+        // Ensure widget panel visibility state is reflected on first load
+        try {
+            this.updateWidgetPanel(this.currentPage);
+        } catch (_) { /* noop */ }
     }
 
     // Navigation System
@@ -332,6 +336,47 @@ class PowerChoosersCRM {
             setTimeout(() => {
                 if (typeof window.accountsModule.init === 'function') {
                     window.accountsModule.init();
+                }
+            }, 50);
+        }
+        
+        // Lists page - ensure overview is shown by default
+        if (pageName === 'lists') {
+            // Make sure we show the overview, not any detail view
+            setTimeout(() => {
+                // Hide any detail views that might be showing
+                const listDetail = document.getElementById('lists-detail');
+                if (listDetail) {
+                    listDetail.hidden = true;
+                    listDetail.style.display = 'none';
+                }
+                
+                // Show the main lists content (overview)
+                const listsContent = document.querySelector('#lists-page .page-content');
+                if (listsContent) {
+                    listsContent.style.display = 'block';
+                    listsContent.classList.add('lists-grid');
+                }
+                
+                // Ensure lists overview module is initialized
+                if (window.ListsOverview && typeof window.ListsOverview.refreshCounts === 'function') {
+                    window.ListsOverview.refreshCounts();
+                }
+            }, 50);
+        }
+        
+        // List Detail page - initialize the detail view
+        if (pageName === 'list-detail') {
+            setTimeout(() => {
+                // Initialize the list detail module if needed
+                if (window.ListDetail && typeof window.ListDetail.init === 'function') {
+                    // Use context passed from the lists overview
+                    const context = window.listDetailContext || {
+                        listId: null,
+                        listName: 'List',
+                        listKind: 'people'
+                    };
+                    window.ListDetail.init(context);
                 }
             }, 50);
         }
@@ -596,14 +641,29 @@ class PowerChoosersCRM {
     // Widget Panel Management
     updateWidgetPanel(pageName) {
         const widgetPanel = document.getElementById('widget-panel');
+        const mainContentEl = document.querySelector('.main-content');
         
         // Show/hide widget panel based on page
         if (pageName === 'settings') {
-            widgetPanel.style.display = 'none';
-            document.querySelector('.main-content').style.flex = '1';
+            if (widgetPanel) {
+                widgetPanel.style.display = 'none';
+                widgetPanel.classList.remove('is-visible');
+            }
+            if (mainContentEl) {
+                mainContentEl.style.flex = '1';
+                // Remove flag so CSS fallback doesn't reserve space
+                mainContentEl.classList.remove('has-widget-panel');
+            }
         } else {
-            widgetPanel.style.display = 'block';
-            document.querySelector('.main-content').style.flex = '3';
+            if (widgetPanel) {
+                widgetPanel.style.display = 'block';
+                widgetPanel.classList.add('is-visible');
+            }
+            if (mainContentEl) {
+                mainContentEl.style.flex = '3';
+                // Add flag so CSS fallback can adjust #lists-grid margin
+                mainContentEl.classList.add('has-widget-panel');
+            }
         }
     }
 
