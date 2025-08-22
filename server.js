@@ -25,9 +25,13 @@ const mimeTypes = {
 const PORT = process.env.PORT || 3000;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm.vercel.app';
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
 
 console.log(`[Server] Starting in ${LOCAL_DEV_MODE ? 'development' : 'production'} mode`);
 console.log(`[Server] API Base URL: ${API_BASE_URL}`);
+if (!GOOGLE_API_KEY) {
+  console.warn('[Server] GOOGLE_API_KEY is not set. /api/tx-price will return a placeholder until configured.');
+}
 
 // Helper function for reading request body
 function readJsonBody(req) {
@@ -126,6 +130,118 @@ async function handleApiCalls(req, res) {
   }
 }
 
+// ---------------- Gemini-backed TX Price (commercial, energy only) ----------------
+const txPriceCache = {
+  price: null, // number (USD per kWh)
+  lastUpdated: null, // ISO string
+  source: 'gemini'
+};
+
+function isWeekend(d) {
+  const day = d.getDay(); // 0 Sun .. 6 Sat
+  return day === 0 || day === 6;
+}
+
+function nextWeekdayEightAM(from = new Date()) {
+  const d = new Date(from);
+  d.setSeconds(0, 0);
+  // Set to today 8:00 AM
+  d.setHours(8, 0, 0, 0);
+  if (from >= d) {
+    // already past 8 AM today, move to next day
+    d.setDate(d.getDate() + 1);
+  }
+  // Skip weekends
+  while (isWeekend(d)) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
+let txPriceTimer = null;
+function scheduleTxPriceRefresh() {
+  const now = new Date();
+  const nextAt = nextWeekdayEightAM(now);
+  const delay = Math.max(1000, nextAt - now);
+  if (txPriceTimer) clearTimeout(txPriceTimer);
+  txPriceTimer = setTimeout(async () => {
+    try {
+      await updateTxPriceFromGemini();
+    } catch (e) {
+      console.error('[TX Price] Scheduled refresh failed:', e.message);
+    } finally {
+      scheduleTxPriceRefresh();
+    }
+  }, delay);
+  console.log(`[TX Price] Next scheduled refresh at: ${nextAt.toString()}`);
+}
+
+async function dynamicGeminiImport() {
+  // ESM-only library; import dynamically in CJS
+  const mod = await import('@google/generative-ai');
+  return mod;
+}
+
+function extractDecimal(str) {
+  // Find number like 0.0xx or 0.1xx etc
+  const m = String(str).replace(/[, $]/g, '').match(/(0?\.[0-9]{2,4}|[1-9]\.[0-9]{2,4})/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+async function fetchTxPriceFromGemini() {
+  if (!GOOGLE_API_KEY) {
+    // Fallback placeholder if no API key
+    return { price: 0.089, note: 'placeholder-no-api-key' };
+  }
+  const { GoogleGenerativeAI } = await dynamicGeminiImport();
+  const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+  const prompt = `You are a pricing assistant. Return ONLY a decimal number representing current typical fixed commercial electricity ENERGY charge rate in Texas (USD per kWh), excluding delivery/transmission/TDU fees. No text, no currency symbol, 3 decimal places. If uncertain, provide your best current market estimate. Example: 0.089`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text().trim();
+  const num = extractDecimal(text);
+  if (!isFinite(num)) {
+    throw new Error(`Gemini returned unparseable value: ${text}`);
+  }
+  // Clamp to reasonable bounds (0.03 .. 0.30)
+  const clamped = Math.min(0.30, Math.max(0.03, num));
+  return { price: Number(clamped.toFixed(3)) };
+}
+
+async function updateTxPriceFromGemini() {
+  const { price } = await fetchTxPriceFromGemini();
+  txPriceCache.price = price;
+  txPriceCache.lastUpdated = new Date().toISOString();
+  console.log(`[TX Price] Updated to $${price.toFixed(3)} per kWh at ${txPriceCache.lastUpdated}`);
+  return txPriceCache;
+}
+
+async function handleApiTxPrice(req, res, parsedUrl) {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  const wantsRefresh = parsedUrl.query && (parsedUrl.query.refresh === '1' || parsedUrl.query.refresh === 'true');
+  try {
+    if (wantsRefresh || !txPriceCache.price) {
+      await updateTxPriceFromGemini();
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      price: txPriceCache.price,
+      lastUpdated: txPriceCache.lastUpdated,
+      source: txPriceCache.source
+    }));
+  } catch (error) {
+    console.error('[TX Price] Error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to fetch TX price', message: error.message }));
+  }
+}
+
 // Create HTTP server
 const server = http.createServer(async (req, res) => {
   // CORS headers
@@ -158,7 +274,8 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/call' ||
     pathname === '/api/calls' ||
     pathname === '/api/energy-news' ||
-    pathname === '/api/search'
+    pathname === '/api/search' ||
+    pathname === '/api/tx-price'
   )) {
     res.writeHead(204);
     res.end();
@@ -180,6 +297,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/search') {
     return handleApiSearch(req, res, parsedUrl);
+  }
+  if (pathname === '/api/tx-price') {
+    return handleApiTxPrice(req, res, parsedUrl);
   }
 
   // Default to crm-dashboard.html for root requests
@@ -299,6 +419,9 @@ server.listen(PORT, () => {
   console.log(`[Server] Power Choosers CRM server running at http://localhost:${PORT}`);
   console.log(`[Server] Environment: ${LOCAL_DEV_MODE ? 'Development' : 'Production'}`);
   console.log(`[Server] Twilio API proxying to: ${API_BASE_URL}`);
+  // Kick off initial load and schedule
+  updateTxPriceFromGemini().catch(err => console.warn('[TX Price] Initial fetch failed:', err.message));
+  scheduleTxPriceRefresh();
 });
 
 // Handle server errors
