@@ -1200,6 +1200,30 @@
           setInCallUI(false);
           console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
           
+          // CRITICAL: Terminate any active server-side call to prevent callback loops
+          if (window.currentServerCallSid) {
+            try {
+              const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+              console.debug('[Phone] DISCONNECT: Terminating server call SID:', window.currentServerCallSid);
+              
+              const terminateResponse = await fetch(`${base}/api/twilio/hangup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callSid: window.currentServerCallSid })
+              });
+              
+              if (terminateResponse.ok) {
+                console.debug('[Phone] DISCONNECT: Server call terminated successfully');
+              } else {
+                console.warn('[Phone] DISCONNECT: Failed to terminate server call:', terminateResponse.status);
+              }
+            } catch (e) {
+              console.error('[Phone] DISCONNECT: Error terminating server call:', e);
+            } finally {
+              window.currentServerCallSid = null;
+            }
+          }
+          
           // Release the input device to avoid the red recording symbol
           // According to Twilio best practices
           if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
@@ -1335,6 +1359,12 @@
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok || data?.error) throw new Error(data?.error || `HTTP ${r.status}`);
+        
+        // Store the server call SID for potential termination
+        if (data?.callSid) {
+          window.currentServerCallSid = data.callSid;
+          console.debug('[Phone] Server call initiated with SID:', data.callSid);
+        }
         
         // Show appropriate message based on call context
         const contactName = currentCallContext.name;
