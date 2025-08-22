@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Choosers CRM</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" type="image/png">
+    <!-- Twilio Voice SDK for browser calling -->
+    <script src="https://unpkg.com/@twilio/voice-sdk@2.11.0/dist/twilio.min.js"></script>
+    <script>
+        // Verify SDK loading
+        window.addEventListener('load', () => {
+            if (typeof Twilio !== 'undefined' && Twilio.Device) {
+                console.log('[Twilio] SDK loaded successfully from unpkg CDN');
+            } else {
+                console.error('[Twilio] SDK failed to load from unpkg CDN');
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers Logo" class="logo">
+                <h1 class="app-title">Power Choosers CRM</h1>
+            </div>
+            <div class="top-bar-center">
+                <div class="search-container">
+                    <input type="text" placeholder="Search accounts, people, or anything..." class="search-input">
+                    <button class="search-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+                </div>
+                <button class="call-btn" id="header-call-btn" title="Open Phone">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="top-bar-right">
+                <button class="icon-btn" id="scripts-btn" title="Phone Scripts">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                </button>
+                <div class="notification-container">
+                    <button class="icon-btn" id="notifications-btn" title="Notifications">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span class="notification-badge" id="notification-badge">0</span>
+                    </button>
+                    <!-- Notification Dropdown -->
+                    <div class="notification-dropdown" id="notification-dropdown" hidden>
+                        <div class="notification-header">
+                            <h3>Notifications</h3>
+                            <button class="mark-all-read" id="mark-all-read">Mark all as read</button>
+                        </div>
+                        <div class="notification-list" id="notification-list">
+                            <!-- Notifications will be populated here -->
+                        </div>
+                        <div class="notification-footer">
+                            <button class="view-all-btn" id="view-all-notifications">View all notifications</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="profile-container">
+                    <div class="profile-avatar">LP</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Global Search Modal -->
+        <div id="global-search-modal" class="global-search-modal" hidden>
+            <div class="search-modal-content">
+                <div class="search-results-container">
+                    <div class="search-loading" id="search-loading" hidden>
+                        <div class="loading-spinner"></div>
+                        <span>Searching...</span>
+                    </div>
+                    <div class="search-results" id="search-results"></div>
+                    <div class="search-empty" id="search-empty" hidden>
+                        <div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="8" stroke="white" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="white" stroke-width="2"/></svg></div>
+                        <div class="empty-text">No results found</div>
+                        <div class="empty-subtext">Try adjusting your search terms</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Layout -->
+        <div class="main-layout">
+            <!-- Left Sidebar -->
+            <nav class="sidebar" id="sidebar">
+                <div class="sidebar-content">
+                    <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="#people" class="nav-item" data-page="people">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <span class="nav-text">People</span>
+                    </a>
+                    <a href="#accounts" class="nav-item" data-page="accounts">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path>
+                        </svg>
+                        <span class="nav-text">Accounts</span>
+                    </a>
+                    <a href="#lists" class="nav-item" data-page="lists">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        <span class="nav-text">Lists</span>
+                    </a>
+                    <a href="#calls" class="nav-item" data-page="calls">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                        <span class="nav-text">Calls</span>
+                    </a>
+                    <a href="#emails" class="nav-item" data-page="emails">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <span class="nav-text">Emails</span>
+                    </a>
+                    <a href="#sequences" class="nav-item" data-page="sequences">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="7 4 20 12 7 20 7 4"></polygon>
+                        </svg>
+                        <span class="nav-text">Sequences</span>
+                    </a>
+                    <a href="#tasks" class="nav-item" data-page="tasks">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9,11 12,14 22,4"></polyline>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        <span class="nav-text">Tasks</span>
+                    </a>
+                    <a href="#deals" class="nav-item" data-page="deals">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        <span class="nav-text">Deals</span>
+                    </a>
+                    <!-- moved Tasks nav item up under Sequences -->
+                    <a href="#insights" class="nav-item" data-page="insights">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"></polyline>
+                        </svg>
+                        <span class="nav-text">Web Insights</span>
+                    </a>
+                    <div class="nav-divider"></div>
+                    <a href="#account-details" class="nav-item" data-page="account-details">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <span class="nav-text">Account Details</span>
+                    </a>
+                    <a href="#settings" class="nav-item" data-page="settings">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                        <span class="nav-text">Settings</span>
+                    </a>
+                </div>
+            </nav>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Main Content Section -->
+                <main class="main-content" id="main-content">
+                    <!-- Dashboard Page (Scrollable) -->
+                    <div class="page active" id="dashboard-page" data-page="dashboard">
+                        <div class="dashboard-content">
+                            <!-- Stat Cards -->
+                            <div class="stat-cards">
+                                <div class="stat-card">
+                                    <div class="stat-value">0</div>
+                                    <div class="stat-label">Open Deals</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">$89,420</div>
+                                    <div class="stat-label">Monthly Revenue</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">2.4M</div>
+                                    <div class="stat-label">Total kWh Managed</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">$0.089</div>
+                                    <div class="stat-label">TX Avg Price/kWh</div>
+                                </div>
+                            </div>
+
+                            <!-- Dashboard Cards -->
+                            <div class="dashboard-card">
+                                <h3 class="card-title">Suggested Leads</h3>
+                                <div class="leads-list">
+                                    <div class="lead-item">
+                                        <div class="lead-info">
+                                            <div class="lead-name">Acme Manufacturing</div>
+                                            <div class="lead-details">Industrial • 500kW avg usage</div>
+                                        </div>
+                                        <div class="lead-score">92%</div>
+                                    </div>
+                                    <div class="lead-item">
+                                        <div class="lead-info">
+                                            <div class="lead-name">Downtown Office Complex</div>
+                                            <div class="lead-details">Commercial • 300kW avg usage</div>
+                                        </div>
+                                        <div class="lead-score">87%</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-card">
+                                <h3 class="card-title">Recent Activities</h3>
+                                <div class="activities-list">
+                                    <div class="activity-item">
+                                        <div class="activity-icon call"></div>
+                                        <div class="activity-info">
+                                            <div class="activity-text">Called Johnson Electric - Follow up scheduled</div>
+                                            <div class="activity-time">2 hours ago</div>
+                                        </div>
+                                    </div>
+                                    <div class="activity-item">
+                                        <div class="activity-icon email"></div>
+                                        <div class="activity-info">
+                                            <div class="activity-text">Email sent to Metro Industries proposal</div>
+                                            <div class="activity-time">4 hours ago</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sequences Page (Container-based) -->
+                    <div class="page" id="sequences-page" data-page="sequences">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Sequences</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="create-sequence-btn">Create sequence</button>
+                                    </div>
+                                </div>
+                                <div class="people-toolbar">
+                                    <button class="action-btn" id="toggle-sequences-filters">
+                                        <span class="filter-icon" aria-hidden="true">&#9881;</span>
+                                        <span class="filter-text">Show Filters</span>
+                                        <span class="filter-count-badge" id="sequences-filter-count" hidden>0</span>
+                                    </button>
+                                    <input type="text" class="search-input-small" id="sequences-quick-search" placeholder="Search sequences..." aria-label="Quick search" />
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="table-container">
+                                    <div class="table-scroll">
+                                        <table class="data-table" id="sequences-table" aria-label="Sequences">
+                                            <thead>
+                                                <tr>
+                                                    <th class="col-select">Activate</th>
+                                                    <th>Name</th>
+                                                    <th>Created By</th>
+                                                    <th>Active</th>
+                                                    <th>Paused</th>
+                                                    <th>Not Sent</th>
+                                                    <th>Bounced</th>
+                                                    <th>Spam Blocked</th>
+                                                    <th>Finished</th>
+                                                    <th>Scheduled</th>
+                                                    <th>Delivered</th>
+                                                    <th>Reply</th>
+                                                    <th>Interested</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Populated by sequences.js -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="table-footer">
+                                        <div id="sequences-pagination-summary" class="pagination-summary" aria-live="polite"></div>
+                                        <div id="sequences-pagination" class="table-pagination" aria-label="Sequences pagination"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sequence Builder Page (Placeholder) -->
+                    <div class="page" id="sequence-builder-page" data-page="sequence-builder">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Sequence Builder</h2>
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="empty-state">
+                                    <div class="empty-title">Sequence builder</div>
+                                    <div class="empty-desc">Select or create a sequence to begin building. This is a placeholder inspired by Apollo.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sequence Create Modal -->
+                    <div id="sequence-create-modal" class="pc-modal" role="dialog" aria-modal="true" aria-labelledby="sequence-create-title" hidden>
+                        <div class="pc-modal__backdrop"></div>
+                        <div class="pc-modal__dialog">
+                            <div class="pc-modal__header">
+                                <h3 id="sequence-create-title" class="card-title">Create sequence</h3>
+                                <button type="button" class="pc-modal__close" id="sequence-modal-close" aria-label="Close">&#215;</button>
+                            </div>
+                            <div class="pc-modal__body">
+                                <div class="form-row" style="flex-direction: column;">
+                                    <label for="sequence-name-input">Sequence name</label>
+                                    <input type="text" id="sequence-name-input" placeholder="e.g., Warm Outreach Q3" autocomplete="off" aria-describedby="sequence-name-help" />
+                                    <div id="sequence-name-help" class="help-text">Give your sequence a short, descriptive name.</div>
+                                </div>
+                                <div class="form-row" style="align-items: center;">
+                                    <label style="display:flex; align-items:center; gap: var(--spacing-sm);">
+                                        <input type="checkbox" id="sequence-biz-hours" />
+                                        Confirm messaging during business hours
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="pc-modal__footer">
+                                <button type="button" class="btn-secondary" id="sequence-modal-cancel">Back</button>
+                                <button type="button" class="btn-primary" id="sequence-modal-create">Create</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Calls Page (Container-based) -->
+                    <div class="page" id="calls-page" data-page="calls">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Calls</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="log-call-btn">Log Call</button>
+                                    </div>
+                                </div>
+                                <div class="people-toolbar">
+                                    <button class="action-btn" id="toggle-calls-filters">
+                                        <span class="filter-icon" aria-hidden="true">&#9881;</span>
+                                        <span class="filter-text">Show Filters</span>
+                                        <span class="filter-count-badge" id="calls-filter-count" hidden>0</span>
+                                    </button>
+                                    <input type="text" class="search-input-small" id="calls-quick-search" placeholder="Quick search..." aria-label="Quick search" />
+                                </div>
+                                <div class="filter-panel" id="calls-filters" hidden>
+                                    <div class="filter-tabs-row">
+                                        <button class="filter-tab active" data-mode="simple">Simple</button>
+                                        <button class="filter-tab" data-mode="advanced">Advanced</button>
+                                    </div>
+                                    <div class="filter-grid" data-mode="simple">
+                                        <div class="filter-field">
+                                            <label for="calls-filter-city">City</label>
+                                            <div class="chip-input" id="calls-filter-city-chip">
+                                                <div class="chip-list" id="calls-filter-city-chips"></div>
+                                                <input type="text" id="calls-filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" />
+                                                <button type="button" class="chip-clear" id="calls-filter-city-clear" aria-label="Clear city filters">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-city-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="calls-filter-title">Job title</label>
+                                            <div class="chip-input" id="calls-filter-title-chip">
+                                                <div class="chip-list" id="calls-filter-title-chips"></div>
+                                                <input type="text" id="calls-filter-title" class="chip-input-field" placeholder="e.g., manager, director" />
+                                                <button type="button" class="chip-clear" id="calls-filter-title-clear" aria-label="Clear title filters">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-title-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="calls-filter-company">Company</label>
+                                            <div class="chip-input" id="calls-filter-company-chip">
+                                                <div class="chip-list" id="calls-filter-company-chips"></div>
+                                                <input type="text" id="calls-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
+                                                <button type="button" class="chip-clear" id="calls-filter-company-clear" aria-label="Clear company filters">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-company-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="calls-filter-state">State</label>
+                                            <div class="chip-input" id="calls-filter-state-chip">
+                                                <div class="chip-list" id="calls-filter-state-chips"></div>
+                                                <input type="text" id="calls-filter-state" class="chip-input-field" placeholder="e.g., TX, CA" />
+                                                <button type="button" class="chip-clear" id="calls-filter-state-clear" aria-label="Clear state filters">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-state-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="calls-filter-employees">Employees</label>
+                                            <div class="chip-input" id="calls-filter-employees-chip">
+                                                <div class="chip-list" id="calls-filter-employees-chips"></div>
+                                                <input type="text" id="calls-filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" />
+                                                <button type="button" class="chip-clear" id="calls-filter-employees-clear" aria-label="Clear employees filters">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-employees-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="calls-filter-industry">Industry</label>
+                                            <div class="chip-input" id="calls-filter-industry-chip">
+                                                <div class="chip-list" id="calls-filter-industry-chips"></div>
+                                                <input type="text" id="calls-filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
+                                                <button type="button" class="chip-clear" id="calls-filter-industry-clear" aria-label="Clear industry filters">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-industry-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="calls-filter-visitor-domain">Website visitors (domain)</label>
+                                            <div class="chip-input" id="calls-filter-visitor-domain-chip">
+                                                <div class="chip-list" id="calls-filter-visitor-domain-chips"></div>
+                                                <input type="text" id="calls-filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" />
+                                                <button type="button" class="chip-clear" id="calls-filter-visitor-domain-clear" aria-label="Clear website visitor domains">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-visitor-domain-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field checkbox">
+                                            <label><input type="checkbox" id="calls-filter-has-email" /> Has email</label>
+                                        </div>
+                                        <div class="filter-field checkbox">
+                                            <label><input type="checkbox" id="calls-filter-has-phone" /> Has phone</label>
+                                        </div>
+                                    </div>
+                                    <div class="filter-actions-row">
+                                        <button class="btn-secondary" id="clear-calls-filters">Clear all</button>
+                                        <button class="btn-primary" id="apply-calls-filters">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="table-container">
+                                    <div class="table-scroll">
+                                        <table class="data-table" id="calls-table" aria-label="Calls">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-select"><input type="checkbox" id="select-all-calls" aria-label="Select all calls"></th>
+                                                <th>Contact</th>
+                                                <th>Title</th>
+                                                <th>Company</th>
+                                                <th>Call Time</th>
+                                                <th>Duration</th>
+                                                <th>Outcome</th>
+                                                <th>Insights</th>
+                                                <th>Quick Actions</th>
+                                                <th>Updated</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                             <!-- Populated by calls.js -->
+                                         </tbody>
+                                        </table>
+                                    </div>
+                                     <div class="table-footer">
+                                         <div id="calls-pagination-summary" class="pagination-summary" aria-live="polite"></div>
+                                         <div id="calls-pagination" class="table-pagination" aria-label="Calls pagination"></div>
+                                     </div>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+                    <!-- Emails Page (Gmail-like Interface) -->
+                    <div class="page" id="emails-page" data-page="emails">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Emails</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="compose-email-btn">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M3 3h18v18H3zM3 9l9 6 9-6"/>
+                                            </svg>
+                                            Compose
+                                        </button>
+                                        <button class="btn-secondary" id="refresh-emails-btn" title="Refresh">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                                <path d="M21 3v5h-5"/>
+                                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                                <path d="M3 21v-5h5"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="email-toolbar">
+                                    <input type="text" class="search-input-small" id="emails-search" placeholder="Search mail..." aria-label="Search emails" />
+                                    <div class="email-view-controls">
+                                        <button class="btn-icon" id="toggle-sidebar-btn" title="Toggle sidebar">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                                <line x1="9" y1="3" x2="9" y2="21"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="email-layout">
+                                    <!-- Email Sidebar -->
+                                    <div class="email-sidebar" id="email-sidebar">
+                                        <div class="email-folders">
+                                            <div class="folder-item active" data-folder="inbox">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+                                                </svg>
+                                                <span>Inbox</span>
+                                                <span class="folder-count" id="inbox-count">0</span>
+                                            </div>
+                                            <div class="folder-item" data-folder="starred">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/>
+                                                </svg>
+                                                <span>Starred</span>
+                                                <span class="folder-count" id="starred-count">0</span>
+                                            </div>
+                                            <div class="folder-item" data-folder="important">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86L7.86 2z"/>
+                                                    <line x1="15" y1="9" x2="9" y2="15"/>
+                                                    <line x1="9" y1="9" x2="15" y2="15"/>
+                                                </svg>
+                                                <span>Important</span>
+                                                <span class="folder-count" id="important-count">0</span>
+                                            </div>
+                                            <div class="folder-item" data-folder="sent">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <line x1="22" y1="2" x2="11" y2="13"/>
+                                                    <polygon points="22,2 15,22 11,13 2,9 22,2"/>
+                                                </svg>
+                                                <span>Sent</span>
+                                                <span class="folder-count" id="sent-count">0</span>
+                                            </div>
+                                            <div class="folder-item" data-folder="drafts">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                                </svg>
+                                                <span>Drafts</span>
+                                                <span class="folder-count" id="drafts-count">0</span>
+                                            </div>
+                                            <div class="folder-item" data-folder="scheduled">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <circle cx="12" cy="12" r="10"/>
+                                                    <polyline points="12,6 12,12 16,14"/>
+                                                </svg>
+                                                <span>Scheduled</span>
+                                                <span class="folder-count" id="scheduled-count">0</span>
+                                            </div>
+                                            <div class="folder-item" data-folder="spam">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                                    <line x1="12" y1="9" x2="12" y2="13"/>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                                </svg>
+                                                <span>Spam</span>
+                                                <span class="folder-count" id="spam-count">0</span>
+                                            </div>
+                                            <div class="folder-item" data-folder="trash">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <polyline points="3,6 5,6 21,6"/>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                                </svg>
+                                                <span>Trash</span>
+                                                <span class="folder-count" id="trash-count">0</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Labels Section -->
+                                        <div class="email-labels">
+                                            <div class="labels-header">
+                                                <span>Labels</span>
+                                                <button class="btn-icon-sm" id="add-label-btn" title="Add label">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <line x1="12" y1="5" x2="12" y2="19"/>
+                                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div class="label-list" id="label-list">
+                                                <!-- Labels will be populated here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Email List -->
+                                    <div class="email-main" id="email-main">
+                                        <div class="email-list-header">
+                                            <div class="email-controls">
+                                                <input type="checkbox" id="select-all-emails" class="email-checkbox">
+                                                <button class="btn-icon" id="archive-btn" title="Archive" disabled>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="21,8 21,21 3,21 3,8"/>
+                                                        <rect x="1" y="3" width="22" height="5"/>
+                                                        <line x1="10" y1="12" x2="14" y2="12"/>
+                                                    </svg>
+                                                </button>
+                                                <button class="btn-icon" id="delete-btn" title="Delete" disabled>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="3,6 5,6 21,6"/>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                                    </svg>
+                                                </button>
+                                                <button class="btn-icon" id="mark-read-btn" title="Mark as read" disabled>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                        <circle cx="12" cy="12" r="3"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div class="email-sort">
+                                                <span class="email-count" id="email-count">0 emails</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="email-list" id="email-list">
+                                            <!-- Loading state -->
+                                            <div class="email-loading" id="email-loading">
+                                                <div class="loading-spinner"></div>
+                                                <span>Loading emails...</span>
+                                            </div>
+                                            
+                                            <!-- Empty state -->
+                                            <div class="email-empty" id="email-empty" style="display: none;">
+                                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                                    <polyline points="22,6 12,13 2,6"/>
+                                                </svg>
+                                                <h3>No emails found</h3>
+                                                <p>Your inbox is empty or no emails match your search.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Deals Page (Container-based, Kanban board) -->
+                    <div class="page" id="deals-page" data-page="deals">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Deals</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="add-deal-btn">Add Deal</button>
+                                    </div>
+                                </div>
+                                <div class="people-toolbar">
+                                    <input type="text" class="search-input-small" id="deals-quick-search" placeholder="Search deals..." aria-label="Quick search" />
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="board-container">
+                                    <div class="deals-board" id="deals-board" aria-label="Deals board"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tasks Page (Container-based) -->
+                    <div class="page" id="tasks-page" data-page="tasks">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">All Tasks</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-secondary">Sequences</button>
+                                        <button class="btn-primary">Add Task</button>
+                                    </div>
+                                </div>
+                                <div class="page-filters">
+                                    <div class="filter-tabs">
+                                        <button class="filter-tab active">All <span class="tab-count">25</span></button>
+                                        <button class="filter-tab">Pending <span class="tab-count">7</span></button>
+                                        <button class="filter-tab">Completed <span class="tab-count">7</span></button>
+                                    </div>
+                                    <div class="filter-actions">
+                                        <input type="text" placeholder="Search tasks..." class="search-input-small">
+                                        <button class="btn-text">Clear</button>
+                                        <span class="results-count">25 tasks</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="table-container">
+                                    <div class="table-scroll">
+                                        <table class="data-table" id="tasks-table" aria-label="Tasks">
+                                            <thead>
+                                                <tr>
+                                                    <th class="col-select"><input type="checkbox" id="select-all-tasks" aria-label="Select all tasks"></th>
+                                                    <th>Task</th>
+                                                    <th>Type</th>
+                                                    <th>Priority</th>
+                                                    <th>Due Date</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Populated by tasks.js -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="table-footer">
+                                        <div id="tasks-pagination-summary" class="pagination-summary" aria-live="polite"></div>
+                                        <div id="tasks-pagination" class="table-pagination" aria-label="Tasks pagination"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Other pages will follow the same container pattern -->
+                    <!-- Web Insights Page (Container-based) -->
+                    <div class="page" id="insights-page" data-page="insights">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Web Insights</h2>
+                                </div>
+                                <div class="people-toolbar">
+                                    <input type="text" class="search-input-small" id="insights-quick-search" placeholder="Quick search..." aria-label="Quick search" />
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="table-container --empty">
+                                    <div id="insights-empty-state" class="empty-state">
+                                        <div class="empty-title">Web Insights</div>
+                                        <div class="empty-desc">See which companies are visiting your website. Integration coming soon.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="page" id="people-page" data-page="people">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">People</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="add-contact-btn">Add Contact</button>
+                                    </div>
+                                </div>
+                                <div class="people-toolbar">
+                                    <button class="action-btn" id="toggle-people-filters">
+                                        <span class="filter-icon" aria-hidden="true">&#9881;</span>
+                                        <span class="filter-text">Show Filters</span>
+                                        <span class="filter-count-badge" id="people-filter-count" hidden>0</span>
+                                    </button>
+                                    <input type="text" class="search-input-small" id="people-quick-search" placeholder="Quick search..." aria-label="Quick search" />
+                                </div>
+                                <div class="filter-panel" id="people-filters" hidden>
+                                    <div class="filter-tabs-row">
+                                        <button class="filter-tab active" data-mode="simple">Simple</button>
+                                        <button class="filter-tab" data-mode="advanced">Advanced</button>
+                                    </div>
+                                    <div class="filter-grid" data-mode="simple">
+                                        <div class="filter-field">
+                                            <label for="filter-city">City</label>
+                                            <div class="chip-input" id="filter-city-chip">
+                                                <div class="chip-list" id="filter-city-chips"></div>
+                                                <input type="text" id="filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" />
+                                                <button type="button" class="chip-clear" id="filter-city-clear" aria-label="Clear city filters">&#215;</button>
+                                                <div class="chip-suggest" id="filter-city-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-title">Job title</label>
+                                            <div class="chip-input" id="filter-title-chip">
+                                                <div class="chip-list" id="filter-title-chips"></div>
+                                                <input type="text" id="filter-title" class="chip-input-field" placeholder="e.g., manager, director" />
+                                                <button type="button" class="chip-clear" id="filter-title-clear" aria-label="Clear title filters">&#215;</button>
+                                                <div class="chip-suggest" id="filter-title-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-company">Company</label>
+                                            <div class="chip-input" id="filter-company-chip">
+                                                <div class="chip-list" id="filter-company-chips"></div>
+                                                <input type="text" id="filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
+                                                <button type="button" class="chip-clear" id="filter-company-clear" aria-label="Clear company filters">&#215;</button>
+                                                <div class="chip-suggest" id="filter-company-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-state">State</label>
+                                            <div class="chip-input" id="filter-state-chip">
+                                                <div class="chip-list" id="filter-state-chips"></div>
+                                                <input type="text" id="filter-state" class="chip-input-field" placeholder="e.g., TX, CA" />
+                                                <button type="button" class="chip-clear" id="filter-state-clear" aria-label="Clear state filters">&#215;</button>
+                                                <div class="chip-suggest" id="filter-state-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-employees">Employees</label>
+                                            <div class="chip-input" id="filter-employees-chip">
+                                                <div class="chip-list" id="filter-employees-chips"></div>
+                                                <input type="text" id="filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" />
+                                                <button type="button" class="chip-clear" id="filter-employees-clear" aria-label="Clear employees filters">&#215;</button>
+                                                <div class="chip-suggest" id="filter-employees-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-industry">Industry</label>
+                                            <div class="chip-input" id="filter-industry-chip">
+                                                <div class="chip-list" id="filter-industry-chips"></div>
+                                                <input type="text" id="filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
+                                                <button type="button" class="chip-clear" id="filter-industry-clear" aria-label="Clear industry filters">&#215;</button>
+                                                <div class="chip-suggest" id="filter-industry-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-visitor-domain">Website visitors (domain)</label>
+                                            <div class="chip-input" id="filter-visitor-domain-chip">
+                                                <div class="chip-list" id="filter-visitor-domain-chips"></div>
+                                                <input type="text" id="filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" />
+                                                <button type="button" class="chip-clear" id="filter-visitor-domain-clear" aria-label="Clear website visitor domains">&#215;</button>
+                                                <div class="chip-suggest" id="filter-visitor-domain-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field checkbox">
+                                            <label><input type="checkbox" id="filter-has-email" /> Has email</label>
+                                        </div>
+                                        <div class="filter-field checkbox">
+                                            <label><input type="checkbox" id="filter-has-phone" /> Has phone</label>
+                                        </div>
+                                    </div>
+                                    <div class="filter-actions-row">
+                                        <button class="btn-secondary" id="clear-people-filters">Clear all</button>
+                                        <button class="btn-primary" id="apply-people-filters">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="table-container">
+                                    <div class="table-scroll">
+                                        <table class="data-table" id="people-table" aria-label="Contacts">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-select"><input type="checkbox" id="select-all-contacts" aria-label="Select all contacts"></th>
+                                                <th>Name</th>
+                                                <th>Title</th>
+                                                <th>Company</th>
+                                                <th>Email</th>
+                                                <th>Phone</th>
+                                                <th>Location</th>
+                                                <th>Quick Actions</th>
+                                                <th>Updated</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                             <!-- Populated by people.js -->
+                                         </tbody>
+                                        </table>
+                                    </div>
+                                     <div class="table-footer">
+                                         <div id="people-pagination-summary" class="pagination-summary" aria-live="polite"></div>
+                                         <div id="people-pagination" class="table-pagination" aria-label="Contacts pagination"></div>
+                                     </div>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Accounts Page (Container-based) -->
+                    <div class="page" id="accounts-page" data-page="accounts">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Accounts</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="add-account-btn">Add Account</button>
+                                    </div>
+                                </div>
+                                <div class="people-toolbar">
+                                    <button class="action-btn" id="toggle-accounts-filters">
+                                        <span class="filter-icon" aria-hidden="true">&#9881;</span>
+                                        <span class="filter-text">Show Filters</span>
+                                        <span class="filter-count-badge" id="accounts-filter-count" hidden>0</span>
+                                    </button>
+                                    <input type="text" class="search-input-small" id="accounts-quick-search" placeholder="Quick search..." aria-label="Quick search" />
+                                </div>
+                                <div class="filter-panel" id="accounts-filters" hidden>
+                                    <div class="filter-tabs-row">
+                                        <button class="filter-tab active" data-mode="simple">Simple</button>
+                                        <button class="filter-tab" data-mode="advanced">Advanced</button>
+                                    </div>
+                                    <div class="filter-grid" data-mode="simple">
+                                        <div class="filter-field">
+                                            <label for="filter-acct-name">Account name</label>
+                                            <input type="text" id="filter-acct-name" class="input-dark" placeholder="e.g., Acme Corp" />
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-industry">Industry</label>
+                                            <input type="text" id="filter-industry" class="input-dark" placeholder="e.g., Industrial, Retail" />
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-domain">Domain</label>
+                                            <input type="text" id="filter-domain" class="input-dark" placeholder="e.g., acme.com" />
+                                        </div>
+                                        <div class="filter-field checkbox">
+                                            <label><input type="checkbox" id="filter-acct-has-phone" /> Has phone</label>
+                                        </div>
+                                    </div>
+                                    <div class="filter-actions-row">
+                                        <button class="btn-secondary" id="clear-accounts-filters">Clear all</button>
+                                        <button class="btn-primary" id="apply-accounts-filters">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="table-container">
+                                    <div class="table-scroll">
+                                        <table class="data-table" id="accounts-table" aria-label="Accounts">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-select"><input type="checkbox" id="select-all-accounts" aria-label="Select all accounts"></th>
+                                                <th>Account</th>
+                                                <th>Industry</th>
+                                                <th>Domain</th>
+                                                <th>Phone</th>
+                                                <th>Contract End Date</th>
+                                                <th>Sq Ft</th>
+                                                <th>Occupancy %</th>
+                                                <th>Employees</th>
+                                                <th>Location</th>
+                                                <th>Quick Actions</th>
+                                                <th>Updated</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                             <!-- Populated by accounts.js -->
+                                         </tbody>
+                                        </table>
+                                    </div>
+                                     <div class="table-footer">
+                                         <div id="accounts-pagination-summary" class="pagination-summary" aria-live="polite"></div>
+                                         <div id="accounts-pagination" class="table-pagination" aria-label="Accounts pagination"></div>
+                                     </div>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Account Details Page (Container-based) -->
+                    <div class="page" id="account-details-page" data-page="account-details">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Account Details</h2>
+                                    <div class="page-actions"></div>
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="table-container">
+                                    <div id="account-details-empty" class="empty-state">
+                                        <div class="empty-title">Account details</div>
+                                        <div class="empty-desc">Select an account from the list to view details.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lists Page (Container-based) -->
+                    <div class="page" id="lists-page" data-page="lists">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <button class="back-btn back-btn--icon" id="lists-back-btn" aria-label="Back to Lists" title="Back to Lists" hidden>
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                                      </svg>
+                                    </button>
+                                    <h2 class="page-title" id="lists-detail-title">Lists</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="lists-add-contact-btn" hidden>Add Contact</button>
+                                        <button class="btn-primary" id="add-list-btn">Create List</button>
+                                    </div>
+                                </div>
+                                <div class="people-toolbar" id="lists-header-toolbar">
+                                    <button class="action-btn" id="toggle-lists-filters" type="button" hidden>
+                                        <span class="filter-icon" aria-hidden="true">&#9881;</span>
+                                        <span class="filter-text">Show Filters</span>
+                                        <span class="filter-count-badge" id="lists-filter-count" hidden>0</span>
+                                    </button>
+                                    <input type="text" class="search-input-small" id="lists-quick-search" placeholder="Quick search..." aria-label="Quick search" />
+                                    <button class="btn-secondary" id="lists-switch-btn" type="button" aria-live="polite">Switch to company lists</button>
+                                </div>
+                            </div>
+                            <div class="page-content lists-grid">
+                                <div id="lists-empty-state" class="empty-state">
+                                    <div class="empty-title">No lists added</div>
+                                    <div class="empty-desc">Get started by creating your first list to organize people or companies. Click the "Create List" button above or use the button below.</div>
+                                    <div class="empty-actions">
+                                        <button class="btn-primary" id="create-first-list-btn">Create your first list</button>
+                                    </div>
+                                </div>
+                                <!-- List cards will be rendered here by lists-overview.js -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- List Detail Page -->
+                    <div class="page" id="list-detail-page" data-page="list-detail">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <button class="back-btn back-btn--icon" id="list-detail-back-btn" aria-label="Back to Lists">
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                                      </svg>
+                                    </button>
+                                    <h2 class="page-title" id="list-detail-title">List Details</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="list-detail-contacts-btn">Contacts</button>
+                                    </div>
+                                </div>
+                                <div class="people-toolbar" id="list-detail-header-toolbar">
+                                    <button class="action-btn" id="list-detail-filters-btn">
+                                        <span class="filter-icon" aria-hidden="true">&#9881;</span>
+                                        <span class="filter-text">Show Filters</span>
+                                    </button>
+                                    <div class="view-toggle" id="list-detail-view-toggle">
+                                        <button class="toggle-btn filter-tab active" data-view="people" aria-selected="true">People</button>
+                                        <button class="toggle-btn filter-tab" data-view="accounts" aria-selected="false">Accounts</button>
+                                    </div>
+                                    <input type="text" id="list-detail-contact-search" class="search-input-small" placeholder="Search contacts to add..." aria-label="Search contacts to add" />
+                                </div>
+                            </div>
+                            
+                            <div class="page-content">
+                                <div class="table-container">
+                                    <div class="table-toolbar">
+                                        <div class="table-toolbar-left"></div>
+                                        <div class="table-toolbar-right"></div>
+                                    </div>
+                            
+                                    <div id="list-detail-filters" class="filter-panel" hidden>
+                                        <div class="filter-tabs-row">
+                                            <button class="filter-tab active" data-mode="simple" aria-selected="true">Simple</button>
+                                            <button class="filter-tab" data-mode="advanced" aria-selected="false">Advanced</button>
+                                        </div>
+                                        <div id="list-detail-people-filters-grid" class="filter-grid" data-mode="simple">
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-city">City</label>
+                                                <div class="chip-input" id="list-detail-filter-city-chip">
+                                                    <div class="chip-list" id="list-detail-filter-city-chips"></div>
+                                                    <input type="text" id="list-detail-filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-city-clear" aria-label="Clear city filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-city-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-title">Job title</label>
+                                                <div class="chip-input" id="list-detail-filter-title-chip">
+                                                    <div class="chip-list" id="list-detail-filter-title-chips"></div>
+                                                    <input type="text" id="list-detail-filter-title" class="chip-input-field" placeholder="e.g., manager, director" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-title-clear" aria-label="Clear title filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-title-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-company">Company</label>
+                                                <div class="chip-input" id="list-detail-filter-company-chip">
+                                                    <div class="chip-list" id="list-detail-filter-company-chips"></div>
+                                                    <input type="text" id="list-detail-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-company-clear" aria-label="Clear company filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-company-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-state">State</label>
+                                                <div class="chip-input" id="list-detail-filter-state-chip">
+                                                    <div class="chip-list" id="list-detail-filter-state-chips"></div>
+                                                    <input type="text" id="list-detail-filter-state" class="chip-input-field" placeholder="e.g., TX, CA" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-state-clear" aria-label="Clear state filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-state-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-employees">Employees</label>
+                                                <div class="chip-input" id="list-detail-filter-employees-chip">
+                                                    <div class="chip-list" id="list-detail-filter-employees-chips"></div>
+                                                    <input type="text" id="list-detail-filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-employees-clear" aria-label="Clear employees filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-employees-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-industry">Industry</label>
+                                                <div class="chip-input" id="list-detail-filter-industry-chip">
+                                                    <div class="chip-list" id="list-detail-filter-industry-chips"></div>
+                                                    <input type="text" id="list-detail-filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-industry-clear" aria-label="Clear industry filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-industry-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field">
+                                                <label for="list-detail-filter-visitor-domain">Website visitors (domain)</label>
+                                                <div class="chip-input" id="list-detail-filter-visitor-domain-chip">
+                                                    <div class="chip-list" id="list-detail-filter-visitor-domain-chips"></div>
+                                                    <input type="text" id="list-detail-filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-visitor-domain-clear" aria-label="Clear website visitor domains">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-visitor-domain-suggest" hidden></div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-field checkbox">
+                                                <label><input type="checkbox" id="list-detail-filter-has-email" /> Has email</label>
+                                            </div>
+                                            <div class="filter-field checkbox">
+                                                <label><input type="checkbox" id="list-detail-filter-has-phone" /> Has phone</label>
+                                            </div>
+                                        </div>
+                                        <div class="filter-actions-row">
+                                            <button class="btn-secondary" id="list-detail-clear-filters">Clear all</button>
+                                            <button class="btn-primary" id="list-detail-apply-filters">Apply</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="table-scroll">
+                                        <table class="data-table" id="list-detail-table" aria-label="List members">
+                                            <thead>
+                                                <tr></tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <div class="table-footer">
+                                        <div id="list-detail-pagination-summary" class="pagination-summary" aria-live="polite"></div>
+                                        <div id="list-detail-pagination" class="table-pagination" aria-label="List pagination"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </main>
+
+                <aside class="widget-panel" id="widget-panel">
+                    <div class="widget-content">
+                        <!-- Quick Actions -->
+                        <div class="widget-card">
+                            <h4 class="widget-title">Quick Actions</h4>
+                            <div class="quick-actions">
+                                <button class="action-btn">Add Contact</button>
+                                <button class="action-btn">Add Account</button>
+                                <button class="action-btn">Bulk Import CSV</button>
+                            </div>
+                        </div>
+
+                        <!-- Today's Tasks -->
+                        <div class="widget-card">
+                            <h4 class="widget-title">Today's Tasks</h4>
+                            <div class="tasks-list">
+                                <div class="task-item">
+                                    <div class="task-info">
+                                        <div class="task-name">Call Johnson Electric</div>
+                                        <div class="task-time">Due in 2 hours</div>
+                                    </div>
+                                    <span class="priority-badge high">High</span>
+                                </div>
+                                <div class="task-item">
+                                    <div class="task-info">
+                                        <div class="task-name">Send proposal to Metro</div>
+                                        <div class="task-time">Due today</div>
+                                    </div>
+                                    <span class="priority-badge medium">Medium</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Energy News -->
+                        <div class="widget-card">
+                            <div class="widget-card-header">
+                                <h4 class="widget-title">Energy News</h4>
+                                <div class="news-time" id="news-last-refreshed">Last updated: —</div>
+                            </div>
+                            <div class="news-list">
+                                <!-- Populated by loadEnergyNews() -->
+                            </div>
+                        </div>
+
+                        <!-- Live TX Price -->
+                        <div class="widget-card">
+                            <h4 class="widget-title">Live TX Electricity Price</h4>
+                            <div class="price-display">
+                                <div class="current-price">$0.089</div>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Contact Modal -->
+    <div id="modal-add-contact" class="pc-modal" hidden>
+        <div class="pc-modal__backdrop" data-close="contact"></div>
+        <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="add-contact-title">
+            <div class="pc-modal__header">
+                <h3 id="add-contact-title">Add Contact</h3>
+                <button class="pc-modal__close" data-close="contact" aria-label="Close">×</button>
+            </div>
+            <form id="form-add-contact" class="pc-modal__body">
+                <div class="form-row">
+                    <label>First name<input type="text" name="firstName" required class="input-dark" /></label>
+                    <label>Last name<input type="text" name="lastName" required class="input-dark" /></label>
+                </div>
+                <div class="form-row">
+                    <label>Title<input type="text" name="title" class="input-dark" /></label>
+                    <label>Company<input type="text" name="companyName" class="input-dark" placeholder="Exact account name" /></label>
+                </div>
+                <div class="form-row">
+                    <label>Email<input type="email" name="email" class="input-dark" /></label>
+                    <label>Phone<input type="text" name="phone" class="input-dark" /></label>
+                </div>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-text" data-close="contact">Cancel</button>
+                    <button type="submit" class="btn-primary">Create contact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Account Modal -->
+    <div id="modal-add-account" class="pc-modal" hidden>
+        <div class="pc-modal__backdrop" data-close="account"></div>
+        <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="add-account-title">
+            <div class="pc-modal__header">
+                <h3 id="add-account-title">Add Account</h3>
+                <button class="pc-modal__close" data-close="account" aria-label="Close">×</button>
+            </div>
+            <form id="form-add-account" class="pc-modal__body">
+                <div class="form-row">
+                    <label>Account name<input type="text" name="accountName" required class="input-dark" /></label>
+                    <label>Industry<input type="text" name="industry" class="input-dark" /></label>
+                </div>
+                <div class="form-row">
+                    <label>Website<input type="text" name="website" class="input-dark" placeholder="https://example.com" /></label>
+                    <label>Phone<input type="text" name="phone" class="input-dark" /></label>
+                </div>
+                <div class="form-row">
+                    <label>City<input type="text" name="city" class="input-dark" /></label>
+                    <label>State<input type="text" name="state" class="input-dark" /></label>
+                </div>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-text" data-close="account">Cancel</button>
+                    <button type="submit" class="btn-primary">Create account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Import CSV Modal -->
+    <div id="modal-bulk-import" class="pc-modal" hidden>
+        <div class="pc-modal__backdrop" data-close="bulk-import"></div>
+        <div class="pc-modal__dialog csv-import-modal" role="dialog" aria-modal="true" aria-labelledby="bulk-import-title">
+            <div class="pc-modal__header">
+                <h3 id="bulk-import-title">Bulk Import CSV</h3>
+                <button class="pc-modal__close" data-close="bulk-import" aria-label="Close">×</button>
+            </div>
+            
+            <!-- Step Indicator -->
+            <div class="csv-steps-indicator">
+                <div class="csv-step active" data-step="1">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Upload File</div>
+                </div>
+                <div class="csv-step" data-step="2">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Map Fields</div>
+                </div>
+                <div class="csv-step" data-step="3">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Review & Import</div>
+                </div>
+            </div>
+
+            <!-- Step 1: File Upload -->
+            <div class="csv-step-content" id="csv-step-1">
+                <div class="pc-modal__body">
+                    <div class="csv-upload-section">
+                        <div class="upload-type-selector">
+                            <h4>What would you like to import?</h4>
+                            <div class="type-options">
+                                <label class="type-option">
+                                    <input type="radio" name="importType" value="contacts" checked>
+                                    <div class="option-content">
+                                        <div class="option-icon">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                                <circle cx="9" cy="7" r="4"></circle>
+                                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="option-text">
+                                            <div class="option-title">Contacts</div>
+                                            <div class="option-desc">People and their information</div>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="type-option">
+                                    <input type="radio" name="importType" value="accounts">
+                                    <div class="option-content">
+                                        <div class="option-icon">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                                <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="option-text">
+                                            <div class="option-title">Accounts</div>
+                                            <div class="option-desc">Companies and organizations</div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="csv-drop-zone" id="csv-drop-zone">
+                            <div class="drop-zone-content">
+                                <div class="upload-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="12" y1="11" x2="12" y2="17"></line>
+                                        <polyline points="9 14 12 11 15 14"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="upload-text">
+                                    <h4>Drop your CSV file here</h4>
+                                    <p>or <button type="button" class="btn-link" id="csv-browse-btn">browse to upload</button></p>
+                                </div>
+                                <div class="file-requirements">
+                                    <small>Supported format: .csv (max 10MB)</small>
+                                </div>
+                            </div>
+                            <input type="file" id="csv-file-input" accept=".csv" hidden>
+                        </div>
+                        
+                        <div class="csv-file-info" id="csv-file-info" hidden>
+                            <div class="file-details">
+                                <div class="file-name" id="csv-file-name"></div>
+                                <div class="file-stats">
+                                    <span id="csv-file-size"></span> • 
+                                    <span id="csv-row-count"></span> rows detected
+                                </div>
+                            </div>
+                            <button type="button" class="btn-text" id="csv-remove-file">Remove file</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-secondary" data-close="bulk-import">Cancel</button>
+                    <button type="button" class="btn-primary" id="csv-next-step-1" disabled>Next: Map Fields</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Field Mapping -->
+            <div class="csv-step-content" id="csv-step-2" hidden>
+                <div class="pc-modal__body">
+                    <div class="csv-mapping-section">
+                        <div class="mapping-header">
+                            <h4>Map your CSV columns to CRM fields</h4>
+                            <p>Match the columns from your CSV file to the appropriate fields in your CRM.</p>
+                        </div>
+                        
+                        <div class="csv-preview">
+                            <h5>CSV Preview (first 3 rows)</h5>
+                            <div class="preview-table" id="csv-preview-table">
+                                <!-- Preview table will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="field-mapping">
+                            <h5>Field Mapping</h5>
+                            <div class="mapping-list" id="csv-field-mapping">
+                                <!-- Field mapping controls will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="mapping-options">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="csv-update-existing" checked>
+                                Update existing records if found
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-secondary" id="csv-back-step-2">Back</button>
+                    <button type="button" class="btn-primary" id="csv-next-step-2">Next: Review</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Review & Import -->
+            <div class="csv-step-content" id="csv-step-3" hidden>
+                <div class="pc-modal__body">
+                    <div class="csv-review-section">
+                        <div class="review-header">
+                            <h4>Review your import</h4>
+                            <p>Please review the details below before importing your data.</p>
+                        </div>
+                        
+                        <div class="review-summary" id="csv-review-summary">
+                            <!-- Summary will be populated by JavaScript -->
+                        </div>
+                        
+                        <div class="review-data">
+                            <h5>Data Preview</h5>
+                            <div class="preview-table" id="csv-final-preview">
+                                <!-- Final preview will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="import-progress" id="csv-import-progress" hidden>
+                            <div class="progress-header">
+                                <h5>Importing data...</h5>
+                                <div class="progress-stats" id="csv-progress-stats"></div>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="csv-progress-fill"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="import-results" id="csv-import-results" hidden>
+                            <div class="results-summary" id="csv-results-summary"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-secondary" id="csv-back-step-3">Back</button>
+                    <button type="button" class="btn-primary" id="csv-start-import">Start Import</button>
+                    <button type="button" class="btn-primary" id="csv-finish-import" hidden>Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="scripts/firebase.js"></script>
+    <!-- API Base URL (global) -->
+    <script>
+      (function(){
+        try {
+          // Detect if running locally
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          
+          if (isLocal) {
+            // Use local server for API calls when running locally
+            window.API_BASE_URL = window.location.origin;
+            console.log('API_BASE_URL (Local server):', window.API_BASE_URL);
+          } else {
+            // Use Vercel deployment for Twilio serverless functions when deployed
+            const vercelUrl = 'https://power-choosers-crm.vercel.app';
+            window.API_BASE_URL = vercelUrl;
+            console.log('API_BASE_URL (Vercel backend):', window.API_BASE_URL);
+          }
+        } catch (e) {
+          console.warn('API_BASE_URL init error:', e);
+        }
+      })();
+    </script>
+    <script src="scripts/pages/contact-detail.js"></script>
+    <script src="scripts/pages/account-detail.js"></script>
+    <script src="scripts/pages/people.js"></script>
+    <script src="scripts/pages/accounts.js"></script>
+    <script src="scripts/pages/calls.js"></script>
+    <script src="scripts/pages/lists-overview.js"></script>
+    <script src="scripts/pages/emails.js"></script>
+    <script src="scripts/pages/sequence-builder.js"></script>
+    <script src="scripts/pages/sequences.js"></script>
+    <script src="scripts/pages/deals.js"></script>
+    <script src="scripts/pages/tasks.js"></script>
+    <script src="scripts/global-search.js"></script>
+    <script src="scripts/widgets/phone.js"></script>
+    <script src="scripts/widgets/notes.js"></script>
+    <script src="scripts/notifications.js"></script>
+    <script src="scripts/click-to-call.js"></script>
+    <script src="scripts/main.js"></script>
+    <script>
+      (function(){
+        function formatUsdPerKwh(n){
+          if (typeof n !== 'number' || !isFinite(n)) return '$—';
+          return `$${n.toFixed(3)}`;
+        }
+        function findTxPriceValueEl(){
+          const labels = document.querySelectorAll('.stat-card .stat-label');
+          for (const lbl of labels){
+            if (lbl && lbl.textContent && lbl.textContent.trim() === 'TX Avg Price/kWh'){
+              const card = lbl.closest('.stat-card');
+              if (card) return card.querySelector('.stat-value');
+            }
+          }
+          return null;
+        }
+        async function loadTxPrice(opts){
+          const refresh = opts && opts.refresh;
+          const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+          const url = `${base}/api/tx-price${refresh ? '?refresh=1' : ''}`;
+          try{
+            const res = await fetch(url, { credentials: 'include' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            const el = findTxPriceValueEl();
+            if (el){
+              el.textContent = formatUsdPerKwh(data.price);
+              el.title = data.lastUpdated ? `Last updated: ${new Date(data.lastUpdated).toLocaleString()}` : '';
+            }
+          }catch(err){
+            console.error('[TX Price] Fetch failed:', err);
+          }
+        }
+        window.addEventListener('DOMContentLoaded', function(){
+          // Force refresh so we can see current value
+          loadTxPrice({ refresh: true });
+        });
+      })();
+    </script>
+
+    <!-- Load List Detail Page Script -->
+    <script src="scripts/pages/list-detail.js"></script>
+</body>
+</html>
