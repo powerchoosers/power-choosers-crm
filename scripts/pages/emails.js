@@ -22,9 +22,21 @@ class EmailManager {
     }
 
     async init() {
-        await this.loadGoogleAPI();
-        this.bindEvents();
-        this.updateUI();
+        try {
+            console.log('EmailManager: Starting initialization...');
+            await this.loadGoogleAPI();
+            this.bindEvents();
+            this.updateUI();
+            console.log('EmailManager: Initialization complete');
+        } catch (error) {
+            console.error('Email manager initialization failed:', error);
+            this.showAuthPrompt();
+        }
+    }
+
+    updateUI() {
+        // Force show auth prompt on initial load
+        this.showAuthPrompt();
     }
 
     async loadGoogleAPI() {
@@ -483,9 +495,16 @@ let emailManager;
 
 function initEmailsPage() {
     const emailsPage = document.getElementById('emails-page');
-    if (!emailsPage) return;
+    if (!emailsPage) {
+        console.log('EmailManager: emails-page not found');
+        return;
+    }
 
+    console.log('EmailManager: Initializing email page...');
     emailManager = new EmailManager();
+    
+    // Ensure emailManager is available globally
+    window.emailManager = emailManager;
 }
 
 // Auto-initialize
