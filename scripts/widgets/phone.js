@@ -383,7 +383,12 @@
                     }
                   }
                   
-                  updateCallStatus(number, 'completed', callStartTime, duration, callId, number, 'incoming');
+                  // Guard: updateCallStatus may not be defined yet if widget hasn't been created
+                  if (typeof updateCallStatus === 'function') {
+                    updateCallStatus(number, 'completed', callStartTime, duration, callId, number, 'incoming');
+                  } else {
+                    console.warn('[TwilioRTC] updateCallStatus not available - skipping status update');
+                  }
                   
                   // Add call completed notification
                   if (window.Notifications && typeof window.Notifications.addCallCompleted === 'function') {
@@ -420,7 +425,12 @@
                   stopLiveCallTimer(card3);
                   lastCallCompleted = Date.now();
                   autoTriggerBlockUntil = Date.now() + 10000;
-                  updateCallStatus(number, 'error', callStartTime, 0, callId, number, 'incoming');
+                  // Guard: updateCallStatus may not be defined yet if widget hasn't been created
+                  if (typeof updateCallStatus === 'function') {
+                    updateCallStatus(number, 'error', callStartTime, 0, callId, number, 'incoming');
+                  } else {
+                    console.warn('[TwilioRTC] updateCallStatus not available - skipping status update');
+                  }
                 });
               } catch (e) {
                 console.error('[TwilioRTC] Failed to accept incoming call:', e);
@@ -1160,25 +1170,35 @@
           // Update call with final status and duration using same call ID
           updateCallStatus(number, 'completed', callStartTime, duration, callId);
           currentCall = null;
-          setInCallUI(false);
           
           // Stop live timer and restore banner
           const widget = document.getElementById(WIDGET_ID);
           stopLiveCallTimer(widget);
           
-          // Clear UI state completely
+          // Clear UI state completely and ensure call button shows "Call"
           if (widget) {
             const btn = widget.querySelector('.call-btn-start');
             if (btn) {
+              console.debug('[Phone] DISCONNECT: Setting button to "Call" state');
               btn.textContent = 'Call';
               btn.classList.remove('btn-danger');
               btn.classList.add('btn-primary');
+              // Disable button briefly to prevent accidental immediate redial
+              btn.disabled = true;
+              setTimeout(() => { 
+                btn.disabled = false; 
+                console.debug('[Phone] DISCONNECT: Button re-enabled after 2s cooldown');
+              }, 2000);
             }
             const input = widget.querySelector('.phone-display');
             if (input) input.value = '';
             const title = widget.querySelector('.widget-title');
             if (title) title.innerHTML = 'Phone';
           }
+          
+          // Force UI update to ensure button state is visible
+          setInCallUI(false);
+          console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
           
           // Release the input device to avoid the red recording symbol
           // According to Twilio best practices
@@ -1222,6 +1242,9 @@
               btn.textContent = 'Call';
               btn.classList.remove('btn-danger');
               btn.classList.add('btn-primary');
+              // Disable button briefly to prevent accidental immediate redial on error
+              btn.disabled = true;
+              setTimeout(() => { btn.disabled = false; }, 2000);
             }
             const input = widget.querySelector('.phone-display');
             if (input) input.value = '';
