@@ -184,64 +184,110 @@
           }
 
           try {
-            console.debug('[TwilioRTC] Accepting incoming call');
-            conn.accept();
-            isCallInProgress = true;
-            currentCallContext = { number: conn.parameters?.From || '', name: '', isActive: true };
-
-            // Update UI if widget is present
-            if (cardForIncoming) {
-              const btn = cardForIncoming.querySelector('.call-btn-start');
-              if (btn) {
-                btn.textContent = 'Hang Up';
-                btn.classList.remove('btn-primary');
-                btn.classList.add('btn-danger');
-              }
-            }
-
-            const callStartTime = Date.now();
+            // Do NOT auto-accept. Show a distinct incoming-call notification first.
             const number = conn.parameters?.From || '';
-            const callId = `call_${callStartTime}_${(number || '').replace(/\D/g, '')}`;
-            updateCallStatus(number, 'connected', callStartTime, 0, callId);
+            const meta = await resolvePhoneMeta(number);
 
-            conn.on('disconnect', async () => {
-              console.debug('[TwilioRTC] Incoming call disconnected');
-              const callEndTime = Date.now();
-              const duration = Math.floor((callEndTime - callStartTime) / 1000);
-              lastCallCompleted = callEndTime;
-              lastCalledNumber = number;
-              isCallInProgress = false;
-              currentCallContext = { number: '', name: '', isActive: false };
-              if (cardForIncoming) {
-                const btn = cardForIncoming.querySelector('.call-btn-start');
-                if (btn) {
-                  btn.textContent = 'Call';
-                  btn.classList.remove('btn-danger');
-                  btn.classList.add('btn-primary');
+            // Remember connection so we can accept on click
+            TwilioRTC.state.pendingIncoming = conn;
+
+            // Pre-populate UI while ringing: show Hang Up to allow declining, and show number/name
+            try {
+              if (!document.getElementById(WIDGET_ID)) openPhone();
+              const card0 = document.getElementById(WIDGET_ID);
+              if (card0) {
+                setInCallUI(true); // show Hang Up while ringing
+                const input0 = card0.querySelector('.phone-display');
+                if (input0) input0.value = number;
+                const title0 = card0.querySelector('.widget-title');
+                if (title0 && (meta?.name || meta?.account)) title0.innerHTML = `Phone - ${meta?.name || meta?.account}`;
+              }
+            } catch(_) {}
+
+            const accept = async () => {
+              try {
+                console.debug('[TwilioRTC] Accepting incoming call after user click');
+                // Ensure widget is open for controls
+                if (!document.getElementById(WIDGET_ID)) {
+                  openPhone();
                 }
+                // Set devices again to be safe
+                if (state.device && state.device.audio) {
+                  try {
+                    const inputDevices = state.device.audio.availableInputDevices;
+                    let inputDeviceId = 'default';
+                    if (inputDevices && inputDevices.size > 0) {
+                      const deviceIds = Array.from(inputDevices.keys());
+                      if (!deviceIds.includes('default') && deviceIds.length > 0) inputDeviceId = deviceIds[0];
+                    }
+                    await state.device.audio.setInputDevice(inputDeviceId);
+                  } catch(_) {}
+                }
+                conn.accept();
+                isCallInProgress = true;
+                currentCallContext = { number: number, name: meta?.name || '', isActive: true };
+                const card = document.getElementById(WIDGET_ID);
+                if (card) {
+                  setInCallUI(true);
+                  const input = card.querySelector('.phone-display');
+                  if (input) input.value = number;
+                  const title = card.querySelector('.widget-title');
+                  if (title && (meta?.name || meta?.account)) title.innerHTML = `Phone - ${meta?.name || meta?.account}`;
+                }
+                const callStartTime = Date.now();
+                const callId = `call_${callStartTime}_${(number || '').replace(/\D/g, '')}`;
+                updateCallStatus(number, 'connected', callStartTime, 0, callId);
+
+                conn.on('disconnect', async () => {
+                  console.debug('[TwilioRTC] Incoming call disconnected');
+                  const callEndTime = Date.now();
+                  const duration = Math.floor((callEndTime - callStartTime) / 1000);
+                  lastCallCompleted = callEndTime;
+                  lastCalledNumber = number;
+                  isCallInProgress = false;
+                  autoTriggerBlockUntil = Date.now() + 10000; // 10s hard block after call
+                  currentCallContext = { number: '', name: '', isActive: false };
+                  const card2 = document.getElementById(WIDGET_ID);
+                  if (card2) {
+                    setInCallUI(false);
+                  }
+                  if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
+                    try { await TwilioRTC.state.device.audio.unsetInputDevice(); } catch (_) {}
+                  }
+                  updateCallStatus(number, 'completed', callStartTime, duration, callId);
+                });
+
+                conn.on('error', (error) => {
+                  console.error('[TwilioRTC] Incoming call error:', error);
+                  isCallInProgress = false;
+                  currentCallContext = { number: '', name: '', isActive: false };
+                  const card3 = document.getElementById(WIDGET_ID);
+                  if (card3) {
+                    setInCallUI(false);
+                  }
+                  lastCallCompleted = Date.now();
+                  autoTriggerBlockUntil = Date.now() + 10000;
+                });
+              } catch (e) {
+                console.error('[TwilioRTC] Failed to accept incoming call:', e);
               }
-              if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
-                try { await TwilioRTC.state.device.audio.unsetInputDevice(); } catch (_) {}
-              }
-              updateCallStatus(number, 'completed', callStartTime, duration, callId);
+            };
+
+            // Show notification
+            showIncomingNotification({
+              number,
+              meta,
+              onClick: accept,
+              onClose: () => { /* user dismissed */ }
             });
 
-            conn.on('error', (error) => {
-              console.error('[TwilioRTC] Incoming call error:', error);
-              isCallInProgress = false;
-              currentCallContext = { number: '', name: '', isActive: false };
-              if (cardForIncoming) {
-                const btn = cardForIncoming.querySelector('.call-btn-start');
-                if (btn) {
-                  btn.textContent = 'Call';
-                  btn.classList.remove('btn-danger');
-                  btn.classList.add('btn-primary');
-                }
-              }
-              lastCallCompleted = Date.now();
-            });
+            // Optional: auto-dismiss notification after 25s (typical ring window)
+            setTimeout(() => {
+              const n = document.getElementById(CALL_NOTIFY_ID);
+              if (n && !isCallInProgress) { try { n.remove(); } catch(_) {} }
+            }, 25000);
           } catch (e) {
-            console.error('[TwilioRTC] Failed to accept incoming call:', e);
+            console.error('[TwilioRTC] Incoming notification error:', e);
           }
         });
 
@@ -298,6 +344,122 @@
   })();
 
   const WIDGET_ID = 'phone-widget';
+  const CALL_NOTIFY_ID = 'incoming-call-notification';
+
+  // Inject minimal styles for incoming call notification (distinct from regular toasts)
+  function ensureCallNotifyStyles() {
+    if (document.getElementById('call-notify-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'call-notify-styles';
+    style.textContent = `
+      .call-notify {
+        position: fixed; z-index: 99999; right: 16px; top: 72px; max-width: 420px;
+        background: linear-gradient(135deg, #0d5, #0aa); color: #fff; border-radius: 10px;
+        box-shadow: 0 10px 28px rgba(0,0,0,0.25); padding: 14px 16px; display: flex; gap: 12px;
+        align-items: center; cursor: pointer; border: 2px solid rgba(255,255,255,0.15);
+        transition: transform .18s ease, opacity .18s ease; opacity: 0; transform: translateY(-8px);
+      }
+      .call-notify.show { opacity: 1; transform: translateY(0); }
+      .call-notify .call-avatar { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 8px; background:#fff2; display:flex; align-items:center; justify-content:center; font-weight:700; }
+      .call-notify .call-meta { flex: 1 1 auto; min-width: 0; }
+      .call-notify .call-title { font-size: 15px; font-weight: 700; line-height: 1.25; margin: 0; }
+      .call-notify .call-sub { font-size: 12px; opacity: 0.9; line-height: 1.25; margin-top: 2px; }
+      .call-notify .call-number { font-size: 13px; font-weight: 600; opacity: .95; }
+      .call-notify .call-close { flex: 0 0 auto; background:#fff2; color:#fff; border: none; border-radius:6px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
+      .call-notify:hover { box-shadow: 0 14px 34px rgba(0,0,0,0.3); }
+    `;
+    document.head.appendChild(style);
+  }
+
+  async function resolvePhoneMeta(number) {
+    const digits = (number || '').replace(/\D/g, '');
+    const meta = { number, name: '', account: '', title: '', city: '', state: '', domain: '' };
+    try {
+      // App-provided resolver if available
+      if (window.crm && typeof window.crm.resolvePhoneMeta === 'function') {
+        const out = await Promise.resolve(window.crm.resolvePhoneMeta(digits));
+        if (out && typeof out === 'object') return { ...meta, ...out };
+      }
+      // Try a generic public search endpoint if the app exposes one
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (base) {
+        // Try contacts first
+        const r1 = await fetch(`${base}/api/search?phone=${encodeURIComponent(digits)}`).catch(() => null);
+        if (r1 && r1.ok) {
+          const j = await r1.json().catch(() => ({}));
+          if (j && (j.contact || j.account)) {
+            const c = j.contact || {};
+            const a = j.account || {};
+            return {
+              ...meta,
+              name: c.name || '',
+              account: a.name || c.account || '',
+              title: c.title || '',
+              city: c.city || a.city || '',
+              state: c.state || a.state || '',
+              domain: c.domain || a.domain || ''
+            };
+          }
+        }
+      }
+    } catch (_) {}
+    return meta;
+  }
+
+  function makeFavicon(domain) {
+    if (!domain) return '';
+    const d = domain.replace(/^https?:\/\//, '');
+    const src = `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent('https://' + d)}`;
+    return src;
+  }
+
+  function computeTopForNotification() {
+    try {
+      const panel = document.getElementById('widget-panel');
+      if (panel) {
+        const r = panel.getBoundingClientRect();
+        return Math.max(56, Math.round(r.top + 12));
+      }
+      const header = document.querySelector('#topbar, .topbar, .pc-topbar, header, .header, .navbar');
+      if (header) {
+        const r2 = header.getBoundingClientRect();
+        return Math.max(56, Math.round(r2.bottom + 12));
+      }
+    } catch(_) {}
+    return 72; // default under top bar
+  }
+
+  function showIncomingNotification(opts) {
+    ensureCallNotifyStyles();
+    const { number, meta, onClick, onClose } = opts;
+    const el = document.createElement('div');
+    el.className = 'call-notify';
+    el.id = CALL_NOTIFY_ID;
+    el.style.top = computeTopForNotification() + 'px';
+
+    const nameLine = meta?.name || meta?.account || 'Incoming call';
+    const subLine = [meta?.account && meta?.name ? meta.account : '', meta?.title].filter(Boolean).join(' • ');
+    const locLine = [meta?.city, meta?.state].filter(Boolean).join(', ');
+    const favicon = makeFavicon(meta?.domain);
+
+    el.innerHTML = `
+      <div class="call-avatar">${favicon ? `<img src="${favicon}" alt="" style="width:24px;height:24px;border-radius:4px;">` : '📞'}</div>
+      <div class="call-meta">
+        <div class="call-title">${nameLine}</div>
+        <div class="call-sub">${[locLine, meta?.account && !meta?.name ? meta.account : ''].filter(Boolean).join(' • ')}</div>
+        <div class="call-number">${number}</div>
+      </div>
+      <button class="call-close" title="Dismiss" aria-label="Dismiss">×</button>
+    `;
+
+    const closeBtn = el.querySelector('.call-close');
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); try { el.remove(); } catch(_) {} onClose && onClose(); });
+    el.addEventListener('click', () => { try { el.remove(); } catch(_) {} onClick && onClick(); });
+
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    return el;
+  }
 
   // Current call context
   let currentCallContext = {
@@ -736,6 +898,7 @@
           lastCallCompleted = disconnectTime;
           lastCalledNumber = number;
           isCallInProgress = false;
+          autoTriggerBlockUntil = Date.now() + 10000; // 10s hard block
           
           // Clear current call context IMMEDIATELY to prevent auto-callback
           console.debug('[Phone] IMMEDIATE: Clearing call context after disconnect to prevent redial');
@@ -784,6 +947,7 @@
           // Set cooldown after error
           lastCallCompleted = Date.now();
           lastCalledNumber = number;
+          autoTriggerBlockUntil = Date.now() + 10000;
         });
         
         return currentCall;
@@ -940,6 +1104,20 @@
       }
     }
     if (callBtn) callBtn.addEventListener('click', async () => {
+      // If there is a pending incoming call (ringing) and not yet connected, treat this button as Decline/Hang Up
+      if (TwilioRTC.state && TwilioRTC.state.pendingIncoming && !isCallInProgress) {
+        try {
+          console.debug('[Phone] Declining pending incoming call');
+          TwilioRTC.state.pendingIncoming.reject();
+        } catch(_) {}
+        TwilioRTC.state.pendingIncoming = null;
+        isCallInProgress = false;
+        setInCallUI(false);
+        lastCallCompleted = Date.now();
+        autoTriggerBlockUntil = Date.now() + 10000;
+        return;
+      }
+
       const raw = (input && input.value || '').trim();
       if (!raw) {
         try { window.crm?.showToast && window.crm.showToast('Enter a number to call'); } catch (_) {}
@@ -972,6 +1150,7 @@
         // Set aggressive cooldown on manual hangup
         lastCallCompleted = Date.now();
         lastCalledNumber = normalized.value;
+        autoTriggerBlockUntil = Date.now() + 10000;
         
         try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
         
@@ -1241,6 +1420,8 @@
   let isCallInProgress = false;
   const CALLBACK_COOLDOWN = 8000; // 8 seconds cooldown
   const SAME_NUMBER_COOLDOWN = 15000; // 15 seconds for same number
+  // Hard global guard to suppress any auto-dial after a call ends unless there is a fresh user click
+  let autoTriggerBlockUntil = 0; // ms epoch
   
   // Track user typing activity in phone widget
   let lastUserTypingTime = 0;
@@ -1260,6 +1441,15 @@
     
     // Allow click-to-call to bypass most restrictions (user-initiated action)
     const isClickToCall = (source === 'click-to-call');
+
+    const lastClickTs = (window.Widgets && window.Widgets._lastClickToCallAt) || 0;
+    const isFreshClick = isClickToCall && (now - lastClickTs) <= 1500;
+
+    // Global hard block unless there is a fresh explicit click
+    if (now < autoTriggerBlockUntil && !isFreshClick) {
+      console.warn('[Phone] Global auto-trigger block active. Blocking callNumber invoke.', { until: new Date(autoTriggerBlockUntil).toISOString() });
+      return false;
+    }
 
     // If this is click-to-call, require a very fresh user gesture timestamp
     if (isClickToCall) {
