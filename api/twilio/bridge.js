@@ -34,7 +34,13 @@ export default function handler(req, res) {
             hangupOnStar: false,
             timeLimit: 14400       // 4 hours max call duration
         });
+        
+        // Add the target number with no retry logic
         dial.number(target);
+        
+        // CRITICAL: Set action URL to handle dial completion without retry
+        // When the dial completes (target hangs up), this prevents automatic retry
+        dial.action('/api/twilio/dial-complete');
         
         console.log(`[Bridge] TwiML generated to connect to ${target}`);
         
