@@ -206,8 +206,8 @@
                             <!-- Stat Cards -->
                             <div class="stat-cards">
                                 <div class="stat-card">
-                                    <div class="stat-value">1,247</div>
-                                    <div class="stat-label">Total Contacts</div>
+                                    <div class="stat-value">0</div>
+                                    <div class="stat-label">Open Deals</div>
                                 </div>
                                 <div class="stat-card">
                                     <div class="stat-value">$89,420</div>
@@ -1355,5 +1355,44 @@
     <script src="scripts/click-to-call.js"></script>
     <script src="scripts/main.js"></script>
     <script src="scripts/firebase.js"></script>
+    <script>
+      (function(){
+        function formatUsdPerKwh(n){
+          if (typeof n !== 'number' || !isFinite(n)) return '$—';
+          return `$${n.toFixed(3)}`;
+        }
+        function findTxPriceValueEl(){
+          const labels = document.querySelectorAll('.stat-card .stat-label');
+          for (const lbl of labels){
+            if (lbl && lbl.textContent && lbl.textContent.trim() === 'TX Avg Price/kWh'){
+              const card = lbl.closest('.stat-card');
+              if (card) return card.querySelector('.stat-value');
+            }
+          }
+          return null;
+        }
+        async function loadTxPrice(opts){
+          const refresh = opts && opts.refresh;
+          const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+          const url = `${base}/api/tx-price${refresh ? '?refresh=1' : ''}`;
+          try{
+            const res = await fetch(url, { credentials: 'include' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            const el = findTxPriceValueEl();
+            if (el){
+              el.textContent = formatUsdPerKwh(data.price);
+              el.title = data.lastUpdated ? `Last updated: ${new Date(data.lastUpdated).toLocaleString()}` : '';
+            }
+          }catch(err){
+            console.error('[TX Price] Fetch failed:', err);
+          }
+        }
+        window.addEventListener('DOMContentLoaded', function(){
+          // Force refresh so we can see current value
+          loadTxPrice({ refresh: true });
+        });
+      })();
+    </script>
 </body>
 </html>
