@@ -144,7 +144,13 @@
         state.device.on('incoming', async (conn) => {
           console.debug('[TwilioRTC] Incoming call:', conn);
           state.connection = conn;
-          
+
+          // Ensure the phone widget is open so UI updates work
+          if (!document.getElementById(WIDGET_ID)) {
+            try { openPhone(); } catch (_) {}
+          }
+          const cardForIncoming = document.getElementById(WIDGET_ID);
+
           // Set input/output devices before accepting the call
           if (state.device.audio) {
             try {
@@ -182,7 +188,16 @@
             conn.accept();
             isCallInProgress = true;
             currentCallContext = { number: conn.parameters?.From || '', name: '', isActive: true };
-            setInCallUI(true);
+
+            // Update UI if widget is present
+            if (cardForIncoming) {
+              const btn = cardForIncoming.querySelector('.call-btn-start');
+              if (btn) {
+                btn.textContent = 'Hang Up';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-danger');
+              }
+            }
 
             const callStartTime = Date.now();
             const number = conn.parameters?.From || '';
@@ -197,7 +212,14 @@
               lastCalledNumber = number;
               isCallInProgress = false;
               currentCallContext = { number: '', name: '', isActive: false };
-              setInCallUI(false);
+              if (cardForIncoming) {
+                const btn = cardForIncoming.querySelector('.call-btn-start');
+                if (btn) {
+                  btn.textContent = 'Call';
+                  btn.classList.remove('btn-danger');
+                  btn.classList.add('btn-primary');
+                }
+              }
               if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
                 try { await TwilioRTC.state.device.audio.unsetInputDevice(); } catch (_) {}
               }
@@ -208,7 +230,14 @@
               console.error('[TwilioRTC] Incoming call error:', error);
               isCallInProgress = false;
               currentCallContext = { number: '', name: '', isActive: false };
-              setInCallUI(false);
+              if (cardForIncoming) {
+                const btn = cardForIncoming.querySelector('.call-btn-start');
+                if (btn) {
+                  btn.textContent = 'Call';
+                  btn.classList.remove('btn-danger');
+                  btn.classList.add('btn-primary');
+                }
+              }
               lastCallCompleted = Date.now();
             });
           } catch (e) {
@@ -1371,6 +1400,16 @@
   
   // Expose for console diagnostics
   try { window.TwilioRTC = TwilioRTC; } catch(_) {}
+
+  // Background: register Twilio Device quietly so inbound calls can reach the browser
+  try {
+    if (window.API_BASE_URL) {
+      // Defer a moment to avoid blocking initial page work
+      setTimeout(() => {
+        TwilioRTC.ensureDevice().catch(e => console.warn('[Phone] Background device init failed:', e?.message || e));
+      }, 800);
+    }
+  } catch (_) {}
 
   // Console helpers for manual dialing from DevTools
   try {
