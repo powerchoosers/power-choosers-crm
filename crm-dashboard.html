@@ -129,12 +129,12 @@
                     </a>
                     <a href="#lists" class="nav-item" data-page="lists">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="8" y1="6" x2="21" y2="6"></line>
-                            <line x1="8" y1="12" x2="21" y2="12"></line>
-                            <line x1="8" y1="18" x2="21" y2="18"></line>
-                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            <circle cx="4" cy="6" r="1"></circle>
+                            <circle cx="4" cy="12" r="1"></circle>
+                            <circle cx="4" cy="18" r="1"></circle>
+                            <line x1="8" y1="6" x2="20" y2="6"></line>
+                            <line x1="8" y1="12" x2="20" y2="12"></line>
+                            <line x1="8" y1="18" x2="20" y2="18"></line>
                         </svg>
                         <span class="nav-text">Lists</span>
                     </a>
@@ -184,7 +184,7 @@
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
-                        <span class="nav-text">Account Details</span>
+                        <span class="nav-text">Client Management</span>
                     </a>
                     <a href="#settings" class="nav-item" data-page="settings">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -246,21 +246,24 @@
 
                             <div class="dashboard-card">
                                 <h3 class="card-title">Recent Activities</h3>
-                                <div class="activities-list">
-                                    <div class="activity-item">
-                                        <div class="activity-icon call"></div>
-                                        <div class="activity-info">
-                                            <div class="activity-text">Called Johnson Electric - Follow up scheduled</div>
-                                            <div class="activity-time">2 hours ago</div>
-                                        </div>
+                                <div class="activities-list" id="home-activity-timeline">
+                                    <div class="activity-placeholder">
+                                        <div class="loading-spinner"></div>
+                                        <div class="placeholder-text">Loading activities...</div>
                                     </div>
-                                    <div class="activity-item">
-                                        <div class="activity-icon email"></div>
-                                        <div class="activity-info">
-                                            <div class="activity-text">Email sent to Metro Industries proposal</div>
-                                            <div class="activity-time">4 hours ago</div>
-                                        </div>
-                                    </div>
+                                </div>
+                                <div class="activity-pagination" id="home-activity-pagination" style="display: none;">
+                                    <button class="activity-pagination-btn" id="home-activity-prev" disabled>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="15,18 9,12 15,6"/>
+                                        </svg>
+                                    </button>
+                                    <div class="activity-pagination-info" id="home-activity-info">1 of 1</div>
+                                    <button class="activity-pagination-btn" id="home-activity-next" disabled>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="9,18 15,12 9,6"/>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -855,6 +858,24 @@
                                                 <div class="chip-suggest" id="filter-visitor-domain-suggest" hidden></div>
                                             </div>
                                         </div>
+                                        <div class="filter-field">
+                                            <label for="filter-seniority">Seniority</label>
+                                            <div class="chip-input" id="filter-seniority-chip">
+                                                <div class="chip-list" id="filter-seniority-chips"></div>
+                                                <input type="text" id="filter-seniority" class="chip-input-field" placeholder="e.g., Senior, Manager, Director" />
+                                                <button type="button" class="chip-clear" id="filter-seniority-clear" aria-label="Clear seniority filters">&#215;</button>
+                                                <div class="chip-suggest" id="filter-seniority-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="filter-department">Department</label>
+                                            <div class="chip-input" id="filter-department-chip">
+                                                <div class="chip-list" id="filter-department-chips"></div>
+                                                <input type="text" id="filter-department" class="chip-input-field" placeholder="e.g., Sales, Marketing, Engineering" />
+                                                <button type="button" class="chip-clear" id="filter-department-clear" aria-label="Clear department filters">&#215;</button>
+                                                <div class="chip-suggest" id="filter-department-suggest" hidden></div>
+                                            </div>
+                                        </div>
                                         <div class="filter-field checkbox">
                                             <label><input type="checkbox" id="filter-has-email" /> Has email</label>
                                         </div>
@@ -984,15 +1005,15 @@
                         <div class="page-container">
                             <div class="page-header">
                                 <div class="page-title-section">
-                                    <h2 class="page-title">Account Details</h2>
+                                    <h2 class="page-title">Client Management</h2>
                                     <div class="page-actions"></div>
                                 </div>
                             </div>
                             <div class="page-content">
                                 <div class="table-container">
                                     <div id="account-details-empty" class="empty-state">
-                                        <div class="empty-title">Account details</div>
-                                        <div class="empty-desc">Select an account from the list to view details.</div>
+                                        <div class="empty-title">Client Management</div>
+                                        <div class="empty-desc">This page is coming soon. In the meantime, use Accounts to view company info.</div>
                                     </div>
                                 </div>
                             </div>
@@ -1096,6 +1117,13 @@
                                                     <button type="button" class="chip-clear" id="list-detail-filter-title-clear" aria-label="Clear title filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-title-suggest" hidden></div>
                                                 </div>
+                                                <label for="list-detail-filter-seniority">Seniority</label>
+                                                <div class="chip-input" id="list-detail-filter-seniority-chip">
+                                                    <div class="chip-list" id="list-detail-filter-seniority-chips"></div>
+                                                    <input type="text" id="list-detail-filter-seniority" class="chip-input-field" placeholder="e.g., Senior, Manager, Director" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-seniority-clear" aria-label="Clear seniority filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-seniority-suggest" hidden></div>
+                                                </div>
                                             </div>
                                             <div class="filter-field">
                                                 <label for="list-detail-filter-company">Company</label>
@@ -1104,6 +1132,13 @@
                                                     <input type="text" id="list-detail-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-company-clear" aria-label="Clear company filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-company-suggest" hidden></div>
+                                                </div>
+                                                <label for="list-detail-filter-department">Department</label>
+                                                <div class="chip-input" id="list-detail-filter-department-chip">
+                                                    <div class="chip-list" id="list-detail-filter-department-chips"></div>
+                                                    <input type="text" id="list-detail-filter-department" class="chip-input-field" placeholder="e.g., Sales, Marketing, Engineering" />
+                                                    <button type="button" class="chip-clear" id="list-detail-filter-department-clear" aria-label="Clear department filters">&#215;</button>
+                                                    <div class="chip-suggest" id="list-detail-filter-department-suggest" hidden></div>
                                                 </div>
                                             </div>
                                             <div class="filter-field">
@@ -1212,7 +1247,7 @@
                         <div class="widget-card">
                             <div class="widget-card-header">
                                 <h4 class="widget-title">Energy News</h4>
-                                <div class="news-time" id="news-last-refreshed">Last updated: —</div>
+                                <div class="news-time" id="news-last-refreshed" aria-live="polite">Last updated: —</div>
                             </div>
                             <div class="news-list">
                                 <!-- Populated by loadEnergyNews() -->
@@ -1517,8 +1552,12 @@
     <script src="scripts/global-search.js"></script>
     <script src="scripts/widgets/phone.js"></script>
     <script src="scripts/widgets/notes.js"></script>
+    <script src="scripts/widgets/health.js"></script>
+    <script src="scripts/widgets/deal.js"></script>
     <script src="scripts/notifications.js"></script>
     <script src="scripts/click-to-call.js"></script>
+    <script src="scripts/activity-manager.js"></script>
+    <script src="scripts/contact-merger.js"></script>
     <script src="scripts/main.js"></script>
     <script>
       (function(){

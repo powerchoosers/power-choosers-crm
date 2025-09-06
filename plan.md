@@ -41,6 +41,7 @@
 - People table now supports client-side pagination (50 rows per page) with page-turning buttons at the bottom.
 - People table pagination bar is now always rendered, even for a single page, per user request.
 - People table pagination/footer is now pinned to the bottom of its container with a consistent 25px margin, per user request.
+- List Detail (Lists → List view) pagination/footer is pinned to the bottom, with the scroll area padded to maintain a consistent 25px visual gap above the footer. Implemented via CSS: `#lists-page #lists-detail .table-scroll { padding-bottom: 25px; }`.
 - People table should render all cell contents on a single line (no wrapping), show "N/A" for invalid dates/timestamps, and allow horizontal scrolling for wide tables.
 - People table now supports Apollo-style bulk selection: when the select-all checkbox is checked, a modal popover appears below the header to choose how many contacts to select (custom number, this page, or all). After selection, a bulk actions modal/bar appears with options (Email, Sequence, Call, Add to list, Export, Research with AI, Delete), matching Apollo's UX flow.
 - Bulk actions bar now includes white vector icons for each option, matching CRM theme and improving usability.
@@ -208,13 +209,47 @@
 - **Data enrichment**: Contact records are enriched with account data when `accountName` matches
 
 ### Field Mapping & Fallbacks
-The system uses multiple field name variations to handle data inconsistencies:
-- Names: `accountName` → `name` → `companyName`
-- Phones: `phone` → `primaryPhone` → `mainPhone`
-- Locations: `city` → `locationCity` → `town`
-- Employee counts: `employees` → `employeeCount` → `numEmployees`
-- Contract dates:  - `contractEndDate` → `contractEnd` → `contract_end_date`
-  
+ The system uses multiple field name variations to handle data inconsistencies:
+ - Names: `accountName` → `name` → `companyName`
+ - Phones: `phone` → `primaryPhone` → `mainPhone`
+ - Locations: `city` → `locationCity` → `town`
+ - Employee counts: `employees` → `employeeCount` → `numEmployees`
+ - Contract dates:  - `contractEndDate` → `contractEnd` → `contract_end_date`
+
+## Google APIs — Gmail + Discovery (as of 2025-08-22)
+
+* __Project ID__: `power-choosers-crm-468420`
+* __OAuth 2.0 Client ID__: `448802258090-re0u5rtja879t4tkej22rnedmo1jt3lp.apps.googleusercontent.com`
+* __API Discovery Key__: `AIzaSyDwrD5n-_1jNzw6Qsj2q8xFUWT3gaMs4Xk`
+* __Discovery Doc__: `https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest`
+* __Scopes__: `https://www.googleapis.com/auth/gmail.readonly`
+
+* __Authorized JavaScript origins (OAuth)__
+  - `https://powerchoosers.com`
+  - `https://powerchoosers.github.io`
+  - `http://localhost:3000`
+  - `https://power-choosers-crm.vercel.app`
+  - Note: Origins must be exact (no trailing slash, no wildcards).
+
+* __API Key restrictions (recommended)__
+  - Application restrictions: Websites (HTTP referrers)
+    - `https://power-choosers-crm.vercel.app/*`
+    - `https://powerchoosers.com/*`
+    - `https://powerchoosers.github.io/*`
+    - `http://localhost:3000/*`
+  - API restrictions: allow
+    - Gmail API
+    - Google API Discovery Service
+
+* __Code references__
+  - `scripts/pages/emails.js` uses `CLIENT_ID` and `API_KEY` above for `gapi.client.init()` and Gmail calls.
+  - No redirect URIs are required for the current popup flow.
+
+* __Test flow__
+  1) Deploy to the target origin (e.g., Vercel).
+  2) Open Emails page → “Try Sign In”.
+  3) If errors occur, check browser console for origin/referrer messages and adjust OAuth origins or API key referrers accordingly.
+
 ## Telephony & Phone Dialer — Current State (as of 2025-08-19)
 
 * __Overview__
