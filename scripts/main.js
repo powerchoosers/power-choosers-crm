@@ -6,6 +6,22 @@ class PowerChoosersCRM {
         this.currentPage = 'dashboard';
         this.sidebar = document.getElementById('sidebar');
         this.init();
+        
+        // Load home activities on initial load if we're on the dashboard
+        setTimeout(() => {
+            if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
+                this.loadHomeActivities();
+            }
+        }, 100);
+
+        // Listen for activity refresh events
+        document.addEventListener('pc:activities-refresh', (e) => {
+            const { entityType } = e.detail || {};
+            if (entityType === 'global') {
+                // Refresh home activities
+                this.loadHomeActivities();
+            }
+        });
     }
 
   createAddAccountModal() {
@@ -318,7 +334,11 @@ class PowerChoosersCRM {
         }
         
         // Activate corresponding nav item
-        const targetNav = document.querySelector(`[data-page="${pageName}"]`);
+        // When on Account Details, keep highlight on Accounts in the sidebar
+        // When on List Detail, keep highlight on Lists in the sidebar
+        const navPageToActivate = (pageName === 'account-details') ? 'accounts' : 
+                                 (pageName === 'list-detail') ? 'lists' : pageName;
+        const targetNav = document.querySelector(`[data-page="${navPageToActivate}"]`);
         if (targetNav) {
             targetNav.classList.add('active');
         }
@@ -337,6 +357,13 @@ class PowerChoosersCRM {
                 if (typeof window.accountsModule.init === 'function') {
                     window.accountsModule.init();
                 }
+            }, 50);
+        }
+        
+        // Load activities for home page
+        if (pageName === 'dashboard' && window.ActivityManager) {
+            setTimeout(() => {
+                this.loadHomeActivities();
             }, 50);
         }
         
@@ -507,6 +534,320 @@ class PowerChoosersCRM {
                 document.body.removeChild(toast);
             }, 300);
         }, 3000);
+    }
+
+    // Unified pagination component
+    createPagination(currentPage, totalPages, onPageChange, containerId = null) {
+        // Always show pagination, even for single page or empty lists
+        if (totalPages < 1) totalPages = 1;
+        
+        const container = containerId ? document.getElementById(containerId) : null;
+        const paginationId = `pagination-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        const html = `
+            <div class="unified-pagination" id="${paginationId}">
+                <button class="pagination-arrow" data-action="prev" ${currentPage <= 1 ? 'disabled' : ''} aria-label="Previous page">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15,18 9,12 15,6"></polyline>
+                    </svg>
+                </button>
+                
+                <div class="pagination-current-container">
+                    <button class="pagination-current" data-action="show-picker" aria-label="Current page ${currentPage} of ${totalPages}">
+                        ${currentPage}
+                    </button>
+                    <div class="pagination-picker" id="${paginationId}-picker">
+                        <div class="pagination-picker-content">
+                            <div class="pagination-picker-header">Go to page</div>
+                            <div class="pagination-picker-pages">
+                                ${this.generatePagePickerPages(currentPage, totalPages, paginationId)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="pagination-arrow" data-action="next" ${currentPage >= totalPages ? 'disabled' : ''} aria-label="Next page">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9,18 15,12 9,6"></polyline>
+                    </svg>
+                </button>
+            </div>
+        `;
+        
+        if (container) {
+            container.innerHTML = html;
+            this.attachPaginationEvents(paginationId, onPageChange, totalPages);
+        }
+        
+        return html;
+    }
+    
+    generatePagePickerPages(currentPage, totalPages, paginationId) {
+        const pages = [];
+        const maxVisible = 10; // Show up to 10 pages in picker
+        
+        if (totalPages <= maxVisible) {
+            // Show all pages
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(`<button class="picker-page ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`);
+            }
+        } else {
+            // Show smart range around current page
+            let start = Math.max(1, currentPage - 4);
+            let end = Math.min(totalPages, currentPage + 4);
+            
+            // Adjust if we're near the beginning or end
+            if (start === 1) {
+                end = Math.min(totalPages, start + maxVisible - 1);
+            } else if (end === totalPages) {
+                start = Math.max(1, end - maxVisible + 1);
+            }
+            
+            // Add first page if not in range
+            if (start > 1) {
+                pages.push(`<button class="picker-page" data-page="1">1</button>`);
+                if (start > 2) {
+                    pages.push(`<span class="picker-ellipsis">...</span>`);
+                }
+            }
+            
+            // Add pages in range
+            for (let i = start; i <= end; i++) {
+                pages.push(`<button class="picker-page ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`);
+            }
+            
+            // Add last page if not in range
+            if (end < totalPages) {
+                if (end < totalPages - 1) {
+                    pages.push(`<span class="picker-ellipsis">...</span>`);
+                }
+                pages.push(`<button class="picker-page" data-page="${totalPages}">${totalPages}</button>`);
+            }
+        }
+        
+        return pages.join('');
+    }
+    
+    attachPaginationEvents(paginationId, onPageChange, totalPages) {
+        const pagination = document.getElementById(paginationId);
+        if (!pagination) return;
+        
+        const currentBtn = pagination.querySelector('.pagination-current');
+        const picker = pagination.querySelector('.pagination-picker');
+        const prevBtn = pagination.querySelector('[data-action="prev"]');
+        const nextBtn = pagination.querySelector('[data-action="next"]');
+        
+        // Show/hide picker on hover
+        let hoverTimeout;
+        
+        currentBtn.addEventListener('mouseenter', () => {
+            clearTimeout(hoverTimeout);
+            picker.style.display = 'block';
+            setTimeout(() => picker.classList.add('visible'), 10);
+        });
+        
+        pagination.addEventListener('mouseleave', () => {
+            hoverTimeout = setTimeout(() => {
+                picker.classList.remove('visible');
+                setTimeout(() => picker.style.display = 'none', 200);
+            }, 100);
+        });
+        
+        // Page selection in picker
+        picker.addEventListener('click', (e) => {
+            const pageBtn = e.target.closest('.picker-page');
+            if (pageBtn) {
+                const page = parseInt(pageBtn.dataset.page);
+                if (page && page !== parseInt(currentBtn.textContent)) {
+                    onPageChange(page);
+                }
+            }
+        });
+        
+        // Prev/Next buttons
+        prevBtn.addEventListener('click', () => {
+            const current = parseInt(currentBtn.textContent);
+            if (current > 1) {
+                onPageChange(current - 1);
+            }
+        });
+        
+        nextBtn.addEventListener('click', () => {
+            const current = parseInt(currentBtn.textContent);
+            if (current < totalPages) {
+                onPageChange(current + 1);
+            }
+        });
+    }
+
+    showProgressToast(message, total, current = 0) {
+        // Progress toast notification with circular progress indicator
+        const toast = document.createElement('div');
+        toast.className = 'toast progress-toast';
+        toast.style.cssText = `
+            position: fixed;
+            top: 90px;
+            right: 25px;
+            background: var(--grey-800);
+            color: var(--text-inverse);
+            padding: 16px 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            font-size: 0.875rem;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            min-width: 200px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        `;
+        
+        // Create progress circle
+        const progressCircle = document.createElement('div');
+        progressCircle.style.cssText = `
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid var(--grey-600);
+            border-top: 2px solid var(--orange-subtle);
+            animation: spin 1s linear infinite;
+            flex-shrink: 0;
+        `;
+        
+        // Create text container
+        const textContainer = document.createElement('div');
+        textContainer.style.cssText = `
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        `;
+        
+        const messageEl = document.createElement('div');
+        messageEl.textContent = message;
+        messageEl.style.cssText = `
+            font-weight: 500;
+        `;
+        
+        const progressText = document.createElement('div');
+        progressText.style.cssText = `
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        `;
+        
+        textContainer.appendChild(messageEl);
+        textContainer.appendChild(progressText);
+        
+        toast.appendChild(progressCircle);
+        toast.appendChild(textContainer);
+        
+        // Add CSS animation if not already present
+        if (!document.querySelector('#progress-toast-styles')) {
+            const style = document.createElement('style');
+            style.id = 'progress-toast-styles';
+            style.textContent = `
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        }, 100);
+        
+        // Update progress function
+        const updateProgress = (current, total) => {
+            const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+            progressText.textContent = `${current} of ${total} (${percentage}%)`;
+        };
+        
+        // Initial progress
+        updateProgress(current, total);
+        
+        // Return update function and cleanup function
+        return {
+            update: (newCurrent, newTotal = total) => {
+                updateProgress(newCurrent, newTotal);
+            },
+            complete: (successMessage) => {
+                // Replace progress circle with checkmark
+                progressCircle.style.cssText = `
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                    background: var(--green-subtle);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                `;
+                progressCircle.innerHTML = `
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20,6 9,17 4,12"></polyline>
+                    </svg>
+                `;
+                
+                if (successMessage) {
+                    messageEl.textContent = successMessage;
+                }
+                progressText.textContent = 'Complete';
+                
+                // Remove after 2 seconds
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(-10px)';
+                    setTimeout(() => {
+                        if (toast.parentNode) {
+                            document.body.removeChild(toast);
+                        }
+                    }, 300);
+                }, 2000);
+            },
+            error: (errorMessage) => {
+                // Replace progress circle with error icon
+                progressCircle.style.cssText = `
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                    background: var(--red-subtle);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                `;
+                progressCircle.innerHTML = `
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                `;
+                
+                if (errorMessage) {
+                    messageEl.textContent = errorMessage;
+                }
+                progressText.textContent = 'Failed';
+                
+                // Remove after 3 seconds
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(-10px)';
+                    setTimeout(() => {
+                        if (toast.parentNode) {
+                            document.body.removeChild(toast);
+                        }
+                    }, 300);
+                }, 3000);
+            }
+        };
     }
 
     // Global dark tooltip replacing native browser title tooltips
@@ -1100,11 +1441,11 @@ class PowerChoosersCRM {
                 if (char === '"') {
                     inQuotes = true;
                 } else if (char === ',') {
-                    row.push(field.trim());
+                    row.push(this.cleanCSVField(field.trim()));
                     field = '';
                 } else if (char === '\n') {
                     // Line Feed ends record
-                    row.push(field.trim());
+                    row.push(this.cleanCSVField(field.trim()));
                     field = '';
                     // Skip potential preceding CR already handled below
                     records.push(row);
@@ -1112,7 +1453,7 @@ class PowerChoosersCRM {
                 } else if (char === '\r') {
                     // Carriage Return may be part of CRLF; treat as end of record
                     // Push field and row, then skip a following \n if present
-                    row.push(field.trim());
+                    row.push(this.cleanCSVField(field.trim()));
                     field = '';
                     records.push(row);
                     row = [];
@@ -1127,7 +1468,7 @@ class PowerChoosersCRM {
 
         // Push last field/row if any content remains
         if (field.length > 0 || inQuotes || row.length > 0) {
-            row.push(field.trim());
+            row.push(this.cleanCSVField(field.trim()));
         }
         if (row.length > 0) {
             records.push(row);
@@ -1140,6 +1481,23 @@ class PowerChoosersCRM {
         const headers = nonEmpty[0];
         const rows = nonEmpty.slice(1);
         return { headers, rows };
+    }
+
+    cleanCSVField(field) {
+        if (!field) return field;
+        
+        // Remove leading apostrophe (common CSV issue)
+        if (field.startsWith("'")) {
+            field = field.slice(1);
+        }
+        
+        // Remove Excel formula wrappers
+        field = field.replace(/^=\s*["']?(.+?)["']?$/u, '$1');
+        
+        // Remove invisible characters
+        field = field.replace(/[\u200B-\u200D\uFEFF]/g, '');
+        
+        return field;
     }
 
     parseCSVLine(line) {
@@ -1327,12 +1685,33 @@ class PowerChoosersCRM {
             ];
         } else {
             return [
+                // Contact Fields
                 { value: 'firstName', label: 'First Name' },
                 { value: 'lastName', label: 'Last Name' },
                 { value: 'email', label: 'Email' },
-                { value: 'phone', label: 'Phone' },
+                { value: 'emailStatus', label: 'Email Status' },
+                { value: 'workDirectPhone', label: 'Work Direct Phone' },
+                { value: 'mobile', label: 'Mobile Phone' },
+                { value: 'otherPhone', label: 'Other Phone' },
                 { value: 'title', label: 'Job Title' },
-                { value: 'companyName', label: 'Company Name' }
+                { value: 'seniority', label: 'Seniority' },
+                { value: 'department', label: 'Department' },
+                { value: 'linkedin', label: 'Contact LinkedIn URL' },
+                { value: 'city', label: 'City' },
+                { value: 'state', label: 'State' },
+                { value: 'companyName', label: 'Company Name' },
+                // Company/Account Fields (will update associated account)
+                { value: 'companyWebsite', label: 'Company Website' },
+                { value: 'companyLinkedin', label: 'Company LinkedIn URL' },
+                { value: 'companyCity', label: 'Company City' },
+                { value: 'companyState', label: 'Company State' },
+                { value: 'companyPhone', label: 'Company Phone' },
+                { value: 'companyEmployees', label: 'Company Employees' },
+                { value: 'companyIndustry', label: 'Company Industry' },
+                { value: 'companySquareFootage', label: 'Company SQ FT' },
+                { value: 'companyOccupancyPct', label: 'Company Occupancy %' },
+                { value: 'companyElectricitySupplier', label: 'Company Electricity Supplier' },
+                { value: 'companyShortDescription', label: 'Company Short Description' }
             ];
         }
     }
@@ -1352,8 +1731,18 @@ class PowerChoosersCRM {
             'company': 'companyName',
             'jobtitle': 'title',
             'position': 'title',
-            'website': 'website',
-            'url': 'website'
+            'website': 'companyWebsite',
+            'url': 'companyWebsite',
+            'industry': 'companyIndustry',
+            'sqft': 'companySquareFootage',
+            'squarefootage': 'companySquareFootage',
+            'occupancy': 'companyOccupancyPct',
+            'electricity': 'companyElectricitySupplier',
+            'supplier': 'companyElectricitySupplier',
+            'description': 'companyShortDescription',
+            'employees': 'companyEmployees',
+            'phone': 'companyPhone',
+            'linkedin': 'companyLinkedin'
         };
         
         return mappings[header] === crmField.value;
@@ -1552,9 +1941,49 @@ class PowerChoosersCRM {
                         
                         // Check for existing record if update is enabled
                         let existingRecord = null;
-                        if (updateExisting) {
-                            // Try to find existing record by email for contacts, by accountName for accounts
-                            const matchField = modal._importType === 'accounts' ? 'accountName' : 'email';
+                        let mergeAction = 'create'; // 'create', 'merge', 'skip'
+                        
+                        if (updateExisting && modal._importType === 'contacts') {
+                            // For contacts, use intelligent duplicate detection
+                            if (window.ContactMerger) {
+                                // Get all existing contacts for comparison
+                                const allContactsQuery = await db.collection('contacts').get();
+                                const existingContacts = allContactsQuery.docs.map(doc => ({
+                                    id: doc.id,
+                                    ...doc.data()
+                                }));
+                                
+                                const duplicates = await window.ContactMerger.findDuplicates(doc, existingContacts);
+                                
+                                if (duplicates.length > 0) {
+                                    const bestMatch = duplicates[0];
+                                    if (bestMatch.similarity.score >= 0.8) {
+                                        // Show merge confirmation dialog
+                                        mergeAction = await window.ContactMerger.showMergeConfirmation(
+                                            bestMatch.contact,
+                                            doc,
+                                            bestMatch.similarity
+                                        );
+                                        
+                                        if (mergeAction === 'merge') {
+                                            existingRecord = { 
+                                                ref: db.collection('contacts').doc(bestMatch.contact.id),
+                                                data: () => bestMatch.contact
+                                            };
+                                        } else if (mergeAction === 'skip') {
+                                            // Skip this contact (don't create or update)
+                                            return;
+                                        }
+                                        // If 'cancel', we'll stop the entire import
+                                        if (mergeAction === 'cancel') {
+                                            throw new Error('Import cancelled by user');
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (updateExisting && modal._importType === 'accounts') {
+                            // For accounts, use simple email/name matching
+                            const matchField = 'accountName';
                             if (doc[matchField]) {
                                 const query = await db.collection(collection)
                                     .where(matchField, '==', doc[matchField])
@@ -1571,9 +2000,19 @@ class PowerChoosersCRM {
                         
                         if (existingRecord) {
                             // Update existing record
-                            doc.updatedAt = now;
-                            doc.enrichedAt = now;
-                            await existingRecord.ref.update(doc);
+                            let updateData = doc;
+                            
+                            if (mergeAction === 'merge' && window.ContactMerger) {
+                                // Use intelligent merging
+                                const existingData = existingRecord.data();
+                                updateData = window.ContactMerger.mergeContacts(existingData, doc);
+                            } else {
+                                // Simple update
+                                updateData.updatedAt = now;
+                                updateData.enrichedAt = now;
+                            }
+                            
+                            await existingRecord.ref.update(updateData);
                             enriched++;
 
                             // Live update tables
@@ -1593,6 +2032,12 @@ class PowerChoosersCRM {
                             doc.createdAt = now;
                             doc.updatedAt = now;
                             doc.importedAt = now;
+                            
+                            // For contacts, check if we need to create/update an account
+                            if (modal._importType === 'contacts' && doc.companyName) {
+                                await this.handleAccountCreationForContact(db, doc, now);
+                            }
+                            
                             const ref = await db.collection(collection).add(doc);
                             imported++;
 
@@ -1687,15 +2132,18 @@ class PowerChoosersCRM {
         try {
             const header = String(headerText || '').toLowerCase();
             let v = String(value == null ? '' : value);
-            // If column header suggests phone OR value looks like phone starting with apostrophe, sanitize
-            const isPhoneHeader = /phone/.test(header);
-            const looksLikePhoneWithApos = /^'\s*[+0-9(]/.test(v);
-            if (isPhoneHeader || looksLikePhoneWithApos) {
-                // Remove leading apostrophe and unwrap ="..."
-                if (v.startsWith("'")) v = v.slice(1);
-                v = v.replace(/^=\s*["']?(.+?)["']?$/u, '$1');
-                v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
+            
+            // Always remove leading apostrophe if present (common CSV issue)
+            if (v.startsWith("'")) {
+                v = v.slice(1);
             }
+            
+            // Remove Excel formula wrappers
+            v = v.replace(/^=\s*["']?(.+?)["']?$/u, '$1');
+            
+            // Remove invisible characters
+            v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
+            
             return v;
         } catch (_) {
             return value;
@@ -1713,10 +2161,100 @@ class PowerChoosersCRM {
         }
     }
 
+    async handleAccountCreationForContact(db, contactDoc, timestamp) {
+        try {
+            const companyName = contactDoc.companyName;
+            if (!companyName) return;
+
+            // Check if account already exists
+            const existingAccountQuery = await db.collection('accounts')
+                .where('accountName', '==', companyName)
+                .limit(1)
+                .get();
+
+            let accountId;
+            if (!existingAccountQuery.empty) {
+                // Account exists, update it with any new company fields
+                const existingAccount = existingAccountQuery.docs[0];
+                accountId = existingAccount.id;
+                
+                const updateData = {};
+                if (contactDoc.companyIndustry && !existingAccount.data().industry) {
+                    updateData.industry = contactDoc.companyIndustry;
+                }
+                if (contactDoc.companyWebsite && !existingAccount.data().website) {
+                    updateData.website = contactDoc.companyWebsite;
+                }
+                if (contactDoc.companyLinkedin && !existingAccount.data().linkedin) {
+                    updateData.linkedin = contactDoc.companyLinkedin;
+                }
+                if (contactDoc.companyCity && !existingAccount.data().city) {
+                    updateData.city = contactDoc.companyCity;
+                }
+                if (contactDoc.companyState && !existingAccount.data().state) {
+                    updateData.state = contactDoc.companyState;
+                }
+                if (contactDoc.companyPhone && !existingAccount.data().phone) {
+                    updateData.phone = contactDoc.companyPhone;
+                }
+                if (contactDoc.companyEmployees && !existingAccount.data().employees) {
+                    updateData.employees = contactDoc.companyEmployees;
+                }
+                if (contactDoc.companySquareFootage && !existingAccount.data().squareFootage) {
+                    updateData.squareFootage = contactDoc.companySquareFootage;
+                }
+                if (contactDoc.companyOccupancyPct && !existingAccount.data().occupancyPct) {
+                    updateData.occupancyPct = contactDoc.companyOccupancyPct;
+                }
+                if (contactDoc.companyElectricitySupplier && !existingAccount.data().electricitySupplier) {
+                    updateData.electricitySupplier = contactDoc.companyElectricitySupplier;
+                }
+                if (contactDoc.companyShortDescription && !existingAccount.data().shortDescription) {
+                    updateData.shortDescription = contactDoc.companyShortDescription;
+                }
+
+                if (Object.keys(updateData).length > 0) {
+                    updateData.updatedAt = timestamp;
+                    await existingAccount.ref.update(updateData);
+                }
+            } else {
+                // Create new account
+                const accountData = {
+                    accountName: companyName,
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                    importedAt: timestamp
+                };
+
+                // Add company fields if they exist in the contact
+                if (contactDoc.companyIndustry) accountData.industry = contactDoc.companyIndustry;
+                if (contactDoc.companyWebsite) accountData.website = contactDoc.companyWebsite;
+                if (contactDoc.companyLinkedin) accountData.linkedin = contactDoc.companyLinkedin;
+                if (contactDoc.companyCity) accountData.city = contactDoc.companyCity;
+                if (contactDoc.companyState) accountData.state = contactDoc.companyState;
+                if (contactDoc.companyPhone) accountData.phone = contactDoc.companyPhone;
+                if (contactDoc.companyEmployees) accountData.employees = contactDoc.companyEmployees;
+                if (contactDoc.companySquareFootage) accountData.squareFootage = contactDoc.companySquareFootage;
+                if (contactDoc.companyOccupancyPct) accountData.occupancyPct = contactDoc.companyOccupancyPct;
+                if (contactDoc.companyElectricitySupplier) accountData.electricitySupplier = contactDoc.companyElectricitySupplier;
+                if (contactDoc.companyShortDescription) accountData.shortDescription = contactDoc.companyShortDescription;
+
+                const accountRef = await db.collection('accounts').add(accountData);
+                accountId = accountRef.id;
+            }
+
+            // Link the contact to the account
+            contactDoc.accountId = accountId;
+        } catch (error) {
+            console.error('Error handling account creation for contact:', error);
+        }
+    }
+
     // Normalize phone numbers imported from CSV
     // - Remove Excel leading apostrophe prefix '123...
     // - Unwrap Excel formula-like wrappers ="+1 234..." => +1 234...
     // - Strip zero-width/invisible characters
+    // - Format as +1XXXXXXXXXX for US numbers
     normalizePhone(value) {
         try {
             let v = String(value == null ? '' : value).trim();
@@ -1726,7 +2264,28 @@ class PowerChoosersCRM {
             v = v.replace(/^=\s*["']?(.+?)["']?$/u, '$1');
             // Remove zero-width spaces and BOM
             v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
-            return v.trim();
+            v = v.trim();
+            
+            if (!v) return '';
+            
+            // If already in +<digits> form, keep plus and digits only
+            if (/^\+/.test(v)) {
+                const cleaned = '+' + v.replace(/[^\d]/g, '');
+                return cleaned;
+            }
+            
+            const digits = v.replace(/[^\d]/g, '');
+            if (!digits) return '';
+            
+            // US default. If 11 and starts with 1, or exactly 10, format as +1XXXXXXXXXX
+            if (digits.length === 11 && digits.startsWith('1')) {
+                return '+' + digits;
+            } else if (digits.length === 10) {
+                return '+1' + digits;
+            }
+            
+            // For other lengths, just return the digits with + prefix
+            return '+' + digits;
         } catch (_) {
             return value;
         }
@@ -1840,7 +2399,7 @@ class PowerChoosersCRM {
 
             if (lastRef && data.lastRefreshed) {
                 const dt = new Date(data.lastRefreshed);
-                lastRef.textContent = `Last updated: ${dt.toLocaleString()}`;
+                lastRef.textContent = `Last updated: ${dt.toLocaleTimeString()}`;
             }
 
             if (newsList) {
@@ -1871,6 +2430,52 @@ class PowerChoosersCRM {
             }
             this.showToast('Failed to refresh Energy News');
         }
+    }
+    
+    loadHomeActivities() {
+        if (!window.ActivityManager) return;
+        
+        // Load global activities for home page
+        window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+        
+        // Setup pagination
+        this.setupHomeActivityPagination();
+    }
+
+    
+    setupHomeActivityPagination() {
+        const paginationEl = document.getElementById('home-activity-pagination');
+        
+        if (!paginationEl) return;
+        
+        // Show pagination if there are more than 4 activities
+        const updatePagination = async () => {
+            if (!window.ActivityManager) return;
+            
+            const activities = await window.ActivityManager.getActivities('global');
+            const totalPages = Math.ceil(activities.length / window.ActivityManager.maxActivitiesPerPage);
+            
+            if (totalPages > 1) {
+                paginationEl.style.display = 'flex';
+                
+                // Use unified pagination component
+                if (this.createPagination) {
+                    this.createPagination(
+                        window.ActivityManager.currentPage + 1, 
+                        totalPages, 
+                        (page) => {
+                            window.ActivityManager.goToPage(page - 1, 'home-activity-timeline', 'global');
+                            updatePagination();
+                        }, 
+                        paginationEl.id
+                    );
+                }
+            } else {
+                paginationEl.style.display = 'none';
+            }
+        };
+        
+        updatePagination();
     }
 }
 

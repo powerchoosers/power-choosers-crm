@@ -368,23 +368,24 @@
     const totalPages = getTotalPages();
     const cur = state.currentPage;
 
-    const btn = (label, { disabled=false, rel, page } = {}) =>
-      `<button class="page-btn"${disabled ? ' disabled' : ''}${rel ? ` data-rel="${rel}"` : ''}${page ? ` data-page="${page}"` : ''}>${label}</button>`;
-
-    const parts = [];
-    parts.push(btn('Prev', { disabled: cur <= 1, rel: 'prev' }));
-
-    // Render up to 5 pages around current
-    const span = 2;
-    const start = Math.max(1, cur - span);
-    const end = Math.min(totalPages, cur + span);
-    for (let p = start; p <= end; p++) {
-      const isCur = p === cur;
-      parts.push(`<button class="page-btn${isCur ? ' active' : ''}" data-page="${p}">${p}</button>`);
+    // Use unified pagination component
+    if (window.crm && window.crm.createPagination) {
+      window.crm.createPagination(cur, totalPages, (page) => {
+        state.currentPage = page;
+        render();
+      }, els.pagination.id);
+    } else {
+      // Fallback to simple pagination if unified component not available
+      els.pagination.innerHTML = `<div class="unified-pagination">
+        <button class="pagination-arrow" ${cur <= 1 ? 'disabled' : ''} onclick="if(${cur} > 1) { state.currentPage = ${cur - 1}; render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
+        </button>
+        <div class="pagination-current">${cur}</div>
+        <button class="pagination-arrow" ${cur >= totalPages ? 'disabled' : ''} onclick="if(${cur} < ${totalPages}) { state.currentPage = ${cur + 1}; render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
+        </button>
+      </div>`;
     }
-
-    parts.push(btn('Next', { disabled: cur >= totalPages, rel: 'next' }));
-    els.pagination.innerHTML = parts.join('');
   }
 
   function loadSampleData() {

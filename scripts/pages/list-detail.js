@@ -28,6 +28,8 @@
       employees: [],
       industry: [],
       visitorDomain: [],
+      seniority: [],
+      department: [],
     },
     pools: {
       title: [],
@@ -37,11 +39,66 @@
       employees: [],
       industry: [],
       visitorDomain: [],
+      seniority: [],
+      department: [],
     },
     flags: { hasEmail: false, hasPhone: false },
   };
 
   const els = {};
+
+  // Column order for List Detail table headers (draggable)
+  const DEFAULT_PEOPLE_COL_ORDER = ['select', 'name', 'title', 'company', 'email', 'phone', 'location', 'actions', 'updated'];
+  const DEFAULT_ACCOUNTS_COL_ORDER = ['select', 'name', 'industry', 'domain', 'phone', 'updated'];
+  
+  const PEOPLE_COL_STORAGE_KEY = 'list_detail_people_column_order';
+  const ACCOUNTS_COL_STORAGE_KEY = 'list_detail_accounts_column_order';
+  
+  let peopleColumnOrder = DEFAULT_PEOPLE_COL_ORDER.slice();
+  let accountsColumnOrder = DEFAULT_ACCOUNTS_COL_ORDER.slice();
+  
+  function loadColumnOrder() {
+    try {
+      const peopleRaw = localStorage.getItem(PEOPLE_COL_STORAGE_KEY);
+      if (peopleRaw) {
+        const peopleArr = JSON.parse(peopleRaw);
+        if (Array.isArray(peopleArr)) {
+          peopleColumnOrder = peopleArr.filter(col => DEFAULT_PEOPLE_COL_ORDER.includes(col));
+          // Add any missing columns
+          DEFAULT_PEOPLE_COL_ORDER.forEach(col => {
+            if (!peopleColumnOrder.includes(col)) {
+              peopleColumnOrder.push(col);
+            }
+          });
+        }
+      }
+      
+      const accountsRaw = localStorage.getItem(ACCOUNTS_COL_STORAGE_KEY);
+      if (accountsRaw) {
+        const accountsArr = JSON.parse(accountsRaw);
+        if (Array.isArray(accountsArr)) {
+          accountsColumnOrder = accountsArr.filter(col => DEFAULT_ACCOUNTS_COL_ORDER.includes(col));
+          // Add any missing columns
+          DEFAULT_ACCOUNTS_COL_ORDER.forEach(col => {
+            if (!accountsColumnOrder.includes(col)) {
+              accountsColumnOrder.push(col);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load column order:', e);
+    }
+  }
+  
+  function persistColumnOrder() {
+    try {
+      localStorage.setItem(PEOPLE_COL_STORAGE_KEY, JSON.stringify(peopleColumnOrder));
+      localStorage.setItem(ACCOUNTS_COL_STORAGE_KEY, JSON.stringify(accountsColumnOrder));
+    } catch (e) {
+      console.warn('Failed to persist column order:', e);
+    }
+  }
 
   function qs(id) { return document.getElementById(id); }
 
@@ -89,6 +146,13 @@
     els.pCompanyClear = qs('list-detail-filter-company-clear');
     els.pCompanySuggest = qs('list-detail-filter-company-suggest');
 
+    // Seniority
+    els.pSeniority = qs('list-detail-filter-seniority');
+    els.pSeniorityWrap = qs('list-detail-filter-seniority-chip');
+    els.pSeniorityChips = qs('list-detail-filter-seniority-chips');
+    els.pSeniorityClear = qs('list-detail-filter-seniority-clear');
+    els.pSenioritySuggest = qs('list-detail-filter-seniority-suggest');
+
     // New fields
     els.pCity = qs('list-detail-filter-city');
     els.pCityWrap = qs('list-detail-filter-city-chip');
@@ -119,6 +183,13 @@
     els.pVisitorDomainChips = qs('list-detail-filter-visitor-domain-chips');
     els.pVisitorDomainClear = qs('list-detail-filter-visitor-domain-clear');
     els.pVisitorDomainSuggest = qs('list-detail-filter-visitor-domain-suggest');
+
+    // Department
+    els.pDepartment = qs('list-detail-filter-department');
+    els.pDepartmentWrap = qs('list-detail-filter-department-chip');
+    els.pDepartmentChips = qs('list-detail-filter-department-chips');
+    els.pDepartmentClear = qs('list-detail-filter-department-clear');
+    els.pDepartmentSuggest = qs('list-detail-filter-department-suggest');
 
     els.pHasEmail = qs('list-detail-filter-has-email');
     els.pHasPhone = qs('list-detail-filter-has-phone');
@@ -183,6 +254,87 @@
         } else {
           els.filterPanel.setAttribute('hidden', '');
           if (els.filterText) els.filterText.textContent = 'Show Filters';
+        }
+      });
+    }
+
+    // Clickable names and companies - use event delegation
+    if (els.tbody) {
+      els.tbody.addEventListener('click', (e) => {
+        const anchor = e.target.closest('a, .name-cell, .company-link');
+        if (!anchor) return;
+        // Handle contact name clicks
+        if (anchor.matches('.name-cell[data-contact-id]')) {
+          e.preventDefault();
+          const contactId = anchor.getAttribute('data-contact-id');
+          const contactName = anchor.getAttribute('data-contact-name');
+          if (contactId) {
+            // Store navigation context for back button
+            window._contactNavigationSource = 'list-detail';
+            window._contactNavigationListId = state.listId;
+            window._contactNavigationListName = state.listName;
+            
+            // Navigate via existing people route to ensure modules are bound, then open detail immediately
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              requestAnimationFrame(() => {
+                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                  window.ContactDetail.show(contactId);
+                }
+              });
+            }
+          }
+        }
+        
+        // Handle company name clicks (for contacts)
+        if (anchor.matches('.company-link[data-company-name]') && !anchor.hasAttribute('data-account-id')) {
+          e.preventDefault();
+          const companyName = anchor.getAttribute('data-company-name');
+          if (companyName) {
+            // Find the account by name
+            const account = state.dataAccounts.find(acc => acc.accountName === companyName || acc.name === companyName);
+            if (account) {
+              // Store navigation context for back button
+              window._accountNavigationSource = 'list-detail';
+              window._accountNavigationListId = state.listId;
+              window._accountNavigationListName = state.listName;
+              window._accountNavigationListView = 'people';
+              
+              // Prefetch account object and open detail immediately
+              try { window._prefetchedAccountForDetail = account; } catch (_) {}
+              if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
+                window.showAccountDetail(account.id);
+              } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                // Fallback: go to accounts page
+                window.crm.navigateToPage('accounts');
+              }
+            }
+          }
+        }
+        
+        // Handle account name clicks (for accounts view)
+        if (anchor.matches('.company-link[data-account-id]')) {
+          e.preventDefault();
+          const accountId = anchor.getAttribute('data-account-id');
+          const accountName = anchor.getAttribute('data-account-name');
+          if (accountId) {
+            // Store navigation context for back button
+            window._accountNavigationSource = 'list-detail';
+            window._accountNavigationListId = state.listId;
+            window._accountNavigationListName = state.listName;
+            window._accountNavigationListView = 'accounts';
+            
+            // Prefetch account object if available and open detail immediately
+            try {
+              const acct = (state.dataAccounts || []).find(a => a.id === accountId);
+              if (acct) window._prefetchedAccountForDetail = acct;
+            } catch (_) {}
+            if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
+              window.showAccountDetail(accountId);
+            } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('accounts');
+            }
+          }
         }
       });
     }
@@ -343,6 +495,84 @@
       });
     }
 
+    // Chip inputs: Seniority
+    if (els.pSeniority) {
+      els.pSeniority.addEventListener('keydown', (e) => {
+        const val = (els.pSeniority.value || '').trim();
+        if ((e.key === 'Enter' || e.key === ',') && val) {
+          e.preventDefault();
+          addSeniorityToken(val);
+          els.pSeniority.value = '';
+          hideSenioritySuggestions();
+          applyFilters();
+        } else if (e.key === 'Backspace') {
+          if (!val && state.chips.seniority.length > 0) {
+            e.preventDefault();
+            state.chips.seniority.pop();
+            renderSeniorityChips();
+            applyFilters();
+          }
+        }
+      });
+      els.pSeniority.addEventListener('input', () => updateSenioritySuggestions());
+    }
+    if (els.pSeniorityWrap) {
+      els.pSeniorityWrap.addEventListener('click', (ev) => { if (ev.target === els.pSeniorityWrap) els.pSeniority?.focus(); });
+    }
+    if (els.pSeniorityClear) {
+      els.pSeniorityClear.addEventListener('click', () => { state.chips.seniority = []; renderSeniorityChips(); applyFilters(); els.pSeniority?.focus(); });
+    }
+    if (els.pSenioritySuggest) {
+      els.pSenioritySuggest.addEventListener('mousedown', (e) => {
+        const it = e.target.closest('[data-sugg]');
+        if (!it) return;
+        const label = it.getAttribute('data-sugg') || '';
+        addSeniorityToken(label);
+        els.pSeniority.value = '';
+        hideSenioritySuggestions();
+        applyFilters();
+      });
+    }
+
+    // Chip inputs: Department
+    if (els.pDepartment) {
+      els.pDepartment.addEventListener('keydown', (e) => {
+        const val = (els.pDepartment.value || '').trim();
+        if ((e.key === 'Enter' || e.key === ',') && val) {
+          e.preventDefault();
+          addDepartmentToken(val);
+          els.pDepartment.value = '';
+          hideDepartmentSuggestions();
+          applyFilters();
+        } else if (e.key === 'Backspace') {
+          if (!val && state.chips.department.length > 0) {
+            e.preventDefault();
+            state.chips.department.pop();
+            renderDepartmentChips();
+            applyFilters();
+          }
+        }
+      });
+      els.pDepartment.addEventListener('input', () => updateDepartmentSuggestions());
+    }
+    if (els.pDepartmentWrap) {
+      els.pDepartmentWrap.addEventListener('click', (ev) => { if (ev.target === els.pDepartmentWrap) els.pDepartment?.focus(); });
+    }
+    if (els.pDepartmentClear) {
+      els.pDepartmentClear.addEventListener('click', () => { state.chips.department = []; renderDepartmentChips(); applyFilters(); els.pDepartment?.focus(); });
+    }
+    if (els.pDepartmentSuggest) {
+      els.pDepartmentSuggest.addEventListener('mousedown', (e) => {
+        const it = e.target.closest('[data-sugg]');
+        if (!it) return;
+        const label = it.getAttribute('data-sugg') || '';
+        addDepartmentToken(label);
+        els.pDepartment.value = '';
+        hideDepartmentSuggestions();
+        applyFilters();
+      });
+    }
+
     // Chip inputs: City
     if (els.pCity) {
       els.pCity.addEventListener('keydown', (e) => {
@@ -484,6 +714,28 @@
 
   async function loadDataOnce() {
     if (state.loadedPeople && state.loadedAccounts) return;
+    // Preload from global caches to eliminate blank flash
+    try {
+      if (!state.loadedPeople && typeof window.getPeopleData === 'function') {
+        const cachedPeople = window.getPeopleData() || [];
+        if (Array.isArray(cachedPeople) && cachedPeople.length) {
+          state.dataPeople = cachedPeople;
+          state.loadedPeople = true;
+        }
+      }
+      if (!state.loadedAccounts && typeof window.getAccountsData === 'function') {
+        const cachedAccounts = window.getAccountsData() || [];
+        if (Array.isArray(cachedAccounts) && cachedAccounts.length) {
+          state.dataAccounts = cachedAccounts;
+          state.loadedAccounts = true;
+        }
+      }
+      if (state.loadedPeople || state.loadedAccounts) {
+        renderTableHead();
+        buildSuggestionPools();
+        applyFilters();
+      }
+    } catch (_) {}
     
     try {
       console.time('[ListDetail] loadDataOnce');
@@ -567,15 +819,23 @@
       if (!gotAny) {
         try {
           const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
+          console.log('[ListDetail] fetchMembers: top-level query result', { 
+            listId, 
+            docs: lmSnap?.docs?.length || 0,
+            rawDocs: lmSnap?.docs?.map(d => ({ id: d.id, data: d.data() })) || []
+          });
           lmSnap?.docs?.forEach(d => {
             const m = d.data() || {};
             const t = (m.targetType || m.type || '').toLowerCase();
             const id = m.targetId || m.id || d.id;
+            console.log('[ListDetail] fetchMembers: processing member', { docId: d.id, targetType: t, targetId: id });
             if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
             else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
           });
           console.debug('[ListDetail] fetchMembers: top-level fetched', { listId, docs: lmSnap?.docs?.length || 0, people: state.membersPeople.size, accounts: state.membersAccounts.size });
-        } catch (_) {}
+        } catch (e) {
+          console.error('[ListDetail] fetchMembers: top-level query failed', e);
+        }
       }
 
       // Update global cache with fetched result for reuse
@@ -589,6 +849,13 @@
         console.debug('[ListDetail] fetchMembers: cache updated', { listId, people: state.membersPeople.size, accounts: state.membersAccounts.size });
       } catch (_) {}
       console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
+      
+      // Debug: Log the actual member IDs
+      console.log('[ListDetail] fetchMembers result:', {
+        listId,
+        peopleMembers: Array.from(state.membersPeople),
+        accountsMembers: Array.from(state.membersAccounts)
+      });
     } catch (err) {
       console.warn('Failed to load list members', err);
     }
@@ -606,6 +873,8 @@
       const employeesTokens = (state.chips.employees || []).map(normalize).filter(Boolean);
       const industryTokens = (state.chips.industry || []).map(normalize).filter(Boolean);
       const domainTokens = (state.chips.visitorDomain || []).map(normalize).filter(Boolean);
+      const seniorityTokens = (state.chips.seniority || []).map(normalize).filter(Boolean);
+      const departmentTokens = (state.chips.department || []).map(normalize).filter(Boolean);
 
       const qMatch = (str) => !q || normalize(str).includes(q);
       const tokenMatch = (tokens) => (str) => { 
@@ -620,6 +889,8 @@
       const employeesMatch = tokenMatch(employeesTokens);
       const industryMatch = tokenMatch(industryTokens);
       const domainMatch = tokenMatch(domainTokens);
+      const seniorityMatch = tokenMatch(seniorityTokens);
+      const departmentMatch = tokenMatch(departmentTokens);
 
       let base = state.dataPeople.filter(c => {
         const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || (c.name || '');
@@ -634,13 +905,21 @@
           (qMatch(fullName) || qMatch(c.title) || qMatch(c.companyName) || qMatch(c.email)) &&
           titleMatch(c.title) && companyMatch(c.companyName) &&
           cityMatch(locCity) && stateMatch(locState) && employeesMatch(String(employees)) &&
-          industryMatch(industry) && domainMatch(domain) && hasEmailOk && hasPhoneOk
+          industryMatch(industry) && domainMatch(domain) && hasEmailOk && hasPhoneOk &&
+          seniorityMatch(c.seniority || '') && departmentMatch(c.department || '')
         );
       });
       
       // Filter by list membership
       if (state.listId) {
+        console.log('[ListDetail] Filtering people by list membership:', {
+          listId: state.listId,
+          totalPeople: state.dataPeople.length,
+          membersCount: state.membersPeople.size,
+          beforeFilter: base.length
+        });
         base = base.filter(c => state.membersPeople.has(c.id));
+        console.log('[ListDetail] After filtering:', { afterFilter: base.length });
       }
       state.filtered = base;
     } else {
@@ -651,7 +930,14 @@
       });
       
       if (state.listId) {
+        console.log('[ListDetail] Filtering accounts by list membership:', {
+          listId: state.listId,
+          totalAccounts: state.dataAccounts.length,
+          membersCount: state.membersAccounts.size,
+          beforeFilter: base.length
+        });
         base = base.filter(a => state.membersAccounts.has(a.id));
+        console.log('[ListDetail] After filtering accounts:', { afterFilter: base.length });
       }
       state.filtered = base;
     }
@@ -738,6 +1024,8 @@
 
     updateHeaderSelectAll();
     renderRowSelectionHighlights();
+    
+    // Note: Drag and drop is initialized after data load in init() function
   }
 
   function escapeHtml(s) {
@@ -793,7 +1081,63 @@
     const updatedStr = escapeHtml(formatDateOrNA(c.updatedAt, c.createdAt));
     const checked = state.selectedPeople.has(id) ? ' checked' : '';
     const rowClass = state.selectedPeople.has(id) ? ' class="row-selected"' : '';
-    return `\n<tr${rowClass}>\n  <td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(id)}" aria-label="Select"${checked}></td>\n  <td>${fullName}</td>\n  <td>${title}</td>\n  <td>${company}</td>\n  <td>${email}</td>\n  <td>${phone}</td>\n  <td>${location}</td>\n  <td class="qa-cell"><div class="qa-actions">\n    <button type="button" class="qa-btn" data-action="addlist" data-id="${escapeHtml(id)}" aria-label="Add to list" title="Add to list"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M3 12h18"></path><path d="M3 18h18"></path></svg></button>\n    <button type="button" class="qa-btn" data-action="sequence" data-id="${escapeHtml(id)}" aria-label="Add to sequence" title="Add to sequence"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg></button>\n    <button type="button" class="qa-btn" data-action="task" data-id="${escapeHtml(id)}" aria-label="Create task" title="Create task"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6a2 2 0 0 1 2 2v2h2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h2V4a2 2 0 0 1 2-2z"></path><path d="M9 4h6"></path><path d="M9 12l2 2 4-4"></path></svg></button>\n    <button type="button" class="qa-btn" data-action="linkedin" data-id="${escapeHtml(id)}" aria-label="LinkedIn" title="LinkedIn"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM0 8h5v16H0V8zm7.5 0h4.8v2.2h.1c.7-1.2 2.4-2.5 4.9-2.5 5.2 0 6.2 3.4 6.2 7.9V24h-5v-7.2c0-1.7 0-3.9-2.4-3.9-2.4 0-2.8 1.9-2.8 3.8V24h-5V8z"></path></svg></button>\n    <button type="button" class="qa-btn" data-action="ai" data-id="${escapeHtml(id)}" aria-label="AI" title="AI"><span style="font-weight:700">AI</span></button>\n    <button type="button" class="qa-btn" data-action="link" data-id="${escapeHtml(id)}" aria-label="Open" title="Open"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 1 0-7l2-2a5 5 0 1 1 7 7l-1 1"></path><path d="M14 11a5 5 0 0 1 0 7l-2 2a5 5 0 1 1-7-7l1-1"></path></svg></button>\n  </div></td>\n  <td>${updatedStr}</td>\n</tr>`;
+    
+    let html = `<tr${rowClass}>`;
+    
+    peopleColumnOrder.forEach(col => {
+      switch (col) {
+        case 'select':
+          html += `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(id)}" aria-label="Select"${checked}></td>`;
+          break;
+        case 'name':
+          html += `<td><a href="#" class="name-cell" data-contact-id="${escapeHtml(id)}" data-contact-name="${escapeHtml(fullName)}">${fullName}</a></td>`;
+          break;
+        case 'title':
+          html += `<td>${title}</td>`;
+          break;
+        case 'company':
+          // Get domain for favicon (similar to people page logic)
+          const favDomain = (() => {
+            // Try to find the account for this company to get its domain
+            const account = state.dataAccounts.find(acc => acc.accountName === company || acc.name === company);
+            if (account) {
+              let d = String(account.domain || account.website || '').trim();
+              if (/^https?:\/\//i.test(d)) {
+                try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
+              }
+              return d ? d.replace(/^www\./i, '') : '';
+            }
+            return '';
+          })();
+          html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : ''}<span class="company-name">${company}</span></span></a></td>`;
+          break;
+        case 'email':
+          html += `<td>${email}</td>`;
+          break;
+        case 'phone':
+          html += `<td>${phone}</td>`;
+          break;
+        case 'location':
+          html += `<td>${location}</td>`;
+          break;
+        case 'actions':
+          html += `<td class="qa-cell"><div class="qa-actions">
+            <button type="button" class="qa-btn" data-action="addlist" data-id="${escapeHtml(id)}" aria-label="Add to list" title="Add to list"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M3 12h18"></path><path d="M3 18h18"></path></svg></button>
+            <button type="button" class="qa-btn" data-action="sequence" data-id="${escapeHtml(id)}" aria-label="Add to sequence" title="Add to sequence"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg></button>
+            <button type="button" class="qa-btn" data-action="task" data-id="${escapeHtml(id)}" aria-label="Create task" title="Create task"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6a2 2 0 0 1 2 2v2h2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h2V4a2 2 0 0 1 2-2z"></path><path d="M9 4h6"></path><path d="M9 12l2 2 4-4"></path></svg></button>
+            <button type="button" class="qa-btn" data-action="linkedin" data-id="${escapeHtml(id)}" aria-label="LinkedIn" title="LinkedIn"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM0 8h5v16H0V8zm7.5 0h4.8v2.2h.1c.7-1.2 2.4-2.5 4.9-2.5 5.2 0 6.2 3.4 6.2 7.9V24h-5v-7.2c0-1.7 0-3.9-2.4-3.9-2.4 0-2.8 1.9-2.8 3.8V24h-5V8z"></path></svg></button>
+            <button type="button" class="qa-btn" data-action="ai" data-id="${escapeHtml(id)}" aria-label="AI" title="AI"><span style="font-weight:700">AI</span></button>
+            <button type="button" class="qa-btn" data-action="link" data-id="${escapeHtml(id)}" aria-label="Open" title="Open"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 1 0-7l2-2a5 5 0 1 1 7 7l-1 1"></path><path d="M14 11a5 5 0 0 1 0 7l-2 2a5 5 0 1 1-7-7l1-1"></path></svg></button>
+          </div></td>`;
+          break;
+        case 'updated':
+          html += `<td>${updatedStr}</td>`;
+          break;
+      }
+    });
+    
+    html += '</tr>';
+    return html;
   }
 
   function rowHtmlAccount(a) {
@@ -805,7 +1149,34 @@
     const updatedStr = escapeHtml(formatDateOrNA(a.updatedAt, a.createdAt));
     const checked = state.selectedAccounts.has(id) ? ' checked' : '';
     const rowClass = state.selectedAccounts.has(id) ? ' class="row-selected"' : '';
-    return `\n<tr${rowClass}>\n  <td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(id)}" aria-label="Select"${checked}></td>\n  <td>${acct}</td>\n  <td>${industry}</td>\n  <td>${domain}</td>\n  <td>${phone}</td>\n  <td>${updatedStr}</td>\n</tr>`;
+    
+    let html = `<tr${rowClass}>`;
+    
+    accountsColumnOrder.forEach(col => {
+      switch (col) {
+        case 'select':
+          html += `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(id)}" aria-label="Select"${checked}></td>`;
+          break;
+        case 'name':
+          html += `<td><a href="#" class="company-link" data-account-id="${escapeHtml(id)}" data-account-name="${escapeHtml(acct)}">${acct}</a></td>`;
+          break;
+        case 'industry':
+          html += `<td>${industry}</td>`;
+          break;
+        case 'domain':
+          html += `<td>${domain}</td>`;
+          break;
+        case 'phone':
+          html += `<td>${phone}</td>`;
+          break;
+        case 'updated':
+          html += `<td>${updatedStr}</td>`;
+          break;
+      }
+    });
+    
+    html += '</tr>';
+    return html;
   }
 
   function emptyHtml() {
@@ -815,26 +1186,49 @@
 
   function renderTableHead() {
     if (!els.theadRow) return;
-    if (state.view === 'people') {
-      els.theadRow.innerHTML = `
-        <th class="col-select" data-col="select" draggable="true"><input type="checkbox" id="select-all-list-detail" aria-label="Select all"></th>
-        <th data-col="name" draggable="true">Name</th>
-        <th data-col="title" draggable="true">Title</th>
-        <th data-col="company" draggable="true">Company</th>
-        <th data-col="email" draggable="true">Email</th>
-        <th data-col="phone" draggable="true">Phone</th>
-        <th data-col="location" draggable="true">Location</th>
-        <th data-col="actions" draggable="true">Quick Actions</th>
-        <th data-col="updated" draggable="true">Updated</th>`;
-    } else {
-      els.theadRow.innerHTML = `
-        <th class="col-select"><input type="checkbox" id="select-all-list-detail" aria-label="Select all"></th>
-        <th>Account</th>
-        <th>Industry</th>
-        <th>Domain</th>
-        <th>Phone</th>
-        <th>Updated</th>`;
-    }
+    
+    const currentOrder = state.view === 'people' ? peopleColumnOrder : accountsColumnOrder;
+    let html = '';
+    
+    currentOrder.forEach(col => {
+      switch (col) {
+        case 'select':
+          html += `<th class="col-select" data-col="select" draggable="true"><input type="checkbox" id="select-all-list-detail" aria-label="Select all"></th>`;
+          break;
+        case 'name':
+          html += `<th data-col="name" draggable="true">${state.view === 'people' ? 'Name' : 'Account'}</th>`;
+          break;
+        case 'title':
+          html += `<th data-col="title" draggable="true">Title</th>`;
+          break;
+        case 'company':
+          html += `<th data-col="company" draggable="true">Company</th>`;
+          break;
+        case 'email':
+          html += `<th data-col="email" draggable="true">Email</th>`;
+          break;
+        case 'phone':
+          html += `<th data-col="phone" draggable="true">Phone</th>`;
+          break;
+        case 'location':
+          html += `<th data-col="location" draggable="true">Location</th>`;
+          break;
+        case 'industry':
+          html += `<th data-col="industry" draggable="true">Industry</th>`;
+          break;
+        case 'domain':
+          html += `<th data-col="domain" draggable="true">Domain</th>`;
+          break;
+        case 'actions':
+          html += `<th data-col="actions" draggable="true">Quick Actions</th>`;
+          break;
+        case 'updated':
+          html += `<th data-col="updated" draggable="true">Updated</th>`;
+          break;
+      }
+    });
+    
+    els.theadRow.innerHTML = html;
   }
 
   function renderPagination() {
@@ -849,41 +1243,63 @@
     const label = state.view === 'people' ? (total === 1 ? 'contact' : 'contacts') : (total === 1 ? 'account' : 'accounts');
     const listLabel = state.listName ? ` in "${state.listName}"` : '';
     els.paginationSummary.textContent = `Showing ${start}–${end} of ${total} ${label}${listLabel}`;
-    // Pagination buttons (always visible like People page)
-    let html = '';
-    const atFirst = state.currentPage <= 1;
-    const atLast = state.currentPage >= totalPages;
-
-    // Prev
-    html += `<button class="page-btn" data-rel="prev" ${atFirst ? 'disabled' : ''}>Previous</button>`;
-
-    // Numbered pages (at least 1)
-    for (let i = 1; i <= totalPages; i++) {
-      const active = i === state.currentPage ? ' active' : '';
-      html += `<button class="page-btn${active}" data-page="${i}">${i}</button>`;
-    }
-
-    // Next
-    html += `<button class="page-btn" data-rel="next" ${atLast ? 'disabled' : ''}>Next</button>`;
-
-    els.pagination.innerHTML = html;
-
-    // Add click handlers once
-    if (!els.pagination.dataset.bound) {
-      els.pagination.addEventListener('click', (e) => {
-        const btn = e.target.closest && e.target.closest('button.page-btn');
-        if (!btn || btn.disabled) return;
-        const rel = btn.getAttribute('data-rel');
-        let next = state.currentPage;
-        if (rel === 'prev') next = Math.max(1, state.currentPage - 1);
-        else if (rel === 'next') next = Math.min(totalPages, state.currentPage + 1);
-        else if (btn.dataset.page) next = Math.min(totalPages, Math.max(1, parseInt(btn.dataset.page, 10)));
-        if (next !== state.currentPage) {
-          state.currentPage = next;
+    
+    // Always use unified pagination component (even for empty lists)
+    if (window.crm && window.crm.createPagination) {
+      window.crm.createPagination(
+        state.currentPage,
+        totalPages,
+        (page) => {
+          state.currentPage = page;
           render();
-        }
-      });
-      els.pagination.dataset.bound = '1';
+        },
+        els.pagination.id || 'list-detail-pagination'
+      );
+    } else {
+      // Fallback to simple pagination with arrows
+      let html = '';
+      const atFirst = state.currentPage <= 1;
+      const atLast = state.currentPage >= totalPages;
+
+      // Prev arrow
+      html += `<button class="page-btn" data-rel="prev" ${atFirst ? 'disabled' : ''}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15,18 9,12 15,6"></polyline>
+        </svg>
+      </button>`;
+
+      // Numbered pages (at least 1)
+      for (let i = 1; i <= totalPages; i++) {
+        const active = i === state.currentPage ? ' active' : '';
+        html += `<button class="page-btn${active}" data-page="${i}">${i}</button>`;
+      }
+
+      // Next arrow
+      html += `<button class="page-btn" data-rel="next" ${atLast ? 'disabled' : ''}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9,18 15,12 9,6"></polyline>
+        </svg>
+      </button>`;
+
+      els.pagination.innerHTML = html;
+
+      // Add click handlers once
+      if (!els.pagination.dataset.bound) {
+        els.pagination.addEventListener('click', (e) => {
+          const btn = e.target.closest && e.target.closest('button.page-btn');
+          if (!btn || btn.disabled) return;
+          const rel = btn.getAttribute('data-rel');
+          let next = state.currentPage;
+          if (rel === 'prev') next = Math.max(1, state.currentPage - 1);
+          else if (rel === 'next') next = Math.min(totalPages, state.currentPage + 1);
+          else if (btn.dataset.page) next = Math.min(totalPages, Math.max(1, parseInt(btn.dataset.page, 10)));
+          if (next !== state.currentPage) {
+            state.currentPage = next;
+            render();
+          }
+        });
+        els.pagination.dataset.bound = '1';
+      }
     }
   }
 
@@ -918,8 +1334,60 @@
       state.pools.employees = dedupe(state.dataPeople.map(c => c.employees || c.companySize || c.employeeCount || ''));
       state.pools.industry = dedupe(state.dataPeople.map(c => c.industry || c.companyIndustry || ''));
       state.pools.visitorDomain = dedupe(state.dataPeople.map(c => c.domain || c.companyDomain || c.website || ''));
+      state.pools.seniority = dedupe(state.dataPeople.map(c => c.seniority || ''));
+      state.pools.department = dedupe(state.dataPeople.map(c => c.department || ''));
     } catch {}
   }
+
+  // ----- Chip render helpers (Seniority / Department) -----
+  function renderSeniorityChips() {
+    if (!els.pSeniorityChips) return;
+    els.pSeniorityChips.innerHTML = (state.chips.seniority || []).map((t, idx) => `
+      <span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>
+    `).join('');
+    els.pSeniorityChips.querySelectorAll('.chip-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.getAttribute('data-idx') || '-1', 10);
+        if (!isNaN(i)) {
+          state.chips.seniority.splice(i, 1);
+          renderSeniorityChips();
+          applyFilters();
+        }
+      });
+    });
+    if (els.pSeniorityClear) {
+      if ((state.chips.seniority || []).length > 0) els.pSeniorityClear.removeAttribute('hidden');
+      else els.pSeniorityClear.setAttribute('hidden', '');
+    }
+  }
+
+  function renderDepartmentChips() {
+    if (!els.pDepartmentChips) return;
+    els.pDepartmentChips.innerHTML = (state.chips.department || []).map((t, idx) => `
+      <span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>
+    `).join('');
+    els.pDepartmentChips.querySelectorAll('.chip-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.getAttribute('data-idx') || '-1', 10);
+        if (!isNaN(i)) {
+          state.chips.department.splice(i, 1);
+          renderDepartmentChips();
+          applyFilters();
+        }
+      });
+    });
+    if (els.pDepartmentClear) {
+      if ((state.chips.department || []).length > 0) els.pDepartmentClear.removeAttribute('hidden');
+      else els.pDepartmentClear.setAttribute('hidden', '');
+    }
+  }
+
+  function addSeniorityToken(label) { const t = (label || '').trim(); if (!t) return; const exists = (state.chips.seniority || []).some((x) => normalize(x) === normalize(t)); if (!exists) { state.chips.seniority.push(t); renderSeniorityChips(); } }
+  function addDepartmentToken(label) { const t = (label || '').trim(); if (!t) return; const exists = (state.chips.department || []).some((x) => normalize(x) === normalize(t)); if (!exists) { state.chips.department.push(t); renderDepartmentChips(); } }
+  function hideSenioritySuggestions() { if (els.pSenioritySuggest) els.pSenioritySuggest.setAttribute('hidden', ''); }
+  function hideDepartmentSuggestions() { if (els.pDepartmentSuggest) els.pDepartmentSuggest.setAttribute('hidden', ''); }
+  function updateSenioritySuggestions() { if (!els.pSenioritySuggest) return; const q = normalize(els.pSeniority ? els.pSeniority.value : ''); if (!q) { hideSenioritySuggestions(); return; } const items = []; for (let i = 0; i < state.pools.seniority.length && items.length < 8; i++) { const s = state.pools.seniority[i]; if (normalize(s).includes(q) && !(state.chips.seniority || []).some((x) => normalize(x) === normalize(s))) items.push(s); } if (items.length === 0) { hideSenioritySuggestions(); return; } els.pSenioritySuggest.innerHTML = items.map((s) => `<div class="item" data-sugg="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join(''); els.pSenioritySuggest.removeAttribute('hidden'); }
+  function updateDepartmentSuggestions() { if (!els.pDepartmentSuggest) return; const q = normalize(els.pDepartment ? els.pDepartment.value : ''); if (!q) { hideDepartmentSuggestions(); return; } const items = []; for (let i = 0; i < state.pools.department.length && items.length < 8; i++) { const s = state.pools.department[i]; if (normalize(s).includes(q) && !(state.chips.department || []).some((x) => normalize(x) === normalize(s))) items.push(s); } if (items.length === 0) { hideDepartmentSuggestions(); return; } els.pDepartmentSuggest.innerHTML = items.map((s) => `<div class="item" data-sugg="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join(''); els.pDepartmentSuggest.removeAttribute('hidden'); }
 
   async function init(context) {
     console.log('[ListDetail] Initializing with context:', context);
@@ -930,6 +1398,9 @@
       return;
     }
 
+    // Load column order from localStorage
+    loadColumnOrder();
+    
     // Set context
     if (context) {
       state.listId = context.listId;
@@ -948,9 +1419,38 @@
 
     attachEvents();
     injectListDetailBulkStyles();
-    await loadDataOnce();
-    await fetchMembers(state.listId);
+    
+    // Instant paint: draw header and render cached data if available
+    renderTableHead();
+    
+    // Try to render cached data immediately to avoid empty state flash
+    try {
+      if (state.listId && window.listMembersCache && window.listMembersCache[state.listId]?.loaded) {
+        const cache = window.listMembersCache[state.listId];
+        state.membersPeople = new Set(cache.people || []);
+        state.membersAccounts = new Set(cache.accounts || []);
+        
+        // If we have cached data, try to render it immediately
+        if (state.view === 'people' && state.dataPeople.length > 0) {
+          const filtered = state.dataPeople.filter(c => state.membersPeople.has(c.id));
+          state.filtered = filtered;
+          render();
+        } else if (state.view === 'accounts' && state.dataAccounts.length > 0) {
+          const filtered = state.dataAccounts.filter(a => state.membersAccounts.has(a.id));
+          state.filtered = filtered;
+          render();
+        }
+      }
+    } catch (_) {}
+    
+    // Load data in parallel for faster loading
     state.currentPage = 1;
+    const [dataLoaded, membersLoaded] = await Promise.all([
+      loadDataOnce(),
+      fetchMembers(state.listId)
+    ]);
+    
+    // Re-render with loaded data
     renderTableHead();
     // Render chip DOM from internal state (if pre-set)
     try {
@@ -971,12 +1471,34 @@
       renderVisitorDomainChips();
     } catch(_) {}
     applyFilters();
+    
+    // Initialize drag and drop after everything is rendered
+    setTimeout(() => {
+      console.log('[ListDetail] Initializing drag and drop after data load');
+      initHeaderDragAndDrop();
+    }, 100);
     console.timeEnd('[ListDetail] init');
   }
 
   // Expose API
+  // Function to refresh list membership
+  async function refreshListMembership() {
+    if (state.listId) {
+      console.log('[ListDetail] Refreshing list membership for:', state.listId);
+      // Clear the cache for this list
+      if (window.listMembersCache && window.listMembersCache[state.listId]) {
+        delete window.listMembersCache[state.listId];
+      }
+      // Re-fetch members
+      await fetchMembers(state.listId);
+      // Re-apply filters
+      applyFilters();
+    }
+  }
+
   window.ListDetail = {
     init: init,
+    refreshListMembership: refreshListMembership,
     _getPool: (kind) => {
       try { return state.pools[kind] || []; } catch (_) { return []; }
     },
@@ -1450,4 +1972,182 @@ async function removeSelectedFromList() {
     console.warn('Remove from list failed', e);
     window.crm?.showToast && window.crm.showToast('Failed to remove from list');
   }
+}
+
+// Drag and Drop functionality for table headers
+let dragSrcTh = null;
+let dragOverTh = null;
+
+function initHeaderDragAndDrop() {
+  // Re-resolve header row each time to avoid stale references
+  const page = document.getElementById('list-detail-page');
+  els.theadRow = page ? page.querySelector('#list-detail-table thead tr') : els.theadRow;
+  if (!els || !els.theadRow) {
+    console.warn('[ListDetail] No theadRow found for drag and drop');
+    return;
+  }
+  
+  // Clean up existing event listeners by cloning the row to remove all listeners
+  const newTheadRow = els.theadRow.cloneNode(true);
+  els.theadRow.parentNode.replaceChild(newTheadRow, els.theadRow);
+  els.theadRow = newTheadRow;
+  
+  const ths = els.theadRow.querySelectorAll('th[draggable="true"]');
+  console.log('[ListDetail] Found', ths.length, 'draggable headers');
+  console.log('[ListDetail] Headers found:', Array.from(ths).map(th => th.textContent.trim()));
+  
+  // Define event handlers
+  const handleDragStart = (e) => {
+    console.log('[ListDetail] Drag start triggered on:', e.target.textContent.trim());
+    dragSrcTh = e.target;
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.target.outerHTML);
+  };
+  
+  const handleDragEnd = () => {
+    if (dragSrcTh) {
+      dragSrcTh.classList.remove('dragging');
+    }
+    if (dragOverTh) {
+      dragOverTh.classList.remove('drag-over');
+      dragOverTh = null;
+    }
+    dragSrcTh = null;
+  };
+  
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (!dragSrcTh) return;
+    
+    // Find the target column based on mouse position
+    let targetTh = null;
+    const elements = document.elementsFromPoint(e.clientX, e.clientY);
+    
+    for (const el of elements) {
+      if (el.tagName === 'TH' && el !== dragSrcTh && el.hasAttribute('draggable')) {
+        targetTh = el;
+        break;
+      }
+    }
+    
+    // Method 2: Check if mouse is over any draggable th
+    if (!targetTh) {
+      const rects = Array.from(ths).map(th => ({ th, rect: th.getBoundingClientRect() }));
+      for (const { th, rect } of rects) {
+        if (th !== dragSrcTh && e.clientX >= rect.left && e.clientX <= rect.right && 
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          targetTh = th;
+          break;
+        }
+      }
+    }
+    
+    // Method 3: Use mouse X position to find closest column
+    if (!targetTh) {
+      const mouseX = e.clientX;
+      let closestTh = null;
+      let closestDistance = Infinity;
+      
+      ths.forEach(th => {
+        if (th === dragSrcTh) return;
+        const rect = th.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const distance = Math.abs(mouseX - centerX);
+        
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestTh = th;
+        }
+      });
+      
+      if (closestTh) {
+        targetTh = closestTh;
+      }
+    }
+    
+    // Method 4: Edge case handling for adjacent columns
+    if (!targetTh) {
+      const draggedIndex = Array.from(els.theadRow.children).indexOf(dragSrcTh);
+      const nextSibling = dragSrcTh.nextElementSibling;
+      const prevSibling = dragSrcTh.previousElementSibling;
+      
+      if (nextSibling && nextSibling.tagName === 'TH') {
+        const nextRect = nextSibling.getBoundingClientRect();
+        if (e.clientX >= nextRect.left - 30 && e.clientX <= nextRect.right + 30) {
+          targetTh = nextSibling;
+        }
+      } else if (prevSibling && prevSibling.tagName === 'TH') {
+        const prevRect = prevSibling.getBoundingClientRect();
+        if (e.clientX >= prevRect.left - 30 && e.clientX <= prevRect.right + 30) {
+          targetTh = prevSibling;
+        }
+      }
+    }
+    
+    // Update highlight if we found a new target
+    if (targetTh && targetTh !== dragOverTh) {
+      // Remove previous highlight
+      if (dragOverTh) {
+        dragOverTh.classList.remove('drag-over');
+      }
+      
+      // Add new highlight
+      dragOverTh = targetTh;
+      targetTh.classList.add('drag-over');
+    }
+  };
+  
+  const handleDrop = (e) => {
+    e.preventDefault();
+    
+    if (!dragSrcTh || !dragOverTh) return;
+    
+    // Remove highlight
+    dragOverTh.classList.remove('drag-over');
+    
+    // Commit the move - this will insert the dragged column before the highlighted target
+    commitHeaderMove(dragSrcTh, dragOverTh);
+    
+    // Update the column order and persist
+    const newOrder = getHeaderOrderFromDom();
+    if (newOrder.length > 0) {
+      if (state.view === 'people') {
+        peopleColumnOrder = newOrder;
+      } else {
+        accountsColumnOrder = newOrder;
+      }
+      persistColumnOrder();
+      // Re-render to reflect new column order
+      render();
+    }
+    
+    dragOverTh = null;
+  };
+  
+  ths.forEach(th => {
+    th.addEventListener('dragstart', handleDragStart);
+    th.addEventListener('dragend', handleDragEnd);
+    console.log('[ListDetail] Added drag listeners to:', th.textContent.trim());
+  });
+  
+  els.theadRow.addEventListener('dragover', handleDragOver);
+  els.theadRow.addEventListener('drop', handleDrop);
+  console.log('[ListDetail] Drag and drop initialized successfully');
+}
+
+function commitHeaderMove(dragSrcTh, dragOverTh) {
+  if (!dragSrcTh || !dragOverTh || dragSrcTh === dragOverTh) return;
+  
+  // Insert the dragged element before the target
+  dragOverTh.parentNode.insertBefore(dragSrcTh, dragOverTh);
+}
+
+function getHeaderOrderFromDom() {
+  if (!els.theadRow) return [];
+  
+  const ths = els.theadRow.querySelectorAll('th[data-col]');
+  return Array.from(ths).map(th => th.getAttribute('data-col')).filter(Boolean);
 }

@@ -17,6 +17,8 @@
     employeesTokens: [],
     industryTokens: [],
     visitorDomainTokens: [],
+    seniorityTokens: [],
+    departmentTokens: [],
     // Suggestion pools (built after load)
     titlePool: [],
     companyPool: [],
@@ -25,6 +27,8 @@
     employeesPool: [],
     industryPool: [],
     visitorDomainPool: [],
+    seniorityPool: [],
+    departmentPool: [],
   };
 
   // Column order for People table headers (draggable)
@@ -194,6 +198,16 @@
             return window.firebaseDB.collection('listMembers').add(doc);
           });
           await Promise.all(ops);
+          
+          // Refresh list membership if we're on a list detail page
+          if (window.ListDetail && window.ListDetail.refreshListMembership) {
+            window.ListDetail.refreshListMembership();
+          }
+          
+          // Refresh list counts on the lists overview page
+          if (window.ListsOverview && window.ListsOverview.refreshCounts) {
+            window.ListsOverview.refreshCounts();
+          }
         }
         window.crm?.showToast && window.crm.showToast(`Added ${ids.length} to "${listName}"`);
       } catch (err) {
@@ -435,6 +449,16 @@
     els.visitorDomainChips = qs('filter-visitor-domain-chips');
     els.visitorDomainClear = qs('filter-visitor-domain-clear');
     els.visitorDomainSuggest = qs('filter-visitor-domain-suggest');
+    els.fSeniority = qs('filter-seniority');
+    els.seniorityChipWrap = qs('filter-seniority-chip');
+    els.seniorityChips = qs('filter-seniority-chips');
+    els.seniorityClear = qs('filter-seniority-clear');
+    els.senioritySuggest = qs('filter-seniority-suggest');
+    els.fDepartment = qs('filter-department');
+    els.departmentChipWrap = qs('filter-department-chip');
+    els.departmentChips = qs('filter-department-chips');
+    els.departmentClear = qs('filter-department-clear');
+    els.departmentSuggest = qs('filter-department-suggest');
     els.fHasEmail = qs('filter-has-email');
     els.fHasPhone = qs('filter-has-phone');
 
@@ -584,34 +608,164 @@
     els.thead.addEventListener('dragend', handler, true);
   }
 
-  // Lightweight built-in DnD for headers (fallback if global contacts DnD isn't present)
+  // Enhanced DnD for headers with better visual feedback
   function initPeopleHeaderDnD() {
     if (!els.headerRow) return;
     let dragSrcTh = null;
+    let dragOverTh = null;
+    let isDragging = false;
     const ths = Array.from(els.headerRow.querySelectorAll('th'));
+    
+    // Helper to commit a move given a source and highlighted target
+    function commitHeaderMove(sourceTh, targetTh) {
+      if (!sourceTh || !targetTh) return false;
+      if (sourceTh === targetTh) return false;
+      // Always populate the highlighted position: insert BEFORE target.
+      // This shifts the target (and everything to the right) one position to the right.
+      els.headerRow.insertBefore(sourceTh, targetTh);
+      return true;
+    }
+
+    // Global drop handler for the entire header row
+    els.headerRow.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      if (!isDragging || !dragSrcTh) return;
+      
+      // Get all available columns (excluding the one being dragged)
+      const allThs = Array.from(els.headerRow.querySelectorAll('th')).filter(th => th !== dragSrcTh);
+      if (allThs.length === 0) return;
+      
+      let targetTh = null;
+      
+      // Method 1: Direct element detection using elementsFromPoint
+      const elements = document.elementsFromPoint(e.clientX, e.clientY);
+      targetTh = elements.find(el => el.tagName === 'TH' && el !== dragSrcTh);
+      
+      // Method 2: If no direct hit, find by mouse position within column bounds
+      if (!targetTh) {
+        for (const th of allThs) {
+          const rect = th.getBoundingClientRect();
+          // More generous hit area for easier targeting
+          const isOverColumn = e.clientX >= rect.left - 15 && e.clientX <= rect.right + 15;
+          
+          if (isOverColumn) {
+            targetTh = th;
+            break;
+          }
+        }
+      }
+      
+      // Method 3: Find closest column by distance to center
+      if (!targetTh) {
+        let closestTh = null;
+        let closestDistance = Infinity;
+        
+        for (const th of allThs) {
+          const rect = th.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const distance = Math.abs(e.clientX - centerX);
+          
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestTh = th;
+          }
+        }
+        
+        // Use closest column if within reasonable distance (reduced threshold for better precision)
+        if (closestDistance < 100) {
+          targetTh = closestTh;
+        }
+      }
+      
+      // Method 4: Edge case handling for adjacent columns
+      if (!targetTh) {
+        // Check if mouse is in the gap between columns
+        const draggedIndex = Array.from(els.headerRow.children).indexOf(dragSrcTh);
+        const nextSibling = dragSrcTh.nextElementSibling;
+        const prevSibling = dragSrcTh.previousElementSibling;
+        
+        if (nextSibling && nextSibling.tagName === 'TH') {
+          const nextRect = nextSibling.getBoundingClientRect();
+          if (e.clientX >= nextRect.left - 30 && e.clientX <= nextRect.right + 30) {
+            targetTh = nextSibling;
+          }
+        } else if (prevSibling && prevSibling.tagName === 'TH') {
+          const prevRect = prevSibling.getBoundingClientRect();
+          if (e.clientX >= prevRect.left - 30 && e.clientX <= prevRect.right + 30) {
+            targetTh = prevSibling;
+          }
+        }
+      }
+      
+      // Update highlight if we found a new target
+      if (targetTh && targetTh !== dragOverTh) {
+        // Remove previous highlight
+        if (dragOverTh) {
+          dragOverTh.classList.remove('drag-over');
+        }
+        
+        // Add new highlight
+        dragOverTh = targetTh;
+        targetTh.classList.add('drag-over');
+      }
+    });
+    
+    // Global drop handler - drop into the currently highlighted (dragOverTh) column
+    els.headerRow.addEventListener('drop', (e) => {
+      e.preventDefault();
+      
+      if (!dragSrcTh || !dragOverTh) return;
+      
+      // Remove highlight
+      dragOverTh.classList.remove('drag-over');
+      
+      // Commit the move - this will insert the dragged column before the highlighted target
+      commitHeaderMove(dragSrcTh, dragOverTh);
+      
+      // Update the column order and persist
+      const newOrder = getHeaderOrderFromDom();
+      if (newOrder.length > 0) {
+        contactsColumnOrder = newOrder;
+        persistPeopleColumnOrder(newOrder);
+        // Re-render to reflect new column order
+        render();
+      }
+      
+      dragOverTh = null;
+    });
+    
     ths.forEach((th) => {
       th.setAttribute('draggable', 'true');
+      
       th.addEventListener('dragstart', (e) => {
+        isDragging = true;
         dragSrcTh = th;
         const key = th.getAttribute('data-col') || '';
-        try { e.dataTransfer?.setData('text/plain', key); } catch (_) { /* noop */ }
+        try { 
+          e.dataTransfer?.setData('text/plain', key);
+          e.dataTransfer.effectAllowed = 'move';
+        } catch (_) { /* noop */ }
         th.classList.add('dragging');
+        
+        // Add visual feedback to all other headers
+        ths.forEach(otherTh => {
+          if (otherTh !== th) {
+            otherTh.classList.add('drag-target');
+          }
+        });
       });
-      th.addEventListener('dragenter', () => th.classList.add('drag-over'));
-      th.addEventListener('dragleave', () => th.classList.remove('drag-over'));
-      th.addEventListener('dragover', (e) => { e.preventDefault(); });
-      th.addEventListener('drop', (e) => {
-        e.preventDefault();
-        th.classList.remove('drag-over');
-        if (!dragSrcTh || dragSrcTh === th) return;
-        const rect = th.getBoundingClientRect();
-        const before = e.clientX < rect.left + rect.width / 2;
-        if (before) els.headerRow.insertBefore(dragSrcTh, th);
-        else els.headerRow.insertBefore(dragSrcTh, th.nextSibling);
-      });
+      
       th.addEventListener('dragend', () => {
+        // Clean up all visual states
+        isDragging = false;
         th.classList.remove('dragging');
+        ths.forEach(otherTh => {
+          otherTh.classList.remove('drag-over', 'drag-target');
+        });
         dragSrcTh = null;
+        dragOverTh = null;
       });
     });
   }
@@ -828,6 +982,34 @@
     }
     if (els.visitorDomainClear) { els.visitorDomainClear.addEventListener('click', () => { clearVisitorDomainTokens(); if (els.fVisitorDomain) els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); els.fVisitorDomain?.focus(); }); }
     if (els.visitorDomainSuggest) { els.visitorDomainSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addVisitorDomainToken(label); if (els.fVisitorDomain) els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); }); }
+    // Seniority chip behaviors
+    if (els.fSeniority) {
+      els.fSeniority.addEventListener('input', () => updateSenioritySuggestions());
+      els.fSeniority.addEventListener('keydown', (e) => {
+        const val = (els.fSeniority.value || '').trim();
+        if (e.key === 'Enter' || e.key === ',') {
+          if (val) { e.preventDefault(); addSeniorityToken(val); els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); }
+        } else if (e.key === 'Backspace') {
+          if (!val && state.seniorityTokens.length > 0) { e.preventDefault(); removeLastSeniorityToken(); applyFilters(); }
+        }
+      });
+    }
+    if (els.seniorityClear) { els.seniorityClear.addEventListener('click', () => { clearSeniorityTokens(); if (els.fSeniority) els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); els.fSeniority?.focus(); }); }
+    if (els.senioritySuggest) { els.senioritySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addSeniorityToken(label); if (els.fSeniority) els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); }); }
+    // Department chip behaviors
+    if (els.fDepartment) {
+      els.fDepartment.addEventListener('input', () => updateDepartmentSuggestions());
+      els.fDepartment.addEventListener('keydown', (e) => {
+        const val = (els.fDepartment.value || '').trim();
+        if (e.key === 'Enter' || e.key === ',') {
+          if (val) { e.preventDefault(); addDepartmentToken(val); els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); }
+        } else if (e.key === 'Backspace') {
+          if (!val && state.departmentTokens.length > 0) { e.preventDefault(); removeLastDepartmentToken(); applyFilters(); }
+        }
+      });
+    }
+    if (els.departmentClear) { els.departmentClear.addEventListener('click', () => { clearDepartmentTokens(); if (els.fDepartment) els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); els.fDepartment?.focus(); }); }
+    if (els.departmentSuggest) { els.departmentSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addDepartmentToken(label); if (els.fDepartment) els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); }); }
     [els.fHasEmail, els.fHasPhone].forEach((chk) => {
       if (chk) chk.addEventListener('change', reFilter);
     });
@@ -866,13 +1048,26 @@
           updateBulkActionsBar();
         }
       });
-      // Contact name click delegation
+      // Contact name and phone click delegation
       els.tbody.addEventListener('click', (e) => {
         const nameCell = e.target.closest('.name-cell');
         if (nameCell) {
           const contactId = nameCell.getAttribute('data-contact-id');
           if (contactId && window.ContactDetail) {
             window.ContactDetail.show(contactId);
+          }
+          return;
+        }
+        
+        const phoneCell = e.target.closest('.phone-cell');
+        if (phoneCell) {
+          const phone = phoneCell.getAttribute('data-phone');
+          if (phone && window.Widgets && window.Widgets.openPhone) {
+            // Normalize phone number for dialing
+            const normalizedPhone = phone.replace(/\D/g, '');
+            if (normalizedPhone.length >= 10) {
+              window.Widgets.openPhone(normalizedPhone);
+            }
           }
           return;
         }
@@ -991,6 +1186,8 @@
       if (typeof buildEmployeesSuggestionPool === 'function') buildEmployeesSuggestionPool();
       if (typeof buildIndustrySuggestionPool === 'function') buildIndustrySuggestionPool();
       if (typeof buildVisitorDomainSuggestionPool === 'function') buildVisitorDomainSuggestionPool();
+      if (typeof buildSenioritySuggestionPool === 'function') buildSenioritySuggestionPool();
+      if (typeof buildDepartmentSuggestionPool === 'function') buildDepartmentSuggestionPool();
       render();
     } catch (e) {
       console.error('Failed loading contacts:', e);
@@ -1005,6 +1202,8 @@
       if (typeof buildEmployeesSuggestionPool === 'function') buildEmployeesSuggestionPool();
       if (typeof buildIndustrySuggestionPool === 'function') buildIndustrySuggestionPool();
       if (typeof buildVisitorDomainSuggestionPool === 'function') buildVisitorDomainSuggestionPool();
+      if (typeof buildSenioritySuggestionPool === 'function') buildSenioritySuggestionPool();
+      if (typeof buildDepartmentSuggestionPool === 'function') buildDepartmentSuggestionPool();
       render();
     }
   }
@@ -1023,6 +1222,8 @@
     const employeesTokens = (state.employeesTokens || []).map(normalize).filter(Boolean);
     const industryTokens = (state.industryTokens || []).map(normalize).filter(Boolean);
     const visitorDomainTokens = (state.visitorDomainTokens || []).map(normalize).filter(Boolean);
+    const seniorityTokens = (state.seniorityTokens || []).map(normalize).filter(Boolean);
+    const departmentTokens = (state.departmentTokens || []).map(normalize).filter(Boolean);
     const mustEmail = !!(els.fHasEmail && els.fHasEmail.checked);
     const mustPhone = !!(els.fHasPhone && els.fHasPhone.checked);
 
@@ -1035,6 +1236,8 @@
       (employeesTokens.length > 0 ? 'x' : ''),
       (industryTokens.length > 0 ? 'x' : ''),
       (visitorDomainTokens.length > 0 ? 'x' : ''),
+      (seniorityTokens.length > 0 ? 'x' : ''),
+      (departmentTokens.length > 0 ? 'x' : ''),
     ].some((v) => v) || mustEmail || mustPhone;
     if (els.filterBadge) {
       count = [
@@ -1045,6 +1248,8 @@
         (employeesTokens.length > 0 ? 'x' : ''),
         (industryTokens.length > 0 ? 'x' : ''),
         (visitorDomainTokens.length > 0 ? 'x' : ''),
+        (seniorityTokens.length > 0 ? 'x' : ''),
+        (departmentTokens.length > 0 ? 'x' : ''),
       ].filter(Boolean).length + (mustEmail ? 1 : 0) + (mustPhone ? 1 : 0);
       if (count > 0) {
         els.filterBadge.textContent = String(count);
@@ -1066,6 +1271,8 @@
     const stateMatch = tokenMatch(stateTokens);
     const employeesMatch = tokenMatch(employeesTokens);
     const industryMatch = tokenMatch(industryTokens);
+    const seniorityMatch = tokenMatch(seniorityTokens);
+    const departmentMatch = tokenMatch(departmentTokens);
 
     // If visitor-domain is set, return no people for now (not wired yet)
     if (visitorDomainTokens.length > 0) {
@@ -1078,16 +1285,18 @@
     state.filtered = state.data.filter((c) => {
       const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ');
       const hasEmail = !!c.email;
-      const hasPhone = !!(c.phone || c.mobile);
+      const hasPhone = !!(c.workDirectPhone || c.mobile || c.otherPhone);
       const city = c.city || c.locationCity || '';
       const stateVal = c.state || c.locationState || '';
       const employeesVal = (c.accountEmployees != null ? c.accountEmployees : c.employees);
       const employeesStr = (employeesVal == null ? '' : String(employeesVal));
       const industryVal = c.industry || c.companyIndustry || '';
+      const seniorityVal = c.seniority || '';
+      const departmentVal = c.department || '';
 
       return (
-        qMatch(fullName) || qMatch(c.title) || qMatch(c.companyName) || qMatch(c.email) || qMatch(c.phone) || qMatch(c.mobile)
-      ) && titleMatch(c.title) && companyMatch(c.companyName) && cityMatch(city) && stateMatch(stateVal) && employeesMatch(employeesStr) && industryMatch(industryVal) && (!mustEmail || hasEmail) && (!mustPhone || hasPhone);
+        qMatch(fullName) || qMatch(c.title) || qMatch(c.companyName) || qMatch(c.email) || qMatch(c.workDirectPhone) || qMatch(c.mobile) || qMatch(c.otherPhone)
+      ) && titleMatch(c.title) && companyMatch(c.companyName) && cityMatch(city) && stateMatch(stateVal) && employeesMatch(employeesStr) && industryMatch(industryVal) && seniorityMatch(seniorityVal) && departmentMatch(departmentVal) && (!mustEmail || hasEmail) && (!mustPhone || hasPhone);
     });
     // Reset to first page after filtering
     state.currentPage = 1;
@@ -1109,6 +1318,10 @@
     clearIndustryTokens();
     if (els.fVisitorDomain) els.fVisitorDomain.value = '';
     clearVisitorDomainTokens();
+    if (els.fSeniority) els.fSeniority.value = '';
+    clearSeniorityTokens();
+    if (els.fDepartment) els.fDepartment.value = '';
+    clearDepartmentTokens();
     if (els.fHasEmail) els.fHasEmail.checked = false;
     if (els.fHasPhone) els.fHasPhone.checked = false;
     if (els.quickSearch) els.quickSearch.value = '';
@@ -1210,12 +1423,26 @@
     }
     state.visitorDomainPool = pool;
   }
+  function buildSenioritySuggestionPool(){ const set=new Set(); const pool=[]; for(const c of state.data){ const v=(c.seniority || '').toString().trim(); if(!v) continue; const key=normalize(v); if(!set.has(key)){ set.add(key); pool.push(v);} if(pool.length>2000) break; } state.seniorityPool=pool; }
+  function buildDepartmentSuggestionPool(){ const set=new Set(); const pool=[]; for(const c of state.data){ const v=(c.department || '').toString().trim(); if(!v) continue; const key=normalize(v); if(!set.has(key)){ set.add(key); pool.push(v);} if(pool.length>2000) break; } state.departmentPool=pool; }
   function renderVisitorDomainChips(){ if(!els.visitorDomainChips) return; els.visitorDomainChips.innerHTML = state.visitorDomainTokens.map((t,idx)=>`<span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); els.visitorDomainChips.querySelectorAll('.chip-remove').forEach((btn)=>{ btn.addEventListener('click',()=>{ const i=parseInt(btn.getAttribute('data-idx')||'-1',10); if(!isNaN(i)){ state.visitorDomainTokens.splice(i,1); renderVisitorDomainChips(); applyFilters(); } });}); if(els.visitorDomainClear){ if(state.visitorDomainTokens.length>0) els.visitorDomainClear.removeAttribute('hidden'); else els.visitorDomainClear.setAttribute('hidden',''); } }
+  function renderSeniorityChips(){ if(!els.seniorityChips) return; els.seniorityChips.innerHTML = state.seniorityTokens.map((t,idx)=>`<span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); els.seniorityChips.querySelectorAll('.chip-remove').forEach((btn)=>{ btn.addEventListener('click',()=>{ const i=parseInt(btn.getAttribute('data-idx')||'-1',10); if(!isNaN(i)){ state.seniorityTokens.splice(i,1); renderSeniorityChips(); applyFilters(); } });}); if(els.seniorityClear){ if(state.seniorityTokens.length>0) els.seniorityClear.removeAttribute('hidden'); else els.seniorityClear.setAttribute('hidden',''); } }
+  function renderDepartmentChips(){ if(!els.departmentChips) return; els.departmentChips.innerHTML = state.departmentTokens.map((t,idx)=>`<span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); els.departmentChips.querySelectorAll('.chip-remove').forEach((btn)=>{ btn.addEventListener('click',()=>{ const i=parseInt(btn.getAttribute('data-idx')||'-1',10); if(!isNaN(i)){ state.departmentTokens.splice(i,1); renderDepartmentChips(); applyFilters(); } });}); if(els.departmentClear){ if(state.departmentTokens.length>0) els.departmentClear.removeAttribute('hidden'); else els.departmentClear.setAttribute('hidden',''); } }
   function addVisitorDomainToken(label){ const t=label.trim(); if(!t) return; const exists=state.visitorDomainTokens.some((x)=>normalize(x)===normalize(t)); if(!exists){ state.visitorDomainTokens.push(t); renderVisitorDomainChips(); } }
   function removeLastVisitorDomainToken(){ if(state.visitorDomainTokens.length===0) return; state.visitorDomainTokens.pop(); renderVisitorDomainChips(); }
   function clearVisitorDomainTokens(){ if(state.visitorDomainTokens.length===0) return; state.visitorDomainTokens=[]; renderVisitorDomainChips(); }
   function updateVisitorDomainSuggestions(){ if(!els.visitorDomainSuggest) return; const q=normalize(els.fVisitorDomain?els.fVisitorDomain.value:''); if(!q){ hideVisitorDomainSuggestions(); return;} const items=[]; for(let i=0;i<state.visitorDomainPool.length && items.length<8;i++){ const s=state.visitorDomainPool[i]; if(normalize(s).includes(q) && !state.visitorDomainTokens.some((x)=>normalize(x)===normalize(s))) items.push(s);} if(items.length===0){ hideVisitorDomainSuggestions(); return;} els.visitorDomainSuggest.innerHTML = items.map((s)=>`<div class="item" data-sugg="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join(''); els.visitorDomainSuggest.removeAttribute('hidden'); }
   function hideVisitorDomainSuggestions(){ if(els.visitorDomainSuggest){ els.visitorDomainSuggest.setAttribute('hidden',''); els.visitorDomainSuggest.innerHTML=''; } }
+  function addSeniorityToken(label){ const t=label.trim(); if(!t) return; const exists=state.seniorityTokens.some((x)=>normalize(x)===normalize(t)); if(!exists){ state.seniorityTokens.push(t); renderSeniorityChips(); } }
+  function removeLastSeniorityToken(){ if(state.seniorityTokens.length===0) return; state.seniorityTokens.pop(); renderSeniorityChips(); }
+  function clearSeniorityTokens(){ if(state.seniorityTokens.length===0) return; state.seniorityTokens=[]; renderSeniorityChips(); }
+  function updateSenioritySuggestions(){ if(!els.senioritySuggest) return; const q=normalize(els.fSeniority?els.fSeniority.value:''); if(!q){ hideSenioritySuggestions(); return;} const items=[]; for(let i=0;i<state.seniorityPool.length && items.length<8;i++){ const s=state.seniorityPool[i]; if(normalize(s).includes(q) && !state.seniorityTokens.some((x)=>normalize(x)===normalize(s))) items.push(s);} if(items.length===0){ hideSenioritySuggestions(); return;} els.senioritySuggest.innerHTML = items.map((s)=>`<div class="item" data-sugg="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join(''); els.senioritySuggest.removeAttribute('hidden'); }
+  function hideSenioritySuggestions(){ if(els.senioritySuggest){ els.senioritySuggest.setAttribute('hidden',''); els.senioritySuggest.innerHTML=''; } }
+  function addDepartmentToken(label){ const t=label.trim(); if(!t) return; const exists=state.departmentTokens.some((x)=>normalize(x)===normalize(t)); if(!exists){ state.departmentTokens.push(t); renderDepartmentChips(); } }
+  function removeLastDepartmentToken(){ if(state.departmentTokens.length===0) return; state.departmentTokens.pop(); renderDepartmentChips(); }
+  function clearDepartmentTokens(){ if(state.departmentTokens.length===0) return; state.departmentTokens=[]; renderDepartmentChips(); }
+  function updateDepartmentSuggestions(){ if(!els.departmentSuggest) return; const q=normalize(els.fDepartment?els.fDepartment.value:''); if(!q){ hideDepartmentSuggestions(); return;} const items=[]; for(let i=0;i<state.departmentPool.length && items.length<8;i++){ const s=state.departmentPool[i]; if(normalize(s).includes(q) && !state.departmentTokens.some((x)=>normalize(x)===normalize(s))) items.push(s);} if(items.length===0){ hideDepartmentSuggestions(); return;} els.departmentSuggest.innerHTML = items.map((s)=>`<div class="item" data-sugg="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join(''); els.departmentSuggest.removeAttribute('hidden'); }
+  function hideDepartmentSuggestions(){ if(els.departmentSuggest){ els.departmentSuggest.setAttribute('hidden',''); els.departmentSuggest.innerHTML=''; } }
 
   // ===== Title chip-input helpers =====
   function buildTitleSuggestionPool() {
@@ -1397,8 +1624,8 @@
       case 'call':
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.5v2a3 3 0 0 1-3.3 3 a19 19 0 0 1-8.3-3.2 19 19 0 0 1-6-6A19 19 0 0 1 1.5 4.3 3 3 0 0 1 4.5 1h2a2 2 0 0 1 2 1.7l.4 2.3a2 2 0 0 1-.5 1.8L7 8a16 16 0 0 0 9 9l1.2-1.3a2 2 0 0 1 1.8-.5l2.3.4A2 2 0 0 1 22 16.5z"/></svg>';
       case 'addlist':
-        /* Larger list lines to fill container */
-        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>';
+        /* Bullet point lists icon from left sidebar with proper spacing and centering */
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="1"></circle><line x1="12" y1="6" x2="20" y2="6"></line><circle cx="6" cy="12" r="1"></circle><line x1="12" y1="12" x2="20" y2="12"></line><circle cx="6" cy="18" r="1"></circle><line x1="12" y1="18" x2="20" y2="18"></line></svg>';
       case 'export':
         /* Download into tray icon (arrow down + base) to match reference */
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
@@ -1406,11 +1633,13 @@
         /* Slightly larger and better-centered AI letters */
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="display:block"><text x="12" y="12" dy="-0.12em" text-anchor="middle" dominant-baseline="central" fill="currentColor" font-size="18" font-weight="800" letter-spacing="0.05" font-family="Inter, system-ui, -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif">AI</text></svg>';
       case 'linkedin':
-        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5z" transform="translate(4 4)"/><path d="M2 8h4v10H2z" transform="translate(4 4)"/><path d="M9 8h3v1.7c.6-1 1.6-1.7 3.2-1.7 3 0 4.8 2 4.8 5.6V18h-4v-3.7c0-1.4-.5-2.4-1.7-2.4-1 0-1.5.7-1.8 1.4-.1.2-.1.6-.1.9V18H9z" transform="translate(4 4)"/></svg>';
+        /* LinkedIn icon - just the "in" letters without border */
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>';
       case 'link':
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20"/></svg>';
       case 'task':
-        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6a2 2 0 0 1 2 2v2h2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h2V4a2 2 0 0 1 2-2z"/><path d="M9 4h6"/><path d="M9 12l2 2 4-4"/></svg>';
+        /* Tasks icon from left sidebar */
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,11 12,14 22,4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>';
       case 'delete':
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
       default:
@@ -1427,7 +1656,7 @@
     const title = safe(c.title);
     const company = safe(c.companyName);
     const email = safe(c.email);
-    const phone = safe(c.phone || c.mobile);
+    const phone = safe(c.workDirectPhone || c.mobile || c.otherPhone);
     const updatedStr = formatDateOrNA(c.updatedAt, c.createdAt);
     const city = safe(c.city || c.locationCity || '');
     const stateVal = safe(c.state || c.locationState || '');
@@ -1466,14 +1695,11 @@
       title: `<td>${escapeHtml(title)}</td>`,
       company: `<td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : ''}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`,
       email: `<td>${escapeHtml(email)}</td>`,
-      phone: `<td>${escapeHtml(phone)}</td>`,
+      phone: `<td class="phone-cell" data-phone="${escapeHtml(phone)}">${phone ? `<span class="phone-link">${escapeHtml(phone)}</span>` : ''}</td>`,
       location: `<td>${location}</td>`,
       actions: `<td class="qa-cell"><div class="qa-actions">
-        <button type="button" class="qa-btn" data-action="addlist" data-id="${escapeHtml(c.id)}" aria-label="Add to list" title="Add to list">${svgIcon('addlist')}</button>
-        <button type="button" class="qa-btn" data-action="sequence" data-id="${escapeHtml(c.id)}" aria-label="Add to sequence" title="Add to sequence">${svgIcon('sequence')}</button>
         <button type="button" class="qa-btn" data-action="task" data-id="${escapeHtml(c.id)}" aria-label="Create task" title="Create task">${svgIcon('task')}</button>
         <button type="button" class="qa-btn" data-action="linkedin" data-id="${escapeHtml(c.id)}" data-linkedin="${escapeHtml(linkedin)}" data-name="${escapeHtml(fullName)}" data-company="${escapeHtml(company)}" aria-label="LinkedIn" title="LinkedIn">${svgIcon('linkedin')}</button>
-        <button type="button" class="qa-btn" data-action="ai" data-id="${escapeHtml(c.id)}" aria-label="Research with AI" title="Research with AI">${svgIcon('ai')}</button>
         <button type="button" class="qa-btn" data-action="website" data-id="${escapeHtml(c.id)}" data-website="${escapeHtml(website)}" data-company="${escapeHtml(company)}" aria-label="Company website" title="Company website">${svgIcon('link')}</button>
       </div></td>`,
       updated: `<td>${escapeHtml(updatedStr)}</td>`,
@@ -1532,6 +1758,8 @@
     renderEmployeesChips();
     renderIndustryChips();
     renderVisitorDomainChips();
+    renderSeniorityChips();
+    renderDepartmentChips();
     loadDataOnce();
   }
 
@@ -1637,39 +1865,126 @@
     const action = btn.getAttribute('data-action');
     const id = btn.getAttribute('data-id');
     switch (action) {
-      case 'addlist': {
-        console.log('People: Add to list', { id });
-        break;
-      }
-      case 'sequence': {
-        console.log('People: Add to sequence', { id });
-        break;
-      }
       case 'task': {
         console.log('People: Create task', { id });
-        break;
-      }
-      case 'ai': {
-        console.log('People: Research with AI', { id });
         break;
       }
       case 'linkedin': {
         let url = btn.getAttribute('data-linkedin') || '';
         const name = btn.getAttribute('data-name') || '';
         const company = btn.getAttribute('data-company') || '';
-        if (!url && (name || company)) {
+        
+        if (url) {
+          // Direct LinkedIn URL available
+          try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
+        } else if (name || company) {
+          // Search LinkedIn with name/company
           const q = encodeURIComponent([name, company].filter(Boolean).join(' '));
           url = `https://www.linkedin.com/search/results/people/?keywords=${q}`;
+          try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
+        } else {
+          // No LinkedIn info available
+          try { window.crm?.showToast && window.crm.showToast('No LinkedIn profile available'); } catch (_) { /* noop */ }
         }
-        if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
         console.log('People: Open LinkedIn', { id, url });
         break;
       }
       case 'website': {
         let url = btn.getAttribute('data-website') || '';
-        if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
-        if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
-        console.log('People: Open website', { id, url });
+        const company = btn.getAttribute('data-company') || '';
+        
+        console.log('Debug: Website button clicked');
+        console.log('Debug: Contact website URL:', url);
+        console.log('Debug: Company name:', company);
+        console.log('Debug: getAccountsData function available:', typeof window.getAccountsData === 'function');
+        
+        // If no website from contact data, try to get it from account data
+        if (!url && company && typeof window.getAccountsData === 'function') {
+          try {
+            const accounts = window.getAccountsData() || [];
+            console.log('Debug: Looking for company:', company);
+            console.log('Debug: Available accounts:', accounts.map(acc => acc.accountName));
+            
+            // Let's see some sample account names to debug the matching
+            const first10Names = accounts.slice(0, 10).map(acc => acc.accountName);
+            console.log('Debug: First 10 account names:', JSON.stringify(first10Names, null, 2));
+            
+            // Let's see the actual structure of the first few account objects
+            const first3Accounts = accounts.slice(0, 3);
+            console.log('Debug: First 3 account objects:', JSON.stringify(first3Accounts, null, 2));
+            
+            // Check what properties are available on account objects
+            if (accounts.length > 0) {
+              const firstAccount = accounts[0];
+              console.log('Debug: First account keys:', Object.keys(firstAccount || {}));
+              console.log('Debug: First account values:', firstAccount);
+            }
+            
+            // Check for partial matches using the correct property name
+            const partialMatches = accounts.filter(acc => 
+              acc.accountName && acc.accountName.toLowerCase().includes(company.toLowerCase())
+            );
+            const partialMatchNames = partialMatches.map(acc => acc.accountName);
+            console.log('Debug: Partial matches found:', JSON.stringify(partialMatchNames, null, 2));
+            
+            // Also check for "Integrated Circuit" specifically
+            const integratedMatches = accounts.filter(acc => 
+              acc.accountName && acc.accountName.toLowerCase().includes('integrated circuit')
+            );
+            const integratedMatchNames = integratedMatches.map(acc => acc.accountName);
+            console.log('Debug: Integrated Circuit matches:', JSON.stringify(integratedMatchNames, null, 2));
+            
+            // Try multiple matching strategies using the correct property name
+            const account = accounts.find(acc => {
+              if (!acc.accountName || !company) return false;
+              
+              const accName = acc.accountName.toLowerCase().trim();
+              const compName = company.toLowerCase().trim();
+              
+              // Exact match
+              if (accName === compName) return true;
+              
+              // Partial match (account name contains company name or vice versa)
+              if (accName.includes(compName) || compName.includes(accName)) return true;
+              
+              // Remove common suffixes and try again
+              const cleanAccName = accName.replace(/\s+(inc|llc|ltd|corp|corporation|company|co)\.?$/i, '');
+              const cleanCompName = compName.replace(/\s+(inc|llc|ltd|corp|corporation|company|co)\.?$/i, '');
+              
+              if (cleanAccName === cleanCompName) return true;
+              if (cleanAccName.includes(cleanCompName) || cleanCompName.includes(cleanAccName)) return true;
+              
+              return false;
+            });
+            
+            if (account) {
+              console.log('Debug: Found matching account:', account.name);
+              console.log('Debug: Account website fields:', {
+                website: account.website,
+                site: account.site,
+                domain: account.domain
+              });
+              url = account.website || account.site || account.domain || '';
+              if (url && !/^https?:\/\//i.test(url)) {
+                url = 'https://' + url;
+              }
+            } else {
+              console.log('Debug: No matching account found for company:', company);
+            }
+          } catch (e) {
+            console.warn('Error fetching account data:', e);
+          }
+        }
+        
+        if (url) {
+          // Website URL available
+          if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+          try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
+        } else {
+          // No website available
+          try { window.crm?.showToast && window.crm.showToast('No website available'); } catch (_) { /* noop */ }
+        }
+        console.log('People: Open website', { id, url, company });
         break;
       }
       default:
@@ -2171,7 +2486,7 @@
       case 'email':
         return c.email || '';
       case 'phone':
-        return (c.phone || c.mobile || '');
+        return (c.workDirectPhone || c.mobile || c.otherPhone || '');
       case 'location': {
         const city = c.city || c.locationCity || '';
         const stateVal = c.state || c.locationState || '';
@@ -2310,21 +2625,45 @@
   async function deleteSelectedContacts() {
     const ids = Array.from(state.selected || []);
     if (!ids.length) return;
+    
+    // Show progress toast
+    const progressToast = window.crm?.showProgressToast ? 
+      window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'contact' : 'contacts'}...`, ids.length, 0) : null;
+    
     let failed = 0;
+    let completed = 0;
+    
     try {
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
-        const ops = ids.map(async (id) => {
+        // Process deletions sequentially to show progress
+        for (const id of ids) {
           try {
             await window.firebaseDB.collection('contacts').doc(id).delete();
+            completed++;
+            if (progressToast) {
+              progressToast.update(completed, ids.length);
+            }
           } catch (e) {
             failed++;
+            completed++;
             console.warn('Delete failed for id', id, e);
+            if (progressToast) {
+              progressToast.update(completed, ids.length);
+            }
           }
-        });
-        await Promise.all(ops);
+        }
+      } else {
+        // If no database, just mark all as completed
+        completed = ids.length;
+        if (progressToast) {
+          progressToast.update(completed, ids.length);
+        }
       }
     } catch (err) {
       console.warn('Bulk delete error', err);
+      if (progressToast) {
+        progressToast.error('Delete operation failed');
+      }
     } finally {
       // Remove locally either way (offline mode supported)
       const idSet = new Set(ids);
@@ -2334,12 +2673,25 @@
       render();
       hideBulkActionsBar();
       if (els.selectAll) { els.selectAll.checked = false; els.selectAll.indeterminate = false; }
+      
       const successCount = Math.max(0, ids.length - failed);
-      if (successCount > 0) {
-        window.crm?.showToast && window.crm.showToast(`Deleted ${successCount} ${successCount === 1 ? 'contact' : 'contacts'}`);
-      }
-      if (failed > 0) {
-        window.crm?.showToast && window.crm.showToast(`Failed to delete ${failed} ${failed === 1 ? 'contact' : 'contacts'}`);
+      
+      if (progressToast) {
+        if (failed === 0) {
+          progressToast.complete(`Successfully deleted ${successCount} ${successCount === 1 ? 'contact' : 'contacts'}`);
+        } else if (successCount > 0) {
+          progressToast.complete(`Deleted ${successCount} of ${ids.length} ${ids.length === 1 ? 'contact' : 'contacts'}`);
+        } else {
+          progressToast.error(`Failed to delete all ${ids.length} ${ids.length === 1 ? 'contact' : 'contacts'}`);
+        }
+      } else {
+        // Fallback to regular toasts if progress toast not available
+        if (successCount > 0) {
+          window.crm?.showToast && window.crm.showToast(`Deleted ${successCount} ${successCount === 1 ? 'contact' : 'contacts'}`);
+        }
+        if (failed > 0) {
+          window.crm?.showToast && window.crm.showToast(`Failed to delete ${failed} ${failed === 1 ? 'contact' : 'contacts'}`);
+        }
       }
     }
   }
@@ -2449,38 +2801,30 @@
   function renderPagination() {
     if (!els.pagination) return;
     const totalPages = getTotalPages();
-    // Always render pagination, even with a single page
     const current = Math.min(state.currentPage, totalPages);
     state.currentPage = current;
     const total = state.filtered.length;
     const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
 
-    const parts = [];
-    parts.push(`<button class="page-btn" data-rel="prev" ${current === 1 ? 'disabled' : ''} aria-label="Previous page">Prev</button>`);
-
-    // Page numbers: show window around current with first/last
-    const windowSize = 1; // neighbors on each side
-    const addBtn = (p) => {
-      parts.push(`<button class="page-btn ${p === current ? 'active' : ''}" data-page="${p}" aria-label="Page ${p}">${p}</button>`);
-    };
-    const addEllipsis = () => parts.push(`<span class="page-ellipsis">…</span>`);
-
-    if (totalPages <= 7) {
-      for (let p = 1; p <= totalPages; p++) addBtn(p);
+    // Use unified pagination component
+    if (window.crm && window.crm.createPagination) {
+      window.crm.createPagination(current, totalPages, (page) => {
+        state.currentPage = page;
+        render();
+      }, els.pagination.id);
     } else {
-      addBtn(1);
-      if (current - windowSize > 2) addEllipsis();
-      const start = Math.max(2, current - windowSize);
-      const end = Math.min(totalPages - 1, current + windowSize);
-      for (let p = start; p <= end; p++) addBtn(p);
-      if (current + windowSize < totalPages - 1) addEllipsis();
-      addBtn(totalPages);
+      // Fallback to simple pagination if unified component not available
+      els.pagination.innerHTML = `<div class="unified-pagination">
+        <button class="pagination-arrow" ${current <= 1 ? 'disabled' : ''} onclick="if(${current} > 1) { state.currentPage = ${current - 1}; render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
+        </button>
+        <div class="pagination-current">${current}</div>
+        <button class="pagination-arrow" ${current >= totalPages ? 'disabled' : ''} onclick="if(${current} < ${totalPages}) { state.currentPage = ${current + 1}; render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
+        </button>
+      </div>`;
     }
-
-    parts.push(`<button class="page-btn" data-rel="next" ${current === totalPages ? 'disabled' : ''} aria-label="Next page">Next</button>`);
-
-    els.pagination.innerHTML = parts.join('');
 
     // Update summary text
     if (els.paginationSummary) {

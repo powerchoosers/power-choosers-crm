@@ -167,14 +167,49 @@
     try {
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (base) {
+        console.log('[Calls] Loading real call data from:', `${base}/api/calls`);
         const r = await fetch(`${base}/api/calls`, { method: 'GET' });
         const j = await r.json().catch(()=>({}));
         if (r.ok && j && j.ok && Array.isArray(j.calls)) {
+          // Build quick phone → contact map from People data (if available)
+          const phoneToContact = (() => {
+            try {
+              if (typeof window.getPeopleData !== 'function') return new Map();
+              const people = window.getPeopleData() || [];
+              const map = new Map();
+              const norm = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
+              for (const c of people) {
+                const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || (c.name || '');
+                const title = c.title || '';
+                const company = c.companyName || '';
+                const phones = [c.phone, c.mobile].map(norm).filter(Boolean);
+                for (const ph of phones) if (ph && !map.has(ph)) map.set(ph, { name, title, company });
+              }
+              return map;
+            } catch (_) { return new Map(); }
+          })();
+
+          console.log('[Calls] Found', j.calls.length, 'real calls from API');
           const rows = j.calls.map((c, idx) => ({
             id: c.id || `call_${Date.now()}_${idx}`,
-            contactName: c.to || '',
-            contactTitle: '',
-            company: '',
+            contactName: (() => {
+              const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
+              const key = norm(c.to || '');
+              const m = key ? phoneToContact.get(key) : null;
+              return (m && m.name) || (c.to || '');
+            })(),
+            contactTitle: (() => {
+              const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
+              const key = norm(c.to || '');
+              const m = key ? phoneToContact.get(key) : null;
+              return (m && m.title) || '';
+            })(),
+            company: (() => {
+              const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
+              const key = norm(c.to || '');
+              const m = key ? phoneToContact.get(key) : null;
+              return (m && m.company) || '';
+            })(),
             contactEmail: '',
             contactPhone: c.to || '',
             contactCity: '',
@@ -193,18 +228,64 @@
           // Always use API data, even if empty
           state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
           return;
+        } else {
+          console.log('[Calls] API returned no calls or error:', j);
         }
+      } else {
+        console.log('[Calls] No API_BASE_URL configured, using demo data');
       }
-    } catch (_) { /* fall back to demo data */ }
+    } catch (error) { 
+      console.warn('[Calls] Failed to load real call data:', error);
+      console.log('[Calls] Falling back to demo data');
+    }
 
-    // 2) Fallback: demo data
+    // 2) Fallback: demo data (only used when no real API data available)
+    console.log('[Calls] Using demo data - configure Twilio/Gemini APIs for real call insights');
     const cos = ['Acme Manufacturing','Metro Industries','Johnson Electric','Downtown Office','Northwind Traders'];
     const cities = ['Austin','Dallas','Houston','San Antonio','Fort Worth'];
     const states = ['TX','TX','TX','TX','TX'];
     const titles = ['Operations Manager','Facilities Director','Procurement Lead','Energy Analyst','CFO'];
     const industries = ['Industrial','Commercial','Electrical','Real Estate','Trading'];
     const rows = [];
-    for (let i=1;i<=60;i++){ const j=i%cos.length; const dur=60+Math.floor(Math.random()*900); rows.push({ id:'call_'+i, contactName:`Contact ${i}`, contactTitle:titles[j], company:cos[j], contactEmail:`c${i}@ex.com`, contactPhone:Math.random()>0.5?`512-555-${(1000+i).toString().slice(-4)}`:'', contactCity:cities[j], contactState:states[j], accountEmployees:[10,50,120,400,900][j], industry:industries[j], visitorDomain:'', callTime:new Date(Date.now()-i*3600*1000).toISOString(), durationSec:dur, outcome:['Connected','Voicemail','No Answer'][i%3], transcript:`Transcript for call ${i} with ${cos[j]}...`, aiSummary:`AI summary for call ${i}...`, audioUrl:'' }); }
+    for (let i=1;i<=60;i++){ 
+      const j=i%cos.length; 
+      const dur=60+Math.floor(Math.random()*900); 
+      const outcomes = ['Connected','Voicemail','No Answer'];
+      const outcome = outcomes[i%3];
+      
+      // Generate sample AI insights for demo purposes
+      const sampleInsights = {
+        sentiment: ['Positive', 'Neutral', 'Negative'][i%3],
+        keyTopics: ['Energy costs', 'Contract terms', 'Renewable options', 'Budget planning', 'Timeline'][i%5] ? [['Energy costs', 'Contract terms', 'Renewable options', 'Budget planning', 'Timeline'][i%5]] : [],
+        nextSteps: ['Follow up next week', 'Send proposal', 'Schedule site visit', 'Review contract', 'Discuss pricing'][i%5] ? [['Follow up next week', 'Send proposal', 'Schedule site visit', 'Review contract', 'Discuss pricing'][i%5]] : [],
+        painPoints: ['High energy costs', 'Outdated equipment', 'Long contracts', 'Poor service', 'Limited options'][i%5] ? [['High energy costs', 'Outdated equipment', 'Long contracts', 'Poor service', 'Limited options'][i%5]] : [],
+        budget: ['$5,000-10,000', '$10,000-25,000', '$25,000-50,000', 'Not discussed', 'Flexible'][i%5],
+        timeline: ['1-3 months', '3-6 months', '6-12 months', 'ASAP', 'Not specified'][i%5]
+      };
+      
+      rows.push({ 
+        id:'call_'+i, 
+        contactName:`Contact ${i}`, 
+        contactTitle:titles[j], 
+        company:cos[j], 
+        contactEmail:`c${i}@ex.com`, 
+        contactPhone:Math.random()>0.5?`512-555-${(1000+i).toString().slice(-4)}`:'', 
+        contactCity:cities[j], 
+        contactState:states[j], 
+        accountEmployees:[10,50,120,400,900][j], 
+        industry:industries[j], 
+        visitorDomain:'', 
+        callTime:new Date(Date.now()-i*3600*1000).toISOString(), 
+        durationSec:dur, 
+        outcome:outcome, 
+        transcript:outcome === 'Connected' ? `Call transcript for ${cos[j]}:\n\nContact: "Hi, I'm interested in learning more about your energy services."\n\nRep: "Great! I'd be happy to help. What's your current energy situation?"\n\nContact: "We're paying about $0.12 per kWh and our contract expires in 6 months. We're looking for better rates."\n\nRep: "I can definitely help with that. Based on your usage, I think we can save you 15-20% on your energy costs."\n\nContact: "That sounds promising. What would the next steps be?"\n\nRep: "I'll send you a detailed proposal with our rates and terms. Would you like to schedule a follow-up call next week?"\n\nContact: "Yes, that works for me."` : 'No transcript available - call not connected',
+        aiSummary:outcome === 'Connected' ? `Call with ${cos[j]} went well. Contact expressed interest in energy services and is looking to reduce costs. Current rate is $0.12/kWh with contract expiring in 6 months. Discussed potential 15-20% savings. Next steps: send proposal and schedule follow-up call.` : 'No summary available - call not connected',
+        aiInsights:outcome === 'Connected' ? sampleInsights : null,
+        audioUrl:outcome === 'Connected' ? '' : '' // No demo audio files
+      }); 
+    }
+    console.log('[Calls] Demo data loaded:', rows.length, 'calls');
+    console.log('[Calls] Sample call data:', rows[0]);
     state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
   }
 
@@ -224,7 +305,36 @@
   function updateFilterCount(){ if(!els.count) return; const n = Object.values(state.tokens).reduce((a,b)=>a+(b?b.length:0),0)+(els.hasEmail&&els.hasEmail.checked?1:0)+(els.hasPhone&&els.hasPhone.checked?1:0); if(n){ els.count.textContent=String(n); els.count.removeAttribute('hidden'); } else { els.count.textContent='0'; els.count.setAttribute('hidden',''); } }
 
   function getPageItems(){ const s=(state.currentPage-1)*state.pageSize; return state.filtered.slice(s,s+state.pageSize); }
-  function paginate(){ if(!els.pag) return; const total=state.filtered.length; const pages=Math.max(1,Math.ceil(total/state.pageSize)); state.currentPage=Math.min(state.currentPage,pages); if(els.summary){ const st=total===0?0:(state.currentPage-1)*state.pageSize+1; const en=Math.min(state.currentPage*state.pageSize,total); els.summary.textContent=`${st}-${en} of ${total}`; } let html=''; const btn=(l,d,p)=>`<button class="page-btn" ${d?'disabled':''} data-page="${p}">${l}</button>`; html+=btn('Prev',state.currentPage===1,state.currentPage-1); for(let p=1;p<=pages;p++){ html+=`<button class="page-btn ${p===state.currentPage?'active':''}" data-page="${p}">${p}</button>`;} html+=btn('Next',state.currentPage===pages,state.currentPage+1); els.pag.innerHTML=html; els.pag.querySelectorAll('.page-btn').forEach(b=>b.addEventListener('click',()=>{ const n=parseInt(b.getAttribute('data-page')||'1',10); if(!isNaN(n)&&n>=1&&n<=pages){ state.currentPage=n; render(); }})); }
+  function paginate(){ 
+    if(!els.pag) return; 
+    const total=state.filtered.length; 
+    const pages=Math.max(1,Math.ceil(total/state.pageSize)); 
+    state.currentPage=Math.min(state.currentPage,pages); 
+    if(els.summary){ 
+      const st=total===0?0:(state.currentPage-1)*state.pageSize+1; 
+      const en=Math.min(state.currentPage*state.pageSize,total); 
+      els.summary.textContent=`${st}-${en} of ${total}`; 
+    } 
+    
+    // Use unified pagination component
+    if (window.crm && window.crm.createPagination) {
+      window.crm.createPagination(state.currentPage, pages, (page) => {
+        state.currentPage = page;
+        render();
+      }, els.pag.id);
+    } else {
+      // Fallback to simple pagination if unified component not available
+      els.pag.innerHTML = `<div class="unified-pagination">
+        <button class="pagination-arrow" ${state.currentPage <= 1 ? 'disabled' : ''} onclick="if(${state.currentPage} > 1) { state.currentPage = ${state.currentPage - 1}; render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
+        </button>
+        <div class="pagination-current">${state.currentPage}</div>
+        <button class="pagination-arrow" ${state.currentPage >= pages ? 'disabled' : ''} onclick="if(${state.currentPage} < ${pages}) { state.currentPage = ${state.currentPage + 1}; render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
+        </button>
+      </div>`;
+    }
+  }
 
   function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
     // row events
@@ -300,7 +410,18 @@
   function escClose(e){ if(e.key==='Escape') closeInsightsModal(); }
   function openInsightsModal(id){
     injectInsightsModalStyles();
-    const r = (state.filtered||[]).find(x=>x.id===id) || (state.data||[]).find(x=>x.id===id); if(!r) return;
+    console.log('[Call Insights] Opening modal for ID:', id);
+    console.log('[Call Insights] State data length:', state.data?.length || 0);
+    console.log('[Call Insights] State filtered length:', state.filtered?.length || 0);
+    const r = (state.filtered||[]).find(x=>x.id===id) || (state.data||[]).find(x=>x.id===id);
+    if(!r) {
+      console.error('[Call Insights] No call data found for ID:', id);
+      return;
+    }
+    console.log('[Call Insights] Found call data:', r);
+    console.log('[Call Insights] AI Summary:', r.aiSummary);
+    console.log('[Call Insights] Transcript:', r.transcript);
+    console.log('[Call Insights] AI Insights:', r.aiInsights);
     const bd=document.createElement('div'); bd.className='pc-insights-backdrop'; bd.addEventListener('click', closeInsightsModal);
     const md=document.createElement('div'); md.className='pc-insights-modal';
     md.innerHTML = `
@@ -315,38 +436,107 @@
     document.addEventListener('keydown', escClose);
   }
   function insightsContentHtml(r){
-    const aiInsights = r.aiInsights || {}; const sentiment = aiInsights.sentiment || 'Unknown';
+    const aiInsights = r.aiInsights || {}; 
+    const sentiment = aiInsights.sentiment || 'Unknown';
     const keyTopics = (aiInsights.keyTopics || []).join(', ');
     const nextSteps = (aiInsights.nextSteps || []).join(', ');
     const painPoints = (aiInsights.painPoints || []).join(', ');
     const budget = aiInsights.budget || 'Not discussed';
     const timeline = aiInsights.timeline || 'Not specified';
+    
+    // Handle real API data that might not have AI insights yet
+    const hasAIInsights = r.aiInsights && Object.keys(r.aiInsights).length > 0;
+    const summaryText = r.aiSummary || (hasAIInsights ? 'AI analysis in progress...' : 'No summary available');
+    const transcriptText = r.transcript || (hasAIInsights ? 'Transcript processing...' : 'Transcript not available');
     return `
       <div class="insights-container" style="background:var(--bg-item); border-radius:var(--border-radius); padding:20px;">
         <div style="display:flex; gap:25px;">
           <div style="flex:2;">
             <div class="insights-section">
-              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">📋 AI Call Summary</h4>
-              <div style="color:var(--text-secondary); margin-bottom:15px; line-height:1.4;">${escapeHtml(r.aiSummary || 'No summary available')}</div>
+              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14,2 14,8 20,8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10,9 9,9 8,9"></polyline>
+                </svg>
+                AI Call Summary
+              </h4>
+              <div style="color:var(--text-secondary); margin-bottom:15px; line-height:1.4;">${escapeHtml(summaryText)}</div>
             </div>
             <div class="insights-section">
-              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">💬 Call Transcript</h4>
-              <div style="color:var(--text-secondary); max-height:300px; overflow-y:auto; border:1px solid var(--border-light); padding:12px; border-radius:6px; background:var(--bg-card); font-family:monospace; font-size:13px; line-height:1.3;">${escapeHtml(r.transcript || 'Transcript not available')}</div>
+              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Call Transcript
+              </h4>
+              <div style="color:var(--text-secondary); max-height:300px; overflow-y:auto; border:1px solid var(--border-light); padding:12px; border-radius:6px; background:var(--bg-card); font-family:monospace; font-size:13px; line-height:1.3;">${escapeHtml(transcriptText)}</div>
             </div>
           </div>
           <div style="flex:1;">
             <div class="insights-section">
-              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600;">🎵 Call Recording</h4>
+              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+                Call Recording
+              </h4>
               <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
               ${r.audioUrl ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
+              ${hasAIInsights ? '<div style="color:var(--orange-subtle); font-size:12px; margin-top:4px;">✓ AI analysis completed</div>' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">AI analysis in progress...</div>'}
             </div>
             <div class="insights-grid" style="display:grid; gap:10px;">
-              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">😊 Sentiment:</span><span style="color:var(--text-secondary); font-size:12px;"> ${sentiment}</span></div>
-              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">🏷️ Key Topics:</span><span style="color:var(--text-secondary); font-size:12px;"> ${keyTopics || 'None identified'}</span></div>
-              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">⏭️ Next Steps:</span><span style="color:var(--text-secondary); font-size:12px;"> ${nextSteps || 'None identified'}</span></div>
-              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">⚠️ Pain Points:</span><span style="color:var(--text-secondary); font-size:12px;"> ${painPoints || 'None mentioned'}</span></div>
-              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">💰 Budget:</span><span style="color:var(--text-secondary); font-size:12px;"> ${budget}</span></div>
-              <div class="insight-item"><span style="font-weight:600; color:var(--text-primary); font-size:12px;">⏰ Timeline:</span><span style="color:var(--text-secondary); font-size:12px;"> ${timeline}</span></div>
+              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Sentiment:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${sentiment}</span>
+              </div>
+              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27,6.96 12,12.01 20.73,6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Key Topics:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${keyTopics || 'None identified'}</span>
+              </div>
+              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Next Steps:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${nextSteps || 'None identified'}</span>
+              </div>
+              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Pain Points:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${painPoints || 'None mentioned'}</span>
+              </div>
+              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <line x1="12" y1="1" x2="12" y2="23"></line>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Budget:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${budget}</span>
+              </div>
+              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12,6 12,12 16,14"></polyline>
+                </svg>
+                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Timeline:</span>
+                <span style="color:var(--text-secondary); font-size:12px;">${timeline}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -491,16 +681,104 @@
     }
   });
   
-  // Add manual refresh button to calls page
+  // Add manual refresh button and AI processing button to calls page
   function addRefreshButton() {
     const header = document.querySelector('#calls-page .page-header');
     if (header && !header.querySelector('.refresh-btn')) {
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.marginLeft = 'auto';
+      buttonContainer.style.display = 'flex';
+      buttonContainer.style.gap = '8px';
+      
       const refreshBtn = document.createElement('button');
       refreshBtn.className = 'btn btn-secondary refresh-btn';
       refreshBtn.innerHTML = '🔄 Refresh';
-      refreshBtn.style.marginLeft = 'auto';
       refreshBtn.addEventListener('click', loadData);
-      header.appendChild(refreshBtn);
+      
+      const processBtn = document.createElement('button');
+      processBtn.className = 'btn btn-primary process-ai-btn';
+      processBtn.innerHTML = '🤖 Process AI';
+      processBtn.addEventListener('click', processAllCalls);
+      
+      buttonContainer.appendChild(refreshBtn);
+      buttonContainer.appendChild(processBtn);
+      header.appendChild(buttonContainer);
+    }
+  }
+  
+  // Process all calls with AI insights
+  async function processAllCalls() {
+    const processBtn = document.querySelector('.process-ai-btn');
+    if (!processBtn) return;
+    
+    // Disable button and show loading state
+    processBtn.disabled = true;
+    processBtn.innerHTML = '⏳ Processing...';
+    
+    try {
+      console.log('🤖 Starting AI processing for all calls...');
+      
+      // Get calls that need processing
+      const callsToProcess = state.data.filter(call => 
+        !call.aiInsights && call.status === 'completed' && call.duration > 0
+      );
+      
+      if (callsToProcess.length === 0) {
+        alert('✅ All calls already have AI insights!');
+        return;
+      }
+      
+      console.log(`📞 Processing ${callsToProcess.length} calls...`);
+      
+      let processed = 0;
+      let failed = 0;
+      
+      // Process each call
+      for (const call of callsToProcess) {
+        try {
+          console.log(`🔄 Processing call: ${call.id}`);
+          
+          const response = await fetch('/api/process-call', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callSid: call.id })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            processed++;
+            console.log(`✅ Processed: ${call.id}`);
+          } else {
+            failed++;
+            console.log(`❌ Failed: ${call.id} - ${data.error}`);
+          }
+          
+          // Update button text with progress
+          processBtn.innerHTML = `⏳ Processing... (${processed + failed}/${callsToProcess.length})`;
+          
+          // Wait between calls to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+        } catch (error) {
+          failed++;
+          console.error(`❌ Error processing ${call.id}:`, error);
+        }
+      }
+      
+      // Show completion message
+      alert(`🎉 AI processing complete!\n✅ Processed: ${processed}\n❌ Failed: ${failed}\n\nRefresh the page to see the results.`);
+      
+      // Reload data to show updated insights
+      await loadData();
+      
+    } catch (error) {
+      console.error('❌ AI processing error:', error);
+      alert('❌ Error processing calls. Check console for details.');
+    } finally {
+      // Reset button
+      processBtn.disabled = false;
+      processBtn.innerHTML = '🤖 Process AI';
     }
   }
   
@@ -509,7 +787,8 @@
     loadData, 
     startAutoRefresh, 
     stopAutoRefresh,
-    addRefreshButton
+    addRefreshButton,
+    processAllCalls
   };
   
   document.addEventListener('DOMContentLoaded', init);

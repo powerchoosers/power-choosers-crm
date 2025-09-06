@@ -176,34 +176,164 @@
     els.thead.addEventListener('dragend', handler, true);
   }
 
-  // Lightweight built-in DnD for headers (fallback/general)
+  // Enhanced DnD for headers with better visual feedback
   function initAccountsHeaderDnD() {
     if (!els.headerRow) return;
     let dragSrcTh = null;
+    let dragOverTh = null;
+    let isDragging = false;
     const ths = Array.from(els.headerRow.querySelectorAll('th'));
+    
+    // Helper to commit a move given a source and highlighted target
+    function commitHeaderMove(sourceTh, targetTh) {
+      if (!sourceTh || !targetTh) return false;
+      if (sourceTh === targetTh) return false;
+      // Always populate the highlighted position: insert BEFORE target.
+      // This shifts the target (and everything to the right) one position to the right.
+      els.headerRow.insertBefore(sourceTh, targetTh);
+      return true;
+    }
+
+    // Global drop handler for the entire header row
+    els.headerRow.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      if (!isDragging || !dragSrcTh) return;
+      
+      // Get all available columns (excluding the one being dragged)
+      const allThs = Array.from(els.headerRow.querySelectorAll('th')).filter(th => th !== dragSrcTh);
+      if (allThs.length === 0) return;
+      
+      let targetTh = null;
+      
+      // Method 1: Direct element detection using elementsFromPoint
+      const elements = document.elementsFromPoint(e.clientX, e.clientY);
+      targetTh = elements.find(el => el.tagName === 'TH' && el !== dragSrcTh);
+      
+      // Method 2: If no direct hit, find by mouse position within column bounds
+      if (!targetTh) {
+        for (const th of allThs) {
+          const rect = th.getBoundingClientRect();
+          // More generous hit area for easier targeting
+          const isOverColumn = e.clientX >= rect.left - 15 && e.clientX <= rect.right + 15;
+          
+          if (isOverColumn) {
+            targetTh = th;
+            break;
+          }
+        }
+      }
+      
+      // Method 3: Find closest column by distance to center
+      if (!targetTh) {
+        let closestTh = null;
+        let closestDistance = Infinity;
+        
+        for (const th of allThs) {
+          const rect = th.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const distance = Math.abs(e.clientX - centerX);
+          
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestTh = th;
+          }
+        }
+        
+        // Use closest column if within reasonable distance (reduced threshold for better precision)
+        if (closestDistance < 100) {
+          targetTh = closestTh;
+        }
+      }
+      
+      // Method 4: Edge case handling for adjacent columns
+      if (!targetTh) {
+        // Check if mouse is in the gap between columns
+        const draggedIndex = Array.from(els.headerRow.children).indexOf(dragSrcTh);
+        const nextSibling = dragSrcTh.nextElementSibling;
+        const prevSibling = dragSrcTh.previousElementSibling;
+        
+        if (nextSibling && nextSibling.tagName === 'TH') {
+          const nextRect = nextSibling.getBoundingClientRect();
+          if (e.clientX >= nextRect.left - 30 && e.clientX <= nextRect.right + 30) {
+            targetTh = nextSibling;
+          }
+        } else if (prevSibling && prevSibling.tagName === 'TH') {
+          const prevRect = prevSibling.getBoundingClientRect();
+          if (e.clientX >= prevRect.left - 30 && e.clientX <= prevRect.right + 30) {
+            targetTh = prevSibling;
+          }
+        }
+      }
+      
+      // Update highlight if we found a new target
+      if (targetTh && targetTh !== dragOverTh) {
+        // Remove previous highlight
+        if (dragOverTh) {
+          dragOverTh.classList.remove('drag-over');
+        }
+        
+        // Add new highlight
+        dragOverTh = targetTh;
+        targetTh.classList.add('drag-over');
+      }
+    });
+    
+    // Global drop handler - drop into the currently highlighted (dragOverTh) column
+    els.headerRow.addEventListener('drop', (e) => {
+      e.preventDefault();
+      
+      if (!dragSrcTh || !dragOverTh) return;
+      
+      // Remove highlight
+      dragOverTh.classList.remove('drag-over');
+      
+      // Commit the move - this will insert the dragged column before the highlighted target
+      commitHeaderMove(dragSrcTh, dragOverTh);
+      
+      // Update the column order and persist
+      const newOrder = getHeaderOrderFromDom();
+      if (newOrder.length > 0) {
+        accountsColumnOrder = newOrder;
+        persistAccountsColumnOrder(newOrder);
+        // Re-render to reflect new column order
+        render();
+      }
+      
+      dragOverTh = null;
+    });
+    
     ths.forEach((th) => {
       th.setAttribute('draggable', 'true');
+      
       th.addEventListener('dragstart', (e) => {
+        isDragging = true;
         dragSrcTh = th;
         const key = th.getAttribute('data-col') || '';
-        try { e.dataTransfer?.setData('text/plain', key); } catch (_) { /* noop */ }
+        try { 
+          e.dataTransfer?.setData('text/plain', key);
+          e.dataTransfer.effectAllowed = 'move';
+        } catch (_) { /* noop */ }
         th.classList.add('dragging');
+        
+        // Add visual feedback to all other headers
+        ths.forEach(otherTh => {
+          if (otherTh !== th) {
+            otherTh.classList.add('drag-target');
+          }
+        });
       });
-      th.addEventListener('dragenter', () => th.classList.add('drag-over'));
-      th.addEventListener('dragleave', () => th.classList.remove('drag-over'));
-      th.addEventListener('dragover', (e) => { e.preventDefault(); });
-      th.addEventListener('drop', (e) => {
-        e.preventDefault();
-        th.classList.remove('drag-over');
-        if (!dragSrcTh || dragSrcTh === th) return;
-        const rect = th.getBoundingClientRect();
-        const before = e.clientX < rect.left + rect.width / 2;
-        if (before) els.headerRow.insertBefore(dragSrcTh, th);
-        else els.headerRow.insertBefore(dragSrcTh, th.nextSibling);
-      });
+      
       th.addEventListener('dragend', () => {
+        // Clean up all visual states
+        isDragging = false;
         th.classList.remove('dragging');
+        ths.forEach(otherTh => {
+          otherTh.classList.remove('drag-over', 'drag-target');
+        });
         dragSrcTh = null;
+        dragOverTh = null;
       });
     });
   }
@@ -1091,21 +1221,45 @@
   async function deleteSelectedAccounts() {
     const ids = Array.from(state.selected || []);
     if (!ids.length) return;
+    
+    // Show progress toast
+    const progressToast = window.crm?.showProgressToast ? 
+      window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'account' : 'accounts'}...`, ids.length, 0) : null;
+    
     let failed = 0;
+    let completed = 0;
+    
     try {
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
-        const ops = ids.map(async (id) => {
+        // Process deletions sequentially to show progress
+        for (const id of ids) {
           try {
             await window.firebaseDB.collection('accounts').doc(id).delete();
+            completed++;
+            if (progressToast) {
+              progressToast.update(completed, ids.length);
+            }
           } catch (e) {
             failed++;
+            completed++;
             console.warn('Account delete failed for id', id, e);
+            if (progressToast) {
+              progressToast.update(completed, ids.length);
+            }
           }
-        });
-        await Promise.all(ops);
+        }
+      } else {
+        // If no database, just mark all as completed
+        completed = ids.length;
+        if (progressToast) {
+          progressToast.update(completed, ids.length);
+        }
       }
     } catch (err) {
       console.warn('Bulk account delete error', err);
+      if (progressToast) {
+        progressToast.error('Delete operation failed');
+      }
     } finally {
       // Update local state
       if (Array.isArray(state.data) && state.data.length) {
@@ -1120,12 +1274,25 @@
       render();
       hideBulkActionsBar();
       if (els.selectAll) { els.selectAll.checked = false; els.selectAll.indeterminate = false; }
+      
       const successCount = Math.max(0, ids.length - failed);
-      if (successCount > 0) {
-        try { window.crm?.showToast && window.crm.showToast(`Deleted ${successCount} ${successCount === 1 ? 'account' : 'accounts'}`); } catch (_) {}
-      }
-      if (failed > 0) {
-        try { window.crm?.showToast && window.crm.showToast(`Failed to delete ${failed} ${failed === 1 ? 'account' : 'accounts'}`); } catch (_) {}
+      
+      if (progressToast) {
+        if (failed === 0) {
+          progressToast.complete(`Successfully deleted ${successCount} ${successCount === 1 ? 'account' : 'accounts'}`);
+        } else if (successCount > 0) {
+          progressToast.complete(`Deleted ${successCount} of ${ids.length} ${ids.length === 1 ? 'account' : 'accounts'}`);
+        } else {
+          progressToast.error(`Failed to delete all ${ids.length} ${ids.length === 1 ? 'account' : 'accounts'}`);
+        }
+      } else {
+        // Fallback to regular toasts if progress toast not available
+        if (successCount > 0) {
+          try { window.crm?.showToast && window.crm.showToast(`Deleted ${successCount} ${successCount === 1 ? 'account' : 'accounts'}`); } catch (_) {}
+        }
+        if (failed > 0) {
+          try { window.crm?.showToast && window.crm.showToast(`Failed to delete ${failed} ${failed === 1 ? 'account' : 'accounts'}`); } catch (_) {}
+        }
       }
     }
   }
@@ -1158,27 +1325,24 @@
     const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
 
-    const parts = [];
-    parts.push(`<button class="page-btn" data-rel="prev" ${current === 1 ? 'disabled' : ''} aria-label="Previous page">Prev</button>`);
-
-    const windowSize = 1;
-    const addBtn = (p) => { parts.push(`<button class="page-btn ${p === current ? 'active' : ''}" data-page="${p}" aria-label="Page ${p}">${p}</button>`); };
-    const addEllipsis = () => parts.push(`<span class="page-ellipsis">…</span>`);
-
-    if (totalPages <= 7) { for (let p = 1; p <= totalPages; p++) addBtn(p); }
-    else {
-      addBtn(1);
-      if (current - windowSize > 2) addEllipsis();
-      const startIdx = Math.max(2, current - windowSize);
-      const endIdx = Math.min(totalPages - 1, current + windowSize);
-      for (let p = startIdx; p <= endIdx; p++) addBtn(p);
-      if (current + windowSize < totalPages - 1) addEllipsis();
-      addBtn(totalPages);
+    // Use unified pagination component
+    if (window.crm && window.crm.createPagination) {
+      window.crm.createPagination(current, totalPages, (page) => {
+        state.currentPage = page;
+        render();
+      }, els.pagination.id);
+    } else {
+      // Fallback to simple pagination if unified component not available
+      els.pagination.innerHTML = `<div class="unified-pagination">
+        <button class="pagination-arrow" ${current <= 1 ? 'disabled' : ''} onclick="if(${current} > 1) { state.currentPage = ${current - 1}; render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
+        </button>
+        <div class="pagination-current">${current}</div>
+        <button class="pagination-arrow" ${current >= totalPages ? 'disabled' : ''} onclick="if(${current} < ${totalPages}) { state.currentPage = ${current + 1}; render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
+        </button>
+      </div>`;
     }
-
-    parts.push(`<button class="page-btn" data-rel="next" ${current === totalPages ? 'disabled' : ''} aria-label="Next page">Next</button>`);
-
-    els.pagination.innerHTML = parts.join('');
 
     if (els.paginationSummary) {
       const label = total === 1 ? 'account' : 'accounts';

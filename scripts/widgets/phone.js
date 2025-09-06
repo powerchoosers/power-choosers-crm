@@ -1041,10 +1041,38 @@
       });
     });
     
+    // Helper: lookup contact by phone and update widget title
+    function enrichTitleFromPhone(rawNumber) {
+      try {
+        const norm = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
+        const needle = norm(rawNumber);
+        if (!needle || typeof window.getPeopleData !== 'function') return;
+        const people = window.getPeopleData() || [];
+        const hit = people.find((c) => {
+          const a = norm(c.phone);
+          const b = norm(c.mobile);
+          return (a && a === needle) || (b && b === needle);
+        });
+        if (hit) {
+          const fullName = [hit.firstName, hit.lastName].filter(Boolean).join(' ') || (hit.name || '');
+          if (fullName) {
+            const titleEl = card.querySelector('.widget-title');
+            const comp = hit.companyName || hit.accountName || hit.company || '';
+            if (titleEl) titleEl.innerHTML = `Phone - ${fullName}${comp ? ' • ' + comp : ''}`;
+            currentCallContext.name = fullName;
+            currentCallContext.company = comp;
+          }
+        }
+      } catch (_) { /* noop */ }
+    }
+
     // Track typing in input field
     if (input) {
       input.addEventListener('input', trackUserInput);
       input.addEventListener('keydown', trackUserInput);
+      input.addEventListener('input', () => {
+        enrichTitleFromPhone(input.value || '');
+      });
     }
 
     // Actions
@@ -1611,8 +1639,9 @@
         try { window.crm?.showToast && window.crm.showToast('Invalid number. Use 10-digit US or +countrycode number.'); } catch (_) {}
         return;
       }
-      // update UI with normalized value
+      // update UI with normalized value and enrich title from People data
       if (input) { input.value = normalized.value; }
+      enrichTitleFromPhone(normalized.value);
       try {
         // Determine website mode: if no API base configured, treat as marketing site
         const isMainWebsite = !window.API_BASE_URL; // No API configured means main website
@@ -1889,6 +1918,28 @@
     console.debug('[Phone] Call stack:', stack?.split('\n').slice(0, 8).join('\n')); // More stack trace
     
     const now = Date.now();
+    let contactCompany = '';
+
+    // Attempt to enrich contactName if missing by looking up People data by phone
+    try {
+      const normalize = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
+      if (!contactName) {
+        const needle = normalize(number);
+        if (needle && typeof window.getPeopleData === 'function') {
+          const people = window.getPeopleData() || [];
+          const hit = people.find((c) => {
+            const a = normalize(c.phone);
+            const b = normalize(c.mobile);
+            return (a && a === needle) || (b && b === needle);
+          });
+          if (hit) {
+            const fullName = [hit.firstName, hit.lastName].filter(Boolean).join(' ') || (hit.name || '');
+            if (fullName) contactName = fullName;
+            contactCompany = hit.companyName || hit.accountName || hit.company || '';
+          }
+        }
+      }
+    } catch (_) { /* non-fatal */ }
     
     // Allow click-to-call to bypass most restrictions (user-initiated action)
     const isClickToCall = (source === 'click-to-call');
@@ -1992,6 +2043,7 @@
     currentCallContext = {
       number: number,
       name: contactName,
+      company: contactCompany || (currentCallContext && currentCallContext.company) || '',
       isActive: autoTrigger // Mark as active only if we're auto-triggering
     };
     
@@ -2011,7 +2063,8 @@
       if (contactName) {
         const title = card.querySelector('.widget-title');
         if (title) {
-          title.innerHTML = `Phone - ${contactName}`;
+          const comp = contactCompany || currentCallContext.company || '';
+          title.innerHTML = `Phone - ${contactName}${comp ? ' • ' + comp : ''}`;
         }
       }
       // Auto-trigger call only if explicitly requested and conditions are met
