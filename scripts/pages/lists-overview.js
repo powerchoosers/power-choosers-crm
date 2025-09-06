@@ -40,9 +40,12 @@
     els.headerCreateBtn = qs('add-list-btn');
     els.createFirstBtn = qs('create-first-list-btn');
     els.tableContainer = els.pageContent;
+    // Scrollbar compensation removed; fixed 25px margins are used
 
     return true;
   }
+
+  // Scrollbar compensation helpers removed
 
   function openCreatePopover(origin = 'header') {
     closeCreatePopover();
@@ -300,8 +303,22 @@
   function render() {
     const items = state.kind === 'people' ? state.peopleLists : state.accountLists;
     const hasAny = Array.isArray(items) && items.length > 0;
+    const isLoading = state.kind === 'people' ? !state.loadedPeople : !state.loadedAccounts;
 
     if (!els.listContainer || !els.emptyState) return;
+
+    // Instant paint: if we already have cached lists from a prior view, render them even while reloading
+    if (isLoading) {
+      const cached = state.kind === 'people' ? state.peopleLists : state.accountLists;
+      if (Array.isArray(cached) && cached.length) {
+        // Fall through to normal render using cached items
+      } else {
+        els.emptyState.hidden = true;
+        // Keep previous UI; avoid heavy loading card that causes flash
+        els.listContainer.innerHTML = els.listContainer.innerHTML || '';
+        return;
+      }
+    }
 
     // Show/hide empty state
     els.emptyState.hidden = hasAny;
@@ -315,6 +332,7 @@
       // Clear any existing list cards when showing empty state
       const existingCards = els.listContainer.querySelectorAll('.list-card');
       existingCards.forEach(card => card.remove());
+      // No scrollbar compensation needed
       return;
     }
 
@@ -379,6 +397,8 @@
     if (emptyStateEl && emptyStateEl.parentElement === els.listContainer) {
       els.listContainer.appendChild(emptyStateEl);
     }
+
+    // No scrollbar compensation needed
   }
   
   // Helper function to attach event listeners to a card
@@ -425,8 +445,10 @@
           showDeleteConfirmation(id, kind);
           return;
         }
-        // TODO: Implement Rename
-        alert(`${action} list ${id} (${kind}) — coming soon`);
+        if (action === 'Rename') {
+          showRenameDialog(id, kind);
+          return;
+        }
       });
     });
   }
@@ -489,6 +511,108 @@
           <button class="btn-text" data-action="Delete" data-id="${id}" data-kind="${type}">Delete</button>
         </div>
       </div>`;
+  }
+
+  function showRenameDialog(id, kind) {
+    const listArr = kind === 'people' ? state.peopleLists : state.accountLists;
+    const item = (listArr || []).find(x => x.id === id);
+    const currentName = item?.name || 'Untitled list';
+    
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Rename List</h3>
+        </div>
+        <div class="modal-body">
+          <p>Enter a new name for "${currentName}":</p>
+          <input type="text" class="input-dark" id="rename-input" value="${currentName}" placeholder="List name">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-text" id="rename-cancel">Cancel</button>
+          <button class="btn-secondary" id="rename-save">Save</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const input = overlay.querySelector('#rename-input');
+    const cancelBtn = overlay.querySelector('#rename-cancel');
+    const saveBtn = overlay.querySelector('#rename-save');
+    
+    // Focus and select text
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 100);
+    
+    // Event handlers
+    const closeModal = () => {
+      document.body.removeChild(overlay);
+    };
+    
+    const saveRename = async () => {
+      const newName = input.value.trim();
+      if (!newName || newName === currentName) {
+        closeModal();
+        return;
+      }
+      
+      try {
+        // Update in Firebase
+        const db = window.firebaseDB;
+        if (db) {
+          await db.collection('lists').doc(id).update({
+            name: newName,
+            updatedAt: new Date()
+          });
+        }
+        
+        // Update local state
+        if (item) {
+          item.name = newName;
+          item.updatedAt = new Date();
+        }
+        
+        // Re-render the page
+        render();
+        
+        // Show success message
+        if (window.crm && window.crm.showToast) {
+          window.crm.showToast(`List renamed to "${newName}"`);
+        }
+        
+        closeModal();
+      } catch (error) {
+        console.error('Failed to rename list:', error);
+        if (window.crm && window.crm.showToast) {
+          window.crm.showToast('Failed to rename list', 'error');
+        }
+      }
+    };
+    
+    cancelBtn.addEventListener('click', closeModal);
+    saveBtn.addEventListener('click', saveRename);
+    
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveRename();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModal();
+      }
+    });
+    
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        closeModal();
+      }
+    });
   }
 
   function showDeleteConfirmation(id, kind) {
@@ -604,6 +728,7 @@
   } catch {}
   attachEvents();
   updateSwitchLabel();
+  render(); // Show loading state immediately
   ensureLoadedThenRender();
 })();
 

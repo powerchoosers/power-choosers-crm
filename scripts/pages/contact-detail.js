@@ -53,11 +53,16 @@
               <label>Title<input type="text" class="input-dark" name="title" value="${escapeHtml(c.title || '')}" /></label>
               <label>Company<input type="text" class="input-dark" name="companyName" value="${escapeHtml(c.companyName || '')}" /></label>
               <label>Email<input type="email" class="input-dark" name="email" value="${escapeHtml(c.email || '')}" /></label>
-              <label>Phone<input type="tel" class="input-dark" name="phone" value="${escapeHtml(c.phone || '')}" /></label>
-              <label>Mobile<input type="tel" class="input-dark" name="mobile" value="${escapeHtml(c.mobile || '')}" /></label>
+              <label>Email Status<select class="input-dark" name="emailStatus"><option value="">Not Verified</option><option value="verified" ${c.emailStatus === 'verified' ? 'selected' : ''}>Verified</option></select></label>
+              <label>Mobile Phone<input type="tel" class="input-dark" name="mobile" value="${escapeHtml(c.mobile || '')}" /></label>
+              <label>Work Direct Phone<input type="tel" class="input-dark" name="workDirectPhone" value="${escapeHtml(c.workDirectPhone || '')}" /></label>
+              <label>Other Phone<input type="tel" class="input-dark" name="otherPhone" value="${escapeHtml(c.otherPhone || '')}" /></label>
               <label>City<input type="text" class="input-dark" name="city" value="${escapeHtml(c.city || c.locationCity || '')}" /></label>
               <label>State<input type="text" class="input-dark" name="state" value="${escapeHtml(c.state || c.locationState || '')}" /></label>
               <label>Industry<input type="text" class="input-dark" name="industry" value="${escapeHtml(c.industry || c.companyIndustry || '')}" /></label>
+              <label>Seniority<input type="text" class="input-dark" name="seniority" value="${escapeHtml(c.seniority || '')}" /></label>
+              <label>Department<input type="text" class="input-dark" name="department" value="${escapeHtml(c.department || '')}" /></label>
+              <label>LinkedIn URL<input type="url" class="input-dark" name="linkedin" value="${escapeHtml(c.linkedin || '')}" /></label>
             </div>
             <div class="form-actions" style="margin-top: var(--spacing-md); display:flex; justify-content:flex-end; gap: var(--spacing-sm);">
               <button type="button" class="btn-secondary btn-cancel">Cancel</button>
@@ -106,14 +111,20 @@
         title: (fd.get('title') || '').toString().trim(),
         companyName: (fd.get('companyName') || '').toString().trim(),
         email: (fd.get('email') || '').toString().trim(),
+        emailStatus: (fd.get('emailStatus') || '').toString().trim(),
         city: (fd.get('city') || '').toString().trim(),
         state: (fd.get('state') || '').toString().trim(),
-        industry: (fd.get('industry') || '').toString().trim()
+        industry: (fd.get('industry') || '').toString().trim(),
+        seniority: (fd.get('seniority') || '').toString().trim(),
+        department: (fd.get('department') || '').toString().trim(),
+        linkedin: (fd.get('linkedin') || '').toString().trim()
       };
-      const phone = (fd.get('phone') || '').toString().trim();
       const mobile = (fd.get('mobile') || '').toString().trim();
-      updates.phone = normalizePhone(phone);
+      const workDirectPhone = (fd.get('workDirectPhone') || '').toString().trim();
+      const otherPhone = (fd.get('otherPhone') || '').toString().trim();
       updates.mobile = normalizePhone(mobile);
+      updates.workDirectPhone = normalizePhone(workDirectPhone);
+      updates.otherPhone = normalizePhone(otherPhone);
 
       // Persist in one update
       const id = state.currentContact?.id;
@@ -161,16 +172,32 @@
         break;
       }
       case 'health': {
-        if (window.Widgets?.openHealth) {
-          try { window.Widgets.openHealth(contactId); return; } catch (_) {}
+        // Toggle Health Check: if open, close; else open for this contact
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isHealthOpen === 'function' && api.isHealthOpen()) {
+              if (typeof api.closeHealth === 'function') { api.closeHealth(); return; }
+            } else if (typeof api.openHealth === 'function') {
+              api.openHealth(contactId); return;
+            }
+          } catch (_) { /* noop */ }
         }
         console.log('Widget: Energy Health Check for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) {}
         break;
       }
       case 'deal': {
-        if (window.Widgets?.openDealCalc) {
-          try { window.Widgets.openDealCalc(contactId); return; } catch (_) {}
+        // Toggle Deal Calculator: if open, close; else open for this contact
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isDealOpen === 'function' && api.isDealOpen()) {
+              if (typeof api.closeDeal === 'function') { api.closeDeal(); return; }
+            } else if (typeof api.openDeal === 'function') {
+              api.openDeal(contactId); return;
+            }
+          } catch (_) { /* noop */ }
         }
         console.log('Widget: Deal Calculator for contact', contactId);
         try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) {}
@@ -282,6 +309,34 @@
     } catch (_) { /* noop */ }
   }
 
+  function getCompanyPhone(contact) {
+    if (!contact) return '';
+    
+    // First try to get from contact's account data if available
+    if (contact.account && contact.account.phone) {
+      return contact.account.phone;
+    }
+    
+    // If no direct account data, try to look up the account by company name
+    if (contact.companyName && typeof window.getAccountsData === 'function') {
+      try {
+        const accounts = window.getAccountsData() || [];
+        const account = accounts.find(acc => {
+          if (!acc.accountName || !contact.companyName) return false;
+          const accName = acc.accountName.toLowerCase().trim();
+          const compName = contact.companyName.toLowerCase().trim();
+          return accName === compName || accName.includes(compName) || compName.includes(accName);
+        });
+        return account ? (account.phone || '') : '';
+      } catch (e) {
+        console.warn('Failed to lookup company phone:', e);
+        return '';
+      }
+    }
+    
+    return '';
+  }
+
   function renderContactDetail() {
     if (!state.currentContact || !els.mainContent) return;
 
@@ -386,12 +441,14 @@
         <div class="contact-info-section">
           <h3 class="section-title">Contact Information</h3>
           <div class="info-grid">
-            ${renderInfoRow('EMAIL', 'email', email)}
-            ${renderInfoRow('PHONE', 'phone', phone)}
-            ${renderInfoRow('MOBILE', 'mobile', contact.mobile || '')}
+            ${renderEmailRow('EMAIL', 'email', email, contact.emailStatus)}
+            ${renderPhoneRow(contact)}
+            ${renderInfoRow('COMPANY PHONE', 'companyPhone', getCompanyPhone(contact))}
             ${renderInfoRow('CITY', 'city', city)}
             ${renderInfoRow('STATE', 'state', stateVal)}
             ${renderInfoRow('INDUSTRY', 'industry', industry)}
+            ${renderInfoRow('SENIORITY', 'seniority', contact.seniority || '')}
+            ${renderInfoRow('DEPARTMENT', 'department', contact.department || '')}
           </div>
         </div>
 
@@ -410,6 +467,19 @@
               </div>
               <div class="placeholder-text">No recent activity</div>
             </div>
+          </div>
+          <div class="activity-pagination" id="contact-activity-pagination" style="display: none;">
+            <button class="activity-pagination-btn" id="contact-activity-prev" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15,18 9,12 15,6"/>
+              </svg>
+            </button>
+            <div class="activity-pagination-info" id="contact-activity-info">1 of 1</div>
+            <button class="activity-pagination-btn" id="contact-activity-next" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9,18 15,12 9,6"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>`;
@@ -443,10 +513,58 @@
     }
     attachContactDetailEvents();
     try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
+    
+    // Load activities
+    loadContactActivities();
   }
 
   function svgPencil() {
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  }
+
+  function loadContactActivities() {
+    if (!window.ActivityManager || !state.currentContact) return;
+    
+    const contactId = state.currentContact.id;
+    window.ActivityManager.renderActivities('contact-activity-timeline', 'contact', contactId);
+    
+    // Setup pagination
+    setupContactActivityPagination(contactId);
+  }
+
+  function setupContactActivityPagination(contactId) {
+    const paginationEl = document.getElementById('contact-activity-pagination');
+    
+    if (!paginationEl) return;
+    
+    // Show pagination if there are more than 4 activities
+    const updatePagination = async () => {
+      if (!window.ActivityManager) return;
+      
+      const activities = await window.ActivityManager.getActivities('contact', contactId);
+      const totalPages = Math.ceil(activities.length / window.ActivityManager.maxActivitiesPerPage);
+      
+      if (totalPages > 1) {
+        paginationEl.style.display = 'flex';
+        
+        // Use unified pagination component
+        if (window.crm && window.crm.createPagination) {
+          window.crm.createPagination(
+            window.ActivityManager.currentPage + 1, 
+            totalPages, 
+            (page) => {
+              window.ActivityManager.goToPage(page - 1, 'contact-activity-timeline', 'contact', contactId);
+              updatePagination();
+            }, 
+            paginationEl.id
+          );
+        }
+      } else {
+        paginationEl.style.display = 'none';
+      }
+    };
+    
+    updatePagination();
   }
   function svgTrash() {
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>';
@@ -456,6 +574,67 @@
   }
   function svgSave() {
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>';
+  }
+
+  function renderPhoneRow(contact) {
+    // Determine the primary phone and its type based on priority
+    const phoneData = getPrimaryPhoneData(contact);
+    const { value, type, field } = phoneData;
+    const text = value ? escapeHtml(String(value)) : '--';
+    const hasValue = !!value;
+    
+    return `
+      <div class="info-row" data-field="phone" data-phone-type="${type}">
+        <div class="info-label">${escapeHtml(type.toUpperCase())}</div>
+        <div class="info-value">
+          <div class="info-value-wrap" data-field="phone" data-has-value="${hasValue ? '1' : '0'}">
+            <span class="info-value-text">${text}</span>
+            <div class="info-actions" aria-hidden="true">
+              <button type="button" class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button>
+              <button type="button" class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button>
+              <button type="button" class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function getPrimaryPhoneData(contact) {
+    // Priority: Mobile > Work Direct > Other
+    if (contact.mobile) {
+      return { value: contact.mobile, type: 'mobile', field: 'mobile' };
+    }
+    if (contact.workDirectPhone) {
+      return { value: contact.workDirectPhone, type: 'work direct', field: 'workDirectPhone' };
+    }
+    if (contact.otherPhone) {
+      return { value: contact.otherPhone, type: 'other', field: 'otherPhone' };
+    }
+    return { value: '', type: 'mobile', field: 'mobile' };
+  }
+
+  function renderEmailRow(label, field, value, emailStatus) {
+    const text = value ? escapeHtml(String(value)) : '--';
+    const hasValue = !!value;
+    const isVerified = emailStatus === 'verified' || emailStatus === true;
+    
+    return `
+      <div class="info-row" data-field="${escapeHtml(field)}">
+        <div class="info-label">
+          ${escapeHtml(label)}
+          ${isVerified ? '<span class="email-status-indicator" title="Email Verified"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg></span>' : ''}
+        </div>
+        <div class="info-value">
+          <div class="info-value-wrap" data-field="${escapeHtml(field)}" data-has-value="${hasValue ? '1' : '0'}">
+            <span class="info-value-text">${text}</span>
+            <div class="info-actions" aria-hidden="true">
+              <button type="button" class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button>
+              <button type="button" class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button>
+              <button type="button" class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
   }
 
   function renderInfoRow(label, field, value) {
@@ -478,9 +657,63 @@
   }
 
   function attachContactDetailEvents() {
+    // Listen for activity refresh events
+    document.addEventListener('pc:activities-refresh', (e) => {
+      const { entityType, entityId } = e.detail || {};
+      if (entityType === 'contact' && entityId === state.currentContact?.id) {
+        // Refresh contact activities
+        if (window.ActivityManager) {
+          const activityManager = new window.ActivityManager();
+          activityManager.renderActivities('contact-activity-timeline', 'contact', entityId);
+        }
+      }
+    });
+
     const backBtn = document.getElementById('back-to-people');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
+        // Check if we came from account details page
+        if (window._contactNavigationSource === 'account-details' && window._contactNavigationAccountId) {
+          console.log('Returning to account details page:', window._contactNavigationAccountId);
+          // Navigate back to account details page
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('account-details');
+            // Show the specific account
+            setTimeout(() => {
+              if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
+                window.showAccountDetail(window._contactNavigationAccountId);
+              }
+            }, 100);
+          }
+          // Clear the navigation source
+          window._contactNavigationSource = null;
+          window._contactNavigationAccountId = null;
+          return;
+        }
+        
+        // Check if we came from list detail page
+        if (window._contactNavigationSource === 'list-detail' && window._contactNavigationListId) {
+          console.log('Returning to list detail page:', window._contactNavigationListId);
+          // Navigate back to list detail page
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            // Provide context up-front so navigateToPage's internal init uses it immediately
+            try {
+              window.listDetailContext = {
+                listId: window._contactNavigationListId,
+                listName: window._contactNavigationListName || 'List',
+                listKind: 'people'
+              };
+            } catch (_) {}
+            window.crm.navigateToPage('list-detail');
+          }
+          // Clear the navigation source
+          window._contactNavigationSource = null;
+          window._contactNavigationListId = null;
+          window._contactNavigationListName = null;
+          return;
+        }
+        
+        // Default behavior: return to people page
         // Show the People toolbar/header again
         showToolbar();
         // Disable contact detail scroll mode
@@ -670,6 +903,13 @@
 
   function beginEditField(wrap, field) {
     if (!wrap) return;
+    
+    // Special handling for phone field
+    if (field === 'phone') {
+      beginEditPhoneField(wrap);
+      return;
+    }
+    
     const current = wrap.querySelector('.info-value-text')?.textContent || '';
     wrap.classList.add('editing');
     const input = document.createElement('input');
@@ -703,6 +943,154 @@
     input.addEventListener('keydown', onKey);
     saveBtn.addEventListener('click', async () => { await commitEdit(wrap, field, input.value); });
     cancelBtn.addEventListener('click', () => { cancelEdit(wrap, field, current); });
+  }
+
+  function beginEditPhoneField(wrap) {
+    if (!wrap) return;
+    
+    const contact = state.currentContact;
+    if (!contact) return;
+    
+    // Get all available phone numbers
+    const phoneOptions = [];
+    if (contact.mobile) {
+      phoneOptions.push({ type: 'mobile', value: contact.mobile, field: 'mobile' });
+    }
+    if (contact.workDirectPhone) {
+      phoneOptions.push({ type: 'work direct', value: contact.workDirectPhone, field: 'workDirectPhone' });
+    }
+    if (contact.otherPhone) {
+      phoneOptions.push({ type: 'other', value: contact.otherPhone, field: 'otherPhone' });
+    }
+    
+    // If no phone numbers exist, show input for new mobile number
+    if (phoneOptions.length === 0) {
+      phoneOptions.push({ type: 'mobile', value: '', field: 'mobile' });
+    }
+    
+    wrap.classList.add('editing');
+    
+    // Create dropdown
+    const dropdown = document.createElement('div');
+    dropdown.className = 'phone-dropdown';
+    
+    phoneOptions.forEach((option, index) => {
+      const item = document.createElement('div');
+      item.className = 'phone-dropdown-item';
+      if (index === 0) item.classList.add('selected');
+      
+      item.innerHTML = `
+        <span class="phone-type">${escapeHtml(option.type.toUpperCase())}</span>
+        <span class="phone-number">${escapeHtml(option.value || 'Click to add')}</span>
+      `;
+      
+      item.addEventListener('click', () => {
+        // Remove selected class from all items
+        dropdown.querySelectorAll('.phone-dropdown-item').forEach(el => el.classList.remove('selected'));
+        // Add selected class to clicked item
+        item.classList.add('selected');
+        
+        // Update the input value
+        const input = wrap.querySelector('.info-edit-input');
+        if (input) {
+          input.value = option.value;
+          input.dataset.selectedType = option.type;
+          input.dataset.selectedField = option.field;
+        }
+      });
+      
+      dropdown.appendChild(item);
+    });
+    
+    // Create input
+    const input = document.createElement('input');
+    input.type = 'tel';
+    input.className = 'input-dark info-edit-input';
+    input.value = phoneOptions[0].value;
+    input.dataset.selectedType = phoneOptions[0].type;
+    input.dataset.selectedField = phoneOptions[0].field;
+    input.placeholder = 'Enter phone number';
+    
+    // Create input wrapper
+    const inputWrap = document.createElement('div');
+    inputWrap.className = 'phone-input-wrap';
+    inputWrap.appendChild(input);
+    inputWrap.appendChild(dropdown);
+    
+    // Create actions
+    const actions = wrap.querySelector('.info-actions');
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'icon-btn-sm info-save';
+    saveBtn.innerHTML = svgSave();
+    saveBtn.title = 'Save';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'icon-btn-sm info-cancel';
+    cancelBtn.textContent = '×';
+    cancelBtn.title = 'Cancel';
+    
+    // Replace content
+    const textEl = wrap.querySelector('.info-value-text');
+    if (textEl && textEl.parentElement) textEl.parentElement.replaceChild(inputWrap, textEl);
+    
+    if (actions) {
+      actions.innerHTML = '';
+      actions.appendChild(saveBtn);
+      actions.appendChild(cancelBtn);
+    }
+    
+    setTimeout(() => input.focus(), 0);
+    
+    // Event handlers
+    const onKey = async (ev) => {
+      if (ev.key === 'Enter') { 
+        ev.preventDefault(); 
+        await commitPhoneEdit(wrap, input.value, input.dataset.selectedField, input.dataset.selectedType); 
+      }
+      else if (ev.key === 'Escape') { 
+        ev.preventDefault(); 
+        cancelEdit(wrap, 'phone', wrap.querySelector('.info-value-text')?.textContent || ''); 
+      }
+    };
+    
+    input.addEventListener('keydown', onKey);
+    saveBtn.addEventListener('click', async () => { 
+      await commitPhoneEdit(wrap, input.value, input.dataset.selectedField, input.dataset.selectedType); 
+    });
+    cancelBtn.addEventListener('click', () => { 
+      cancelEdit(wrap, 'phone', wrap.querySelector('.info-value-text')?.textContent || ''); 
+    });
+    
+    // Close dropdown when clicking outside
+    const closeDropdown = (e) => {
+      if (!wrap.contains(e.target)) {
+        dropdown.style.display = 'none';
+        document.removeEventListener('click', closeDropdown);
+      }
+    };
+    
+    setTimeout(() => {
+      document.addEventListener('click', closeDropdown);
+    }, 100);
+  }
+
+  async function commitPhoneEdit(wrap, value, field, type) {
+    const normalizedValue = normalizePhone(value);
+    await saveField(field, normalizedValue);
+    
+    // Update the contact data
+    if (state.currentContact) {
+      state.currentContact[field] = normalizedValue;
+    }
+    
+    // Re-render the phone row with new primary phone
+    const phoneRow = wrap.closest('.info-row');
+    if (phoneRow) {
+      const newPhoneRow = renderPhoneRow(state.currentContact);
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = newPhoneRow;
+      const newRow = tempDiv.firstElementChild;
+      phoneRow.parentElement.replaceChild(newRow, phoneRow);
+    }
   }
 
   async function commitEdit(wrap, field, value) {
@@ -1591,8 +1979,35 @@ async function createContactSequenceThenAdd(name) {
         return bv - av;
       });
 
+      // Fetch actual member counts for each list
+      const listCounts = new Map();
+      for (const list of lists.slice(0, 100)) {
+        try {
+          // Try to get from cache first
+          const cache = window.listMembersCache?.[list.id];
+          if (cache && cache.loaded) {
+            listCounts.set(list.id, cache.people?.size || 0);
+          } else {
+            // Fetch actual count from Firebase
+            let count = 0;
+            try {
+              const lmSnap = await db.collection('listMembers').where('listId', '==', list.id).where('targetType', '==', 'people').get();
+              count = lmSnap?.docs?.length || 0;
+            } catch (e) {
+              // Fallback to cached count
+              count = (typeof list.count === 'number') ? list.count : (list.recordCount || 0);
+            }
+            listCounts.set(list.id, count);
+          }
+        } catch (e) {
+          // Fallback to cached count
+          const count = (typeof list.count === 'number') ? list.count : (list.recordCount || 0);
+          listCounts.set(list.id, count);
+        }
+      }
+
       const listHtml = lists.slice(0, 100).map(it => {
-        const count = (typeof it.count === 'number') ? it.count : (it.recordCount || 0);
+        const count = listCounts.get(it.id) || 0;
         const already = existing.has(String(it.id || ''));
         const memberId = existingMap.get(String(it.id || '')) || '';
         return `<div class="list-item" tabindex="0" data-id="${escapeHtml(it.id || '')}" data-name="${escapeHtml(it.name || 'List')}" ${memberId ? `data-member-id="${escapeHtml(memberId)}"` : ''}>
@@ -1678,6 +2093,21 @@ async function createContactSequenceThenAdd(name) {
           doc.updatedAt = new Date();
         }
         await db.collection('listMembers').add(doc);
+        
+        // Update the cache for this list
+        if (window.listMembersCache && window.listMembersCache[listId]) {
+          window.listMembersCache[listId].people.add(contactId);
+        }
+        
+        // Refresh list membership if we're on a list detail page
+        if (window.ListDetail && window.ListDetail.refreshListMembership) {
+          window.ListDetail.refreshListMembership();
+        }
+        
+        // Refresh list counts on the lists overview page
+        if (window.ListsOverview && window.ListsOverview.refreshCounts) {
+          window.ListsOverview.refreshCounts();
+        }
       }
       window.crm?.showToast && window.crm.showToast(`Added to "${listName}"`);
     } catch (err) {
@@ -1720,11 +2150,17 @@ async function createContactSequenceThenAdd(name) {
       case 'linkedin':
         const contact = state.currentContact;
         if (contact) {
-          const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name;
-          const company = contact.companyName || '';
-          const query = encodeURIComponent([fullName, company].filter(Boolean).join(' '));
-          const url = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
-          try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
+          // If contact has a LinkedIn URL, use it directly
+          if (contact.linkedin) {
+            try { window.open(contact.linkedin, '_blank', 'noopener'); } catch (e) { /* noop */ }
+          } else {
+            // Fallback to search if no LinkedIn URL
+            const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name;
+            const company = contact.companyName || '';
+            const query = encodeURIComponent([fullName, company].filter(Boolean).join(' '));
+            const url = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
+            try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
+          }
         }
         break;
     }

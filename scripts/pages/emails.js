@@ -14,7 +14,7 @@ class EmailManager {
         
         // Google API configuration
         this.CLIENT_ID = '448802258090-re0u5rtja879t4tkej22rnedmo1jt3lp.apps.googleusercontent.com';
-        this.API_KEY = 'AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE'; // From Firebase config
+        this.API_KEY = 'AIzaSyDwrD5n-_1jNzw6Qsj2q8xFUWT3gaMs4Xk'; // Updated to match Google Cloud Console key used for Gmail
         this.DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest';
         this.SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
         
@@ -54,7 +54,6 @@ class EmailManager {
                 await this.gapi.load('client:auth2', async () => {
                     try {
                         await this.gapi.client.init({
-                            apiKey: this.API_KEY,
                             clientId: this.CLIENT_ID,
                             discoveryDocs: [this.DISCOVERY_DOC],
                             scope: this.SCOPES
@@ -71,8 +70,10 @@ class EmailManager {
                         
                         resolve();
                     } catch (error) {
-                        console.error('Error initializing Google API:', error);
-                        reject(error);
+                        // Surface detailed Google API init errors (e.g., API key, consent, origin)
+                        const details = (error && (error.result || error.error || error.message)) || error;
+                        console.error('Error initializing Google API:', details);
+                        reject(details);
                     }
                 });
             };

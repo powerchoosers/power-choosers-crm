@@ -1,13 +1,15 @@
 (function () {
   'use strict';
 
-  // Notes Widget for Contact Detail
-  // Exposes: window.Widgets.openNotes(contactId)
+  // Notes Widget for Contact Detail and Account Detail
+  // Exposes: window.Widgets.openNotes(contactId), window.Widgets.openNotesForAccount(accountId)
   if (!window.Widgets) window.Widgets = {};
 
   const WIDGET_ID = 'notes-widget';
   let unsub = null; // Firestore unsubscribe for realtime listener
   let currentContactId = null;
+  let currentAccountId = null;
+  let currentEntityType = 'contact'; // 'contact' or 'account'
   let autosaveTimer = null;
   let suppressRemoteWhileFocused = false;
   let lastRemoteText = '';
@@ -75,7 +77,7 @@
     card.addEventListener('transitionend', onEnd);
   }
 
-  function makeCard(contactId) {
+  function makeCard(entityId, entityType = 'contact') {
     const card = document.createElement('div');
     card.className = 'widget-card notes-card';
     card.id = WIDGET_ID;
@@ -109,7 +111,8 @@
 
     // Pre-populate from any preloaded cache
     try {
-      const cached = window._preloadedNotes && window._preloadedNotes[String(contactId)];
+      const cacheKey = entityType === 'account' ? `account-${entityId}` : String(entityId);
+      const cached = window._preloadedNotes && window._preloadedNotes[cacheKey];
       if (cached && textarea && !textarea.value) {
         textarea.value = cached.text || '';
         lastRemoteText = textarea.value;
@@ -117,10 +120,11 @@
       }
     } catch (_) { /* noop */ }
 
-    // Listen once for late-arriving preload for this contact
+    // Listen once for late-arriving preload for this entity
     const onPreloaded = (e) => {
       try {
-        if (!e || !e.detail || String(e.detail.id) !== String(contactId)) return;
+        const expectedId = entityType === 'account' ? `account-${entityId}` : String(entityId);
+        if (!e || !e.detail || String(e.detail.id) !== expectedId) return;
         if (!textarea || document.activeElement === textarea) return;
         if (!textarea.value) {
           textarea.value = e.detail.text || '';
@@ -141,7 +145,8 @@
     }
 
     const saveNow = async () => {
-      if (!currentContactId) return;
+      const currentId = entityType === 'account' ? currentAccountId : currentContactId;
+      if (!currentId) return;
       const db = window.firebaseDB;
       const fv = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
       if (!db) {
@@ -151,7 +156,8 @@
       const text = (textarea && textarea.value != null) ? String(textarea.value) : '';
       setStatus('Saving...');
       try {
-        const ref = db.collection('contacts').doc(currentContactId);
+        const collection = entityType === 'account' ? 'accounts' : 'contacts';
+        const ref = db.collection(collection).doc(currentId);
         const payload = { notes: text, notesUpdatedAt: fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now() };
         await ref.set(payload, { merge: true });
         lastRemoteText = text;
@@ -159,6 +165,31 @@
         // American 12-hour time with AM/PM
         const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         setStatus(`Saved ${timeStr}`);
+        
+        // Trigger activity refresh for the current entity
+        try {
+          if (window.ActivityManager) {
+            const activityManager = new window.ActivityManager();
+            // Refresh activities for the current entity
+            if (entityType === 'contact' && currentContactId) {
+              // Trigger contact activity refresh
+              document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
+                detail: { entityType: 'contact', entityId: currentContactId } 
+              }));
+            } else if (entityType === 'account' && currentAccountId) {
+              // Trigger account activity refresh
+              document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
+                detail: { entityType: 'account', entityId: currentAccountId } 
+              }));
+            }
+            // Also refresh global activities
+            document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
+              detail: { entityType: 'global' } 
+            }));
+          }
+        } catch (e) {
+          console.warn('Failed to trigger activity refresh:', e);
+        }
       } catch (err) {
         console.error('Save notes failed', err);
         setStatus('Save failed');
@@ -191,95 +222,121 @@
     // Helper to compute and set dynamic title + placeholder
     const updateMeta = (data) => {
       if (!textarea || !titleEl) return;
-      const first = (data.firstName || '').toString().trim();
-      const last = (data.lastName || '').toString().trim();
-      const name = (data.name || '').toString().trim();
-      // Consider multiple possible fields for company label
-      const company = (data.companyName || data.company || data.accountName || '').toString().trim();
-      // Title: prefer first name explicitly
-      const displayFirst = first || (name ? name.split(' ')[0] : '') || '';
-      let ttl = 'Notes';
-      if (displayFirst && company) ttl = `Notes for ${displayFirst} at ${company}`;
-      else if (displayFirst) ttl = `Notes for ${displayFirst}`;
-      else if (company) ttl = `Notes for ${company}`;
-      titleEl.textContent = ttl;
-      // Placeholder
-      const base = (last || first || name || 'this contact').toString().trim();
-      const firstToken = base.split(/\s+/)[0] || base;
-      const placeholderName = firstToken.toLowerCase();
-      textarea.placeholder = `Write notes for ${placeholderName}`;
+      
+      if (entityType === 'account') {
+        // For accounts, use account name
+        const accountName = (data.accountName || data.name || data.companyName || '').toString().trim();
+        const industry = (data.industry || '').toString().trim();
+        let ttl = 'Notes';
+        if (accountName) {
+          ttl = `Notes for ${accountName}`;
+          if (industry) ttl += ` (${industry})`;
+        }
+        titleEl.textContent = ttl;
+        textarea.placeholder = `Write notes for ${accountName || 'this account'}`;
+      } else {
+        // For contacts
+        const first = (data.firstName || '').toString().trim();
+        const last = (data.lastName || '').toString().trim();
+        const name = (data.name || '').toString().trim();
+        // Consider multiple possible fields for company label
+        const company = (data.companyName || data.company || data.accountName || '').toString().trim();
+        // Title: prefer first name explicitly
+        const displayFirst = first || (name ? name.split(' ')[0] : '') || '';
+        let ttl = 'Notes';
+        if (displayFirst && company) ttl = `Notes for ${displayFirst} at ${company}`;
+        else if (displayFirst) ttl = `Notes for ${displayFirst}`;
+        else if (company) ttl = `Notes for ${company}`;
+        titleEl.textContent = ttl;
+        // Placeholder
+        const base = (last || first || name || 'this contact').toString().trim();
+        const firstToken = base.split(/\s+/)[0] || base;
+        const placeholderName = firstToken.toLowerCase();
+        textarea.placeholder = `Write notes for ${placeholderName}`;
+      }
     };
 
-    // Immediately try to set meta from local data (People page cache) before Firestore returns
+    // Immediately try to set meta from local data before Firestore returns
     try {
-      if (typeof window.getPeopleData === 'function') {
+      if (entityType === 'account' && typeof window.getAccountsData === 'function') {
+        const accounts = window.getAccountsData() || [];
+        const local = accounts.find(a => String(a.id || '') === String(entityId));
+        if (local) updateMeta(local);
+      } else if (entityType === 'contact' && typeof window.getPeopleData === 'function') {
         const people = window.getPeopleData() || [];
-        const local = people.find(p => String(p.id || '') === String(contactId));
+        const local = people.find(p => String(p.id || '') === String(entityId));
         if (local) updateMeta(local);
       }
     } catch (_) { /* noop */ }
     // Retry shortly after mount in case the cache populates a moment later
     setTimeout(() => {
       try {
-        if (typeof window.getPeopleData === 'function') {
+        if (entityType === 'account' && typeof window.getAccountsData === 'function') {
+          const accounts = window.getAccountsData() || [];
+          const local = accounts.find(a => String(a.id || '') === String(entityId));
+          if (local) updateMeta(local);
+        } else if (entityType === 'contact' && typeof window.getPeopleData === 'function') {
           const people = window.getPeopleData() || [];
-          const local = people.find(p => String(p.id || '') === String(contactId));
+          const local = people.find(p => String(p.id || '') === String(entityId));
           if (local) updateMeta(local);
         }
       } catch (_) { /* noop */ }
     }, 250);
 
-    // Subscribe to Firestore realtime updates for this contact's notes and metadata
-    subscribeToContact(contactId, textarea, setStatus, updateMeta);
+    // Subscribe to Firestore realtime updates for this entity's notes and metadata
+    subscribeToEntity(entityId, entityType, textarea, setStatus, updateMeta);
 
     return card;
   }
 
-  function subscribeToContact(contactId, textarea, setStatus, updateMeta) {
+  function subscribeToEntity(entityId, entityType, textarea, setStatus, updateMeta) {
     const db = window.firebaseDB;
-    if (!db || !contactId) return;
+    if (!db || !entityId) return;
     try { if (typeof unsub === 'function') { unsub(); } } catch (_) { /* noop */ }
 
-    const ref = db.collection('contacts').doc(contactId);
+    const collection = entityType === 'account' ? 'accounts' : 'contacts';
+    const ref = db.collection(collection).doc(entityId);
     unsub = ref.onSnapshot((snap) => {
       const data = snap && snap.exists ? (snap.data() || {}) : {};
       // Always attempt to update the meta immediately with whatever we have
       try { typeof updateMeta === 'function' && updateMeta(data); } catch (_) {}
 
-      // If company not present, try to resolve it from accounts by id or by name
-      const rawCompany = (data.companyName || data.accountName || data.company || '').toString().trim();
-      const accountId = (data.accountId || data.account_id || '').toString().trim();
-      const applyResolved = (companyName) => {
-        if (!companyName) return;
-        try { typeof updateMeta === 'function' && updateMeta({ ...data, companyName }); } catch (_) {}
-      };
-      if (!rawCompany && accountId) {
-        try {
-          db.collection('accounts').doc(accountId).get().then((doc) => {
-            const acc = doc && doc.exists ? (doc.data() || {}) : {};
-            const companyName = (acc.accountName || acc.name || acc.companyName || acc.company || '').toString().trim();
-            applyResolved(companyName);
-          }).catch(() => {});
-        } catch (_) { /* noop */ }
-      } else if (!rawCompany) {
-        // As a fallback, try to match by name from any globally cached accounts list
-        try {
-          const getAccounts = (typeof window.getAccountsData === 'function') ? window.getAccountsData : null;
-          if (getAccounts) {
-            const accounts = getAccounts() || [];
-            const key = (data.accountName || data.companyName || data.company || '').toString().trim().toLowerCase();
-            if (key) {
-              const match = accounts.find((a) => {
-                const nm = (a.accountName || a.name || a.companyName || '').toString().trim().toLowerCase();
-                return nm === key;
-              });
-              if (match) {
-                const companyName = (match.accountName || match.name || match.companyName || '').toString().trim();
-                applyResolved(companyName);
+      // For contacts only: resolve company information if needed
+      if (entityType === 'contact') {
+        const rawCompany = (data.companyName || data.accountName || data.company || '').toString().trim();
+        const accountId = (data.accountId || data.account_id || '').toString().trim();
+        const applyResolved = (companyName) => {
+          if (!companyName) return;
+          try { typeof updateMeta === 'function' && updateMeta({ ...data, companyName }); } catch (_) {}
+        };
+        if (!rawCompany && accountId) {
+          try {
+            db.collection('accounts').doc(accountId).get().then((doc) => {
+              const acc = doc && doc.exists ? (doc.data() || {}) : {};
+              const companyName = (acc.accountName || acc.name || acc.companyName || acc.company || '').toString().trim();
+              applyResolved(companyName);
+            }).catch(() => {});
+          } catch (_) { /* noop */ }
+        } else if (!rawCompany) {
+          // As a fallback, try to match by name from any globally cached accounts list
+          try {
+            const getAccounts = (typeof window.getAccountsData === 'function') ? window.getAccountsData : null;
+            if (getAccounts) {
+              const accounts = getAccounts() || [];
+              const key = (data.accountName || data.companyName || data.company || '').toString().trim().toLowerCase();
+              if (key) {
+                const match = accounts.find((a) => {
+                  const nm = (a.accountName || a.name || a.companyName || '').toString().trim().toLowerCase();
+                  return nm === key;
+                });
+                if (match) {
+                  const companyName = (match.accountName || match.name || match.companyName || '').toString().trim();
+                  applyResolved(companyName);
+                }
               }
             }
-          }
-        } catch (_) { /* noop */ }
+          } catch (_) { /* noop */ }
+        }
       }
 
       const incoming = (data.notes == null ? '' : String(data.notes));
@@ -304,6 +361,8 @@
 
   function openNotes(contactId) {
     currentContactId = contactId;
+    currentAccountId = null;
+    currentEntityType = 'contact';
     const content = getPanelContentEl();
     if (!content) {
       try { window.crm?.showToast && window.crm.showToast('Widget panel not found'); } catch (_) {}
@@ -316,7 +375,7 @@
 
     // Mount widget at the top of the panel content
     removeExistingWidget();
-    const card = makeCard(contactId);
+    const card = makeCard(contactId, 'contact');
 
     // Smooth expand-in animation that pushes other widgets down
     const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -382,7 +441,90 @@
     try { window.crm?.showToast && window.crm.showToast('Notes opened'); } catch (_) {}
   }
 
+  function openNotesForAccount(accountId) {
+    currentAccountId = accountId;
+    currentContactId = null;
+    currentEntityType = 'account';
+    const content = getPanelContentEl();
+    if (!content) {
+      try { window.crm?.showToast && window.crm.showToast('Widget panel not found'); } catch (_) {}
+      return;
+    }
+    if (!accountId) {
+      try { window.crm?.showToast && window.crm.showToast('No account selected'); } catch (_) {}
+      return;
+    }
+
+    // Mount widget at the top of the panel content
+    removeExistingWidget();
+    const card = makeCard(accountId, 'account');
+
+    // Smooth expand-in animation that pushes other widgets down
+    const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!prefersReduce) {
+      try { card.classList.add('notes-anim'); } catch (_) {}
+      // Prevent flash before we collapse and read paddings after insertion
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-6px)';
+    }
+
+    if (content.firstChild) content.insertBefore(card, content.firstChild);
+    else content.appendChild(card);
+
+    if (!prefersReduce) {
+      // Collapse now that it's in the DOM, and store paddings
+      const cs = window.getComputedStyle(card);
+      const pt = parseFloat(cs.paddingTop) || 0;
+      const pb = parseFloat(cs.paddingBottom) || 0;
+      card.dataset._pt = String(pt);
+      card.dataset._pb = String(pb);
+      card.style.overflow = 'hidden';
+      card.style.height = '0px';
+      card.style.paddingTop = '0px';
+      card.style.paddingBottom = '0px';
+
+      // Next frame: expand to natural height + paddings
+      requestAnimationFrame(() => {
+        // scrollHeight here is content height because padding is 0; don't add padding to height to avoid double-count
+        const target = card.scrollHeight;
+        card.style.transition = 'height 360ms ease-out, opacity 360ms ease-out, transform 360ms ease-out, padding-top 360ms ease-out, padding-bottom 360ms ease-out';
+        card.style.height = target + 'px';
+        card.style.paddingTop = pt + 'px';
+        card.style.paddingBottom = pb + 'px';
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+        const pending = new Set(['height', 'padding-top', 'padding-bottom']);
+        const onEnd = (e) => {
+          if (!e) return;
+          if (pending.has(e.propertyName)) pending.delete(e.propertyName);
+          if (pending.size > 0) return;
+          card.removeEventListener('transitionend', onEnd);
+          // Cleanup inline styles so the card behaves normally
+          card.style.transition = '';
+          card.style.height = '';
+          card.style.overflow = '';
+          card.style.opacity = '';
+          card.style.transform = '';
+          card.style.paddingTop = '';
+          card.style.paddingBottom = '';
+          try { delete card.dataset._pt; delete card.dataset._pb; } catch (_) {}
+          try { card.classList.remove('notes-anim'); } catch (_) {}
+        };
+        card.addEventListener('transitionend', onEnd);
+      });
+    }
+
+    // Bring panel into view
+    try {
+      const panel = document.getElementById('widget-panel');
+      if (panel) panel.scrollTop = 0;
+    } catch (_) { /* noop */ }
+
+    try { window.crm?.showToast && window.crm.showToast('Account notes opened'); } catch (_) {}
+  }
+
   window.Widgets.openNotes = openNotes;
+  window.Widgets.openNotesForAccount = openNotesForAccount;
   // Expose close and is-open helpers for toggle behavior
   window.Widgets.closeNotes = closeNotesWidget;
   window.Widgets.isNotesOpen = function () { return !!document.getElementById(WIDGET_ID); };
