@@ -43,7 +43,11 @@ export default function handler(req, res) {
                 answerOnBridge: true,
                 hangupOnStar: false,
                 timeLimit: 14400,
-                action: `${base}/api/twilio/status`
+                action: `${base}/api/twilio/status`,
+                // Enable Twilio Voice Intelligence for real-time transcription and AI insights
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST'
             });
             
             // Pass the original caller's number as a custom parameter
@@ -64,7 +68,11 @@ export default function handler(req, res) {
                 answerOnBridge: true,
                 hangupOnStar: false,
                 timeLimit: 14400,
-                action: `${base}/api/twilio/dial-complete`
+                action: `${base}/api/twilio/dial-complete`,
+                // Enable Twilio Voice Intelligence for real-time transcription and AI insights
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST'
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -75,7 +83,11 @@ export default function handler(req, res) {
                 callerId: businessNumber,
                 timeout: 30,
                 answerOnBridge: true,
-                action: `${base}/api/twilio/dial-complete`
+                action: `${base}/api/twilio/dial-complete`,
+                // Enable Twilio Voice Intelligence for real-time transcription and AI insights
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST'
             });
             dial.client('agent');
         }

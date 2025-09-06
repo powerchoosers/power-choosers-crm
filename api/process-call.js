@@ -13,9 +13,6 @@ function corsMiddleware(req, res, next) {
     next();
 }
 
-// In-memory call storage (replace with database in production)
-const callStore = new Map();
-
 export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
@@ -24,82 +21,68 @@ export default async function handler(req, res) {
     }
     
     try {
-        const {
-            RecordingUrl,
-            RecordingSid,
-            CallSid,
-            AccountSid,
-            RecordingStatus,
-            RecordingDuration
-        } = req.body;
+        const { callSid, recordingUrl } = req.body;
         
-        console.log('[Recording] Webhook received:', {
-            RecordingSid,
-            CallSid,
-            RecordingStatus,
-            RecordingDuration
-        });
+        if (!callSid) {
+            return res.status(400).json({ error: 'CallSid is required' });
+        }
         
-        if (RecordingStatus === 'completed' && RecordingUrl) {
-            // Ensure we have a direct mp3 URL for playback
-            const recordingMp3Url = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
-
-            // Store call data in local memory (best-effort)
-            const callData = {
-                id: CallSid,
-                recordingSid: RecordingSid,
-                recordingUrl: recordingMp3Url,
-                duration: parseInt(RecordingDuration) || 0,
-                status: 'completed',
-                timestamp: new Date().toISOString(),
-                transcript: null,
-                aiInsights: null
-            };
-
-            callStore.set(CallSid, callData);
-
-            // Upsert into central /api/calls so the UI can see the recording immediately
+        console.log('[Process Call] Starting AI processing for:', callSid);
+        
+        // If no recording URL provided, try to get it from Twilio
+        let finalRecordingUrl = recordingUrl;
+        if (!finalRecordingUrl) {
             try {
-                const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
-                await fetch(`${base}/api/calls`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        callSid: CallSid,
-                        status: 'completed',
-                        duration: parseInt(RecordingDuration) || 0,
-                        recordingUrl: recordingMp3Url
-                    })
-                }).catch(() => {});
-            } catch (e) {
-                console.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
-            }
-
-            // Trigger Twilio native transcription and AI analysis
-            try {
-                await processRecordingWithTwilio(recordingMp3Url, CallSid, RecordingSid);
+                const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                const recordings = await client.recordings.list({ callSid: callSid, limit: 1 });
+                
+                if (recordings.length > 0) {
+                    finalRecordingUrl = recordings[0].uri;
+                    console.log('[Process Call] Found recording URL:', finalRecordingUrl);
+                } else {
+                    return res.status(404).json({ error: 'No recording found for this call' });
+                }
             } catch (error) {
-                console.error('[Recording] Processing error:', error);
+                console.error('[Process Call] Error fetching recording:', error);
+                return res.status(500).json({ error: 'Failed to fetch recording from Twilio' });
             }
         }
         
-        res.status(200).json({ success: true });
+        // Process the recording using Twilio native services
+        const result = await processRecordingWithTwilio(finalRecordingUrl, callSid);
+        
+        return res.status(200).json({
+            success: true,
+            callSid,
+            transcript: result.transcript,
+            aiInsights: result.aiInsights
+        });
         
     } catch (error) {
-        console.error('[Recording] Webhook error:', error);
-        res.status(500).json({ 
-            error: 'Failed to process recording webhook',
+        console.error('[Process Call] Error:', error);
+        return res.status(500).json({ 
+            error: 'Failed to process call',
             details: error.message 
         });
     }
 }
 
-async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
+async function processRecordingWithTwilio(recordingUrl, callSid) {
     try {
-        console.log('[Recording] Starting Twilio AI processing for:', callSid);
+        console.log('[Process Call] Starting Twilio AI processing for:', callSid);
         
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+        
+        // Get recordings for this call
+        const recordings = await client.recordings.list({ callSid: callSid, limit: 1 });
+        
+        if (recordings.length === 0) {
+            throw new Error('No recording found for this call');
+        }
+        
+        const recording = recordings[0];
+        console.log('[Process Call] Found recording:', recording.sid);
         
         // Use Twilio's native transcription service
         let transcript = '';
@@ -108,19 +91,19 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
         try {
             // Check if transcription already exists
             const transcriptions = await client.transcriptions.list({ 
-                recordingSid: recordingSid,
+                recordingSid: recording.sid,
                 limit: 1 
             });
             
             if (transcriptions.length > 0) {
                 const transcription = await client.transcriptions(transcriptions[0].sid).fetch();
                 transcript = transcription.transcriptionText || '';
-                console.log('[Recording] Existing transcript found:', transcript.substring(0, 100) + '...');
+                console.log('[Process Call] Existing transcript found:', transcript.substring(0, 100) + '...');
             } else {
                 // Create new transcription using Twilio's service
-                console.log('[Recording] Creating Twilio transcription...');
+                console.log('[Process Call] Creating Twilio transcription...');
                 const newTranscription = await client.transcriptions.create({
-                    recordingSid: recordingSid,
+                    recordingSid: recording.sid,
                     languageCode: 'en-US'
                 });
                 
@@ -129,7 +112,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                 
                 const completedTranscription = await client.transcriptions(newTranscription.sid).fetch();
                 transcript = completedTranscription.transcriptionText || '';
-                console.log('[Recording] New transcript created:', transcript.substring(0, 100) + '...');
+                console.log('[Process Call] New transcript created:', transcript.substring(0, 100) + '...');
             }
             
             // Generate AI insights using Twilio-based analysis
@@ -138,7 +121,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
             }
             
         } catch (transcriptionError) {
-            console.error('[Recording] Twilio transcription error:', transcriptionError);
+            console.error('[Process Call] Twilio transcription error:', transcriptionError);
             // Fallback to basic insights
             aiInsights = {
                 summary: 'Call transcription processing in progress',
@@ -152,15 +135,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
             };
         }
         
-        // Update call data
-        const callData = callStore.get(callSid);
-        if (callData) {
-            callData.transcript = transcript;
-            callData.aiInsights = aiInsights;
-            callStore.set(callSid, callData);
-        }
-        
-        // Also upsert transcript and insights into /api/calls for the UI
+        // Update the call data in the central store
         try {
             const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
             await fetch(`${base}/api/calls`, {
@@ -173,64 +148,29 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                 })
             }).catch(() => {});
         } catch (e) {
-            console.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
+            console.warn('[Process Call] Failed posting transcript/insights to /api/calls:', e?.message);
         }
+
+        console.log('[Process Call] Twilio AI processing completed for:', callSid);
         
-        console.log('[Recording] Twilio AI processing completed for:', callSid);
+        return { transcript, aiInsights };
         
     } catch (error) {
-        console.error('[Recording] Twilio AI processing failed:', error);
+        console.error('[Process Call] Twilio AI processing failed:', error);
+        throw error;
     }
 }
 
 async function processRecording(recordingUrl, callSid) {
     try {
-        console.log('[Recording] Starting AI processing for:', callSid);
+        console.log('[Process Call] Starting transcription for:', callSid);
         
-        // Use Google Speech-to-Text for transcription
-        const transcript = await transcribeAudio(recordingUrl);
-        
-        // Generate AI insights
-        const aiInsights = await generateAIInsights(transcript);
-        
-        // Update call data
-        const callData = callStore.get(callSid);
-        if (callData) {
-            callData.transcript = transcript;
-            callData.aiInsights = aiInsights;
-            callStore.set(callSid, callData);
-        }
-        
-        // Also upsert transcript and insights into /api/calls for the UI
-        try {
-            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
-            await fetch(`${base}/api/calls`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    callSid: callSid,
-                    transcript,
-                    aiInsights
-                })
-            }).catch(() => {});
-        } catch (e) {
-            console.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
-        }
-        
-        console.log('[Recording] AI processing completed for:', callSid);
-        
-    } catch (error) {
-        console.error('[Recording] AI processing failed:', error);
-    }
-}
-
-async function transcribeAudio(recordingUrl) {
-    try {
         // 1) Download the recording (mp3) from Twilio using basic auth
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
         const authToken = process.env.TWILIO_AUTH_TOKEN;
+        
         if (!accountSid || !authToken) {
-            console.warn('[Transcribe] Missing Twilio credentials');
+            throw new Error('Missing Twilio credentials');
         }
 
         const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
@@ -262,17 +202,41 @@ async function transcribeAudio(recordingUrl) {
 
         const data = await response.json().catch(() => ({}));
 
+        let transcript = 'Transcription not available';
         if (data.results && data.results.length > 0) {
-            return data.results
+            transcript = data.results
                 .map(result => result.alternatives[0].transcript)
                 .join(' ');
         }
 
-        return 'Transcription not available';
+        console.log('[Process Call] Transcript generated:', transcript.substring(0, 100) + '...');
+
+        // 3) Generate AI insights
+        const aiInsights = await generateAIInsights(transcript);
+        
+        // 4) Update the call data in the central store
+        try {
+            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+            await fetch(`${base}/api/calls`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    callSid: callSid,
+                    transcript,
+                    aiInsights
+                })
+            }).catch(() => {});
+        } catch (e) {
+            console.warn('[Process Call] Failed posting transcript/insights to /api/calls:', e?.message);
+        }
+
+        console.log('[Process Call] AI processing completed for:', callSid);
+        
+        return { transcript, aiInsights };
         
     } catch (error) {
-        console.error('[Transcribe] Error:', error);
-        return 'Transcription failed';
+        console.error('[Process Call] AI processing failed:', error);
+        throw error;
     }
 }
 
@@ -396,6 +360,3 @@ Provide a JSON response with:
         };
     }
 }
-
-// Export call store for API access
-export { callStore };
