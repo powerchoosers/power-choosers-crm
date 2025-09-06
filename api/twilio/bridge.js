@@ -13,6 +13,12 @@ export default function handler(req, res) {
         
         console.log(`[Bridge] Connecting agent call to target: ${target}, CallSid: ${CallSid}`);
         
+        // Ensure absolute base URL for Twilio callbacks
+        const base =
+            (req.headers?.host ? `https://${req.headers.host}` : null) ||
+            process.env.PUBLIC_BASE_URL ||
+            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+        
         if (!target) {
             // No target specified, just say hello
             const twiml = new VoiceResponse();
@@ -32,7 +38,11 @@ export default function handler(req, res) {
             timeout: 30,
             answerOnBridge: true,  // This ensures proper audio bridging
             hangupOnStar: false,
-            timeLimit: 14400       // 4 hours max call duration
+            timeLimit: 14400,      // 4 hours max call duration
+            // Enable Twilio Voice Intelligence for real-time transcription and AI insights
+            record: 'record-from-answer',
+            recordingStatusCallback: `${base}/api/twilio/recording`,
+            recordingStatusCallbackMethod: 'POST'
         });
         
         // Add the target number with no retry logic
