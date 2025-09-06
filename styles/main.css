@@ -386,20 +386,7 @@
     color: var(--text-secondary);
     font-size: 0.9rem;
 }
-.step-type-modal .close-btn {
-    background: none;
-    border: 1px solid var(--border-light);
-    color: var(--grey-300);
-    width: 32px;
-    height: 32px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-}
-.step-type-modal .close-btn:hover { background: var(--grey-700); }
-.step-type-modal .close-btn:focus-visible {
-    outline: 2px solid var(--orange-muted);
-    outline-offset: 2px;
-}
+/* .step-type-modal .close-btn styles moved to standardized close button section above */
 .step-type-modal .body {
     padding: var(--spacing-base);
     max-height: min(70vh, 720px);
@@ -535,15 +522,7 @@
   justify-content: space-between;
   margin-bottom: 18px;
 }
-.add-contact-modal .close-btn {
-  background: none;
-  border: 1px solid var(--border-light);
-  color: var(--grey-300);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--border-radius-sm);
-  cursor: pointer;
-}
+/* .add-contact-modal .close-btn styles moved to standardized close button section above */
 .add-contact-modal .title {
   font-size: 1.1rem;
   font-weight: 600;
@@ -1686,15 +1665,19 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
 
-  /* Notes widget close button: light grey container with centered X */
-  .widget-card .notes-close {
+  /* Standardized close button styles for all modals and widgets */
+  .widget-card .notes-close,
+  .widget-card .health-close,
+  .widget-card .deal-close,
+  .pc-modal__close,
+  .close-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    min-width: 24px;
-    min-height: 24px;
+    width: 28px; /* slightly larger hit area */
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
     padding: 0;
     background: var(--bg-item);
     color: var(--grey-300);
@@ -1706,12 +1689,21 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
     cursor: pointer;
     transition: var(--transition-fast);
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent; /* better touch behavior */
   }
-  .widget-card .notes-close:hover {
+  .widget-card .notes-close:hover,
+  .widget-card .health-close:hover,
+  .widget-card .deal-close:hover,
+  .pc-modal__close:hover,
+  .close-btn:hover {
     background: var(--grey-600);
     color: var(--text-inverse);
   }
-  .widget-card .notes-close:focus-visible {
+  .widget-card .notes-close:focus-visible,
+  .widget-card .health-close:focus-visible,
+  .widget-card .deal-close:focus-visible,
+  .pc-modal__close:focus-visible,
+  .close-btn:focus-visible {
     outline: 2px solid var(--orange-muted);
     outline-offset: 2px;
   }
@@ -2380,6 +2372,11 @@ html, body {
     box-shadow: var(--elevation-card);
 }
 
+/* Ensure bottom spacing on dashboard equals one base unit (25px) */
+.dashboard-content .dashboard-card:last-child {
+    margin-bottom: 0;
+}
+
 .card-title {
     font-size: 1.125rem;
     font-weight: 600;
@@ -2811,7 +2808,7 @@ html, body {
 }
 
 /* === QUICK ACTIONS (Accounts) === */
-.qa-cell { min-width: 200px; }
+.qa-cell { min-width: 120px; }
 .qa-actions {
     display: inline-flex;
     align-items: center;
@@ -3288,7 +3285,10 @@ html, body {
 #lists-page .page-content {
     /* Lists overview: host a dedicated inner grid; avoid grid here to prevent conflicts */
     display: block;
-    padding: 0; /* padding comes from the inner #lists-grid */
+    /* Fixed 25px left/right margins - no scrollbar compensation */
+    padding: 25px;
+    /* Reserve space for the vertical scrollbar so the visible right margin stays 25px */
+    scrollbar-gutter: stable;
     flex: 1 1 auto;
     min-height: 0; /* allow children to flex properly */
     overflow-y: auto; /* confine scroll to the page content */
@@ -3300,20 +3300,12 @@ html, body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-base);
-    padding: var(--spacing-base);
+    /* No internal padding; spacing is provided by .page-content */
+    padding: 0;
     align-items: start;
     width: 100%;
     box-sizing: border-box;
-}
-
-/* When widget panel is visible, adjust right margin to maintain spacing */
-.content-area:has(.widget-panel.is-visible) #lists-page #lists-grid {
-    margin-right: var(--spacing-base);
-}
-
-/* Fallback for browsers that don't support :has() selector */
-.main-content.has-widget-panel #lists-page #lists-grid {
-    margin-right: var(--spacing-base);
+    /* Spacing is handled by #lists-page .page-content padding */
 }
 
 #lists-page .table-container {
@@ -3409,8 +3401,104 @@ html, body {
     margin-bottom: 0;
 }
 
+#list-detail-page .page-container {
+    display: flex;
+    flex-direction: column;
+    /* Exact 25px bottom gap using base spacing - mirror people page */
+    padding-bottom: var(--spacing-base);
+    overflow: visible; /* allow inner shadows to render */
+}
+
+#list-detail-page .page-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0; /* allow children to flex properly */
+    padding-bottom: 0; /* ensure table container touches bottom of page container */
+    /* Allow card box-shadow to render outside its bounds */
+    overflow: visible;
+}
+
+#list-detail-page .table-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* No extra external margin; page-container padding defines the gap */
+    margin-bottom: 0;
+    /* Allow popovers anchored inside to render rounded corners and shadows */
+    overflow: visible;
+}
+
 #list-detail-page .table-container .table-footer {
     margin-top: auto; /* push footer to bottom of table container */
+}
+
+/* List Detail table clickable names and companies - mirror people/accounts pages */
+#list-detail-table .name-cell {
+    color: var(--text-primary);
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: inline-block;
+}
+
+#list-detail-table .name-cell:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+#list-detail-table .name-cell:focus {
+    outline: none;
+}
+
+#list-detail-table .name-cell:focus-visible {
+    outline: 2px solid var(--orange-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+#list-detail-table .company-link {
+    color: var(--text-primary);
+    text-decoration: none;
+    cursor: pointer;
+    outline: none;
+    transition: var(--transition-fast);
+    display: inline-block;
+}
+
+#list-detail-table .company-link:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+#list-detail-table .company-link:focus {
+    outline: none;
+}
+
+#list-detail-table .company-link:focus-visible {
+    outline: 2px solid var(--orange-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* List Detail table: company favicon + name layout (mirror People table) */
+#list-detail-table .company-link .company-cell__wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#list-detail-table .company-favicon {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+#list-detail-table .company-name {
+    display: inline-block;
 }
 
 /* Let the scroll area consume remaining space and scroll while footer stays pinned */
@@ -3423,7 +3511,7 @@ html, body {
 }
 
 /* Quick Actions (shared) */
-.qa-cell { width: 1%; white-space: nowrap; }
+.qa-cell { width: 120px; white-space: nowrap; }
 .qa-actions { display: inline-flex; gap: 8px; align-items: center; }
 .qa-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -3706,18 +3794,7 @@ html, body {
     border-bottom: 1px solid var(--border-light);
 }
 .pc-modal__header .card-title { margin: 0; font-size: 1.1rem; letter-spacing: 0.2px; }
-.pc-modal__close {
-    background: none;
-    border: 1px solid transparent;
-    color: var(--grey-400);
-    font-size: 1.25rem;
-    line-height: 1;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-}
-.pc-modal__close:hover { color: var(--text-inverse); border-color: var(--border-light); background: var(--grey-700); }
+/* .pc-modal__close styles moved to standardized close button section above */
 .pc-modal__body { padding: var(--spacing-lg); }
 .pc-modal__body label { display:block; margin-bottom: 6px; }
 .pc-modal__body .help-text { color: var(--text-muted); font-size: 0.8rem; margin-top: 6px; }
@@ -3863,6 +3940,149 @@ html, body {
 .table-pagination .page-ellipsis {
     padding: 0 4px;
     opacity: 0.7;
+}
+
+/* === UNIFIED PAGINATION COMPONENT === */
+.unified-pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+}
+
+.pagination-arrow {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.pagination-arrow:hover:not(:disabled) {
+    background: var(--grey-700);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+}
+
+.pagination-arrow:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-arrow svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+}
+
+.pagination-current-container {
+    position: relative;
+}
+
+.pagination-current {
+    width: 40px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.pagination-current:hover {
+    background: var(--grey-700);
+    border-color: var(--border-medium);
+}
+
+.pagination-picker {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+    display: none;
+    z-index: 1000;
+}
+
+.pagination-picker.visible {
+    display: block;
+}
+
+.pagination-picker-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    padding: 12px;
+    min-width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.pagination-picker-header {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.pagination-picker-pages {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+}
+
+.picker-page {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.picker-page:hover {
+    background: var(--grey-700);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+}
+
+.picker-page.active {
+    background: var(--orange-subtle);
+    border-color: var(--orange-subtle);
+    color: var(--text-inverse);
+    font-weight: 600;
+}
+
+.picker-ellipsis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    grid-column: span 5;
+    margin: 4px 0;
 }
 
 /* === TASKS PAGE TABLE LAYOUT (pin footer to bottom) === */
@@ -4125,9 +4345,12 @@ html, body {
     align-items: center; /* center items vertically for even top/bottom padding */
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: var(--spacing-md);
+    margin-bottom: 8px; /* reduce gap between header and subtitle */
+    padding: 0; /* align with Notes widget */
 }
 .widget-card-header .widget-title { margin: 0; }
+/* Keep Energy News header on one line by preventing wrap */
+.widget-card-header .news-time { white-space: nowrap; }
 .notes-body {
     display: flex;
     flex-direction: column;
@@ -4135,10 +4358,18 @@ html, body {
 }
 
 /* Notes-specific padding to give breathing room for header X and footer buttons */
-.notes-card {
-  /* Match base widget-card padding for uniform spacing */
-  padding: var(--spacing-md, 12px);
+/* Base padding for all widget cards to keep header/subtitle breathing room */
+.widget-card { 
+    padding: var(--spacing-md) var(--spacing-base) var(--spacing-base) var(--spacing-base); 
 }
+/* Deal Calculator: stronger 25px space on all sides to match Energy Health Check */
+.deal-card.widget-card { padding: var(--spacing-md) var(--spacing-base); }
+/* Energy Health Check: ensure 25px bottom space under Reset */
+.health-card.widget-card { padding-bottom: var(--spacing-base); }
+/* Ensure header sits exactly at the top padding without extra offset */
+.deal-card .widget-card-header { margin-top: 0; padding-top: 0; }
+/* Deal Calculator: ensure 25px outer padding (matches Energy Health Check) */
+/* removed per revert request */
 
 .notes-footer {
   margin-top: var(--spacing-sm, 8px);
@@ -4161,8 +4392,8 @@ html, body {
 }
 
 .widget-title {
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: 1.1rem;
+    font-weight: 700;
     margin-bottom: var(--spacing-md);
     color: var(--text-primary);
 }
@@ -4190,6 +4421,12 @@ html, body {
     transform: translateY(-1px);
 }
 
+/* === DASHBOARD WIDGETS === */
+/* Ensure dashboard widgets have proper margins matching Deal Calculator and Energy Health Check */
+.widget-panel .widget-card {
+    padding: var(--spacing-md) var(--spacing-base) var(--spacing-base) var(--spacing-base);
+}
+
 /* === WIDGET LISTS === */
 .tasks-list, .news-list, .leads-list, .activities-list {
     display: flex;
@@ -4202,6 +4439,14 @@ html, body {
     background: var(--bg-item);
     border-radius: var(--border-radius-sm);
     transition: var(--transition-fast);
+}
+
+/* Ensure last items in widget lists have proper bottom spacing */
+.tasks-list:last-child .task-item:last-child,
+.news-list:last-child .news-item:last-child,
+.leads-list:last-child .lead-item:last-child,
+.activities-list:last-child .activity-item:last-child {
+    margin-bottom: 0; /* Remove any extra margin from last items */
 }
 
 /* Ensure anchor-based news items render like cards */
@@ -4229,6 +4474,7 @@ html, body {
 /* === PRICE WIDGET === */
 .price-display {
     text-align: center;
+    margin-bottom: 0; /* Ensure no extra margin at bottom */
 }
 
 .current-price {
@@ -4258,22 +4504,55 @@ html, body {
 
 /* === ACTIVITY ICONS === */
 .activity-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     margin-right: var(--spacing-sm);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
 }
 
-.activity-icon.call {
-    background: #28a745;
+.activity-item:hover .activity-icon {
+    background: var(--grey-700);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
 }
 
-.activity-icon.email {
-    background: var(--blue-subtle);
+.activity-icon svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+}
+
+.activity-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    font-size: 0.9rem;
+}
+
+.activity-description {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    line-height: 1.3;
+}
+
+.activity-time {
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
 }
 
 /* === DEALS BOARD (KANBAN) === */
@@ -4609,7 +4888,7 @@ html, body {
     border: none;            /* only inner body shows a border */
     border-radius: 6px;
     padding: 6px;            /* tighter spacing around the inner body */
-    cursor: grab;
+    cursor: default; /* not draggable widget */
     transition: all 0.2s ease;
 }
 
@@ -4699,6 +4978,728 @@ html, body {
     padding: 10px 12px;
     width: 100%;
     box-sizing: border-box;
+}
+
+/* === Enhanced Widget Styling === */
+
+/* Widget Card Base Styling */
+.health-card,
+.deal-card {
+    background: linear-gradient(135deg, var(--bg-widget), var(--bg-container));
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+}
+
+.health-card:hover,
+.deal-card:hover {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    transform: translateY(-1px);
+}
+
+/* Widget Headers */
+.health-card .widget-title,
+.deal-card .widget-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.health-subtitle,
+.deal-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 4px 0 16px 0; /* minimal gap between title and subtitle */
+    line-height: 1.5;
+}
+
+/* Section Pills with Enhanced Styling */
+.health-section-pill,
+.deal-section-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+}
+
+.health-section-pill.active,
+.deal-section-pill.active {
+    background: var(--orange-subtle);
+    border-color: var(--orange-subtle);
+    color: var(--text-inverse);
+    box-shadow: 0 2px 8px rgba(255,145,0,0.2);
+}
+
+.health-section-pill.completed,
+.deal-section-pill.completed {
+    background: #10b981;
+    border-color: #10b981;
+    color: var(--text-inverse);
+}
+
+.health-section-icon,
+.deal-section-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--bg-widget);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    transition: all 0.3s ease;
+}
+
+.health-section-pill.active .health-section-icon,
+.deal-section-pill.active .deal-section-icon {
+    background: rgba(255,255,255,0.2);
+    color: var(--text-inverse);
+}
+
+.health-section-pill.completed .health-section-icon,
+.deal-section-pill.completed .deal-section-icon {
+    background: rgba(255,255,255,0.2);
+    color: var(--text-inverse);
+}
+
+/* Enhanced Input Styling */
+.health-form-input,
+.deal-form-input {
+    height: 40px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 2px solid var(--border-light);
+    background: var(--bg-item);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+/* Keep dark background when browser autofill or suggestions are applied */
+.health-form-input:-webkit-autofill,
+.health-form-input:-webkit-autofill:hover,
+.health-form-input:-webkit-autofill:focus,
+.deal-form-input:-webkit-autofill,
+.deal-form-input:-webkit-autofill:hover,
+.deal-form-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text-primary) !important;
+    -webkit-box-shadow: 0 0 0px 1000px var(--bg-widget) inset !important;
+            box-shadow: 0 0 0px 1000px var(--bg-widget) inset !important;
+    border-color: var(--border-light) !important;
+}
+
+/* Firefox */
+.health-form-input:-moz-autofill,
+.deal-form-input:-moz-autofill {
+    box-shadow: 0 0 0px 1000px var(--bg-widget) inset;
+    -moz-text-fill-color: var(--text-primary);
+}
+
+.health-form-input::placeholder,
+.deal-form-input::placeholder { 
+    color: var(--text-muted); 
+    font-family: inherit; 
+    font-size: 0.85rem;
+}
+
+.health-form-input:focus,
+.deal-form-input:focus { 
+    outline: none; 
+    border-color: var(--orange-subtle); 
+    background: var(--bg-widget);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+    transform: translateY(-1px);
+}
+
+.health-form-input:hover,
+.deal-form-input:hover {
+    border-color: var(--grey-500);
+    background: var(--bg-widget);
+}
+
+/* Remove number spinners */
+.health-form-input[type="number"],
+.deal-form-input[type="number"] { 
+    -moz-appearance: textfield; 
+    appearance: textfield; 
+}
+
+.health-form-input[type="number"]::-webkit-outer-spin-button,
+.health-form-input[type="number"]::-webkit-inner-spin-button,
+.deal-form-input[type="number"]::-webkit-outer-spin-button,
+.deal-form-input[type="number"]::-webkit-inner-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+
+/* Input Labels */
+.health-input-label,
+.deal-input-label {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Input Groups */
+.health-input-group,
+.deal-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+/* Enhanced Button Styling */
+.health-calculate-btn,
+.deal-calculate-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    min-width: 160px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, var(--orange-subtle), #e67e22);
+    color: var(--text-inverse);
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(255,145,0,0.3);
+    cursor: pointer;
+}
+
+.health-calculate-btn:hover,
+.deal-calculate-btn:hover { 
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255,145,0,0.4);
+    filter: brightness(1.1);
+}
+
+.health-calculate-btn:active,
+.deal-calculate-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(255,145,0,0.3);
+}
+
+.health-calculate-btn:disabled,
+.deal-calculate-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Reset Button Styling */
+.health-reset-btn,
+.deal-reset-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--grey-600);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.health-reset-btn:hover,
+.deal-reset-btn:hover { 
+    background: var(--grey-700); 
+    color: var(--text-inverse);
+    border-color: var(--grey-500);
+    transform: translateY(-1px);
+}
+
+/* Widget body: no extra padding; sections control spacing */
+.health-card .health-body,
+.deal-card .deal-body { 
+    padding: 0; /* single source of side spacing from .widget-card padding */
+    transition: height 0.35s cubic-bezier(0.4,0,0.2,1);
+    will-change: height;
+}
+
+/* Form Sections Container - Clean slate with identical inner gutter */
+.health-form-sections { padding: 0; margin: 0; }
+.deal-form-sections { padding: 0; margin: 0; }
+
+/* Clean slate for inner groups to avoid hidden padding diffs */
+.health-section-header, .deal-section-header,
+.health-inputs, .deal-inputs { padding: 0; margin: 0; }
+
+/* Form Sections - Clean slate with consistent padding */
+.health-form-section,
+.deal-form-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 12px 16px; /* content buffer so inputs don't touch border */
+    margin: var(--spacing-sm) 0; /* revert to single source of left/right via card padding */
+    transition: all 0.3s ease;
+}
+
+/* Health CTA block: show button alone (no border/background) */
+#health-section-cta {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0; /* full-width like adjacent sections and reset button */
+    margin: var(--spacing-sm) 0; /* align vertical rhythm with sections */
+}
+#health-section-cta .health-calculate-btn {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Health reset button: full width to match CTA */
+.health-button-group .health-reset-btn {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 20px;
+}
+
+/* Deal Calculator: ensure extra bottom breathing room inside orange border */
+.deal-form-section { padding: 12px 16px 18px; }
+
+/* Deal Calculator buttons: full width and identical sizing */
+.deal-button-group { flex-direction: column; }
+.deal-calculate-btn, .deal-reset-btn { width: 100%; box-sizing: border-box; }
+.deal-reset-btn { padding: 12px 20px; }
+
+/* Trim extra space at the edges to avoid double margins */
+.health-form-section:first-child,
+.deal-form-section:first-child { margin-top: 0; }
+.health-form-section:last-child,
+.deal-form-section:last-child { margin-bottom: 0; }
+
+.health-form-section.active,
+.deal-form-section.active {
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 1px rgba(255,145,0,0.2);
+}
+
+/* Deal Calculator: enforce 25px gap below the last orange container */
+.deal-form-sections .deal-form-section:last-child { margin-bottom: calc(var(--spacing-base) - var(--spacing-md)); }
+
+.health-form-section.completed,
+.deal-form-section.completed {
+    border-color: #10b981;
+    background: rgba(16,185,129,0.05);
+}
+
+/* Results Styling */
+.health-results,
+.deal-results {
+    background: linear-gradient(135deg, var(--bg-card), var(--bg-item));
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 16px;
+    margin-top: 16px;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Loading Spinner */
+.health-loading,
+.deal-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+}
+
+.health-spinner,
+.deal-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-light);
+    border-top: 3px solid var(--orange-subtle);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 12px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.health-loading-text,
+.deal-loading-text {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Deal Calculator Specific */
+.deal-summary-box {
+    background: linear-gradient(135deg, var(--bg-item), var(--bg-card));
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+}
+
+.deal-result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+}
+
+.deal-result-item {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+}
+
+.deal-result-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.deal-result-value.deal-total {
+    color: var(--orange-subtle);
+    font-size: 1.4rem;
+}
+
+.deal-result-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Health Check Specific */
+.health-usage-display {
+    background: linear-gradient(135deg, var(--bg-item), var(--bg-card));
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+}
+
+/* Inline SVG icon styling for Health widget */
+.health-icon {
+    width: 16px;
+    height: 16px;
+    fill: #ffffff;
+    display: inline-block;
+    vertical-align: -2px;
+}
+
+.health-usage-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Results layout & aesthetics */
+.health-main-result {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px;
+    border-radius: 10px;
+    color: var(--text-inverse);
+    margin-bottom: 16px;
+}
+.health-main-result.savings {
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+}
+.health-main-result.increase {
+    background: linear-gradient(135deg, #ef4444, #f97316);
+}
+.health-main-result.neutral {
+    background: linear-gradient(135deg, var(--grey-700), var(--grey-600));
+}
+.health-result-amount {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.1;
+}
+.health-result-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.9;
+}
+
+.health-details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.health-detail-item {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 6px 12px;
+    text-align: center;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px;
+    width: 100%;
+}
+.health-detail-value {
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 0;
+}
+.health-detail-label {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    line-height: 1.15;
+    margin: 0;
+}
+
+.health-analysis-box {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 16px;
+}
+.health-analysis-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+.health-analysis-text { color: var(--text-secondary); line-height: 1.5; }
+
+/* no responsive overrides needed; list is stacked vertically by design */
+
+.health-usage-title {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.health-usage-details {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.health-input-feedback {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    border: 1px solid;
+    transition: all 0.3s ease;
+}
+
+.health-input-feedback.hidden {
+    display: none;
+}
+
+.health-input-feedback.feedback-danger {
+    background: rgba(239,68,68,0.1);
+    color: #ef4444;
+    border-color: rgba(239,68,68,0.3);
+}
+
+.health-input-feedback.feedback-warning {
+    background: rgba(245,158,11,0.1);
+    color: #f59e0b;
+    border-color: rgba(245,158,11,0.3);
+}
+
+.health-input-feedback.feedback-success {
+    background: rgba(16,185,129,0.1);
+    color: #10b981;
+    border-color: rgba(16,185,129,0.3);
+}
+
+.health-input-feedback.feedback-info {
+    background: rgba(30,64,175,0.1);
+    color: #1e40af;
+    border-color: rgba(30,64,175,0.3);
+}
+
+/* Button Groups */
+.health-button-group,
+.deal-button-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+/* Commission Type Styling */
+.deal-commission-type {
+    margin-top: 16px;
+    padding: 12px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+}
+
+.deal-commission-label {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+}
+
+.deal-radio-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.deal-radio-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    background: var(--bg-widget);
+    border: 1px solid var(--border-light);
+    flex: 1;
+    justify-content: flex-start;
+}
+
+.deal-radio-label:hover {
+    background: var(--bg-hover);
+    border-color: var(--grey-500);
+}
+
+.deal-radio-label input[type="radio"] {
+    margin: 0;
+    accent-color: var(--orange-subtle);
+}
+
+.deal-radio-label input[type="radio"]:checked + .deal-radio-text {
+    color: var(--orange-subtle);
+    font-weight: 600;
+}
+
+.deal-radio-text {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+}
+
+/* Input Notes */
+.deal-input-note {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-style: italic;
+    margin-top: 4px;
+    line-height: 1.3;
+}
+
+/* Summary Box Styling */
+.deal-summary-title {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.deal-summary-content {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+/* Ready Text Styling */
+.health-ready-text {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-align: center;
+    font-style: italic;
+    margin: 8px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .health-card .health-body,
+    .deal-card .deal-body {
+        padding: 12px 16px;
+    }
+    
+    .health-form-section,
+    .deal-form-section {
+        padding: 12px;
+    }
+    
+    .health-calculate-btn,
+    .deal-calculate-btn {
+        min-width: 100%;
+    }
+    
+    .health-button-group,
+    .deal-button-group {
+        flex-direction: column;
+    }
+    
+    .deal-radio-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .deal-radio-label {
+        justify-content: center;
+    }
 }
 
 /* Remove gaps between lines inside the body */
@@ -5110,6 +6111,202 @@ margin-bottom: var(--spacing-md);
     min-width: 0; /* allow children to shrink inside grid cell */
 }
 #account-detail-view .info-input-wrap .info-edit-input {
+
+/* Email Status Indicator */
+.email-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    color: #10b981; /* green-500 */
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 50%;
+    padding: 2px;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.email-status-indicator svg {
+    width: 12px;
+    height: 12px;
+    stroke: #10b981;
+    fill: none;
+}
+
+.email-status-indicator:hover {
+    background: rgba(16, 185, 129, 0.2);
+    transform: scale(1.1);
+    transition: all 0.2s ease;
+}
+
+/* Phone Field Dropdown */
+.phone-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--elevation-card);
+    z-index: 1000;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.phone-dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-light);
+    transition: background-color 0.2s ease;
+}
+
+.phone-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.phone-dropdown-item:hover {
+    background: var(--grey-800);
+}
+
+.phone-dropdown-item.selected {
+    background: var(--primary-700);
+    color: white;
+}
+
+.phone-dropdown-item .phone-type {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+
+.phone-dropdown-item .phone-number {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.phone-dropdown-item.selected .phone-number {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.phone-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+/* Account Contacts Section */
+.contacts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.contact-item:hover {
+    background: var(--grey-800);
+    border-color: var(--border-medium);
+}
+
+.contact-avatar {
+    flex-shrink: 0;
+}
+
+.contact-info {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Force contact name size in account contacts section */
+#account-contacts-list .contact-item .contact-name,
+.contacts-list .contact-item .contact-name,
+.contact-info .contact-name {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    margin-bottom: 4px !important;
+    line-height: 1.2 !important;
+}
+
+.contact-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.contact-details span {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.contact-title {
+    font-weight: 500;
+}
+
+.contact-email {
+    color: var(--primary-400);
+}
+
+.contact-phone {
+    color: var(--text-secondary);
+}
+
+.contact-actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+}
+
+.contact-quick-action-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.contact-quick-action-btn:hover {
+    background: var(--grey-700);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+}
+
+.contact-quick-action-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+}
+
+.contacts-placeholder {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
     width: auto; /* override global width:100% to keep actions inline */
     flex: 1 1 0%; /* allow input to shrink so actions never wrap */
     min-width: 0;
@@ -5152,12 +6349,12 @@ margin-bottom: var(--spacing-md);
 #account-detail-view .info-row--full { grid-column: 1 / -1; }
 /* Multiline value display */
 #account-detail-view .info-value-wrap--multiline { align-items: flex-start; }
-#account-detail-view .info-value-text--multiline {
-  white-space: pre-wrap; /* preserve newlines */
-  overflow: visible;
-  text-overflow: clip;
-  word-break: break-word;
-  line-height: 1.4;
+#account-detail-view .info-value-wrap .info-value-text--multiline {
+    white-space: pre-wrap; /* preserve newlines */
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    line-height: 1.4;
 }
 /* Multiline edit layout */
 #account-detail-view .info-input-wrap--multiline { display: flex; align-items: flex-start; gap: 6px; width: 100%; }
@@ -5249,6 +6446,53 @@ margin-bottom: var(--spacing-md);
 
 .activity-timeline {
     min-height: 120px;
+    position: relative;
+}
+
+.activity-pagination {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+}
+
+.activity-pagination-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.activity-pagination-btn:hover:not(:disabled) {
+    background: var(--grey-700);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+}
+
+.activity-pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.activity-pagination-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+}
+
+.activity-pagination-info {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
 }
 
 .activity-placeholder {
@@ -5259,6 +6503,15 @@ margin-bottom: var(--spacing-md);
     padding: var(--spacing-xl);
     color: var(--text-muted);
     text-align: center;
+}
+
+.activity-placeholder .loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-light);
+    border-top: 2px solid var(--orange-subtle);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 
 .placeholder-icon {
@@ -5316,6 +6569,186 @@ margin-bottom: var(--spacing-md);
 }
 #people-table .name-cell .name-text {
     display: inline-block;
+}
+
+/* Make phone numbers clickable in people table */
+#people-table .phone-cell {
+    cursor: pointer;
+    color: var(--grey-400);
+    font-weight: 400;
+    text-decoration: none;
+    outline: none;
+    transition: var(--transition-fast);
+}
+
+#people-table .phone-cell:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+/* Keyboard focus: mirror hover without rectangle */
+#people-table .phone-cell:focus {
+    outline: none;
+}
+#people-table .phone-cell:focus-visible {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+/* Drag and Drop Styling for Table Headers */
+th.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg);
+    z-index: 1000;
+    position: relative;
+    background: var(--bg-widget) !important;
+    border: 2px solid var(--orange-primary) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: none;
+}
+
+th.drag-target {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+th.drag-over {
+    background: var(--orange-subtle) !important;
+    border-left: 3px solid var(--orange-primary) !important;
+    border-right: 3px solid var(--orange-primary) !important;
+    position: relative;
+    z-index: 999;
+}
+
+th.drag-over::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -2px;
+    right: -2px;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        var(--orange-primary) 2px, 
+        var(--orange-primary) calc(100% - 2px), 
+        transparent 100%);
+    opacity: 0.3;
+    z-index: -1;
+}
+
+th.drag-over::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1001;
+    pointer-events: none;
+}
+
+/* Accounts table drag and drop styling */
+#accounts-table th.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg);
+    z-index: 1000;
+    position: relative;
+    background: var(--bg-widget) !important;
+    border: 2px solid var(--orange-primary) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: none;
+}
+
+#accounts-table th.drag-target {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+#accounts-table th.drag-over {
+    background: var(--orange-subtle) !important;
+    border-left: 3px solid var(--orange-primary) !important;
+    border-right: 3px solid var(--orange-primary) !important;
+    position: relative;
+    z-index: 999;
+}
+
+#accounts-table th.drag-over::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -2px;
+    right: -2px;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        var(--orange-primary) 2px, 
+        var(--orange-primary) calc(100% - 2px), 
+        transparent 100%);
+    opacity: 0.3;
+    z-index: -1;
+}
+
+/* List Detail table drag and drop styling */
+#list-detail-table th.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg);
+    z-index: 1000;
+    position: relative;
+    background: var(--bg-widget) !important;
+    border: 2px solid var(--orange-primary) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: none;
+}
+
+#list-detail-table th.drag-target {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+#list-detail-table th.drag-over {
+    background: var(--orange-subtle) !important;
+    border-left: 3px solid var(--orange-primary) !important;
+    border-right: 3px solid var(--orange-primary) !important;
+    position: relative;
+    z-index: 999;
+}
+
+#list-detail-table th.drag-over::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -2px;
+    right: -2px;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        var(--orange-primary) 2px, 
+        var(--orange-primary) calc(100% - 2px), 
+        transparent 100%);
+    opacity: 0.3;
+    z-index: -1;
+}
+
+#list-detail-table th.drag-over::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1001;
+    pointer-events: none;
+}
+
+#accounts-table th.drag-over::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1001;
+    pointer-events: none;
 }
 
 /* People table: company favicon + name */
@@ -5502,6 +6935,97 @@ margin-bottom: var(--spacing-md);
     pointer-events: none;
 }
 
+/* Account Detail header: same styling as contact detail */
+#account-detail-header #open-widgets {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;   /* match quick-action icon size */
+    height: 36px;  /* enforce perfect square */
+    padding: 0;    /* remove default button padding */
+    line-height: 0; /* prevent baseline offset */
+    box-sizing: border-box; /* include border in total size */
+    border-radius: var(--border-radius);
+    vertical-align: middle;
+}
+#account-detail-header #open-widgets svg {
+    width: 18px;
+    height: 18px;
+    display: block; /* avoid inline SVG baseline spacing */
+    pointer-events: none;
+}
+
+/* Prevent hover translate on this icon-only primary button */
+#account-detail-header #open-widgets:hover {
+    transform: none;
+}
+
+/* Widgets drawer container and slide-out behavior */
+#account-detail-header .widgets-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    /* Hover bridge to the left so users can move into the drawer without losing hover */
+    padding-left: 16px;
+    margin-left: -16px; /* neutralize layout shift */
+}
+#account-detail-header .widgets-drawer {
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    transform: translateY(-50%) translateX(0); /* flush to button */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    background: var(--grey-700);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    box-shadow: var(--elevation-card);
+    padding: 6px;
+    display: inline-flex;
+    gap: 6px;
+    z-index: 5;
+    transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+}
+#account-detail-header .widgets-wrap:hover .widgets-drawer,
+#account-detail-header .widgets-wrap:focus-within .widgets-drawer,
+#account-detail-header .widgets-wrap.open .widgets-drawer {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(-50%) translateX(0); /* keep flush while visible */
+}
+
+/* Widget icon buttons inside drawer */
+#account-detail-header .widgets-drawer .widget-item {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--grey-300);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+#account-detail-header .widgets-drawer .widget-item:hover {
+    background: var(--grey-600);
+    color: var(--text-inverse);
+    border-color: var(--grey-500);
+}
+#account-detail-header .widgets-drawer .widget-item:focus-visible {
+    outline: 2px solid var(--orange-muted);
+    outline-offset: 2px;
+}
+#account-detail-header .widgets-drawer .widget-item svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+    pointer-events: none;
+}
+
 /* People table: company favicon + name layout (mirror Accounts table) */
 #people-table .company-cell__wrap {
     display: inline-flex;
@@ -5539,17 +7063,7 @@ margin-bottom: var(--spacing-md);
 .vars-modal .title-wrap { display: flex; flex-direction: column; gap: 2px; }
 .vars-modal .title { font-size: 1.05rem; font-weight: 600; }
 .vars-modal .subtitle { color: var(--text-secondary); font-size: 0.9rem; }
-.vars-modal .close-btn {
-    background: none;
-    border: 1px solid var(--border-light);
-    color: var(--grey-300);
-    width: 32px;
-    height: 32px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-}
-.vars-modal .close-btn:hover { background: var(--grey-700); }
-.vars-modal .close-btn:focus-visible { outline: 2px solid var(--orange-muted); outline-offset: 2px; }
+/* .vars-modal .close-btn styles moved to standardized close button section above */
 .vars-modal .body { padding: var(--spacing-base); max-height: min(70vh, 640px); overflow: auto; }
 
 .vars-tabs { display: flex; gap: 8px; margin-bottom: var(--spacing-md); }
@@ -5928,20 +7442,7 @@ input.row-select[type="checkbox"]:focus-visible {
     margin-top: 4px;
 }
 
-.contacts-modal .close-btn {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 4px;
-    line-height: 1;
-    transition: var(--transition-fast);
-}
-
-.contacts-modal .close-btn:hover {
-    color: var(--text-primary);
-}
+/* .contacts-modal .close-btn styles moved to standardized close button section above */
 
 .contacts-modal .modal-content {
     flex: 1;
@@ -6586,12 +8087,27 @@ input.row-select[type="checkbox"]:focus-visible {
     color: var(--text-secondary);
     background: transparent;
     border: 1px solid var(--border-light);
+    border-radius: var(--border-radius-sm);
 }
 
 .list-card-actions .btn-text:hover {
     color: var(--text-primary);
     background: var(--bg-item);
     border-color: var(--text-secondary);
+}
+
+/* === CRM-WIDE BUTTON CONSISTENCY RULE === */
+/* All buttons throughout the CRM should have rounded corners for consistency */
+.btn-secondary,
+.btn-text,
+.btn-primary,
+.page-btn,
+.pagination-arrow,
+.qa-btn,
+.contact-quick-action-btn,
+.unified-pagination button,
+.activity-pagination-btn {
+    border-radius: var(--border-radius-sm) !important;
 }
 
 /* Empty state positioning in grid */
@@ -6737,6 +8253,12 @@ input.contact-name-input.input-dark:focus {
 }
 
 /* === CSV IMPORT MODAL STYLES === */
+
+/* CRITICAL: Force contact name size in account details page */
+div[id="account-contacts-list"] .contact-item .contact-name {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+}
 
 /* Larger modal dialog for CSV import */
 .csv-import-modal {
@@ -7158,6 +8680,8 @@ input.contact-name-input.input-dark:focus {
 .checkbox-label input[type="checkbox"] {
     margin: 0;
     accent-color: var(--orange-subtle);
+    vertical-align: middle;
+    margin-top: -1px;
 }
 
 /* Review section */
@@ -7165,6 +8689,41 @@ input.contact-name-input.input-dark:focus {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-base);
+}
+
+/* Contact Merge Dialog */
+.merge-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+    margin: var(--spacing-lg) 0;
+}
+
+.merge-contact {
+    padding: var(--spacing-md);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.merge-contact h4 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.contact-preview {
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.similarity-info {
+    padding: var(--spacing-sm);
+    background: var(--orange-muted);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    margin: var(--spacing-md) 0;
 }
 
 .review-header h4 {
