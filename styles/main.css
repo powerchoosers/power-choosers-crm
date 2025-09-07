@@ -98,6 +98,97 @@
     --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* === EMAIL EDITOR: AI BAR (slide-down) === */
+.ai-bar {
+    display: block;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--surface-hover);
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    position: relative;
+    z-index: 2; /* ensure above compose-body */
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ai-bar.open {
+    max-height: 480px;
+    opacity: 1;
+    padding: 16px;
+    overflow: visible; /* allow chips to paint outside inner flow if needed */
+    margin-bottom: 10px; /* ensure content below does not overlap */
+}
+.ai-inner { display: flex; flex-direction: column; gap: 10px; max-height: min(60vh, 440px); overflow-y: auto; }
+.ai-row { display: flex; gap: 8px; align-items: stretch; }
+.ai-row.suggestions { flex-wrap: wrap; }
+.ai-suggestion {
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--grey-300);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+}
+.ai-suggestion:hover { background: var(--grey-700); color: var(--text-inverse); border-color: var(--grey-600); }
+.ai-prompt { width: 100%; min-height: 68px; }
+.ai-row.actions { align-items: center; }
+.ai-row .ai-status { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
+
+/* === Recipient suggestions dropdown === */
+.recipient-row { position: relative; }
+.recipient-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 60px; /* align with input after label width */
+    right: 0;
+    z-index: 3000; /* ensure above compose editor and toolbars */
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    box-shadow: var(--elevation-card);
+    margin-top: 6px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.recipient-suggestions .suggestion-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-light);
+}
+.recipient-suggestions .suggestion-item:last-child { border-bottom: none; }
+.recipient-suggestions .suggestion-item:hover { background: var(--surface-hover); }
+.recipient-suggestions .sugg-main { font-weight: 600; color: var(--text-primary); }
+.recipient-suggestions .sugg-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.recipient-suggestions .suggestion-empty { padding: 10px; color: var(--text-secondary); font-style: italic; }
+
+/* HTML mode: show raw HTML and a subtle badge */
+.body-input[data-mode="html"] {
+    position: relative;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    white-space: pre-wrap;
+}
+.body-input[data-mode="html"]::before,
+.body-input[data-mode="html"]:empty::before {
+    content: 'HTML MODE';
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: var(--orange-subtle);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.6px;
+    border-radius: 999px;
+    padding: 4px 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    pointer-events: none;
+    text-transform: uppercase;
+}
+
 /* === VARIABLES POPOVER (anchored dropdown) === */
 .vars-popover {
     position: fixed; /* positioned via JS near the toolbar button */
@@ -1140,10 +1231,10 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
     align-items: center;
     gap: var(--spacing-sm);
     background: var(--bg-item);
-    border: 1px solid var(--border-light);
+    border: none;
     border-radius: var(--border-radius-sm);
     padding: 6px;
-    margin-bottom: var(--spacing-sm); /* even gap with subject row */
+    margin-bottom: 0; /* remove margin to bring compose input closer */
 }
 
 .editor-toolbar .toolbar-btn {
@@ -1172,10 +1263,10 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
 .editor-toolbar .toolbar-btn:active {
     transform: translateY(0.5px);
 }
-.editor-toolbar .toolbar-btn svg {
-    width: 22px;
-    height: 22px;
-    display: block;
+.editor-toolbar .toolbar-btn svg { 
+    width: 16px !important; 
+    height: 16px !important; 
+    display: block; 
 }
 .editor-toolbar .toolbar-btn[data-action="formatting"] svg text {
     /* Center the rendered glyph vertically within the 22x22 viewbox */
@@ -1233,6 +1324,7 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
 .editor-toolbar .toolbar-btn .icon {
     display: inline-flex;
     color: var(--grey-300);
+    font-size: 16px;
 }
 
 /* Hide verbose label inside the AI button to keep toolbar compact */
@@ -2711,6 +2803,11 @@ html, body {
     flex: 1;
     padding: var(--spacing-base);
     overflow-y: auto;
+}
+
+/* Emails page: remove inner padding so the email layout touches container edges */
+#emails-page .page-content {
+    padding: 0;
 }
 
 /* === BUTTONS === */
@@ -7372,6 +7469,9 @@ input.row-select[type="checkbox"]:focus-visible {
     width: 0;
     padding: 0;
     overflow: hidden;
+    border-right: none;
+    opacity: 0;
+    transform: translateX(-100%);
 }
 
 /* Custom scrollbar for webkit browsers */
@@ -7550,6 +7650,7 @@ input.row-select[type="checkbox"]:focus-visible {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0; /* allow inner flex children to scroll */
     margin: 0;
 }
 
@@ -7675,7 +7776,7 @@ input.row-select[type="checkbox"]:focus-visible {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-md);
+    padding: 0 var(--spacing-md);
     border-bottom: 1px solid var(--border-light);
     background: var(--bg-container);
     border-radius: 0;
@@ -7923,21 +8024,25 @@ input.row-select[type="checkbox"]:focus-visible {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-lg) * 2;
+    padding: calc(var(--spacing-lg) * 2);
     text-align: center;
     color: var(--text-muted);
     gap: var(--spacing-md);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.03));
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    box-shadow: var(--elevation-card);
 }
 
 .email-auth-prompt svg {
     opacity: 0.6;
-    margin-bottom: var(--spacing-md);
+    margin-bottom: 8px;
 }
 
 .email-auth-prompt h3 {
     color: var(--text-secondary);
     margin: 0;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
 }
 
@@ -7952,6 +8057,851 @@ input.row-select[type="checkbox"]:focus-visible {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    min-width: 160px;
+    justify-content: center;
+}
+
+.email-auth-prompt .btn-secondary {
+    min-width: 160px;
+}
+
+/* Gmail Sign-in Button - styled like Deal Calculator button */
+.gmail-signin-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    min-width: 160px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, var(--orange-subtle), #e67e22);
+    color: var(--text-inverse);
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: none; /* remove glow */
+}
+
+.gmail-signin-btn:hover { 
+    transform: translateY(-2px);
+    box-shadow: none; /* remove glow */
+    filter: brightness(1.1);
+}
+
+.gmail-signin-btn:active {
+    transform: translateY(0);
+    box-shadow: none; /* remove glow */
+}
+
+.gmail-signin-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Gmail Compose Button - styled like Gmail Sign-in button */
+.gmail-compose-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    min-width: 120px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, var(--orange-subtle), #e67e22);
+    color: var(--text-inverse);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: none; /* remove glow */
+}
+
+.gmail-compose-btn:hover { 
+    transform: translateY(-2px);
+    box-shadow: none;
+    filter: brightness(1.1);
+}
+
+.gmail-compose-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.gmail-compose-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Email Search Controls - search input and toggle button side by side */
+.email-search-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Email Sort Controls - refresh button and email count side by side */
+.email-sort {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Gmail-style Compose Window */
+.compose-window {
+    position: fixed;
+    bottom: 0;
+    right: 20px;
+    width: 600px;
+    max-width: calc(100vw - 40px);
+    height: 600px;
+    max-height: calc(100vh - 40px);
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: visible; /* allow editor popovers to render outside */
+    will-change: transform, height;
+    min-height: 0; /* allow internal flex children to scroll */
+}
+
+.compose-window.open {
+    transform: translateY(0);
+}
+
+.compose-window.minimized {
+    height: 60px;
+    transform: translateY(calc(100% - 60px));
+}
+
+.compose-window.maximized {
+    width: calc(100vw - 40px);
+    height: calc(100vh - 40px);
+    right: 20px;
+    bottom: 20px;
+    border-radius: 8px;
+}
+
+.compose-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border-light);
+    border-radius: 8px 8px 0 0;
+    cursor: move;
+    user-select: none;
+}
+
+.compose-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.compose-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.compose-control-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: background-color 0.2s;
+}
+
+.compose-control-btn:hover {
+    background: var(--surface-hover);
+}
+
+.compose-control-btn:active {
+    background: var(--border-light);
+}
+
+.compose-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: visible; /* Allow dropdowns to extend beyond this container */
+    min-height: 0; /* critical for child scroll areas */
+}
+
+.compose-recipients {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-light);
+    position: relative;
+    z-index: 4; /* keep suggestions above compose body */
+}
+
+.recipient-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.recipient-row:last-child {
+    margin-bottom: 0;
+}
+
+.recipient-label {
+    width: 60px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.recipient-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    padding: 4px 0;
+    color: var(--text-primary);
+    background: transparent;
+}
+
+.recipient-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.recipient-actions {
+    margin-top: 8px;
+}
+
+.recipient-toggle {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.recipient-toggle:hover {
+    text-decoration: underline;
+}
+
+.compose-subject {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.subject-input {
+    width: 100%;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    padding: 0;
+    color: var(--text-primary);
+    background: transparent;
+    line-height: 1.4;
+    height: 24px;
+    display: flex;
+    align-items: center;
+}
+
+.subject-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.compose-editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: visible; /* Allow dropdowns to extend beyond this container */
+    min-height: 0; /* allow children to define scrollable area */
+}
+
+.editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-light); /* divider below toolbar */
+    background: var(--surface-hover);
+    position: relative;
+    z-index: 10;
+    border-radius: 0;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
+}
+
+.toolbar-btn::after,
+.toolbar-btn::before {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.toolbar-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-light);
+}
+
+.toolbar-btn.active {
+    background: var(--primary-subtle);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.toolbar-btn .icon {
+    font-size: 16px;
+}
+
+.toolbar-btn .label {
+    font-weight: 500;
+}
+
+.formatting-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start; /* align to left like editor toolbar */
+    gap: 8px;
+    padding: 0 16px; /* keep horizontal padding to avoid horizontal shift */
+    border-bottom: none;
+    background: transparent; /* avoid grey seam when closed */
+    position: relative;
+    z-index: 10;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.formatting-bar.open {
+    max-height: 60px;
+    opacity: 1;
+    transform: translateY(0);
+    padding: 8px 16px; /* keep same padding as closed to avoid lateral shift */
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border-light); /* dividing line below formatting bar */
+    overflow: visible; /* allow dropdowns to extend beyond bar */
+}
+
+
+.fmt-group {
+    position: relative;
+}
+
+.fmt-btn {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.fmt-btn::after,
+.fmt-btn::before {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.fmt-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-light);
+}
+
+.fmt-btn[aria-pressed="true"] {
+    background: var(--primary-subtle);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Tooltip styles for formatting buttons */
+.fmt-btn[title]:hover::after,
+.toolbar-btn[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1004;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-light);
+    margin-bottom: 4px;
+    opacity: 1;
+    pointer-events: none;
+}
+
+.fmt-btn[title]:hover::before,
+.toolbar-btn[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--border-light);
+    z-index: 1004;
+    margin-bottom: -1px;
+    opacity: 1;
+    pointer-events: none;
+}
+
+.fmt-label {
+    font-weight: 500;
+}
+
+.fmt-glyph {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* SVG icons inside formatting buttons (matching sequence builder) */
+.fmt-btn svg { width: 16px; height: 16px; display: block; }
+
+/* Force override inline SVG sizing in compose and sequence builder */
+.compose-window svg[width][height],
+.step-card svg[width][height] {
+    width: 20px !important;
+    height: 20px !important;
+}
+
+/* Specific override for formatting bar SVGs */
+.formatting-bar svg[width][height],
+.fmt-btn svg[width][height] {
+    width: 16px !important;
+    height: 16px !important;
+}
+
+/* Toolbar SVG sizing with flexbox constraints */
+.editor-toolbar svg,
+.toolbar-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+    max-width: 16px !important;
+    max-height: 16px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+}
+
+/* Compose window control SVGs */
+.compose-control-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+
+.fmt-btn .ql-stroke {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.75;
+}
+
+.fmt-btn .ql-stroke.ql-thin {
+    stroke-width: 1;
+}
+
+.fmt-btn .ql-fill {
+    fill: currentColor;
+}
+
+.format-popover {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    z-index: 1200; /* ensure above compose body */
+    display: none;
+    min-width: 120px;
+}
+
+.format-popover::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid var(--border-light);
+}
+
+.format-popover::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 5px solid var(--bg-card);
+}
+
+.format-popover.open {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.popover-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.popover-item:hover {
+    background: var(--surface-hover);
+}
+
+.color-swatches {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    justify-content: center;
+}
+
+.color-swatch {
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border-color: var(--primary);
+}
+
+.link-bar {
+    display: block;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--surface-hover);
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.link-bar.open {
+    max-height: 200px;
+    opacity: 1;
+    padding: 16px;
+}
+
+.link-bar .field {
+    margin-bottom: 12px;
+}
+
+.link-bar .field:last-child {
+    margin-bottom: 0;
+}
+
+.link-bar .fmt-label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.link-bar .input-dark {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.link-bar .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.link-bar .fmt-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.link-bar .fmt-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* === EMAIL EDITOR: VARIABLES BAR === */
+.variables-bar {
+    display: block;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--surface-raised);
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-4px);
+    transition: max-height var(--transition-smooth), opacity var(--transition-smooth), transform var(--transition-smooth),
+                padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.variables-bar.open { max-height: 280px; opacity: 1; transform: translateY(0); padding: 16px; }
+.variables-bar .vars-tabs { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.variables-bar .vars-tab {
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--grey-300);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-size: 0.85rem;
+}
+.variables-bar .vars-tab:hover { background: var(--grey-700); color: var(--text-inverse); }
+.variables-bar .vars-tab.active { background: var(--grey-700); color: var(--text-inverse); border-color: var(--grey-600); }
+.variables-bar .vars-panels { display: block; }
+.variables-bar .vars-panel.hidden { display: none; }
+.variables-bar .var-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.variables-bar .var-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    text-align: left;
+    transition: var(--transition-fast);
+}
+.variables-bar .var-item:hover { background: var(--surface-hover); border-color: var(--grey-500); }
+.variables-bar .var-item .var-item-token { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; color: var(--grey-300); }
+.variables-bar .fmt-btn { margin-left: auto; }
+
+.compose-body {
+    flex: 1 1 auto;
+    min-height: 0; /* critical: let this area shrink and become scrollable */
+    max-height: 100%;
+    padding: 0 16px 16px 16px; /* move compose text up by 5px */
+    margin-top: 10px; /* reduce gap above to bring placeholder up */
+    overflow-y: auto; /* enable vertical scrolling for long content */
+    overflow-x: visible; /* keep horizontal overflow visible for popovers */
+    position: relative; /* create stacking context below popovers */
+    z-index: 0;
+    -webkit-overflow-scrolling: touch; /* smooth on iOS */
+}
+
+.body-input {
+    width: 100%;
+    /* Let content drive height; container scrolls */
+    min-height: 220px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    line-height: 1.4; /* allow proper line spacing for lists */
+    color: var(--text-primary);
+    resize: none;
+    font-family: inherit;
+    background: transparent;
+}
+
+.compose-preview {
+    width: 100%;
+    min-height: 220px;
+    padding: 8px 0;
+}
+
+.body-input:empty:before {
+    content: attr(placeholder);
+    color: var(--text-tertiary);
+    pointer-events: none;
+}
+
+/* Override placeholder in HTML mode (make badge visible even when empty) */
+.compose-body .body-input[data-mode="html"]:empty:before {
+    content: 'HTML MODE';
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: var(--orange-subtle);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.6px;
+    border-radius: 999px;
+    padding: 4px 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    pointer-events: none;
+    text-transform: uppercase;
+}
+
+/* Lists inside the editor */
+.compose-body ul,
+.compose-body ol {
+    margin: 0 0 0 20px;
+    padding-left: 20px;
+}
+
+.compose-body li {
+    margin: 4px 0;
+}
+
+.compose-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-light);
+    background: var(--surface-hover);
+}
+
+.compose-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.compose-send-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, var(--orange-subtle), #e67e22);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: none; /* remove glow */
+}
+
+.compose-send-btn:hover {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    box-shadow: none;
+    transform: translateY(-1px);
+}
+
+.compose-send-btn:active {
+    background: linear-gradient(135deg, #d35400, #c0392b);
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+
+/* Responsive adjustments for compose window */
+@media (max-width: 768px) {
+    .compose-window {
+        right: 10px;
+        left: 10px;
+        width: auto;
+        max-width: none;
+    }
+    
+    .compose-window.maximized {
+        right: 10px;
+        left: 10px;
+        width: auto;
+    }
+    
+    .editor-toolbar {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    
+    .toolbar-btn {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+    
+    .compose-formatting {
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+    
+    .format-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
 }
 
 /* Responsive Design for Email Interface */
