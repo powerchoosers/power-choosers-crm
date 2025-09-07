@@ -507,31 +507,20 @@
                                 <div class="page-title-section">
                                     <h2 class="page-title">Emails</h2>
                                     <div class="page-actions">
-                                        <button class="btn-primary" id="compose-email-btn">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M3 3h18v18H3zM3 9l9 6 9-6"/>
-                                            </svg>
+                                        <button class="gmail-compose-btn" id="compose-email-btn">
                                             Compose
-                                        </button>
-                                        <button class="btn-secondary" id="refresh-emails-btn" title="Refresh">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                                                <path d="M21 3v5h-5"/>
-                                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                                                <path d="M3 21v-5h5"/>
-                                            </svg>
                                         </button>
                                     </div>
                                 </div>
                                 <div class="email-toolbar">
-                                    <input type="text" class="search-input-small" id="emails-search" placeholder="Search mail..." aria-label="Search emails" />
-                                    <div class="email-view-controls">
+                                    <div class="email-search-controls">
                                         <button class="btn-icon" id="toggle-sidebar-btn" title="Toggle sidebar">
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                                                 <line x1="9" y1="3" x2="9" y2="21"/>
                                             </svg>
                                         </button>
+                                        <input type="text" class="search-input-small" id="emails-search" placeholder="Search mail..." aria-label="Search emails" />
                                     </div>
                                 </div>
                             </div>
@@ -648,6 +637,14 @@
                                                 </button>
                                             </div>
                                             <div class="email-sort">
+                                                <button class="btn-icon" id="refresh-emails-btn" title="Refresh">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                                        <path d="M21 3v5h-5"/>
+                                                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                                        <path d="M3 21v-5h5"/>
+                                                    </svg>
+                                                </button>
                                                 <span class="email-count" id="email-count">0 emails</span>
                                             </div>
                                         </div>
@@ -1602,5 +1599,235 @@
     <!-- Load List Detail Page Script -->
     <script src="scripts/pages/list-detail.js"></script>
     <script src="debug-lists.js"></script>
+
+    <!-- Gmail-style Compose Window -->
+    <div class="compose-window" id="compose-window" style="display: none;">
+        <div class="compose-header">
+            <div class="compose-title">New Message</div>
+            <div class="compose-controls">
+                <button class="compose-control-btn" id="compose-minimize" title="Minimize">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <button class="compose-control-btn" id="compose-maximize" title="Maximize">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    </svg>
+                </button>
+                <button class="compose-control-btn" id="compose-close" title="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="compose-content">
+            <div class="compose-recipients">
+                <div class="recipient-row" style="position: relative;">
+                    <label class="recipient-label">To</label>
+                    <input type="text" class="recipient-input" id="compose-to" placeholder="Recipients" autocomplete="off" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="compose-to-suggestions">
+                    <div class="recipient-suggestions" id="compose-to-suggestions" role="listbox" aria-label="Suggested recipients" hidden></div>
+                </div>
+                <div class="recipient-row" id="cc-bcc-row" style="display: none;">
+                    <label class="recipient-label">Cc</label>
+                    <input type="text" class="recipient-input" id="compose-cc" placeholder="Cc">
+                </div>
+                <div class="recipient-row" id="bcc-row" style="display: none;">
+                    <label class="recipient-label">Bcc</label>
+                    <input type="text" class="recipient-input" id="compose-bcc" placeholder="Bcc">
+                </div>
+                <div class="recipient-actions">
+                    <button class="recipient-toggle" id="toggle-cc-bcc">Cc Bcc</button>
+                </div>
+            </div>
+            
+            <div class="compose-subject">
+                <input type="text" class="subject-input" id="compose-subject" placeholder="Subject">
+            </div>
+            
+            <div class="compose-editor">
+                <div class="editor-toolbar" role="toolbar" aria-label="Email editor actions">
+                    <button class="toolbar-btn toolbar-ai" type="button" data-action="ai" aria-label="Write with AI" title="Write with AI">
+                        <span class="icon">✨</span>
+                        <span class="label">Write with AI</span>
+                    </button>
+                    <button class="toolbar-btn" type="button" data-action="formatting" aria-label="Text formatting" title="Text formatting">Aa</button>
+                    <button class="toolbar-btn" type="button" data-action="link" aria-label="Insert link" title="Insert link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                    </button>
+                    <button class="toolbar-btn" type="button" data-action="image" aria-label="Upload image" title="Upload image">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21,15 16,10 5,21"></polyline>
+                        </svg>
+                    </button>
+                    <button class="toolbar-btn" type="button" data-action="attach" aria-label="Attach files" title="Attach files">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 16.2a2 2 0 0 1-2.83-2.83l8.49-8.49"></path>
+                        </svg>
+                    </button>
+                    <button class="toolbar-btn" type="button" data-action="code" aria-label="Edit raw HTML" title="Edit raw HTML">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="7 8 3 12 7 16"></polyline>
+                            <polyline points="17 8 21 12 17 16"></polyline>
+                            <path d="M14 4l-4 16"></path>
+                        </svg>
+                    </button>
+                    <button class="toolbar-btn" type="button" data-action="templates" aria-label="Load templates" title="Load templates">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <path d="M14 2v6h6"></path>
+                            <path d="M8 13h8M8 17h8M8 9h2"></path>
+                        </svg>
+                    </button>
+                    <button class="toolbar-btn" type="button" data-action="variables" aria-label="Add dynamic variables" title="Add dynamic variables">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M8 3a3 3 0 0 0-3 3v2a3 3 0 0 1-3 3 3 3 0 0 1 3 3v2a3 3 0 0 0 3 3"></path>
+                            <path d="M16 3a3 3 0 0 1 3 3v2a3 3 0 0 0 3 3 3 3 0 0 0-3 3v2a3 3 0 0 1-3 3"></path>
+                        </svg>
+                    </button>
+                    <!-- Preview toggle: eye (preview) / pencil (editor) icon-only -->
+                    <button class="toolbar-btn" type="button" data-action="preview" aria-label="Preview message" title="Preview">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="formatting-bar" aria-hidden="true">
+                    <div class="fmt-group">
+                        <button class="fmt-btn" type="button" data-fmt="font" aria-haspopup="true" aria-expanded="false" aria-label="Font" title="Font">
+                            <span class="fmt-label" data-current-font>Sans Serif</span>
+                        </button>
+                        <div class="format-popover font-popover" role="menu">
+                            <button class="popover-item font-item" data-font="Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" style="font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">Inter</button>
+                            <button class="popover-item font-item" data-font="Arial, Helvetica, sans-serif" style="font-family:Arial, Helvetica, sans-serif">Arial</button>
+                            <button class="popover-item font-item" data-font="Helvetica, Arial, sans-serif" style="font-family:Helvetica, Arial, sans-serif">Helvetica</button>
+                            <button class="popover-item font-item" data-font="Georgia, serif" style="font-family:Georgia, serif">Georgia</button>
+                            <button class="popover-item font-item" data-font="Times New Roman, Times, serif" style="font-family:Times New Roman, Times, serif">Times New Roman</button>
+                        </div>
+                    </div>
+                    <div class="fmt-group">
+                        <button class="fmt-btn" type="button" data-fmt="size" aria-haspopup="true" aria-expanded="false" aria-label="Size" title="Size">
+                            <span class="fmt-label" data-current-size>12</span>
+                        </button>
+                        <div class="format-popover size-popover" role="menu">
+                            <button class="popover-item size-item" data-size="10" style="font-size:10px">10</button>
+                            <button class="popover-item size-item" data-size="12" style="font-size:12px">12</button>
+                            <button class="popover-item size-item" data-size="14" style="font-size:14px">14</button>
+                            <button class="popover-item size-item" data-size="16" style="font-size:16px">16</button>
+                            <button class="popover-item size-item" data-size="18" style="font-size:18px">18</button>
+                            <button class="popover-item size-item" data-size="20" style="font-size:20px">20</button>
+                            <button class="popover-item size-item" data-size="24" style="font-size:24px">24</button>
+                        </div>
+                    </div>
+                    <button class="fmt-btn" type="button" data-fmt="bold" aria-label="Bold" title="Bold"><span class="fmt-glyph">B</span></button>
+                    <button class="fmt-btn" type="button" data-fmt="italic" aria-label="Italic" title="Italic"><span class="fmt-glyph" style="font-style:italic;">I</span></button>
+                    <button class="fmt-btn" type="button" data-fmt="underline" aria-label="Underline" title="Underline"><span class="fmt-glyph" style="text-decoration:underline;">U</span></button>
+                    <div class="fmt-group">
+                        <button class="fmt-btn" type="button" data-fmt="color" aria-haspopup="true" aria-expanded="false" aria-label="Text Color" title="Text Color">
+                            <span class="fmt-glyph" style="color:#fff;">A</span>
+                        </button>
+                        <div class="format-popover color-popover" role="menu">
+                            <div class="color-swatches">
+                                <button class="color-swatch" data-color="transparent" style="background:transparent; border:2px dashed #666; position:relative;" title="Default color">
+                                    <span style="position:absolute; top:2px; left:2px; bottom:2px; right:2px; background:linear-gradient(45deg, transparent 45%, #666 45%, #666 55%, transparent 55%), linear-gradient(-45deg, transparent 45%, #666 45%, #666 55%, transparent 55%);"></span>
+                                </button>
+                                <button class="color-swatch" data-color="#FF0000" style="background:#FF0000;"></button>
+                                <button class="color-swatch" data-color="#00FF00" style="background:#00FF00;"></button>
+                                <button class="color-swatch" data-color="#0000FF" style="background:#0000FF;"></button>
+                                <button class="color-swatch" data-color="#FFFF00" style="background:#FFFF00;"></button>
+                                <button class="color-swatch" data-color="#FF00FF" style="background:#FF00FF;"></button>
+                                <button class="color-swatch" data-color="#00FFFF" style="background:#00FFFF;"></button>
+                                <button class="color-swatch" data-color="#808080" style="background:#808080;"></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="fmt-group">
+                        <button class="fmt-btn" type="button" data-fmt="highlight" aria-haspopup="true" aria-expanded="false" aria-label="Highlight" title="Highlight">
+                            <span class="fmt-glyph" style="position:relative;">A<span style="position:absolute; bottom:-2px; left:0; right:0; height:2px; background:#FFFF00;"></span></span>
+                        </button>
+                        <div class="format-popover highlight-popover" role="menu">
+                            <div class="color-swatches">
+                                <button class="color-swatch" data-color="transparent" style="background:transparent; border:2px dashed #666; position:relative;" title="No highlight">
+                                    <span style="position:absolute; top:2px; left:2px; bottom:2px; right:2px; background:linear-gradient(45deg, transparent 45%, #666 45%, #666 55%, transparent 55%), linear-gradient(-45deg, transparent 45%, #666 45%, #666 55%, transparent 55%);"></span>
+                                </button>
+                                <button class="color-swatch" data-color="#FFFF00" style="background:#FFFF00;"></button>
+                                <button class="color-swatch" data-color="#FF0000" style="background:#FF0000;"></button>
+                                <button class="color-swatch" data-color="#00FF00" style="background:#00FF00;"></button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="fmt-btn" type="button" data-fmt="insertOrderedList" aria-label="Numbered List" title="Numbered List">
+                        <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+                            <line class="ql-stroke" x1="7" x2="15" y1="4" y2="4"></line>
+                            <line class="ql-stroke" x1="7" x2="15" y1="9" y2="9"></line>
+                            <line class="ql-stroke" x1="7" x2="15" y1="14" y2="14"></line>
+                            <line class="ql-stroke ql-thin" x1="2.5" x2="4.5" y1="5.5" y2="5.5"></line>
+                            <path class="ql-fill" d="M3.5,6A0.5,0.5,0,0,1,3,5.5V3.085l-0.276.138A0.5,0.5,0,0,1,2.053,3c-0.124-.247-0.023-0.324.224-0.447l1-.5A0.5,0.5,0,0,1,4,2.5v3A0.5,0.5,0,0,1,3.5,6Z"></path>
+                            <path class="ql-stroke ql-thin" d="M4.5,10.5h-2c0-.234,1.85-1.076,1.85-2.234A0.959,0.959,0,0,0,2.5,8.156"></path>
+                            <path class="ql-stroke ql-thin" d="M2.5,14.846a0.959,0.959,0,0,0,1.85-.109A0.7,0.7,0,0,0,3.75,14a0.688,0.688,0,0,0,.6-0.736,0.959,0.959,0,0,0-1.85-.109"></path>
+                        </svg>
+                    </button>
+                    <button class="fmt-btn" type="button" data-fmt="insertUnorderedList" aria-label="Bulleted List" title="Bulleted List">
+                        <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+                            <line class="ql-stroke" x1="6" x2="15" y1="4" y2="4"></line>
+                            <line class="ql-stroke" x1="6" x2="15" y1="9" y2="9"></line>
+                            <line class="ql-stroke" x1="6" x2="15" y1="14" y2="14"></line>
+                            <line class="ql-stroke" x1="3" x2="3" y1="4" y2="4"></line>
+                            <line class="ql-stroke" x1="3" x2="3" y1="9" y2="9"></line>
+                            <line class="ql-stroke" x1="3" x2="3" y1="14" y2="14"></line>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="link-bar" aria-hidden="true">
+                    <div class="field">
+                        <label class="fmt-label" for="compose-link-text">Text</label>
+                        <input id="compose-link-text" class="input-dark" type="text" placeholder="Display text" data-link-text />
+                    </div>
+                    <div class="field">
+                        <label class="fmt-label" for="compose-link-url">URL</label>
+                        <input id="compose-link-url" class="input-dark" type="url" placeholder="https://" data-link-url />
+                    </div>
+                    <div class="actions">
+                        <button class="fmt-btn" type="button" data-link-insert>Insert</button>
+                        <button class="fmt-btn" type="button" data-link-cancel>Cancel</button>
+                    </div>
+                </div>
+                
+                <!-- Variables toolbar: slides down similar to link/formatting bars -->
+                <div class="variables-bar" aria-hidden="true"></div>
+                
+                <!-- AI toolbar: slides down similar to link/formatting and variables -->
+                <div class="ai-bar" aria-hidden="true"></div>
+                
+                <div class="compose-body">
+                    <div class="body-input" contenteditable="true" role="textbox" aria-multiline="true" data-editor="rich" placeholder="Compose email..."></div>
+                    <div class="compose-preview" hidden></div>
+                </div>
+            </div>
+            
+            <div class="compose-footer">
+                <div class="compose-actions">
+                    <button class="compose-send-btn" id="compose-send">
+                        <span style="font-weight: bold;">Send</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22,2 15,22 11,13 2,9 22,2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

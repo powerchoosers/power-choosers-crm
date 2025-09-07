@@ -33,6 +33,57 @@ if (!GOOGLE_API_KEY) {
   console.warn('[Server] GOOGLE_API_KEY is not set. /api/tx-price will return a placeholder until configured.');
 }
 
+// ---------------- Local Gemini Email Generation ----------------
+function buildEmailSystemPrompt({ mode, recipient, to, prompt }) {
+  const r = recipient || {};
+  const name = r.name || r.full_name || r.fullName || '';
+  const email = r.email || '';
+  const company = r.company || r.accountName || '';
+  const job = r.title || r.role || '';
+
+  const common = `You are Power Choosers' email assistant. Draft a clear, concise, and friendly ${mode === 'html' ? 'HTML' : 'plain text'} email for outbound sales.
+Keep tone professional and helpful; personalize with known recipient context when appropriate; include a specific next step; avoid hallucinations.`;
+
+  const recipientContext = `Known recipient fields:\n- Name: ${name || 'Unknown'}\n- Email: ${email || 'Unknown'}\n- Company: ${company || 'Unknown'}\n- Title/Role: ${job || 'Unknown'}`;
+
+  const outputStyle = mode === 'html'
+    ? `Output STRICTLY an HTML fragment suitable for an email body. Use semantic tags and inline styles as needed. Do not include <html>, <head>, or <body> wrappers.`
+    : `Output plain text suitable for an email body. Do not include code fences.`;
+
+  const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}`;
+
+  return [common, recipientContext, outputStyle, instructions].join('\n\n');
+}
+
+async function handleApiGeminiEmail(req, res) {
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  if (req.method !== 'POST') { res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' })); return; }
+  try {
+    if (!GOOGLE_API_KEY) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing GOOGLE_API_KEY (or GEMINI_API_KEY). Set it in your environment.' }));
+      return;
+    }
+    const body = await readJsonBody(req);
+    const { prompt = '', mode = 'standard', recipient = null, to = '' } = body || {};
+    const sys = buildEmailSystemPrompt({ mode, recipient, to, prompt });
+
+    const { GoogleGenerativeAI } = await dynamicGeminiImport();
+    const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    const result = await model.generateContent(sys);
+    const text = (result && result.response && typeof result.response.text === 'function')
+      ? result.response.text()
+      : '';
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, output: text }));
+  } catch (error) {
+    console.error('[Gemini Email] Error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to generate email', message: error.message }));
+  }
+}
+
 // Helper function for reading request body
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -275,7 +326,8 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/calls' ||
     pathname === '/api/energy-news' ||
     pathname === '/api/search' ||
-    pathname === '/api/tx-price'
+    pathname === '/api/tx-price' ||
+    pathname === '/api/gemini-email'
   )) {
     res.writeHead(204);
     res.end();
@@ -300,6 +352,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/tx-price') {
     return handleApiTxPrice(req, res, parsedUrl);
+  }
+  if (pathname === '/api/gemini-email') {
+    return handleApiGeminiEmail(req, res);
   }
 
   // Default to crm-dashboard.html for root requests
