@@ -1407,6 +1407,10 @@
       state.listName = context.listName;
       state.listKind = context.listKind;
       state.view = context.listKind || 'people';
+      // Prevent flicker: clear previous rows immediately when switching lists
+      if (els.tbody) {
+        els.tbody.innerHTML = '';
+      }
     }
 
     // Update title
@@ -1422,6 +1426,8 @@
     
     // Instant paint: draw header and render cached data if available
     renderTableHead();
+    // Force a synchronous style/layout update to avoid flashing previous content
+    if (els.tbody) { void els.tbody.offsetHeight; }
     
     // Try to render cached data immediately to avoid empty state flash
     try {
@@ -1452,6 +1458,10 @@
     
     // Re-render with loaded data
     renderTableHead();
+    // Avoid repaint jump by batching DOM updates after data is ready
+    if (els.tbody) {
+      els.tbody.style.visibility = 'hidden';
+    }
     // Render chip DOM from internal state (if pre-set)
     try {
       window.__listDetailState = window.__listDetailState || {};
@@ -1471,6 +1481,11 @@
       renderVisitorDomainChips();
     } catch(_) {}
     applyFilters();
+    if (els.tbody) {
+      // ensure the rows are present before showing
+      void els.tbody.offsetHeight;
+      els.tbody.style.visibility = '';
+    }
     
     // Initialize drag and drop after everything is rendered
     setTimeout(() => {
