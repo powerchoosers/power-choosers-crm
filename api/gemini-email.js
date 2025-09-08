@@ -169,7 +169,7 @@ SPECIFIC PROMPT HANDLING:
 - "Follow-up with tailored value props": Highlight 2-3 specific benefits for their industry/company
 - "Schedule a quick demo": Include specific time windows and what the demo covers
 - "Proposal delivery with next steps": Reference the proposal and outline 2-3 clear next steps
-- "Cold email to a lead I could not reach by phone": Write exactly 3 paragraphs: 1) "Hi [Name], I hope you're having a productive week." 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well. [Add value proposition about Power Choosers services]." 3) "Would you be open to a brief introductory call next week?" - NEVER repeat any phrase from paragraph 2 in paragraph 3`;
+- "Cold email to a lead I could not reach by phone": Follow this EXACT template - do not deviate: Paragraph 1: "Hi ${firstName || 'there'}, I hope you're having a productive week." Paragraph 2: "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well. Power Choosers helps businesses like yours secure better energy contracts through competitive bidding and expert negotiation." Paragraph 3: "Would you be open to a brief introductory call next week?" - Use this EXACT wording for paragraph 3, do not repeat any other content. NEVER use template variables like {{contact.first_name}} - always use the actual values provided`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -207,6 +207,8 @@ FINAL CHECKLIST (MANDATORY VERIFICATION):
 - For cold emails: Subject must reference speaking with their colleague
 - For cold emails: Must include specific pain points relevant to their industry and what Power Choosers does
 - For cold emails: Must include exactly ONE call-to-action, no duplicates
+- For cold emails: Use the EXACT template provided - do not add extra paragraphs or repeat content
+- For cold emails: The final paragraph must be EXACTLY "Would you be open to a brief introductory call next week?" - nothing else
 - Read the entire email once more to catch any duplication`;
 
   return [
