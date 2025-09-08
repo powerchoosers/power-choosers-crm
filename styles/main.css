@@ -98,6 +98,14 @@
     --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Compose editor paragraph spacing */
+.body-input p {
+  margin: 0 0 12px 0;
+}
+.body-input p:last-child {
+  margin-bottom: 0;
+}
+
 /* === EMAIL EDITOR: AI BAR (slide-down) === */
 .ai-bar {
     display: block;
@@ -108,7 +116,7 @@
     overflow: hidden;
     opacity: 0;
     position: relative;
-    z-index: 2; /* ensure above compose-body */
+    z-index: 50; /* ensure above compose-body and any closed toolbars */
     transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                 padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -119,22 +127,176 @@
     padding: 16px;
     overflow: visible; /* allow chips to paint outside inner flow if needed */
     margin-bottom: 10px; /* ensure content below does not overlap */
+    pointer-events: auto; /* Ensure the bar itself doesn't block clicks */
 }
-.ai-inner { display: flex; flex-direction: column; gap: 10px; max-height: min(60vh, 440px); overflow-y: auto; }
-.ai-row { display: flex; gap: 8px; align-items: stretch; }
-.ai-row.suggestions { flex-wrap: wrap; }
+.ai-inner { display: flex; flex-direction: column; gap: 10px; max-height: none; overflow: visible; }
+.ai-row { 
+    display: flex; 
+    gap: 8px; 
+    align-items: stretch; 
+    pointer-events: auto;
+    position: relative;
+    z-index: 1;
+}
+.ai-row.suggestions {
+    /* Use a 3-column grid so 5 items render in exactly 2 rows (3 + 2) on desktop */
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
 .ai-suggestion {
     background: none;
     border: 1px solid var(--border-light);
     color: var(--grey-300);
     border-radius: 6px;
-    padding: 6px 10px;
+    padding: 8px 12px; /* Increased padding for larger click area */
     cursor: pointer;
+    pointer-events: auto !important; /* Ensure buttons are clickable */
+    user-select: none; /* Prevent text selection */
+    position: relative; /* Ensure proper stacking */
+    z-index: 10; /* Ensure buttons are above other elements */
+    display: inline-block; /* Base behavior inside grid cell */
+    width: 100%; /* Fill grid cell width */
+    text-align: left;
+    white-space: normal; /* Allow long labels to wrap */
+    touch-action: manipulation; /* Improve touch responsiveness */
+    min-height: 32px; /* Ensure minimum clickable height */
+    min-width: 0; /* Allow shrinking within grid to avoid extra rows */
+    transition: all 0.2s ease; /* Smooth transitions */
 }
-.ai-suggestion:hover { background: var(--grey-700); color: var(--text-inverse); border-color: var(--grey-600); }
-.ai-prompt { width: 100%; min-height: 68px; }
-.ai-row.actions { align-items: center; }
-.ai-row .ai-status { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
+.ai-suggestion:hover { 
+    background: var(--grey-700); 
+    color: var(--text-inverse); 
+    border-color: var(--grey-600); 
+}
+.ai-suggestion:active {
+    background: var(--grey-600);
+    transform: translateY(1px);
+}
+
+/* Create larger hover area with pseudo-element */
+.ai-suggestion::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    z-index: -1;
+    pointer-events: none; /* do not intercept events over neighboring elements */
+}
+.ai-prompt { 
+    width: 100%; 
+    min-height: 68px; 
+    background: var(--grey-700);
+    border: 1px solid var(--grey-600);
+    border-radius: var(--border-radius);
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    transition: border-color var(--transition-fast);
+    cursor: text;
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 5;
+    box-sizing: border-box;
+}
+
+.ai-prompt:focus {
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
+    background: var(--grey-600);
+}
+
+.ai-prompt::placeholder {
+    color: var(--text-muted);
+}
+.ai-row.actions { 
+    display: flex;
+    align-items: center; 
+    justify-content: center; /* Center the content */
+    gap: 12px; /* Add gap between buttons */
+    position: relative; /* For absolute positioning of status */
+}
+.ai-row .ai-status { 
+    position: absolute;
+    right: 0;
+    color: var(--text-secondary); 
+    font-size: 12px; 
+}
+
+/* AI Generate buttons styling */
+.ai-row.actions .ai-generate {
+    background: var(--grey-600);
+    border: none; /* Remove border */
+    color: var(--text-primary);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: normal; /* Remove bold text */
+    transition: var(--transition-fast);
+    cursor: pointer;
+    pointer-events: auto; /* Ensure buttons are clickable */
+    user-select: none; /* Prevent text selection */
+    position: relative; /* Ensure proper stacking */
+    z-index: 10; /* Ensure buttons are above other elements */
+}
+
+.ai-row.actions .ai-generate:hover {
+    background: var(--grey-500);
+    color: var(--text-inverse);
+}
+
+.ai-row.actions .ai-generate:active {
+    background: var(--grey-400);
+    transform: translateY(1px);
+}
+
+/* === AI GENERATION LOADING + FADE-IN === */
+@keyframes aiShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes aiFadeIn {
+  0% { opacity: 0; transform: translateY(2px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Subject shimmer overlay while generating */
+#compose-subject.is-loading {
+  position: relative;
+  color: transparent !important;
+}
+#compose-subject.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,165,0,0.18), rgba(255,255,255,0.08), rgba(255,165,0,0.18));
+  background-size: 200% 100%;
+  animation: aiShimmer 1.2s linear infinite;
+  pointer-events: none;
+}
+
+/* Editor shimmer overlay while generating */
+.body-input.is-loading { position: relative; }
+.body-input.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255,165,0,0.12), rgba(255,255,255,0.06), rgba(255,165,0,0.12));
+  background-size: 200% 100%;
+  animation: aiShimmer 1.2s linear infinite;
+  pointer-events: none;
+}
+
+/* Fade-in effect once content arrives */
+#compose-subject.fade-in,
+.body-input.fade-in { animation: aiFadeIn 280ms ease-out; }
 
 /* === Recipient suggestions dropdown === */
 .recipient-row { position: relative; }
@@ -143,26 +305,51 @@
     top: 100%;
     left: 60px; /* align with input after label width */
     right: 0;
-    z-index: 3000; /* ensure above compose editor and toolbars */
-    background: var(--bg-card);
+    z-index: 999999; /* Extremely high z-index to ensure it's above everything including modals */
+    background: #383f46 !important; /* Force solid background, no transparency */
+    background-color: #383f46 !important; /* Ensure solid background, no transparency */
     color: var(--text-primary);
     border: 1px solid var(--border-light);
     border-radius: 6px;
-    box-shadow: var(--elevation-card);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* Stronger shadow for better visibility */
     margin-top: 6px;
     max-height: 280px;
     overflow-y: auto;
+    opacity: 1 !important; /* Force full opacity */
+    transform: translateZ(0); /* Create new stacking context */
+    isolation: isolate; /* Create new stacking context */
 }
 .recipient-suggestions .suggestion-item {
     padding: 8px 10px;
     cursor: pointer;
     border-bottom: 1px solid var(--border-light);
+    background: #383f46 !important; /* Solid background for each item */
+    background-color: #383f46 !important; /* Ensure solid background, no transparency */
+    opacity: 1 !important; /* Ensure full opacity */
 }
 .recipient-suggestions .suggestion-item:last-child { border-bottom: none; }
-.recipient-suggestions .suggestion-item:hover { background: var(--surface-hover); }
-.recipient-suggestions .sugg-main { font-weight: 600; color: var(--text-primary); }
-.recipient-suggestions .sugg-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.recipient-suggestions .suggestion-empty { padding: 10px; color: var(--text-secondary); font-style: italic; }
+.recipient-suggestions .suggestion-item:hover { 
+    background: var(--surface-hover) !important; 
+    background-color: #495057 !important; /* Ensure solid hover background */
+}
+.recipient-suggestions .sugg-main { 
+    font-weight: 600; 
+    color: var(--text-primary) !important; 
+    opacity: 1 !important;
+}
+.recipient-suggestions .sugg-sub { 
+    font-size: 12px; 
+    color: var(--text-secondary) !important; 
+    margin-top: 2px; 
+    opacity: 1 !important;
+}
+.recipient-suggestions .suggestion-empty { 
+    padding: 10px; 
+    color: var(--text-secondary) !important; 
+    font-style: italic; 
+    background: #383f46 !important;
+    opacity: 1 !important;
+}
 
 /* HTML mode: show raw HTML and a subtle badge */
 .body-input[data-mode="html"] {
@@ -1330,6 +1517,13 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
 /* Hide verbose label inside the AI button to keep toolbar compact */
 .editor-toolbar .toolbar-ai .label {
     display: none;
+}
+
+/* Style the AI button SVG icon */
+.editor-toolbar .toolbar-ai svg {
+    width: 16px !important;
+    height: 16px !important;
+    display: block;
 }
 
 /* Editor toolbar layout: even spacing + thin dividers between icons */
@@ -8253,7 +8447,8 @@ input.row-select[type="checkbox"]:focus-visible {
     padding: 16px;
     border-bottom: 1px solid var(--border-light);
     position: relative;
-    z-index: 4; /* keep suggestions above compose body */
+    z-index: 1001; /* Ensure it's above the compose window */
+    isolation: isolate; /* Create new stacking context */
 }
 
 .recipient-row {
@@ -8645,8 +8840,11 @@ input.row-select[type="checkbox"]:focus-visible {
     border-bottom: 1px solid var(--border-light);
     background: var(--surface-hover);
     max-height: 0;
-    overflow: hidden;
+    overflow: hidden; /* Hide content when closed to prevent overlay */
     opacity: 0;
+    position: relative; /* Ensure proper positioning context */
+    z-index: 10; /* Above editor content when open */
+    pointer-events: none; /* Non-interactive while closed */
     transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
                 opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                 padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -8656,6 +8854,8 @@ input.row-select[type="checkbox"]:focus-visible {
     max-height: 200px;
     opacity: 1;
     padding: 16px;
+    overflow: visible; /* Ensure content is visible when open */
+    pointer-events: auto; /* Interactive when open */
 }
 
 .link-bar .field {
@@ -8715,12 +8915,30 @@ input.row-select[type="checkbox"]:focus-visible {
     background: var(--surface-raised);
     max-height: 0;
     opacity: 0;
-    overflow: hidden;
-    transform: translateY(-4px);
+    overflow: hidden; /* Hide content when closed to prevent overlay */
+    position: relative; /* Ensure proper positioning context */
+    z-index: 10; /* Ensure it's above other content */
+    transform: translateY(0); /* Remove negative transform that causes clipping */
+    pointer-events: none; /* Non-interactive while closed */
     transition: max-height var(--transition-smooth), opacity var(--transition-smooth), transform var(--transition-smooth),
                 padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.variables-bar.open { max-height: 280px; opacity: 1; transform: translateY(0); padding: 16px; }
+.variables-bar.open { 
+    max-height: 280px; 
+    opacity: 1; 
+    transform: translateY(0); 
+    padding: 16px; 
+    overflow: visible; /* Ensure content is visible when open */
+    pointer-events: auto; /* Interactive when open */
+}
+
+/* Responsive columns for AI suggestions */
+@media (max-width: 900px) {
+  .ai-row.suggestions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .ai-row.suggestions { grid-template-columns: 1fr; }
+}
 .variables-bar .vars-tabs { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .variables-bar .vars-tab {
     background: none;

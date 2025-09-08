@@ -31,12 +31,22 @@ class EmailManager {
         };
         // Editor state
         this._isHtmlMode = false;
+        // Compose autocomplete cache
+        this._composePeopleById = new Map();
         
         this.init();
     }
 
     renderAIBar(aiBar) {
         if (!aiBar) return;
+        
+        // Check if already rendered to avoid re-rendering
+        if (aiBar.dataset.rendered === 'true') {
+            console.log('[AI] Bar already rendered, skipping re-render');
+            return;
+        }
+        
+        console.log('[AI] Rendering AI bar...');
         const suggestions = [
             'Warm intro after a call',
             'Follow-up with tailored value props',
@@ -55,29 +65,184 @@ class EmailManager {
                 <div class="ai-row actions">
                     <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
                     <button class="fmt-btn ai-generate" data-mode="html">Generate HTML</button>
-                    <button class="fmt-btn ai-close" type="button">Close</button>
                     <div class="ai-status" aria-live="polite"></div>
                 </div>
             </div>
         `;
         // Wire events
-        aiBar.querySelectorAll('.ai-suggestion').forEach(btn => {
-            btn.addEventListener('click', () => {
+        console.log('[AI] Wiring suggestion button events...');
+        const suggestionButtons = aiBar.querySelectorAll('.ai-suggestion');
+        console.log('[AI] Found suggestion buttons:', suggestionButtons.length);
+        
+        suggestionButtons.forEach((btn, index) => {
+            console.log(`[AI] Adding click listener to suggestion ${index}:`, btn.textContent);
+            console.log('[AI] Button element:', btn);
+            console.log('[AI] Button computed style:', window.getComputedStyle(btn));
+            
+            // Add both click and mousedown events as backup
+            const handleSuggestionClick = (e) => {
+                console.log('[AI] Suggestion click event triggered for:', btn.textContent);
+                console.log('[AI] Event details:', {
+                    type: e.type,
+                    target: e.target,
+                    currentTarget: e.currentTarget,
+                    bubbles: e.bubbles,
+                    cancelable: e.cancelable
+                });
+                
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                // Mark the event as handled by AI
+                e.aiHandled = true;
+                
+                // Prevent variables toolbar from opening
+                const variablesBar = document.querySelector('.variables-bar');
+                if (variablesBar) {
+                    variablesBar.classList.remove('open');
+                    variablesBar.setAttribute('aria-hidden', 'true');
+                }
+                
+                console.log('[AI] Suggestion clicked:', btn.textContent);
                 const ta = aiBar.querySelector('.ai-prompt');
-                ta.value = btn.textContent;
+                if (ta) {
+                    ta.value = btn.textContent;
+                    ta.focus();
+                    console.log('[AI] Updated textarea value:', ta.value);
+                } else {
+                    console.error('[AI] Could not find textarea');
+                }
+                return false;
+            };
+            
+            btn.addEventListener('click', handleSuggestionClick, true); // Use capture phase
+            btn.addEventListener('mousedown', handleSuggestionClick, true); // Use capture phase
+        });
+
+        // Safety net: delegated handler so any future dynamically-added suggestion works
+        aiBar.addEventListener('click', (e) => {
+            const btn = e.target.closest('.ai-suggestion');
+            if (!btn) return;
+            console.log('[AI] Delegated suggestion click for:', btn.textContent);
+            const ta = aiBar.querySelector('.ai-prompt');
+            if (ta) {
+                ta.value = (btn.textContent || '').trim();
                 ta.focus();
-            });
+                console.log('[AI] Delegated: textarea updated to:', ta.value);
+            }
         });
-        aiBar.querySelector('.ai-close')?.addEventListener('click', () => {
-            aiBar.classList.remove('open');
-            aiBar.setAttribute('aria-hidden', 'true');
-        });
-        aiBar.querySelectorAll('.ai-generate').forEach(btn => {
-            btn.addEventListener('click', async () => {
+        
+        console.log('[AI] Wiring generate button events...');
+        aiBar.querySelectorAll('.ai-generate').forEach((btn, index) => {
+            console.log(`[AI] Adding click listener to generate button ${index}:`, btn.textContent);
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[AI] Generate button clicked:', btn.textContent);
                 const mode = btn.getAttribute('data-mode') || 'standard';
                 await this.generateWithAI(aiBar, mode);
             });
         });
+        
+        // Ensure textarea is editable
+        const textarea = aiBar.querySelector('.ai-prompt');
+        if (textarea) {
+            console.log('[AI] Textarea found, ensuring it\'s editable');
+            // Remove contenteditable as it conflicts with textarea
+            textarea.removeAttribute('contenteditable');
+            textarea.removeAttribute('readonly');
+            textarea.removeAttribute('disabled');
+            
+            // Add click debugging and prevent variable toolbar interference
+            textarea.addEventListener('click', (e) => {
+                console.log('[AI] Textarea clicked at position:', e.offsetX, e.offsetY);
+                console.log('[AI] Textarea click event:', e);
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                // Prevent variables toolbar from opening
+                const variablesBar = document.querySelector('.variables-bar');
+                if (variablesBar) {
+                    variablesBar.classList.remove('open');
+                    variablesBar.setAttribute('aria-hidden', 'true');
+                }
+            }, true);
+            
+            textarea.addEventListener('mousedown', (e) => {
+                console.log('[AI] Textarea mousedown at position:', e.offsetX, e.offsetY);
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            }, true);
+            
+            textarea.addEventListener('focus', (e) => {
+                console.log('[AI] Textarea focused');
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                // Prevent variables toolbar from opening
+                const variablesBar = document.querySelector('.variables-bar');
+                if (variablesBar) {
+                    variablesBar.classList.remove('open');
+                    variablesBar.setAttribute('aria-hidden', 'true');
+                }
+            }, true);
+        } else {
+            console.error('[AI] Could not find textarea');
+        }
+        
+        // Mark as rendered
+        aiBar.dataset.rendered = 'true';
+        console.log('[AI] AI bar rendering complete');
+        
+        // Add global mouse debugging for AI bar
+        const debugMouseEvents = (e) => {
+            const aiBar = document.querySelector('.ai-bar');
+            if (aiBar && aiBar.contains(e.target)) {
+                console.log('[AI] Mouse event on AI bar:', {
+                    type: e.type,
+                    target: e.target,
+                    targetClass: e.target.className,
+                    targetTag: e.target.tagName,
+                    offsetX: e.offsetX,
+                    offsetY: e.offsetY,
+                    clientX: e.clientX,
+                    clientY: e.clientY
+                });
+            }
+        };
+        
+        // Add mouse event listeners for debugging
+        document.addEventListener('mousedown', debugMouseEvents, true);
+        document.addEventListener('click', debugMouseEvents, true);
+        
+        // Prevent AI bar interactions from bubbling into handlers that open other toolbars,
+        // but DO allow clicks on AI suggestions, prompt, and generate buttons to proceed.
+        const preventVariablesOnAI = (e) => {
+            const aiBar = document.querySelector('.ai-bar');
+            if (aiBar && aiBar.contains(e.target)) {
+                const allowed = e.target.closest('.ai-suggestion, .ai-generate, .ai-prompt');
+                if (allowed) {
+                    // Let AI controls handle the event normally
+                    return;
+                }
+                console.log('[AI] Preventing variables toolbar trigger from AI bar (non-AI control)');
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                // Ensure variables toolbar stays closed
+                const variablesBar = document.querySelector('.variables-bar');
+                if (variablesBar) {
+                    variablesBar.classList.remove('open');
+                    variablesBar.setAttribute('aria-hidden', 'true');
+                }
+            }
+        };
+        
+        // Add event listeners to prevent variables toolbar from opening
+        document.addEventListener('click', preventVariablesOnAI, true);
+        document.addEventListener('mousedown', preventVariablesOnAI, true);
+        document.addEventListener('focus', preventVariablesOnAI, true);
     }
 
     async generateWithAI(aiBar, mode = 'standard') {
@@ -86,9 +251,19 @@ class EmailManager {
         const status = aiBar?.querySelector('.ai-status');
         const prompt = aiBar?.querySelector('.ai-prompt')?.value?.trim() || '';
         const toInput = compose?.querySelector('#compose-to');
+        const subjectInput = compose?.querySelector('#compose-subject');
         const recipient = this._selectedRecipient || null;
         if (!editor) return;
-        status.textContent = 'Generating...';
+
+        // Close AI bar immediately
+        if (aiBar) {
+            aiBar.classList.remove('open');
+            aiBar.setAttribute('aria-hidden', 'true');
+        }
+
+        // Start generating animation on editor + subject
+        this.startGeneratingAnimation(compose);
+        if (status) status.textContent = 'Generating...';
         try {
             const localUrl = '/api/gemini-email';
             const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
@@ -123,20 +298,31 @@ class EmailManager {
                     if (!res2.ok) {
                         const msg2 = (data2 && (data2.error || data2.message)) || `HTTP ${res2.status}`;
                         console.error('[AI] Production generation failed', { status: res2.status, data: data2 });
-                        status.textContent = `Generation failed: ${msg2}`;
+                        if (status) status.textContent = `Generation failed: ${msg2}`;
                         return;
                     }
                     const output2 = data2?.output || '';
+                    // Use the same formatting pipeline for prod fallback
+                    const { subject: subject2, html: html2 } = this.formatGeneratedEmail(output2, recipient);
+                    if (subjectInput) {
+                        subjectInput.classList.remove('fade-in');
+                        subjectInput.value = subject2 || '';
+                        requestAnimationFrame(() => subjectInput.classList.add('fade-in'));
+                    }
                     if (mode === 'html') {
                         if (!this._isHtmlMode) this.toggleHtmlMode(compose);
-                        editor.textContent = output2;
-                        status.textContent = 'Inserted HTML into editor (prod).';
+                        editor.textContent = html2;
+                        if (status) status.textContent = 'Inserted HTML into editor (prod).';
                     } else {
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
-                        editor.innerHTML = output2;
+                        editor.innerHTML = html2;
                         this.normalizeVariablesInEditor(editor);
-                        status.textContent = 'Draft inserted (prod).';
+                        // Extra safety: sanitize DOM for duplicate greetings/closings
+                        this.sanitizeGeneratedEditor(editor, recipient);
+                        if (status) status.textContent = 'Draft inserted (prod).';
                     }
+                    editor.classList.remove('fade-in');
+                    requestAnimationFrame(() => editor.classList.add('fade-in'));
                     return;
                 }
                 const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
@@ -145,28 +331,288 @@ class EmailManager {
                 return;
             }
             const output = data?.output || '';
+
+            // Build clean subject + body layout
+            const { subject, html } = this.formatGeneratedEmail(output, recipient);
+
+            // Subject
+            if (subjectInput) {
+                subjectInput.classList.remove('fade-in');
+                subjectInput.value = subject || '';
+                // Trigger fade-in
+                requestAnimationFrame(() => subjectInput.classList.add('fade-in'));
+            }
+
+            // Body
             if (mode === 'html') {
                 // Switch to HTML mode and set raw HTML
                 if (!this._isHtmlMode) this.toggleHtmlMode(compose);
-                editor.textContent = output;
-                status.textContent = 'Inserted HTML into editor.';
+                editor.textContent = html; // raw source in HTML mode
+                if (status) status.textContent = 'Inserted HTML into editor.';
             } else {
                 // Insert styled HTML into rich editor
                 if (this._isHtmlMode) this.toggleHtmlMode(compose);
-                editor.innerHTML = output;
+                editor.innerHTML = html;
                 this.normalizeVariablesInEditor(editor);
-                status.textContent = 'Draft inserted.';
+                // Extra safety: sanitize DOM for duplicate greetings/closings
+                this.sanitizeGeneratedEditor(editor, recipient);
+                if (status) status.textContent = 'Draft inserted.';
             }
+
+            // Fade-in effect for body
+            editor.classList.remove('fade-in');
+            requestAnimationFrame(() => editor.classList.add('fade-in'));
         } catch (e) {
             console.error('AI generation failed', e);
-            status.textContent = `Generation failed: ${e?.message || e}`;
+            if (status) status.textContent = `Generation failed: ${e?.message || e}`;
+        } finally {
+            // Stop the loading shimmer
+            this.stopGeneratingAnimation(compose);
         }
+    }
+
+    // Convert model output into a clean subject + body with greeting, paragraphs, and closing
+    formatGeneratedEmail(output, recipient) {
+        const raw = String(output || '').trim();
+        let subject = '';
+        let body = raw;
+
+        // If the model returned HTML, convert to plain text before analysis
+        const looksLikeHtml = /<\w+[^>]*>/.test(raw);
+        const toPlain = (html) => {
+            if (!html) return '';
+            return String(html)
+                .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+                .replace(/<\s*\/p\s*>/gi, '\n\n')
+                .replace(/<\s*\/div\s*>/gi, '\n\n')
+                .replace(/<\s*\/li\s*>/gi, '\n')
+                .replace(/<\s*(p|div|li|ul|ol|h[1-6])\b[^>]*>/gi, '')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/gi, ' ')
+                .replace(/&amp;/gi, '&')
+                .replace(/&lt;/gi, '<')
+                .replace(/&gt;/gi, '>')
+                .replace(/&#39;/g, "'")
+                .replace(/&quot;/g, '"');
+        };
+
+        // Extract explicit Subject: line if present
+        const subjMatch = raw.match(/^\s*Subject\s*:\s*(.+)$/im);
+        if (subjMatch) {
+            subject = (subjMatch[1] || '').trim();
+            body = raw.replace(subjMatch[0], '').trim();
+        } else {
+            // Fallback: use first non-empty line as subject (<= 120 chars) if it looks like a title
+            const firstLine = (raw.split(/\r?\n/).find(l => l.trim().length) || '').trim();
+            if (firstLine && firstLine.length <= 120) {
+                subject = firstLine.replace(/^[-•\s]+/, '');
+                const idx = raw.indexOf(firstLine);
+                body = idx >= 0 ? raw.slice(idx + firstLine.length).trim() : raw;
+            }
+        }
+
+        // Normalize newlines and strip HTML to plain text if needed
+        body = (looksLikeHtml ? toPlain(body) : body).replace(/\r\n/g, '\n');
+
+        // Prepare greeting
+        const firstName = (recipient?.name || '').split(' ')[0] || '{{contact.first_name}}';
+        const greeting = `Hi ${firstName},`;
+
+        // Remove greeting lines anywhere and cut from the first closing onward
+        const lines = body.split('\n');
+        const greetAnyRegex = /^\s*(hi|hello|hey)\b.*?[,!-]?\s*$/i;
+        const closingTerms = [
+            'best regards','regards','kind regards','warm regards','sincerely','thanks','thank you','cheers'
+        ];
+        const isClosingLine = (text) => {
+            const t = String(text || '').toLowerCase().replace(/\s+/g,' ').trim();
+            // strip trailing punctuation
+            const t2 = t.replace(/[.,!;:]+$/,'');
+            return closingTerms.some(term => t2.startsWith(term));
+        };
+        const placeholderRegex = /\[\s*(your\s+name|your\s+title|your\s+contact\s*information)\s*\]/i;
+
+        const kept = [];
+        let cut = false;
+        for (const ln of lines) {
+            if (cut) break;
+            const t = ln.trim();
+            if (!t) { kept.push(''); continue; }
+            if (isClosingLine(t) || placeholderRegex.test(t)) { cut = true; continue; }
+            if (greetAnyRegex.test(t)) { continue; } // drop all greetings from model
+            // Also drop a greeting directly addressing firstName (case-insensitive)
+            const nameEsc = firstName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const greetNameRegex = new RegExp(`^\\s*(hi|hello|hey)\\s+${nameEsc}\\s*[,!-]?\\s*$`, 'i');
+            if (greetNameRegex.test(t)) { continue; }
+            kept.push(ln);
+        }
+        // Trim leading/trailing empties and compress multiple blanks
+        while (kept.length && !kept[0].trim()) kept.shift();
+        while (kept.length && !kept[kept.length - 1].trim()) kept.pop();
+        const compact = [];
+        let lastBlank = false;
+        for (const ln of kept) {
+            const blank = !ln.trim();
+            if (blank && lastBlank) continue;
+            compact.push(ln);
+            lastBlank = blank;
+        }
+
+        // Rebuild body and normalize paragraphs: ensure blank line between paragraphs
+        body = compact.join('\n').trim();
+        // Convert single newlines inside paragraphs to spaces if they are likely wrapped lines
+        // but keep double newlines as paragraph breaks
+        body = body
+            .split(/\n{2,}/)
+            .map(p => p.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim())
+            .filter(Boolean)
+            .join('\n\n');
+
+        // Build HTML paragraphs
+        const paras = body.split(/\n\n/).map(p => p.trim()).filter(Boolean);
+        const paraHtml = paras.map(p => `<p>${this.escapeHtml(p)}</p>`).join('');
+
+        // Add a single standardized closing (first name only)
+        const senderFirst = '{{sender.first_name}}';
+        const closingHtml = `<p>Best regards,</p><p>${senderFirst}</p>`;
+
+        const fullHtml = [`<p>${this.escapeHtml(greeting)}</p>`, paraHtml, closingHtml]
+            .filter(Boolean)
+            .join('');
+        return { subject, html: fullHtml };
+    }
+
+    escapeHtml(s) {
+        return String(s || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // Post-insert DOM sanitizer: remove duplicate greetings/closings and placeholders
+    sanitizeGeneratedEditor(editor, recipient) {
+        try {
+            if (!editor) return;
+            const firstName = (recipient?.name || '').split(' ')[0] || '{{contact.first_name}}';
+            const nameEsc = firstName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const isGreeting = (t) => {
+                const s = String(t || '').trim();
+                return new RegExp(`^\\s*(hi|hello|hey)(?:\\s+${nameEsc})?\\s*[,!-]?\\s*$`, 'i').test(s);
+            };
+            const normalizeGreeting = () => `Hi ${firstName},`;
+            const isClosing = (t) => {
+                const s = String(t || '').toLowerCase().replace(/\s+/g,' ').trim().replace(/[.,!;:]+$/,'');
+                return s.startsWith('best regards') || s === 'regards' || s.startsWith('kind regards') || s.startsWith('warm regards') || s === 'sincerely' || s === 'thanks' || s === 'thank you' || s === 'cheers';
+            };
+            const isPlaceholder = (t) => /\[\s*(your\s+name|your\s+title|your\s+contact\s*information)\s*\]/i.test(String(t || ''));
+
+            const ps = Array.from(editor.querySelectorAll('p'));
+            if (!ps.length) return;
+
+            // Ensure first paragraph is a single normalized greeting
+            let greetingPlaced = false;
+            for (let i = 0; i < ps.length; i++) {
+                const t = ps[i].textContent || '';
+                if (isGreeting(t)) {
+                    if (!greetingPlaced) {
+                        // Move/normalize the first greeting to be the first paragraph
+                        ps[i].textContent = normalizeGreeting();
+                        if (i !== 0) editor.insertBefore(ps[i], editor.firstChild);
+                        greetingPlaced = true;
+                    } else {
+                        ps[i].remove();
+                    }
+                }
+            }
+            // If no greeting at all, prepend one
+            if (!greetingPlaced) {
+                const p = document.createElement('p');
+                p.textContent = normalizeGreeting();
+                editor.insertBefore(p, editor.firstChild);
+            }
+
+            // Recompute paragraphs
+            let paras = Array.from(editor.querySelectorAll('p'));
+
+            // Remove placeholder lines
+            paras.forEach(p => {
+                const t = p.textContent || '';
+                if (isPlaceholder(t)) p.remove();
+            });
+
+            // Remove any standalone sender chips above the closing (lines that contain only sender name chips)
+            Array.from(editor.querySelectorAll('p')).forEach(p => {
+                const chips = Array.from(p.querySelectorAll('.var-chip[data-var^="sender."]'));
+                if (chips.length) {
+                    const clone = p.cloneNode(true);
+                    clone.querySelectorAll('.var-chip').forEach(c => c.remove());
+                    const residual = clone.textContent.trim();
+                    if (!residual) p.remove();
+                }
+            });
+
+            // Remove all closings and placeholders anywhere
+            Array.from(editor.querySelectorAll('p')).forEach(p => {
+                const t = p.textContent || '';
+                if (isClosing(t) || isPlaceholder(t)) p.remove();
+            });
+
+            // Remove any sender.name chips entirely; we'll use sender.first_name
+            editor.querySelectorAll('.var-chip[data-var="sender.name"]').forEach(el => el.remove());
+
+            // Determine sender first name chip (if exists) to reuse; otherwise create one
+            let senderChip = editor.querySelector('.var-chip[data-var="sender.first_name"]');
+            if (senderChip) {
+                senderChip = senderChip.cloneNode(true);
+            } else {
+                senderChip = document.createElement('span');
+                senderChip.className = 'var-chip';
+                senderChip.setAttribute('data-var', 'sender.first_name');
+                senderChip.setAttribute('data-token', '{{sender.first_name}}');
+                senderChip.setAttribute('contenteditable', 'false');
+                senderChip.textContent = 'sender first name';
+            }
+
+            // Append a clean closing block at the end: "Best regards," then sender name (chip or token)
+            const pClose = document.createElement('p');
+            pClose.textContent = 'Best regards,';
+            editor.appendChild(pClose);
+            const pName = document.createElement('p');
+            pName.appendChild(senderChip);
+            editor.appendChild(pName);
+
+            // Remove empty paragraphs and collapse extra blanks (leave natural spacing to CSS)
+            Array.from(editor.querySelectorAll('p')).forEach((p, idx, arr) => {
+                const txt = (p.textContent || '').replace(/\u00A0/g, ' ').trim();
+                if (!txt) p.remove();
+            });
+        } catch (e) {
+            console.warn('sanitizeGeneratedEditor failed', e);
+        }
+    }
+
+    startGeneratingAnimation(composeWindow) {
+        if (!composeWindow) return;
+        const editor = composeWindow.querySelector('.body-input');
+        const subject = composeWindow.querySelector('#compose-subject');
+        editor?.classList.add('is-loading');
+        subject?.classList.add('is-loading');
+    }
+
+    stopGeneratingAnimation(composeWindow) {
+        if (!composeWindow) return;
+        const editor = composeWindow.querySelector('.body-input');
+        const subject = composeWindow.querySelector('#compose-subject');
+        editor?.classList.remove('is-loading');
+        subject?.classList.remove('is-loading');
     }
 
     // Recipient autocomplete for #compose-to
     initRecipientAutocomplete(composeWindow) {
         const input = composeWindow.querySelector('#compose-to');
-        const panel = composeWindow.querySelector('#compose-to-suggestions');
+        const panel = composeWindow.querySelector('#compose-to-suggestions') || composeWindow.querySelector('.recipient-suggestions');
         console.log('[ComposeAutocomplete] initRecipientAutocomplete start', { composeWindow: !!composeWindow, input: !!input, panel: !!panel });
         if (!input || !panel) {
             console.warn('[ComposeAutocomplete] Missing input or panel');
@@ -183,8 +629,14 @@ class EmailManager {
             return ready;
         };
         const closePanel = () => { panel.hidden = true; input.setAttribute('aria-expanded', 'false'); };
-        const openPanel = () => { panel.hidden = false; input.setAttribute('aria-expanded', 'true'); };
+        const openPanel = () => { 
+            panel.hidden = false; 
+            input.setAttribute('aria-expanded', 'true');
+        };
         const render = (items=[]) => {
+            // refresh index for quick lookup on selection
+            this._composePeopleById = new Map();
+            items.forEach(p => { if (p && (p.id || p.data?.id)) this._composePeopleById.set(p.id || p.data?.id, p); });
             if (!items.length) { panel.innerHTML = '<div class="suggestion-empty">No matches</div>'; return; }
             panel.innerHTML = items.map(p => {
                 const name = p.full_name || p.fullName || p.name || `${p.first_name || p.firstName || ''} ${p.last_name || p.lastName || ''}`.trim();
@@ -209,18 +661,106 @@ class EmailManager {
         const onInput = debounce((val) => { console.log('[ComposeAutocomplete] input event val:', val); searchRun(String(val || '').trim()); }, 180);
         input.addEventListener('input', (e) => { onInput(e.target.value); });
         input.addEventListener('focus', () => { console.log('[ComposeAutocomplete] focus event'); searchRun(input.value || ''); });
-        document.addEventListener('click', (evt) => { if (!panel.contains(evt.target) && evt.target !== input) { console.log('[ComposeAutocomplete] doc click closing panel'); closePanel(); } });
-        panel.addEventListener('click', (evt) => {
-            const row = evt.target.closest('.suggestion-item');
+        
+        // Close when clicking anywhere outside the input or panel
+        const onDocPointerDown = (evt) => {
+            if (!panel.contains(evt.target) && evt.target !== input) {
+                console.log('[ComposeAutocomplete] pointerdown outside - closing panel');
+                closePanel();
+            }
+        };
+        document.addEventListener('pointerdown', onDocPointerDown, true);
+        document.addEventListener('click', (evt) => {
+            if (!panel.contains(evt.target) && evt.target !== input) {
+                console.log('[ComposeAutocomplete] doc click closing panel');
+                closePanel();
+            }
+        }, true);
+        
+        // Close on blur (allow click on a suggestion first)
+        input.addEventListener('blur', () => {
+            setTimeout(() => {
+                const active = document.activeElement;
+                if (!panel.contains(active)) {
+                    console.log('[ComposeAutocomplete] input blur - closing panel');
+                    closePanel();
+                }
+            }, 100);
+        });
+        
+        // Close on Escape
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                closePanel();
+            }
+        });
+        
+        const selectRow = (row) => {
             if (!row) return;
-            const name = row.getAttribute('data-name') || '';
-            const email = row.getAttribute('data-email') || '';
+            const emailFromText = (() => {
+                const sub = row.querySelector('.sugg-sub')?.textContent || '';
+                const main = row.querySelector('.sugg-main')?.textContent || '';
+                const match = (sub + ' ' + main).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+                return match ? match[0] : '';
+            })();
+            const nameFromText = (row.querySelector('.sugg-main')?.textContent || '').trim();
+            const name = row.getAttribute('data-name') || nameFromText || '';
+            const email = row.getAttribute('data-email') || emailFromText || '';
             const id = row.getAttribute('data-id') || '';
             // Populate with email only as requested
             input.value = email || name;
-            this._selectedRecipient = { id, name, email };
+            const person = this._composePeopleById.get(id) || {};
+            // Build a rich recipient context object
+            this._selectedRecipient = {
+                id,
+                name,
+                email,
+                firstName: person.firstName || person.first_name || (name?.split(' ')[0]) || '',
+                lastName: person.lastName || person.last_name || '',
+                fullName: person.fullName || person.full_name || name || '',
+                company: person.company || person.companyName || person.accountName || '',
+                title: person.title || person.jobTitle || person.role || '',
+                industry: person.industry || person.sector || '',
+                // Use non-specific facility size; exact sqft will not be echoed by AI
+                squareFootage: person.squareFootage || person.square_footage || person.buildingSize || person.sqft || '',
+                energy: {
+                    usage: person.energyUsage || person.annual_kwh || person.kwh || '',
+                    supplier: person.energySupplier || person.supplier || person.contractSupplier || '',
+                    contractEnd: person.contractEnd || person.contract_end || person.contractEndDate || ''
+                },
+                linkedin: person.linkedin || person.linkedinUrl || person.linkedin_url || person.linkedIn || ''
+            };
             console.log('[ComposeAutocomplete] selected', this._selectedRecipient);
+            // Notify listeners that the input changed
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            // Keep focus on input for continued typing
+            setTimeout(() => input.focus(), 0);
             closePanel();
+        };
+
+        // Use pointerdown/mousedown (capture) to select before input blur closes panel
+        panel.addEventListener('pointerdown', (evt) => {
+            const row = evt.target.closest('.suggestion-item');
+            if (!row) return;
+            evt.preventDefault();
+            evt.stopPropagation();
+            selectRow(row);
+        }, true);
+
+        // Mouse fallback
+        panel.addEventListener('mousedown', (evt) => {
+            const row = evt.target.closest('.suggestion-item');
+            if (!row) return;
+            evt.preventDefault(); // prevent focus shift until we've handled selection
+            selectRow(row);
+        }, true);
+
+        // Fallback on click as well
+        panel.addEventListener('click', (evt) => {
+            const row = evt.target.closest('.suggestion-item');
+            if (!row) return;
+            selectRow(row);
         });
     }
 
@@ -843,6 +1383,9 @@ class EmailManager {
         const composeWindow = document.getElementById('compose-window');
         if (!composeWindow) return;
 
+        // Always start fresh on open
+        this.resetComposeWindow();
+
         // Show the window and add open class for animation
         composeWindow.style.display = 'flex';
         setTimeout(() => {
@@ -859,6 +1402,64 @@ class EmailManager {
         this.initializeComposeWindow();
     }
 
+    // Reset all compose UI state to a clean slate
+    resetComposeWindow() {
+        const composeWindow = document.getElementById('compose-window');
+        if (!composeWindow) return;
+
+        // Inputs
+        const toInput = composeWindow.querySelector('#compose-to');
+        const subjectInput = composeWindow.querySelector('#compose-subject');
+        const ccInput = composeWindow.querySelector('#compose-cc');
+        const bccInput = composeWindow.querySelector('#compose-bcc');
+        const body = composeWindow.querySelector('.body-input');
+        const preview = composeWindow.querySelector('.compose-preview');
+        const suggestionsPanel = composeWindow.querySelector('#compose-to-suggestions') || composeWindow.querySelector('.recipient-suggestions');
+        
+        if (toInput) { toInput.value = ''; toInput.setAttribute('aria-expanded', 'false'); }
+        if (subjectInput) subjectInput.value = '';
+        if (ccInput) ccInput.value = '';
+        if (bccInput) bccInput.value = '';
+        if (body) { body.removeAttribute('data-mode'); body.innerHTML = ''; }
+        if (preview) { preview.setAttribute('hidden', ''); preview.innerHTML = ''; }
+        if (suggestionsPanel) { suggestionsPanel.hidden = true; suggestionsPanel.innerHTML = ''; }
+
+        // Toolbars
+        const formattingBar = composeWindow.querySelector('.formatting-bar');
+        const linkBar = composeWindow.querySelector('.link-bar');
+        const variablesBar = composeWindow.querySelector('.variables-bar');
+        const aiBar = composeWindow.querySelector('.ai-bar');
+        
+        formattingBar?.classList.remove('open');
+        formattingBar?.setAttribute('aria-hidden', 'true');
+        linkBar?.classList.remove('open');
+        linkBar?.setAttribute('aria-hidden', 'true');
+        variablesBar?.classList.remove('open');
+        variablesBar?.setAttribute('aria-hidden', 'true');
+        aiBar?.classList.remove('open');
+        aiBar?.setAttribute('aria-hidden', 'true');
+        
+        // Clear link inputs
+        linkBar?.querySelector('[data-link-text]') && (linkBar.querySelector('[data-link-text]').value = '');
+        linkBar?.querySelector('[data-link-url]') && (linkBar.querySelector('[data-link-url]').value = '');
+
+        // Force AI bar to re-render next time it's opened so event wiring is fresh
+        if (aiBar) {
+            aiBar.dataset.rendered = 'false';
+            aiBar.innerHTML = '';
+        }
+
+        // Reset toolbar button expanded states
+        composeWindow.querySelectorAll('.toolbar-btn[aria-expanded="true"]').forEach(btn => {
+            btn.setAttribute('aria-expanded', 'false');
+        });
+
+        // Reset internal editor state
+        this._isHtmlMode = false;
+        this._editorSelection = null;
+        this._currentFormatting = { color: null, backgroundColor: null, fontSize: null, bold: false, italic: false, underline: false };
+    }
+
     closeComposeWindow() {
         const composeWindow = document.getElementById('compose-window');
         if (!composeWindow) return;
@@ -867,13 +1468,18 @@ class EmailManager {
         setTimeout(() => {
             composeWindow.style.display = 'none';
             composeWindow.classList.remove('minimized', 'maximized');
+            // After the close animation completes, reset for a fresh next open
+            this.resetComposeWindow();
         }, 300);
     }
 
     initializeComposeWindow() {
         const composeWindow = document.getElementById('compose-window');
         if (!composeWindow) return;
-        
+        // Avoid rebinding events multiple times across opens
+        if (composeWindow.dataset.initialized === 'true') {
+            return;
+        }
 
         // Window controls
         const minimizeBtn = document.getElementById('compose-minimize');
@@ -956,6 +1562,9 @@ class EmailManager {
                 });
             }
         });
+        
+        // Mark as initialized so we don't attach handlers repeatedly
+        composeWindow.dataset.initialized = 'true';
     }
 
     initializeComposeEditor() {
@@ -1851,27 +2460,42 @@ class EmailManager {
             const variablesBar = composeWindow?.querySelector('.variables-bar');
             const aiBar = composeWindow?.querySelector('.ai-bar');
             console.log('[Toolbar] handleToolbarAction:', action, { editor, formattingBar, linkBar, variablesBar });
+            
+            // Helper function to close all toolbars
+            const closeAllToolbars = () => {
+                formattingBar?.classList.remove('open');
+                formattingBar?.setAttribute('aria-hidden', 'true');
+                linkBar?.classList.remove('open');
+                linkBar?.setAttribute('aria-hidden', 'true');
+                variablesBar?.classList.remove('open');
+                variablesBar?.setAttribute('aria-hidden', 'true');
+                aiBar?.classList.remove('open');
+                aiBar?.setAttribute('aria-hidden', 'true');
+                
+                // Also close any formatting popovers
+                composeWindow?.querySelectorAll('.format-popover').forEach(p => p.classList.remove('open'));
+                
+                // Reset button states
+                composeWindow?.querySelectorAll('.toolbar-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+            };
+            
             switch (action) {
                 case 'formatting': {
+                    // Close all other toolbars first
+                    closeAllToolbars();
+                    // Then open formatting bar
                     const isOpen = formattingBar?.classList.toggle('open');
                     formattingBar?.setAttribute('aria-hidden', String(!isOpen));
-                    linkBar?.classList.remove('open');
-                    linkBar?.setAttribute('aria-hidden', 'true');
-                    variablesBar?.classList.remove('open');
-                    variablesBar?.setAttribute('aria-hidden', 'true');
-                    aiBar?.classList.remove('open');
-                    aiBar?.setAttribute('aria-hidden', 'true');
+                    btn.setAttribute('aria-expanded', String(isOpen));
                     break;
                 }
                 case 'link': {
+                    // Close all other toolbars first
+                    closeAllToolbars();
+                    // Then open link bar
                     const isOpen = linkBar?.classList.toggle('open');
                     linkBar?.setAttribute('aria-hidden', String(!isOpen));
-                    formattingBar?.classList.remove('open');
-                    formattingBar?.setAttribute('aria-hidden', 'true');
-                    variablesBar?.classList.remove('open');
-                    variablesBar?.setAttribute('aria-hidden', 'true');
-                    aiBar?.classList.remove('open');
-                    aiBar?.setAttribute('aria-hidden', 'true');
+                    btn.setAttribute('aria-expanded', String(isOpen));
                     // Prefill link text from selection
                     try {
                         const sel = window.getSelection();
@@ -1883,33 +2507,43 @@ class EmailManager {
                     break;
                 }
                 case 'variables': {
-                    if (variablesBar && !variablesBar.classList.contains('open')) this.renderVariablesBar(variablesBar);
+                    // Close all other toolbars first
+                    closeAllToolbars();
+                    // Render variables if not already rendered
+                    if (variablesBar && !variablesBar.classList.contains('open')) {
+                        this.renderVariablesBar(variablesBar);
+                    }
+                    // Then open variables bar
                     const isOpen = variablesBar?.classList.toggle('open');
                     variablesBar?.setAttribute('aria-hidden', String(!isOpen));
-                    formattingBar?.querySelectorAll?.('.format-popover')?.forEach(p => p.classList.remove('open'));
-                    aiBar?.classList.remove('open');
-                    aiBar?.setAttribute('aria-hidden', 'true');
+                    btn.setAttribute('aria-expanded', String(isOpen));
                     break;
                 }
                 case 'ai': {
-                    if (aiBar && !aiBar.classList.contains('open')) this.renderAIBar(aiBar);
-                    const isOpen = aiBar?.classList.toggle('open');
-                    aiBar?.setAttribute('aria-hidden', String(!isOpen));
-                    // close others
-                    formattingBar?.classList.remove('open');
-                    formattingBar?.setAttribute('aria-hidden', 'true');
-                    linkBar?.classList.remove('open');
-                    linkBar?.setAttribute('aria-hidden', 'true');
-                    variablesBar?.classList.remove('open');
-                    variablesBar?.setAttribute('aria-hidden', 'true');
+                    // Check if AI bar is currently open
+                    const isCurrentlyOpen = aiBar?.classList.contains('open');
+                    
+                    if (isCurrentlyOpen) {
+                        // If open, close it
+                        aiBar?.classList.remove('open');
+                        aiBar?.setAttribute('aria-hidden', 'true');
+                        btn.setAttribute('aria-expanded', 'false');
+                    } else {
+                        // If closed, close all other toolbars first, then open AI bar
+                        closeAllToolbars();
+                        // Render AI bar if not already rendered
+                        if (aiBar && !aiBar.classList.contains('open')) {
+                            this.renderAIBar(aiBar);
+                        }
+                        // Then open AI bar
+                        aiBar?.classList.add('open');
+                        aiBar?.setAttribute('aria-hidden', 'false');
+                        btn.setAttribute('aria-expanded', 'true');
+                    }
                     break;
                 }
                 case 'preview': {
                     this.togglePreview(composeWindow);
-                    break;
-                }
-                case 'ai': {
-                    // handled above
                     break;
                 }
                 case 'image': {
