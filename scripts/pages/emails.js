@@ -1369,11 +1369,15 @@ class EmailManager {
 
         try {
             if (window.emailTrackingManager) {
+                console.log('[EmailManager] Loading sent emails...');
                 const sentEmails = await window.emailTrackingManager.getSentEmails();
+                console.log('[EmailManager] Retrieved sent emails:', sentEmails.length);
                 this.emails = sentEmails.map(email => this.parseSentEmailData(email));
+                console.log('[EmailManager] Parsed emails:', this.emails.length);
                 this.renderEmails();
                 this.updateFolderCounts();
             } else {
+                console.warn('[EmailManager] Email tracking manager not available');
                 this.emails = [];
                 this.showEmptyState();
             }
@@ -1385,14 +1389,28 @@ class EmailManager {
     }
 
     parseSentEmailData(emailData) {
+        // Fix date formatting issue
+        let dateStr = '';
+        try {
+            const date = new Date(emailData.sentAt);
+            if (isNaN(date.getTime())) {
+                dateStr = 'Unknown date';
+            } else {
+                dateStr = date.toLocaleDateString();
+            }
+        } catch (error) {
+            console.warn('[EmailManager] Date parsing error:', error);
+            dateStr = 'Unknown date';
+        }
+
         return {
             id: emailData.id,
             from: emailData.from,
             to: Array.isArray(emailData.to) ? emailData.to.join(', ') : emailData.to,
             subject: emailData.subject,
             snippet: this.stripHtml(emailData.originalContent || emailData.content || ''),
-            date: new Date(emailData.sentAt).toLocaleDateString(),
-            timestamp: new Date(emailData.sentAt).getTime(),
+            date: dateStr,
+            timestamp: new Date(emailData.sentAt).getTime() || Date.now(),
             // Tracking data
             openCount: emailData.openCount || 0,
             replyCount: emailData.replyCount || 0,
