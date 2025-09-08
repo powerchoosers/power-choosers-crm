@@ -554,25 +554,6 @@ class EmailTrackingManager {
         }
     }
 
-    /**
-     * Simulate email open for testing
-     */
-    simulateEmailOpen(trackingId) {
-        console.log('[EmailTracking] Simulating email open:', trackingId);
-        
-        // Create a mock open event
-        const openEvent = {
-            openedAt: new Date().toISOString(),
-            userAgent: 'Test Browser (Simulation)',
-            ip: '127.0.0.1'
-        };
-
-        // Trigger notification
-        this.notifyEmailOpened(trackingId, openEvent);
-        
-        // Update demo data if available
-        this.updateDemoEmailOpenCount(trackingId);
-    }
 
     /**
      * Simulate email reply for testing
@@ -609,6 +590,81 @@ class EmailTrackingManager {
     updateDemoEmailReplyCount(trackingId) {
         // This would update the demo data in a real implementation
         console.log('[EmailTracking] Updated reply count for:', trackingId);
+    }
+
+    /**
+     * Save an email record to Firebase (for Gmail API emails)
+     */
+    async saveEmailRecord(emailData) {
+        try {
+            const { to, subject, content, from, gmailMessageId } = emailData;
+            
+            // Generate unique tracking ID
+            const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Create email record
+            const emailRecord = {
+                id: trackingId,
+                to: Array.isArray(to) ? to : [to],
+                subject,
+                content: content,
+                originalContent: content,
+                from: from || 'noreply@powerchoosers.com',
+                sentAt: new Date().toISOString(),
+                opens: [],
+                replies: [],
+                openCount: 0,
+                replyCount: 0,
+                status: 'sent',
+                gmailMessageId: gmailMessageId, // Store Gmail's message ID
+                sentVia: 'gmail_api' // Mark as sent via Gmail API
+            };
+
+            // Save to Firebase
+            await this.db.collection('emails').doc(trackingId).set(emailRecord);
+            console.log('[EmailTracking] Gmail email record saved:', emailRecord);
+            
+            return { success: true, trackingId };
+        } catch (error) {
+            console.error('[EmailTracking] Failed to save email record:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Simulate email open for testing (since tracking pixels aren't working yet)
+     */
+    async simulateEmailOpen(trackingId) {
+        try {
+            if (!this.db) {
+                console.warn('[EmailTracking] Firebase not initialized');
+                return;
+            }
+
+            const openEvent = {
+                openedAt: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                ip: 'simulated',
+                location: null
+            };
+
+            // Update the email document with the open event
+            const emailRef = this.db.collection('emails').doc(trackingId);
+            await emailRef.update({
+                opens: this.db.FieldValue.arrayUnion(openEvent),
+                openCount: this.db.FieldValue.increment(1),
+                lastOpened: openEvent.openedAt,
+                updatedAt: new Date().toISOString()
+            });
+
+            console.log('[EmailTracking] Email open simulated:', trackingId);
+
+            // Trigger notification
+            this.notifyEmailOpened(trackingId, openEvent);
+
+        } catch (error) {
+            console.error('[EmailTracking] Simulate open error:', error);
+        }
     }
 }
 

@@ -1110,11 +1110,64 @@ class EmailManager {
     }
 
     updateUI() {
-        // Force show auth prompt on initial load
+        // Only show auth prompt if not authenticated
+        if (!this.isAuthenticated) {
+            this.showAuthPrompt();
+        }
+    }
+
+    saveAuthState() {
+        try {
+            const authState = {
+                accessToken: this.accessToken,
+                isAuthenticated: this.isAuthenticated,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('gmail_auth_state', JSON.stringify(authState));
+            console.log('[Auth] Auth state saved to localStorage');
+        } catch (error) {
+            console.warn('[Auth] Failed to save auth state:', error);
+        }
+    }
+
+    restoreAuthState() {
+        try {
+            const savedState = localStorage.getItem('gmail_auth_state');
+            if (savedState) {
+                const authState = JSON.parse(savedState);
+                const now = Date.now();
+                const tokenAge = now - authState.timestamp;
+                
+                // Check if token is less than 1 hour old (Gmail tokens typically last 1 hour)
+                if (tokenAge < 3600000 && authState.accessToken) {
+                    this.accessToken = authState.accessToken;
+                    this.isAuthenticated = authState.isAuthenticated;
+                    console.log('[Auth] Auth state restored from localStorage');
+                    return true;
+                } else {
+                    console.log('[Auth] Token expired, clearing saved state');
+                    localStorage.removeItem('gmail_auth_state');
+                }
+            }
+        } catch (error) {
+            console.warn('[Auth] Failed to restore auth state:', error);
+            localStorage.removeItem('gmail_auth_state');
+        }
+        return false;
+    }
+
+    logout() {
+        this.accessToken = null;
+        this.isAuthenticated = false;
+        localStorage.removeItem('gmail_auth_state');
+        console.log('[Auth] Logged out and cleared auth state');
         this.showAuthPrompt();
     }
 
     async loadGIS() {
+        // Check for existing token first
+        this.restoreAuthState();
+        
         // Load Google Identity Services script and initialize token client
         return new Promise((resolve, reject) => {
             if (window.google && window.google.accounts && window.google.accounts.oauth2) {
@@ -1125,6 +1178,7 @@ class EmailManager {
                         if (tokenResponse && tokenResponse.access_token) {
                             this.accessToken = tokenResponse.access_token;
                             this.isAuthenticated = true;
+                            this.saveAuthState();
                         }
                     },
                 });
@@ -1145,6 +1199,7 @@ class EmailManager {
                             if (tokenResponse && tokenResponse.access_token) {
                                 this.accessToken = tokenResponse.access_token;
                                 this.isAuthenticated = true;
+                                this.saveAuthState();
                             }
                         },
                     });
@@ -1242,23 +1297,43 @@ class EmailManager {
         }
         try {
             console.log('Starting Google authentication (GIS)...');
+            console.log('[Auth] Current auth state:', { 
+                isAuthenticated: this.isAuthenticated, 
+                hasAccessToken: !!this.accessToken 
+            });
+            
             await new Promise((resolve) => {
-                // Prompt the user only if we do not yet have a token
+                // Store the original callback
+                const originalCallback = this.tokenClient.callback;
+                
+                // Set a temporary callback for this authentication attempt
                 this.tokenClient.callback = (resp) => {
+                    console.log('[Auth] Token response received:', { 
+                        hasToken: !!resp?.access_token,
+                        tokenLength: resp?.access_token?.length 
+                    });
+                    
                     if (resp && resp.access_token) {
                         this.accessToken = resp.access_token;
                         this.isAuthenticated = true;
+                        this.saveAuthState();
+                        console.log('[Auth] Authentication successful');
                         resolve();
                     } else {
+                        console.log('[Auth] No access token received');
                         resolve();
                     }
                 };
+                
                 this.tokenClient.requestAccessToken({ prompt: this.accessToken ? '' : 'consent' });
             });
+            
             if (this.isAuthenticated) {
-            await this.loadEmails();
-            window.crm?.showToast('Successfully connected to Gmail!');
+                console.log('[Auth] Loading emails after successful authentication');
+                await this.loadEmails();
+                window.crm?.showToast('Successfully connected to Gmail!');
             } else {
+                console.log('[Auth] Authentication was cancelled or failed');
                 window.crm?.showToast('Google authentication was cancelled.');
             }
         } catch (error) {
@@ -1389,18 +1464,16 @@ class EmailManager {
     }
 
     parseSentEmailData(emailData) {
-        // Fix date formatting issue
-        let dateStr = '';
+        // Fix date formatting issue - pass the actual Date object instead of string
+        let dateObj = null;
         try {
-            const date = new Date(emailData.sentAt);
-            if (isNaN(date.getTime())) {
-                dateStr = 'Unknown date';
-            } else {
-                dateStr = date.toLocaleDateString();
+            dateObj = new Date(emailData.sentAt);
+            if (isNaN(dateObj.getTime())) {
+                dateObj = new Date(); // Fallback to current time
             }
         } catch (error) {
             console.warn('[EmailManager] Date parsing error:', error);
-            dateStr = 'Unknown date';
+            dateObj = new Date(); // Fallback to current time
         }
 
         return {
@@ -1409,8 +1482,8 @@ class EmailManager {
             to: Array.isArray(emailData.to) ? emailData.to.join(', ') : emailData.to,
             subject: emailData.subject,
             snippet: this.stripHtml(emailData.originalContent || emailData.content || ''),
-            date: dateStr,
-            timestamp: new Date(emailData.sentAt).getTime() || Date.now(),
+            date: dateObj, // Pass Date object instead of string
+            timestamp: dateObj.getTime(),
             // Tracking data
             openCount: emailData.openCount || 0,
             replyCount: emailData.replyCount || 0,
@@ -1418,7 +1491,10 @@ class EmailManager {
             lastReplied: emailData.lastReplied,
             status: emailData.status || 'sent',
             // Mark as sent email for UI rendering
-            isSentEmail: true
+            isSentEmail: true,
+            // Gmail API specific data
+            sentVia: emailData.sentVia || 'simulation',
+            gmailMessageId: emailData.gmailMessageId
         };
     }
 
@@ -1439,6 +1515,9 @@ class EmailManager {
         const hasOpened = openCount > 0;
         const hasReplied = replyCount > 0;
 
+        const gmailBadge = email.sentVia === 'gmail_api' ? 
+            '<div class="gmail-badge" title="Sent via Gmail API">Gmail</div>' : '';
+
         return `
             <div class="email-tracking-icons">
                 <div class="tracking-icon ${hasOpened ? 'opened' : 'not-opened'}" title="${hasOpened ? `Opened ${openCount} time${openCount !== 1 ? 's' : ''}` : 'Not opened'}">
@@ -1456,6 +1535,7 @@ class EmailManager {
                     </svg>
                     ${hasReplied ? `<span class="tracking-badge">${replyCount}</span>` : ''}
                 </div>
+                ${gmailBadge}
             </div>
         `;
     }
@@ -3218,10 +3298,19 @@ class EmailManager {
             const { to, subject, content } = emailData;
             
             // Get current user's email address
-            const userProfile = await this.gapi.client.gmail.users.getProfile({
-                userId: 'me'
+            const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Content-Type': 'application/json'
+                }
             });
-            const fromEmail = userProfile.result.emailAddress;
+            
+            if (!profileResponse.ok) {
+                throw new Error(`Failed to get user profile: ${profileResponse.statusText}`);
+            }
+            
+            const profile = await profileResponse.json();
+            const fromEmail = profile.emailAddress;
             
             // Create email message in Gmail format
             const recipients = Array.isArray(to) ? to.join(', ') : to;
@@ -3242,17 +3331,46 @@ class EmailManager {
                 .replace(/=+$/, '');
 
             // Send via Gmail API
-            const response = await this.gapi.client.gmail.users.messages.send({
-                userId: 'me',
-                resource: {
+            const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
                     raw: encodedEmail
-                }
+                })
             });
 
-            console.log('[Gmail] Email sent successfully:', response.result);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Gmail API error: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+
+            const result = await response.json();
+            console.log('[Gmail] Email sent successfully:', result);
+            
+            // Also store the email in our tracking system so it appears in Sent section
+            if (window.emailTrackingManager) {
+                const trackingEmailData = {
+                    to: emailData.to,
+                    subject: emailData.subject,
+                    content: emailData.content,
+                    from: fromEmail,
+                    gmailMessageId: result.id
+                };
+                
+                try {
+                    await window.emailTrackingManager.saveEmailRecord(trackingEmailData);
+                    console.log('[Gmail] Email record saved to tracking system');
+                } catch (trackingError) {
+                    console.warn('[Gmail] Failed to save email record:', trackingError);
+                }
+            }
+            
             return {
                 success: true,
-                messageId: response.result.id,
+                messageId: result.id,
                 message: 'Email sent successfully via Gmail API'
             };
 
@@ -3306,7 +3424,13 @@ class EmailManager {
             // Try Gmail API first, fallback to email tracking manager
             let result;
             try {
-                if (this.isAuthenticated && this.gapi) {
+                console.log('[EmailManager] Auth check:', { 
+                    isAuthenticated: this.isAuthenticated, 
+                    hasAccessToken: !!this.accessToken,
+                    accessTokenLength: this.accessToken?.length 
+                });
+                
+                if (this.isAuthenticated && this.accessToken) {
                     result = await this.sendEmailViaGmail(emailData);
                     console.log('[EmailManager] Email sent via Gmail API');
                 } else {
@@ -3439,7 +3563,42 @@ class EmailManager {
                 }
             });
         }
+
+        // Add a test button to simulate email opens
+        const simulateOpenButton = document.createElement('button');
+        simulateOpenButton.textContent = 'Test Email Open';
+        simulateOpenButton.style.cssText = 'position: fixed; top: 50px; right: 10px; z-index: 9999; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;';
+        simulateOpenButton.onclick = async () => {
+            await this.simulateEmailOpen();
+        };
+        document.body.appendChild(simulateOpenButton);
     }
+
+    async simulateEmailOpen() {
+        try {
+            // Get the most recent email from the current list
+            if (this.emails && this.emails.length > 0) {
+                const mostRecentEmail = this.emails[0];
+                if (window.emailTrackingManager) {
+                    await window.emailTrackingManager.simulateEmailOpen(mostRecentEmail.id);
+                    window.crm?.showToast('Email open simulated! Check the eyeball icon.');
+                    
+                    // Refresh the sent emails to show the updated tracking
+                    if (this.currentFolder === 'sent') {
+                        await this.loadSentEmails();
+                    }
+                } else {
+                    window.crm?.showToast('Email tracking manager not initialized');
+                }
+            } else {
+                window.crm?.showToast('No emails found to simulate open');
+            }
+        } catch (error) {
+            console.error('[EmailManager] Simulate open error:', error);
+            window.crm?.showToast('Failed to simulate email open: ' + error.message);
+        }
+    }
+
 }
 
 // Initialize email manager
