@@ -54,7 +54,8 @@ class EmailManager {
             { text: 'Follow-up with tailored value props', prompt: 'Follow-up with tailored value props' },
             { text: 'Schedule an Energy Health Check', prompt: 'Schedule an Energy Health Check' },
             { text: 'Proposal delivery with next steps', prompt: 'Proposal delivery with next steps' },
-            { text: 'Cold email to a lead I could not reach by phone', prompt: 'Cold email to a lead I could not reach by phone' }
+            { text: 'Cold email to a lead I could not reach by phone', prompt: 'Cold email to a lead I could not reach by phone' },
+            { text: 'Standard Invoice Request', prompt: 'Standard Invoice Request' }
         ];
         aiBar.innerHTML = `
             <div class="ai-inner">
@@ -481,7 +482,13 @@ class EmailManager {
         // but keep double newlines as paragraph breaks
         body = body
             .split(/\n{2,}/)
-            .map(p => p.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim())
+            .map(p => {
+                // Preserve bullet lists within a paragraph (lines starting with - or •)
+                if (/^(\s*[•\-]\s+)/m.test(p)) {
+                    return String(p).replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
+                }
+                return p.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+            })
             .filter(Boolean)
             .join('\n\n');
 
@@ -505,22 +512,34 @@ class EmailManager {
             const normalize = (s) => String(s || '').replace(/\s+/g, ' ').trim().replace(/[\s.,;:]+$/,'').toLowerCase();
             const isColleagueLine = (s) => /recently\s+spoke\s+with/i.test(s) || /colleague/i.test(s);
             const ctaMatchers = /(call|chat|schedule|meet|demo|health\s*check|time|tomorrow|next\s+week|15\s*min|10\s*min|10-?minute|15-?minute)/i; // intentionally excludes "connect" and overly broad terms like "available"
+            const timeSignals = /(mon|tue|wed|thu|fri|monday|tuesday|wednesday|thursday|friday|\b\d{1,2}\s*(am|pm)\b|\b\d{1,2}\s*[–-]\s*\d{1,2}\b)/i;
+            const isExplanationSentence = (s) => /energy\s*health\s*check/i.test(s) && /(\bis\b|provides|helps|why|matters)/i.test(s);
 
             const allSentences = splitSentences(body);
             console.debug('[AI][format] sentences (pre-CTA-scan):', allSentences);
 
-            // Detect CTA from original body (prefer questions, exclude the colleague/connection sentence)
+            // Detect CTA from original body (prefer scheduling/time or explicit CTA keywords; exclude explanation-like questions)
             let detectedCTA = null;
             for (const s of allSentences) {
                 const looksQuestion = /\?$/.test(s);
-                const looksCTA = ctaMatchers.test(s);
-                if ((looksQuestion || looksCTA) && !isColleagueLine(s)) { detectedCTA = s; break; }
+                const looksCTA = ctaMatchers.test(s) || timeSignals.test(s);
+                if ((looksCTA || (looksQuestion && (ctaMatchers.test(s) || timeSignals.test(s)))) && !isColleagueLine(s) && !isExplanationSentence(s)) {
+                    detectedCTA = s; break;
+                }
             }
 
             // While trimming paragraphs, remove the CTA sentence if it appears inside to avoid duplication later
             const trimmedParas = [];
+            const isBulletPara = (txt) => /^(\s*[•\-]\s+)/m.test(String(txt || ''));
+
             for (const p of paras) {
                 let sentences = splitSentences(p);
+                // Keep bullet paragraphs intact (no sentence trimming and no CTA removal inside)
+                if (isBulletPara(p)) {
+                    trimmedParas.push(p);
+                    if (trimmedParas.length === 2) break;
+                    continue;
+                }
                 if (detectedCTA) {
                     const target = normalize(detectedCTA);
                     sentences = sentences.filter(s => normalize(s) !== target);
@@ -533,8 +552,67 @@ class EmailManager {
             paras = trimmedParas.length ? trimmedParas : paras.slice(0, 2);
             console.debug('[AI][format] paras after trim/no-dup-CTA:', paras);
 
+            // For Energy Health Check, ensure ordering: explanation first, coverage second
+            try {
+                const looksEHC = /energy\s*health\s*check/i.test(body);
+                if (looksEHC && paras.length >= 1) {
+                    const isExplanationPara = (p) => /energy\s*health\s*check/i.test(p) && /(\bis\b|provides|helps|why|matters)/i.test(p);
+                    const isCoveragePara = (p) => /(bill|supplier|rate|contract\s*end|usage|health\s*score|bbb|recommend)/i.test(p);
+                    if (paras.length >= 2) {
+                        const p1 = paras[0] || '';
+                        const p2 = paras[1] || '';
+                        if (isCoveragePara(p1) && isExplanationPara(p2)) {
+                            [paras[0], paras[1]] = [paras[1], paras[0]];
+                            console.debug('[AI][format][EHC] Reordered paragraphs to put explanation first');
+                        }
+                    }
+                }
+            } catch (_) { /* noop */ }
+
+            // For Standard Invoice Request, ensure ordering: reminder first, bullet list second
+            try {
+                const looksInvoice = /standard\s*invoice\s*request|invoice\s+request|invoice\b/i.test(body);
+                if (looksInvoice && paras.length) {
+                    const isBulletPara = (txt) => /^(\s*[•\-]\s+)/m.test(String(txt || ''));
+                    const bulletIdx = paras.findIndex(p => isBulletPara(p));
+                    if (bulletIdx !== -1) {
+                        // Ensure bullet paragraph is at index 1 (second paragraph)
+                        if (bulletIdx !== 1 && paras.length >= 2) {
+                            const bullet = paras.splice(bulletIdx, 1)[0];
+                            // If first paragraph is also bullet, try to find a non-bullet explanation to place first
+                            if (paras[0] && isBulletPara(paras[0])) {
+                                const explIdx = paras.findIndex(p => !isBulletPara(p));
+                                if (explIdx > -1) {
+                                    const expl = paras.splice(explIdx, 1)[0];
+                                    paras.unshift(expl);
+                                }
+                            }
+                            paras.splice(1, 0, bullet);
+                            // Keep only the first two content paragraphs (explanation + bullets)
+                            paras = paras.slice(0, 2);
+                            console.debug('[AI][format][INVOICE] Reordered to ensure bullets as second paragraph');
+                        } else if (bulletIdx === 0 && paras.length >= 2) {
+                            // If bullets are first, try swapping with next non-bullet
+                            if (!isBulletPara(paras[1])) {
+                                [paras[0], paras[1]] = [paras[1], paras[0]];
+                                console.debug('[AI][format][INVOICE] Swapped to ensure reminder first, bullets second');
+                            }
+                            paras = paras.slice(0, 2);
+                        } else {
+                            // Ensure we don't exceed two content paragraphs
+                            paras = paras.slice(0, 2);
+                        }
+                    }
+                }
+            } catch (_) { /* noop */ }
+
             // Choose final CTA text
-            let cta = detectedCTA || 'Open to a quick 10‑min call next week?';
+            const looksEHC2 = /energy\s*health\s*check/i.test(body);
+            const looksInvoice2 = /standard\s*invoice\s*request|invoice\s+request|invoice\b/i.test(body);
+            let cta = detectedCTA
+                || (looksEHC2 ? 'Does Tue 10–12 or Thu 2–4 work for a brief review?'
+                : looksInvoice2 ? 'Could you send the latest invoice today or by tomorrow EOD?'
+                : 'Open to a quick 10‑min call next week?');
             // Keep CTA very short
             const ctaWords = cta.split(/\s+/).filter(Boolean);
             if (ctaWords.length > 16) cta = ctaWords.slice(0, 16).join(' ').replace(/[,;:]$/, '') + (cta.endsWith('?') ? '' : '?');
@@ -616,7 +694,28 @@ class EmailManager {
             }
         } catch (_) { /* noop */ }
 
-        const paraHtml = paras.map(p => `<p style="margin: 0 0 16px 0;">${this.escapeHtml(p)}</p>`).join('');
+        const isBulletPara = (txt) => /^(\s*[•\-]\s+)/m.test(String(txt || ''));
+        const paraHtml = paras.map(p => {
+            if (!isBulletPara(p)) {
+                return `<p style="margin: 0 0 16px 0;">${this.escapeHtml(p)}</p>`;
+            }
+            // Build a list: optional header + bullet items
+            const lines = String(p).replace(/\r/g, '').split(/\n+/).map(l => l.trim()).filter(Boolean);
+            const items = [];
+            const nonBullets = [];
+            for (const l of lines) {
+                if (/^(\s*[•\-]\s+)/.test(l)) {
+                    items.push(l.replace(/^(\s*[•\-]\s+)/, ''));
+                } else {
+                    nonBullets.push(l);
+                }
+            }
+            const header = nonBullets.length ? `<p style="margin: 0 0 8px 0;">${this.escapeHtml(nonBullets.join(' '))}</p>` : '';
+            const list = items.length
+                ? `<ul style="margin: 0 0 16px 18px; padding: 0;">${items.map(i => `<li>${this.escapeHtml(i)}</li>`).join('')}</ul>`
+                : '';
+            return `${header}${list}`;
+        }).join('');
 
         // Add a single standardized closing (first name only)
         const senderFirst = (mode === 'html') ? 'Power Choosers' : '{{sender.first_name}}';
