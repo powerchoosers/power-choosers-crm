@@ -18,6 +18,15 @@
             }
         });
     </script>
+    <script>
+        // Default API base: use current origin unless explicitly overridden elsewhere
+        (function(){
+          if (!window.API_BASE_URL) {
+            window.API_BASE_URL = window.location.origin.replace(/\/$/, '');
+            try { console.log('[CRM] API_BASE_URL set to', window.API_BASE_URL); } catch(_) {}
+          }
+        })();
+    </script>
 </head>
 <body>
     <div class="app-container">

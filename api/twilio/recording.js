@@ -140,7 +140,8 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
         } catch (transcriptionError) {
             console.error('[Recording] Twilio transcription error:', transcriptionError);
             // If Google key is available, fall back to Google STT end-to-end
-            if (process.env.GOOGLE_API_KEY) {
+            const googleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+            if (googleKey) {
                 console.log('[Recording] Falling back to Google STT for:', callSid);
                 await processRecording(recordingUrl, callSid);
                 return; // processing and /api/calls update handled by fallback
@@ -159,7 +160,8 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
         }
 
         // If Twilio returned no transcript text, optionally fall back to Google STT
-        if (!transcript && process.env.GOOGLE_API_KEY) {
+        const googleKey2 = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+        if (!transcript && googleKey2) {
             console.log('[Recording] Twilio transcript empty; falling back to Google STT for:', callSid);
             await processRecording(recordingUrl, callSid);
             return;
@@ -253,7 +255,8 @@ async function transcribeAudio(recordingUrl) {
         const base64Audio = Buffer.from(arrayBuf).toString('base64');
 
         // 2) Transcribe using Google Speech-to-Text (API key via query param)
-        const sttUrl = `https://speech.googleapis.com/v1/speech:recognize?key=${encodeURIComponent(process.env.GOOGLE_API_KEY || '')}`;
+        const googleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
+        const sttUrl = `https://speech.googleapis.com/v1/speech:recognize?key=${encodeURIComponent(googleKey)}`;
         const response = await fetch(sttUrl, {
             method: 'POST',
             headers: {
