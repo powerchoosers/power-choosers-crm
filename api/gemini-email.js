@@ -85,6 +85,8 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
 
   // Determine if the user prompt is requesting a cold email template
   const isColdPrompt = /cold\s+email|could\s+not\s+reach\s+by\s+phone/i.test(String(prompt || ''));
+  // Determine if the user prompt is requesting an Energy Health Check template
+  const isEhcPrompt = /energy\s+health\s+check/i.test(String(prompt || ''));
 
   // Common industry pain points. Pick 1 (max 2) that best fits context.
   const painPoints = [
@@ -179,10 +181,11 @@ CONTEXT AWARENESS:
   - "Warm intro after a call": Reference the call once (what we discussed), then propose specific next steps and suggest two time windows for a follow-up. Keep it concise.
   - "Follow-up with tailored value props": Assume a few days/weeks have passed. Recap in one line, then highlight 1–2 tailored benefits tied to their industry/facility scale or known data. Optionally include one brief proof point. End with a light CTA to keep the lead warm.
   - "Schedule an energy health check":
-    • Do NOT include any mention of speaking with a colleague (that belongs only to the cold-call-not-reached template).
-    • If notes imply prior conversation, write a warm follow‑up; otherwise, for cold outreach, include a one‑line explanation of what the Energy Health Check is, why it matters, and tie benefits to known data or common pain points for their industry.
-    • Explicitly mention coverage: current bill/supplier/rate review, contract end month/year, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, recommended next steps.
-    • End with exactly one short question CTA with two time windows.
+    • Never include any mention of speaking with a colleague (that belongs only to the cold-call-not-reached template).
+    • Structure STRICTLY:
+      – Paragraph 1: One concise sentence that explains what an Energy Health Check is and why it matters for this recipient. If notes indicate warm context, reference the prior call in a few words; if cold, tie to a single relevant pain point.
+      – Paragraph 2: One concise sentence listing what the review covers: current bill/supplier/rate review, contract end Month YYYY, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, and recommended next steps.
+      – CTA line: Exactly one short question offering two specific time windows (e.g., "Does Tue 10–12 or Thu 2–4 work?").
   - "Proposal delivery with next steps": Provide a crisp summary of the options (supplier/term/rate/est. annual cost/notable terms), selection guidance, and 2–3 clear next steps. CTA: short call to review/confirm.
   - "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Pattern‑interrupt hook using one concrete pain point or timely risk for their industry (no generic claims), 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + tightly aligned value prop, 3) ONE call‑to‑action. NEVER say "following up on our call" with this person.`;
 
@@ -225,9 +228,15 @@ CONTEXT AWARENESS:
   • Subject may reference the colleague or a specific risk/pain point.
   • Include exactly ONE call-to-action, no duplicates.`;
 
+  const ehcChecklist = `
+- Energy Health Check specifics:
+  • Paragraph 1 must explain what an Energy Health Check is and why it matters to this recipient (tie to one relevant pain point if cold, or lightly reference prior call if warm).
+  • Paragraph 2 must list what the review covers in one concise sentence: current bill/supplier/rate, contract end Month YYYY, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, recommended next steps.
+  • CTA line must be a single short question offering two specific time windows (e.g., Tue 10–12 or Thu 2–4).`;
+
   const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}
 
-${baseChecklist}${isColdPrompt ? coldChecklist : ''}
+${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist : ''}
 
 - Read the entire email once more to catch any duplication`;
 
