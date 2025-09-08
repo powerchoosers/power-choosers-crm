@@ -28,6 +28,26 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
   const contractEnd = energy.contractEnd || '';
   const currentRate = energy.currentRate || '';
   const sqftRaw = r.squareFootage || r.square_footage || '';
+  // Format helper: convert any date-like string to "Month YYYY"
+  const toMonthYear = (val) => {
+    const s = String(val || '').trim();
+    if (!s) return '';
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return `${months[d.getMonth()]} ${d.getFullYear()}`;
+    const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); // MM/DD/YYYY
+    if (m1) { const m = Math.max(1, Math.min(12, parseInt(m1[1], 10))); return `${months[m - 1]} ${m1[3]}`; }
+    const m2 = s.match(/^(\d{4})[\-](\d{1,2})[\-](\d{1,2})$/); // YYYY-MM-DD
+    if (m2) { const m = Math.max(1, Math.min(12, parseInt(m2[2], 10))); return `${months[m - 1]} ${m2[1]}`; }
+    const m3 = s.match(/^(\d{1,2})[\/\-](\d{4})$/); // MM/YYYY
+    if (m3) { const m = Math.max(1, Math.min(12, parseInt(m3[1], 10))); return `${months[m - 1]} ${m3[2]}`; }
+    const m4 = s.match(/([A-Za-z]+)\s+(\d{4})/); // Month YYYY
+    if (m4) return `${m4[1]} ${m4[2]}`;
+    const y = s.match(/(19\d{2}|20\d{2})/);
+    if (y) return y[1];
+    return s;
+  };
+  const contractEndLabel = toMonthYear(contractEnd);
   const sqftNum = Number(String(sqftRaw).replace(/[^0-9.]/g, ''));
   let facilityScale = '';
   if (!isNaN(sqftNum) && sqftNum > 0) {
@@ -68,7 +88,7 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
 - Title/Role: ${job || 'Unknown'}
 - Industry: ${industry || 'Unknown'}
 - Facility: ${facilityScale || 'Unknown scale'} (do NOT mention exact square footage)
-- Energy (if relevant): usage=${usage || 'n/a'}; supplier=${supplier || 'n/a'}; currentRate=${currentRate || 'n/a'}; contractEnd=${contractEnd || 'n/a'}
+- Energy (if relevant): usage=${usage || 'n/a'}; supplier=${supplier || 'n/a'}; currentRate=${currentRate || 'n/a'}; contractEnd=${contractEndLabel || 'n/a'}
 - LinkedIn: ${linkedin || 'n/a'}
 - Notes (free text, optional): ${notes || 'n/a'}`;
 
@@ -76,12 +96,18 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
 
   const subjectGuidelines = `Subject line requirements:
 - The FIRST LINE must begin with "Subject:" followed by the subject text.
-- Keep it under ~60 characters and make it specific.
+- Keep it tight: aim under ~50 characters; make it specific.
 - Prefer including ${firstName ? 'the recipient\'s first name' : 'the company name'} and/or the company name (e.g., "${firstName || 'Name'} — energy options for ${company || 'your facilities'}").
 - When applicable, hint the chosen pain point in the subject (e.g., "${company || 'Your accounts'} — simplify bills" or "${firstName || 'Team'} — renewal timing")`;
 
+  const brevityGuidelines = `Brevity and style requirements:
+- Total body length target: ~70–110 words max (be concise).
+- Use short sentences and plain words. Cut filler and hedging.
+- Prefer active voice and verbs over adjectives.
+- Keep one value prop tightly aligned to the hook.`;
+
   const bodyGuidelines = `Body requirements:
-- Write 3 short paragraphs (1–3 sentences each) + a clear CTA.
+- Structure: 2 very short paragraphs (1–2 sentences each) + a single-line CTA.
 - Reflect the recipient's title/company/industry when helpful.
 - You may allude to scale (e.g., multi-site or large facility) but do NOT state exact square footage.
 - Mention one or two of our offerings most relevant to this contact (procurement, renewals/contracting, bill management, or efficiency) without overloading the email.
@@ -89,10 +115,13 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
-- Contract end: reference the window (e.g., "before ${contractEnd || 'your renewal window'}").
+- Contract end: reference month and year only (no day), e.g., "before ${contractEndLabel || 'your renewal window'}".
 - Current rate: you may reference the rate succinctly if provided (e.g., "at ${currentRate || 'your current'} $/kWh").
 - Usage: reference qualitatively (e.g., "your usage profile" or "annual usage") without exact precision if it feels too granular.
 - Do NOT mention exact square footage; keep scale abstract (e.g., "large facility").`;
+
+  const dateGuidelines = `Date redaction policy:
+- If you mention dates (e.g., a contract end date), state only Month and Year (e.g., "April 2026"). Do NOT include an exact day.`;
 
   const painPointGuidelines = `Choose ONE primary pain-point as the HOOK for the opening line. Consider the industry and signals above. Examples: ${painPoints.join('; ')}. Use at most one supporting pain-point if it adds clarity.`;
 
@@ -112,6 +141,8 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
     common,
     recipientContext,
     bizContext,
+    dateGuidelines,
+    brevityGuidelines,
     painPointGuidelines,
     energyGuidelines,
     notesGuidelines,
