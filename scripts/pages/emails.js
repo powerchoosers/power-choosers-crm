@@ -35,6 +35,8 @@ class EmailManager {
         this._composePeopleById = new Map();
         
         this.init();
+        this.setupEmailTrackingListeners();
+        this.setupTestButton();
     }
 
     renderAIBar(aiBar) {
@@ -1316,6 +1318,13 @@ class EmailManager {
     }
 
     async loadEmails() {
+        // Handle sent folder differently - load from Firebase tracking data
+        if (this.currentFolder === 'sent') {
+            await this.loadSentEmails();
+            return;
+        }
+
+        // For other folders, use Gmail API
         if (!this.isAuthenticated || !this.accessToken) {
             this.showAuthPrompt();
             return;
@@ -1353,6 +1362,84 @@ class EmailManager {
             window.crm?.showToast('Failed to load emails. Please try again.');
             this.showEmptyState();
         }
+    }
+
+    async loadSentEmails() {
+        this.showLoading();
+
+        try {
+            if (window.emailTrackingManager) {
+                const sentEmails = await window.emailTrackingManager.getSentEmails();
+                this.emails = sentEmails.map(email => this.parseSentEmailData(email));
+                this.renderEmails();
+                this.updateFolderCounts();
+            } else {
+                this.emails = [];
+                this.showEmptyState();
+            }
+        } catch (error) {
+            console.error('Error loading sent emails:', error);
+            window.crm?.showToast('Failed to load sent emails. Please try again.');
+            this.showEmptyState();
+        }
+    }
+
+    parseSentEmailData(emailData) {
+        return {
+            id: emailData.id,
+            from: emailData.from,
+            to: Array.isArray(emailData.to) ? emailData.to.join(', ') : emailData.to,
+            subject: emailData.subject,
+            snippet: this.stripHtml(emailData.originalContent || emailData.content || ''),
+            date: new Date(emailData.sentAt).toLocaleDateString(),
+            timestamp: new Date(emailData.sentAt).getTime(),
+            // Tracking data
+            openCount: emailData.openCount || 0,
+            replyCount: emailData.replyCount || 0,
+            lastOpened: emailData.lastOpened,
+            lastReplied: emailData.lastReplied,
+            status: emailData.status || 'sent',
+            // Mark as sent email for UI rendering
+            isSentEmail: true
+        };
+    }
+
+    stripHtml(html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        return tmp.textContent || tmp.innerText || '';
+    }
+
+    renderTrackingIcons(email) {
+        // Only show tracking icons for sent emails
+        if (!email.isSentEmail) {
+            return '';
+        }
+
+        const openCount = email.openCount || 0;
+        const replyCount = email.replyCount || 0;
+        const hasOpened = openCount > 0;
+        const hasReplied = replyCount > 0;
+
+        return `
+            <div class="email-tracking-icons">
+                <div class="tracking-icon ${hasOpened ? 'opened' : 'not-opened'}" title="${hasOpened ? `Opened ${openCount} time${openCount !== 1 ? 's' : ''}` : 'Not opened'}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    ${hasOpened ? `<span class="tracking-badge">${openCount}</span>` : ''}
+                </div>
+                <div class="tracking-icon ${hasReplied ? 'replied' : 'not-replied'}" title="${hasReplied ? `Replied ${replyCount} time${replyCount !== 1 ? 's' : ''}` : 'No reply'}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        <path d="M13 8H7"/>
+                        <path d="M17 12H7"/>
+                    </svg>
+                    ${hasReplied ? `<span class="tracking-badge">${replyCount}</span>` : ''}
+                </div>
+            </div>
+        `;
     }
 
     buildQuery() {
@@ -1417,6 +1504,7 @@ class EmailManager {
                 <div class="email-item-meta">
                     <div class="email-item-time">${this.formatDate(email.date)}</div>
                     ${email.important ? '<div class="email-attachment-icon">!</div>' : ''}
+                    ${this.renderTrackingIcons(email)}
                 </div>
             </div>
         `).join('');
@@ -3078,7 +3166,7 @@ class EmailManager {
         });
     }
 
-    sendEmail() {
+    async sendEmail() {
         const toInput = document.getElementById('compose-to');
         const subjectInput = document.getElementById('compose-subject');
         const bodyInput = document.querySelector('.body-input');
@@ -3105,9 +3193,47 @@ class EmailManager {
             return;
         }
 
-        // Here you would integrate with your email sending service
-        window.crm?.showToast('Email sent successfully!');
-        this.closeComposeWindow();
+        try {
+            // Show sending state
+            const sendButton = document.querySelector('#compose-send');
+            if (sendButton) {
+                sendButton.disabled = true;
+                sendButton.textContent = 'Sending...';
+            }
+
+            // Use email tracking manager to send email
+            if (window.emailTrackingManager) {
+                const emailData = {
+                    to: to.split(',').map(email => email.trim()),
+                    subject,
+                    content: body,
+                    from: 'noreply@powerchoosers.com'
+                };
+
+                await window.emailTrackingManager.sendEmail(emailData);
+                
+                // Close compose window on success
+                this.closeComposeWindow();
+                
+                // Refresh sent emails if we're on the sent folder
+                if (this.currentFolder === 'sent') {
+                    await this.loadEmails();
+                }
+            } else {
+                throw new Error('Email tracking manager not initialized');
+            }
+
+        } catch (error) {
+            console.error('[EmailManager] Send email error:', error);
+            window.crm?.showToast('Failed to send email: ' + error.message);
+        } finally {
+            // Reset send button
+            const sendButton = document.querySelector('#compose-send');
+            if (sendButton) {
+                sendButton.disabled = false;
+                sendButton.textContent = 'Send';
+            }
+        }
     }
 
     async refreshEmails() {
@@ -3132,6 +3258,71 @@ class EmailManager {
 
     openEmail(emailId) {
         window.crm?.showToast(`Opening email ${emailId} - coming soon`);
+    }
+
+    setupEmailTrackingListeners() {
+        // Listen for email tracking events
+        document.addEventListener('email-opened', (event) => {
+            console.log('[EmailManager] Email opened event:', event.detail);
+            this.handleEmailOpened(event.detail);
+        });
+
+        document.addEventListener('email-replied', (event) => {
+            console.log('[EmailManager] Email replied event:', event.detail);
+            this.handleEmailReplied(event.detail);
+        });
+    }
+
+    handleEmailOpened(notification) {
+        // Show notification
+        if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast(`📧 ${notification.message}`, 'success');
+        }
+
+        // Refresh sent emails if we're currently viewing the sent folder
+        if (this.currentFolder === 'sent') {
+            this.loadSentEmails();
+        }
+    }
+
+    handleEmailReplied(notification) {
+        // Show notification
+        if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast(`💬 ${notification.message}`, 'success');
+        }
+
+        // Refresh sent emails if we're currently viewing the sent folder
+        if (this.currentFolder === 'sent') {
+            this.loadSentEmails();
+        }
+    }
+
+    setupTestButton() {
+        const testButton = document.getElementById('test-email-tracking-btn');
+        if (testButton) {
+            testButton.addEventListener('click', async () => {
+                try {
+                    testButton.disabled = true;
+                    testButton.textContent = 'Testing...';
+                    
+                    if (window.emailTrackingManager) {
+                        await window.emailTrackingManager.testEmailTracking();
+                        window.crm?.showToast('Test email sent! Watch for tracking notifications.');
+                        
+                        // Switch to sent folder to see the email
+                        this.switchFolder('sent');
+                    } else {
+                        window.crm?.showToast('Email tracking manager not initialized');
+                    }
+                } catch (error) {
+                    console.error('[EmailManager] Test error:', error);
+                    window.crm?.showToast('Test failed: ' + error.message);
+                } finally {
+                    testButton.disabled = false;
+                    testButton.textContent = 'Test Tracking';
+                }
+            });
+        }
     }
 }
 
