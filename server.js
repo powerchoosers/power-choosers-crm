@@ -52,11 +52,16 @@ async function handleApiGeminiEmail(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    
-    const data = await response.json();
-    
+    // Attempt to parse JSON; if not JSON, forward raw text body
+    const raw = await response.text();
+    let payload;
+    try {
+      payload = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      payload = { error: 'Upstream responded with non-JSON', body: raw };
+    }
     res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    res.end(JSON.stringify(payload));
   } catch (error) {
     console.error('[Gemini Email] Proxy error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -94,10 +99,15 @@ async function handleApiTwilioToken(req, res, parsedUrl) {
   
   try {
     const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
+    const raw = await response.text();
+    let payload;
+    try {
+      payload = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      payload = { error: 'Upstream responded with non-JSON', body: raw };
+    }
     res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    res.end(JSON.stringify(payload));
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
