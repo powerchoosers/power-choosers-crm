@@ -655,7 +655,7 @@
     container.querySelector('#bulk-delete').addEventListener('click', () => console.log('Bulk delete', Array.from(state.selected)));
   }
 
-  function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); addRefreshButton(); }
+  function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); /* buttons removed */ }
   
   // Manual refresh only - no auto-refresh to prevent UI disruption
   let refreshInterval = null;
@@ -681,30 +681,8 @@
     }
   });
   
-  // Add manual refresh button and AI processing button to calls page
-  function addRefreshButton() {
-    const header = document.querySelector('#calls-page .page-header');
-    if (header && !header.querySelector('.refresh-btn')) {
-      const buttonContainer = document.createElement('div');
-      buttonContainer.style.marginLeft = 'auto';
-      buttonContainer.style.display = 'flex';
-      buttonContainer.style.gap = '8px';
-      
-      const refreshBtn = document.createElement('button');
-      refreshBtn.className = 'btn btn-secondary refresh-btn';
-      refreshBtn.innerHTML = '🔄 Refresh';
-      refreshBtn.addEventListener('click', loadData);
-      
-      const processBtn = document.createElement('button');
-      processBtn.className = 'btn btn-primary process-ai-btn';
-      processBtn.innerHTML = '🤖 Process AI';
-      processBtn.addEventListener('click', processAllCalls);
-      
-      buttonContainer.appendChild(refreshBtn);
-      buttonContainer.appendChild(processBtn);
-      header.appendChild(buttonContainer);
-    }
-  }
+  // Buttons removed per request (no-op)
+  function addRefreshButton() { /* intentionally empty */ }
   
   // Process all calls with AI insights
   async function processAllCalls() {
@@ -786,9 +764,7 @@
   window.callsModule = { 
     loadData, 
     startAutoRefresh, 
-    stopAutoRefresh,
-    addRefreshButton,
-    processAllCalls
+    stopAutoRefresh
   };
   
   document.addEventListener('DOMContentLoaded', init);

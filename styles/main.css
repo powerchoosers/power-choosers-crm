@@ -6935,8 +6935,8 @@ margin-bottom: var(--spacing-md);
     cursor: pointer;
     color: var(--grey-400);
     font-weight: 400;
+    line-height: 1.2;
     text-decoration: none;
-    outline: none;
     transition: var(--transition-fast);
 }
 
@@ -6950,6 +6950,34 @@ margin-bottom: var(--spacing-md);
     outline: none;
 }
 #people-table .phone-cell:focus-visible {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+/* Make phone numbers clickable in accounts table (mirror people table) */
+#accounts-table .phone-cell,
+#accounts-table .click-to-call {
+    cursor: pointer;
+    color: var(--grey-400);
+    font-weight: 400;
+    line-height: 1.2;
+    text-decoration: none;
+    transition: var(--transition-fast);
+}
+
+#accounts-table .phone-cell:hover,
+#accounts-table .click-to-call:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+/* Keyboard focus: mirror hover without rectangle */
+#accounts-table .phone-cell:focus,
+#accounts-table .click-to-call:focus {
+    outline: none;
+}
+#accounts-table .phone-cell:focus-visible,
+#accounts-table .click-to-call:focus-visible {
     color: var(--text-inverse);
     text-decoration: none;
 }
