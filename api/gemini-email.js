@@ -125,7 +125,7 @@ CONTEXT AWARENESS:
 - For "follow-up with tailored value props": Focus on specific benefits relevant to their industry/company size
 - For "schedule a quick demo": Provide specific time windows and demo details
 - For "proposal delivery with next steps": Reference the proposal and outline clear next steps
-- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Do NOT say "following up on our call" or reference any conversation with this specific person`;
+- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person`;
 
   const recipientContext = `Recipient/context signals (use selectively; do not reveal sensitive specifics):
 - Name: ${name || 'Unknown'} (${firstName || 'Unknown'})
@@ -169,7 +169,7 @@ SPECIFIC PROMPT HANDLING:
 - "Follow-up with tailored value props": Highlight 2-3 specific benefits for their industry/company
 - "Schedule a quick demo": Include specific time windows and what the demo covers
 - "Proposal delivery with next steps": Reference the proposal and outline 2-3 clear next steps
-- "Cold email to a lead I could not reach by phone": Follow this EXACT template - do not deviate: Paragraph 1: "Hi ${firstName || 'there'}, I hope you're having a productive week." Paragraph 2: "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well. Power Choosers helps businesses like yours secure better energy contracts through competitive bidding and expert negotiation." Paragraph 3: "Would you be open to a brief introductory call next week?" - Use this EXACT wording for paragraph 3, do not repeat any other content. NEVER use template variables like {{contact.first_name}} - always use the actual values provided`;
+- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + value prop, 3) ONE call-to-action - NEVER say "following up on our call" or reference any conversation with this specific person`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -204,11 +204,10 @@ FINAL CHECKLIST (MANDATORY VERIFICATION):
 - Each sentence adds unique value to the email
 - Personal touch included after greeting (day/season awareness)
 - For cold emails: NO reference to "our call" or "following up" with this person
+- For cold emails: Must include "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well"
 - For cold emails: Subject must reference speaking with their colleague
 - For cold emails: Must include specific pain points relevant to their industry and what Power Choosers does
 - For cold emails: Must include exactly ONE call-to-action, no duplicates
-- For cold emails: Use the EXACT template provided - do not add extra paragraphs or repeat content
-- For cold emails: The final paragraph must be EXACTLY "Would you be open to a brief introductory call next week?" - nothing else
 - Read the entire email once more to catch any duplication`;
 
   return [
