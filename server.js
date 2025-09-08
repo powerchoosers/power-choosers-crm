@@ -217,7 +217,11 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/energy-news' ||
     pathname === '/api/search' ||
     pathname === '/api/tx-price' ||
-    pathname === '/api/gemini-email'
+    pathname === '/api/gemini-email' ||
+    pathname === '/api/email/send' ||
+    pathname.startsWith('/api/email/track/') ||
+    pathname === '/api/email/webhook' ||
+    pathname === '/api/email/stats'
   )) {
     res.writeHead(204);
     res.end();
@@ -245,6 +249,20 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/gemini-email') {
     return handleApiGeminiEmail(req, res);
+  }
+  
+  // Email tracking routes
+  if (pathname === '/api/email/send') {
+    return handleApiSendEmail(req, res);
+  }
+  if (pathname.startsWith('/api/email/track/')) {
+    return handleApiEmailTrack(req, res, parsedUrl);
+  }
+  if (pathname === '/api/email/webhook') {
+    return handleApiEmailWebhook(req, res);
+  }
+  if (pathname === '/api/email/stats') {
+    return handleApiEmailStats(req, res, parsedUrl);
   }
 
   // Default to crm-dashboard.html for root requests
@@ -442,5 +460,205 @@ async function handleApiEnergyNews(req, res) {
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to fetch energy news', message: error.message }));
+  }
+}
+
+// Email tracking endpoints
+async function handleApiSendEmail(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(req);
+    const { to, subject, content, from } = body;
+
+    if (!to || !subject || !content) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing required fields: to, subject, content' }));
+      return;
+    }
+
+    // Generate unique tracking ID
+    const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create tracking pixel URL
+    const trackingPixelUrl = `${req.headers.host ? 'http://' + req.headers.host : 'http://localhost:3000'}/api/email/track/${trackingId}`;
+    
+    // Inject tracking pixel into email content
+    const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
+    const emailContent = content + trackingPixel;
+
+    // Store email record in database (you'll need to implement this with your database)
+    const emailRecord = {
+      id: trackingId,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      content: emailContent,
+      from: from || 'noreply@powerchoosers.com',
+      sentAt: new Date().toISOString(),
+      opens: [],
+      replies: [],
+      openCount: 0,
+      replyCount: 0,
+      status: 'sent'
+    };
+
+    // Save to Firebase (simulated for now - in production, you'd use Firebase Admin SDK)
+    console.log('[Email] Storing email record:', emailRecord);
+    
+    // In a real implementation, you would use Firebase Admin SDK here:
+    // const admin = require('firebase-admin');
+    // await admin.firestore().collection('emails').doc(trackingId).set(emailRecord);
+
+    // For now, we'll simulate sending the email
+    // In production, integrate with your email service (SendGrid, Mailgun, etc.)
+    console.log('[Email] Sending email:', { to, subject, trackingId });
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: true, 
+      trackingId,
+      message: 'Email sent successfully' 
+    }));
+
+  } catch (error) {
+    console.error('[Email] Send error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to send email', message: error.message }));
+  }
+}
+
+async function handleApiEmailTrack(req, res, parsedUrl) {
+  if (req.method !== 'GET') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const trackingId = parsedUrl.pathname.split('/').pop();
+    const userAgent = req.headers['user-agent'] || '';
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    
+    console.log('[Email] Tracking pixel hit:', { trackingId, userAgent, ip });
+
+    // Update database with open event
+    const openEvent = {
+      trackingId,
+      openedAt: new Date().toISOString(),
+      userAgent,
+      ip
+    };
+
+    console.log('[Email] Open event:', openEvent);
+    
+    // In a real implementation, you would update Firebase here:
+    // const admin = require('firebase-admin');
+    // const emailRef = admin.firestore().collection('emails').doc(trackingId);
+    // await emailRef.update({
+    //   opens: admin.firestore.FieldValue.arrayUnion(openEvent),
+    //   openCount: admin.firestore.FieldValue.increment(1),
+    //   lastOpened: openEvent.openedAt,
+    //   updatedAt: new Date().toISOString()
+    // });
+
+    // Return a 1x1 transparent pixel
+    const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    
+    res.writeHead(200, {
+      'Content-Type': 'image/png',
+      'Content-Length': pixel.length,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    res.end(pixel);
+
+  } catch (error) {
+    console.error('[Email] Track error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to track email', message: error.message }));
+  }
+}
+
+async function handleApiEmailWebhook(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(req);
+    const { event, trackingId, data } = body;
+
+    console.log('[Email] Webhook received:', { event, trackingId, data });
+
+    // Handle different webhook events
+    switch (event) {
+      case 'email_opened':
+        // TODO: Update database with open event
+        console.log('[Email] Email opened:', trackingId);
+        break;
+      case 'email_replied':
+        // TODO: Update database with reply event
+        console.log('[Email] Email replied:', trackingId);
+        break;
+      case 'email_bounced':
+        // TODO: Update database with bounce event
+        console.log('[Email] Email bounced:', trackingId);
+        break;
+      default:
+        console.log('[Email] Unknown webhook event:', event);
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+
+  } catch (error) {
+    console.error('[Email] Webhook error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to process webhook', message: error.message }));
+  }
+}
+
+async function handleApiEmailStats(req, res, parsedUrl) {
+  if (req.method !== 'GET') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const trackingId = parsedUrl.query.trackingId;
+    
+    if (!trackingId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing trackingId parameter' }));
+      return;
+    }
+
+    // TODO: Fetch email stats from database
+    // For now, return mock data
+    const stats = {
+      trackingId,
+      openCount: 0,
+      replyCount: 0,
+      lastOpened: null,
+      lastReplied: null,
+      opens: [],
+      replies: []
+    };
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(stats));
+
+  } catch (error) {
+    console.error('[Email] Stats error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to fetch email stats', message: error.message }));
   }
 }
