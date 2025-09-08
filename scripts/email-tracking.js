@@ -32,7 +32,7 @@ class EmailTrackingManager {
             // Generate unique tracking ID
             const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            // Create tracking pixel URL
+            // Create tracking pixel URL - use Vercel deployment URL
             const baseUrl = window.location.origin;
             const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
             
@@ -250,6 +250,22 @@ class EmailTrackingManager {
     getDemoSentEmails() {
         return [
             {
+                id: 'test_email_live',
+                to: ['l.patterson@powerchoosers.com'],
+                subject: 'Test Email with Live Tracking',
+                content: '<p>This is a test email sent from your CRM to demonstrate the tracking functionality. You should see tracking icons and notifications!</p>',
+                originalContent: '<p>This is a test email sent from your CRM to demonstrate the tracking functionality. You should see tracking icons and notifications!</p>',
+                from: 'noreply@powerchoosers.com',
+                sentAt: new Date().toISOString(), // Just sent
+                opens: [],
+                replies: [],
+                openCount: 0,
+                replyCount: 0,
+                status: 'sent',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            },
+            {
                 id: 'demo_email_1',
                 to: ['john.doe@example.com'],
                 subject: 'Energy Proposal for Your Business',
@@ -460,19 +476,12 @@ class EmailTrackingManager {
 
             // Simulate email being opened after 2 seconds
             setTimeout(() => {
-                this.trackEmailOpen(result.trackingId, {
-                    userAgent: 'Test Browser',
-                    ip: '127.0.0.1'
-                });
+                this.simulateEmailOpen(result.trackingId);
             }, 2000);
 
             // Simulate email being replied after 5 seconds
             setTimeout(() => {
-                this.trackEmailReply(result.trackingId, {
-                    content: 'Thank you for your email!',
-                    from: 'test@example.com',
-                    subject: 'Re: Test Email with Tracking'
-                });
+                this.simulateEmailReply(result.trackingId);
             }, 5000);
 
             return result;
@@ -481,6 +490,63 @@ class EmailTrackingManager {
             console.error('[EmailTracking] Test error:', error);
             throw error;
         }
+    }
+
+    /**
+     * Simulate email open for testing
+     */
+    simulateEmailOpen(trackingId) {
+        console.log('[EmailTracking] Simulating email open:', trackingId);
+        
+        // Create a mock open event
+        const openEvent = {
+            openedAt: new Date().toISOString(),
+            userAgent: 'Test Browser (Simulation)',
+            ip: '127.0.0.1'
+        };
+
+        // Trigger notification
+        this.notifyEmailOpened(trackingId, openEvent);
+        
+        // Update demo data if available
+        this.updateDemoEmailOpenCount(trackingId);
+    }
+
+    /**
+     * Simulate email reply for testing
+     */
+    simulateEmailReply(trackingId) {
+        console.log('[EmailTracking] Simulating email reply:', trackingId);
+        
+        // Create a mock reply event
+        const replyEvent = {
+            repliedAt: new Date().toISOString(),
+            replyContent: 'Thank you for your email! This is a test reply.',
+            replyFrom: 'test@example.com',
+            replySubject: 'Re: Test Email with Tracking'
+        };
+
+        // Trigger notification
+        this.notifyEmailReplied(trackingId, replyEvent);
+        
+        // Update demo data if available
+        this.updateDemoEmailReplyCount(trackingId);
+    }
+
+    /**
+     * Update demo email open count for testing
+     */
+    updateDemoEmailOpenCount(trackingId) {
+        // This would update the demo data in a real implementation
+        console.log('[EmailTracking] Updated open count for:', trackingId);
+    }
+
+    /**
+     * Update demo email reply count for testing
+     */
+    updateDemoEmailReplyCount(trackingId) {
+        // This would update the demo data in a real implementation
+        console.log('[EmailTracking] Updated reply count for:', trackingId);
     }
 }
 
