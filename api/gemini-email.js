@@ -58,6 +58,30 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
 
   // Notes from contact or associated account
   const notes = [r.notes, r.account?.notes].filter(Boolean).join(' \n').slice(0, 800);
+  
+  // Extract colleague information from notes
+  let colleagueInfo = null;
+  if (notes) {
+    // Look for patterns like "spoke with [name]", "talked to [name]", "met with [name]", etc.
+    const colleaguePatterns = [
+      /spoke with ([A-Za-z\s]+)/i,
+      /talked to ([A-Za-z\s]+)/i,
+      /met with ([A-Za-z\s]+)/i,
+      /connected with ([A-Za-z\s]+)/i,
+      /called ([A-Za-z\s]+)/i
+    ];
+    
+    for (const pattern of colleaguePatterns) {
+      const match = notes.match(pattern);
+      if (match && match[1]) {
+        colleagueInfo = {
+          name: match[1].trim(),
+          found: true
+        };
+        break;
+      }
+    }
+  }
 
   // Common industry pain points. Pick 1 (max 2) that best fits context.
   const painPoints = [
@@ -101,7 +125,7 @@ CONTEXT AWARENESS:
 - For "follow-up with tailored value props": Focus on specific benefits relevant to their industry/company size
 - For "schedule a quick demo": Provide specific time windows and demo details
 - For "proposal delivery with next steps": Reference the proposal and outline clear next steps
-- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with [colleague name] at [company] and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person`;
+- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person`;
 
   const recipientContext = `Recipient/context signals (use selectively; do not reveal sensitive specifics):
 - Name: ${name || 'Unknown'} (${firstName || 'Unknown'})
@@ -111,7 +135,8 @@ CONTEXT AWARENESS:
 - Facility: ${facilityScale || 'Unknown scale'} (do NOT mention exact square footage)
 - Energy (if relevant): usage=${usage || 'n/a'}; supplier=${supplier || 'n/a'}; currentRate=${currentRate || 'n/a'}; contractEnd=${contractEndLabel || 'n/a'}
 - LinkedIn: ${linkedin || 'n/a'}
-- Notes (free text, optional): ${notes || 'n/a'}`;
+- Notes (free text, optional): ${notes || 'n/a'}
+- Colleague contact: ${colleagueInfo?.found ? colleagueInfo.name : 'none found'}`;
 
   const bizContext = `About Power Choosers (for positioning only): ${companyOverview}`;
 
@@ -120,7 +145,7 @@ CONTEXT AWARENESS:
 - Keep it tight: aim under ~50 characters; make it specific.
 - Prefer including ${firstName ? 'the recipient\'s first name' : 'the company name'} and/or the company name (e.g., "${firstName || 'Name'} — energy options for ${company || 'your facilities'}").
 - When applicable, hint the chosen pain point in the subject (e.g., "${company || 'Your accounts'} — simplify bills" or "${firstName || 'Team'} — renewal timing")
-- For "cold email to a lead I could not reach by phone": Include reference to speaking with their colleague, e.g., "Quick question from [colleague name] at [company]"
+- For "cold email to a lead I could not reach by phone": Include reference to speaking with their colleague, e.g., "${firstName || 'Name'} - I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'}"
 - For other email types: Experiment with different approaches - questions, value props, time-sensitive offers, industry-specific benefits, etc.`;
 
   const brevityGuidelines = `Brevity and style requirements:
@@ -144,7 +169,7 @@ SPECIFIC PROMPT HANDLING:
 - "Follow-up with tailored value props": Highlight 2-3 specific benefits for their industry/company
 - "Schedule a quick demo": Include specific time windows and what the demo covers
 - "Proposal delivery with next steps": Reference the proposal and outline 2-3 clear next steps
-- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with [colleague name] at [company] and wanted to connect with you as well" + value prop, 3) ONE call-to-action - NEVER say "following up on our call" or reference any conversation with this specific person`;
+- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + value prop, 3) ONE call-to-action - NEVER say "following up on our call" or reference any conversation with this specific person`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -179,8 +204,10 @@ FINAL CHECKLIST (MANDATORY VERIFICATION):
 - Each sentence adds unique value to the email
 - Personal touch included after greeting (day/season awareness)
 - For cold emails: NO reference to "our call" or "following up" with this person
-- For cold emails: Must include "I recently spoke with [colleague name] at [company] and wanted to connect with you as well"
+- For cold emails: Must include "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well"
 - For cold emails: Subject must reference speaking with their colleague
+- For cold emails: Must include specific pain points relevant to their industry and what Power Choosers does
+- For cold emails: Must include exactly ONE call-to-action, no duplicates
 - Read the entire email once more to catch any duplication`;
 
   return [
