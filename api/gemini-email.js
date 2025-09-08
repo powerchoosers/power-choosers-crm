@@ -83,6 +83,9 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
     }
   }
 
+  // Determine if the user prompt is requesting a cold email template
+  const isColdPrompt = /cold\s+email|could\s+not\s+reach\s+by\s+phone/i.test(String(prompt || ''));
+
   // Common industry pain points. Pick 1 (max 2) that best fits context.
   const painPoints = [
     'billing issues or invoice complexity',
