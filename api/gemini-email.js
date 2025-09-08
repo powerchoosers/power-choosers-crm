@@ -169,7 +169,7 @@ SPECIFIC PROMPT HANDLING:
 - "Follow-up with tailored value props": Highlight 2-3 specific benefits for their industry/company
 - "Schedule a quick demo": Include specific time windows and what the demo covers
 - "Proposal delivery with next steps": Reference the proposal and outline 2-3 clear next steps
-- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + value proposition about Power Choosers services, 3) ONE call-to-action asking if they'd be open to a brief call - NEVER say "following up on our call" or reference any conversation with this specific person. CRITICAL: Use the colleague reference EXACTLY ONCE in paragraph 2 only, then move to call-to-action in paragraph 3`;
+- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + value proposition about Power Choosers services, 3) ONE call-to-action asking if they'd be open to a brief call - NEVER say "following up on our call" or reference any conversation with this specific person. CRITICAL: Use the colleague reference EXACTLY ONCE in paragraph 2 only, then move to call-to-action in paragraph 3. NEVER repeat the colleague reference in paragraph 3`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -210,6 +210,7 @@ FINAL CHECKLIST (MANDATORY VERIFICATION):
 - For cold emails: Must include exactly ONE call-to-action, no duplicates
 - For cold emails: NEVER repeat the colleague reference or any phrase from paragraph 2
 - For cold emails: The final paragraph must be ONLY a call-to-action, never repeat colleague reference
+- For cold emails: Example final paragraph: "Would you be open to a brief introductory call next week?" - NOT "I recently spoke with..."
 - Read the entire email once more to catch any duplication`;
 
   return [
