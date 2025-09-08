@@ -1506,26 +1506,38 @@ class EmailManager {
             return;
         }
 
-        emailList.innerHTML = this.emails.map(email => `
-            <div class="email-item ${email.unread ? 'unread' : ''}" data-email-id="${email.id}">
-                <input type="checkbox" class="email-item-checkbox" data-email-id="${email.id}">
-                <button class="email-item-star ${email.starred ? 'starred' : ''}" data-email-id="${email.id}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="${email.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/>
-                    </svg>
-                </button>
-                <div class="email-item-sender">${this.extractName(email.from)}</div>
-                <div class="email-item-content">
-                    <div class="email-item-subject">${email.subject}</div>
-                    <div class="email-item-preview">${email.snippet}</div>
-                </div>
-                <div class="email-item-meta">
-                    <div class="email-item-time">${this.formatDate(email.date)}</div>
-                    ${email.important ? '<div class="email-attachment-icon">!</div>' : ''}
-                    ${this.renderTrackingIcons(email)}
-                </div>
-            </div>
-        `).join('');
+        emailList.innerHTML = this.emails.map(email => {
+            try {
+                return `
+                    <div class="email-item ${email.unread ? 'unread' : ''}" data-email-id="${email.id}">
+                        <input type="checkbox" class="email-item-checkbox" data-email-id="${email.id}">
+                        <button class="email-item-star ${email.starred ? 'starred' : ''}" data-email-id="${email.id}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="${email.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/>
+                            </svg>
+                        </button>
+                        <div class="email-item-sender">${this.extractName(email.from || 'Unknown')}</div>
+                        <div class="email-item-content">
+                            <div class="email-item-subject">${email.subject || 'No Subject'}</div>
+                            <div class="email-item-preview">${email.snippet || 'No preview available'}</div>
+                        </div>
+                        <div class="email-item-meta">
+                            <div class="email-item-time">${this.formatDate(email.date)}</div>
+                            ${email.important ? '<div class="email-attachment-icon">!</div>' : ''}
+                            ${this.renderTrackingIcons(email)}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('[EmailManager] Error rendering email:', email, error);
+                return `<div class="email-item error" data-email-id="${email.id}">
+                    <div class="email-item-content">
+                        <div class="email-item-subject">Error loading email</div>
+                        <div class="email-item-preview">Failed to render email data</div>
+                    </div>
+                </div>`;
+            }
+        }).join('');
 
         this.bindEmailItemEvents();
     }
@@ -1570,16 +1582,29 @@ class EmailManager {
     }
 
     formatDate(date) {
-        const now = new Date();
-        const diff = now - date;
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        
-        if (days === 0) {
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (days < 7) {
-            return date.toLocaleDateString([], { weekday: 'short' });
-        } else {
-            return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        try {
+            // Handle both Date objects and date strings
+            const dateObj = date instanceof Date ? date : new Date(date);
+            
+            // Check if date is valid
+            if (isNaN(dateObj.getTime())) {
+                return 'Invalid date';
+            }
+            
+            const now = new Date();
+            const diff = now - dateObj;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            
+            if (days === 0) {
+                return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else if (days < 7) {
+                return dateObj.toLocaleDateString([], { weekday: 'short' });
+            } else {
+                return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            }
+        } catch (error) {
+            console.warn('[EmailManager] Date formatting error:', error);
+            return 'Unknown date';
         }
     }
 
