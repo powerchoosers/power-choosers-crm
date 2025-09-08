@@ -169,7 +169,7 @@ SPECIFIC PROMPT HANDLING:
 - "Follow-up with tailored value props": Highlight 2-3 specific benefits for their industry/company
 - "Schedule a quick demo": Include specific time windows and what the demo covers
 - "Proposal delivery with next steps": Reference the proposal and outline 2-3 clear next steps
-- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + value prop, 3) ONE call-to-action - NEVER say "following up on our call" or reference any conversation with this specific person`;
+- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + value proposition about Power Choosers services, 3) ONE call-to-action - NEVER say "following up on our call" or reference any conversation with this specific person. CRITICAL: Use the colleague reference EXACTLY ONCE in paragraph 2 only`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -204,10 +204,11 @@ FINAL CHECKLIST (MANDATORY VERIFICATION):
 - Each sentence adds unique value to the email
 - Personal touch included after greeting (day/season awareness)
 - For cold emails: NO reference to "our call" or "following up" with this person
-- For cold emails: Must include "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well"
+- For cold emails: Include colleague reference ONLY ONCE in the second paragraph
 - For cold emails: Subject must reference speaking with their colleague
 - For cold emails: Must include specific pain points relevant to their industry and what Power Choosers does
 - For cold emails: Must include exactly ONE call-to-action, no duplicates
+- For cold emails: NEVER repeat the colleague reference or any phrase from paragraph 2
 - Read the entire email once more to catch any duplication`;
 
   return [
