@@ -105,10 +105,9 @@ CRITICAL RULES (ZERO TOLERANCE FOR VIOLATIONS):
 - NEVER duplicate any sentence, phrase, or call-to-action within the same email
 - NEVER repeat the same information in different words
 - NEVER use the same phrase twice anywhere in the email
-- NEVER repeat company names, person names, or any words multiple times in the same sentence
 - Each sentence must add unique value to the email
 - Include exactly ONE clear call-to-action
-- End with "Best regards," followed immediately by "Lewis" on the next line with no blank line between them
+- End with "Best regards," followed immediately by the sender name on the next line with no blank line between them
 - Keep tone professional and helpful
 - Personalize with known recipient context when appropriate
 - Avoid hallucinations; if unsure, keep it generic
@@ -126,7 +125,7 @@ CONTEXT AWARENESS:
 - For "follow-up with tailored value props": Focus on specific benefits relevant to their industry/company size
 - For "schedule a quick demo": Provide specific time windows and demo details
 - For "proposal delivery with next steps": Reference the proposal and outline clear next steps
-- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Do NOT say "following up on our call" or reference any conversation with this specific person`;
+- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person`;
 
   const recipientContext = `Recipient/context signals (use selectively; do not reveal sensitive specifics):
 - Name: ${name || 'Unknown'} (${firstName || 'Unknown'})
@@ -146,7 +145,7 @@ CONTEXT AWARENESS:
 - Keep it tight: aim under ~50 characters; make it specific.
 - Prefer including ${firstName ? 'the recipient\'s first name' : 'the company name'} and/or the company name (e.g., "${firstName || 'Name'} — energy options for ${company || 'your facilities'}").
 - When applicable, hint the chosen pain point in the subject (e.g., "${company || 'Your accounts'} — simplify bills" or "${firstName || 'Team'} — renewal timing")
-- For "cold email to a lead I could not reach by phone": Include reference to speaking with their colleague, e.g., "${firstName || 'Name'} - spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'}"
+- For "cold email to a lead I could not reach by phone": Include reference to speaking with their colleague, e.g., "${firstName || 'Name'} - I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'}"
 - For other email types: Experiment with different approaches - questions, value props, time-sensitive offers, industry-specific benefits, etc.`;
 
   const brevityGuidelines = `Brevity and style requirements:
@@ -170,7 +169,7 @@ SPECIFIC PROMPT HANDLING:
 - "Follow-up with tailored value props": Highlight 2-3 specific benefits for their industry/company
 - "Schedule a quick demo": Include specific time windows and what the demo covers
 - "Proposal delivery with next steps": Reference the proposal and outline 2-3 clear next steps
-- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + brief value proposition, 3) ONE call-to-action asking if they'd be open to a brief call - NEVER say "following up on our call" or reference any conversation with this specific person. CRITICAL: Do NOT repeat the company name multiple times in the same sentence. Use the company name only once per sentence. In the value proposition, refer to "your company" or "your business" instead of repeating the company name`;
+- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + value prop, 3) ONE call-to-action - NEVER say "following up on our call" or reference any conversation with this specific person`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -201,10 +200,11 @@ FINAL CHECKLIST (MANDATORY VERIFICATION):
 - NO duplicate content anywhere in the email - check every sentence
 - NO repeated phrases or similar wording
 - Exactly one call-to-action
-- Proper signature formatting with no blank line before "Lewis"
+- Proper signature formatting with no blank line before sender name
 - Each sentence adds unique value to the email
 - Personal touch included after greeting (day/season awareness)
 - For cold emails: NO reference to "our call" or "following up" with this person
+- For cold emails: Must include "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well"
 - For cold emails: Subject must reference speaking with their colleague
 - For cold emails: Must include specific pain points relevant to their industry and what Power Choosers does
 - For cold emails: Must include exactly ONE call-to-action, no duplicates
