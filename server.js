@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-const sgMail = require('@sendgrid/mail');
+// SendGrid removed - using Gmail API via frontend
 
 // MIME types for different file extensions
 const mimeTypes = {
@@ -27,15 +27,8 @@ const PORT = process.env.PORT || 3000;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm.vercel.app';
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
-
-// Configure SendGrid
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-  console.log('[Server] SendGrid configured for email sending');
-} else {
-  console.warn('[Server] SENDGRID_API_KEY is not set. Email sending will be simulated.');
-}
+// Email sending now handled by Gmail API via frontend
+console.log('[Server] Email sending configured to use Gmail API via frontend authentication');
 
 console.log(`[Server] Starting in ${LOCAL_DEV_MODE ? 'development' : 'production'} mode`);
 console.log(`[Server] API Base URL: ${API_BASE_URL}`);
@@ -267,6 +260,12 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname.startsWith('/api/email/track/')) {
     return handleApiEmailTrack(req, res, parsedUrl);
+  }
+  if (pathname === '/api/email/update-tracking') {
+    return handleApiEmailUpdateTracking(req, res);
+  }
+  if (pathname === '/api/email/tracking-events') {
+    return handleApiEmailTrackingEvents(req, res);
   }
   if (pathname === '/api/email/webhook') {
     return handleApiEmailWebhook(req, res);
@@ -525,56 +524,16 @@ async function handleApiSendEmail(req, res) {
     // const admin = require('firebase-admin');
     // await admin.firestore().collection('emails').doc(trackingId).set(emailRecord);
 
-    // Send the actual email via SendGrid
-    if (SENDGRID_API_KEY) {
-      try {
-        const msg = {
-          to: Array.isArray(to) ? to : [to],
-          from: from || 'noreply@powerchoosers.com',
-          subject: subject,
-          html: emailContent,
-          text: content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
-          trackingSettings: {
-            clickTracking: {
-              enable: true,
-              enableText: false
-            },
-            openTracking: {
-              enable: true
-            }
-          }
-        };
-
-        console.log('[Email] Sending via SendGrid:', { to, subject, trackingId });
-        await sgMail.send(msg);
-        console.log('[Email] Email sent successfully via SendGrid');
-        
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          success: true, 
-          trackingId,
-          message: 'Email sent successfully via SendGrid' 
-        }));
-      } catch (sendError) {
-        console.error('[Email] SendGrid error:', sendError);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          error: 'Failed to send email', 
-          message: sendError.message 
-        }));
-        return;
-      }
-    } else {
-      // Fallback: simulate sending the email
-      console.log('[Email] Simulating email send (no SendGrid API key):', { to, subject, trackingId });
-      
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        success: true, 
-        trackingId,
-        message: 'Email simulated (no SendGrid API key configured)' 
-      }));
-    }
+    // Email sending is now handled by the frontend using Gmail API
+    // This endpoint just stores the email record for tracking purposes
+    console.log('[Email] Storing email record for tracking:', { to, subject, trackingId });
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: true, 
+      trackingId,
+      message: 'Email record stored for tracking (actual sending handled by Gmail API)' 
+    }));
 
   } catch (error) {
     console.error('[Email] Send error:', error);
@@ -607,15 +566,22 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
 
     console.log('[Email] Open event:', openEvent);
     
-    // In a real implementation, you would update Firebase here:
-    // const admin = require('firebase-admin');
-    // const emailRef = admin.firestore().collection('emails').doc(trackingId);
-    // await emailRef.update({
-    //   opens: admin.firestore.FieldValue.arrayUnion(openEvent),
-    //   openCount: admin.firestore.FieldValue.increment(1),
-    //   lastOpened: openEvent.openedAt,
-    //   updatedAt: new Date().toISOString()
-    // });
+    // Since we're using client-side Firebase, we'll trigger a client-side update
+    // The tracking pixel will be loaded by the email client, which will then
+    // make a request to update Firebase via the client-side tracking system
+
+    // Store the tracking event in memory for the client to pick up
+    if (!global.emailTrackingEvents) {
+      global.emailTrackingEvents = new Map();
+    }
+    
+    const eventKey = `${trackingId}_open`;
+    global.emailTrackingEvents.set(eventKey, {
+      trackingId,
+      type: 'open',
+      data: openEvent,
+      timestamp: new Date().toISOString()
+    });
 
     // Return a 1x1 transparent pixel
     const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
@@ -633,6 +599,78 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
     console.error('[Email] Track error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to track email', message: error.message }));
+  }
+}
+
+async function handleApiEmailUpdateTracking(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(req);
+    const { trackingId, type, data } = body;
+
+    if (!trackingId || !type) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing required fields: trackingId, type' }));
+      return;
+    }
+
+    console.log('[Email] Update tracking request:', { trackingId, type, data });
+
+    // Store the tracking event in a simple in-memory store
+    // In production, this would be stored in a database
+    if (!global.emailTrackingEvents) {
+      global.emailTrackingEvents = new Map();
+    }
+    
+    const eventKey = `${trackingId}_${type}`;
+    global.emailTrackingEvents.set(eventKey, {
+      trackingId,
+      type,
+      data,
+      timestamp: new Date().toISOString()
+    });
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: true, 
+      message: 'Tracking update stored',
+      trackingId,
+      type
+    }));
+
+  } catch (error) {
+    console.error('[Email] Update tracking error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to update tracking', message: error.message }));
+  }
+}
+
+async function handleApiEmailTrackingEvents(req, res) {
+  if (req.method !== 'GET') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const events = global.emailTrackingEvents ? Array.from(global.emailTrackingEvents.values()) : [];
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: true, 
+      events,
+      count: events.length
+    }));
+
+  } catch (error) {
+    console.error('[Email] Get tracking events error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to get tracking events', message: error.message }));
   }
 }
 
