@@ -87,6 +87,8 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
   const isColdPrompt = /cold\s+email|could\s+not\s+reach\s+by\s+phone/i.test(String(prompt || ''));
   // Determine if the user prompt is requesting an Energy Health Check template
   const isEhcPrompt = /energy\s+health\s+check/i.test(String(prompt || ''));
+  // Determine if the user prompt is requesting a Standard Invoice Request
+  const isInvoicePrompt = /standard\s+invoice\s+request|invoice\s+request/i.test(String(prompt || ''));
 
   // Common industry pain points. Pick 1 (max 2) that best fits context.
   const painPoints = [
@@ -156,9 +158,13 @@ CONTEXT AWARENESS:
 - Keep it tight: aim under ~50 characters; make it specific.
 - Prefer including ${firstName ? 'the recipient\'s first name' : 'the company name'} and/or the company name (e.g., "${firstName || 'Name'} — energy options for ${company || 'your facilities'}").
 - When applicable, hint the chosen pain point in the subject (e.g., "${company || 'Your accounts'} — simplify bills" or "${firstName || 'Team'} — renewal timing")
-- For other email types: Experiment with different approaches - questions, value props, time-sensitive offers, industry-specific benefits, etc.` + (isColdPrompt
-    ? `\n- For "cold email to a lead I could not reach by phone": Consider a pattern-interrupt subject or a specific pain point (e.g., renewal risk, above-market rate) and you may include reference to speaking with their colleague if appropriate.`
-    : '');
+- For other email types: Experiment with different approaches - questions, value props, time-sensitive offers, industry-specific benefits, etc.`
+    + (isColdPrompt
+      ? `\n- For "cold email to a lead I could not reach by phone": Consider a pattern-interrupt subject or a specific pain point (e.g., renewal risk, above-market rate) and you may include reference to speaking with their colleague if appropriate.`
+      : '')
+    + (isInvoicePrompt
+      ? `\n- For "Standard Invoice Request": Make the ask clear and helpful (e.g., "Invoice copy for quick review" or "Last bill to start your Energy Health Check").`
+      : '');
 
   const brevityGuidelines = `Brevity and style requirements:
 - Total body length target: ~70–110 words max (be concise).
@@ -187,7 +193,8 @@ CONTEXT AWARENESS:
       – Paragraph 2: One concise sentence listing what the review covers: current bill/supplier/rate review, contract end Month YYYY, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, and recommended next steps.
       – CTA line: Exactly one short question offering two specific time windows (e.g., "Does Tue 10–12 or Thu 2–4 work?").
   - "Proposal delivery with next steps": Provide a crisp summary of the options (supplier/term/rate/est. annual cost/notable terms), selection guidance, and 2–3 clear next steps. CTA: short call to review/confirm.
-  - "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Pattern‑interrupt hook using one concrete pain point or timely risk for their industry (no generic claims), 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + tightly aligned value prop, 3) ONE call‑to‑action. NEVER say "following up on our call" with this person.`;
+  - "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Pattern‑interrupt hook using one concrete pain point or timely risk for their industry (no generic claims), 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + tightly aligned value prop, 3) ONE call‑to‑action. NEVER say "following up on our call" with this person.
+  - "Standard Invoice Request": Warm follow‑up after they agreed to send their invoice. If energy contract details exist, briefly reference any known values (supplier, contract end Month YYYY, current rate) or tie to one relevant pain point if unknown. Structure: Paragraph 1 (one sentence): polite reminder + why sending the invoice helps us start immediately. Paragraph 2 (bullet list): "We use your invoice to:" with 3 bullets — ESID(s), Contract End Date, Service Address — and mention free Energy Health Check and a quick review for extra charges/discrepancies. CTA line: one short, time‑bounded ask (e.g., "Could you send the latest invoice today or by tomorrow EOD?"). Keep it helpful, not salesy.`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -234,9 +241,15 @@ CONTEXT AWARENESS:
   • Paragraph 2 must list what the review covers in one concise sentence: current bill/supplier/rate, contract end Month YYYY, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, recommended next steps.
   • CTA line must be a single short question offering two specific time windows (e.g., Tue 10–12 or Thu 2–4).`;
 
+  const invoiceChecklist = `
+- Standard Invoice Request specifics:
+  • Paragraph 1: one-sentence warm reminder referencing the prior agreement to share the invoice and why it helps us start immediately.
+  • Paragraph 2: include a short bullet list under "We use your invoice to:" with exactly these items: ESID(s), Contract End Date, Service Address. Optionally mention free Energy Health Check and quick review for extra charges.
+  • CTA line: one short, time-bounded ask to send the invoice now/today/by tomorrow EOD (polite urgency, not salesy).`;
+
   const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}
 
-${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist : ''}
+${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist : ''}${isInvoicePrompt ? invoiceChecklist : ''}
 
 - Read the entire email once more to catch any duplication`;
 
