@@ -1418,6 +1418,7 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
     align-items: center;
     gap: var(--spacing-sm);
     background: var(--bg-item);
+    border: none;
     border-radius: var(--border-radius-sm);
     padding: 6px;
     margin-bottom: 0; /* remove margin to bring compose input closer */
@@ -8230,7 +8231,7 @@ input.row-select[type="checkbox"]:focus-visible {
 .compose-editor .editor-toolbar {
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: none;
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     padding: var(--spacing-sm);
     display: flex;
@@ -8909,7 +8910,7 @@ input.row-select[type="checkbox"]:focus-visible {
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    border-bottom: 1px solid var(--border-light); /* divider below toolbar */
+    border-bottom: 1px solid var(--border-light) !important; /* divider below toolbar */
     background: var(--surface-hover);
     position: relative;
     z-index: 10;
