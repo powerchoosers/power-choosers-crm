@@ -50,11 +50,11 @@ class EmailManager {
         
         console.log('[AI] Rendering AI bar...');
         const suggestions = [
-            'Warm intro after a call',
-            'Follow-up with tailored value props',
-            'Schedule a quick demo',
-            'Proposal delivery with next steps',
-            'Cold email to a lead I could not reach by phone'
+            { text: 'Warm intro after a call', prompt: 'Warm intro after a call' },
+            { text: 'Follow-up with tailored value props', prompt: 'Follow-up with tailored value props' },
+            { text: 'Schedule a quick demo', prompt: 'Schedule a quick demo' },
+            { text: 'Proposal delivery with next steps', prompt: 'Proposal delivery with next steps' },
+            { text: 'Cold email to a lead I could not reach by phone', prompt: 'Cold email to a lead I could not reach by phone' }
         ];
         aiBar.innerHTML = `
             <div class="ai-inner">
@@ -62,7 +62,7 @@ class EmailManager {
                     <textarea class="ai-prompt input-dark" rows="3" placeholder="Describe the email you want... (tone, goal, offer, CTA)"></textarea>
                 </div>
                 <div class="ai-row suggestions" role="list">
-                    ${suggestions.map(s => `<button class="ai-suggestion" type="button">${s}</button>`).join('')}
+                    ${suggestions.map(s => `<button class="ai-suggestion" type="button" data-prompt="${s.prompt}">${s.text}</button>`).join('')}
                 </div>
                 <div class="ai-row actions">
                     <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
@@ -109,7 +109,8 @@ class EmailManager {
                 console.log('[AI] Suggestion clicked:', btn.textContent);
                 const ta = aiBar.querySelector('.ai-prompt');
                 if (ta) {
-                    ta.value = btn.textContent;
+                    const prompt = btn.getAttribute('data-prompt') || btn.textContent;
+                    ta.value = prompt;
                     ta.focus();
                     console.log('[AI] Updated textarea value:', ta.value);
                 } else {
@@ -129,7 +130,8 @@ class EmailManager {
             console.log('[AI] Delegated suggestion click for:', btn.textContent);
             const ta = aiBar.querySelector('.ai-prompt');
             if (ta) {
-                ta.value = (btn.textContent || '').trim();
+                const prompt = btn.getAttribute('data-prompt') || btn.textContent;
+                ta.value = (prompt || '').trim();
                 ta.focus();
                 console.log('[AI] Delegated: textarea updated to:', ta.value);
             }
@@ -1330,8 +1332,8 @@ class EmailManager {
             
             if (this.isAuthenticated) {
                 console.log('[Auth] Loading emails after successful authentication');
-                await this.loadEmails();
-                window.crm?.showToast('Successfully connected to Gmail!');
+            await this.loadEmails();
+            window.crm?.showToast('Successfully connected to Gmail!');
             } else {
                 console.log('[Auth] Authentication was cancelled or failed');
                 window.crm?.showToast('Google authentication was cancelled.');
@@ -1445,12 +1447,30 @@ class EmailManager {
         try {
             if (window.emailTrackingManager) {
                 console.log('[EmailManager] Loading sent emails...');
-                const sentEmails = await window.emailTrackingManager.getSentEmails();
-                console.log('[EmailManager] Retrieved sent emails:', sentEmails.length);
-                this.emails = sentEmails.map(email => this.parseSentEmailData(email));
-                console.log('[EmailManager] Parsed emails:', this.emails.length);
-                this.renderEmails();
-                this.updateFolderCounts();
+                
+                // Set up real-time listener for sent emails
+                if (!this.sentEmailsListener) {
+                    this.sentEmailsListener = await window.emailTrackingManager.getSentEmails((sentEmails) => {
+                        try {
+                            console.log('[EmailManager] Real-time update - Retrieved sent emails:', sentEmails.length);
+                            this.emails = sentEmails.map(email => this.parseSentEmailData(email));
+                            console.log('[EmailManager] Real-time update - Parsed emails:', this.emails.length);
+                            this.renderEmails();
+                            this.updateFolderCounts();
+                            this.hideLoading();
+                        } catch (error) {
+                            console.error('[EmailManager] Real-time update error:', error);
+                        }
+                    });
+                } else {
+                    // Fallback to one-time fetch if listener already exists
+                    const sentEmails = await window.emailTrackingManager.getSentEmails();
+                    console.log('[EmailManager] Retrieved sent emails:', sentEmails.length);
+                    this.emails = sentEmails.map(email => this.parseSentEmailData(email));
+                    console.log('[EmailManager] Parsed emails:', this.emails.length);
+                    this.renderEmails();
+                    this.updateFolderCounts();
+                }
             } else {
                 console.warn('[EmailManager] Email tracking manager not available');
                 this.emails = [];
@@ -1576,6 +1596,8 @@ class EmailManager {
     renderEmails() {
         const emailList = document.getElementById('email-list');
         const emailCount = document.getElementById('email-count');
+        const loading = document.getElementById('email-loading');
+        const empty = document.getElementById('email-empty');
         
         if (!emailList) return;
 
@@ -1586,27 +1608,33 @@ class EmailManager {
             return;
         }
 
+        // Hide loading and empty states, show email list
+        if (loading) loading.style.display = 'none';
+        if (empty) empty.style.display = 'none';
+        emailList.style.display = 'block';
+        emailList.style.flexDirection = 'initial';
+
         emailList.innerHTML = this.emails.map(email => {
             try {
                 return `
-                    <div class="email-item ${email.unread ? 'unread' : ''}" data-email-id="${email.id}">
-                        <input type="checkbox" class="email-item-checkbox" data-email-id="${email.id}">
-                        <button class="email-item-star ${email.starred ? 'starred' : ''}" data-email-id="${email.id}">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="${email.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/>
-                            </svg>
-                        </button>
+            <div class="email-item ${email.unread ? 'unread' : ''}" data-email-id="${email.id}">
+                <input type="checkbox" class="email-item-checkbox" data-email-id="${email.id}">
+                <button class="email-item-star ${email.starred ? 'starred' : ''}" data-email-id="${email.id}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="${email.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/>
+                    </svg>
+                </button>
                         <div class="email-item-sender">${this.extractName(email.from || 'Unknown')}</div>
-                        <div class="email-item-content">
+                <div class="email-item-content">
                             <div class="email-item-subject">${email.subject || 'No Subject'}</div>
                             <div class="email-item-preview">${email.snippet || 'No preview available'}</div>
-                        </div>
-                        <div class="email-item-meta">
-                            <div class="email-item-time">${this.formatDate(email.date)}</div>
-                            ${email.important ? '<div class="email-attachment-icon">!</div>' : ''}
+                </div>
+                <div class="email-item-meta">
+                    <div class="email-item-time">${this.formatDate(email.date)}</div>
+                    ${email.important ? '<div class="email-attachment-icon">!</div>' : ''}
                             ${this.renderTrackingIcons(email)}
-                        </div>
-                    </div>
+                </div>
+            </div>
                 `;
             } catch (error) {
                 console.error('[EmailManager] Error rendering email:', email, error);
@@ -1671,15 +1699,15 @@ class EmailManager {
                 return 'Invalid date';
             }
             
-            const now = new Date();
+        const now = new Date();
             const diff = now - dateObj;
-            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-            
-            if (days === 0) {
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        
+        if (days === 0) {
                 return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            } else if (days < 7) {
+        } else if (days < 7) {
                 return dateObj.toLocaleDateString([], { weekday: 'short' });
-            } else {
+        } else {
                 return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
             }
         } catch (error) {
@@ -1695,7 +1723,15 @@ class EmailManager {
         
         if (loading) loading.style.display = 'flex';
         if (empty) empty.style.display = 'none';
-        if (emailList) emailList.style.display = 'block';
+        if (emailList) {
+            emailList.style.display = 'flex';
+            emailList.style.flexDirection = 'column';
+        }
+    }
+
+    hideLoading() {
+        const loading = document.getElementById('email-loading');
+        if (loading) loading.style.display = 'none';
     }
 
     showEmptyState() {
@@ -1705,7 +1741,11 @@ class EmailManager {
         
         if (loading) loading.style.display = 'none';
         if (empty) empty.style.display = 'flex';
-        if (emailList) emailList.innerHTML = '';
+        if (emailList) {
+            emailList.style.display = 'flex';
+            emailList.style.flexDirection = 'column';
+            emailList.innerHTML = '';
+        }
     }
 
     toggleSidebar() {
@@ -1715,6 +1755,13 @@ class EmailManager {
     }
 
     switchFolder(folder) {
+        // Clean up real-time listener if switching away from sent folder
+        if (this.currentFolder === 'sent' && folder !== 'sent' && this.sentEmailsListener) {
+            console.log('[EmailManager] Cleaning up sent emails listener');
+            this.sentEmailsListener();
+            this.sentEmailsListener = null;
+        }
+        
         document.querySelectorAll('.folder-item').forEach(item => {
             item.classList.remove('active');
         });
@@ -3312,6 +3359,16 @@ class EmailManager {
             const profile = await profileResponse.json();
             const fromEmail = profile.emailAddress;
             
+            // Generate unique tracking ID for this email
+            const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Create tracking pixel URL
+            const trackingPixelUrl = `${window.location.protocol}//${window.location.host}/api/email/track/${trackingId}`;
+            
+            // Inject tracking pixel into email content
+            const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
+            const contentWithTracking = content + trackingPixel;
+            
             // Create email message in Gmail format
             const recipients = Array.isArray(to) ? to.join(', ') : to;
             const emailLines = [
@@ -3321,7 +3378,7 @@ class EmailManager {
                 'MIME-Version: 1.0',
                 'Content-Type: text/html; charset=utf-8',
                 '',
-                content
+                contentWithTracking
             ];
 
             const emailString = emailLines.join('\r\n');
@@ -3353,11 +3410,19 @@ class EmailManager {
             // Also store the email in our tracking system so it appears in Sent section
             if (window.emailTrackingManager) {
                 const trackingEmailData = {
+                    id: trackingId, // Use the tracking ID we generated
                     to: emailData.to,
                     subject: emailData.subject,
-                    content: emailData.content,
+                    content: contentWithTracking, // Use content with tracking pixel
                     from: fromEmail,
-                    gmailMessageId: result.id
+                    gmailMessageId: result.id,
+                    sentVia: 'gmail_api',
+                    sentAt: new Date().toISOString(),
+                    opens: [],
+                    replies: [],
+                    openCount: 0,
+                    replyCount: 0,
+                    status: 'sent'
                 };
                 
                 try {
@@ -3453,7 +3518,7 @@ class EmailManager {
             }
             
             // Close compose window on success
-            this.closeComposeWindow();
+        this.closeComposeWindow();
             
             // Refresh sent emails if we're on the sent folder
             if (this.currentFolder === 'sent') {
@@ -3497,7 +3562,416 @@ class EmailManager {
     }
 
     openEmail(emailId) {
-        window.crm?.showToast(`Opening email ${emailId} - coming soon`);
+        const email = this.emails.find(e => e.id === emailId);
+        if (!email) {
+            console.error('[EmailManager] Email not found:', emailId);
+            return;
+        }
+
+        this.showEmailViewer(email);
+    }
+
+    showEmailViewer(email) {
+        // Create email viewer modal
+        const modal = document.createElement('div');
+        modal.className = 'email-viewer-modal';
+        modal.innerHTML = `
+            <div class="email-viewer-content">
+                <div class="email-viewer-header">
+                    <div class="email-viewer-title">
+                        <h2>${email.subject || 'No Subject'}</h2>
+                        <div class="email-viewer-meta">
+                            <span class="email-from">From: ${email.from || 'Unknown'}</span>
+                            <span class="email-to">To: ${email.to || 'Unknown'}</span>
+                            <span class="email-date">${this.formatDate(email.date)}</span>
+                        </div>
+                    </div>
+                    <div class="email-viewer-actions">
+                        <button class="email-action-btn" data-action="reply" title="Reply">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9,10 4,15 9,20"/>
+                                <path d="M20,4v7a4,4,0,0,1-4,4H4"/>
+                            </svg>
+                        </button>
+                        <button class="email-action-btn" data-action="reply-all" title="Reply All">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9,10 4,15 9,20"/>
+                                <path d="M20,4v7a4,4,0,0,1-4,4H4"/>
+                                <path d="M12,4v7a4,4,0,0,0,4,4h4"/>
+                            </svg>
+                        </button>
+                        <button class="email-action-btn" data-action="forward" title="Forward">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15,14 20,9 15,4"/>
+                                <path d="M4,20v-7a4,4,0,0,1,4-4H20"/>
+                            </svg>
+                        </button>
+                        <button class="email-action-btn ${email.starred ? 'starred' : ''}" data-action="star" title="Star">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="${email.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/>
+                            </svg>
+                        </button>
+                        <button class="email-action-btn" data-action="close" title="Close">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="email-viewer-body">
+                    <div class="email-content">
+                        ${email.content || email.snippet || 'No content available'}
+                    </div>
+                    ${this.renderTrackingIcons(email)}
+                </div>
+                <div class="email-viewer-compose" style="display: none;">
+                    <div class="compose-header">
+                        <h3>Compose Reply</h3>
+                        <button class="email-action-btn" data-action="close-compose" title="Close Compose">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="compose-form">
+                        <div class="compose-field">
+                            <label>To:</label>
+                            <input type="text" id="modal-compose-to" class="compose-input" placeholder="Recipients">
+                        </div>
+                        <div class="compose-field">
+                            <label>Subject:</label>
+                            <input type="text" id="modal-compose-subject" class="compose-input" placeholder="Subject">
+                        </div>
+                        <div class="compose-editor">
+                            <div class="editor-toolbar">
+                                <button class="fmt-btn" data-format="bold" title="Bold">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+                                        <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+                                    </svg>
+                                </button>
+                                <button class="fmt-btn" data-format="italic" title="Italic">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="19" y1="4" x2="10" y2="4"/>
+                                        <line x1="14" y1="20" x2="5" y2="20"/>
+                                        <line x1="15" y1="4" x2="9" y2="20"/>
+                                    </svg>
+                                </button>
+                                <button class="fmt-btn" data-format="underline" title="Underline">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/>
+                                        <line x1="4" y1="21" x2="20" y2="21"/>
+                                    </svg>
+                                </button>
+                                <div class="toolbar-separator"></div>
+                                <button class="fmt-btn" data-format="insertUnorderedList" title="Bullet List">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="8" y1="6" x2="21" y2="6"/>
+                                        <line x1="8" y1="12" x2="21" y2="12"/>
+                                        <line x1="8" y1="18" x2="21" y2="18"/>
+                                        <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                        <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                        <line x1="3" y1="18" x2="3.01" y2="18"/>
+                                    </svg>
+                                </button>
+                                <button class="fmt-btn" data-format="insertOrderedList" title="Numbered List">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="10" y1="6" x2="21" y2="6"/>
+                                        <line x1="10" y1="12" x2="21" y2="12"/>
+                                        <line x1="10" y1="18" x2="21" y2="18"/>
+                                        <path d="M4 6h1v4"/>
+                                        <path d="M4 10h2"/>
+                                        <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>
+                                    </svg>
+                                </button>
+                                <div class="toolbar-separator"></div>
+                                <button class="fmt-btn" data-format="createLink" title="Insert Link">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                    </svg>
+                                </button>
+                                <button class="fmt-btn ai-generate" title="AI Generate">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                        <path d="M2 17l10 5 10-5"/>
+                                        <path d="M2 12l10 5 10-5"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="editor-content" id="modal-compose-content" contenteditable="true" placeholder="Type your message here..."></div>
+                        </div>
+                        <div class="compose-actions">
+                            <button class="btn btn-primary" data-action="send-reply">Send</button>
+                            <button class="btn btn-secondary" data-action="save-draft">Save Draft</button>
+                            <button class="btn btn-secondary" data-action="cancel-reply">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to page
+        document.body.appendChild(modal);
+
+        // Bind events
+        this.bindEmailViewerEvents(modal, email);
+
+        // Show modal
+        setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    bindEmailViewerEvents(modal, email) {
+        // Close button
+        modal.querySelector('[data-action="close"]').addEventListener('click', () => {
+            this.closeEmailViewer(modal);
+        });
+
+        // Reply button
+        modal.querySelector('[data-action="reply"]').addEventListener('click', () => {
+            this.showComposeInModal(modal, email, 'reply');
+        });
+
+        // Reply All button
+        modal.querySelector('[data-action="reply-all"]').addEventListener('click', () => {
+            this.showComposeInModal(modal, email, 'reply-all');
+        });
+
+        // Forward button
+        modal.querySelector('[data-action="forward"]').addEventListener('click', () => {
+            this.showComposeInModal(modal, email, 'forward');
+        });
+
+        // Star button
+        modal.querySelector('[data-action="star"]').addEventListener('click', () => {
+            this.toggleEmailStar(email);
+        });
+
+        // Compose actions
+        modal.querySelector('[data-action="close-compose"]').addEventListener('click', () => {
+            this.hideComposeInModal(modal);
+        });
+
+        modal.querySelector('[data-action="send-reply"]').addEventListener('click', () => {
+            this.sendReplyFromModal(modal, email);
+        });
+
+        modal.querySelector('[data-action="save-draft"]').addEventListener('click', () => {
+            this.saveDraftFromModal(modal);
+        });
+
+        modal.querySelector('[data-action="cancel-reply"]').addEventListener('click', () => {
+            this.hideComposeInModal(modal);
+        });
+
+        // Initialize editor toolbar
+        this.initializeModalEditorToolbar(modal);
+
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeEmailViewer(modal);
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('show')) {
+                this.closeEmailViewer(modal);
+            }
+        });
+    }
+
+    closeEmailViewer(modal) {
+        modal.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+        }, 300);
+    }
+
+    showComposeInModal(modal, email, type) {
+        const composeSection = modal.querySelector('.email-viewer-compose');
+        const bodySection = modal.querySelector('.email-viewer-body');
+        
+        // Hide body, show compose
+        bodySection.style.display = 'none';
+        composeSection.style.display = 'block';
+        
+        // Set up compose data based on type
+        const toInput = modal.querySelector('#modal-compose-to');
+        const subjectInput = modal.querySelector('#modal-compose-subject');
+        const contentEditor = modal.querySelector('#modal-compose-content');
+        
+        if (type === 'reply') {
+            toInput.value = email.from || '';
+            subjectInput.value = email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`;
+            contentEditor.innerHTML = `<br><br>--- Original Message ---<br>From: ${email.from}<br>Date: ${this.formatDate(email.date)}<br>Subject: ${email.subject}<br><br>${email.content || email.snippet}`;
+        } else if (type === 'reply-all') {
+            toInput.value = `${email.from}, ${email.to}`;
+            subjectInput.value = email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`;
+            contentEditor.innerHTML = `<br><br>--- Original Message ---<br>From: ${email.from}<br>Date: ${this.formatDate(email.date)}<br>Subject: ${email.subject}<br><br>${email.content || email.snippet}`;
+        } else if (type === 'forward') {
+            toInput.value = '';
+            subjectInput.value = email.subject.startsWith('Fwd:') ? email.subject : `Fwd: ${email.subject}`;
+            contentEditor.innerHTML = `<br><br>--- Forwarded Message ---<br>From: ${email.from}<br>Date: ${this.formatDate(email.date)}<br>Subject: ${email.subject}<br><br>${email.content || email.snippet}`;
+        }
+        
+        // Focus on content editor
+        setTimeout(() => contentEditor.focus(), 100);
+    }
+
+    hideComposeInModal(modal) {
+        const composeSection = modal.querySelector('.email-viewer-compose');
+        const bodySection = modal.querySelector('.email-viewer-body');
+        
+        // Show body, hide compose
+        bodySection.style.display = 'block';
+        composeSection.style.display = 'none';
+    }
+
+    initializeModalEditorToolbar(modal) {
+        const toolbar = modal.querySelector('.editor-toolbar');
+        const editor = modal.querySelector('#modal-compose-content');
+        
+        // Bind toolbar events (reuse existing toolbar functionality)
+        toolbar.addEventListener('click', (e) => {
+            const btn = e.target.closest('.fmt-btn');
+            if (!btn) return;
+            
+            e.preventDefault();
+            const format = btn.dataset.format;
+            
+            if (format === 'ai') {
+                // Handle AI generation
+                this.handleAIGeneration(editor);
+            } else if (format === 'createLink') {
+                // Handle link creation
+                this.handleLinkCreation(editor);
+            } else {
+                // Handle standard formatting
+                document.execCommand(format, false, null);
+                editor.focus();
+            }
+        });
+    }
+
+    handleAIGeneration(editor) {
+        // Reuse existing AI generation logic
+        if (window.crm && window.crm.showToast) {
+            window.crm.showToast('AI generation coming soon in modal!');
+        }
+    }
+
+    handleLinkCreation(editor) {
+        const url = prompt('Enter URL:');
+        if (url) {
+            document.execCommand('createLink', false, url);
+            editor.focus();
+        }
+    }
+
+    sendReplyFromModal(modal, originalEmail) {
+        const toInput = modal.querySelector('#modal-compose-to');
+        const subjectInput = modal.querySelector('#modal-compose-subject');
+        const contentEditor = modal.querySelector('#modal-compose-content');
+        
+        const emailData = {
+            to: toInput.value,
+            subject: subjectInput.value,
+            content: contentEditor.innerHTML
+        };
+        
+        // Send email using existing sendEmail method
+        this.sendEmail(emailData).then(() => {
+            window.crm?.showToast('Reply sent successfully!');
+            this.hideComposeInModal(modal);
+        }).catch(error => {
+            console.error('Error sending reply:', error);
+            window.crm?.showToast('Failed to send reply. Please try again.');
+        });
+    }
+
+    saveDraftFromModal(modal) {
+        // Save draft functionality
+        window.crm?.showToast('Draft saved!');
+    }
+
+    replyToEmail(email, type) {
+        this.closeEmailViewer(document.querySelector('.email-viewer-modal'));
+        
+        // Open compose with reply data
+        const composeData = {
+            to: type === 'reply' ? email.from : `${email.from}, ${email.to}`,
+            subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+            content: `\n\n--- Original Message ---\nFrom: ${email.from}\nDate: ${this.formatDate(email.date)}\nSubject: ${email.subject}\n\n${email.content || email.snippet}`
+        };
+        
+        this.openCompose(composeData);
+    }
+
+    forwardEmail(email) {
+        this.closeEmailViewer(document.querySelector('.email-viewer-modal'));
+        
+        // Open compose with forward data
+        const composeData = {
+            to: '',
+            subject: email.subject.startsWith('Fwd:') ? email.subject : `Fwd: ${email.subject}`,
+            content: `\n\n--- Forwarded Message ---\nFrom: ${email.from}\nDate: ${this.formatDate(email.date)}\nSubject: ${email.subject}\n\n${email.content || email.snippet}`
+        };
+        
+        this.openCompose(composeData);
+    }
+
+    toggleEmailStar(email) {
+        email.starred = !email.starred;
+        
+        // Update UI
+        const emailItem = document.querySelector(`[data-email-id="${email.id}"]`);
+        if (emailItem) {
+            const starBtn = emailItem.querySelector('.email-item-star');
+            if (starBtn) {
+                starBtn.classList.toggle('starred', email.starred);
+                const svg = starBtn.querySelector('svg');
+                if (svg) {
+                    svg.setAttribute('fill', email.starred ? 'currentColor' : 'none');
+                }
+            }
+        }
+
+        // Update in viewer if open
+        const viewer = document.querySelector('.email-viewer-modal');
+        if (viewer) {
+            const starBtn = viewer.querySelector('[data-action="star"]');
+            if (starBtn) {
+                starBtn.classList.toggle('starred', email.starred);
+                const svg = starBtn.querySelector('svg');
+                if (svg) {
+                    svg.setAttribute('fill', email.starred ? 'currentColor' : 'none');
+                }
+            }
+        }
+
+        window.crm?.showToast(`Email ${email.starred ? 'starred' : 'unstarred'}`);
+    }
+
+    openCompose(composeData = {}) {
+        // Switch to compose mode
+        this.switchFolder('compose');
+        
+        // Fill in compose data
+        setTimeout(() => {
+            const toInput = document.getElementById('compose-to');
+            const subjectInput = document.getElementById('compose-subject');
+            const contentTextarea = document.getElementById('compose-content');
+            
+            if (toInput && composeData.to) toInput.value = composeData.to;
+            if (subjectInput && composeData.subject) subjectInput.value = composeData.subject;
+            if (contentTextarea && composeData.content) contentTextarea.value = composeData.content;
+        }, 100);
     }
 
     setupEmailTrackingListeners() {
@@ -3519,10 +3993,8 @@ class EmailManager {
             window.crm.showToast(`📧 ${notification.message}`, 'success');
         }
 
-        // Refresh sent emails if we're currently viewing the sent folder
-        if (this.currentFolder === 'sent') {
-            this.loadSentEmails();
-        }
+        // Real-time listener will automatically update the UI
+        console.log('[EmailManager] Email opened notification received - UI will update via real-time listener');
     }
 
     handleEmailReplied(notification) {
@@ -3531,10 +4003,8 @@ class EmailManager {
             window.crm.showToast(`💬 ${notification.message}`, 'success');
         }
 
-        // Refresh sent emails if we're currently viewing the sent folder
-        if (this.currentFolder === 'sent') {
-            this.loadSentEmails();
-        }
+        // Real-time listener will automatically update the UI
+        console.log('[EmailManager] Email replied notification received - UI will update via real-time listener');
     }
 
     setupTestButton() {
@@ -3583,10 +4053,8 @@ class EmailManager {
                     await window.emailTrackingManager.simulateEmailOpen(mostRecentEmail.id);
                     window.crm?.showToast('Email open simulated! Check the eyeball icon.');
                     
-                    // Refresh the sent emails to show the updated tracking
-                    if (this.currentFolder === 'sent') {
-                        await this.loadSentEmails();
-                    }
+                    // Real-time listener will automatically update the UI
+                    console.log('[EmailManager] Email open simulated - UI will update via real-time listener');
                 } else {
                     window.crm?.showToast('Email tracking manager not initialized');
                 }

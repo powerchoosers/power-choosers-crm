@@ -16,6 +16,62 @@ class EmailTrackingManager {
         }
         this.db = window.firebaseDB;
         console.log('[EmailTracking] Initialized with Firebase');
+        
+        // Start polling for tracking events
+        this.startTrackingEventPolling();
+    }
+
+    startTrackingEventPolling() {
+        // Poll for tracking events every 5 seconds
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/email/tracking-events');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.events && data.events.length > 0) {
+                        console.log('[EmailTracking] Found tracking events:', data.events.length);
+                        for (const event of data.events) {
+                            await this.processTrackingEvent(event);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('[EmailTracking] Error polling tracking events:', error);
+            }
+        }, 5000);
+    }
+
+    async processTrackingEvent(event) {
+        try {
+            if (event.type === 'open') {
+                await this.updateEmailOpen(event.trackingId, event.data);
+            } else if (event.type === 'reply') {
+                await this.updateEmailReply(event.trackingId, event.data);
+            }
+        } catch (error) {
+            console.error('[EmailTracking] Error processing tracking event:', error);
+        }
+    }
+
+    async updateEmailOpen(trackingId, openData) {
+        try {
+            if (!this.db) {
+                console.warn('[EmailTracking] Firebase not initialized');
+                return;
+            }
+
+            const emailRef = this.db.collection('emails').doc(trackingId);
+            await emailRef.update({
+                opens: window.firebase.firestore.FieldValue.arrayUnion(openData),
+                openCount: window.firebase.firestore.FieldValue.increment(1),
+                lastOpened: openData.openedAt,
+                updatedAt: new Date().toISOString()
+            });
+
+            console.log('[EmailTracking] Email open updated:', trackingId);
+        } catch (error) {
+            console.error('[EmailTracking] Error updating email open:', error);
+        }
     }
 
     /**
@@ -131,8 +187,8 @@ class EmailTrackingManager {
             // Update the email document with the open event
             const emailRef = this.db.collection('emails').doc(trackingId);
             await emailRef.update({
-                opens: this.db.FieldValue.arrayUnion(openEvent),
-                openCount: this.db.FieldValue.increment(1),
+                opens: window.firebase.firestore.FieldValue.arrayUnion(openEvent),
+                openCount: window.firebase.firestore.FieldValue.increment(1),
                 lastOpened: openEvent.openedAt,
                 updatedAt: new Date().toISOString()
             });
@@ -167,8 +223,8 @@ class EmailTrackingManager {
             // Update the email document with the reply event
             const emailRef = this.db.collection('emails').doc(trackingId);
             await emailRef.update({
-                replies: this.db.FieldValue.arrayUnion(replyEvent),
-                replyCount: this.db.FieldValue.increment(1),
+                replies: window.firebase.firestore.FieldValue.arrayUnion(replyEvent),
+                replyCount: window.firebase.firestore.FieldValue.increment(1),
                 lastReplied: replyEvent.repliedAt,
                 updatedAt: new Date().toISOString()
             });
@@ -221,14 +277,43 @@ class EmailTrackingManager {
 
     /**
      * Get all sent emails with their tracking data
+     * @param {Function} callback - Optional callback for real-time updates
      */
-    async getSentEmails() {
+    async getSentEmails(callback = null) {
         try {
             if (!this.db) {
                 console.warn('[EmailTracking] Firebase not initialized');
                 return this.getDemoSentEmails();
             }
 
+            // If callback is provided, set up real-time listener
+            if (callback) {
+                return this.db.collection('emails')
+                    .orderBy('sentAt', 'desc')
+                    .limit(100)
+                    .onSnapshot((snapshot) => {
+                        const emails = [];
+                        snapshot.forEach(doc => {
+                            const data = doc.data();
+                            emails.push({
+                                id: doc.id,
+                                ...data
+                            });
+                        });
+
+                        // If no emails in database, return demo data
+                        if (emails.length === 0) {
+                            callback(this.getDemoSentEmails());
+                        } else {
+                            callback(emails);
+                        }
+                    }, (error) => {
+                        console.error('[EmailTracking] Real-time listener error:', error);
+                        callback(this.getDemoSentEmails());
+                    });
+            }
+
+            // One-time fetch
             const snapshot = await this.db.collection('emails')
                 .orderBy('sentAt', 'desc')
                 .limit(100)
@@ -651,8 +736,8 @@ class EmailTrackingManager {
             // Update the email document with the open event
             const emailRef = this.db.collection('emails').doc(trackingId);
             await emailRef.update({
-                opens: this.db.FieldValue.arrayUnion(openEvent),
-                openCount: this.db.FieldValue.increment(1),
+                opens: window.firebase.firestore.FieldValue.arrayUnion(openEvent),
+                openCount: window.firebase.firestore.FieldValue.increment(1),
                 lastOpened: openEvent.openedAt,
                 updatedAt: new Date().toISOString()
             });
