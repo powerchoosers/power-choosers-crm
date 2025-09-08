@@ -70,6 +70,30 @@ export default async function handler(req, res) {
         } catch (e) {
             console.warn('[Status] Failed posting to /api/calls:', e?.message);
         }
+
+        // If call completed and RecordingUrl not provided, try to fetch the recording via Twilio API
+        try {
+            if (CallStatus === 'completed' && !RecordingUrl && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+                const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                const recs = await client.recordings.list({ callSid: CallSid, limit: 1 });
+                if (recs && recs.length > 0) {
+                    const url = recs[0].mediaUrl || recs[0].uri || '';
+                    // Build full URL if needed
+                    const full = url.startsWith('http') ? url : `https://api.twilio.com${url}.mp3`;
+                    console.log(`[Status] Found recording for ${CallSid}: ${full}`);
+                    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+                    await fetch(`${base}/api/calls`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ callSid: CallSid, recordingUrl: full })
+                    }).catch(() => {});
+                } else {
+                    console.log(`[Status] No recordings found yet for ${CallSid}`);
+                }
+            }
+        } catch (err) {
+            console.warn('[Status] Error while fetching recording by CallSid:', err?.message);
+        }
         
         // Always respond with 200 OK
         res.status(200).send('OK');

@@ -139,7 +139,13 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
             
         } catch (transcriptionError) {
             console.error('[Recording] Twilio transcription error:', transcriptionError);
-            // Fallback to basic insights
+            // If Google key is available, fall back to Google STT end-to-end
+            if (process.env.GOOGLE_API_KEY) {
+                console.log('[Recording] Falling back to Google STT for:', callSid);
+                await processRecording(recordingUrl, callSid);
+                return; // processing and /api/calls update handled by fallback
+            }
+            // Fallback to basic placeholder insights if no Google key
             aiInsights = {
                 summary: 'Call transcription processing in progress',
                 sentiment: 'Unknown',
@@ -150,6 +156,13 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                 timeline: 'Not specified',
                 decisionMakers: []
             };
+        }
+
+        // If Twilio returned no transcript text, optionally fall back to Google STT
+        if (!transcript && process.env.GOOGLE_API_KEY) {
+            console.log('[Recording] Twilio transcript empty; falling back to Google STT for:', callSid);
+            await processRecording(recordingUrl, callSid);
+            return;
         }
         
         // Update call data
