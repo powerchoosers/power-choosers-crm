@@ -26,6 +26,7 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
   const usage = energy.usage || '';
   const supplier = energy.supplier || '';
   const contractEnd = energy.contractEnd || '';
+  const currentRate = energy.currentRate || '';
   const sqftRaw = r.squareFootage || r.square_footage || '';
   const sqftNum = Number(String(sqftRaw).replace(/[^0-9.]/g, ''));
   let facilityScale = '';
@@ -34,6 +35,19 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
     else if (sqftNum < 100000) facilityScale = 'mid-sized facility';
     else facilityScale = 'large facility';
   }
+
+  // Notes from contact or associated account
+  const notes = [r.notes, r.account?.notes].filter(Boolean).join(' \n').slice(0, 800);
+
+  // Common industry pain points. Pick 1 (max 2) that best fits context.
+  const painPoints = [
+    'billing issues or invoice complexity',
+    'high TDU/delivery charges relative to energy',
+    'confusing or unfavorable contract terms (bandwidth, swing, pass-throughs)',
+    'above-market current rate / renewal risk',
+    'rising market costs driven by data centers/population growth',
+    'high load/operational intensity for manufacturers or large facilities (>20k sf)'
+  ];
 
   const companyOverview = [
     'Power Choosers is an energy procurement and management partner.',
@@ -54,15 +68,17 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
 - Title/Role: ${job || 'Unknown'}
 - Industry: ${industry || 'Unknown'}
 - Facility: ${facilityScale || 'Unknown scale'} (do NOT mention exact square footage)
-- Energy usage/supplier/contract (if relevant): ${usage || 'n/a'}, ${supplier || 'n/a'}, ${contractEnd || 'n/a'}
-- LinkedIn: ${linkedin || 'n/a'}`;
+- Energy (if relevant): usage=${usage || 'n/a'}; supplier=${supplier || 'n/a'}; currentRate=${currentRate || 'n/a'}; contractEnd=${contractEnd || 'n/a'}
+- LinkedIn: ${linkedin || 'n/a'}
+- Notes (free text, optional): ${notes || 'n/a'}`;
 
   const bizContext = `About Power Choosers (for positioning only): ${companyOverview}`;
 
   const subjectGuidelines = `Subject line requirements:
 - The FIRST LINE must begin with "Subject:" followed by the subject text.
 - Keep it under ~60 characters and make it specific.
-- Prefer including ${firstName ? 'the recipient\'s first name' : 'the company name'} and/or the company name (e.g., "${firstName || 'Name'} — energy options for ${company || 'your facilities'}").`;
+- Prefer including ${firstName ? 'the recipient\'s first name' : 'the company name'} and/or the company name (e.g., "${firstName || 'Name'} — energy options for ${company || 'your facilities'}").
+- When applicable, hint the chosen pain point in the subject (e.g., "${company || 'Your accounts'} — simplify bills" or "${firstName || 'Team'} — renewal timing")`;
 
   const bodyGuidelines = `Body requirements:
 - Write 3 short paragraphs (1–3 sentences each) + a clear CTA.
@@ -70,6 +86,17 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
 - You may allude to scale (e.g., multi-site or large facility) but do NOT state exact square footage.
 - Mention one or two of our offerings most relevant to this contact (procurement, renewals/contracting, bill management, or efficiency) without overloading the email.
 - Keep it skimmable and client-friendly.`;
+
+  const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
+- Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
+- Contract end: reference the window (e.g., "before ${contractEnd || 'your renewal window'}").
+- Current rate: you may reference the rate succinctly if provided (e.g., "at ${currentRate || 'your current'} $/kWh").
+- Usage: reference qualitatively (e.g., "your usage profile" or "annual usage") without exact precision if it feels too granular.
+- Do NOT mention exact square footage; keep scale abstract (e.g., "large facility").`;
+
+  const painPointGuidelines = `Choose ONE primary pain-point as the HOOK for the opening line. Consider the industry and signals above. Examples: ${painPoints.join('; ')}. Use at most one supporting pain-point if it adds clarity.`;
+
+  const notesGuidelines = `If notes are present, incorporate a relevant reference in one line (e.g., recent call context or initiative) — keep it natural and non-repetitive.`;
 
   const outputStyle = mode === 'html'
     ? `Formatting contract: Output must be exactly two parts.
@@ -85,6 +112,9 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
     common,
     recipientContext,
     bizContext,
+    painPointGuidelines,
+    energyGuidelines,
+    notesGuidelines,
     subjectGuidelines,
     bodyGuidelines,
     outputStyle,

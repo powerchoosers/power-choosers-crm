@@ -468,8 +468,35 @@ class EmailManager {
             .filter(Boolean)
             .join('\n\n');
 
-        // Build HTML paragraphs
+        // Build HTML paragraphs (and ensure energy details are referenced if available)
         const paras = body.split(/\n\n/).map(p => p.trim()).filter(Boolean);
+
+        // If recipient has energy details, add a short mention when missing
+        try {
+            const energy = recipient?.energy || {};
+            const supplier = String(energy.supplier || '').trim();
+            const currentRate = String(energy.currentRate || '').trim();
+            const contractEnd = String(energy.contractEnd || '').trim();
+            const usage = String(energy.usage || '').trim();
+            const bodyLower = body.toLowerCase();
+            let needsSupplier = supplier && !bodyLower.includes(supplier.toLowerCase());
+            let needsRate = currentRate && !/\brate\b/i.test(body) && !/\$/i.test(body);
+            let needsEnd = contractEnd && !/contract|renewal|expires|end\s*date/i.test(body);
+            let needsUsage = usage && !/usage|load|consumption/i.test(bodyLower);
+            if (needsSupplier || needsRate || needsEnd || needsUsage) {
+                const bits = [];
+                if (needsSupplier) bits.push(`you're with ${supplier}`);
+                if (needsRate) bits.push(`at ${currentRate} $/kWh`);
+                if (needsEnd) bits.push(`with a contract ending around ${contractEnd}`);
+                let line = '';
+                if (bits.length) line = `I kept in mind that ${bits.join(', ')}.`;
+                if (needsUsage) {
+                    line += (line ? ' ' : '') + `I also considered your annual usage profile.`;
+                }
+                if (line) paras.push(line);
+            }
+        } catch (_) { /* noop */ }
+
         const paraHtml = paras.map(p => `<p>${this.escapeHtml(p)}</p>`).join('');
 
         // Add a single standardized closing (first name only)
@@ -711,6 +738,25 @@ class EmailManager {
             // Populate with email only as requested
             input.value = email || name;
             const person = this._composePeopleById.get(id) || {};
+            // Try to find associated account by explicit id or name/domain match
+            const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+            const personAccountId = person.accountId || person.account_id || person.companyId || person.company_id || '';
+            const personCompany = person.company || person.companyName || person.accountName || (name?.split(' at ')[1]) || '';
+            const personDomain = (email || '').split('@')[1]?.toLowerCase() || '';
+            let account = null;
+            if (personAccountId) {
+                account = accounts.find(a => String(a.id || '') === String(personAccountId)) || null;
+            }
+            if (!account && personCompany) {
+                const cmp = String(personCompany).toLowerCase().trim();
+                account = accounts.find(a => String(a.accountName || a.name || a.companyName || '').toLowerCase().trim() === cmp) || null;
+            }
+            if (!account && personDomain) {
+                account = accounts.find(a => {
+                    const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
+                    return d && personDomain.endsWith(d);
+                }) || null;
+            }
             // Build a rich recipient context object
             this._selectedRecipient = {
                 id,
@@ -719,16 +765,31 @@ class EmailManager {
                 firstName: person.firstName || person.first_name || (name?.split(' ')[0]) || '',
                 lastName: person.lastName || person.last_name || '',
                 fullName: person.fullName || person.full_name || name || '',
-                company: person.company || person.companyName || person.accountName || '',
+                company: person.company || person.companyName || person.accountName || (account?.accountName || account?.name || account?.companyName) || '',
                 title: person.title || person.jobTitle || person.role || '',
-                industry: person.industry || person.sector || '',
+                industry: person.industry || person.sector || account?.industry || '',
                 // Use non-specific facility size; exact sqft will not be echoed by AI
-                squareFootage: person.squareFootage || person.square_footage || person.buildingSize || person.sqft || '',
+                squareFootage: person.squareFootage || person.square_footage || person.buildingSize || person.sqft || account?.squareFootage || account?.sqft || account?.square_feet || '',
                 energy: {
-                    usage: person.energyUsage || person.annual_kwh || person.kwh || '',
-                    supplier: person.energySupplier || person.supplier || person.contractSupplier || '',
-                    contractEnd: person.contractEnd || person.contract_end || person.contractEndDate || ''
+                    usage: person.energyUsage || person.annual_kwh || person.kwh || account?.annual_kwh || account?.kwh || '',
+                    supplier: person.energySupplier || person.supplier || person.contractSupplier || account?.electricitySupplier || account?.supplier || '',
+                    currentRate: person.currentRate || person.rate || account?.currentRate || account?.rate || '',
+                    contractEnd: person.contractEnd || person.contract_end || person.contractEndDate || account?.contractEndDate || account?.contractEnd || account?.contract_end_date || ''
                 },
+                notes: person.notes || person.note || '',
+                account: account ? {
+                    id: account.id,
+                    name: account.accountName || account.name || account.companyName || '',
+                    industry: account.industry || '',
+                    domain: account.domain || account.website || '',
+                    notes: account.notes || account.note || '',
+                    energy: {
+                        supplier: account.electricitySupplier || account.supplier || '',
+                        currentRate: account.currentRate || account.rate || '',
+                        usage: account.annual_kwh || account.kwh || '',
+                        contractEnd: account.contractEndDate || account.contractEnd || account.contract_end_date || ''
+                    }
+                } : null,
                 linkedin: person.linkedin || person.linkedinUrl || person.linkedin_url || person.linkedIn || ''
             };
             console.log('[ComposeAutocomplete] selected', this._selectedRecipient);
