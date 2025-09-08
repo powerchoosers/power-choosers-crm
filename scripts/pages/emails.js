@@ -18,7 +18,7 @@ class EmailManager {
         this.CLIENT_ID = '448802258090-re0u5rtja879t4tkej22rnedmo1jt3lp.apps.googleusercontent.com';
         this.API_KEY = 'AIzaSyDwrD5n-_1jNzw6Qsj2q8xFUWT3gaMs4Xk'; // Updated to match Google Cloud Console key used for Gmail
         this.DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest';
-        this.SCOPES = 'https://www.googleapis.com/auth/gmail.modify';
+        this.SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
         
         // Formatting state tracking
         this._currentFormatting = {
@@ -1402,14 +1402,14 @@ class EmailManager {
         }
 
         emailList.innerHTML = this.emails.map(email => `
-        <div class="email-item ${email.unread ? 'unread' : ''}" data-email-id="${email.id}">
-            <input type="checkbox" class="email-item-checkbox" data-email-id="${email.id}">
+            <div class="email-item ${email.unread ? 'unread' : ''}" data-email-id="${email.id}">
+                <input type="checkbox" class="email-item-checkbox" data-email-id="${email.id}">
                 <button class="email-item-star ${email.starred ? 'starred' : ''}" data-email-id="${email.id}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="${email.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
                         <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/>
                     </svg>
                 </button>
-                <div class="email-item-sender">${(() => { try { const m = (email.from || '').match(/<([^>]+)>/); const addr = (m ? m[1] : (email.from||'')).trim(); const domain = (addr.split('@')[1] || '').replace(/^www\./i,''); const fav = this.getFaviconUrl(domain); const name = this.extractName(email.from); return `<img class=\"email-favicon\" src=\"${fav}\" alt=\"${domain}\" onerror=\"this.style.display='none'\" /> ${this.escapeHtml(name)}`; } catch(_) { return this.escapeHtml(this.extractName(email.from)); } })()}</div>
+                <div class="email-item-sender">${this.extractName(email.from)}</div>
                 <div class="email-item-content">
                     <div class="email-item-subject">${email.subject}</div>
                     <div class="email-item-preview">${email.snippet}</div>
@@ -3040,280 +3040,98 @@ class EmailManager {
         }
     }
 
-    // Resolve favicon for a domain
-    getFaviconUrl(domain) {
-        if (!domain) return '';
-        const d = String(domain).replace(/^https?:\/\//i,'').replace(/^www\./i,'').split('/')[0];
-        return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(d)}&sz=64`;
-    }
-
-    // Lookup CRM contact/account by email or domain
-    lookupCRMByEmail(email, domain) {
-        let contact = null, account = null, contactName = '', accountName = '';
-        try {
-            const people = (typeof window.getPeopleData === 'function') ? (window.getPeopleData() || []) : [];
-            const eml = String(email || '').toLowerCase();
-            contact = people.find(p => String(p.email || '').toLowerCase() === eml) || null;
-            if (!contact && domain) {
-                const dom = String(domain).toLowerCase();
-                contact = people.find(p => (String(p.email || '').toLowerCase().split('@')[1] || '') === dom) || null;
-            }
-            if (contact) contactName = [contact.firstName || contact.first_name, contact.lastName || contact.last_name].filter(Boolean).join(' ') || contact.fullName || contact.name || '';
-        } catch(_) {}
-        try {
-            const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
-            if (contact) {
-                const accId = contact.accountId || contact.account_id || '';
-                if (accId) account = accounts.find(a => String(a.id) === String(accId)) || null;
-            }
-            if (!account && domain) {
-                const d = String(domain).toLowerCase();
-                account = accounts.find(a => {
-                    const ad = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
-                    return ad && (d === ad || d.endsWith(ad));
-                }) || null;
-            }
-            if (account) accountName = account.accountName || account.name || account.companyName || '';
-        } catch(_) {}
-        return { contact, account, contactName, accountName };
-    }
-
-    // Fetch full Gmail message and extract HTML/text bodies
-    async fetchMessageById(id) {
-        if (!this.accessToken) throw new Error('Not authenticated');
-        const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`;
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${this.accessToken}` } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const headers = data.payload?.headers || [];
-        const getHeader = (name) => headers.find(h => h.name === name)?.value || '';
-        const parts = [];
-        const walk = (p) => {
-            if (!p) return;
-            if (p.mimeType) parts.push(p);
-            (p.parts || []).forEach(walk);
-        };
-        walk(data.payload);
-        const findFirst = (mt) => parts.find(p => (p.mimeType || '').toLowerCase() === mt);
-        const decode = (s) => this.decodeBase64Url(s || '');
-        const htmlPart = findFirst('text/html');
-        const textPart = findFirst('text/plain');
-        const bodyHtml = htmlPart ? decode(htmlPart.body?.data) : '';
-        const bodyText = textPart ? decode(textPart.body?.data) : (bodyHtml ? '' : decode(data.payload?.body?.data));
-        const msg = {
-            id: data.id,
-            threadId: data.threadId,
-            from: getHeader('From'),
-            to: getHeader('To'),
-            subject: getHeader('Subject') || '(no subject)',
-            date: new Date(getHeader('Date')),
-            snippet: data.snippet || '',
-            unread: data.labelIds?.includes('UNREAD') || false,
-            starred: data.labelIds?.includes('STARRED') || false,
-            important: data.labelIds?.includes('IMPORTANT') || false,
-            labels: data.labelIds || [],
-            bodyHtml,
-            bodyText
-        };
-        // cache into list for quick back navigation
-        const idx = (this.emails || []).findIndex(e => e.id === id);
-        if (idx >= 0) this.emails[idx] = { ...this.emails[idx], ...msg };
-        return msg;
-    }
-
-    decodeBase64Url(s) {
-        try {
-            const pad = (str) => str + '='.repeat((4 - (str.length % 4)) % 4);
-            const b64 = pad(String(s).replace(/-/g, '+').replace(/_/g, '/'));
-            const decoded = atob(b64);
-            // Convert binary to UTF-8
-            const bytes = Uint8Array.from(decoded, c => c.charCodeAt(0));
-            const text = new TextDecoder('utf-8').decode(bytes);
-            return text;
-        } catch (_) {
-            return '';
+    normalizeVariablesInEditor(editor) {
+        if (!editor) return;
+        const regex = /\{\{(contact|account|sender)\.([a-zA-Z0-9_]+)\}\}/g;
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null, false);
+        const toProcess = [];
+        let node;
+        while ((node = walker.nextNode())) {
+            if (!node.nodeValue || !regex.test(node.nodeValue)) continue;
+            toProcess.push(node);
         }
-    }
-
-    async toggleStar(emailId, opts = {}) {
-        try {
-            const email = (this.emails || []).find(e => e.id === emailId);
-            const currentlyStarred = !!email?.starred;
-            // Optimistic UI
-            if (email) email.starred = !currentlyStarred;
-            this.renderEmails();
-            const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(emailId)}/modify`;
-            const body = currentlyStarred ? { removeLabelIds: ['STARRED'] } : { addLabelIds: ['STARRED'] };
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.accessToken}` },
-                body: JSON.stringify(body)
+        toProcess.forEach(textNode => {
+            const text = textNode.nodeValue;
+            const parent = textNode.parentNode;
+            if (!parent) return;
+            const frag = document.createDocumentFragment();
+            let lastIndex = 0;
+            text.replace(regex, (match, scope, key, offset) => {
+                // preceding text
+                if (offset > lastIndex) {
+                    frag.appendChild(document.createTextNode(text.slice(lastIndex, offset)));
+                }
+                // chip
+                const span = document.createElement('span');
+                span.className = 'var-chip';
+                span.setAttribute('data-var', `${scope}.${key}`);
+                span.setAttribute('data-token', `{{${scope}.${key}}}`);
+                span.setAttribute('contenteditable', 'false');
+                span.textContent = String(key).replace(/_/g, ' ').toLowerCase();
+                frag.appendChild(span);
+                frag.appendChild(document.createTextNode(' '));
+                lastIndex = offset + match.length;
+                return match;
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            if (opts.refresh) {
-                // If reader is open, refresh its header icon by reopening
-                // No-op; header uses toggleStar which re-renders list only for now
-            }
-        } catch (err) {
-            console.warn('toggleStar failed', err);
-            window.crm?.showToast('Failed to toggle star');
-        }
+            if (lastIndex < text.length) frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+            parent.replaceChild(frag, textNode);
+        });
     }
 
-    async composeReply(emailId) {
-        try {
-            const msg = await this.fetchMessageById(emailId);
-            const to = (msg.from || '').match(/<([^>]+)>/)?.[1] || msg.from || '';
-            const subj = msg.subject?.startsWith('Re:') ? msg.subject : `Re: ${msg.subject || ''}`.trim();
-            const quoted = (msg.bodyHtml || `<pre>${this.escapeHtml(msg.bodyText || '')}</pre>`);
-            this.openComposeWindow();
-            const toInput = document.getElementById('compose-to');
-            const subjectInput = document.getElementById('compose-subject');
-            const editor = document.querySelector('.body-input');
-            if (toInput) toInput.value = to;
-            if (subjectInput) subjectInput.value = subj;
-            if (editor) editor.innerHTML = `<p></p><div class="quoted" style="margin-top:12px; padding-left:12px; border-left:3px solid var(--border-light)">${quoted}</div>`;
-        } catch (e) {
-            window.crm?.showToast('Failed to start reply');
+    sendEmail() {
+        const toInput = document.getElementById('compose-to');
+        const subjectInput = document.getElementById('compose-subject');
+        const bodyInput = document.querySelector('.body-input');
+        
+        const to = toInput?.value?.trim() || '';
+        const subject = subjectInput?.value?.trim() || '';
+        const body = bodyInput?.innerHTML || '';
+        
+        if (!to) {
+            window.crm?.showToast('Please enter recipients');
+            toInput?.focus();
+            return;
         }
+        
+        if (!subject) {
+            window.crm?.showToast('Please enter a subject');
+            subjectInput?.focus();
+            return;
+        }
+        
+        if (!body) {
+            window.crm?.showToast('Please enter email content');
+            bodyInput?.focus();
+            return;
+        }
+
+        // Here you would integrate with your email sending service
+        window.crm?.showToast('Email sent successfully!');
+        this.closeComposeWindow();
     }
 
-    async composeForward(emailId) {
-        try {
-            const msg = await this.fetchMessageById(emailId);
-            const subj = msg.subject?.startsWith('Fwd:') ? msg.subject : `Fwd: ${msg.subject || ''}`.trim();
-            const quoted = (msg.bodyHtml || `<pre>${this.escapeHtml(msg.bodyText || '')}</pre>`);
-            this.openComposeWindow();
-            const subjectInput = document.getElementById('compose-subject');
-            const editor = document.querySelector('.body-input');
-            if (subjectInput) subjectInput.value = subj;
-            if (editor) editor.innerHTML = `<p></p><div class="quoted" style="margin-top:12px; padding-left:12px; border-left:3px solid var(--border-light)">${quoted}</div>`;
-        } catch (e) {
-            window.crm?.showToast('Failed to start forward');
-        }
+    async refreshEmails() {
+        await this.loadEmails();
+        window.crm?.showToast('Emails refreshed');
+    }
+
+    searchEmails(query) {
+        // Simple client-side search for now
+        const filteredEmails = this.emails.filter(email => 
+            email.subject.toLowerCase().includes(query.toLowerCase()) ||
+            email.from.toLowerCase().includes(query.toLowerCase()) ||
+            email.snippet.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        // Re-render with filtered results
+        const originalEmails = this.emails;
+        this.emails = filteredEmails;
+        this.renderEmails();
+        this.emails = originalEmails;
     }
 
     openEmail(emailId) {
-        const list = document.getElementById('email-list');
-        const reader = document.getElementById('email-reader');
-        if (!reader) { window.crm?.showToast('Reader not found'); return; }
-
-        const renderReader = (msg) => {
-            try {
-                const from = msg.from || '';
-                const m = from.match(/<([^>]+)>/);
-                const fromEmail = (m ? m[1] : from).trim();
-                const fromName = this.extractName(from);
-                const domain = (fromEmail.split('@')[1] || '').replace(/^www\./i, '');
-                const fav = this.getFaviconUrl(domain);
-                const dateStr = this.formatDate(msg.date || new Date());
-
-                const crm = this.lookupCRMByEmail(fromEmail, domain);
-                const contactLink = crm?.contact
-                    ? `<button class="btn-text" data-action="view-contact" data-contact-id="${crm.contact.id}">${this.escapeHtml(crm.contactName)}</button>`
-                    : this.escapeHtml(fromName);
-                const accountLink = crm?.account
-                    ? ` • <button class="btn-text" data-action="view-account" data-account-id="${crm.account.id}">${this.escapeHtml(crm.accountName)}</button>`
-                    : (crm?.accountName ? ` • ${this.escapeHtml(crm.accountName)}` : '');
-
-                const starred = !!msg.starred;
-                const starIcon = starred
-                    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/></svg>'
-                    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/></svg>';
-
-                reader.innerHTML = `
-                    <div class="email-reader-header">
-                        <button class="btn-icon" data-action="back-to-list" title="Back">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
-                        </button>
-                        <img src="${fav}" alt="${this.escapeHtml(domain)}" class="email-favicon" onerror="this.style.display='none'" />
-                        <div class="sender-block">
-                            <div class="sender-line">${contactLink}${accountLink}</div>
-                            <div class="meta-line"><span class="sender-email">${this.escapeHtml(fromEmail)}</span> • <span class="email-date">${this.escapeHtml(dateStr)}</span></div>
-                        </div>
-                        <div class="reader-actions">
-                            <button class="btn-icon" data-action="toggle-star" data-email-id="${msg.id}" title="Toggle star">${starIcon}</button>
-                            <button class="btn-icon" data-action="reply" data-email-id="${msg.id}" title="Reply">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10,19 3,12 10,5"/><path d="M20 19v-8a8 8 0 0 0-8-8H7"/></svg>
-                            </button>
-                            <button class="btn-icon" data-action="forward" data-email-id="${msg.id}" title="Forward">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="14,9 21,12 14,15"/><path d="M3 19v-8a8 8 0 0 1 8-8h4"/></svg>
-                            </button>
-                            <button class="btn-icon" data-action="add-contact" data-email="${this.escapeHtml(fromEmail)}" data-name="${this.escapeHtml(fromName)}" title="Add to Contacts">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a6 6 0 0 1 12 0v2"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="email-reader-subject">${this.escapeHtml(msg.subject || '(no subject)')}</div>
-                    <div class="email-reader-body">${msg.bodyHtml || `<pre>${this.escapeHtml(msg.bodyText || '')}</pre>`}</div>
-                `;
-                // Toggle views
-                list?.setAttribute('hidden','');
-                reader.removeAttribute('hidden');
-                const main = reader.closest('.email-main');
-                main && main.classList.add('show-reader');
-
-                // One-time delegated events
-                if (!reader._bound) {
-                    reader.addEventListener('click', (e) => {
-                        const btn = e.target.closest('button');
-                        if (!btn) return;
-                        const action = btn.getAttribute('data-action');
-                        if (action === 'back-to-list') {
-                            reader.setAttribute('hidden','');
-                            list?.removeAttribute('hidden');
-                            main && main.classList.remove('show-reader');
-                        } else if (action === 'toggle-star') {
-                            const id = btn.getAttribute('data-email-id');
-                            this.toggleStar(id, { refresh: true });
-                        } else if (action === 'reply') {
-                            const id = btn.getAttribute('data-email-id');
-                            this.composeReply(id);
-                        } else if (action === 'forward') {
-                            const id = btn.getAttribute('data-email-id');
-                            this.composeForward(id);
-                        } else if (action === 'view-contact') {
-                            const cid = btn.getAttribute('data-contact-id');
-                            if (cid && window.ContactDetail?.show) window.ContactDetail.show(cid);
-                            else window.crm?.navigateToPage && window.crm.navigateToPage('people');
-                        } else if (action === 'view-account') {
-                            const aid = btn.getAttribute('data-account-id');
-                            if (aid && window.AccountDetail?.show) window.AccountDetail.show(aid);
-                            else window.crm?.navigateToPage && window.crm.navigateToPage('account-details');
-                        } else if (action === 'add-contact') {
-                            window.crm?.showModal && window.crm.showModal('add-contact');
-                            try {
-                                const modal = document.getElementById('modal-add-contact');
-                                setTimeout(() => {
-                                    const nm = btn.getAttribute('data-name') || '';
-                                    const parts = nm.split(' ');
-                                    const first = parts.shift() || '';
-                                    const last = parts.join(' ');
-                                    modal?.querySelector('#form-add-contact input[name="firstName"]').value = first;
-                                    modal?.querySelector('#form-add-contact input[name="lastName"]').value = last;
-                                    modal?.querySelector('#form-add-contact input[name="email"]').value = btn.getAttribute('data-email') || '';
-                                }, 200);
-                            } catch(_) {}
-                        }
-                    });
-                    reader._bound = true;
-                }
-            } catch (err) {
-                console.error('Render reader failed', err);
-                window.crm?.showToast('Failed to open message');
-            }
-        };
-
-        // If we already have expanded body on the item, use it; otherwise fetch
-        const cached = (this.emails || []).find(e => e.id === emailId && (e.bodyHtml || e.bodyText));
-        if (cached) {
-            renderReader(cached);
-        } else {
-            this.fetchMessageById(emailId).then(renderReader).catch(err => {
-                console.warn('fetchMessageById failed', err);
-                window.crm?.showToast('Failed to load message');
-            });
-        }
+        window.crm?.showToast(`Opening email ${emailId} - coming soon`);
     }
 }
 
