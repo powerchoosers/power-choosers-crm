@@ -33,54 +33,31 @@ if (!GOOGLE_API_KEY) {
   console.warn('[Server] GOOGLE_API_KEY is not set. /api/tx-price will return a placeholder until configured.');
 }
 
-// ---------------- Local Gemini Email Generation ----------------
-function buildEmailSystemPrompt({ mode, recipient, to, prompt }) {
-  const r = recipient || {};
-  const name = r.name || r.full_name || r.fullName || '';
-  const email = r.email || '';
-  const company = r.company || r.accountName || '';
-  const job = r.title || r.role || '';
-
-  const common = `You are Power Choosers' email assistant. Draft a clear, concise, and friendly ${mode === 'html' ? 'HTML' : 'plain text'} email for outbound sales.
-Keep tone professional and helpful; personalize with known recipient context when appropriate; include a specific next step; avoid hallucinations.`;
-
-  const recipientContext = `Known recipient fields:\n- Name: ${name || 'Unknown'}\n- Email: ${email || 'Unknown'}\n- Company: ${company || 'Unknown'}\n- Title/Role: ${job || 'Unknown'}`;
-
-  const outputStyle = mode === 'html'
-    ? `Output STRICTLY an HTML fragment suitable for an email body. Use semantic tags and inline styles as needed. Do not include <html>, <head>, or <body> wrappers.`
-    : `Output plain text suitable for an email body. Do not include code fences.`;
-
-  const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}`;
-
-  return [common, recipientContext, outputStyle, instructions].join('\n\n');
-}
+// ---------------- Gemini API endpoints now proxied to Vercel ----------------
 
 async function handleApiGeminiEmail(req, res) {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   if (req.method !== 'POST') { res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' })); return; }
+  
+  // Proxy to Vercel deployment since local server doesn't have API key
   try {
-    if (!GOOGLE_API_KEY) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing GOOGLE_API_KEY (or GEMINI_API_KEY). Set it in your environment.' }));
-      return;
-    }
     const body = await readJsonBody(req);
-    const { prompt = '', mode = 'standard', recipient = null, to = '' } = body || {};
-    const sys = buildEmailSystemPrompt({ mode, recipient, to, prompt });
-
-    const { GoogleGenerativeAI } = await dynamicGeminiImport();
-    const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-    const result = await model.generateContent(sys);
-    const text = (result && result.response && typeof result.response.text === 'function')
-      ? result.response.text()
-      : '';
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, output: text }));
+    const proxyUrl = `${API_BASE_URL}/api/gemini-email`;
+    
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    const data = await response.json();
+    
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
   } catch (error) {
-    console.error('[Gemini Email] Error:', error);
+    console.error('[Gemini Email] Proxy error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to generate email', message: error.message }));
+    res.end(JSON.stringify({ error: 'Failed to proxy Gemini email request', message: error.message }));
   }
 }
 
@@ -181,93 +158,7 @@ async function handleApiCalls(req, res) {
   }
 }
 
-// ---------------- Gemini-backed TX Price (commercial, energy only) ----------------
-const txPriceCache = {
-  price: null, // number (USD per kWh)
-  lastUpdated: null, // ISO string
-  source: 'gemini'
-};
-
-function isWeekend(d) {
-  const day = d.getDay(); // 0 Sun .. 6 Sat
-  return day === 0 || day === 6;
-}
-
-function nextWeekdayEightAM(from = new Date()) {
-  const d = new Date(from);
-  d.setSeconds(0, 0);
-  // Set to today 8:00 AM
-  d.setHours(8, 0, 0, 0);
-  if (from >= d) {
-    // already past 8 AM today, move to next day
-    d.setDate(d.getDate() + 1);
-  }
-  // Skip weekends
-  while (isWeekend(d)) {
-    d.setDate(d.getDate() + 1);
-  }
-  return d;
-}
-
-let txPriceTimer = null;
-function scheduleTxPriceRefresh() {
-  const now = new Date();
-  const nextAt = nextWeekdayEightAM(now);
-  const delay = Math.max(1000, nextAt - now);
-  if (txPriceTimer) clearTimeout(txPriceTimer);
-  txPriceTimer = setTimeout(async () => {
-    try {
-      await updateTxPriceFromGemini();
-    } catch (e) {
-      console.error('[TX Price] Scheduled refresh failed:', e.message);
-    } finally {
-      scheduleTxPriceRefresh();
-    }
-  }, delay);
-  console.log(`[TX Price] Next scheduled refresh at: ${nextAt.toString()}`);
-}
-
-async function dynamicGeminiImport() {
-  // ESM-only library; import dynamically in CJS
-  const mod = await import('@google/generative-ai');
-  return mod;
-}
-
-function extractDecimal(str) {
-  // Find number like 0.0xx or 0.1xx etc
-  const m = String(str).replace(/[, $]/g, '').match(/(0?\.[0-9]{2,4}|[1-9]\.[0-9]{2,4})/);
-  return m ? parseFloat(m[1]) : null;
-}
-
-async function fetchTxPriceFromGemini() {
-  if (!GOOGLE_API_KEY) {
-    // Fallback placeholder if no API key
-    return { price: 0.089, note: 'placeholder-no-api-key' };
-  }
-  const { GoogleGenerativeAI } = await dynamicGeminiImport();
-  const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-  const prompt = `You are a pricing assistant. Return ONLY a decimal number representing current typical fixed commercial electricity ENERGY charge rate in Texas (USD per kWh), excluding delivery/transmission/TDU fees. No text, no currency symbol, 3 decimal places. If uncertain, provide your best current market estimate. Example: 0.089`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim();
-  const num = extractDecimal(text);
-  if (!isFinite(num)) {
-    throw new Error(`Gemini returned unparseable value: ${text}`);
-  }
-  // Clamp to reasonable bounds (0.03 .. 0.30)
-  const clamped = Math.min(0.30, Math.max(0.03, num));
-  return { price: Number(clamped.toFixed(3)) };
-}
-
-async function updateTxPriceFromGemini() {
-  const { price } = await fetchTxPriceFromGemini();
-  txPriceCache.price = price;
-  txPriceCache.lastUpdated = new Date().toISOString();
-  console.log(`[TX Price] Updated to $${price.toFixed(3)} per kWh at ${txPriceCache.lastUpdated}`);
-  return txPriceCache;
-}
+// ---------------- Gemini API endpoints now proxied to Vercel ----------------
 
 async function handleApiTxPrice(req, res, parsedUrl) {
   if (req.method === 'OPTIONS') {
@@ -275,21 +166,20 @@ async function handleApiTxPrice(req, res, parsedUrl) {
     res.end();
     return;
   }
-  const wantsRefresh = parsedUrl.query && (parsedUrl.query.refresh === '1' || parsedUrl.query.refresh === 'true');
+  
+  // Proxy to Vercel deployment since local server doesn't have API key
   try {
-    if (wantsRefresh || !txPriceCache.price) {
-      await updateTxPriceFromGemini();
-    }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      price: txPriceCache.price,
-      lastUpdated: txPriceCache.lastUpdated,
-      source: txPriceCache.source
-    }));
+    const proxyUrl = `${API_BASE_URL}/api/tx-price${parsedUrl.search || ''}`;
+    
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
   } catch (error) {
-    console.error('[TX Price] Error:', error);
+    console.error('[TX Price] Proxy error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to fetch TX price', message: error.message }));
+    res.end(JSON.stringify({ error: 'Failed to proxy TX price request', message: error.message }));
   }
 }
 
@@ -474,9 +364,7 @@ server.listen(PORT, () => {
   console.log(`[Server] Power Choosers CRM server running at http://localhost:${PORT}`);
   console.log(`[Server] Environment: ${LOCAL_DEV_MODE ? 'Development' : 'Production'}`);
   console.log(`[Server] Twilio API proxying to: ${API_BASE_URL}`);
-  // Kick off initial load and schedule
-  updateTxPriceFromGemini().catch(err => console.warn('[TX Price] Initial fetch failed:', err.message));
-  scheduleTxPriceRefresh();
+  console.log(`[Server] Gemini API proxying to: ${API_BASE_URL}`);
 });
 
 // Handle server errors
