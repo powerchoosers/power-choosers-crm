@@ -1679,6 +1679,7 @@ class PowerChoosersCRM {
                 { value: 'employees', label: 'Employees' },
                 { value: 'shortDescription', label: 'Short Description' },
                 { value: 'electricitySupplier', label: 'Electricity Supplier' },
+                { value: 'contractEndDate', label: 'Contract End Date' },
                 { value: 'benefits', label: 'Benefits' },
                 { value: 'painPoints', label: 'Pain Points' },
                 { value: 'linkedin', label: 'LinkedIn URL' }
@@ -2154,7 +2155,12 @@ class PowerChoosersCRM {
     normalizeForField(field, value) {
         try {
             if (!field) return value;
-            if (field === 'phone') return this.normalizePhone(value);
+            const f = String(field).toLowerCase();
+            // Normalize any field that is clearly a phone number
+            // Examples: phone, primaryPhone, mainPhone, workDirectPhone, mobile, otherPhone, companyPhone
+            if (f.includes('phone') || f === 'mobile') {
+                return this.normalizePhone(value);
+            }
             return value;
         } catch (_) {
             return value;

@@ -234,7 +234,8 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/email/send' ||
     pathname.startsWith('/api/email/track/') ||
     pathname === '/api/email/webhook' ||
-    pathname === '/api/email/stats'
+    pathname === '/api/email/stats' ||
+    pathname === '/api/recording'
   )) {
     res.writeHead(204);
     res.end();
@@ -250,6 +251,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/calls') {
     return handleApiCalls(req, res);
+  }
+  if (pathname === '/api/recording') {
+    return handleApiRecording(req, res, parsedUrl);
   }
   if (pathname === '/api/energy-news') {
     return handleApiEnergyNews(req, res);
@@ -760,5 +764,58 @@ async function handleApiEmailStats(req, res, parsedUrl) {
     console.error('[Email] Stats error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to fetch email stats', message: error.message }));
+  }
+}
+
+// Proxy Twilio recording audio to the browser
+async function handleApiRecording(req, res, parsedUrl) {
+  if (req.method !== 'GET') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const query = parsedUrl.query || {};
+    const remoteUrl = query.url;
+    if (!remoteUrl) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing url parameter' }));
+      return;
+    }
+
+    const sid = process.env.TWILIO_ACCOUNT_SID;
+    const token = process.env.TWILIO_AUTH_TOKEN;
+    if (!sid || !token) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing Twilio credentials on server' }));
+      return;
+    }
+
+    const authHeader = 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64');
+    const upstream = await fetch(remoteUrl, { headers: { Authorization: authHeader } });
+    if (!upstream.ok) {
+      const txt = await upstream.text().catch(() => '');
+      res.writeHead(upstream.status, { 'Content-Type': 'text/plain' });
+      res.end(txt || 'Failed to fetch recording');
+      return;
+    }
+
+    // Stream audio back to the client
+    res.writeHead(200, {
+      'Content-Type': upstream.headers.get('content-type') || 'audio/mpeg',
+      'Cache-Control': 'no-cache'
+    });
+    const reader = upstream.body.getReader();
+    const pump = () => reader.read().then(({ done, value }) => {
+      if (done) { res.end(); return; }
+      res.write(Buffer.from(value));
+      return pump();
+    });
+    await pump();
+  } catch (error) {
+    console.error('[Server] /api/recording proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to proxy recording', message: error.message }));
   }
 }

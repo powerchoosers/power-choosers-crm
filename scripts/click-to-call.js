@@ -7,12 +7,16 @@
   function formatPhoneForDisplay(phone) {
     if (!phone) return '';
     const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
-    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    // Always display US numbers with +1 prefix
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
       return `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
     }
-    return phone; // Return as-is if doesn't match expected format
+    if (cleaned.length === 10) {
+      return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    }
+    // If the input already starts with + and is not US length, leave as-is
+    if (/^\+/.test(String(phone))) return String(phone);
+    return phone; // Fallback: return as-is
   }
 
   function isValidPhoneNumber(text) {
@@ -85,14 +89,27 @@
   }
 
   function findContactName(phoneElement) {
+    // Direct data attribute from element takes precedence
+    try {
+      const direct = phoneElement.getAttribute && phoneElement.getAttribute('data-name');
+      if (direct) {
+        const v = String(direct).trim();
+        if (v && v !== 'N/A') return v;
+      }
+    } catch (_) { /* noop */ }
+
     // Try to find the contact/account name from the table row
     const row = phoneElement.closest('tr');
     if (row) {
+      // Prefer explicit account name element if present
+      const nameEl = row.querySelector('.account-name, .name-text');
+      const nameFromEl = nameEl && nameEl.textContent ? nameEl.textContent.trim() : '';
+      if (nameFromEl && nameFromEl !== 'N/A') return nameFromEl;
       const cells = row.querySelectorAll('td');
       if (cells.length > 1) {
-        // Name is usually in the second column (index 1)
+        // Fallback: second column
         const nameCell = cells[1];
-        const nameText = nameCell.textContent.trim();
+        const nameText = (nameCell && nameCell.textContent || '').trim();
         if (nameText && nameText !== '' && nameText !== 'N/A') {
           return nameText;
         }
@@ -150,21 +167,21 @@
       const rows = accountsTable.querySelectorAll('tbody tr');
       rows.forEach(row => {
         if (row.dataset.phoneProcessed) return;
-        
-        const cells = row.querySelectorAll('td');
-        if (cells.length >= 5) {
-          // Phone column in accounts table (index 4)
-          const phoneCell = cells[4];
-          const phoneText = phoneCell.textContent.trim();
-          
-          if (phoneText && phoneText !== '' && phoneText !== 'N/A' && isValidPhoneNumber(phoneText)) {
-            // Account name is usually in first column after checkbox
-            const nameCell = cells[1];
-            const accountName = nameCell ? nameCell.textContent.trim() : '';
-            makePhoneClickable(phoneCell, phoneText, accountName);
+        // Find the phone cell reliably even if columns are reordered
+        let phoneCell = row.querySelector('td[data-field="phone"], td.phone-cell, td.click-to-call');
+        if (!phoneCell) {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 5) phoneCell = cells[4];
+        }
+        if (phoneCell && !phoneCell.classList.contains('clickable-phone')) {
+          const dataPhone = (phoneCell.getAttribute('data-phone') || '').trim();
+          const textPhone = (phoneCell.textContent || '').trim();
+          const rawPhone = dataPhone || textPhone;
+          if (rawPhone && rawPhone !== '' && rawPhone !== 'N/A' && isValidPhoneNumber(rawPhone)) {
+            const accountName = findContactName(phoneCell);
+            makePhoneClickable(phoneCell, rawPhone, accountName);
           }
         }
-        
         row.dataset.phoneProcessed = 'true';
       });
     }
@@ -197,6 +214,7 @@
       'td[data-field="phone"]',
       'td[data-field="mobile"]',
       '.phone-cell',
+      '.click-to-call',
       '.contact-phone',
       '.phone-number',
       '.phone-value',

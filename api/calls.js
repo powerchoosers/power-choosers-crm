@@ -1,4 +1,5 @@
 const twilio = require('twilio');
+const { admin, db } = require('./_firebase');
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -19,11 +20,42 @@ const callStore = new Map();
 export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     if (req.method === 'GET') {
-        // Return recent calls with AI insights
+        // Return recent calls with AI insights (Firestore first, fallback to memory)
+        try {
+            if (db) {
+                const snap = await db
+                    .collection('calls')
+                    .orderBy('timestamp', 'desc')
+                    .limit(50)
+                    .get();
+                const calls = [];
+                snap.forEach(doc => {
+                    const d = doc.data() || {};
+                    calls.push({
+                        id: d.id || doc.id,
+                        to: d.to,
+                        from: d.from,
+                        status: d.status,
+                        duration: d.duration,
+                        timestamp: d.timestamp,
+                        callTime: d.callTime || d.timestamp,
+                        durationSec: d.duration || 0,
+                        outcome: d.outcome || (d.status === 'completed' ? 'Connected' : 'No Answer'),
+                        transcript: d.transcript || '',
+                        aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
+                        aiInsights: d.aiInsights || null,
+                        audioUrl: d.recordingUrl || ''
+                    });
+                });
+                return res.status(200).json({ ok: true, calls });
+            }
+        } catch (e) {
+            console.warn('[Calls] Firestore GET failed, falling back to memory:', e?.message);
+        }
+
         const calls = Array.from(callStore.values())
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
             .slice(0, 50);
-            
         return res.status(200).json({
             ok: true,
             calls: calls.map(call => ({
@@ -66,6 +98,16 @@ export default async function handler(req, res) {
             recordingUrl: recordingUrl || existingCall.recordingUrl
         };
         
+        // Persist to Firestore if available
+        try {
+            if (db) {
+                await db.collection('calls').doc(callId).set(callData, { merge: true });
+            }
+        } catch (e) {
+            console.warn('[Calls] Firestore POST failed, storing in memory only:', e?.message);
+        }
+
+        // Always upsert into in-memory store as a fallback cache
         callStore.set(callId, callData);
         
         return res.status(200).json({
