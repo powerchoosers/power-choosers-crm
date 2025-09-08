@@ -1,4 +1,22 @@
 /* Power Choosers CRM - Strategic CSS Foundation */
+/* === Toolbar spacing fix (robust) === */
+/* Ensure consistent spacing between email editor toolbar icons.
+   This enforces gap and provides a fallback margin when flex gap isn't supported
+   or if earlier rules inadvertently override spacing. */
+.compose-editor .editor-toolbar,
+.editor-toolbar {
+    display: flex;
+    align-items: center;
+    column-gap: 10px; /* modern browsers */
+    row-gap: 8px;
+}
+
+/* Fallback for environments without flex gap support */
+@supports not (gap: 1rem) {
+    .compose-editor .editor-toolbar .toolbar-btn + .toolbar-btn,
+    .editor-toolbar .toolbar-btn + .toolbar-btn { margin-left: 10px; }
+}
+
 /* Apollo-inspired layout with consistent 25px spacing and grey theme */
 
 /* === CSS VARIABLES === */
@@ -8908,13 +8926,18 @@ input.row-select[type="checkbox"]:focus-visible {
 .editor-toolbar {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px !important; /* enforce spacing */
+    column-gap: 10px !important; /* explicit column gap */
+    row-gap: 8px; /* vertical wrap spacing */
     padding: 8px 16px;
     border-bottom: 1px solid var(--border-light) !important; /* divider below toolbar */
     background: var(--surface-hover);
     position: relative;
     z-index: 10;
-    border-radius: 0;
+}
+
+@supports not (gap: 1rem) {
+    .editor-toolbar .toolbar-btn + .toolbar-btn { margin-left: 10px; }
 }
 
 .toolbar-btn {

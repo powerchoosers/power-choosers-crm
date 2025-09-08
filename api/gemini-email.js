@@ -123,7 +123,13 @@ PERSONAL TOUCH REQUIREMENT:
 CONTEXT AWARENESS:
 - For "warm intro after a call": Reference the previous conversation naturally, don't repeat the same phrase twice
 - For "follow-up with tailored value props": Focus on specific benefits relevant to their industry/company size
-- For "schedule a quick demo": Provide specific time windows and demo details
+- For "schedule an energy health check":
+    • Never reference speaking with a colleague; do not include that phrasing in this email type.
+    • Use notes to infer relationship stage:
+      – If notes indicate we already spoke (e.g., "spoke with", "talked to", "met", "called"), write as a warm follow‑up.
+      – Otherwise treat as a cold intro and briefly explain what an Energy Health Check is and why companies need one.
+    • Briefly outline what the health check covers: current bill/supplier/rate review, contract end month/year (Month YYYY only), quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating insight, and recommended next steps.
+    • Offer two specific time windows and include exactly one short question CTA.
 - For "proposal delivery with next steps": Reference the proposal and outline clear next steps
 - For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person`;
 
@@ -145,8 +151,9 @@ CONTEXT AWARENESS:
 - Keep it tight: aim under ~50 characters; make it specific.
 - Prefer including ${firstName ? 'the recipient\'s first name' : 'the company name'} and/or the company name (e.g., "${firstName || 'Name'} — energy options for ${company || 'your facilities'}").
 - When applicable, hint the chosen pain point in the subject (e.g., "${company || 'Your accounts'} — simplify bills" or "${firstName || 'Team'} — renewal timing")
-- For "cold email to a lead I could not reach by phone": Include reference to speaking with their colleague, e.g., "${firstName || 'Name'} - I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'}"
-- For other email types: Experiment with different approaches - questions, value props, time-sensitive offers, industry-specific benefits, etc.`;
+- For other email types: Experiment with different approaches - questions, value props, time-sensitive offers, industry-specific benefits, etc.` + (isColdPrompt
+    ? `\n- For "cold email to a lead I could not reach by phone": Consider a pattern-interrupt subject or a specific pain point (e.g., renewal risk, above-market rate) and you may include reference to speaking with their colleague if appropriate.`
+    : '');
 
   const brevityGuidelines = `Brevity and style requirements:
 - Total body length target: ~70–110 words max (be concise).
@@ -163,13 +170,18 @@ CONTEXT AWARENESS:
 - You may allude to scale (e.g., multi-site or large facility) but do NOT state exact square footage.
 - Mention one or two of our offerings most relevant to this contact (procurement, renewals/contracting, bill management, or efficiency) without overloading the email.
 - Keep it skimmable and client-friendly.
+ - Avoid opening with generic statements (e.g., "we work with 100+ suppliers"). Lead with the most relevant point for the reader.`;
 
-SPECIFIC PROMPT HANDLING:
-- "Warm intro after a call": Reference the call once, then focus on next steps
-- "Follow-up with tailored value props": Highlight 2-3 specific benefits for their industry/company
-- "Schedule a quick demo": Include specific time windows and what the demo covers
-- "Proposal delivery with next steps": Reference the proposal and outline 2-3 clear next steps
-- "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Personal greeting + time awareness, 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + value prop, 3) ONE call-to-action - NEVER say "following up on our call" or reference any conversation with this specific person`;
+  const specificHandling = `SPECIFIC PROMPT HANDLING:
+  - "Warm intro after a call": Reference the call once (what we discussed), then propose specific next steps and suggest two time windows for a follow-up. Keep it concise.
+  - "Follow-up with tailored value props": Assume a few days/weeks have passed. Recap in one line, then highlight 1–2 tailored benefits tied to their industry/facility scale or known data. Optionally include one brief proof point. End with a light CTA to keep the lead warm.
+  - "Schedule an energy health check":
+    • Do NOT include any mention of speaking with a colleague (that belongs only to the cold-call-not-reached template).
+    • If notes imply prior conversation, write a warm follow‑up; otherwise, for cold outreach, include a one‑line explanation of what the Energy Health Check is, why it matters, and tie benefits to known data or common pain points for their industry.
+    • Explicitly mention coverage: current bill/supplier/rate review, contract end month/year, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, recommended next steps.
+    • End with exactly one short question CTA with two time windows.
+  - "Proposal delivery with next steps": Provide a crisp summary of the options (supplier/term/rate/est. annual cost/notable terms), selection guidance, and 2–3 clear next steps. CTA: short call to review/confirm.
+  - "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Pattern‑interrupt hook using one concrete pain point or timely risk for their industry (no generic claims), 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + tightly aligned value prop, 3) ONE call‑to‑action. NEVER say "following up on our call" with this person.`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -193,21 +205,27 @@ SPECIFIC PROMPT HANDLING:
 1) First line: Subject: ...
 2) Then one blank line, then the BODY as plain text (no code fences).`;
 
-  const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}
-
-FINAL CHECKLIST (MANDATORY VERIFICATION):
+  const baseChecklist = `FINAL CHECKLIST (MANDATORY VERIFICATION):
 - Complete all sentences - no incomplete thoughts
 - NO duplicate content anywhere in the email - check every sentence
 - NO repeated phrases or similar wording
 - Exactly one call-to-action
 - Proper signature formatting with no blank line before sender name
 - Each sentence adds unique value to the email
-- Personal touch included after greeting (day/season awareness)
-- For cold emails: NO reference to "our call" or "following up" with this person
-- For cold emails: Must include "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well"
-- For cold emails: Subject must reference speaking with their colleague
-- For cold emails: Must include specific pain points relevant to their industry and what Power Choosers does
-- For cold emails: Must include exactly ONE call-to-action, no duplicates
+- Personal touch included after greeting (day/season awareness)`;
+
+  const coldChecklist = `
+- Cold email specifics:
+  • Do NOT reference any prior conversation with this person.
+  • In paragraph 1, use a concrete pain point or timely risk as a pattern‑interrupt hook (avoid generic claims).
+  • In paragraph 2, include: "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + a tightly aligned value prop.
+  • Subject may reference the colleague or a specific risk/pain point.
+  • Include exactly ONE call-to-action, no duplicates.`;
+
+  const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}
+
+${baseChecklist}${isColdPrompt ? coldChecklist : ''}
+
 - Read the entire email once more to catch any duplication`;
 
   return [
@@ -221,6 +239,7 @@ FINAL CHECKLIST (MANDATORY VERIFICATION):
     notesGuidelines,
     subjectGuidelines,
     bodyGuidelines,
+    specificHandling,
     outputStyle,
     instructions
   ].join('\n\n');

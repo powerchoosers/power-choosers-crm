@@ -52,7 +52,7 @@ class EmailManager {
         const suggestions = [
             { text: 'Warm intro after a call', prompt: 'Warm intro after a call' },
             { text: 'Follow-up with tailored value props', prompt: 'Follow-up with tailored value props' },
-            { text: 'Schedule a quick demo', prompt: 'Schedule a quick demo' },
+            { text: 'Schedule an Energy Health Check', prompt: 'Schedule an Energy Health Check' },
             { text: 'Proposal delivery with next steps', prompt: 'Proposal delivery with next steps' },
             { text: 'Cold email to a lead I could not reach by phone', prompt: 'Cold email to a lead I could not reach by phone' }
         ];
@@ -335,9 +335,16 @@ class EmailManager {
                 return;
             }
             const output = data?.output || '';
+            try {
+                console.debug('[AI][generate] mode:', mode, 'recipient.firstName:', recipient?.firstName, 'company:', recipient?.company);
+                console.debug('[AI][generate] raw output (first 600 chars):', String(output).slice(0, 600));
+            } catch (_) {}
 
             // Build clean subject + body layout
             const { subject, html } = this.formatGeneratedEmail(output, recipient, mode);
+            try {
+                console.debug('[AI][generate] formatted subject:', subject);
+            } catch (_) {}
 
             // Subject
             if (subjectInput) {
@@ -494,27 +501,44 @@ class EmailManager {
                 .map(s => s.trim())
                 .filter(Boolean);
 
-            // Detect CTA from original body
-            const ctaMatchers = /(call|chat|connect|schedule|meet|available|time|next\s+week|10\s*min|10-?minute)/i;
-            let detectedCTA = null;
-            const allSentences = splitSentences(body);
-            for (const s of allSentences) {
-                if (s.endsWith('?') || ctaMatchers.test(s)) { detectedCTA = s; break; }
-            }
-            let cta = detectedCTA || 'Open to a quick 10‑min call next week?';
-            // Keep CTA very short
-            const ctaWords = cta.split(/\s+/).filter(Boolean);
-            if (ctaWords.length > 16) cta = ctaWords.slice(0, 16).join(' ').replace(/[,;:]$/, '') + (cta.endsWith('?') ? '' : '?');
+            // Helpers for CTA detection and normalization
+            const normalize = (s) => String(s || '').replace(/\s+/g, ' ').trim().replace(/[\s.,;:]+$/,'').toLowerCase();
+            const isColleagueLine = (s) => /recently\s+spoke\s+with/i.test(s) || /colleague/i.test(s);
+            const ctaMatchers = /(call|chat|schedule|meet|demo|health\s*check|time|tomorrow|next\s+week|15\s*min|10\s*min|10-?minute|15-?minute)/i; // intentionally excludes "connect" and overly broad terms like "available"
 
-            // Trim paragraphs to max 2 and max 2 sentences each
+            const allSentences = splitSentences(body);
+            console.debug('[AI][format] sentences (pre-CTA-scan):', allSentences);
+
+            // Detect CTA from original body (prefer questions, exclude the colleague/connection sentence)
+            let detectedCTA = null;
+            for (const s of allSentences) {
+                const looksQuestion = /\?$/.test(s);
+                const looksCTA = ctaMatchers.test(s);
+                if ((looksQuestion || looksCTA) && !isColleagueLine(s)) { detectedCTA = s; break; }
+            }
+
+            // While trimming paragraphs, remove the CTA sentence if it appears inside to avoid duplication later
             const trimmedParas = [];
             for (const p of paras) {
-                const sentences = splitSentences(p).slice(0, 2);
+                let sentences = splitSentences(p);
+                if (detectedCTA) {
+                    const target = normalize(detectedCTA);
+                    sentences = sentences.filter(s => normalize(s) !== target);
+                }
+                sentences = sentences.slice(0, 2);
                 if (!sentences.length) continue;
                 trimmedParas.push(sentences.join(' '));
                 if (trimmedParas.length === 2) break;
             }
             paras = trimmedParas.length ? trimmedParas : paras.slice(0, 2);
+            console.debug('[AI][format] paras after trim/no-dup-CTA:', paras);
+
+            // Choose final CTA text
+            let cta = detectedCTA || 'Open to a quick 10‑min call next week?';
+            // Keep CTA very short
+            const ctaWords = cta.split(/\s+/).filter(Boolean);
+            if (ctaWords.length > 16) cta = ctaWords.slice(0, 16).join(' ').replace(/[,;:]$/, '') + (cta.endsWith('?') ? '' : '?');
+            console.debug('[AI][format] chosen CTA:', cta);
 
             // Global word cap (~100). If exceeded, drop last sentences first, then shorten CTA
             const countWords = (txt) => String(txt || '').trim().split(/\s+/).filter(Boolean).length;
@@ -536,7 +560,16 @@ class EmailManager {
             }
 
             // Ensure CTA is appended as its own short paragraph
-            if (cta) paras.push(cta);
+            if (cta) {
+                const lastPara = paras[paras.length - 1] || '';
+                const existsAlready = normalize(lastPara) === normalize(cta) || paras.some(p => normalize(p) === normalize(cta));
+                if (!existsAlready) {
+                    paras.push(cta);
+                } else {
+                    console.debug('[AI][format] skipping CTA append; already present at end');
+                }
+            }
+            console.debug('[AI][format] final paras with CTA placement:', paras);
         } catch (_) { /* noop */ }
 
         // If recipient has energy details, add a short mention when missing
@@ -565,7 +598,7 @@ class EmailManager {
                 // Brevity guard and blend into an existing content paragraph (not CTA)
                 if (line) {
                     const countWords = (txt) => String(txt || '').trim().split(/\s+/).filter(Boolean).length;
-                    const isCTA = (p) => /\?$/.test(String(p || '').trim()) || /(call|chat|connect|schedule|meet|available|time|next\s+week|10\s*min|10-?minute)/i.test(p || '');
+                    const isCTA = (p) => /\?$/.test(String(p || '').trim()) || /(call|chat|schedule|meet|demo|health\s*check|time|tomorrow|next\s+week|15\s*min|10\s*min|10-?minute|15-?minute)/i.test(p || '');
                     const splitSentencesLocal = (txt) => String(txt || '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
                     const currentWordCount = countWords(paras.join(' '));
                     const projected = currentWordCount + countWords(line);
