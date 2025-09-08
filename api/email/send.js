@@ -1,11 +1,5 @@
-// Vercel API endpoint for sending emails with tracking
+// Vercel API endpoint for email tracking (sending handled by Gmail API)
 import { cors } from '../_cors';
-import sgMail from '@sendgrid/mail';
-
-// Configure SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -55,52 +49,15 @@ export default async function handler(req, res) {
     // TODO: Save to Firebase or your database
     console.log('[Email] Storing email record:', emailRecord);
 
-    // Send the actual email via SendGrid
-    if (process.env.SENDGRID_API_KEY) {
-      try {
-        const msg = {
-          to: Array.isArray(to) ? to : [to],
-          from: from || 'noreply@powerchoosers.com',
-          subject: subject,
-          html: emailContent,
-          text: content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
-          trackingSettings: {
-            clickTracking: {
-              enable: true,
-              enableText: false
-            },
-            openTracking: {
-              enable: true
-            }
-          }
-        };
-
-        console.log('[Email] Sending via SendGrid:', { to, subject, trackingId });
-        await sgMail.send(msg);
-        console.log('[Email] Email sent successfully via SendGrid');
-
-        return res.status(200).json({ 
-          success: true, 
-          trackingId,
-          message: 'Email sent successfully via SendGrid'
-        });
-      } catch (sendError) {
-        console.error('[Email] SendGrid error:', sendError);
-        return res.status(500).json({ 
-          error: 'Failed to send email', 
-          message: sendError.message 
-        });
-      }
-    } else {
-      // Fallback: simulate sending the email
-      console.log('[Email] Simulating email send (no SendGrid API key):', { to, subject, trackingId });
-      
-      return res.status(200).json({ 
-        success: true, 
-        trackingId,
-        message: 'Email simulated (no SendGrid API key configured)'
-      });
-    }
+    // Email sending is now handled by Gmail API in the frontend
+    // This endpoint is kept for compatibility with email tracking
+    console.log('[Email] Email record stored for tracking:', { to, subject, trackingId });
+    
+    return res.status(200).json({ 
+      success: true, 
+      trackingId,
+      message: 'Email record stored (sending handled by Gmail API)'
+    });
 
   } catch (error) {
     console.error('[Email] Send error:', error);

@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-const sgMail = require('@sendgrid/mail');
+// const sgMail = require('@sendgrid/mail'); // Removed - using Gmail API instead
 
 // MIME types for different file extensions
 const mimeTypes = {
@@ -29,13 +29,8 @@ const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm.ver
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
 
-// Configure SendGrid
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-  console.log('[Server] SendGrid configured for email sending');
-} else {
-  console.warn('[Server] SENDGRID_API_KEY is not set. Email sending will be simulated.');
-}
+// Gmail API email sending (configured in frontend)
+console.log('[Server] Email sending configured to use Gmail API via frontend authentication');
 
 console.log(`[Server] Starting in ${LOCAL_DEV_MODE ? 'development' : 'production'} mode`);
 console.log(`[Server] API Base URL: ${API_BASE_URL}`);
@@ -525,56 +520,16 @@ async function handleApiSendEmail(req, res) {
     // const admin = require('firebase-admin');
     // await admin.firestore().collection('emails').doc(trackingId).set(emailRecord);
 
-    // Send the actual email via SendGrid
-    if (SENDGRID_API_KEY) {
-      try {
-        const msg = {
-          to: Array.isArray(to) ? to : [to],
-          from: from || 'noreply@powerchoosers.com',
-          subject: subject,
-          html: emailContent,
-          text: content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
-          trackingSettings: {
-            clickTracking: {
-              enable: true,
-              enableText: false
-            },
-            openTracking: {
-              enable: true
-            }
-          }
-        };
-
-        console.log('[Email] Sending via SendGrid:', { to, subject, trackingId });
-        await sgMail.send(msg);
-        console.log('[Email] Email sent successfully via SendGrid');
-        
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          success: true, 
-          trackingId,
-          message: 'Email sent successfully via SendGrid' 
-        }));
-      } catch (sendError) {
-        console.error('[Email] SendGrid error:', sendError);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          error: 'Failed to send email', 
-          message: sendError.message 
-        }));
-        return;
-      }
-    } else {
-      // Fallback: simulate sending the email
-      console.log('[Email] Simulating email send (no SendGrid API key):', { to, subject, trackingId });
-      
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        success: true, 
-        trackingId,
-        message: 'Email simulated (no SendGrid API key configured)' 
-      }));
-    }
+    // Email sending is now handled by Gmail API in the frontend
+    // This endpoint is kept for compatibility with email tracking
+    console.log('[Email] Email record stored for tracking:', { to, subject, trackingId });
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: true, 
+      trackingId,
+      message: 'Email record stored (sending handled by Gmail API)' 
+    }));
 
   } catch (error) {
     console.error('[Email] Send error:', error);

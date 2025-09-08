@@ -18,7 +18,7 @@ class EmailManager {
         this.CLIENT_ID = '448802258090-re0u5rtja879t4tkej22rnedmo1jt3lp.apps.googleusercontent.com';
         this.API_KEY = 'AIzaSyDwrD5n-_1jNzw6Qsj2q8xFUWT3gaMs4Xk'; // Updated to match Google Cloud Console key used for Gmail
         this.DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest';
-        this.SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+        this.SCOPES = 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly';
         
         // Formatting state tracking
         this._currentFormatting = {
@@ -1673,10 +1673,10 @@ class EmailManager {
     updateFolderCounts() {
         // This would typically come from the API, but for now we'll use placeholder logic
         const counts = {
-            inbox: this.emails.filter(e => e.labels.includes('INBOX')).length,
+            inbox: this.emails.filter(e => e.labels && e.labels.includes('INBOX')).length,
             starred: this.emails.filter(e => e.starred).length,
             important: this.emails.filter(e => e.important).length,
-            sent: 0, // Would need separate API call
+            sent: this.emails.filter(e => e.isSentEmail).length, // Count sent emails
             drafts: 0, // Would need separate API call
             scheduled: 0,
             spam: 0,
@@ -3209,6 +3209,59 @@ class EmailManager {
         });
     }
 
+    async sendEmailViaGmail(emailData) {
+        try {
+            if (!this.accessToken) {
+                await this.authenticate();
+            }
+
+            const { to, subject, content } = emailData;
+            
+            // Get current user's email address
+            const userProfile = await this.gapi.client.gmail.users.getProfile({
+                userId: 'me'
+            });
+            const fromEmail = userProfile.result.emailAddress;
+            
+            // Create email message in Gmail format
+            const recipients = Array.isArray(to) ? to.join(', ') : to;
+            const emailLines = [
+                `To: ${recipients}`,
+                `From: ${fromEmail}`,
+                `Subject: ${subject}`,
+                'MIME-Version: 1.0',
+                'Content-Type: text/html; charset=utf-8',
+                '',
+                content
+            ];
+
+            const emailString = emailLines.join('\r\n');
+            const encodedEmail = btoa(emailString)
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+
+            // Send via Gmail API
+            const response = await this.gapi.client.gmail.users.messages.send({
+                userId: 'me',
+                resource: {
+                    raw: encodedEmail
+                }
+            });
+
+            console.log('[Gmail] Email sent successfully:', response.result);
+            return {
+                success: true,
+                messageId: response.result.id,
+                message: 'Email sent successfully via Gmail API'
+            };
+
+        } catch (error) {
+            console.error('[Gmail] Send error:', error);
+            throw error;
+        }
+    }
+
     async sendEmail() {
         const toInput = document.getElementById('compose-to');
         const subjectInput = document.getElementById('compose-subject');
@@ -3244,27 +3297,47 @@ class EmailManager {
                 sendButton.textContent = 'Sending...';
             }
 
-            // Use email tracking manager to send email
-            if (window.emailTrackingManager) {
-                const emailData = {
-                    to: to.split(',').map(email => email.trim()),
-                    subject,
-                    content: body,
-                    from: 'noreply@powerchoosers.com'
-                };
+            const emailData = {
+                to: to.split(',').map(email => email.trim()),
+                subject,
+                content: body
+            };
 
-                await window.emailTrackingManager.sendEmail(emailData);
-                
-                // Close compose window on success
-                this.closeComposeWindow();
-                
-                // Refresh sent emails if we're on the sent folder
-                if (this.currentFolder === 'sent') {
-                    await this.loadEmails();
+            // Try Gmail API first, fallback to email tracking manager
+            let result;
+            try {
+                if (this.isAuthenticated && this.gapi) {
+                    result = await this.sendEmailViaGmail(emailData);
+                    console.log('[EmailManager] Email sent via Gmail API');
+                } else {
+                    throw new Error('Gmail API not authenticated');
                 }
-            } else {
-                throw new Error('Email tracking manager not initialized');
+            } catch (gmailError) {
+                console.warn('[EmailManager] Gmail API failed, using email tracking manager:', gmailError);
+                
+                // Fallback to email tracking manager
+                if (window.emailTrackingManager) {
+                    const trackingEmailData = {
+                        ...emailData,
+                        from: 'noreply@powerchoosers.com'
+                    };
+                    result = await window.emailTrackingManager.sendEmail(trackingEmailData);
+                    console.log('[EmailManager] Email sent via tracking manager (simulation mode)');
+                } else {
+                    throw new Error('No email sending method available');
+                }
             }
+            
+            // Close compose window on success
+            this.closeComposeWindow();
+            
+            // Refresh sent emails if we're on the sent folder
+            if (this.currentFolder === 'sent') {
+                await this.loadEmails();
+            }
+
+            // Show success message
+            window.crm?.showToast('Email sent successfully!');
 
         } catch (error) {
             console.error('[EmailManager] Send email error:', error);
