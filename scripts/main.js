@@ -2327,37 +2327,139 @@ class PowerChoosersCRM {
     }
 
     loadTodaysTasks() {
-        // This would typically fetch from an API
-        const tasksData = [
-            {
-                name: 'Call Johnson Electric',
-                time: 'Due in 2 hours',
-                priority: 'high'
-            },
-            {
-                name: 'Send proposal to Metro',
-                time: 'Due today',
-                priority: 'medium'
-            },
-            {
-                name: 'Follow up with Acme Corp',
-                time: 'Due in 4 hours',
-                priority: 'low'
-            }
-        ];
-
         const tasksList = document.querySelector('.tasks-list');
-        if (tasksList) {
-            tasksList.innerHTML = tasksData.map(task => `
-                <div class="task-item">
-                    <div class="task-info">
-                        <div class="task-name">${task.name}</div>
-                        <div class="task-time">${task.time}</div>
-                    </div>
-                    <span class="priority-badge ${task.priority}">${task.priority}</span>
-                </div>
-            `).join('');
+        if (!tasksList) return;
+
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Load user tasks from localStorage
+        let todaysTasks = [];
+        try {
+            const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+            todaysTasks = userTasks.filter(task => {
+                // Filter for today's tasks that are pending
+                return task.dueDate === today && task.status === 'pending';
+            });
+        } catch (e) {
+            console.warn('Could not load user tasks for Today\'s Tasks widget:', e);
         }
+
+        // Sort by priority (high, medium, low) and then by creation time
+        const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+        todaysTasks.sort((a, b) => {
+            const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+            if (priorityDiff !== 0) return priorityDiff;
+            return (b.createdAt || 0) - (a.createdAt || 0);
+        });
+
+        // Initialize pagination state if not exists
+        if (!this.todaysTasksPagination) {
+            this.todaysTasksPagination = {
+                currentPage: 1,
+                pageSize: 3,
+                totalTasks: todaysTasks.length
+            };
+        }
+
+        // Update total tasks count
+        this.todaysTasksPagination.totalTasks = todaysTasks.length;
+        this.todaysTasksPagination.currentPage = Math.min(this.todaysTasksPagination.currentPage, Math.ceil(todaysTasks.length / this.todaysTasksPagination.pageSize) || 1);
+
+        // Get tasks for current page
+        const startIndex = (this.todaysTasksPagination.currentPage - 1) * this.todaysTasksPagination.pageSize;
+        const endIndex = startIndex + this.todaysTasksPagination.pageSize;
+        const pageTasks = todaysTasks.slice(startIndex, endIndex);
+
+        // Generate HTML for tasks
+        let tasksHtml = '';
+        if (pageTasks.length === 0) {
+            tasksHtml = `
+                <div class="task-item empty-state">
+                    <div class="task-info">
+                        <div class="task-name">No tasks for today</div>
+                        <div class="task-time">You're all caught up!</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            tasksHtml = pageTasks.map(task => {
+                const timeText = this.getTaskTimeText(task.dueDate);
+                return `
+                    <div class="task-item" data-task-id="${task.id}">
+                        <div class="task-info">
+                            <div class="task-name">${this.escapeHtml(task.title)}</div>
+                            <div class="task-time">${timeText}</div>
+                        </div>
+                        <span class="priority-badge ${task.priority}">${task.priority}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Add pagination if needed
+        const totalPages = Math.ceil(todaysTasks.length / this.todaysTasksPagination.pageSize);
+        if (totalPages > 1) {
+            tasksHtml += `
+                <div class="tasks-pagination">
+                    <button class="pagination-btn prev-btn" ${this.todaysTasksPagination.currentPage === 1 ? 'disabled' : ''} data-action="prev">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15,18 9,12 15,6"></polyline>
+                        </svg>
+                    </button>
+                    <span class="pagination-info">${this.todaysTasksPagination.currentPage} of ${totalPages}</span>
+                    <button class="pagination-btn next-btn" ${this.todaysTasksPagination.currentPage === totalPages ? 'disabled' : ''} data-action="next">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9,18 15,12 9,6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }
+
+        tasksList.innerHTML = tasksHtml;
+
+        // Attach pagination event listeners
+        tasksList.querySelectorAll('.pagination-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const action = btn.getAttribute('data-action');
+                if (action === 'prev' && this.todaysTasksPagination.currentPage > 1) {
+                    this.todaysTasksPagination.currentPage--;
+                    this.loadTodaysTasks();
+                } else if (action === 'next' && this.todaysTasksPagination.currentPage < totalPages) {
+                    this.todaysTasksPagination.currentPage++;
+                    this.loadTodaysTasks();
+                }
+            });
+        });
+    }
+
+    getTaskTimeText(dueDate) {
+        const today = new Date();
+        const due = new Date(dueDate);
+        const diffTime = due - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+            return 'Due today';
+        } else if (diffDays === 1) {
+            return 'Due tomorrow';
+        } else if (diffDays > 1) {
+            return `Due in ${diffDays} days`;
+        } else {
+            return 'Overdue';
+        }
+    }
+
+    escapeHtml(str) {
+        if (window.escapeHtml) return window.escapeHtml(str);
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     async loadEnergyNews() {

@@ -55,6 +55,22 @@
       #tasks-bulk-actions .action-btn-sm.danger { background: var(--red-muted); border-color: var(--red-subtle); color: var(--text-inverse); }
       #tasks-bulk-actions .action-btn-sm svg { display: block; }
       #tasks-bulk-actions .action-btn-sm span { display: inline-block; white-space: nowrap; }
+
+      /* Create Task Modal */
+      .create-task-modal { background: var(--bg-card); border-radius: var(--border-radius-lg); box-shadow: var(--elevation-modal); max-width: 600px; width: 90vw; max-height: 90vh; overflow: hidden; }
+      .create-task-modal .header { display: flex; align-items: center; justify-content: space-between; padding: var(--spacing-lg); border-bottom: 1px solid var(--border-light); }
+      .create-task-modal .title { font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0; }
+      .create-task-modal .subtitle { font-size: 0.875rem; color: var(--text-secondary); margin: 4px 0 0 0; }
+      .create-task-modal .close-btn { background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; padding: 4px; line-height: 1; }
+      .create-task-modal .close-btn:hover { color: var(--text-primary); }
+      .create-task-modal .body { padding: var(--spacing-lg); max-height: 60vh; overflow-y: auto; }
+      .create-task-modal .form-group { margin-bottom: var(--spacing-md); }
+      .create-task-modal .form-group:last-child { margin-bottom: 0; }
+      .create-task-modal label { display: block; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; font-size: 0.875rem; }
+      .create-task-modal input, .create-task-modal select, .create-task-modal textarea { width: 100%; padding: 10px 12px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); font-size: 0.875rem; }
+      .create-task-modal input:focus, .create-task-modal select:focus, .create-task-modal textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.1); }
+      .create-task-modal textarea { resize: vertical; min-height: 80px; }
+      .create-task-modal .footer { display: flex; justify-content: flex-end; gap: var(--spacing-sm); padding: var(--spacing-lg); border-top: 1px solid var(--border-light); background: var(--bg-subtle); }
     `;
     document.head.appendChild(style);
   }
@@ -70,6 +86,7 @@
     els.summary = document.getElementById('tasks-pagination-summary');
     els.selectAll = document.getElementById('select-all-tasks');
     els.filterTabs = Array.from(els.page.querySelectorAll('.filter-tab'));
+    els.createTaskBtn = els.page.querySelector('.create-task-btn');
     return true;
   }
 
@@ -93,6 +110,10 @@
         applyFilters();
       });
     });
+    // Create task button
+    if(els.createTaskBtn){
+      els.createTaskBtn.addEventListener('click', openCreateTaskModal);
+    }
   }
 
   function loadData(){
@@ -193,7 +214,21 @@
   function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML = rows.map(r=>rowHtml(r)).join('');
     // Row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
-    els.tbody.querySelectorAll('button.btn-success').forEach(btn=>btn.addEventListener('click',()=>{ const id = btn.getAttribute('data-id'); const rec = state.data.find(x=>x.id===id); if(rec){ rec.status='completed'; } btn.textContent='Completed'; btn.disabled=true; btn.style.opacity='0.6'; render(); }));
+    els.tbody.querySelectorAll('button.btn-success').forEach(btn=>btn.addEventListener('click',()=>{ const id = btn.getAttribute('data-id'); const rec = state.data.find(x=>x.id===id); if(rec){ rec.status='completed'; 
+      // Update localStorage for user tasks
+      try {
+        const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        const userTaskIndex = userTasks.findIndex(task => task.id === id);
+        if (userTaskIndex !== -1) {
+          userTasks[userTaskIndex].status = 'completed';
+          localStorage.setItem('userTasks', JSON.stringify(userTasks));
+        }
+      } catch (e) {
+        console.warn('Could not update task status in localStorage:', e);
+      }
+      // Update Today's Tasks widget
+      updateTodaysTasksWidget();
+    } btn.textContent='Completed'; btn.disabled=true; btn.style.opacity='0.6'; render(); }));
     // Header select state
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
@@ -287,6 +322,188 @@
     container.querySelector('#bulk-delete').addEventListener('click',()=>console.log('Bulk delete', Array.from(state.selected)));
   }
 
-  function init(){ if(!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); loadData(); }
+  // Task creation modal
+  function openCreateTaskModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.tabIndex = -1;
+    overlay.innerHTML = `
+      <div class="create-task-modal" role="dialog" aria-modal="true" aria-labelledby="create-task-title">
+        <div class="header">
+          <div class="title-wrap">
+            <div class="title" id="create-task-title">Create New Task</div>
+            <div class="subtitle">Add a new task to your schedule</div>
+          </div>
+          <button class="close-btn" aria-label="Close">×</button>
+        </div>
+        <div class="body">
+          <form id="create-task-form">
+            <div class="form-group">
+              <label for="task-title">Task Title *</label>
+              <input type="text" id="task-title" name="title" required placeholder="Enter task title">
+            </div>
+            
+            <div class="form-group">
+              <label for="task-type">Task Type *</label>
+              <select id="task-type" name="type" required>
+                <option value="">Select task type</option>
+                <option value="phone-call">Phone Call</option>
+                <option value="auto-email">Automatic Email</option>
+                <option value="manual-email">Manual Email</option>
+                <option value="li-connect">LinkedIn - Send Connection Request</option>
+                <option value="li-message">LinkedIn - Send Message</option>
+                <option value="li-view-profile">LinkedIn - View Profile</option>
+                <option value="li-interact-post">LinkedIn - Interact with Post</option>
+                <option value="custom-task">Custom Task</option>
+                <option value="follow-up">Follow-up</option>
+                <option value="demo">Demo</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="task-priority">Priority *</label>
+              <select id="task-priority" name="priority" required>
+                <option value="">Select priority</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="task-contact">Contact/Person</label>
+              <input type="text" id="task-contact" name="contact" placeholder="Contact name (optional)">
+            </div>
+            
+            <div class="form-group">
+              <label for="task-account">Account/Company</label>
+              <input type="text" id="task-account" name="account" placeholder="Company name (optional)">
+            </div>
+            
+            <div class="form-group">
+              <label for="task-due-date">Due Date *</label>
+              <input type="date" id="task-due-date" name="dueDate" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="task-notes">Notes</label>
+              <textarea id="task-notes" name="notes" rows="3" placeholder="Additional notes (optional)"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="footer">
+          <button type="button" class="btn-text" id="cancel-create-task">Cancel</button>
+          <button type="button" class="btn-primary" id="save-create-task">Create Task</button>
+        </div>
+      </div>`;
+
+    const close = () => { if (overlay.parentElement) overlay.parentElement.removeChild(overlay); };
+    
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || (e.target.classList && e.target.classList.contains('close-btn'))) close();
+    });
+    
+    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    
+    // Set default due date to today
+    const dueDateInput = overlay.querySelector('#task-due-date');
+    if (dueDateInput) {
+      const today = new Date().toISOString().split('T')[0];
+      dueDateInput.value = today;
+    }
+    
+    // Event listeners
+    overlay.querySelector('#cancel-create-task').addEventListener('click', close);
+    overlay.querySelector('#save-create-task').addEventListener('click', () => {
+      const form = overlay.querySelector('#create-task-form');
+      const formData = new FormData(form);
+      const taskData = Object.fromEntries(formData.entries());
+      
+      // Validate required fields
+      if (!taskData.title || !taskData.type || !taskData.priority || !taskData.dueDate) {
+        alert('Please fill in all required fields');
+        return;
+      }
+      
+      createTask(taskData);
+      close();
+    });
+    
+    document.body.appendChild(overlay);
+    
+    // Focus first input
+    setTimeout(() => {
+      const firstInput = overlay.querySelector('#task-title');
+      if (firstInput) firstInput.focus();
+    }, 0);
+  }
+
+  function createTask(taskData) {
+    const newTask = {
+      id: 'task_' + Date.now(),
+      title: taskData.title,
+      contact: taskData.contact || '',
+      account: taskData.account || '',
+      type: taskData.type,
+      priority: taskData.priority,
+      dueDate: taskData.dueDate,
+      status: 'pending',
+      notes: taskData.notes || '',
+      createdAt: Date.now()
+    };
+    
+    // Add to state
+    state.data.unshift(newTask);
+    state.filtered = state.data.slice();
+    
+    // Save to localStorage for persistence
+    try {
+      const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+      existingTasks.unshift(newTask);
+      localStorage.setItem('userTasks', JSON.stringify(existingTasks));
+    } catch (e) {
+      console.warn('Could not save task to localStorage:', e);
+    }
+    
+    // Refresh display
+    applyFilters();
+    
+    // Show success message
+    if (window.crm && typeof window.crm.showToast === 'function') {
+      window.crm.showToast('Task created successfully');
+    }
+    
+    // Update Today's Tasks widget
+    updateTodaysTasksWidget();
+  }
+
+  function updateTodaysTasksWidget() {
+    // Update the Today's Tasks widget
+    if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+      window.crm.loadTodaysTasks();
+    }
+    
+    // Also trigger a custom event for other components that might need to know about task updates
+    window.dispatchEvent(new CustomEvent('tasksUpdated', { 
+      detail: { source: 'taskCreation' } 
+    }));
+  }
+
+  function init(){ if(!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); loadData(); loadUserTasks(); }
+  
+  function loadUserTasks() {
+    try {
+      const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+      if (userTasks.length > 0) {
+        // Add user tasks to the beginning of the data array
+        state.data = [...userTasks, ...state.data];
+        state.filtered = state.data.slice();
+        render();
+      }
+    } catch (e) {
+      console.warn('Could not load user tasks:', e);
+    }
+  }
+  
   document.addEventListener('DOMContentLoaded', init);
 })();
