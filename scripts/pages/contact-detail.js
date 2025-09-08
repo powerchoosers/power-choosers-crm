@@ -18,6 +18,39 @@
     return !!els.page && !!els.mainContent;
   }
 
+  function injectTaskPopoverStyles(){
+    const id = 'contact-task-popover-styles';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.type = 'text/css';
+    style.textContent = `
+      .task-popover { position: absolute; z-index: 1100; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); box-shadow: var(--elevation-card); min-width: 360px; max-width: 420px; }
+      .task-popover .tp-inner { padding: 12px 12px 8px 12px; }
+      .task-popover .tp-header { font-weight: 600; margin: 4px 4px 10px 4px; color: var(--text-primary); }
+      .task-popover .tp-body { margin-bottom: 8px; }
+      .task-popover .form-row { display: flex; gap: 12px; margin: 8px 0; flex-wrap: wrap; }
+      .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); flex: 1 1 48%; }
+      .task-popover input.input-dark, .task-popover select.input-dark, .task-popover textarea.input-dark { width: 100%; padding: 8px 10px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); font-size: 13px; }
+      .task-popover textarea.input-dark { min-height: 68px; resize: vertical; }
+      .task-popover .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+      .task-popover .btn-primary { height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm); background: var(--grey-700); color: var(--text-inverse); border: 1px solid var(--grey-600); font-weight: 600; }
+      .task-popover .btn-text { height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border: 1px solid transparent; }
+      .task-popover .btn-text:hover { background: var(--grey-700); border-color: var(--border-light); color: var(--text-inverse); }
+      .task-popover .arrow { position: absolute; top: -8px; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 8px solid var(--bg-card); filter: drop-shadow(0 -1px 0 var(--border-light)); }
+      .task-popover .tp-footer { border-top: 1px solid var(--border-light); margin-top: 8px; padding-top: 8px; }
+      .task-popover .tp-empty { color: var(--text-secondary); font-size: 12px; }
+      .task-popover .tp-subtitle { font-size: 12px; color: var(--text-secondary); margin: 0 0 6px 0; }
+      .task-popover .tp-task { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
+      .task-popover .tp-task-title { font-size: 13px; color: var(--text-primary); }
+      .task-popover .tp-badge { font-size: 11px; text-transform: uppercase; letter-spacing: 0.02em; padding: 2px 6px; border-radius: 10px; border: 1px solid var(--border-light); }
+      .task-popover .tp-badge.pending { background: var(--bg-subtle); color: var(--text-secondary); }
+      .task-popover .tp-badge.completed { background: var(--green-muted); color: var(--text-inverse); border-color: var(--green-subtle); }
+      .task-popover .tp-task-due { font-size: 11px; color: var(--text-secondary); margin-left: 6px; }
+    `;
+    document.head.appendChild(style);
+  }
+
   // ===== Edit Contact Modal =====
   function openEditContactModal() {
     const overlay = createEditContactModal();
@@ -206,6 +239,195 @@
       default:
         console.log('Unknown widget action:', which, 'for contact', contactId);
     }
+
+    // Task popover open handler
+    const taskBtn = document.getElementById('open-contact-task-popover');
+    if (taskBtn) {
+      taskBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openContactTaskPopover(taskBtn);
+      });
+    }
+  }
+
+  function openContactTaskPopover(anchorEl) {
+    closeContactTaskPopover();
+    if (!anchorEl) return;
+
+    // Build popover
+    const pop = document.createElement('div');
+    pop.className = 'task-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Create task for contact');
+
+    const c = state.currentContact || {};
+    const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || 'this contact';
+    const company = c.companyName || '';
+
+    const nextBiz = getNextBusinessDayISO();
+
+    const currentTasksHtml = renderExistingTasksForContact(c.id, fullName);
+
+    pop.innerHTML = `
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="tp-inner">
+        <div class="tp-header">Create Task</div>
+        <div class="tp-body">
+          <form id="contact-task-form">
+            <div class="form-row">
+              <label>Type
+                <select name="type" class="input-dark" required>
+                  <option value="">Select task type</option>
+                  <option value="phone-call">Phone Call</option>
+                  <option value="manual-email">Manual Email</option>
+                  <option value="auto-email">Automatic Email</option>
+                  <option value="follow-up">Follow-up</option>
+                  <option value="demo">Demo</option>
+                  <option value="custom-task">Custom Task</option>
+                </select>
+              </label>
+              <label>Priority
+                <select name="priority" class="input-dark" required>
+                  <option value="">Select priority</option>
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-row">
+              <label>Due date
+                <input type="date" name="dueDate" class="input-dark" value="${nextBiz}" required />
+              </label>
+            </div>
+            <div class="form-row">
+              <label>Notes
+                <textarea name="notes" class="input-dark" rows="3" placeholder="Add context (optional)"></textarea>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-text" id="tp-cancel">Cancel</button>
+              <button type="submit" class="btn-primary" id="tp-save">Create Task</button>
+            </div>
+          </form>
+        </div>
+        ${currentTasksHtml}
+      </div>
+    `;
+
+    document.body.appendChild(pop);
+
+    // Position popover under the anchor, centered horizontally
+    const rect = anchorEl.getBoundingClientRect();
+    const popRect = pop.getBoundingClientRect();
+    const top = Math.round(window.scrollY + rect.bottom + 10);
+    const left = Math.round(window.scrollX + rect.left + rect.width / 2 - popRect.width / 2);
+    pop.style.top = `${top}px`;
+    pop.style.left = `${Math.max(8, left)}px`;
+    // Position arrow
+    const arrow = pop.querySelector('.arrow');
+    if (arrow) {
+      const anchorCenter = rect.left + rect.width / 2;
+      const popLeft = Math.max(8, left);
+      const arrowLeft = Math.max(16, Math.min(popRect.width - 16, anchorCenter - popLeft));
+      arrow.style.left = `${arrowLeft}px`;
+    }
+
+    // Event handling
+    const form = pop.querySelector('#contact-task-form');
+    const cancelBtn = pop.querySelector('#tp-cancel');
+    cancelBtn?.addEventListener('click', closeContactTaskPopover);
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const type = String(fd.get('type') || '').trim();
+      const priority = String(fd.get('priority') || '').trim();
+      const dueDate = String(fd.get('dueDate') || '').trim();
+      const notes = String(fd.get('notes') || '').trim();
+      if (!type || !priority || !dueDate) return;
+      const title = buildTaskTitle(type, fullName);
+      const newTask = {
+        id: 'task_' + Date.now(),
+        title,
+        contact: fullName,
+        contactId: c.id || '',
+        account: company,
+        type,
+        priority,
+        dueDate,
+        status: 'pending',
+        notes,
+        createdAt: Date.now()
+      };
+      try {
+        const key = 'userTasks';
+        const existing = JSON.parse(localStorage.getItem(key) || '[]');
+        existing.unshift(newTask);
+        localStorage.setItem(key, JSON.stringify(existing));
+      } catch (_) { /* noop */ }
+
+      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) {}
+      // Notify other components
+      try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'contact-detail' } })); } catch (_) {}
+      closeContactTaskPopover();
+    });
+
+    // Close on outside click / escape
+    const outside = (ev) => { if (!pop.contains(ev.target) && ev.target !== anchorEl) { cleanup(); } };
+    const onEsc = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); cleanup(); } };
+    setTimeout(() => {
+      document.addEventListener('mousedown', outside);
+      document.addEventListener('keydown', onEsc);
+    }, 0);
+    function cleanup(){
+      document.removeEventListener('mousedown', outside);
+      document.removeEventListener('keydown', onEsc);
+      closeContactTaskPopover();
+    }
+  }
+
+  function closeContactTaskPopover(){
+    const ex = document.querySelector('.task-popover');
+    if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+  }
+
+  function buildTaskTitle(type, name){
+    const map = {
+      'phone-call': 'Call',
+      'manual-email': 'Email',
+      'auto-email': 'Auto Email',
+      'follow-up': 'Follow-up',
+      'demo': 'Demo',
+      'custom-task': 'Task'
+    };
+    const label = map[type] || 'Task';
+    return `${label} — ${name}`;
+  }
+
+  function getNextBusinessDayISO(){
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    // If Saturday, move to Monday; if Sunday, move to Monday
+    if (d.getDay() === 6) d.setDate(d.getDate() + 2);
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  }
+
+  function renderExistingTasksForContact(contactId, fullName){
+    let tasks = [];
+    try {
+      const all = JSON.parse(localStorage.getItem('userTasks') || '[]');
+      tasks = all.filter(t => (t.contactId && contactId && t.contactId === contactId) || (t.contact && fullName && String(t.contact).trim() === fullName));
+    } catch (_) { tasks = []; }
+    if (!tasks.length) return '<div class="tp-footer tp-empty">No existing tasks for this contact.</div>';
+    const items = tasks.slice(0, 5).map(t => {
+      const status = (t.status || 'pending').toLowerCase();
+      const badge = status === 'completed' ? 'completed' : 'pending';
+      const due = t.dueDate ? `<span class="tp-task-due">Due ${escapeHtml(t.dueDate)}</span>` : '';
+      return `<div class="tp-task"><span class="tp-task-title">${escapeHtml(t.title || 'Task')}</span><span class="tp-badge ${badge}">${badge}</span>${due}</div>`;
+    }).join('');
+    return `<div class="tp-footer"><div class="tp-subtitle">Current tasks for ${escapeHtml(fullName)}</div>${items}</div>`;
   }
 
   // Normalize phone numbers to E.164 when possible.
@@ -351,6 +573,7 @@
     const industry = contact.industry || contact.companyIndustry || '';
     // Ensure header styles (divider, layout) are present
     injectContactHeaderStyles();
+    injectTaskPopoverStyles();
 
     // Header (styled same as page header)
     const headerHtml = `
@@ -397,6 +620,13 @@
                 <button class="quick-action-btn list-header-btn" id="add-contact-to-sequences" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <polygon points="7 4 20 12 7 20 7 4"></polygon>
+                  </svg>
+                </button>
+                <button class="quick-action-btn list-header-btn" id="open-contact-task-popover" title="Tasks" aria-label="Tasks" aria-haspopup="dialog">
+                  <!-- Tasks icon (same as left nav) -->
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <polyline points="9,11 12,14 22,4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                   </svg>
                 </button>
               </div>

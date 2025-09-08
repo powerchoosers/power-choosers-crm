@@ -194,12 +194,12 @@ CONTEXT AWARENESS:
       – CTA line: Exactly one short question offering two specific time windows (e.g., "Does Tue 10–12 or Thu 2–4 work?").
   - "Proposal delivery with next steps": Provide a crisp summary of the options (supplier/term/rate/est. annual cost/notable terms), selection guidance, and 2–3 clear next steps. CTA: short call to review/confirm.
   - "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Pattern‑interrupt hook using one concrete pain point or timely risk for their industry (no generic claims), 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + tightly aligned value prop, 3) ONE call‑to‑action. NEVER say "following up on our call" with this person.
-  - "Standard Invoice Request": Warm follow‑up after they agreed to send their invoice. If energy contract details exist, briefly reference any known values (supplier, contract end Month YYYY, current rate) or tie to one relevant pain point if unknown. Structure: Paragraph 1 (one sentence): polite reminder + why sending the invoice helps us start immediately. Paragraph 2 (bullet list): "We use your invoice to:" with 3 bullets — ESID(s), Contract End Date, Service Address — and mention free Energy Health Check and a quick review for extra charges/discrepancies. CTA line: one short, time‑bounded ask (e.g., "Could you send the latest invoice today or by tomorrow EOD?"). Keep it helpful, not salesy.`;
+  - "Standard Invoice Request": Warm follow‑up after they agreed to send their invoice. If energy contract details exist, you MUST briefly include them in paragraph 1 in a single, natural clause (e.g., "with ${supplier || 'your supplier'}, ~${usage || 'your annual'} kWh, at ${currentRate || '$/kWh'} and a contract ending ${contractEndLabel || 'Month YYYY'}"). Do NOT list numbers aggressively; keep it one short clause. If unknown, tie to one relevant pain point instead. Structure: Paragraph 1 (one sentence): polite reminder + why sending the invoice helps us start immediately (mention we'll review for discrepancies/extra charges and run a free Energy Health Check). Paragraph 2 (bullet list): "We use your invoice to:" with exactly 3 bullets — ESID(s), Contract End Date (Month YYYY only), Service Address. CTA line: one short, time‑bounded ask to send the bill today or by EOD (e.g., "Could you send the latest invoice today or by EOD so my team can get started right away?"). Keep it helpful, not salesy.`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
 - Contract end: reference month and year only (no day), e.g., "before ${contractEndLabel || 'your renewal window'}".
-- Current rate: you may reference the rate succinctly if provided (e.g., "at ${currentRate || 'your current'} $/kWh").
+- Current rate: you may reference the rate succinctly if provided (normalize like 0.089 → $0.089/kWh), e.g., "at ${currentRate || 'your current'} $/kWh".
 - Usage: reference qualitatively (e.g., "your usage profile" or "annual usage") without exact precision if it feels too granular.
 - Do NOT mention exact square footage; keep scale abstract (e.g., "large facility").`;
 
@@ -243,9 +243,10 @@ CONTEXT AWARENESS:
 
   const invoiceChecklist = `
 - Standard Invoice Request specifics:
-  • Paragraph 1: one-sentence warm reminder referencing the prior agreement to share the invoice and why it helps us start immediately.
-  • Paragraph 2: include a short bullet list under "We use your invoice to:" with exactly these items: ESID(s), Contract End Date, Service Address. Optionally mention free Energy Health Check and quick review for extra charges.
-  • CTA line: one short, time-bounded ask to send the invoice now/today/by tomorrow EOD (polite urgency, not salesy).`;
+  • Paragraph 1: one-sentence warm reminder referencing the prior agreement to share the invoice and why it helps us start immediately. If supplier/current rate/usage/contract end are known, include them in a single short clause (Month YYYY for contract end only).
+  • Paragraph 2: include a short bullet list under "We use your invoice to:" with exactly these items: ESID(s), Contract End Date (Month YYYY), Service Address.
+  • CTA line: one short, time-bounded ask to send the invoice today or by EOD so the team can begin immediately (polite urgency, not salesy).
+  • No duplicate "We use your invoice to:" lines anywhere.`;
 
   const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}
 

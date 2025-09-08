@@ -272,7 +272,59 @@ class EmailManager {
         try {
             const localUrl = '/api/gemini-email';
             const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
-            const payload = { prompt, mode, recipient, to: toInput?.value || '' };
+
+            // Enrich recipient with account energy details when available (ensures Gemini sees known values)
+            let enrichedRecipient = recipient ? JSON.parse(JSON.stringify(recipient)) : null;
+            try {
+                if (enrichedRecipient && (enrichedRecipient.company || enrichedRecipient.email)) {
+                    const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+                    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
+                    const comp = norm(enrichedRecipient.company || '');
+                    const domain = (enrichedRecipient.email || '').split('@')[1]?.toLowerCase() || '';
+                    let acct = null;
+                    if (comp) {
+                        acct = accounts.find(a => {
+                            const an = norm(a.accountName || a.name || a.companyName || '');
+                            return an === comp || an.includes(comp) || comp.includes(an);
+                        }) || null;
+                    }
+                    if (!acct && domain) {
+                        acct = accounts.find(a => {
+                            const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
+                            return d && domain.endsWith(d);
+                        }) || null;
+                    }
+                    if (acct) {
+                        const acctEnergy = {
+                            supplier: acct.electricitySupplier || acct.supplier || '',
+                            currentRate: acct.currentRate || acct.rate || '',
+                            usage: acct.annual_kwh || acct.kwh || '',
+                            contractEnd: acct.contractEndDate || acct.contractEnd || acct.contract_end_date || ''
+                        };
+                        enrichedRecipient.account = enrichedRecipient.account || {
+                            id: acct.id,
+                            name: acct.accountName || acct.name || acct.companyName || '',
+                            industry: acct.industry || '',
+                            domain: acct.domain || acct.website || ''
+                        };
+                        // Merge: prefer existing recipient.energy if set; otherwise use account values
+                        const rE = enrichedRecipient.energy || {};
+                        const merged = {
+                            supplier: rE.supplier || acctEnergy.supplier || '',
+                            currentRate: rE.currentRate || acctEnergy.currentRate || '',
+                            usage: rE.usage || acctEnergy.usage || '',
+                            contractEnd: rE.contractEnd || acctEnergy.contractEnd || ''
+                        };
+                        // Normalize currentRate like .089 -> 0.089 (do not force $ here; model will format)
+                        if (/^\.\d+$/.test(String(merged.currentRate))) {
+                            merged.currentRate = '0' + merged.currentRate;
+                        }
+                        enrichedRecipient.energy = merged;
+                    }
+                }
+            } catch (e) { console.warn('[AI] Could not enrich recipient energy from accounts', e); }
+
+            const payload = { prompt, mode, recipient: enrichedRecipient, to: toInput?.value || '' };
             let res;
             try {
                 res = await fetch(localUrl, {
@@ -501,6 +553,38 @@ class EmailManager {
         // Build HTML paragraphs (and ensure energy details are referenced if available)
         let paras = body.split(/\n\n/).map(p => p.trim()).filter(Boolean);
 
+        // Expand inline bullet text into proper bullet lines for Invoice Requests
+        try {
+            const looksInvoice = /standard\s*invoice\s*request|invoice\s+request|\binvoice\b/i.test(body);
+            const expandInlineBullets = (p) => {
+                // If paragraph contains bullet separators inline (e.g., "We use your invoice to: • A • B • C")
+                // convert to header + newline-delimited bullet lines starting with "• ".
+                if (!/•/.test(p)) return p;
+                // If it already has line-start bullets, leave as-is
+                if (/^(\s*[•\-]\s+)/m.test(p)) return p;
+                const parts = p.split('•').map(s => s.trim()).filter(Boolean);
+                if (parts.length <= 1) return p;
+                const header = parts[0].endsWith(':') ? parts[0] : (parts[0] + ':');
+                const bullets = parts.slice(1).map(item => '• ' + item.replace(/^[-•]\s+/, ''));
+                return [header, ...bullets].join('\n');
+            };
+            if (looksInvoice) {
+                paras = paras.map(expandInlineBullets);
+                // Deduplicate repeated header line "We use your invoice to:" if it appears multiple times
+                const headerRegex = /^\s*we\s+use\s+your\s+invoice\s+to\s*:\s*$/i;
+                const newParas = [];
+                let headerSeen = false;
+                for (const p of paras) {
+                    if (headerRegex.test(p)) {
+                        if (headerSeen) continue;
+                        headerSeen = true;
+                    }
+                    newParas.push(p);
+                }
+                paras = newParas;
+            }
+        } catch (_) { /* noop */ }
+
         // Enforce brevity: 2 short paragraphs (1–2 sentences each) + single-line CTA
         try {
             const splitSentences = (txt) => String(txt || '')
@@ -611,7 +695,7 @@ class EmailManager {
             const looksInvoice2 = /standard\s*invoice\s*request|invoice\s+request|invoice\b/i.test(body);
             let cta = detectedCTA
                 || (looksEHC2 ? 'Does Tue 10–12 or Thu 2–4 work for a brief review?'
-                : looksInvoice2 ? 'Could you send the latest invoice today or by tomorrow EOD?'
+                : looksInvoice2 ? 'Could you send a copy of your latest invoice today by EOD so my team can get started right away?'
                 : 'Open to a quick 10‑min call next week?');
             // Keep CTA very short
             const ctaWords = cta.split(/\s+/).filter(Boolean);
