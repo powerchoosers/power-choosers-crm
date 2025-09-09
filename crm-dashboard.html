@@ -350,6 +350,28 @@
                         </div>
                     </div>
 
+                    <!-- Call Scripts Page (Container-based) -->
+                    <div class="page" id="call-scripts-page" data-page="call-scripts">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Call Scripts</h2>
+                                    <div class="page-actions"></div>
+                                </div>
+                                <div class="people-toolbar" id="call-scripts-toolbar">
+                                    <button class="action-btn" id="call-scripts-back" title="Back">Back</button>
+                                    <button class="action-btn" id="call-scripts-restart" title="Restart">Restart</button>
+                                </div>
+                            </div>
+                            <div class="page-content">
+                                <div class="call-scripts-card">
+                                    <div class="script-display" id="call-scripts-display">Click "Dial" to begin the call.</div>
+                                    <div class="response-buttons" id="call-scripts-responses"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Sequence Create Modal -->
                     <div id="sequence-create-modal" class="pc-modal" role="dialog" aria-modal="true" aria-labelledby="sequence-create-title" hidden>
                         <div class="pc-modal__backdrop"></div>
@@ -1280,7 +1302,7 @@
     <!-- Add Contact Modal -->
     <div id="modal-add-contact" class="pc-modal" hidden>
         <div class="pc-modal__backdrop" data-close="contact"></div>
-        <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="add-contact-title">
+        <div class="pc-modal__dialog">
             <div class="pc-modal__header">
                 <h3 id="add-contact-title">Add Contact</h3>
                 <button class="pc-modal__close" data-close="contact" aria-label="Close">×</button>
@@ -1298,18 +1320,18 @@
                     <label>Email<input type="email" name="email" class="input-dark" /></label>
                     <label>Phone<input type="text" name="phone" class="input-dark" /></label>
                 </div>
-                <div class="pc-modal__footer">
-                    <button type="button" class="btn-text" data-close="contact">Cancel</button>
-                    <button type="submit" class="btn-primary">Create contact</button>
-                </div>
             </form>
+            <div class="pc-modal__footer">
+                <button type="button" class="btn-text" data-close="contact">Cancel</button>
+                <button type="submit" class="btn-primary">Create contact</button>
+            </div>
         </div>
     </div>
 
     <!-- Add Account Modal -->
     <div id="modal-add-account" class="pc-modal" hidden>
         <div class="pc-modal__backdrop" data-close="account"></div>
-        <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="add-account-title">
+        <div class="pc-modal__dialog">
             <div class="pc-modal__header">
                 <h3 id="add-account-title">Add Account</h3>
                 <button class="pc-modal__close" data-close="account" aria-label="Close">×</button>
@@ -1327,11 +1349,11 @@
                     <label>City<input type="text" name="city" class="input-dark" /></label>
                     <label>State<input type="text" name="state" class="input-dark" /></label>
                 </div>
-                <div class="pc-modal__footer">
-                    <button type="button" class="btn-text" data-close="account">Cancel</button>
-                    <button type="submit" class="btn-primary">Create account</button>
-                </div>
             </form>
+            <div class="pc-modal__footer">
+                <button type="button" class="btn-text" data-close="account">Cancel</button>
+                <button type="submit" class="btn-primary">Create account</button>
+            </div>
         </div>
     </div>
 
@@ -1559,6 +1581,7 @@
     <script src="scripts/pages/sequences.js"></script>
     <script src="scripts/pages/deals.js"></script>
     <script src="scripts/pages/tasks.js"></script>
+    <script src="scripts/pages/call-scripts.js"></script>
     <script src="scripts/global-search.js"></script>
     <script src="scripts/widgets/phone.js"></script>
     <script src="scripts/widgets/notes.js"></script>

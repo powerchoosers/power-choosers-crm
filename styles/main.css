@@ -3934,6 +3934,55 @@ html, body {
     color: var(--text-secondary);
     min-height: 240px;
 }
+/* === Call Scripts Page === */
+#call-scripts-page .call-scripts-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-base);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+#call-scripts-page .script-display {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-base);
+    min-height: 180px;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+#call-scripts-page .response-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+}
+
+#call-scripts-page .response-buttons.full-width {
+    grid-template-columns: 1fr;
+}
+
+#call-scripts-page .response-btn,
+#call-scripts-page .dial-btn {
+    background: var(--bg-item);
+    color: var(--text-inverse);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: 12px var(--spacing-md);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+#call-scripts-page .response-btn:hover,
+#call-scripts-page .dial-btn:hover {
+    background: var(--grey-700);
+}
+
+#call-scripts-page .dial-btn { font-weight: 600; }
+
 .empty-title {
     color: var(--text-inverse);
     font-size: 1.1rem;
