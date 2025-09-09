@@ -18,6 +18,26 @@
     return !!els.page && !!els.mainContent;
   }
 
+  // Save an Account field from the contact detail energy section
+  async function saveAccountField(field, value) {
+    const db = window.firebaseDB;
+    const accountId = state._linkedAccountId;
+    if (!accountId) return;
+    const payload = { [field]: value, updatedAt: Date.now() };
+    // Update local cache if we have it
+    try {
+      if (typeof window.getAccountsData === 'function') {
+        const accounts = window.getAccountsData() || [];
+        const idx = accounts.findIndex(a => a.id === accountId);
+        if (idx !== -1) {
+          try { accounts[idx][field] = value; } catch(_) {}
+        }
+      }
+    } catch(_) {}
+    if (!db) return;
+    try { await db.collection('accounts').doc(accountId).update(payload); window.crm?.showToast && window.crm.showToast('Saved'); } catch (e) { console.warn('Failed to save account field', field, e); window.crm?.showToast && window.crm.showToast('Save failed'); }
+  }
+
   function injectTaskPopoverStyles(){
     const id = 'contact-task-popover-styles';
     if (document.getElementById(id)) return;
@@ -29,9 +49,19 @@
       .task-popover .tp-inner { padding: 12px 12px 8px 12px; }
       .task-popover .tp-header { font-weight: 600; margin: 4px 4px 10px 4px; color: var(--text-primary); }
       .task-popover .tp-body { margin-bottom: 8px; }
+      .task-popover .tp-header { display:flex; align-items:center; justify-content:space-between; }
+      .task-popover .close-btn { appearance:none; background:transparent; border:0; color: var(--text-secondary); font-size: 18px; line-height:1; padding: 2px 6px; border-radius: 6px; }
+      .task-popover .close-btn:hover { background: var(--grey-700); color: var(--text-inverse); }
       .task-popover .form-row { display: flex; gap: 12px; margin: 8px 0; flex-wrap: wrap; }
       .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); flex: 1 1 48%; }
-      .task-popover input.input-dark, .task-popover select.input-dark, .task-popover textarea.input-dark { width: 100%; padding: 8px 10px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); font-size: 13px; }
+      .task-popover input.input-dark, .task-popover select.input-dark, .task-popover textarea.input-dark { width: 100%; padding: 8px 10px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); font-size: 13px; font-family: inherit; }
+      .task-popover input.input-dark::placeholder, .task-popover textarea.input-dark::placeholder { color: var(--text-secondary); opacity: 0.8; font-family: inherit; }
+      /* Themed selects and options */
+      .task-popover select.input-dark { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%), linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }
+      .task-popover select.input-dark option, .task-popover select.input-dark optgroup { background-color: var(--bg-card); color: var(--text-primary); }
+      /* Themed date picker icon (WebKit) */
+      .task-popover input[type="date"].input-dark::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.85; cursor: pointer; }
+      .task-popover input[type="date"].input-dark { color-scheme: dark; }
       .task-popover textarea.input-dark { min-height: 68px; resize: vertical; }
       .task-popover .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
       .task-popover .btn-primary { height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm); background: var(--grey-700); color: var(--text-inverse); border: 1px solid var(--grey-600); font-weight: 600; }
@@ -239,16 +269,6 @@
       default:
         console.log('Unknown widget action:', which, 'for contact', contactId);
     }
-
-    // Task popover open handler
-    const taskBtn = document.getElementById('open-contact-task-popover');
-    if (taskBtn) {
-      taskBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        openContactTaskPopover(taskBtn);
-      });
-    }
   }
 
   function openContactTaskPopover(anchorEl) {
@@ -272,7 +292,10 @@
     pop.innerHTML = `
       <div class="arrow" aria-hidden="true"></div>
       <div class="tp-inner">
-        <div class="tp-header">Create Task</div>
+        <div class="tp-header">
+          <div class="tp-title">Create Task</div>
+          <button type="button" class="close-btn" id="tp-close" aria-label="Close">×</button>
+        </div>
         <div class="tp-body">
           <form id="contact-task-form">
             <div class="form-row">
@@ -307,7 +330,6 @@
               </label>
             </div>
             <div class="form-actions">
-              <button type="button" class="btn-text" id="tp-cancel">Cancel</button>
               <button type="submit" class="btn-primary" id="tp-save">Create Task</button>
             </div>
           </form>
@@ -318,27 +340,31 @@
 
     document.body.appendChild(pop);
 
-    // Position popover under the anchor, centered horizontally
-    const rect = anchorEl.getBoundingClientRect();
-    const popRect = pop.getBoundingClientRect();
-    const top = Math.round(window.scrollY + rect.bottom + 10);
-    const left = Math.round(window.scrollX + rect.left + rect.width / 2 - popRect.width / 2);
-    pop.style.top = `${top}px`;
-    pop.style.left = `${Math.max(8, left)}px`;
-    // Position arrow
-    const arrow = pop.querySelector('.arrow');
-    if (arrow) {
-      const anchorCenter = rect.left + rect.width / 2;
-      const popLeft = Math.max(8, left);
-      const arrowLeft = Math.max(16, Math.min(popRect.width - 16, anchorCenter - popLeft));
-      arrow.style.left = `${arrowLeft}px`;
-    }
+    // Position popover under the anchor, centered horizontally (recompute after paint)
+    const position = () => {
+      const rect = anchorEl.getBoundingClientRect();
+      const popRect = pop.getBoundingClientRect();
+      const desiredLeft = Math.round(window.scrollX + rect.left + rect.width / 2 - popRect.width / 2);
+      const clampedLeft = Math.max(8, Math.min(desiredLeft, (window.scrollX + document.documentElement.clientWidth) - popRect.width - 8));
+      const top = Math.round(window.scrollY + rect.bottom + 10);
+      pop.style.top = `${top}px`;
+      pop.style.left = `${clampedLeft}px`;
+      const arrow = pop.querySelector('.arrow');
+      if (arrow) {
+        const anchorCenter = Math.round(rect.left + rect.width / 2);
+        const popLeft = clampedLeft - window.scrollX;
+        const arrowLeft = Math.max(16, Math.min(popRect.width - 16, anchorCenter - popLeft));
+        arrow.style.left = `${arrowLeft}px`;
+      }
+    };
+    position();
+    requestAnimationFrame(position);
 
     // Event handling
     const form = pop.querySelector('#contact-task-form');
-    const cancelBtn = pop.querySelector('#tp-cancel');
-    cancelBtn?.addEventListener('click', closeContactTaskPopover);
-    form?.addEventListener('submit', (e) => {
+    const closeBtn = pop.querySelector('#tp-close');
+    closeBtn?.addEventListener('click', closeContactTaskPopover);
+    form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
       const type = String(fd.get('type') || '').trim();
@@ -369,7 +395,14 @@
 
       try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) {}
       // Notify other components
-      try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'contact-detail' } })); } catch (_) {}
+      try {
+        // Update Today's Tasks widget immediately
+        if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+          window.crm.loadTodaysTasks();
+        }
+        // Notify Tasks page (and any listeners) to refresh its list from localStorage
+        window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'contact-detail', task: newTask } }));
+      } catch (_) {}
       closeContactTaskPopover();
     });
 
@@ -559,6 +592,25 @@
     return '';
   }
 
+  // Find the associated account for this contact (by id or normalized company name)
+  function findAssociatedAccount(contact) {
+    try {
+      if (!contact || typeof window.getAccountsData !== 'function') return null;
+      const accounts = window.getAccountsData() || [];
+      // Prefer explicit accountId
+      const accountId = contact.accountId || contact.account_id || '';
+      if (accountId) {
+        const m = accounts.find(a => a.id === accountId);
+        if (m) return m;
+      }
+      // Fallback to company name
+      const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+      const key = norm(contact.companyName || contact.accountName || '');
+      if (!key) return null;
+      return accounts.find(a => norm(a.accountName || a.name || a.companyName) === key) || null;
+    } catch (_) { return null; }
+  }
+
   function renderContactDetail() {
     if (!state.currentContact || !els.mainContent) return;
 
@@ -571,6 +623,15 @@
     const city = contact.city || contact.locationCity || '';
     const stateVal = contact.state || contact.locationState || '';
     const industry = contact.industry || contact.companyIndustry || '';
+    const linkedAccount = findAssociatedAccount(contact);
+    // Cache for saves
+    try { state._linkedAccountId = linkedAccount?.id || null; } catch (_) {}
+    const electricitySupplier = linkedAccount?.electricitySupplier || '';
+    const annualUsage = linkedAccount?.annualUsage || linkedAccount?.annual_usage || '';
+    let currentRate = linkedAccount?.currentRate || linkedAccount?.current_rate || '';
+    const contractEndDate = linkedAccount?.contractEndDate || linkedAccount?.contract_end_date || '';
+    // Normalize currentRate like .089 -> 0.089
+    if (/^\.\d+$/.test(String(currentRate))) currentRate = '0' + currentRate;
     // Ensure header styles (divider, layout) are present
     injectContactHeaderStyles();
     injectTaskPopoverStyles();
@@ -681,6 +742,18 @@
             ${renderInfoRow('DEPARTMENT', 'department', contact.department || '')}
           </div>
         </div>
+
+        ${linkedAccount ? `
+        <div class="contact-info-section">
+          <h3 class="section-title">Energy & Contract</h3>
+          <div class="info-grid" id="contact-energy-grid">
+            <div class="info-row"><div class="info-label">ELECTRICITY SUPPLIER</div><div class="info-value"><div class="info-value-wrap" data-field="electricitySupplier"><span class="info-value-text">${escapeHtml(electricitySupplier) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
+            <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value"><div class="info-value-wrap" data-field="annualUsage"><span class="info-value-text">${escapeHtml(annualUsage) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
+            <div class="info-row"><div class="info-label">CURRENT RATE ($/kWh)</div><div class="info-value"><div class="info-value-wrap" data-field="currentRate"><span class="info-value-text">${escapeHtml(currentRate) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
+            <div class="info-row"><div class="info-label">CONTRACT END DATE</div><div class="info-value"><div class="info-value-wrap" data-field="contractEndDate"><span class="info-value-text">${escapeHtml(contractEndDate) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
+          </div>
+        </div>
+        ` : ''}
 
         <div class="contact-activity-section">
           <div class="activity-header">
@@ -1032,8 +1105,20 @@
     // Company link -> open Account Detail
     const compLink = document.getElementById('contact-company-link');
     if (compLink && !compLink._bound) {
-      compLink.addEventListener('click', (e) => { e.preventDefault(); navigateToAccountFromContact(); });
-      compLink.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigateToAccountFromContact(); } });
+      compLink.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        window._contactNavigationSource = 'contact-detail';
+        window._contactNavigationContactId = state.currentContact.id;
+        navigateToAccountFromContact(); 
+      });
+      compLink.addEventListener('keydown', (e) => { 
+        if (e.key === 'Enter' || e.key === ' ') { 
+          e.preventDefault(); 
+          window._contactNavigationSource = 'contact-detail';
+          window._contactNavigationContactId = state.currentContact.id;
+          navigateToAccountFromContact(); 
+        } 
+      });
       compLink._bound = '1';
     }
 
@@ -1049,6 +1134,17 @@
     if (addToSequencesBtn && !addToSequencesBtn._bound) {
       addToSequencesBtn.addEventListener('click', (e) => { e.preventDefault(); openContactSequencesPanel(); });
       addToSequencesBtn._bound = '1';
+    }
+
+    // Tasks button (opens inline task popover)
+    const tasksBtn = document.getElementById('open-contact-task-popover');
+    if (tasksBtn && !tasksBtn._bound) {
+      tasksBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openContactTaskPopover(tasksBtn);
+      });
+      tasksBtn._bound = '1';
     }
 
     // Title actions: edit/copy/clear contact name
@@ -1129,6 +1225,35 @@
       });
       infoGrid._bound = '1';
     }
+
+    // Energy & Contract grid (edits save to Accounts collection)
+    const energyGrid = document.getElementById('contact-energy-grid');
+    if (energyGrid && !energyGrid._bound) {
+      energyGrid.addEventListener('click', async (e) => {
+        const wrap = e.target.closest?.('.info-value-wrap');
+        if (!wrap) return;
+        const field = wrap.getAttribute('data-field');
+        if (!field) return;
+
+        const editBtn = e.target.closest('.info-edit');
+        if (editBtn) { e.preventDefault(); beginEditAccountField(wrap, field); return; }
+        const copyBtn = e.target.closest('.info-copy');
+        if (copyBtn) {
+          const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
+          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          return;
+        }
+        const delBtn = e.target.closest('.info-delete');
+        if (delBtn) {
+          e.preventDefault();
+          await saveAccountField(field, '');
+          updateFieldText(wrap, '');
+          return;
+        }
+      });
+      energyGrid._bound = '1';
+    }
   }
 
   function beginEditField(wrap, field) {
@@ -1172,6 +1297,76 @@
     };
     input.addEventListener('keydown', onKey);
     saveBtn.addEventListener('click', async () => { await commitEdit(wrap, field, input.value); });
+    cancelBtn.addEventListener('click', () => { cancelEdit(wrap, field, current); });
+  }
+
+  // Inline edit for Account fields (Energy & Contract) shown on Contact Detail
+  function beginEditAccountField(wrap, field) {
+    if (!wrap) return;
+
+    const current = wrap.querySelector('.info-value-text')?.textContent || '';
+    wrap.classList.add('editing');
+
+    // Build appropriate input
+    let input;
+    if (field === 'contractEndDate') {
+      input = document.createElement('input');
+      input.type = 'date';
+      input.className = 'input-dark info-edit-input';
+      // Normalize to yyyy-mm-dd when possible
+      try {
+        const d = new Date(current);
+        if (!isNaN(d.getTime())) {
+          input.value = d.toISOString().split('T')[0];
+        }
+      } catch (_) {}
+    } else {
+      input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'input-dark info-edit-input';
+      input.value = current === '--' ? '' : current;
+      input.placeholder = 'Enter ' + field;
+    }
+
+    const actions = wrap.querySelector('.info-actions');
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'icon-btn-sm info-save';
+    saveBtn.innerHTML = svgSave();
+    saveBtn.title = 'Save';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'icon-btn-sm info-cancel';
+    cancelBtn.textContent = '×';
+    cancelBtn.title = 'Cancel';
+
+    // Swap text for input
+    const textEl = wrap.querySelector('.info-value-text');
+    if (textEl && textEl.parentElement) textEl.parentElement.replaceChild(input, textEl);
+
+    // Replace actions with save/cancel temporarily
+    if (actions) {
+      actions.innerHTML = '';
+      actions.appendChild(saveBtn);
+      actions.appendChild(cancelBtn);
+    }
+
+    setTimeout(() => input.focus(), 0);
+
+    const commit = async () => {
+      let val = input.value;
+      if (field === 'currentRate') {
+        val = String(val || '').trim();
+        if (/^\.\d+$/.test(val)) val = '0' + val;
+      }
+      await saveAccountField(field, val);
+      updateFieldText(wrap, val || '');
+    };
+
+    const onKey = async (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); await commit(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); cancelEdit(wrap, field, current); }
+    };
+    input.addEventListener('keydown', onKey);
+    saveBtn.addEventListener('click', async () => { await commit(); });
     cancelBtn.addEventListener('click', () => { cancelEdit(wrap, field, current); });
   }
 
@@ -2374,7 +2569,17 @@ async function createContactSequenceThenAdd(name) {
       case 'email':
         const email = btn.getAttribute('data-email');
         if (email) {
-          try { window.open(`mailto:${encodeURIComponent(email)}`); } catch (e) { /* noop */ }
+          try {
+            const c = state.currentContact || {};
+            const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+            if (window.EmailCompose && typeof window.EmailCompose.openTo === 'function') {
+              window.EmailCompose.openTo(email, fullName);
+            } else {
+              // Fallback: click compose and prefill
+              document.getElementById('compose-email-btn')?.click();
+              setTimeout(()=>{ const to = document.getElementById('compose-to'); if (to) to.value = email; }, 120);
+            }
+          } catch (e) { /* noop */ }
         }
         break;
       case 'linkedin':
