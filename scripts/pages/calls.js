@@ -22,6 +22,22 @@
     return '';
   }
 
+  // Lookup helpers from client-side datasets
+  function getContactById(id){
+    try{
+      if (!id || typeof window.getPeopleData !== 'function') return null;
+      const people = window.getPeopleData() || [];
+      return people.find(p => p && (p.id === id));
+    }catch(_){ return null; }
+  }
+  function getAccountById(id){
+    try{
+      if (!id || typeof window.getAccountsData !== 'function') return null;
+      const accounts = window.getAccountsData() || [];
+      return accounts.find(a => a && (a.id === id));
+    }catch(_){ return null; }
+  }
+
   // Find account by phone using Accounts data
   function findAccountByPhone(phone10){
     try{
@@ -252,6 +268,15 @@
           const rows = j.calls.map((c, idx) => ({
             id: c.id || `call_${Date.now()}_${idx}`,
             contactName: (() => {
+              // Prefer explicit server-provided contact attribution
+              if (c.contactName) return c.contactName;
+              if (c.contactId) {
+                const pc = getContactById(c.contactId);
+                if (pc) {
+                  const full = [pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '';
+                  if (full) return full;
+                }
+              }
               const party = pickCounterparty(c);
               // Try exact contact by phone
               const m = phoneToContact.get(party);
@@ -268,6 +293,11 @@
               return '';
             })(),
             contactTitle: (() => {
+              // Prefer explicit contact by ID if known
+              if (c.contactId) {
+                const pc = getContactById(c.contactId);
+                if (pc && pc.title) return pc.title;
+              }
               const party = pickCounterparty(c);
               const m = phoneToContact.get(party);
               if (m && m.title) return m.title;
@@ -279,6 +309,17 @@
               return '';
             })(),
             company: (() => {
+              // Prefer stored account attribution
+              if (c.accountName) return c.accountName;
+              if (c.accountId) {
+                const a = getAccountById(c.accountId);
+                if (a) return a.accountName || a.name || a.companyName || '';
+              }
+              // If contactId is known, derive from their record
+              if (c.contactId) {
+                const pc = getContactById(c.contactId);
+                if (pc) return pc.companyName || pc.accountName || pc.company || '';
+              }
               const party = pickCounterparty(c);
               const m = phoneToContact.get(party);
               if (m && m.company) return m.company;

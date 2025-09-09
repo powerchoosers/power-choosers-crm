@@ -44,7 +44,13 @@ export default async function handler(req, res) {
                         transcript: d.transcript || '',
                         aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
                         aiInsights: d.aiInsights || null,
-                        audioUrl: d.recordingUrl || ''
+                        audioUrl: d.recordingUrl || '',
+                        recordingUrl: d.recordingUrl || '',
+                        twilioSid: d.twilioSid || d.callSid || '',
+                        accountId: d.accountId || null,
+                        accountName: d.accountName || null,
+                        contactId: d.contactId || null,
+                        contactName: d.contactName || null
                     });
                 });
                 return res.status(200).json({ ok: true, calls });
@@ -71,14 +77,20 @@ export default async function handler(req, res) {
                 transcript: call.transcript || '',
                 aiSummary: call.aiInsights?.summary || '',
                 aiInsights: call.aiInsights || null,
-                audioUrl: call.recordingUrl || ''
+                audioUrl: call.recordingUrl || '',
+                recordingUrl: call.recordingUrl || '',
+                twilioSid: call.twilioSid || call.id || '',
+                accountId: call.accountId || null,
+                accountName: call.accountName || null,
+                contactId: call.contactId || null,
+                contactName: call.contactName || null
             }))
         });
     }
     
     if (req.method === 'POST') {
         // Log a new call or update existing call
-        const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl, timestamp, callTime } = req.body || {};
+        const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl, timestamp, callTime, accountId, accountName, contactId, contactName, source, targetPhone, businessPhone } = req.body || {};
         
         let callId = callSid || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
@@ -88,26 +100,38 @@ export default async function handler(req, res) {
         // Helper: normalize phone (10-digit) and strip Twilio client prefix
         const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
         const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
+        // Business numbers for merge logic (comma-separated env)
+        const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '').split(',').map(norm).filter(Boolean);
+        const isBiz = (p) => !!p && bizList.includes(p);
+        const otherParty = (toRaw, fromRaw) => {
+            const to = norm(isClient(toRaw) ? '' : toRaw);
+            const from = norm(isClient(fromRaw) ? '' : fromRaw);
+            if (isBiz(to) && !isBiz(from)) return from;
+            if (isBiz(from) && !isBiz(to)) return to;
+            // Prefer non-empty to
+            return to || from || '';
+        };
 
         // If there is no exact record for callSid, try to merge into a recent matching call to avoid duplicates
         if (!existingCall || Object.keys(existingCall).length === 0) {
             try {
                 const now = Date.now();
-                const targetTo = norm(isClient(to) ? '' : to);
-                const targetFrom = norm(isClient(from) ? '' : from);
+                const targetCounterparty = otherParty(to, from);
                 let best = null;
+                let bestTs = -1;
                 for (const v of callStore.values()) {
                     try {
                         const ts = new Date(v.timestamp || v.callTime || 0).getTime();
                         if (!ts || Math.abs(now - ts) > 5 * 60 * 1000) continue; // within 5 minutes
-                        const vTo = norm(isClient(v.to) ? '' : v.to);
-                        const vFrom = norm(isClient(v.from) ? '' : v.from);
-                        // Match either direction (same other party)
-                        const partyMatch = (vTo && vTo === targetTo) || (vFrom && vFrom === targetFrom) || (vTo && vTo === targetFrom) || (vFrom && vFrom === targetTo);
+                        const candCounterparty = otherParty(v.to, v.from);
+                        // Match exact counterparty only (avoid matching shared business number)
+                        const partyMatch = !!candCounterparty && candCounterparty === targetCounterparty;
                         if (!partyMatch) continue;
-                        // Prefer a row without a recording yet
-                        if (!v.recordingUrl) { best = v; break; }
-                        if (!best) best = v;
+                        // Strong preference: same account/contact id if provided
+                        const idBoost = ((accountId && v.accountId === accountId) || (contactId && v.contactId === contactId)) ? 1 : 0;
+                        // Prefer newer timestamps, then missing recording, then id match boost
+                        const score = (ts || 0) + ( (!v.recordingUrl ? 1 : 0) * 1 ) + (idBoost * 1);
+                        if (score > bestTs) { bestTs = score; best = v; }
                     } catch (_) {}
                 }
                 if (best && best.id && (!recordingUrl || !callStore.has(callId))) {
@@ -145,7 +169,15 @@ export default async function handler(req, res) {
             transcript: transcript || existingCall.transcript,
             aiInsights: aiInsights || existingCall.aiInsights,
             recordingUrl: recordingUrl || existingCall.recordingUrl,
-            twilioSid: callSid || existingCall.twilioSid || null
+            twilioSid: callSid || existingCall.twilioSid || null,
+            // Persist context if provided
+            accountId: accountId || existingCall.accountId || null,
+            accountName: accountName || existingCall.accountName || null,
+            contactId: contactId || existingCall.contactId || null,
+            contactName: contactName || existingCall.contactName || null,
+            source: source || existingCall.source || null,
+            targetPhone: targetPhone || existingCall.targetPhone || null,
+            businessPhone: businessPhone || existingCall.businessPhone || null
         };
         
         // Persist to Firestore if available

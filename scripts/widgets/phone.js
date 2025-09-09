@@ -665,6 +665,11 @@
   let currentCallContext = {
     number: '',
     name: '',
+    company: '',
+    accountId: null,
+    accountName: null,
+    contactId: null,
+    contactName: null,
     isActive: false
   };
 
@@ -1155,6 +1160,7 @@
         // Track call start time and generate consistent call ID
         const callStartTime = Date.now();
         const callId = `call_${callStartTime}_${number.replace(/\D/g, '')}`;
+        let twilioCallSid = null;
         
         // Log initial call
         await logCall(number, 'browser', callId);
@@ -1164,11 +1170,17 @@
           console.debug('[Phone] Call connected');
           isCallInProgress = true;
           currentCallContext.isActive = true;
+          try {
+            // Capture the Twilio CallSid if exposed by the SDK
+            const p = (currentCall && (currentCall.parameters || currentCall._parameters)) || {};
+            twilioCallSid = p.CallSid || p.callSid || null;
+            if (twilioCallSid) console.debug('[Phone] Captured Twilio CallSid:', twilioCallSid);
+          } catch(_) {}
           // Show live timer in banner
           const card = document.getElementById(WIDGET_ID);
           startLiveCallTimer(card);
           // Update call status to connected using same call ID
-          updateCallStatus(number, 'connected', callStartTime, 0, callId);
+          updateCallStatus(number, 'connected', callStartTime, 0, twilioCallSid || callId);
         });
         
         currentCall.on('disconnect', async () => {
@@ -1188,6 +1200,11 @@
           currentCallContext = {
             number: '',
             name: '',
+            company: '',
+            accountId: null,
+            accountName: null,
+            contactId: null,
+            contactName: null,
             isActive: false
           };
           
@@ -1195,8 +1212,8 @@
           TwilioRTC.state.connection = null;
           TwilioRTC.state.pendingIncoming = null;
           
-          // Update call with final status and duration using same call ID
-          updateCallStatus(number, 'completed', callStartTime, duration, callId);
+          // Update call with final status and duration using Twilio CallSid if available
+          updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
           currentCall = null;
           
           // Stop live timer and restore banner
@@ -1431,7 +1448,15 @@
             status: 'initiated',
             callType: callType,
             callTime: timestamp,
-            timestamp: timestamp
+            timestamp: timestamp,
+            // include call context
+            accountId: currentCallContext.accountId || null,
+            accountName: currentCallContext.accountName || currentCallContext.company || null,
+            contactId: currentCallContext.contactId || null,
+            contactName: currentCallContext.contactName || currentCallContext.name || null,
+            source: 'phone-widget',
+            targetPhone: String(phoneNumber || '').replace(/\D/g, '').slice(-10),
+            businessPhone: '+18176630380'
           })
         });
         
@@ -1470,7 +1495,15 @@
             duration: duration,
             durationSec: duration,
             callTime: timestamp,
-            timestamp: timestamp
+            timestamp: timestamp,
+            // include call context
+            accountId: currentCallContext.accountId || null,
+            accountName: currentCallContext.accountName || currentCallContext.company || null,
+            contactId: currentCallContext.contactId || null,
+            contactName: currentCallContext.contactName || currentCallContext.name || null,
+            source: 'phone-widget',
+            targetPhone: String(phoneNumber || '').replace(/\D/g, '').slice(-10),
+            businessPhone: '+18176630380'
           })
         });
         
@@ -2102,6 +2135,18 @@
 
   window.Widgets.openPhone = openPhone;
   window.Widgets.closePhone = closePhoneWidget;
+  // Allow pages to set the current call context (account/contact attribution)
+  window.Widgets.setCallContext = function(ctx){
+    try {
+      ctx = ctx || {};
+      currentCallContext.accountId = ctx.accountId || null;
+      currentCallContext.accountName = ctx.accountName || null;
+      currentCallContext.contactId = ctx.contactId || null;
+      currentCallContext.contactName = ctx.contactName || null;
+      if (ctx.company) currentCallContext.company = ctx.company;
+      if (ctx.name) currentCallContext.name = ctx.name;
+    } catch(_) {}
+  };
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };
   window.Widgets.resetMicrophonePermission = resetMicrophonePermission;
   
