@@ -865,12 +865,19 @@
       case 'call': {
         const phone = btn.getAttribute('data-phone') || '';
         const name = btn.closest('tr').querySelector('.account-name')?.textContent || 'Unknown Account';
+        const aid = btn.getAttribute('data-id') || btn.closest('tr')?.getAttribute('data-id') || '';
         if (phone) {
           // Use phone widget instead of tel: link
           if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
+            // Provide context so backend and Calls page can attribute correctly
+            try {
+              if (typeof window.Widgets.setCallContext === 'function') {
+                window.Widgets.setCallContext({ accountId: aid || null, accountName: name || null, company: name || null });
+              }
+            } catch (_) {}
             window.Widgets.callNumber(phone, name, false);
             if (window.crm && typeof window.crm.showToast === 'function') {
-              window.crm.showToast(`Calling ${name}...`);
+              window.crm.showToast(`Calling ${name}`);
             }
           } else {
             // Fallback to tel: link if widget not available

@@ -526,7 +526,28 @@
       case 'call': {
         const phone = contact.workDirectPhone || contact.mobile || contact.otherPhone;
         if (phone) {
-          try { window.open(`tel:${encodeURIComponent(phone)}`); } catch (e) { /* noop */ }
+          const account = state.currentAccount || {};
+          const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unknown Contact';
+          try {
+            if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
+              // Provide both account and contact attribution
+              if (typeof window.Widgets.setCallContext === 'function') {
+                window.Widgets.setCallContext({
+                  accountId: account.id || null,
+                  accountName: account.accountName || account.name || account.companyName || null,
+                  company: account.accountName || account.name || account.companyName || null,
+                  contactId: contact.id || null,
+                  contactName: fullName || null,
+                  name: fullName || null
+                });
+              }
+              // Trigger call
+              window.Widgets.callNumber(phone, fullName, true, 'account-detail-contact');
+            } else {
+              // Fallback to tel: link
+              window.open(`tel:${encodeURIComponent(phone)}`);
+            }
+          } catch (e) { /* noop */ }
         }
         break;
       }
@@ -591,7 +612,21 @@
       case 'call': {
         const phone = a?.phone || a?.primaryPhone || a?.mainPhone;
         if (phone) {
-          try { window.open(`tel:${encodeURIComponent(phone)}`); } catch (e) { /* noop */ }
+          try {
+            if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
+              if (typeof window.Widgets.setCallContext === 'function') {
+                window.Widgets.setCallContext({
+                  accountId: a?.id || null,
+                  accountName: a?.accountName || a?.name || a?.companyName || null,
+                  company: a?.accountName || a?.name || a?.companyName || null
+                });
+              }
+              const name = a?.accountName || a?.name || a?.companyName || 'Account';
+              window.Widgets.callNumber(phone, name, true, 'account-detail');
+            } else {
+              window.open(`tel:${encodeURIComponent(phone)}`);
+            }
+          } catch (e) { /* noop */ }
         }
         break;
       }
