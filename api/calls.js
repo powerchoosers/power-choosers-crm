@@ -199,7 +199,7 @@ export default async function handler(req, res) {
                     console.warn('[Calls][POST][%s] Firestore twilioSid lookup failed:', _rid, e?.message);
                 }
             }
-            // 3) Fallback to window-based counterparty matching
+            // 3) Fallback to window-based counterparty matching (STRICT when explicit IDs are provided)
             try {
                 const now = Date.now();
                 // If caller provided a clear targetPhone, prefer it as counterparty
@@ -214,11 +214,15 @@ export default async function handler(req, res) {
                         const candCounterparty = otherParty(v.to, v.from);
                         // Match exact counterparty only (avoid matching shared business number)
                         const partyMatch = !!candCounterparty && candCounterparty === targetCounterparty;
+                        // If explicit attribution provided, require it to match to avoid cross-company flips
+                        const requireIdMatch = !!(accountId || contactId);
+                        const idMatchStrict = ((accountId && v.accountId === accountId) || (contactId && v.contactId === contactId)) ? 1 : 0;
+                        if (requireIdMatch && !idMatchStrict) continue;
                         if (!partyMatch) continue;
                         // Strong preference: same account/contact id if provided
-                        const idBoost = ((accountId && v.accountId === accountId) || (contactId && v.contactId === contactId)) ? 1 : 0;
+                        const idBoost = idMatchStrict;
                         // Prefer newer timestamps, then missing recording, then id match boost
-                        const score = (ts || 0) + ( (!v.recordingUrl ? 1 : 0) * 1 ) + (idBoost * 1);
+                        const score = (ts || 0) + ( (!v.recordingUrl ? 1 : 0) * 1 ) + (idBoost * 1000);
                         if (score > bestTs) {
                             bestTs = score; best = v;
                         }
@@ -244,9 +248,12 @@ export default async function handler(req, res) {
                             const ts = new Date(d.timestamp || d.callTime || 0).getTime();
                             const candCp = otherParty(d.to, d.from);
                             const partyMatch = !!candCp && candCp === targetCounterparty;
+                            const requireIdMatch = !!(accountId || contactId);
+                            const idMatchStrict = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
+                            if (requireIdMatch && !idMatchStrict) return;
                             if (!partyMatch) return;
                             const idBoost = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
-                            const score = (ts || 0) + ((!d.recordingUrl ? 1 : 0) * 1) + (idBoost * 1);
+                            const score = (ts || 0) + ((!d.recordingUrl ? 1 : 0) * 1) + (idBoost * 1000);
                             if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
                             try { console.log('[Calls][POST][%s] FS cand id=%s ts=%s cp=%s score=%s hasRec=%s idMatch=%s', _rid, doc.id, new Date(ts).toISOString(), candCp, score, !!d.recordingUrl, !!idBoost); } catch(_) {}
                         });
