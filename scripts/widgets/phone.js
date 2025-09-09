@@ -1474,13 +1474,16 @@
           })
         });
         
-        // Refresh calls page if it's open
-        setTimeout(() => {
+        // Refresh calls page if it's open (immediate and delayed to catch webhooks)
+        const refreshCalls = (label) => {
           if (window.callsModule && typeof window.callsModule.loadData === 'function') {
             window.callsModule.loadData();
-            console.debug('[Phone] Refreshed calls page data');
+            console.debug(`[Phone] Refreshed calls page data (${label})`);
           }
-        }, 1000);
+        };
+        setTimeout(() => refreshCalls('t+1s'), 1000);
+        setTimeout(() => refreshCalls('t+15s'), 15000);
+        setTimeout(() => refreshCalls('t+30s'), 30000);
         
       } catch (error) {
         console.error('[Phone] Failed to update call status:', error);

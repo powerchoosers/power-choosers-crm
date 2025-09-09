@@ -111,14 +111,27 @@ export default async function handler(req, res) {
 
             // Upsert into central /api/calls so the UI can see the recording immediately
             try {
+                // Attempt to fetch Call resource so we can include to/from
+                let callResource = null;
+                if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && CallSid) {
+                    try {
+                        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                        callResource = await client.calls(CallSid).fetch();
+                    } catch (fe) {
+                        console.warn('[Recording] Could not fetch Call resource:', fe?.message);
+                    }
+                }
+
                 const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
                 await fetch(`${base}/api/calls`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         callSid: CallSid,
+                        to: callResource?.to || undefined,
+                        from: callResource?.from || undefined,
                         status: 'completed',
-                        duration: parseInt(RecordingDuration) || 0,
+                        duration: parseInt(RecordingDuration) || parseInt(callResource?.duration, 10) || 0,
                         recordingUrl: recordingMp3Url
                     })
                 }).catch(() => {});
@@ -165,23 +178,36 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
             });
             
             if (transcriptions.length > 0) {
-                const transcription = await client.transcriptions(transcriptions[0].sid).fetch();
-                transcript = transcription.transcriptionText || '';
-                console.log('[Recording] Existing transcript found:', transcript.substring(0, 100) + '...');
+                const t = await client.transcriptions(transcriptions[0].sid).fetch();
+                transcript = t.transcriptionText || '';
+                console.log('[Recording] Existing transcript found:', (transcript || '').substring(0, 100) + '...');
             } else {
                 // Create new transcription using Twilio's service
                 console.log('[Recording] Creating Twilio transcription...');
-                const newTranscription = await client.transcriptions.create({
+                const created = await client.transcriptions.create({
                     recordingSid: recordingSid,
                     languageCode: 'en-US'
                 });
-                
-                // Wait for transcription to complete (Twilio processes asynchronously)
-                await new Promise(resolve => setTimeout(resolve, 10000));
-                
-                const completedTranscription = await client.transcriptions(newTranscription.sid).fetch();
-                transcript = completedTranscription.transcriptionText || '';
-                console.log('[Recording] New transcript created:', transcript.substring(0, 100) + '...');
+                // Poll for completion up to ~60s
+                let attempts = 0;
+                const maxAttempts = 12; // 12 * 5s = 60s
+                while (attempts < maxAttempts) {
+                    await new Promise(r => setTimeout(r, 5000));
+                    let t = null;
+                    try { t = await client.transcriptions(created.sid).fetch(); } catch(_) {}
+                    const text = t?.transcriptionText || '';
+                    if (text && text.trim().length > 0) {
+                        transcript = text;
+                        break;
+                    }
+                    attempts++;
+                    if (attempts % 3 === 0) console.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
+                }
+                if (transcript) {
+                    console.log('[Recording] Transcription ready:', transcript.substring(0, 100) + '...');
+                } else {
+                    console.log('[Recording] Transcription not ready within timeout');
+                }
             }
             
             // Generate AI insights: prefer Gemini (if GEMINI_API_KEY set), else heuristic

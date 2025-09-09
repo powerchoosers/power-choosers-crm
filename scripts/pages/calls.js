@@ -195,21 +195,31 @@
             id: c.id || `call_${Date.now()}_${idx}`,
             contactName: (() => {
               const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
-              const key = norm(c.to || '');
-              const m = key ? phoneToContact.get(key) : null;
-              return (m && m.name) || (c.to || '');
+              const tryKeys = [norm(c.to || ''), norm(c.from || '')].filter(Boolean);
+              for (const key of tryKeys) {
+                const m = phoneToContact.get(key);
+                if (m && m.name) return m.name;
+              }
+              // Fallback: display whichever number looks like the contact (prefer non-business number)
+              return c.from || c.to || '';
             })(),
             contactTitle: (() => {
               const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
-              const key = norm(c.to || '');
-              const m = key ? phoneToContact.get(key) : null;
-              return (m && m.title) || '';
+              const tryKeys = [norm(c.to || ''), norm(c.from || '')].filter(Boolean);
+              for (const key of tryKeys) {
+                const m = phoneToContact.get(key);
+                if (m && m.title) return m.title;
+              }
+              return '';
             })(),
             company: (() => {
               const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
-              const key = norm(c.to || '');
-              const m = key ? phoneToContact.get(key) : null;
-              return (m && m.company) || '';
+              const tryKeys = [norm(c.to || ''), norm(c.from || '')].filter(Boolean);
+              for (const key of tryKeys) {
+                const m = phoneToContact.get(key);
+                if (m && m.company) return m.company;
+              }
+              return '';
             })(),
             contactEmail: '',
             contactPhone: c.to || '',
