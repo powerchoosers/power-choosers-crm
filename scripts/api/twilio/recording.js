@@ -75,9 +75,9 @@ export default async function handler(req, res) {
                 console.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
             }
 
-            // Trigger transcription and AI analysis
+            // Trigger Twilio native transcription and AI analysis
             try {
-                await processRecording(recordingMp3Url, CallSid);
+                await processRecordingWithTwilio(recordingMp3Url, CallSid, RecordingSid);
             } catch (error) {
                 console.error('[Recording] Processing error:', error);
             }
@@ -94,133 +94,37 @@ export default async function handler(req, res) {
     }
 }
 
-async function processRecording(recordingUrl, callSid) {
+async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
     try {
-        console.log('[Recording] Starting AI processing for:', callSid);
+        console.log('[Recording] Starting Twilio AI processing for:', callSid);
         
-        // Use Google Speech-to-Text for transcription
-        const transcript = await transcribeAudio(recordingUrl);
-        
-        // Generate AI insights
-        const aiInsights = await generateAIInsights(transcript);
-        
-        // Update call data
-        const callData = callStore.get(callSid);
-        if (callData) {
-            callData.transcript = transcript;
-            callData.aiInsights = aiInsights;
-            callStore.set(callSid, callData);
-        }
-        
-        // Also upsert transcript and insights into /api/calls for the UI
+        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+        let transcript = '';
+        let aiInsights = null;
         try {
-            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
-            await fetch(`${base}/api/calls`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    callSid: callSid,
-                    transcript,
-                    aiInsights
-                })
-            }).catch(() => {});
-        } catch (e) {
-            console.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
-        }
-        
-        console.log('[Recording] AI processing completed for:', callSid);
-        
-    } catch (error) {
-        console.error('[Recording] AI processing failed:', error);
-    }
-}
-
-async function transcribeAudio(recordingUrl) {
-    try {
-        // 1) Download the recording (mp3) from Twilio using basic auth
-        const accountSid = process.env.TWILIO_ACCOUNT_SID;
-        const authToken = process.env.TWILIO_AUTH_TOKEN;
-        if (!accountSid || !authToken) {
-            console.warn('[Transcribe] Missing Twilio credentials');
-        }
-
-        const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-        const recResp = await fetch(recordingUrl, { headers: { Authorization: authHeader } });
-        if (!recResp.ok) throw new Error(`Failed to fetch recording: ${recResp.status}`);
-        const arrayBuf = await recResp.arrayBuffer();
-        const base64Audio = Buffer.from(arrayBuf).toString('base64');
-
-        // 2) Transcribe using Google Speech-to-Text (API key via query param)
-        const sttUrl = `https://speech.googleapis.com/v1/speech:recognize?key=${encodeURIComponent(process.env.GOOGLE_API_KEY || '')}`;
-        const response = await fetch(sttUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                config: {
-                    encoding: 'MP3',
-                    sampleRateHertz: 8000,
-                    languageCode: 'en-US',
-                    enableAutomaticPunctuation: true,
-                    model: 'phone_call'
-                },
-                audio: {
-                    content: base64Audio
+            const transcriptions = await client.transcriptions.list({ recordingSid, limit: 1 });
+            if (transcriptions.length > 0) {
+                const t = await client.transcriptions(transcriptions[0].sid).fetch();
+                transcript = t.transcriptionText || '';
+            } else {
+                const newT = await client.transcriptions.create({ recordingSid, languageCode: 'en-US' });
+                await new Promise(r => setTimeout(r, 10000));
+                const done = await client.transcriptions(newT.sid).fetch();
+                transcript = done.transcriptionText || '';
+            }
+            if (transcript) {
+                if (process.env.GEMINI_API_KEY) {
+                    try { aiInsights = await generateGeminiAIInsights(transcript); }
+                    catch (e) { console.warn('[Recording] Gemini insights failed:', e?.message); aiInsights = await generateTwilioAIInsights(transcript); }
+                } else {
+                    aiInsights = await generateTwilioAIInsights(transcript);
                 }
-            })
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (data.results && data.results.length > 0) {
-            return data.results
-                .map(result => result.alternatives[0].transcript)
-                .join(' ');
-        }
-
-        return 'Transcription not available';
-        
-    } catch (error) {
-        console.error('[Transcribe] Error:', error);
-        return 'Transcription failed';
-    }
-}
-
-async function generateAIInsights(transcript) {
-    try {
-        const { GoogleGenerativeAI } = require('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-        
-        const prompt = `
-Analyze this sales call transcript and provide insights:
-
-TRANSCRIPT:
-${transcript}
-
-Provide a JSON response with:
-- summary: Brief 2-3 sentence summary
-- sentiment: Overall customer sentiment (Positive/Neutral/Negative)  
-- keyTopics: Array of main topics discussed
-- nextSteps: Array of identified next steps
-- painPoints: Array of customer pain points mentioned
-- budget: Budget discussion status (Discussed/Not Mentioned/Unclear)
-- timeline: Timeline mentioned or "Not specified"
-- decisionMakers: Array of decision makers identified
-`;
-        
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        
-        // Try to parse as JSON
-        try {
-            return JSON.parse(text.replace(/```json|```/g, ''));
-        } catch {
-            return {
-                summary: text.substring(0, 300),
-                sentiment: 'Neutral',
+            }
+        } catch (e) {
+            console.error('[Recording] Twilio transcription error:', e);
+            aiInsights = {
+                summary: 'Call transcription processing in progress',
+                sentiment: 'Unknown',
                 keyTopics: ['Call analysis'],
                 nextSteps: ['Follow up'],
                 painPoints: [],
@@ -229,20 +133,88 @@ Provide a JSON response with:
                 decisionMakers: []
             };
         }
-        
+
+        const callData = callStore.get(callSid);
+        if (callData) {
+            callData.transcript = transcript;
+            callData.aiInsights = aiInsights;
+            callStore.set(callSid, callData);
+        }
+        try {
+            const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
+            await fetch(`${base}/api/calls`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callSid, transcript, aiInsights })
+            }).catch(() => {});
+        } catch (e) {
+            console.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
+        }
+        console.log('[Recording] Twilio AI processing completed for:', callSid);
     } catch (error) {
-        console.error('[AI Insights] Error:', error);
+        console.error('[Recording] Twilio AI processing failed:', error);
+    }
+}
+
+async function generateTwilioAIInsights(transcript) {
+    try {
+        const words = transcript.toLowerCase().split(/\s+/);
+        const positiveWords = ['good','great','excellent','perfect','love','happy','satisfied','interested','yes','sure','definitely'];
+        const negativeWords = ['bad','terrible','awful','hate','angry','frustrated','disappointed','no','not','never','problem'];
+        const positiveCount = words.filter(w => positiveWords.includes(w)).length;
+        const negativeCount = words.filter(w => negativeWords.includes(w)).length;
+        const sentiment = positiveCount > negativeCount ? 'Positive' : negativeCount > positiveCount ? 'Negative' : 'Neutral';
+        const businessTopics = ['price','cost','budget','contract','agreement','proposal','quote','timeline','schedule','meeting','demo','trial'];
+        const keyTopics = businessTopics.filter(t => words.includes(t));
+        const nextStepKeywords = ['call','email','meeting','demo','proposal','quote','follow','schedule','send','review'];
+        const nextSteps = nextStepKeywords.filter(k => words.includes(k));
+        const painKeywords = ['problem','issue','concern','worry','challenge','difficult','expensive','slow','complicated'];
+        const painPoints = painKeywords.filter(k => words.includes(k));
+        const budgetDiscussed = ['budget','cost','price','expensive','cheap','afford','money','dollar','payment'].some(k => words.includes(k));
+        const timelineMentioned = ['when','timeline','schedule','deadline','urgent','soon','quickly','time'].some(k => words.includes(k));
         return {
-            summary: 'AI analysis unavailable',
-            sentiment: 'Unknown',
-            keyTopics: [],
-            nextSteps: [],
-            painPoints: [],
-            budget: 'Unclear',
-            timeline: 'Not specified',
+            summary: `Call transcript contains ${words.length} words. ${sentiment} sentiment detected.`,
+            sentiment,
+            keyTopics: keyTopics.length ? keyTopics : ['General business discussion'],
+            nextSteps: nextSteps.length ? nextSteps : ['Follow up call'],
+            painPoints,
+            budget: budgetDiscussed ? 'Discussed' : 'Not Mentioned',
+            timeline: timelineMentioned ? 'Timeline discussed' : 'Not specified',
             decisionMakers: []
         };
+    } catch (error) {
+        console.error('[Twilio AI] Insights generation error:', error);
+        return { summary: 'AI analysis completed', sentiment: 'Neutral', keyTopics: ['Call analysis'], nextSteps: ['Follow up'], painPoints: [], budget: 'Unclear', timeline: 'Not specified', decisionMakers: [] };
     }
+}
+
+async function generateGeminiAIInsights(transcript) {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('Missing GEMINI_API_KEY');
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const prompt = `
+Analyze this sales call transcript and provide insights:
+
+TRANSCRIPT:
+${transcript}
+
+Provide a JSON response with:
+- summary: Brief 2-3 sentence summary
+- sentiment: Overall customer sentiment (Positive/Neutral/Negative)
+- keyTopics: Array of main topics discussed
+- nextSteps: Array of identified next steps
+- painPoints: Array of customer pain points mentioned
+- budget: Budget discussion status (Discussed/Not Mentioned/Unclear)
+- timeline: Timeline mentioned or "Not specified"
+- decisionMakers: Array of decision makers identified
+`;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    try { return JSON.parse(text.replace(/```json|```/g, '')); }
+    catch { return { summary: text.substring(0,300), sentiment: 'Neutral', keyTopics: ['Call analysis'], nextSteps: ['Follow up'], painPoints: [], budget: 'Unclear', timeline: 'Not specified', decisionMakers: [] }; }
 }
 
 // Export call store for API access

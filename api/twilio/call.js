@@ -31,9 +31,8 @@ const handler = async function handler(req, res) {
         const client = twilio(accountSid, authToken);
         
         // Improved call bridging approach
-        // This will call your phone first, then connect to the target with proper audio handling
-        // CRITICAL: Always use production URL for webhooks since localhost isn't accessible to Twilio
-        const baseUrl = 'https://power-choosers-crm.vercel.app';
+        // Always use production URL for webhooks to avoid preview-domain auth (401)
+        const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
         
         const call = await client.calls.create({
             from: twilioPhone,
