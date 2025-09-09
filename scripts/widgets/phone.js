@@ -1491,8 +1491,9 @@
         // For incoming calls, use the caller's number as 'from' and business number as 'to'
         // For outgoing calls, use business number as 'from' and target number as 'to'
         const isIncoming = callType === 'incoming';
-        const callFrom = isIncoming ? (fromNumber || phoneNumber) : '+18176630380';
-        const callTo = isIncoming ? '+18176630380' : phoneNumber;
+        const biz = getBusinessNumberE164();
+        const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
+        const callTo = isIncoming ? biz : phoneNumber;
         
         await fetch(`${base}/api/calls`, {
           method: 'POST',
@@ -1515,7 +1516,7 @@
             contactName: currentCallContext.contactName || currentCallContext.name || null,
             source: 'phone-widget',
             targetPhone: String(phoneNumber || '').replace(/\D/g, '').slice(-10),
-            businessPhone: '+18176630380'
+            businessPhone: biz
           })
         });
         
