@@ -190,6 +190,7 @@
           })();
 
           console.log('[Calls] Found', j.calls.length, 'real calls from API');
+          const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
           const rows = j.calls.map((c, idx) => ({
             id: c.id || `call_${Date.now()}_${idx}`,
             contactName: (() => {
@@ -223,7 +224,7 @@
             transcript: c.transcript || '',
             aiSummary: c.aiSummary || '',
             aiInsights: c.aiInsights || null,
-            audioUrl: c.audioUrl ? `${base}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
+            audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
           }));
           // Always use API data, even if empty
           state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
