@@ -122,7 +122,11 @@ export default async function handler(req, res) {
                     }
                 }
 
-                const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
+                // Determine base URL from request headers (works for any deployment domain)
+                const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+                const host = req.headers['x-forwarded-host'] || req.headers.host;
+                const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+                const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm.vercel.app');
 
                 // Derive targetPhone and businessPhone to assist merge on the /api/calls endpoint
                 const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
@@ -156,7 +160,7 @@ export default async function handler(req, res) {
 
             // Trigger Twilio native transcription and AI analysis
             try {
-                await processRecordingWithTwilio(recordingMp3Url, CallSid, effectiveRecordingSid || RecordingSid);
+                await processRecordingWithTwilio(recordingMp3Url, CallSid, effectiveRecordingSid || RecordingSid, base);
             } catch (error) {
                 console.error('[Recording] Processing error:', error);
             }
