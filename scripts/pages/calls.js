@@ -1,3 +1,61 @@
+  // Normalize to last 10 digits
+  function normPhone(s){ return (s==null?'':String(s)).replace(/\D/g,'').slice(-10); }
+  function isClientAddr(s){ return typeof s==='string' && s.startsWith('client:'); }
+  function pickCounterparty(c){
+    const toRaw = c.to || '';
+    const fromRaw = c.from || '';
+    const to = normPhone(toRaw);
+    const from = normPhone(fromRaw);
+    const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(normPhone).filter(Boolean) : [];
+    const isBiz = (p)=> bizList.includes(p);
+    // Prefer the non-client side
+    if (isClientAddr(toRaw) && !isClientAddr(fromRaw)) return from;
+    if (isClientAddr(fromRaw) && !isClientAddr(toRaw)) return to;
+    // Prefer the non-business side if we know business numbers
+    if (bizList.length){
+      if (isBiz(to) && !isBiz(from)) return from;
+      if (isBiz(from) && !isBiz(to)) return to;
+    }
+    // Fallbacks: prefer the 'to' number if it's a real phone, else 'from'
+    if (to) return to;
+    if (from) return from;
+    return '';
+  }
+
+  // Find account by phone using Accounts data
+  function findAccountByPhone(phone10){
+    try{
+      if (typeof window.getAccountsData !== 'function') return null;
+      const accounts = window.getAccountsData() || [];
+      const hit = accounts.find(a=> normPhone(a.phone||a.primaryPhone||a.mainPhone) === phone10);
+      return hit || null;
+    }catch(_){ return null; }
+  }
+
+  // Choose most recently active contact in an account (best-effort)
+  function pickRecentContactForAccount(accountId){
+    try{
+      if (typeof window.getPeopleData !== 'function') return null;
+      const people = window.getPeopleData() || [];
+      const list = people.filter(p=> p && (p.accountId===accountId || p.accountID===accountId));
+      if (!list.length) return null;
+      // Compute recency based on common fields if available
+      const scoreTime = (p)=>{
+        const cand = [p.lastActivityAt, p.lastContactedAt, p.notesUpdatedAt, p.updatedAt, p.createdAt].map(v=>{
+          try{
+            if (!v) return 0;
+            if (typeof v.toDate==='function') return v.toDate().getTime();
+            const d = new Date(v); const t = d.getTime(); return isNaN(t)?0:t;
+          }catch(_){ return 0; }
+        });
+        return Math.max(0, ...cand);
+      };
+      let best = null, bestT = -1;
+      for (const p of list){ const t = scoreTime(p); if (t>bestT){ bestT=t; best=p; } }
+      return best || null;
+    }catch(_){ return null; }
+  }
+
 'use strict';
 (function () {
   const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [] } };
@@ -194,35 +252,50 @@
           const rows = j.calls.map((c, idx) => ({
             id: c.id || `call_${Date.now()}_${idx}`,
             contactName: (() => {
-              const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
-              const tryKeys = [norm(c.to || ''), norm(c.from || '')].filter(Boolean);
-              for (const key of tryKeys) {
-                const m = phoneToContact.get(key);
-                if (m && m.name) return m.name;
+              const party = pickCounterparty(c);
+              // Try exact contact by phone
+              const m = phoneToContact.get(party);
+              if (m && m.name) return m.name;
+              // Try account by phone, then most recent contact; otherwise leave blank per spec
+              const acct = findAccountByPhone(party);
+              if (acct){
+                const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
+                if (p){
+                  const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
+                  if (full) return full;
+                }
               }
-              // Fallback: display whichever number looks like the contact (prefer non-business number)
-              return c.from || c.to || '';
+              return '';
             })(),
             contactTitle: (() => {
-              const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
-              const tryKeys = [norm(c.to || ''), norm(c.from || '')].filter(Boolean);
-              for (const key of tryKeys) {
-                const m = phoneToContact.get(key);
-                if (m && m.title) return m.title;
+              const party = pickCounterparty(c);
+              const m = phoneToContact.get(party);
+              if (m && m.title) return m.title;
+              const acct = findAccountByPhone(party);
+              if (acct){
+                const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
+                if (p && p.title) return p.title;
               }
               return '';
             })(),
             company: (() => {
-              const norm = (s) => (s || '').toString().replace(/\D/g, '').slice(-10);
-              const tryKeys = [norm(c.to || ''), norm(c.from || '')].filter(Boolean);
-              for (const key of tryKeys) {
-                const m = phoneToContact.get(key);
-                if (m && m.company) return m.company;
+              const party = pickCounterparty(c);
+              const m = phoneToContact.get(party);
+              if (m && m.company) return m.company;
+              const acct = findAccountByPhone(party);
+              if (acct){
+                return acct.accountName || acct.name || acct.companyName || '';
               }
               return '';
             })(),
             contactEmail: '',
-            contactPhone: c.to || '',
+            contactPhone: (()=>{
+              const party = pickCounterparty(c);
+              if (!party) return '';
+              // Pretty print (US)
+              const d = party;
+              return d ? `+1 (${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : '';
+            })(),
             contactCity: '',
             contactState: '',
             accountEmployees: null,
