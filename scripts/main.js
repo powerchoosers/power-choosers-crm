@@ -392,6 +392,17 @@ class PowerChoosersCRM {
             }, 50);
         }
         
+        // Call Scripts page - initialize the module when navigating to it
+        if (pageName === 'call-scripts' && window.callScriptsModule) {
+            setTimeout(() => {
+                try {
+                    if (typeof window.callScriptsModule.init === 'function') {
+                        window.callScriptsModule.init();
+                    }
+                } catch (_) { /* noop */ }
+            }, 50);
+        }
+
         // List Detail page - initialize the detail view
         if (pageName === 'list-detail') {
             setTimeout(() => {
@@ -1063,6 +1074,15 @@ class PowerChoosersCRM {
                         if (typeof W.openPhone === 'function') W.openPhone();
                     }
                 } catch (_) { /* noop */ }
+            });
+        }
+
+        // Top bar: Scripts button -> navigate to Call Scripts page
+        const scriptsBtn = document.getElementById('scripts-btn');
+        if (scriptsBtn) {
+            scriptsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.navigateToPage('call-scripts');
             });
         }
     }

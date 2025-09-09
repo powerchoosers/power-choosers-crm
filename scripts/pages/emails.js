@@ -270,8 +270,8 @@ class EmailManager {
         this.startGeneratingAnimation(compose);
         if (status) status.textContent = 'Generating...';
         try {
-            const localUrl = '/api/gemini-email';
-            const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
+            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+            const genUrl = `${base}/api/gemini-email`;
 
             // Enrich recipient with account energy details when available (ensures Gemini sees known values)
             let enrichedRecipient = recipient ? JSON.parse(JSON.stringify(recipient)) : null;
@@ -327,13 +327,14 @@ class EmailManager {
             const payload = { prompt, mode, recipient: enrichedRecipient, to: toInput?.value || '' };
             let res;
             try {
-                res = await fetch(localUrl, {
+                res = await fetch(genUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
             } catch (netErr) {
-                console.warn('[AI] Local request failed, falling back to production endpoint', netErr);
+                console.warn('[AI] Primary endpoint failed, trying Vercel fallback', netErr);
+                const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
                 res = await fetch(prodUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -343,9 +344,9 @@ class EmailManager {
             let data = null;
             try { data = await res.json(); } catch (_) { data = null; }
             if (!res.ok) {
-                // If local returned 404, retry against production once
-                if (res.status === 404) {
-                    console.warn('[AI] Local /api/gemini-email 404, retrying against production');
+                // Retry once directly against Vercel if not already
+                const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
+                if (!genUrl.startsWith(prodUrl)) {
                     const res2 = await fetch(prodUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -359,7 +360,6 @@ class EmailManager {
                         return;
                     }
                     const output2 = data2?.output || '';
-                    // Use the same formatting pipeline for prod fallback
                     const { subject: subject2, html: html2 } = this.formatGeneratedEmail(output2, recipient, mode);
                     if (subjectInput) {
                         subjectInput.classList.remove('fade-in');
@@ -374,7 +374,6 @@ class EmailManager {
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
                         editor.innerHTML = html2;
                         this.normalizeVariablesInEditor(editor);
-                        // Extra safety: sanitize DOM for duplicate greetings/closings
                         this.sanitizeGeneratedEditor(editor, recipient);
                         if (status) status.textContent = 'Draft inserted (prod).';
                     }
@@ -384,7 +383,7 @@ class EmailManager {
                 }
                 const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
                 console.error('[AI] Generation failed', { status: res.status, data });
-                status.textContent = `Generation failed: ${msg}`;
+                if (status) status.textContent = `Generation failed: ${msg}`;
                 return;
             }
             const output = data?.output || '';
