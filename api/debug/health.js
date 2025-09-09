@@ -34,7 +34,7 @@ module.exports = async function handler(req, res) {
       VERCEL_URL: has('VERCEL_URL')
     };
 
-    let firestore = { enabled: false, lastCalls: [], error: null };
+    let firestore = { enabled: false, lastCalls: [], webhooks: [], error: null };
     try {
       if (db) {
         firestore.enabled = true;
@@ -54,6 +54,17 @@ module.exports = async function handler(req, res) {
             transcriptLen: (d.transcript || '').length,
             updated: d.timestamp || null
           });
+        });
+
+        // Recent webhook hits
+        const w = await db
+          .collection('twilio_webhooks')
+          .orderBy('ts', 'desc')
+          .limit(5)
+          .get();
+        w.forEach((doc) => {
+          const d = doc.data() || {};
+          firestore.webhooks.push({ type: d.type, event: d.event || null, callSid: d.body?.CallSid || null, status: d.body?.CallStatus || d.body?.RecordingStatus || null, ts: d.ts });
         });
       }
     } catch (e) {
