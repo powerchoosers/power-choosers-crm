@@ -1,5 +1,11 @@
 export default async function handler(req, res) {
-    // Only allow POST requests
+    // Accept GET for quick verification; Twilio will POST status updates
+    if (req.method === 'GET') {
+        try {
+            console.log('[Status GET] Host:', req.headers.host, 'Query:', req.query || {});
+        } catch (_) {}
+        return res.status(200).send('OK');
+    }
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
@@ -29,8 +35,11 @@ export default async function handler(req, res) {
             CallDuration
         } = body;
         
+        const sig = req.headers['x-twilio-signature'] || null;
         console.log(`[Status Callback] Call ${CallSid} status: ${CallStatus}`);
+        console.log('  Host:', req.headers.host, 'Twilio-Signature:', sig);
         console.log(`  From: ${From} → To: ${To}`);
+        console.log('  Raw body:', JSON.stringify(body).slice(0, 800));
         // Log to Firestore (best-effort)
         try {
             const { db } = require('../_firebase');
