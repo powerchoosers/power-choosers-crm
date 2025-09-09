@@ -22,10 +22,17 @@ class EmailTrackingManager {
     }
 
     startTrackingEventPolling() {
-        // Poll for tracking events every 5 seconds
+        // Only poll the local development server; production uses serverless pixel + Firebase
+        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+        if (!isLocal) {
+            console.log('[EmailTracking] Skipping tracking-events polling in production');
+            return;
+        }
+        // Poll for tracking events every 5 seconds (local dev)
         setInterval(async () => {
             try {
-                const response = await fetch('/api/email/tracking-events');
+                const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+                const response = await fetch(`${base}/api/email/tracking-events`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.events && data.events.length > 0) {
@@ -88,8 +95,8 @@ class EmailTrackingManager {
             // Generate unique tracking ID
             const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            // Create tracking pixel URL - use Vercel deployment URL
-            const baseUrl = window.location.origin;
+            // Create tracking pixel URL using configured API base (prod -> Vercel)
+            const baseUrl = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
             const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
             
             // Inject tracking pixel into email content
@@ -117,10 +124,9 @@ class EmailTrackingManager {
             // Save to Firebase
             await this.db.collection('emails').doc(trackingId).set(emailRecord);
 
-            // Send the email via API - use the correct endpoint based on environment
-            const apiUrl = window.location.hostname === 'localhost' 
-                ? '/api/email/send' 
-                : 'https://power-choosers-crm.vercel.app/api/email/send';
+            // Send the email via API using configured base
+            const apiBase = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+            const apiUrl = `${apiBase}/api/email/send`;
                 
             const response = await fetch(apiUrl, {
                 method: 'POST',
