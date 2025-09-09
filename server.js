@@ -172,6 +172,31 @@ async function handleApiTwilioCall(req, res) {
   }
 }
 
+async function handleApiTwilioAIInsights(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+  try {
+    const body = await readJsonBody(req);
+    const proxyUrl = `${API_BASE_URL}/api/twilio/ai-insights`;
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const raw = await response.text();
+    let payload;
+    try { payload = raw ? JSON.parse(raw) : {}; } catch (_) { payload = { error: 'Upstream responded with non-JSON', body: raw }; }
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(payload));
+  } catch (error) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
 async function handleApiCalls(req, res) {
   const proxyUrl = `${API_BASE_URL}/api/calls`;
   
