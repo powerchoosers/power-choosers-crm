@@ -123,6 +123,17 @@ export default async function handler(req, res) {
                 }
 
                 const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
+
+                // Derive targetPhone and businessPhone to assist merge on the /api/calls endpoint
+                const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+                const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+                  .split(',').map(norm).filter(Boolean);
+                const to10 = norm(callResource?.to || '');
+                const from10 = norm(callResource?.from || '');
+                const isBiz = (p) => !!p && envBiz.includes(p);
+                const businessPhone = isBiz(to10) ? callResource?.to : (isBiz(from10) ? callResource?.from : (envBiz[0] || ''));
+                const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
+
                 await fetch(`${base}/api/calls`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -132,7 +143,10 @@ export default async function handler(req, res) {
                         from: callResource?.from || undefined,
                         status: 'completed',
                         duration: parseInt(RecordingDuration) || parseInt(callResource?.duration, 10) || 0,
-                        recordingUrl: recordingMp3Url
+                        recordingUrl: recordingMp3Url,
+                        source: 'twilio-recording-webhook',
+                        targetPhone: targetPhone || undefined,
+                        businessPhone: businessPhone || undefined
                     })
                 }).catch(() => {});
                 console.log('[Recording] Posted initial call data to /api/calls for', CallSid);
