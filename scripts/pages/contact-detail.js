@@ -1757,6 +1757,26 @@
     panel.innerHTML = `<div class="rc-details-inner">${insightsInlineHtml(call)}</div>`;
     item.insertAdjacentElement('afterend', panel);
     animateExpand(panel);
+
+    // Background transcript fetch if missing
+    try {
+      const candidateSid = call.twilioSid || call.callSid || (typeof call.id==='string' && /^CA[0-9a-zA-Z]+$/.test(call.id) ? call.id : '');
+      if ((!call.transcript || String(call.transcript).trim()==='') && candidateSid) {
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const url = base ? `${base}/api/twilio/ai-insights` : '/api/twilio/ai-insights';
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callSid: candidateSid })
+        }).then(res=>res.json()).then(data=>{
+          if (data && data.transcript) {
+            call.transcript = data.transcript;
+            const tEl = panel.querySelector('.pc-transcript');
+            if (tEl) tEl.textContent = data.transcript;
+          }
+        }).catch(()=>{});
+      }
+    } catch(_) {}
   }
   function animateExpand(el){
     el.style.height = '0px'; el.style.opacity = '0';

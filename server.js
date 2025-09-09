@@ -259,6 +259,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/call' ||
     pathname === '/api/calls' ||
     pathname === '/api/twilio/language-webhook' ||
+    pathname === '/api/twilio/ai-insights' ||
     pathname === '/api/energy-news' ||
     pathname === '/api/search' ||
     pathname === '/api/tx-price' ||
@@ -283,6 +284,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/twilio/language-webhook') {
     return handleApiTwilioLanguageWebhook(req, res);
+  }
+  if (pathname === '/api/twilio/ai-insights') {
+    return handleApiTwilioAIInsights(req, res);
   }
   if (pathname === '/api/calls') {
     return handleApiCalls(req, res);
