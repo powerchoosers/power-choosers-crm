@@ -13,6 +13,26 @@ function corsMiddleware(req, res, next) {
     next();
 }
 
+function normalizeBody(req) {
+    // Supports: JS object, JSON string, x-www-form-urlencoded string
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    const b = req.body;
+    if (!b) return req.query || {};
+    if (typeof b === 'object') return b;
+    if (typeof b === 'string') {
+        try {
+            if (ct.includes('application/json')) return JSON.parse(b);
+        } catch(_) {}
+        try {
+            const params = new URLSearchParams(b);
+            const out = {};
+            for (const [k, v] of params.entries()) out[k] = v;
+            return out;
+        } catch(_) {}
+    }
+    return b;
+}
+
 // In-memory call storage (replace with database in production)
 const callStore = new Map();
 
@@ -24,6 +44,7 @@ export default async function handler(req, res) {
     }
     
     try {
+        const body = normalizeBody(req);
         const {
             RecordingUrl,
             RecordingSid,
@@ -31,7 +52,7 @@ export default async function handler(req, res) {
             AccountSid,
             RecordingStatus,
             RecordingDuration
-        } = req.body;
+        } = body;
         
         console.log('[Recording] Webhook received:', {
             RecordingSid,
