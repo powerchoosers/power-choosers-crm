@@ -16,6 +16,27 @@
       apiKey: 'AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE',
       projectId: 'power-choosers-crm'
     };
+
+    // Guard: ignore invalid placeholder overrides (e.g., YOUR_PROJECT_ID)
+    function isInvalidConfig(cfg) {
+      try {
+        if (!cfg || typeof cfg !== 'object') return true;
+        const pid = String(cfg.projectId || '').trim();
+        const key = String(cfg.apiKey || '').trim();
+        const invalidPid = !pid || /^your_project_id$/i.test(pid) || /YOUR_PROJECT_ID/i.test(pid);
+        const invalidKey = !key || /YOUR_API_KEY|your_api_key/i.test(key);
+        return invalidPid || invalidKey;
+      } catch (_) {
+        return true;
+      }
+    }
+
+    if (override && isInvalidConfig(override)) {
+      try { console.warn('[Firebase] Ignoring invalid override config (PC_FIREBASE_CONFIG/__FIREBASE_CONFIG). Using fallback.', override); } catch(_) {}
+      try { localStorage.removeItem('PC_FIREBASE_CONFIG'); } catch(_) {}
+      override = null;
+    }
+
     const firebaseConfig = Object.assign({}, fallbackConfig, override || {});
 
     try {
