@@ -428,6 +428,25 @@
     panel.innerHTML = `<div class="rc-details-inner">${insightsInlineHtml(call)}</div>`;
     item.insertAdjacentElement('afterend', panel);
     animateExpand(panel);
+
+    // Background transcript fetch if missing
+    try {
+      if ((!call.transcript || String(call.transcript).trim()==='') && call.twilioSid) {
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const url = base ? `${base}/api/twilio/ai-insights` : '/api/twilio/ai-insights';
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callSid: call.twilioSid })
+        }).then(res=>res.json()).then(data=>{
+          if (data && data.transcript) {
+            call.transcript = data.transcript;
+            const tEl = panel.querySelector('.pc-transcript');
+            if (tEl) tEl.textContent = data.transcript;
+          }
+        }).catch(()=>{});
+      }
+    } catch(_) {}
   }
   function animateExpand(el){ el.style.height='0px'; el.style.opacity='0'; const h=el.scrollHeight; requestAnimationFrame(()=>{ el.classList.add('expanding'); el.style.transition='height 180ms ease, opacity 180ms ease'; el.style.height=h+'px'; el.style.opacity='1'; setTimeout(()=>{ el.style.height=''; el.style.transition=''; el.classList.remove('expanding'); },200); }); }
   function animateCollapse(el, done){ const h=el.scrollHeight; el.style.height=h+'px'; el.style.opacity='1'; requestAnimationFrame(()=>{ el.classList.add('collapsing'); el.style.transition='height 140ms ease, opacity 140ms ease'; el.style.height='0px'; el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('collapsing'); done&&done(); },160); }); }

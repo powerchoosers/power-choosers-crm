@@ -591,6 +591,30 @@
     document.body.appendChild(bd); document.body.appendChild(md);
     md.querySelector('.pc-insights-close').addEventListener('click', closeInsightsModal);
     document.addEventListener('keydown', escClose);
+
+    // Background fetch: if transcript is missing but we have a Twilio SID, try to generate/fetch it
+    try {
+      const candidateSid = r.twilioSid || r.callSid || (typeof r.id==='string' && /^CA[0-9a-zA-Z]+$/.test(r.id) ? r.id : '');
+      if ((!r.transcript || String(r.transcript).trim()==='') && candidateSid) {
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const url = base ? `${base}/api/twilio/ai-insights` : '/api/twilio/ai-insights';
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callSid: candidateSid })
+        }).then(res => res.json()).then(data => {
+          if (data && data.transcript) {
+            r.transcript = data.transcript;
+            const tEl = md.querySelector('.pc-transcript');
+            if (tEl) tEl.textContent = data.transcript;
+          }
+          if (data && data.aiInsights) {
+            r.aiInsights = data.aiInsights;
+            // We won't re-render full modal to avoid flicker; transcript is the main missing piece.
+          }
+        }).catch(()=>{});
+      }
+    } catch(_) {}
   }
   function insightsContentHtml(r){
     const aiInsights = r.aiInsights || {};

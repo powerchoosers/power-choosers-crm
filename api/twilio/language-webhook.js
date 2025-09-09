@@ -71,6 +71,16 @@ export default async function handler(req, res) {
     const body = normalizeBody(req);
     try { console.log('[LanguageWebhook] incoming body keys:', Object.keys(body || {})); } catch(_) {}
 
+    // Twilio Language often sends a Results field (JSON string). Parse it if present.
+    let resultsObj = null;
+    try {
+      const raw = body.Results || body.results || null;
+      if (raw) {
+        if (typeof raw === 'string') { try { resultsObj = JSON.parse(raw); } catch(e) { console.warn('[LanguageWebhook] Failed to parse Results JSON:', e?.message); } }
+        else if (typeof raw === 'object') { resultsObj = raw; }
+      }
+    } catch(_) {}
+
     // Try to locate relevant identifiers
     const callSid = body.CallSid || body.callSid || body.call_sid || body.call_id || null;
     let recordingSid = body.RecordingSid || body.recordingSid || body.recording_sid || null;
@@ -81,8 +91,10 @@ export default async function handler(req, res) {
       recordingSid = sourceSid; // best-effort map
     }
 
-    // Extract transcript text from arbitrary payload
-    const texts = extractAllTexts(body);
+    // Extract transcript text from Results (preferred) and full body as fallback
+    let texts = [];
+    try { if (resultsObj) texts = texts.concat(extractAllTexts(resultsObj)); } catch(_) {}
+    try { texts = texts.concat(extractAllTexts(body)); } catch(_) {}
     const transcript = texts.length ? texts.join('\n') : '';
 
     // If we don't have a callSid, try to resolve via recording
