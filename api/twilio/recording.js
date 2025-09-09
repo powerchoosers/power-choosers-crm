@@ -81,7 +81,7 @@ export default async function handler(req, res) {
 
             // Upsert into central /api/calls so the UI can see the recording immediately
             try {
-                const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+                const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
                 await fetch(`${base}/api/calls`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -153,21 +153,23 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                 console.log('[Recording] New transcript created:', transcript.substring(0, 100) + '...');
             }
             
-            // Generate AI insights using Twilio-based analysis
+            // Generate AI insights: prefer Gemini (if GEMINI_API_KEY set), else heuristic
             if (transcript) {
-                aiInsights = await generateTwilioAIInsights(transcript);
+                if (process.env.GEMINI_API_KEY) {
+                    try {
+                        aiInsights = await generateGeminiAIInsights(transcript);
+                    } catch (e) {
+                        console.warn('[Recording] Gemini insights failed, falling back to heuristic:', e?.message);
+                        aiInsights = await generateTwilioAIInsights(transcript);
+                    }
+                } else {
+                    aiInsights = await generateTwilioAIInsights(transcript);
+                }
             }
             
         } catch (transcriptionError) {
             console.error('[Recording] Twilio transcription error:', transcriptionError);
-            // If Google key is available, fall back to Google STT end-to-end
-            const googleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-            if (googleKey) {
-                console.log('[Recording] Falling back to Google STT for:', callSid);
-                await processRecording(recordingUrl, callSid);
-                return; // processing and /api/calls update handled by fallback
-            }
-            // Fallback to basic placeholder insights if no Google key
+            // Fallback to basic placeholder insights; Google STT removed
             aiInsights = {
                 summary: 'Call transcription processing in progress',
                 sentiment: 'Unknown',
@@ -180,13 +182,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
             };
         }
 
-        // If Twilio returned no transcript text, optionally fall back to Google STT
-        const googleKey2 = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-        if (!transcript && googleKey2) {
-            console.log('[Recording] Twilio transcript empty; falling back to Google STT for:', callSid);
-            await processRecording(recordingUrl, callSid);
-            return;
-        }
+        
         
         // Update call data
         const callData = callStore.get(callSid);
@@ -198,7 +194,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
         
         // Also upsert transcript and insights into /api/calls for the UI
         try {
-            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+            const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -219,99 +215,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
     }
 }
 
-async function processRecording(recordingUrl, callSid) {
-    try {
-        console.log('[Recording] Starting AI processing for:', callSid);
-        
-        // Use Google Speech-to-Text for transcription
-        const transcript = await transcribeAudio(recordingUrl);
-        
-        // Generate AI insights
-        const aiInsights = await generateAIInsights(transcript);
-        
-        // Update call data
-        const callData = callStore.get(callSid);
-        if (callData) {
-            callData.transcript = transcript;
-            callData.aiInsights = aiInsights;
-            callStore.set(callSid, callData);
-        }
-        
-        // Also upsert transcript and insights into /api/calls for the UI
-        try {
-            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
-            await fetch(`${base}/api/calls`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    callSid: callSid,
-                    transcript,
-                    aiInsights
-                })
-            }).catch(() => {});
-        } catch (e) {
-            console.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
-        }
-        
-        console.log('[Recording] AI processing completed for:', callSid);
-        
-    } catch (error) {
-        console.error('[Recording] AI processing failed:', error);
-    }
-}
-
-async function transcribeAudio(recordingUrl) {
-    try {
-        // 1) Download the recording (mp3) from Twilio using basic auth
-        const accountSid = process.env.TWILIO_ACCOUNT_SID;
-        const authToken = process.env.TWILIO_AUTH_TOKEN;
-        if (!accountSid || !authToken) {
-            console.warn('[Transcribe] Missing Twilio credentials');
-        }
-
-        const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-        const recResp = await fetch(recordingUrl, { headers: { Authorization: authHeader } });
-        if (!recResp.ok) throw new Error(`Failed to fetch recording: ${recResp.status}`);
-        const arrayBuf = await recResp.arrayBuffer();
-        const base64Audio = Buffer.from(arrayBuf).toString('base64');
-
-        // 2) Transcribe using Google Speech-to-Text (API key via query param)
-        const googleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
-        const sttUrl = `https://speech.googleapis.com/v1/speech:recognize?key=${encodeURIComponent(googleKey)}`;
-        const response = await fetch(sttUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                config: {
-                    encoding: 'MP3',
-                    sampleRateHertz: 8000,
-                    languageCode: 'en-US',
-                    enableAutomaticPunctuation: true,
-                    model: 'phone_call'
-                },
-                audio: {
-                    content: base64Audio
-                }
-            })
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (data.results && data.results.length > 0) {
-            return data.results
-                .map(result => result.alternatives[0].transcript)
-                .join(' ');
-        }
-
-        return 'Transcription not available';
-        
-    } catch (error) {
-        console.error('[Transcribe] Error:', error);
-        return 'Transcription failed';
-    }
-}
+ 
 
 async function generateTwilioAIInsights(transcript) {
     try {
@@ -376,13 +280,14 @@ async function generateTwilioAIInsights(transcript) {
     }
 }
 
-async function generateAIInsights(transcript) {
-    try {
-        const { GoogleGenerativeAI } = require('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-        
-        const prompt = `
+async function generateGeminiAIInsights(transcript) {
+    // Uses @google/generative-ai with GEMINI_API_KEY
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('Missing GEMINI_API_KEY');
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const prompt = `
 Analyze this sales call transcript and provide insights:
 
 TRANSCRIPT:
@@ -390,7 +295,7 @@ ${transcript}
 
 Provide a JSON response with:
 - summary: Brief 2-3 sentence summary
-- sentiment: Overall customer sentiment (Positive/Neutral/Negative)  
+- sentiment: Overall customer sentiment (Positive/Neutral/Negative)
 - keyTopics: Array of main topics discussed
 - nextSteps: Array of identified next steps
 - painPoints: Array of customer pain points mentioned
@@ -398,34 +303,17 @@ Provide a JSON response with:
 - timeline: Timeline mentioned or "Not specified"
 - decisionMakers: Array of decision makers identified
 `;
-        
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        
-        // Try to parse as JSON
-        try {
-            return JSON.parse(text.replace(/```json|```/g, ''));
-        } catch {
-            return {
-                summary: text.substring(0, 300),
-                sentiment: 'Neutral',
-                keyTopics: ['Call analysis'],
-                nextSteps: ['Follow up'],
-                painPoints: [],
-                budget: 'Unclear',
-                timeline: 'Not specified',
-                decisionMakers: []
-            };
-        }
-        
-    } catch (error) {
-        console.error('[AI Insights] Error:', error);
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    try {
+        return JSON.parse(text.replace(/```json|```/g, ''));
+    } catch {
         return {
-            summary: 'AI analysis unavailable',
-            sentiment: 'Unknown',
-            keyTopics: [],
-            nextSteps: [],
+            summary: text.substring(0, 300),
+            sentiment: 'Neutral',
+            keyTopics: ['Call analysis'],
+            nextSteps: ['Follow up'],
             painPoints: [],
             budget: 'Unclear',
             timeline: 'Not specified',

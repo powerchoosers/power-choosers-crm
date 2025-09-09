@@ -26,15 +26,11 @@ const mimeTypes = {
 const PORT = process.env.PORT || 3000;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm.vercel.app';
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
 // Email sending now handled by Gmail API via frontend
 console.log('[Server] Email sending configured to use Gmail API via frontend authentication');
 
 console.log(`[Server] Starting in ${LOCAL_DEV_MODE ? 'development' : 'production'} mode`);
 console.log(`[Server] API Base URL: ${API_BASE_URL}`);
-if (!GOOGLE_API_KEY) {
-  console.warn('[Server] GOOGLE_API_KEY is not set. /api/tx-price will return a placeholder until configured.');
-}
 
 // ---------------- Gemini API endpoints now proxied to Vercel ----------------
 

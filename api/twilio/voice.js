@@ -17,11 +17,8 @@ export default function handler(req, res) {
         // Your business phone number for caller ID
         const businessNumber = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
         
-        // Ensure absolute base URL for Twilio callbacks
-        const base =
-            (req.headers?.host ? `https://${req.headers.host}` : null) ||
-            process.env.PUBLIC_BASE_URL ||
-            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+        // Ensure absolute base URL for Twilio callbacks (avoid preview domains)
+        const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
 
         const digits = (s) => (s || '').toString().replace(/\D/g, '');
         const toDigits = digits(To);

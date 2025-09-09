@@ -13,11 +13,8 @@ export default function handler(req, res) {
         
         console.log(`[Bridge] Connecting agent call to target: ${target}, CallSid: ${CallSid}`);
         
-        // Ensure absolute base URL for Twilio callbacks
-        const base =
-            (req.headers?.host ? `https://${req.headers.host}` : null) ||
-            process.env.PUBLIC_BASE_URL ||
-            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+        // Ensure absolute base URL for Twilio callbacks (avoid preview domains that require auth)
+        const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
         
         if (!target) {
             // No target specified, just say hello
