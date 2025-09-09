@@ -53,7 +53,34 @@ export default async function handler(req, res) {
                         contactName: d.contactName || null
                     });
                 });
-                return res.status(200).json({ ok: true, calls });
+                // Deduplicate by twilioSid (or id) to avoid showing multiple rows for the same call
+                const dedupe = (arr) => {
+                    const map = new Map();
+                    for (const c of arr) {
+                        const key = c.twilioSid || c.id;
+                        if (!map.has(key)) { map.set(key, c); continue; }
+                        const prev = map.get(key);
+                        const aHasRec = !!c.recordingUrl;
+                        const bHasRec = !!prev.recordingUrl;
+                        const pick = aHasRec && !bHasRec ? c : (!aHasRec && bHasRec ? prev : ((c.durationSec||0) > (prev.durationSec||0) ? c : (new Date(c.timestamp) > new Date(prev.timestamp) ? c : prev)));
+                        const merged = { ...prev, ...c };
+                        merged.id = pick.id; // prefer the picked id for stability
+                        merged.recordingUrl = pick.recordingUrl || prev.recordingUrl || '';
+                        merged.audioUrl = merged.recordingUrl;
+                        merged.durationSec = pick.durationSec || prev.durationSec || 0;
+                        merged.duration = pick.duration || prev.duration || merged.durationSec || 0;
+                        merged.status = pick.status || prev.status;
+                        merged.accountId = pick.accountId || prev.accountId || null;
+                        merged.accountName = pick.accountName || prev.accountName || null;
+                        merged.contactId = pick.contactId || prev.contactId || null;
+                        merged.contactName = pick.contactName || prev.contactName || null;
+                        map.set(key, merged);
+                    }
+                    return Array.from(map.values());
+                };
+                const pruned = dedupe(calls);
+                try { console.log('[Calls][GET] returning %d calls (deduped from %d)', pruned.length, calls.length); } catch(_) {}
+                return res.status(200).json({ ok: true, calls: pruned });
             }
         } catch (e) {
             console.warn('[Calls] Firestore GET failed, falling back to memory:', e?.message);
@@ -62,9 +89,33 @@ export default async function handler(req, res) {
         const calls = Array.from(callStore.values())
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
             .slice(0, 50);
+        // Dedupe memory results similar to Firestore path
+        const dedupeMem = (arr) => {
+            const map = new Map();
+            for (const c of arr) {
+                const key = c.twilioSid || c.id;
+                if (!map.has(key)) { map.set(key, c); continue; }
+                const prev = map.get(key);
+                const aHasRec = !!c.recordingUrl;
+                const bHasRec = !!prev.recordingUrl;
+                const pick = aHasRec && !bHasRec ? c : (!aHasRec && bHasRec ? prev : ((c.duration||0) > (prev.duration||0) ? c : (new Date(c.timestamp) > new Date(prev.timestamp) ? c : prev)));
+                const merged = { ...prev, ...c };
+                merged.id = pick.id;
+                merged.recordingUrl = pick.recordingUrl || prev.recordingUrl || '';
+                merged.duration = pick.duration || prev.duration || 0;
+                merged.status = pick.status || prev.status;
+                merged.accountId = pick.accountId || prev.accountId || null;
+                merged.accountName = pick.accountName || prev.accountName || null;
+                merged.contactId = pick.contactId || prev.contactId || null;
+                merged.contactName = pick.contactName || prev.contactName || null;
+                map.set(key, merged);
+            }
+            return Array.from(map.values());
+        };
+        const memPruned = dedupeMem(calls);
         return res.status(200).json({
             ok: true,
-            calls: calls.map(call => ({
+            calls: memPruned.map(call => ({
                 id: call.id,
                 to: call.to,
                 from: call.from,
@@ -122,8 +173,33 @@ export default async function handler(req, res) {
             return to || from || '';
         };
 
-        // If there is no exact record for callSid, try to merge into a recent matching call to avoid duplicates
+        // If there is no exact record for this callSid, try stronger merges: by twilioSid, then by window/counterparty
         if (!existingCall || Object.keys(existingCall).length === 0) {
+            // 1) Exact twilioSid match in memory
+            if (callSid) {
+                for (const v of callStore.values()) {
+                    if (v && v.twilioSid && v.twilioSid === callSid) {
+                        try { console.log('[Calls][POST][%s] Exact memory twilioSid match -> %s', _rid, v.id); } catch(_) {}
+                        callId = v.id; existingCall = v;
+                        break;
+                    }
+                }
+            }
+            // 2) Exact twilioSid match in Firestore
+            if ((!existingCall || !existingCall.id) && db && callSid) {
+                try {
+                    const snapSid = await db.collection('calls').where('twilioSid', '==', callSid).limit(1).get();
+                    if (!snapSid.empty) {
+                        const doc = snapSid.docs[0];
+                        existingCall = { id: doc.id, ...(doc.data()||{}) };
+                        callId = doc.id;
+                        try { console.log('[Calls][POST][%s] Exact Firestore twilioSid match -> %s', _rid, callId); } catch(_) {}
+                    }
+                } catch(e) {
+                    console.warn('[Calls][POST][%s] Firestore twilioSid lookup failed:', _rid, e?.message);
+                }
+            }
+            // 3) Fallback to window-based counterparty matching
             try {
                 const now = Date.now();
                 // If caller provided a clear targetPhone, prefer it as counterparty
@@ -149,8 +225,8 @@ export default async function handler(req, res) {
                         try { console.log('[Calls][POST][%s] candidate id=%s ts=%s candCounterparty=%s score=%s hasRec=%s idMatch=%s', _rid, v.id, new Date(ts).toISOString(), candCounterparty, score, !!v.recordingUrl, !!idBoost); } catch(_) {}
                     } catch (_) {}
                 }
-                if (best && best.id && (!recordingUrl || !callStore.has(callId))) {
-                    // Merge into the existing best row
+                if (best && best.id) {
+                    // Always merge into the existing best row to maintain a single call record
                     try { console.log('[Calls][POST][%s] Merging into existing id=%s for callSid=%s', _rid, best.id, callSid); } catch(_) {}
                     callId = best.id;
                     existingCall = best;

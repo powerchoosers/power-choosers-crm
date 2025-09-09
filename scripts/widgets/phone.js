@@ -7,7 +7,17 @@
   if (!window.Widgets) window.Widgets = {};
 
   // Business phone number for fallback calls
-  const BUSINESS_PHONE = '8176630380'; // Your Twilio number without formatting
+  const DEFAULT_BUSINESS_E164 = '+18176630380';
+  const BUSINESS_PHONE = '8176630380'; // legacy fallback without formatting
+  function getBusinessNumberE164(){
+    try {
+      const arr = (window.CRM_BUSINESS_NUMBERS || []).filter(Boolean);
+      if (arr && arr.length) return String(arr[0]);
+    } catch(_) {}
+    // Fallbacks
+    if (BUSINESS_PHONE && BUSINESS_PHONE.length === 10) return `+1${BUSINESS_PHONE}`;
+    return DEFAULT_BUSINESS_E164;
+  }
 
   // Twilio Device state management
   const TwilioRTC = (function() {
@@ -1434,8 +1444,9 @@
         // For incoming calls, use the caller's number as 'from' and business number as 'to'
         // For outgoing calls, use business number as 'from' and target number as 'to'
         const isIncoming = callType === 'incoming';
-        const callFrom = isIncoming ? (fromNumber || phoneNumber) : '+18176630380';
-        const callTo = isIncoming ? '+18176630380' : phoneNumber;
+        const biz = getBusinessNumberE164();
+        const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
+        const callTo = isIncoming ? biz : phoneNumber;
         
         const response = await fetch(`${base}/api/calls`, {
           method: 'POST',
@@ -1457,7 +1468,7 @@
             contactName: currentCallContext.contactName || currentCallContext.name || null,
             source: 'phone-widget',
             targetPhone: String(phoneNumber || '').replace(/\D/g, '').slice(-10),
-            businessPhone: '+18176630380'
+            businessPhone: biz
           })
         });
         
