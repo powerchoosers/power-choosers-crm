@@ -78,21 +78,37 @@ export default async function handler(req, res) {
     
     if (req.method === 'POST') {
         // Log a new call or update existing call
-        const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl } = req.body;
+        const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl, timestamp, callTime } = req.body || {};
         
         const callId = callSid || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         // Get existing call data or create new
         const existingCall = callStore.get(callId) || {};
+
+        // If to/from missing, try to fetch from Twilio Call resource
+        let _to = to || existingCall.to;
+        let _from = from || existingCall.from;
+        let _duration = duration || existingCall.duration || 0;
+        if ((!_to || !_from) && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+            try {
+                const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                const call = await client.calls(callSid).fetch();
+                _to = _to || call.to;
+                _from = _from || call.from;
+                if (!_duration && call?.duration) _duration = parseInt(call.duration, 10) || 0;
+            } catch (e) {
+                console.warn('[Calls] Failed to fetch Call resource for', callSid, e?.message);
+            }
+        }
         
         const callData = {
             ...existingCall,
             id: callId,
-            to: to || existingCall.to,
-            from: from || existingCall.from,
+            to: _to,
+            from: _from,
             status: status || existingCall.status || 'initiated',
-            duration: duration || existingCall.duration || 0,
-            timestamp: existingCall.timestamp || new Date().toISOString(),
+            duration: _duration,
+            timestamp: timestamp || callTime || existingCall.timestamp || new Date().toISOString(),
             transcript: transcript || existingCall.transcript,
             aiInsights: aiInsights || existingCall.aiInsights,
             recordingUrl: recordingUrl || existingCall.recordingUrl
@@ -106,7 +122,7 @@ export default async function handler(req, res) {
         } catch (e) {
             console.warn('[Calls] Firestore POST failed, storing in memory only:', e?.message);
         }
-
+        
         // Always upsert into in-memory store as a fallback cache
         callStore.set(callId, callData);
         
