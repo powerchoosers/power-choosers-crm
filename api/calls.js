@@ -80,10 +80,43 @@ export default async function handler(req, res) {
         // Log a new call or update existing call
         const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl, timestamp, callTime } = req.body || {};
         
-        const callId = callSid || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        let callId = callSid || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         // Get existing call data or create new
-        const existingCall = callStore.get(callId) || {};
+        let existingCall = callStore.get(callId) || {};
+
+        // Helper: normalize phone (10-digit) and strip Twilio client prefix
+        const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+        const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
+
+        // If there is no exact record for callSid, try to merge into a recent matching call to avoid duplicates
+        if (!existingCall || Object.keys(existingCall).length === 0) {
+            try {
+                const now = Date.now();
+                const targetTo = norm(isClient(to) ? '' : to);
+                const targetFrom = norm(isClient(from) ? '' : from);
+                let best = null;
+                for (const v of callStore.values()) {
+                    try {
+                        const ts = new Date(v.timestamp || v.callTime || 0).getTime();
+                        if (!ts || Math.abs(now - ts) > 5 * 60 * 1000) continue; // within 5 minutes
+                        const vTo = norm(isClient(v.to) ? '' : v.to);
+                        const vFrom = norm(isClient(v.from) ? '' : v.from);
+                        // Match either direction (same other party)
+                        const partyMatch = (vTo && vTo === targetTo) || (vFrom && vFrom === targetFrom) || (vTo && vTo === targetFrom) || (vFrom && vFrom === targetTo);
+                        if (!partyMatch) continue;
+                        // Prefer a row without a recording yet
+                        if (!v.recordingUrl) { best = v; break; }
+                        if (!best) best = v;
+                    } catch (_) {}
+                }
+                if (best && best.id && (!recordingUrl || !callStore.has(callId))) {
+                    // Merge into the existing best row
+                    callId = best.id;
+                    existingCall = best;
+                }
+            } catch (_) {}
+        }
 
         // If to/from missing, try to fetch from Twilio Call resource
         let _to = to || existingCall.to;
@@ -111,7 +144,8 @@ export default async function handler(req, res) {
             timestamp: timestamp || callTime || existingCall.timestamp || new Date().toISOString(),
             transcript: transcript || existingCall.transcript,
             aiInsights: aiInsights || existingCall.aiInsights,
-            recordingUrl: recordingUrl || existingCall.recordingUrl
+            recordingUrl: recordingUrl || existingCall.recordingUrl,
+            twilioSid: callSid || existingCall.twilioSid || null
         };
         
         // Persist to Firestore if available
