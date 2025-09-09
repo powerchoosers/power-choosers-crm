@@ -98,7 +98,10 @@ export default async function handler(req, res) {
 
     // Upsert into central /api/calls so UI can read transcript
     try {
-      const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
+      const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+      const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm.vercel.app');
       await fetch(`${base}/api/calls`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,7 +112,7 @@ export default async function handler(req, res) {
           recordingSid: recordingSid || undefined
         })
       }).catch(()=>{});
-      console.log('[LanguageWebhook] Posted transcript to /api/calls for', finalCallSid || recordingSid || '(unknown)');
+      console.log('[LanguageWebhook] Posted transcript to /api/calls', { base, finalCallSid, recordingSid, gotText: !!transcript, textLen: (transcript||'').length });
     } catch (e) {
       console.warn('[LanguageWebhook] Failed to post to /api/calls:', e?.message);
     }
