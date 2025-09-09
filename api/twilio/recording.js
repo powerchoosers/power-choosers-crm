@@ -54,21 +54,51 @@ export default async function handler(req, res) {
             RecordingDuration
         } = body;
         
+        try {
+            console.log('[Recording] Webhook headers:', {
+                host: req.headers.host,
+                'user-agent': req.headers['user-agent'] || '',
+                'content-type': req.headers['content-type'] || '',
+                'x-twilio-signature': req.headers['x-twilio-signature'] || ''
+            });
+        } catch(_) {}
         console.log('[Recording] Webhook received:', {
             RecordingSid,
             CallSid,
             RecordingStatus,
-            RecordingDuration
+            RecordingDuration,
+            RecordingUrl: RecordingUrl || '(none)'
         });
+        try { console.log('[Recording] Raw body:', JSON.stringify(body).slice(0, 1200)); } catch(_) {}
         
-        if (RecordingStatus === 'completed' && RecordingUrl) {
+        // If the recording is completed but RecordingUrl is missing, attempt to fetch it by CallSid
+        let effectiveRecordingUrl = RecordingUrl || '';
+        let effectiveRecordingSid = RecordingSid || '';
+        if (RecordingStatus === 'completed' && !effectiveRecordingUrl && CallSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+            try {
+                const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                const recs = await client.recordings.list({ callSid: CallSid, limit: 1 });
+                if (recs && recs.length > 0) {
+                    effectiveRecordingSid = recs[0].sid;
+                    effectiveRecordingUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${effectiveRecordingSid}.mp3`;
+                    console.log('[Recording] Fetched recording by CallSid:', { effectiveRecordingSid, effectiveRecordingUrl });
+                } else {
+                    console.log('[Recording] No recordings found via API for CallSid:', CallSid);
+                }
+            } catch (e) {
+                console.warn('[Recording] Failed to fetch recording by CallSid:', e?.message);
+            }
+        }
+
+        if (RecordingStatus === 'completed' && (effectiveRecordingUrl || RecordingUrl)) {
             // Ensure we have a direct mp3 URL for playback
-            const recordingMp3Url = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
+            const rawUrl = effectiveRecordingUrl || RecordingUrl;
+            const recordingMp3Url = rawUrl.endsWith('.mp3') ? rawUrl : `${rawUrl}.mp3`;
 
             // Store call data in local memory (best-effort)
             const callData = {
                 id: CallSid,
-                recordingSid: RecordingSid,
+                recordingSid: effectiveRecordingSid || RecordingSid,
                 recordingUrl: recordingMp3Url,
                 duration: parseInt(RecordingDuration) || 0,
                 status: 'completed',
@@ -92,13 +122,14 @@ export default async function handler(req, res) {
                         recordingUrl: recordingMp3Url
                     })
                 }).catch(() => {});
+                console.log('[Recording] Posted initial call data to /api/calls for', CallSid);
             } catch (e) {
                 console.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
             }
 
             // Trigger Twilio native transcription and AI analysis
             try {
-                await processRecordingWithTwilio(recordingMp3Url, CallSid, RecordingSid);
+                await processRecordingWithTwilio(recordingMp3Url, CallSid, effectiveRecordingSid || RecordingSid);
             } catch (error) {
                 console.error('[Recording] Processing error:', error);
             }
