@@ -5,6 +5,20 @@ export default async function handler(req, res) {
     }
     
     try {
+        // Normalize body: Twilio often sends application/x-www-form-urlencoded
+        const ct = (req.headers['content-type'] || '').toLowerCase();
+        let body = req.body;
+        if (typeof body === 'string') {
+            try { if (ct.includes('application/json')) body = JSON.parse(body); } catch(_) {}
+            if (typeof body === 'string') {
+                try {
+                    const params = new URLSearchParams(body);
+                    const o = {}; for (const [k,v] of params.entries()) o[k] = v; body = o;
+                } catch(_) {}
+            }
+        }
+        if (!body || typeof body !== 'object') body = {};
+
         const {
             CallSid,
             CallStatus,
@@ -13,10 +27,23 @@ export default async function handler(req, res) {
             Duration,
             RecordingUrl,
             CallDuration
-        } = req.body;
+        } = body;
         
         console.log(`[Status Callback] Call ${CallSid} status: ${CallStatus}`);
         console.log(`  From: ${From} → To: ${To}`);
+        // Log to Firestore (best-effort)
+        try {
+            const { db } = require('../_firebase');
+            if (db) {
+                await db.collection('twilio_webhooks').add({
+                    type: 'status',
+                    ts: new Date().toISOString(),
+                    event: CallStatus,
+                    body,
+                    host: req.headers.host || null
+                });
+            }
+        } catch (_) {}
         
         // Handle different call statuses
         switch (CallStatus) {
@@ -77,9 +104,8 @@ export default async function handler(req, res) {
                 const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
                 const recs = await client.recordings.list({ callSid: CallSid, limit: 1 });
                 if (recs && recs.length > 0) {
-                    const url = recs[0].mediaUrl || recs[0].uri || '';
-                    // Build full URL if needed
-                    const full = url.startsWith('http') ? url : `https://api.twilio.com${url}.mp3`;
+                    const recSid = recs[0].sid;
+                    const full = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${recSid}.mp3`;
                     console.log(`[Status] Found recording for ${CallSid}: ${full}`);
                     const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
                     await fetch(`${base}/api/calls`, {
