@@ -755,6 +755,15 @@
         </div>
         ` : ''}
 
+        <div class="contact-info-section" id="contact-recent-calls">
+          <div class="rc-header">
+            <h3 class="section-title">Recent Calls</h3>
+          </div>
+          <div class="rc-list" id="contact-recent-calls-list">
+            <div class="rc-empty">Loading recent calls…</div>
+          </div>
+        </div>
+
         <div class="contact-activity-section">
           <div class="activity-header">
             <h3 class="section-title">Recent Activity</h3>
@@ -819,6 +828,8 @@
     
     // Load activities
     loadContactActivities();
+    // Load recent calls and styles
+    try { injectRecentCallsStyles(); loadRecentCallsForContact(); } catch (_) { /* noop */ }
   }
 
   function svgPencil() {
@@ -1625,9 +1636,255 @@
     }
   }
 
-  async function saveField(field, value) {
-    if (!state.currentContact) return;
-    const id = state.currentContact.id;
+  // ===== Recent Calls (Contact) =====
+  function injectRecentCallsStyles(){
+    if (document.getElementById('recent-calls-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'recent-calls-styles';
+    style.textContent = `
+      .rc-header { display:flex; align-items:center; justify-content:space-between; }
+      .rc-list { display:flex; flex-direction:column; gap:8px; }
+      .rc-empty { color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
+      .rc-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
+      .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
+      .rc-title { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .rc-sub { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
+      .rc-outcome { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); color:var(--text-secondary); }
+      .rc-actions { display:flex; align-items:center; gap:8px; }
+      .rc-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
+      .rc-icon-btn:hover { background: var(--grey-700); color: var(--text-inverse); }
+      /* Inline details panel that expands under the item */
+      .rc-details { overflow:hidden; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-card); margin: 6px 2px 2px 2px; box-shadow: var(--elevation-card); }
+      .rc-details-inner { padding: 12px; }
+      .rc-details.collapsing, .rc-details.expanding { will-change: height, opacity; }
+      .rc-details.expanding { animation: rcExpand 180ms ease-out forwards; }
+      .rc-details.collapsing { animation: rcCollapse 140ms ease-in forwards; }
+      @keyframes rcExpand { from { opacity: .0; } to { opacity: 1; } }
+      @keyframes rcCollapse { from { opacity: 1; } to { opacity: .0; } }
+      .insights-grid { display:grid; grid-template-columns: 2fr 1fr; gap:14px; }
+      @media (max-width: 960px){ .insights-grid{ grid-template-columns:1fr; } }
+      .ip-card { background: var(--bg-item); border:1px solid var(--border-light); border-radius: 10px; padding: 12px; }
+      .ip-card h4 { margin:0 0 8px 0; font-size:13px; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:8px; }
+      .pc-chips { display:flex; flex-wrap:wrap; gap:8px; }
+      .pc-chip { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); font-size:12px; color:var(--text-secondary); }
+      .pc-chip.ok{ background:rgba(16,185,129,.15); border-color:rgba(16,185,129,.25); color:#16c088 }
+      .pc-chip.warn{ background:rgba(234,179,8,.15); border-color:rgba(234,179,8,.25); color:#eab308 }
+      .pc-chip.danger{ background:rgba(239,68,68,.15); border-color:rgba(239,68,68,.25); color:#ef4444 }
+      .pc-chip.info{ background:rgba(59,130,246,.13); border-color:rgba(59,130,246,.25); color:#60a5fa }
+      .pc-kv{ display:grid; grid-template-columns:160px 1fr; gap:8px 12px; }
+      .pc-kv .k{ color:var(--text-secondary); font-size:12px }
+      .pc-kv .v{ color:var(--text-primary); font-size:12px }
+      .pc-transcript { color:var(--text-secondary); max-height:260px; overflow:auto; border:1px solid var(--border-light); padding:10px; border-radius:8px; background:var(--bg-card); font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; line-height:1.35 }
+    `;
+    document.head.appendChild(style);
+  }
+
+  async function loadRecentCallsForContact(){
+    const list = document.getElementById('contact-recent-calls-list');
+    if (!list || !state.currentContact) return;
+    const contactId = state.currentContact.id;
+    const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+    try {
+      const r = await fetch(`${base}/api/calls`);
+      const j = await r.json().catch(()=>({}));
+      const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
+      const nums = collectContactPhones(state.currentContact).map(n=>n.replace(/\D/g,'').slice(-10)).filter(Boolean);
+      const filtered = calls.filter(c => {
+        if (c.contactId && c.contactId === contactId) return true;
+        const to10 = String(c.to||'').replace(/\D/g,'').slice(-10);
+        const from10 = String(c.from||'').replace(/\D/g,'').slice(-10);
+        return nums.includes(to10) || nums.includes(from10);
+      }).slice(0, 6);
+      if (!filtered.length){ list.innerHTML = '<div class="rc-empty">No recent calls</div>'; return; }
+      list.innerHTML = filtered.map(call => rcItemHtml(call)).join('');
+      // delegate click to handle dynamic rerenders
+      list.querySelectorAll('.rc-insights').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const id = btn.getAttribute('data-id');
+          const call = filtered.find(x=>String(x.id)===String(id));
+          if (!call) return;
+          toggleRcDetails(btn, call);
+        });
+      });
+      try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch(_) {}
+    } catch (e) {
+      console.warn('[RecentCalls][Contact] load failed', e);
+      list.innerHTML = '<div class="rc-empty">Failed to load recent calls</div>';
+    }
+  }
+
+  function collectContactPhones(c){
+    const arr = [c.mobile, c.workDirectPhone, c.otherPhone];
+    try { const company = getCompanyPhone(c); if (company) arr.push(company); } catch(_){}
+    return arr.filter(Boolean);
+  }
+
+  function rcItemHtml(c){
+    const name = escapeHtml(c.contactName || 'Unknown');
+    const company = escapeHtml(c.accountName || c.company || '');
+    const outcome = escapeHtml(c.outcome || c.status || '');
+    const ts = c.callTime || c.timestamp || new Date().toISOString();
+    const when = new Date(ts).toLocaleString();
+    const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
+    const durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
+    const phone = escapeHtml(String(c.to||c.from||''));
+    return `
+      <div class="rc-item">
+        <div class="rc-meta">
+          <div class="rc-title">${name}${company?` • ${company}`:''}</div>
+          <div class="rc-sub">${when} • ${durStr} • ${phone}</div>
+        </div>
+        <div class="rc-actions">
+          <span class="rc-outcome">${outcome}</span>
+          <button type="button" class="rc-icon-btn rc-insights" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="View insights">${svgEye()}</button>
+        </div>
+      </div>`;
+  }
+
+  // Inline expanding details under an rc-item
+  function toggleRcDetails(btn, call){
+    const item = btn.closest('.rc-item');
+    if (!item) return;
+    const existing = item.nextElementSibling && item.nextElementSibling.classList && item.nextElementSibling.classList.contains('rc-details') ? item.nextElementSibling : null;
+    if (existing) {
+      // collapse then remove
+      animateCollapse(existing, () => existing.remove());
+      return;
+    }
+    const panel = document.createElement('div');
+    panel.className = 'rc-details';
+    panel.innerHTML = `<div class="rc-details-inner">${insightsInlineHtml(call)}</div>`;
+    item.insertAdjacentElement('afterend', panel);
+    animateExpand(panel);
+  }
+  function animateExpand(el){
+    el.style.height = '0px'; el.style.opacity = '0';
+    const h = el.scrollHeight; // measure
+    requestAnimationFrame(()=>{
+      el.classList.add('expanding');
+      el.style.transition = 'height 180ms ease, opacity 180ms ease';
+      el.style.height = h + 'px'; el.style.opacity = '1';
+      setTimeout(()=>{ el.style.height = ''; el.style.transition = ''; el.classList.remove('expanding'); }, 200);
+    });
+  }
+  function animateCollapse(el, done){
+    const h = el.scrollHeight;
+    el.style.height = h + 'px'; el.style.opacity = '1';
+    requestAnimationFrame(()=>{
+      el.classList.add('collapsing');
+      el.style.transition = 'height 140ms ease, opacity 140ms ease';
+      el.style.height = '0px'; el.style.opacity = '0';
+      setTimeout(()=>{ el.classList.remove('collapsing'); done && done(); }, 160);
+    });
+  }
+  function insightsInlineHtml(r){
+    const AI = r.aiInsights || {};
+    const summaryText = r.aiSummary || (AI && Object.keys(AI).length ? 'AI analysis in progress...' : 'No summary available');
+    const sentiment = AI.sentiment || 'Unknown';
+    const disposition = AI.disposition || '';
+    const keyTopics = Array.isArray(AI.keyTopics) ? AI.keyTopics : [];
+    const nextSteps = Array.isArray(AI.nextSteps) ? AI.nextSteps : [];
+    const pain = Array.isArray(AI.painPoints) ? AI.painPoints : [];
+    const flags = AI.flags || {};
+    const chips = [
+      `<span class=\"pc-chip ${sentiment==='Positive'?'ok':sentiment==='Negative'?'danger':'info'}\">Sentiment: ${escapeHtml(sentiment)}</span>`,
+      disposition ? `<span class=\"pc-chip info\">Disposition: ${escapeHtml(disposition)}</span>` : '',
+      flags.nonEnglish ? '<span class="pc-chip warn">Non‑English</span>' : '',
+      flags.voicemailDetected ? '<span class="pc-chip warn">Voicemail</span>' : '',
+      flags.callTransfer ? '<span class="pc-chip info">Transferred</span>' : '',
+      flags.doNotContact ? '<span class="pc-chip danger">Do Not Contact</span>' : '',
+      flags.recordingDisclosure ? '<span class="pc-chip ok">Recording Disclosure</span>' : ''
+    ].filter(Boolean).join('');
+    const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
+    const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
+    const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
+    const transcriptText = r.transcript || (AI && Object.keys(AI).length ? 'Transcript processing...' : 'Transcript not available');
+    const rawRec = r.audioUrl || r.recordingUrl || '';
+    let audioSrc = '';
+    if (rawRec) {
+      if (String(rawRec).includes('/api/recording?url=')) {
+        audioSrc = rawRec;
+      } else {
+        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+        const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
+        audioSrc = `${playbackBase}/api/recording?url=${encodeURIComponent(rawRec)}`;
+      }
+    }
+    const audio = audioSrc ? `<audio controls style="width:100%; margin-top:8px;"><source src="${audioSrc}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : '<div style="color:var(--text-muted); font-size:12px;">No recording available</div>';
+    const hasAI = AI && Object.keys(AI).length > 0;
+
+    // Energy & Contract details
+    const contract = AI.contract || {};
+    const rate = contract.currentRate || contract.rate || 'Unknown';
+    const supplier = contract.supplier || contract.utility || 'Unknown';
+    const contractEnd = contract.contractEnd || contract.endDate || 'Not discussed';
+    const usage = (contract.usageKWh || contract.usage || 'Not provided')+'';
+    const rateType = contract.rateType || 'Unknown';
+    const contractLength = (contract.contractLength || 'Unknown')+'';
+    const budget = AI.budget || 'Unclear';
+    const timeline = AI.timeline || 'Not specified';
+    const entities = Array.isArray(AI.entities) ? AI.entities : [];
+    const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class="pc-chip">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class="pc-chip">None</span>';
+    return `
+      <div class="insights-grid">
+        <div>
+          <div class="ip-card">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline></svg>
+              AI Call Summary
+            </h4>
+            <div class="pc-chips" style="margin:6px 0 10px 0;">${chips}</div>
+            <div style="color:var(--text-secondary); line-height:1.5;">${escapeHtml(summaryText)}</div>
+          </div>
+          <div class="ip-card" style="margin-top:12px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              Call Transcript
+            </h4>
+            <div class="pc-transcript">${escapeHtml(transcriptText)}</div>
+          </div>
+        </div>
+        <div>
+          <div class="ip-card">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              Call Recording
+            </h4>
+            <div style="color:var(--text-secondary); font-style:italic;">${audio}</div>
+            ${audioSrc ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
+            ${hasAI ? '<div style="color:var(--orange-subtle); font-size:12px; margin-top:4px;">✓ AI analysis completed</div>' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">AI analysis in progress...</div>'}
+          </div>
+          <div class="ip-card" style="margin-top:12px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              Energy & Contract Details
+            </h4>
+            <div class="pc-kv">
+              <div class="k">Current rate</div><div class="v">${escapeHtml(rate)}</div>
+              <div class="k">Supplier/Utility</div><div class="v">${escapeHtml(supplier)}</div>
+              <div class="k">Contract end</div><div class="v">${escapeHtml(contractEnd)}</div>
+              <div class="k">Usage</div><div class="v">${escapeHtml(usage)}</div>
+              <div class="k">Rate type</div><div class="v">${escapeHtml(rateType)}</div>
+              <div class="k">Term</div><div class="v">${escapeHtml(contractLength)}</div>
+              <div class="k">Budget</div><div class="v">${escapeHtml(budget)}</div>
+              <div class="k">Timeline</div><div class="v">${escapeHtml(timeline)}</div>
+            </div>
+          </div>
+          <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg> Key Topics</h4><div class="pc-chips">${topicsHtml}</div></div>
+          <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg> Next Steps</h4><div style="color:var(--text-secondary); font-size:12px;">${nextHtml}</div></div>
+          <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Pain Points</h4><div style="color:var(--text-secondary); font-size:12px;">${painHtml}</div></div>
+          <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg> Entities</h4><div class="pc-chips">${entitiesHtml}</div></div>
+          <div class="ip-card" style="margin-top:12px; text-align:right;"><button class="rc-icon-btn" onclick="(function(){ try{ openInsightsModal && openInsightsModal('${String(r.id||'')}'); }catch(_){}})()" title="Open full modal" aria-label="Open full modal">${svgEye()}</button></div>
+        </div>
+      </div>`;
+  }
+
+  function svgEye(){
+    return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  }
+
+  async function updateField(field, value, id) {
     const db = window.firebaseDB;
     const payload = { [field]: value, updatedAt: Date.now() };
     // If DB not available, update local state and exit gracefully

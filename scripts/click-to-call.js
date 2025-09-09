@@ -221,6 +221,7 @@
       // Contact detail view phone fields
       '#contact-detail-view .info-row[data-field="phone"] .info-value-text',
       '#contact-detail-view .info-row[data-field="mobile"] .info-value-text',
+      '#contact-detail-view .info-row[data-field="companyPhone"] .info-value-text',
       // Account detail view phone field
       '#account-detail-view .info-value-wrap[data-field="phone"] .info-value-text'
     ];
