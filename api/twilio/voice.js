@@ -42,9 +42,6 @@ export default function handler(req, res) {
                 timeLimit: 14400,
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete`,
-                // statusCallback is for JSON status updates
-                statusCallback: `${base}/api/twilio/status`,
-                statusCallbackMethod: 'POST',
                 // Enable Twilio Voice Intelligence for real-time transcription and AI insights
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
@@ -86,9 +83,6 @@ export default function handler(req, res) {
                 answerOnBridge: true,
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete`,
-                // statusCallback is for JSON status updates
-                statusCallback: `${base}/api/twilio/status`,
-                statusCallbackMethod: 'POST',
                 // Enable Twilio Voice Intelligence for real-time transcription and AI insights
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
