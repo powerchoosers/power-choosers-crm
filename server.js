@@ -65,6 +65,41 @@ async function handleApiGeminiEmail(req, res) {
   }
 }
 
+async function handleApiTwilioLanguageWebhook(req, res) {
+  try {
+    const parsedUrl = url.parse(req.url, true);
+    const proxyUrl = `${API_BASE_URL}/api/twilio/language-webhook${parsedUrl.search || ''}`;
+    if (req.method === 'GET') {
+      const response = await fetch(proxyUrl);
+      const raw = await response.text();
+      // Twilio may not require a particular response body for GET callbacks; echo upstream
+      res.writeHead(response.status, { 'Content-Type': response.headers.get('content-type') || 'application/json' });
+      res.end(raw);
+      return;
+    }
+    if (req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const raw = await response.text();
+      let payload;
+      try { payload = raw ? JSON.parse(raw) : {}; } catch (_) { payload = { ok: true, body: raw }; }
+      res.writeHead(response.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(payload));
+      return;
+    }
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+  } catch (error) {
+    console.error('[Twilio Language Webhook] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
 // Helper function for reading request body
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -223,6 +258,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/token' ||
     pathname === '/api/twilio/call' ||
     pathname === '/api/calls' ||
+    pathname === '/api/twilio/language-webhook' ||
     pathname === '/api/energy-news' ||
     pathname === '/api/search' ||
     pathname === '/api/tx-price' ||
@@ -244,6 +280,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/twilio/call') {
     return handleApiTwilioCall(req, res);
+  }
+  if (pathname === '/api/twilio/language-webhook') {
+    return handleApiTwilioLanguageWebhook(req, res);
   }
   if (pathname === '/api/calls') {
     return handleApiCalls(req, res);
