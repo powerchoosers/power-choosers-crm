@@ -530,12 +530,33 @@
     const style=document.createElement('style'); style.id=id; style.type='text/css';
     style.textContent=`
       .pc-insights-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200}
-      .pc-insights-modal{position:fixed;inset:auto;left:50%;top:50%;transform:translate(-50%,-50%);width:min(1000px,92vw);max-height:86vh;overflow:auto;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border-light);border-radius:12px;box-shadow:var(--elevation-card);z-index:1210}
-      .pc-insights-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border-light)}
-      .pc-insights-title{font-weight:700}
-      .pc-insights-body{padding:16px}
-      .pc-insights-close{background:transparent;border:1px solid var(--border-light);border-radius:8px;color:var(--text-secondary);height:30px;padding:0 10px}
+      .pc-insights-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(1100px,92vw);max-height:86vh;overflow:auto;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border-light);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.45);z-index:1210}
+      .pc-insights-header{position:sticky;top:0;background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0));backdrop-filter:saturate(1.4) blur(6px);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border-light);z-index:1}
+      .pc-insights-title{font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+      .pc-insights-sub{color:var(--text-secondary);font-size:12px}
+      .pc-insights-body{padding:18px}
+      .pc-insights-close{background:transparent;border:1px solid var(--border-light);border-radius:10px;color:var(--text-secondary);height:32px;padding:0 12px}
       .pc-insights-close:hover{background:var(--bg-item);}
+
+      /* Modern cards and grid */
+      .pc-sec-grid{display:grid;grid-template-columns:2fr 1fr;gap:18px}
+      @media (max-width: 960px){ .pc-sec-grid{grid-template-columns:1fr} }
+      .pc-card{background:var(--bg-item);border:1px solid var(--border-light);border-radius:12px;padding:16px}
+      .pc-card h4{margin:0 0 10px 0;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+      .pc-kv{display:grid;grid-template-columns:160px 1fr;gap:8px 12px}
+      .pc-kv .k{color:var(--text-secondary);font-size:12px}
+      .pc-kv .v{color:var(--text-primary);font-size:12px}
+
+      /* Chips and badges */
+      .pc-chips{display:flex;flex-wrap:wrap;gap:8px}
+      .pc-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--border-light);background:var(--bg-card);font-size:12px;color:var(--text-secondary)}
+      .pc-chip.ok{background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.25);color:#16c088}
+      .pc-chip.warn{background:rgba(234,179,8,.15);border-color:rgba(234,179,8,.25);color:#eab308}
+      .pc-chip.danger{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.25);color:#ef4444}
+      .pc-chip.info{background:rgba(59,130,246,.13);border-color:rgba(59,130,246,.25);color:#60a5fa}
+
+      /* Transcript panel */
+      .pc-transcript{color:var(--text-secondary);max-height:360px;overflow:auto;border:1px solid var(--border-light);padding:12px;border-radius:8px;background:var(--bg-card);font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:13px;line-height:1.35}
     `; document.head.appendChild(style);
   }
   function closeInsightsModal(){
@@ -572,111 +593,136 @@
     document.addEventListener('keydown', escClose);
   }
   function insightsContentHtml(r){
-    const aiInsights = r.aiInsights || {}; 
+    const aiInsights = r.aiInsights || {};
     const sentiment = aiInsights.sentiment || 'Unknown';
-    const keyTopics = (aiInsights.keyTopics || []).join(', ');
-    const nextSteps = (aiInsights.nextSteps || []).join(', ');
-    const painPoints = (aiInsights.painPoints || []).join(', ');
+    const keyTopics = Array.isArray(aiInsights.keyTopics) ? aiInsights.keyTopics : [];
+    const nextStepsArr = Array.isArray(aiInsights.nextSteps) ? aiInsights.nextSteps : [];
+    const painPointsArr = Array.isArray(aiInsights.painPoints) ? aiInsights.painPoints : [];
     const budget = aiInsights.budget || 'Not discussed';
     const timeline = aiInsights.timeline || 'Not specified';
-    
+
+    // Energy & Contract
+    const contract = aiInsights.contract || {};
+    const rate = contract.currentRate || contract.rate || '';
+    const supplier = contract.supplier || contract.utility || '';
+    const contractEnd = contract.contractEnd || contract.endDate || '';
+    const usage = contract.usageKWh || contract.usage || '';
+    const rateType = contract.rateType || '';
+    const contractLength = contract.contractLength || '';
+
+    // Operators / flags
+    const flags = aiInsights.flags || {};
+    const disposition = aiInsights.disposition || '';
+    const nonEnglish = flags.nonEnglish || flags.isNonEnglish || false;
+    const voicemail = flags.voicemailDetected || flags.voicemail || false;
+    const transfer = flags.callTransfer || flags.transferred || false;
+    const dnc = flags.doNotContact || flags.dnc || false;
+    const escalation = flags.escalationRequest || flags.escalation || false;
+    const recordingDisclosure = flags.recordingDisclosure || false;
+    const entities = Array.isArray(aiInsights.entities) ? aiInsights.entities : [];
+
     // Handle real API data that might not have AI insights yet
     const hasAIInsights = r.aiInsights && Object.keys(r.aiInsights).length > 0;
     const summaryText = r.aiSummary || (hasAIInsights ? 'AI analysis in progress...' : 'No summary available');
     const transcriptText = r.transcript || (hasAIInsights ? 'Transcript processing...' : 'Transcript not available');
+
+    const chipsHtml = [
+      `<span class="pc-chip ${sentiment==='Positive'?'ok':sentiment==='Negative'?'danger':'info'}">Sentiment: ${escapeHtml(sentiment)}</span>`,
+      disposition ? `<span class="pc-chip info">Disposition: ${escapeHtml(disposition)}</span>` : '',
+      nonEnglish ? '<span class="pc-chip warn">Non‑English</span>' : '',
+      voicemail ? '<span class="pc-chip warn">Voicemail</span>' : '',
+      transfer ? '<span class="pc-chip info">Transferred</span>' : '',
+      dnc ? '<span class="pc-chip danger">Do Not Contact</span>' : '',
+      recordingDisclosure ? '<span class="pc-chip ok">Recording Disclosure</span>' : ''
+    ].filter(Boolean).join('');
+
+    const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class="pc-chip">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
+    const nextStepsHtml = nextStepsArr.length ? nextStepsArr.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
+    const painHtml = painPointsArr.length ? painPointsArr.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
+    const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class="pc-chip">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class="pc-chip">None</span>';
+
     return `
-      <div class="insights-container" style="background:var(--bg-item); border-radius:var(--border-radius); padding:20px;">
-        <div style="display:flex; gap:25px;">
-          <div style="flex:2;">
-            <div class="insights-section">
-              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14,2 14,8 20,8"></polyline>
-                  <line x1="16" y1="13" x2="8" y2="13"></line>
-                  <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <polyline points="10,9 9,9 8,9"></polyline>
-                </svg>
-                AI Call Summary
-              </h4>
-              <div style="color:var(--text-secondary); margin-bottom:15px; line-height:1.4;">${escapeHtml(summaryText)}</div>
-            </div>
-            <div class="insights-section">
-              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-                Call Transcript
-              </h4>
-              <div style="color:var(--text-secondary); max-height:300px; overflow-y:auto; border:1px solid var(--border-light); padding:12px; border-radius:6px; background:var(--bg-card); font-family:monospace; font-size:13px; line-height:1.3;">${escapeHtml(transcriptText)}</div>
-            </div>
+      <div class="pc-sec-grid">
+        <div class="pc-col-left">
+          <div class="pc-card">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline></svg>
+              AI Call Summary
+            </h4>
+            <div class="pc-chips" style="margin:6px 0 12px 0;">${chipsHtml}</div>
+            <div style="color:var(--text-secondary); line-height:1.5;">${escapeHtml(summaryText)}</div>
           </div>
-          <div style="flex:1;">
-            <div class="insights-section">
-              <h4 style="color:var(--text-primary); margin:0 0 8px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                </svg>
-                Call Recording
-              </h4>
-              <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
-              ${r.audioUrl ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
-              ${hasAIInsights ? '<div style="color:var(--orange-subtle); font-size:12px; margin-top:4px;">✓ AI analysis completed</div>' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">AI analysis in progress...</div>'}
-            </div>
-            <div class="insights-grid" style="display:grid; gap:10px;">
-              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                </svg>
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Sentiment:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${sentiment}</span>
-              </div>
-              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                  <polyline points="3.27,6.96 12,12.01 20.73,6.96"></polyline>
-                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                </svg>
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Key Topics:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${keyTopics || 'None identified'}</span>
-              </div>
-              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Next Steps:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${nextSteps || 'None identified'}</span>
-              </div>
-              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                  <line x1="12" y1="9" x2="12" y2="13"></line>
-                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Pain Points:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${painPoints || 'None mentioned'}</span>
-              </div>
-              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <line x1="12" y1="1" x2="12" y2="23"></line>
-                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                </svg>
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Budget:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${budget}</span>
-              </div>
-              <div class="insight-item" style="display:flex; align-items:center; gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-primary);">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12,6 12,12 16,14"></polyline>
-                </svg>
-                <span style="font-weight:600; color:var(--text-primary); font-size:12px;">Timeline:</span>
-                <span style="color:var(--text-secondary); font-size:12px;">${timeline}</span>
-              </div>
-            </div>
+
+          <div class="pc-card" style="margin-top:14px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              Call Transcript
+            </h4>
+            <div class="pc-transcript">${escapeHtml(transcriptText)}</div>
           </div>
         </div>
-      </div>`;
+
+        <div class="pc-col-right">
+          <div class="pc-card">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              Call Recording
+            </h4>
+            <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
+            ${r.audioUrl ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
+            ${hasAIInsights ? '<div style="color:var(--orange-subtle); font-size:12px; margin-top:4px;">✓ AI analysis completed</div>' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">AI analysis in progress...</div>'}
+          </div>
+
+          <div class="pc-card" style="margin-top:14px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              Energy & Contract Details
+            </h4>
+            <div class="pc-kv">
+              <div class="k">Current rate</div><div class="v">${escapeHtml(rate || 'Unknown')}</div>
+              <div class="k">Supplier/Utility</div><div class="v">${escapeHtml(supplier || 'Unknown')}</div>
+              <div class="k">Contract end</div><div class="v">${escapeHtml(contractEnd || 'Not discussed')}</div>
+              <div class="k">Usage</div><div class="v">${escapeHtml(String(usage || 'Not provided'))}</div>
+              <div class="k">Rate type</div><div class="v">${escapeHtml(rateType || 'Unknown')}</div>
+              <div class="k">Term</div><div class="v">${escapeHtml(String(contractLength || 'Unknown'))}</div>
+              <div class="k">Budget</div><div class="v">${escapeHtml(budget)}</div>
+              <div class="k">Timeline</div><div class="v">${escapeHtml(timeline)}</div>
+            </div>
+          </div>
+
+          <div class="pc-card" style="margin-top:14px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+              Key Topics
+            </h4>
+            <div class="pc-chips">${topicsHtml}</div>
+          </div>
+
+          <div class="pc-card" style="margin-top:14px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              Next Steps
+            </h4>
+            <div style="color:var(--text-secondary);font-size:12px;line-height:1.5;">${nextStepsHtml}</div>
+          </div>
+
+          <div class="pc-card" style="margin-top:14px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              Pain Points
+            </h4>
+            <div style="color:var(--text-secondary);font-size:12px;line-height:1.5;">${painHtml}</div>
+          </div>
+
+          <div class="pc-card" style="margin-top:14px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
+              Entities
+            </h4>
+            <div class="pc-chips">${entitiesHtml}</div>
+          </div>
+        </div>
+      </div>`
   }
 
   // Bulk selection popover (refined with backdrop and cleanup)

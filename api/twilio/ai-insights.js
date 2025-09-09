@@ -13,6 +13,50 @@ function corsMiddleware(req, res, next) {
     next();
 }
 
+// Helper: wait
+function delay(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+// Robust transcript fetch with retry and auto-create when missing
+async function getTranscriptWithRetry(client, recordingSid, opts = {}) {
+    const attempts = Number(opts.attempts || 5);
+    const delayMs = Number(opts.delayMs || 3000);
+    let created = false;
+    let lastSid = null;
+    for (let i = 1; i <= attempts; i++) {
+        try {
+            const list = await client.transcriptions.list({ recordingSid, limit: 1 });
+            if (list && list.length > 0) {
+                lastSid = list[0].sid;
+                const t = await client.transcriptions(lastSid).fetch();
+                const status = (t.status || '').toLowerCase();
+                const text = t.transcriptionText || '';
+                console.log(`[Twilio AI] Attempt ${i}/${attempts} transcription status: ${status}, length: ${text.length}`);
+                if (text) return text;
+                if (status === 'failed') {
+                    console.warn('[Twilio AI] Transcription failed');
+                    break;
+                }
+            } else if (!created) {
+                console.log('[Twilio AI] No transcription found, creating...');
+                const newT = await client.transcriptions.create({ recordingSid, languageCode: 'en-US' });
+                lastSid = newT?.sid || null;
+                created = true;
+            }
+        } catch (e) {
+            console.warn('[Twilio AI] getTranscriptWithRetry error on attempt', i, e?.message);
+        }
+        if (i < attempts) await delay(delayMs);
+    }
+    // Final fetch if we have a sid
+    if (lastSid) {
+        try {
+            const t = await client.transcriptions(lastSid).fetch();
+            return t.transcriptionText || '';
+        } catch(_) {}
+    }
+    return '';
+}
+
 export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
@@ -43,45 +87,20 @@ export default async function handler(req, res) {
         const recording = recordings[0];
         console.log('[Twilio AI] Found recording:', recording.sid);
         
-        // Use Twilio's native transcription service
+        // Use Twilio's native transcription service (with retry)
         let transcript = '';
         let aiInsights = null;
-        
         try {
-            // Get transcription from Twilio
-            const transcriptions = await client.transcriptions.list({ 
-                recordingSid: recording.sid,
-                limit: 1 
-            });
-            
-            if (transcriptions.length > 0) {
-                const transcription = await client.transcriptions(transcriptions[0].sid).fetch();
-                transcript = transcription.transcriptionText || '';
-                console.log('[Twilio AI] Transcript found:', transcript.substring(0, 100) + '...');
-            } else {
-                // If no transcription exists, create one
-                console.log('[Twilio AI] Creating transcription...');
-                const newTranscription = await client.transcriptions.create({
-                    recordingSid: recording.sid,
-                    languageCode: 'en-US'
-                });
-                
-                // Wait a moment for transcription to complete
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                
-                const completedTranscription = await client.transcriptions(newTranscription.sid).fetch();
-                transcript = completedTranscription.transcriptionText || '';
-                console.log('[Twilio AI] New transcript created:', transcript.substring(0, 100) + '...');
+            transcript = await getTranscriptWithRetry(client, recording.sid, { attempts: 6, delayMs: 3000 });
+            if (!transcript) {
+                console.log('[Twilio AI] Transcript not ready after retries');
             }
-            
-            // Generate AI insights using Twilio's AI capabilities
             if (transcript) {
                 aiInsights = await generateTwilioAIInsights(transcript);
             }
-            
         } catch (transcriptionError) {
             console.error('[Twilio AI] Transcription error:', transcriptionError);
-            // Fallback to basic insights
+            // Fallback to basic insights placeholder
             aiInsights = {
                 summary: 'Call transcription processing in progress',
                 sentiment: 'Unknown',

@@ -117,23 +117,13 @@
   }
 
   function loadData(){
-    const types=['call','email','follow-up','demo'];
-    const prios=['low','medium','high'];
-    const statuses=['pending','completed'];
-    const rows=[];
-    
-    // Add LinkedIn tasks from sequences
+    // Build from real sources only: LinkedIn sequence tasks + user tasks from localStorage
     const linkedInTasks = getLinkedInTasksFromSequences();
-    rows.push(...linkedInTasks);
-    
-    // Add mock tasks for demo
-    for(let i=1;i<=80;i++){
-      const t = types[i%types.length];
-      const p = prios[i%prios.length];
-      const s = statuses[i%2];
-      const due = new Date(Date.now()+ (i%15-7)*86400000).toLocaleDateString();
-      rows.push({ id:'task_'+i, title:`Task ${i} for Account ${((i%5)+1)}`, contact:`Contact ${((i%20)+1)}`, account:`Account ${((i%10)+1)}`, type:t, priority:p, dueDate:due, status:s });
-    }
+    let userTasks = [];
+    try { userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]'); } catch(_) { userTasks = []; }
+    // Merge with user tasks first (top priority), then LinkedIn tasks that aren't duplicates by id
+    const nonDupLinkedIn = linkedInTasks.filter(li => !userTasks.some(u => u.id === li.id));
+    const rows = [...userTasks, ...nonDupLinkedIn];
     state.data = rows; state.filtered = rows.slice(); render();
   }
 
@@ -489,20 +479,14 @@
     }));
   }
 
-  function init(){ if(!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); loadData(); loadUserTasks(); }
-  
-  function loadUserTasks() {
-    try {
-      const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-      if (userTasks.length > 0) {
-        // Add user tasks to the beginning of the data array
-        state.data = [...userTasks, ...state.data];
-        state.filtered = state.data.slice();
-        render();
-      }
-    } catch (e) {
-      console.warn('Could not load user tasks:', e);
-    }
+  function init(){ if(!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); loadData(); bindUpdates(); }
+
+  // Listen for cross-page task updates and refresh immediately
+  function bindUpdates(){
+    window.addEventListener('tasksUpdated', () => {
+      // Rebuild from localStorage + LinkedIn tasks
+      loadData();
+    });
   }
   
   document.addEventListener('DOMContentLoaded', init);

@@ -7,6 +7,7 @@
   let loadingStartAt = 0;
   const SEARCH_DELAY = 300; // ms delay for debouncing
   const MIN_LOADING_MS = 200; // ensure spinner is visible briefly
+  const MAX_LOADING_MS = 2000; // hard cap: show partial results within 2s
   // Cache last search results for quick lookups (e.g., direct navigation)
   let lastResults = null;
 
@@ -201,34 +202,40 @@
   }
 
   async function searchAllData(query) {
-    const results = {};
     const normalizedQuery = query.toLowerCase();
+    const pPeople = searchPeople(normalizedQuery);
+    const pAccounts = searchAccounts(normalizedQuery);
+    const pSequences = searchSequences(normalizedQuery);
+    const pDeals = searchDeals(normalizedQuery);
 
-    // Search People
-    const peopleResults = await searchPeople(normalizedQuery);
-    if (peopleResults.length > 0) {
-      results.people = peopleResults;
-    }
+    const assemble = (peep = [], acct = [], seq = [], deal = []) => {
+      const out = {};
+      if (Array.isArray(peep) && peep.length) out.people = peep;
+      if (Array.isArray(acct) && acct.length) out.accounts = acct;
+      if (Array.isArray(seq) && seq.length) out.sequences = seq;
+      if (Array.isArray(deal) && deal.length) out.deals = deal;
+      return out;
+    };
 
-    // Search Accounts
-    const accountResults = await searchAccounts(normalizedQuery);
-    if (accountResults.length > 0) {
-      results.accounts = accountResults;
-    }
+    return new Promise((resolve) => {
+      let done = false;
+      // Hard cap: emit whatever we have at 2s
+      const capTimer = setTimeout(async () => {
+        const settled = await Promise.allSettled([pPeople, pAccounts, pSequences, pDeals]);
+        const vals = settled.map(s => (s.status === 'fulfilled' ? s.value : []));
+        if (!done) { done = true; resolve(assemble(...vals)); }
+      }, MAX_LOADING_MS);
 
-    // Search Sequences
-    const sequenceResults = await searchSequences(normalizedQuery);
-    if (sequenceResults.length > 0) {
-      results.sequences = sequenceResults;
-    }
-
-    // Search Deals
-    const dealResults = await searchDeals(normalizedQuery);
-    if (dealResults.length > 0) {
-      results.deals = dealResults;
-    }
-
-    return results;
+      Promise.all([pPeople, pAccounts, pSequences, pDeals])
+        .then(([a, b, c, d]) => {
+          if (!done) { clearTimeout(capTimer); done = true; resolve(assemble(a, b, c, d)); }
+        })
+        .catch(async () => {
+          const settled = await Promise.allSettled([pPeople, pAccounts, pSequences, pDeals]);
+          const vals = settled.map(s => (s.status === 'fulfilled' ? s.value : []));
+          if (!done) { clearTimeout(capTimer); done = true; resolve(assemble(...vals)); }
+        });
+    });
   }
 
   async function searchPeople(query) {
@@ -564,20 +571,18 @@
         break;
       case 'email':
         if (type === 'person') {
-          // Get person data and trigger email compose
           const item = findItemById(id, type);
-          if (item && item.data && item.data.email) {
-            // Navigate to emails and compose
-            navigateToPage('emails');
-            setTimeout(() => {
-              if (window.crm && typeof window.crm.showToast === 'function') {
-                window.crm.showToast(`Composing email to ${item.title}`);
+          const email = item?.data?.email || '';
+          if (email) {
+            try {
+              if (window.EmailCompose && typeof window.EmailCompose.openTo === 'function') {
+                window.EmailCompose.openTo(email, item?.title || '');
+              } else {
+                navigateToPage('emails');
               }
-            }, 100);
+            } catch (_) { navigateToPage('emails'); }
           } else {
-            if (window.crm && typeof window.crm.showToast === 'function') {
-              window.crm.showToast('No email address found for this contact');
-            }
+            window.crm?.showToast && window.crm.showToast('No email address found for this contact');
           }
         }
         break;

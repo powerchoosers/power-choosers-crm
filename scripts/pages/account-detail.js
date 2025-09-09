@@ -323,11 +323,32 @@
     const backBtn = document.getElementById('back-to-accounts');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
+        // Special case: if we arrived here from Contact Detail's company link,
+        // return back to that contact detail view.
+        if (window._contactNavigationSource === 'contact-detail' && window._contactNavigationContactId) {
+          const contactId = window._contactNavigationContactId;
+          // Clear the navigation source first
+          window._contactNavigationSource = null;
+          window._contactNavigationContactId = null;
+          try {
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              // Ensure contact detail renders after page switches
+              setTimeout(() => {
+                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                  window.ContactDetail.show(contactId);
+                }
+              }, 80);
+            }
+          } catch (_) { /* noop */ }
+          return;
+        }
         // Check if we came from list detail page
         if (window._accountNavigationSource === 'list-detail' && window._accountNavigationListId) {
           console.log('Returning to list detail page:', window._accountNavigationListId);
           // Navigate back to list detail page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            console.log('Navigating to list detail page for account:', window._accountNavigationListId);
             // Seed context so list detail initializes to the correct list and view
             try {
               window.listDetailContext = {
@@ -554,7 +575,17 @@
       case 'email': {
         const email = contact.email;
         if (email) {
-          try { window.open(`mailto:${encodeURIComponent(email)}`); } catch (e) { /* noop */ }
+          try {
+            const account = state.currentAccount || {};
+            const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || '';
+            if (window.EmailCompose && typeof window.EmailCompose.openTo === 'function') {
+              window.EmailCompose.openTo(email, fullName);
+            } else {
+              // Fallback: click compose button and prefill the To field
+              document.getElementById('compose-email-btn')?.click();
+              setTimeout(()=>{ const to = document.getElementById('compose-to'); if (to) to.value = email; }, 120);
+            }
+          } catch (e) { /* noop */ }
         }
         break;
       }
