@@ -91,6 +91,13 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
         // Log a new call or update existing call
         const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl, timestamp, callTime, accountId, accountName, contactId, contactName, source, targetPhone, businessPhone } = req.body || {};
+        const _rid = `r${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+        try {
+            console.log('[Calls][POST][%s] body:', _rid, {
+                callSid, to, from, status, duration, timestamp, callTime, accountId, accountName, contactId, contactName, source, targetPhone, businessPhone,
+                hasTranscript: !!transcript, hasAI: !!aiInsights, hasRecording: !!recordingUrl
+            });
+        } catch(_) {}
         
         let callId = callSid || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
@@ -101,7 +108,10 @@ export default async function handler(req, res) {
         const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
         const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
         // Business numbers for merge logic (comma-separated env)
-        const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '').split(',').map(norm).filter(Boolean);
+        const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+            .split(',').map(norm).filter(Boolean);
+        const bodyBiz = norm(businessPhone);
+        if (bodyBiz && !bizList.includes(bodyBiz)) bizList.push(bodyBiz);
         const isBiz = (p) => !!p && bizList.includes(p);
         const otherParty = (toRaw, fromRaw) => {
             const to = norm(isClient(toRaw) ? '' : toRaw);
@@ -116,7 +126,9 @@ export default async function handler(req, res) {
         if (!existingCall || Object.keys(existingCall).length === 0) {
             try {
                 const now = Date.now();
-                const targetCounterparty = otherParty(to, from);
+                // If caller provided a clear targetPhone, prefer it as counterparty
+                const targetCounterparty = (targetPhone && norm(targetPhone)) || otherParty(to, from);
+                try { console.log('[Calls][POST][%s] bizList=%j targetCounterparty=%s', _rid, bizList, targetCounterparty); } catch(_) {}
                 let best = null;
                 let bestTs = -1;
                 for (const v of callStore.values()) {
@@ -131,13 +143,47 @@ export default async function handler(req, res) {
                         const idBoost = ((accountId && v.accountId === accountId) || (contactId && v.contactId === contactId)) ? 1 : 0;
                         // Prefer newer timestamps, then missing recording, then id match boost
                         const score = (ts || 0) + ( (!v.recordingUrl ? 1 : 0) * 1 ) + (idBoost * 1);
-                        if (score > bestTs) { bestTs = score; best = v; }
+                        if (score > bestTs) {
+                            bestTs = score; best = v;
+                        }
+                        try { console.log('[Calls][POST][%s] candidate id=%s ts=%s candCounterparty=%s score=%s hasRec=%s idMatch=%s', _rid, v.id, new Date(ts).toISOString(), candCounterparty, score, !!v.recordingUrl, !!idBoost); } catch(_) {}
                     } catch (_) {}
                 }
                 if (best && best.id && (!recordingUrl || !callStore.has(callId))) {
                     // Merge into the existing best row
+                    try { console.log('[Calls][POST][%s] Merging into existing id=%s for callSid=%s', _rid, best.id, callSid); } catch(_) {}
                     callId = best.id;
                     existingCall = best;
+                }
+                // If not found in memory, try Firestore recent rows
+                if ((!existingCall || !existingCall.id) && db) {
+                    try {
+                        const sinceIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+                        let query = db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(25);
+                        const snap = await query.get();
+                        let fbBest = null;
+                        let fbScore = -1;
+                        snap.forEach(doc => {
+                            const d = doc.data() || {};
+                            const ts = new Date(d.timestamp || d.callTime || 0).getTime();
+                            const candCp = otherParty(d.to, d.from);
+                            const partyMatch = !!candCp && candCp === targetCounterparty;
+                            if (!partyMatch) return;
+                            const idBoost = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
+                            const score = (ts || 0) + ((!d.recordingUrl ? 1 : 0) * 1) + (idBoost * 1);
+                            if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
+                            try { console.log('[Calls][POST][%s] FS cand id=%s ts=%s cp=%s score=%s hasRec=%s idMatch=%s', _rid, doc.id, new Date(ts).toISOString(), candCp, score, !!d.recordingUrl, !!idBoost); } catch(_) {}
+                        });
+                        if (fbBest && fbBest.id) {
+                            callId = fbBest.id;
+                            existingCall = fbBest;
+                            try { console.log('[Calls][POST][%s] Firestore merge target id=%s', _rid, callId); } catch(_) {}
+                        } else {
+                            try { console.log('[Calls][POST][%s] No Firestore merge target found', _rid); } catch(_) {}
+                        }
+                    } catch (fe) {
+                        console.warn('[Calls][POST][%s] Firestore merge search failed:', _rid, fe?.message);
+                    }
                 }
             } catch (_) {}
         }
@@ -179,6 +225,9 @@ export default async function handler(req, res) {
             targetPhone: targetPhone || existingCall.targetPhone || null,
             businessPhone: businessPhone || existingCall.businessPhone || null
         };
+        try {
+            console.log('[Calls][POST][%s] UPSERT id=%s twilioSid=%s status=%s duration=%s hasRec=%s accId=%s conId=%s', _rid, callData.id, callData.twilioSid, callData.status, callData.duration, !!callData.recordingUrl, callData.accountId, callData.contactId);
+        } catch(_) {}
         
         // Persist to Firestore if available
         try {

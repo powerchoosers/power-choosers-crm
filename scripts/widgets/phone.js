@@ -1195,24 +1195,12 @@
           isCallInProgress = false;
           autoTriggerBlockUntil = Date.now() + 15000; // Increased to 15s hard block
           
-          // Clear current call context IMMEDIATELY to prevent auto-callback
-          console.debug('[Phone] IMMEDIATE: Clearing call context after disconnect to prevent redial');
-          currentCallContext = {
-            number: '',
-            name: '',
-            company: '',
-            accountId: null,
-            accountName: null,
-            contactId: null,
-            contactName: null,
-            isActive: false
-          };
-          
           // Clear ALL Twilio state to prevent ghost connections
           TwilioRTC.state.connection = null;
           TwilioRTC.state.pendingIncoming = null;
           
           // Update call with final status and duration using Twilio CallSid if available
+          console.debug('[Phone] Posting final status with context before clearing it');
           updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
           currentCall = null;
           
@@ -1279,6 +1267,19 @@
               console.warn('[Phone] Failed to release audio input device:', e);
             }
           }
+          
+          // Now clear the current call context after final POST
+          console.debug('[Phone] Clearing call context after final POST');
+          currentCallContext = {
+            number: '',
+            name: '',
+            company: '',
+            accountId: null,
+            accountName: null,
+            contactId: null,
+            contactName: null,
+            isActive: false
+          };
           
           console.debug('[Phone] Call cleanup complete - aggressive anti-redial protection active');
           console.debug('[Phone] Cooldown set:', { lastCallCompleted: disconnectTime, lastCalledNumber: number });

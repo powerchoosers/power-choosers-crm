@@ -265,91 +265,102 @@
 
           console.log('[Calls] Found', j.calls.length, 'real calls from API');
           const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
-          const rows = j.calls.map((c, idx) => ({
-            id: c.id || `call_${Date.now()}_${idx}`,
-            contactName: (() => {
-              // Prefer explicit server-provided contact attribution
-              if (c.contactName) return c.contactName;
-              if (c.contactId) {
-                const pc = getContactById(c.contactId);
-                if (pc) {
-                  const full = [pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '';
-                  if (full) return full;
-                }
-              }
-              const party = pickCounterparty(c);
-              // Try exact contact by phone
+          const rows = j.calls.map((c, idx) => {
+            const id = c.id || `call_${Date.now()}_${idx}`;
+            const party = pickCounterparty(c);
+            const debug = { id, to: c.to, from: c.from, party, accountId: c.accountId || null, contactId: c.contactId || null };
+
+            // Contact name resolution
+            let contactName = '';
+            if (c.contactName) { contactName = c.contactName; debug.contactSource = 'api.contactName'; }
+            else if (c.contactId) {
+              const pc = getContactById(c.contactId);
+              const full = pc ? ([pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '') : '';
+              if (full) { contactName = full; debug.contactSource = 'people.byId'; }
+            }
+            if (!contactName) {
               const m = phoneToContact.get(party);
-              if (m && m.name) return m.name;
-              // Try account by phone, then most recent contact; otherwise leave blank per spec
+              if (m && m.name) { contactName = m.name; debug.contactSource = 'people.byPhone'; }
+            }
+            if (!contactName) {
               const acct = findAccountByPhone(party);
               if (acct){
                 const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
                 if (p){
                   const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
-                  if (full) return full;
+                  if (full) { contactName = full; debug.contactSource = 'account.recentContact'; }
                 }
               }
-              return '';
-            })(),
-            contactTitle: (() => {
-              // Prefer explicit contact by ID if known
-              if (c.contactId) {
-                const pc = getContactById(c.contactId);
-                if (pc && pc.title) return pc.title;
-              }
-              const party = pickCounterparty(c);
+            }
+
+            // Contact title resolution
+            let contactTitle = '';
+            if (c.contactId) {
+              const pc = getContactById(c.contactId);
+              if (pc && pc.title) { contactTitle = pc.title; debug.titleSource = 'people.byId'; }
+            }
+            if (!contactTitle) {
               const m = phoneToContact.get(party);
-              if (m && m.title) return m.title;
+              if (m && m.title) { contactTitle = m.title; debug.titleSource = 'people.byPhone'; }
+            }
+            if (!contactTitle) {
               const acct = findAccountByPhone(party);
               if (acct){
                 const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
-                if (p && p.title) return p.title;
+                if (p && p.title) { contactTitle = p.title; debug.titleSource = 'account.recentContact'; }
               }
-              return '';
-            })(),
-            company: (() => {
-              // Prefer stored account attribution
-              if (c.accountName) return c.accountName;
-              if (c.accountId) {
-                const a = getAccountById(c.accountId);
-                if (a) return a.accountName || a.name || a.companyName || '';
-              }
-              // If contactId is known, derive from their record
-              if (c.contactId) {
-                const pc = getContactById(c.contactId);
-                if (pc) return pc.companyName || pc.accountName || pc.company || '';
-              }
-              const party = pickCounterparty(c);
+            }
+
+            // Company resolution
+            let company = '';
+            if (c.accountName) { company = c.accountName; debug.companySource = 'api.accountName'; }
+            else if (c.accountId) {
+              const a = getAccountById(c.accountId);
+              if (a) { company = a.accountName || a.name || a.companyName || ''; debug.companySource = 'accounts.byId'; }
+            }
+            if (!company && c.contactId) {
+              const pc = getContactById(c.contactId);
+              if (pc) { company = pc.companyName || pc.accountName || pc.company || ''; debug.companySource = 'people.companyFromContactId'; }
+            }
+            if (!company) {
               const m = phoneToContact.get(party);
-              if (m && m.company) return m.company;
+              if (m && m.company) { company = m.company; debug.companySource = 'people.byPhone'; }
+            }
+            if (!company) {
               const acct = findAccountByPhone(party);
-              if (acct){
-                return acct.accountName || acct.name || acct.companyName || '';
-              }
-              return '';
-            })(),
-            contactEmail: '',
-            contactPhone: (()=>{
-              const party = pickCounterparty(c);
-              if (!party) return '';
-              // Pretty print (US)
-              const d = party;
-              return d ? `+1 (${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : '';
-            })(),
-            contactCity: '',
-            contactState: '',
-            accountEmployees: null,
-            industry: '',
-            visitorDomain: '',
-            callTime: c.callTime || new Date().toISOString(),
-            durationSec: c.durationSec || 0,
-            outcome: c.outcome || '',
-            transcript: c.transcript || '',
-            aiSummary: c.aiSummary || '',
-            aiInsights: c.aiInsights || null,
-            audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
-          }));
+              if (acct){ company = acct.accountName || acct.name || acct.companyName || ''; debug.companySource = 'accounts.byPhone'; }
+            }
+
+            // Pretty print phone
+            const contactPhone = party ? `+1 (${party.slice(0,3)}) ${party.slice(3,6)}-${party.slice(6)}` : '';
+
+            const row = {
+              id,
+              contactName,
+              contactTitle,
+              company,
+              contactEmail: '',
+              contactPhone,
+              contactCity: '',
+              contactState: '',
+              accountEmployees: null,
+              industry: '',
+              visitorDomain: '',
+              callTime: c.callTime || new Date().toISOString(),
+              durationSec: c.durationSec || 0,
+              outcome: c.outcome || '',
+              transcript: c.transcript || '',
+              aiSummary: c.aiSummary || '',
+              aiInsights: c.aiInsights || null,
+              audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
+            };
+
+            if (window.CRM_DEBUG_CALLS) {
+              try { console.debug('[Calls][map]', { ...debug, contactName, contactTitle, company, duration: row.durationSec, outcome: row.outcome, audio: !!row.audioUrl }); } catch(_) {}
+            }
+
+            return row;
+          });
           // Always use API data, even if empty
           state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
           return;
