@@ -4137,7 +4137,7 @@ html, body {
   background: var(--bg-container);
   border-top: none; /* remove dividing line between display and buttons */
   padding: 0; /* no inner padding so the element respects outer spacing only */
-  margin-top: 6px; /* half of --spacing-sm for tight spacing */
+  margin-top: 1px; /* tightened spacing per request (reduced by 5px) */
   margin-bottom: 0; /* avoid compounding with natural page spacing */
   border-bottom-left-radius: var(--border-radius);
   border-bottom-right-radius: var(--border-radius);
