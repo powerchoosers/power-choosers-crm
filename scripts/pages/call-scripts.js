@@ -440,6 +440,52 @@
     return node.text || '';
   }
 
+  // Smoothly animate a container's height during content changes (FLIP)
+  function animateContainerResize(el, applyChangesFn, duration = 320) {
+    try {
+      if (!el) return applyChangesFn();
+      const startHeight = el.getBoundingClientRect().height;
+      el.style.height = startHeight + 'px';
+      el.style.overflow = 'hidden';
+      el.style.transition = `height ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+      
+      // Apply content changes
+      applyChangesFn();
+      
+      // Double RAF for reliable layout after DOM mutations
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const endHeight = el.scrollHeight;
+          if (Math.abs(endHeight - startHeight) > 1) {
+            el.style.height = endHeight + 'px';
+          } else {
+            // No height change, just cleanup immediately
+            el.style.height = '';
+            el.style.transition = '';
+            el.style.overflow = '';
+            return;
+          }
+          
+          const cleanup = () => {
+            el.style.height = '';
+            el.style.transition = '';
+            el.style.overflow = '';
+          };
+          
+          const timer = setTimeout(cleanup, duration + 50);
+          el.addEventListener('transitionend', function handler(ev){
+            if (ev.propertyName === 'height') {
+              clearTimeout(timer);
+              cleanup();
+            }
+          }, { once: true });
+        });
+      });
+    } catch(_) {
+      try { applyChangesFn(); } catch(e) {}
+    }
+  }
+
   function render(){
     const { display, responses, backBtn } = els();
     const node = FLOW[state.current] || FLOW.start;
@@ -448,37 +494,55 @@
       const live = isLiveCall();
       const baseText = buildNodeText(state.current, node);
       const html = renderTemplate(baseText, live ? 'text' : 'chips');
-      display.innerHTML = html;
+
+      // Animate script display height change after initial render
+      if (state._didInitialRender) {
+        animateContainerResize(display, () => { display.innerHTML = html; }, 260);
+      } else {
+        display.innerHTML = html;
+      }
     }
 
     if (responses){
-      responses.innerHTML = '';
-      responses.classList.remove('full-width');
+      // Rebuild response buttons with an animated resize
+      const buildResponses = () => {
+        responses.innerHTML = '';
+        responses.classList.remove('full-width');
 
-      if (state.current === 'start'){
-        const btn = document.createElement('button');
-        btn.className = 'dial-btn';
-        btn.type = 'button';
-        btn.textContent = 'Dial';
-        btn.addEventListener('click', () => go('dialing'));
-        responses.appendChild(btn);
-        responses.classList.add('full-width');
+        if (state.current === 'start'){
+          const btn = document.createElement('button');
+          btn.className = 'dial-btn';
+          btn.type = 'button';
+          btn.textContent = 'Dial';
+          btn.addEventListener('click', () => go('dialing'));
+          responses.appendChild(btn);
+          responses.classList.add('full-width');
+        } else {
+          (node.responses || []).forEach(r => {
+            const b = document.createElement('button');
+            b.className = 'response-btn';
+            b.type = 'button';
+            b.textContent = r.label;
+            b.addEventListener('click', () => go(r.next));
+            responses.appendChild(b);
+          });
+          if ((node.responses || []).length === 1) responses.classList.add('full-width');
+        }
+      };
+
+      if (state._didInitialRender) {
+        animateContainerResize(responses, buildResponses, 200);
       } else {
-        (node.responses || []).forEach(r => {
-          const b = document.createElement('button');
-          b.className = 'response-btn';
-          b.type = 'button';
-          b.textContent = r.label;
-          b.addEventListener('click', () => go(r.next));
-          responses.appendChild(b);
-        });
-        if ((node.responses || []).length === 1) responses.classList.add('full-width');
+        buildResponses();
       }
     }
 
     if (backBtn){
       backBtn.disabled = state.history.length === 0;
     }
+
+    // Mark initial render completed so subsequent renders animate
+    state._didInitialRender = true;
   }
 
   function go(next){
