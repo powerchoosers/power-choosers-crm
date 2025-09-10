@@ -204,6 +204,26 @@
     let section1Complete = false, section2Complete = false;
     let currentAnnualUsage = 0, currentMonthlyBill = 0, currentRate = 0, sellRate = 0, currentSupplier = '';
 
+    // ==== Helpers: Firestore persistence and DOM updates ====
+    function getCollectionName(){ return entityType === 'account' ? 'accounts' : 'contacts'; }
+    async function saveEntityFields(patch){
+      try {
+        if (!window.firebaseDB || !entityId) return;
+        const coll = getCollectionName();
+        await window.firebaseDB.collection(coll).doc(String(entityId)).set(patch, { merge: true });
+      } catch (e) { console.warn('[Health] saveEntityFields failed', e); }
+    }
+    function updateDetailFieldDOM(field, value){
+      try {
+        const scopeId = entityType === 'account' ? 'account-detail-view' : 'contact-detail-view';
+        const root = document.getElementById(scopeId);
+        if (!root) return;
+        const wrap = root.querySelector(`.info-value-wrap[data-field="${field}"] .info-value-text`);
+        if (wrap) wrap.textContent = (value !== undefined && value !== null && String(value).trim() !== '') ? String(value) : '--';
+      } catch(_) {}
+    }
+    function debounce(fn, ms){ let t; return function(...args){ clearTimeout(t); t = setTimeout(()=>fn.apply(this,args), ms); }; }
+
     const formatNumber = num => Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
     // Smoothly adjust the card height whenever inner content changes
@@ -367,7 +387,7 @@
       setTimeout(() => calculateResults(), 1500);
     };
 
-    const calculateResults = () => {
+    const calculateResults = async () => {
       try {
         const contractEndDateStr = contractEndInput.value;
         const effectiveSellRateAllIn = sellRate + ESTIMATED_DELIVERY_CHARGE_CENTS;
@@ -526,28 +546,124 @@
     if (contractEndInput) contractEndInput.addEventListener('input', validateSection2);
     if (sellRateInput) sellRateInput.addEventListener('input', validateSection2);
 
+    // Two-way sync helpers
+    async function applyPatchAndUpdateCaches(patch){
+      await saveEntityFields(patch);
+      try {
+        if (entityType === 'account' && typeof window.getAccountsData === 'function'){
+          const arr = window.getAccountsData() || [];
+          const obj = arr.find(a => String(a.id||'') === String(entityId));
+          if (obj) Object.assign(obj, patch);
+        } else if (entityType === 'contact' && typeof window.getPeopleData === 'function'){
+          const arr = window.getPeopleData() || [];
+          const obj = arr.find(p => String(p.id||'') === String(entityId));
+          if (obj) Object.assign(obj, patch);
+        }
+      } catch(_) {}
+    }
+
+    // Debounced save for continuous typing
+    const debouncedSave = debounce(async () => {
+      const supplierVal = (supplierInput?.value ?? '').trim();
+      const rateVal = currentRateInput?.value ?? '';
+      const contractVal = contractEndInput?.value ?? '';
+      const patch = {
+        electricitySupplier: supplierVal || null,
+        currentRate: rateVal !== '' ? rateVal : null,
+        contractEndDate: contractVal || null
+      };
+      updateDetailFieldDOM('electricitySupplier', supplierVal || null);
+      updateDetailFieldDOM('currentRate', rateVal !== '' ? rateVal : null);
+      updateDetailFieldDOM('contractEndDate', contractVal || null);
+      await applyPatchAndUpdateCaches(patch);
+    }, 500);
+
+    // Immediate save on blur/change to avoid losing edits on re-render
+    async function immediateSave(){
+      try {
+        const supplierVal = (supplierInput?.value ?? '').trim();
+        const rateVal = currentRateInput?.value ?? '';
+        const contractVal = contractEndInput?.value ?? '';
+        const patch = {
+          electricitySupplier: supplierVal || null,
+          currentRate: rateVal !== '' ? rateVal : null,
+          contractEndDate: contractVal || null
+        };
+        updateDetailFieldDOM('electricitySupplier', supplierVal || null);
+        updateDetailFieldDOM('currentRate', rateVal !== '' ? rateVal : null);
+        updateDetailFieldDOM('contractEndDate', contractVal || null);
+        await applyPatchAndUpdateCaches(patch);
+        try { window.crm?.showToast && window.crm.showToast('Saved'); } catch(_) {}
+      } catch(_) {}
+    }
+
+    if (supplierInput){
+      supplierInput.addEventListener('input', debouncedSave);
+      supplierInput.addEventListener('change', immediateSave);
+      supplierInput.addEventListener('blur', immediateSave);
+    }
+    if (currentRateInput){
+      currentRateInput.addEventListener('input', debouncedSave);
+      currentRateInput.addEventListener('change', immediateSave);
+      currentRateInput.addEventListener('blur', immediateSave);
+    }
+    if (contractEndInput){
+      contractEndInput.addEventListener('input', debouncedSave);
+      contractEndInput.addEventListener('change', immediateSave);
+      contractEndInput.addEventListener('blur', immediateSave);
+    }
+
     // Initialize
     activateSection(1);
     updateButton();
 
-    // Pre-populate from entity data if available
+    // Pre-populate from entity data if available (supplier, current rate, contract end)
     try {
       if (entityType === 'account' && typeof window.getAccountsData === 'function') {
         const accounts = window.getAccountsData() || [];
         const account = accounts.find(a => String(a.id || '') === String(entityId));
-        if (account && account.electricitySupplier) {
-          supplierInput.value = account.electricitySupplier;
+        if (account) {
+          if (account.electricitySupplier) supplierInput.value = account.electricitySupplier;
+          if (account.currentRate || account.current_rate) currentRateInput.value = account.currentRate || account.current_rate;
+          if (account.contractEndDate || account.contract_end_date || account.contractEnd) contractEndInput.value = account.contractEndDate || account.contract_end_date || account.contractEnd;
           validateSection1();
+          validateSection2();
         }
       } else if (entityType === 'contact' && typeof window.getPeopleData === 'function') {
         const people = window.getPeopleData() || [];
         const contact = people.find(p => String(p.id || '') === String(entityId));
-        if (contact && contact.electricitySupplier) {
-          supplierInput.value = contact.electricitySupplier;
+        if (contact) {
+          if (contact.electricitySupplier) supplierInput.value = contact.electricitySupplier;
+          if (contact.currentRate || contact.current_rate) currentRateInput.value = contact.currentRate || contact.current_rate;
+          if (contact.contractEndDate || contact.contract_end_date || contact.contractEnd) contractEndInput.value = contact.contractEndDate || contact.contract_end_date || contact.contractEnd;
           validateSection1();
+          validateSection2();
         }
       }
     } catch (_) { /* noop */ }
+
+    // If Firestore has a saved result, show it immediately (auto-open results)
+    (async () => {
+      try {
+        if (!window.firebaseDB || !entityId) return;
+        const coll = getCollectionName();
+        const snap = await window.firebaseDB.collection(coll).doc(String(entityId)).get();
+        const data = snap && snap.exists ? (snap.data() || {}) : {};
+        const saved = data.energyHealth;
+        if (saved && saved.html) {
+          const formSections = card.querySelector('.health-form-sections');
+          const calculateBtn2 = card.querySelector('#health-calculate-btn');
+          const resetBtn2 = card.querySelector('#health-reset-btn');
+          if (formSections) formSections.style.display = 'none';
+          if (calculateBtn2) calculateBtn2.style.display = 'none';
+          if (resetBtn2) resetBtn2.style.display = 'none';
+          const resultsContainer = card.querySelector('#health-results');
+          resultsContainer.innerHTML = saved.html;
+          resultsContainer.classList.remove('hidden');
+          animateAutoHeight();
+        }
+      } catch (e) { console.warn('[Health] Load saved results failed', e); }
+    })();
   }
 
   function openHealth(contactId) {

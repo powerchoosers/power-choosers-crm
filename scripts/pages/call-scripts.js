@@ -98,6 +98,14 @@
       contact.firstName = sp.first; contact.lastName = sp.last; contact.fullName = sp.full;
     }
     if (!contact.company && ctx.company) contact.company = ctx.company;
+    // If user has manually selected a contact in the Call Scripts search, prefer that
+    try {
+      if (typeof state !== 'undefined' && state && state.overrideContactId) {
+        const people = getPeopleCache();
+        const sel = people.find(p => String(p.id || '') === String(state.overrideContactId));
+        if (sel) contact = sel;
+      }
+    } catch(_) {}
     try { account = findAccountForContact(contact) || {}; } catch(_) { account = {}; }
     if (!account.name && ctx.company) account.name = ctx.company;
     return { ctx, contact, account };
@@ -243,7 +251,7 @@
       ]
     },
     pathA: {
-      text: "Got it. now {{contact.first_name}}, we've been working with other {{account.industry}}'s in {{account.city}}, and my main job here -- is to make sure account holders like yourself aren't -- blind sided by next years' rate increases.. <span class=\"script-highlight\">How are <em>you</em> guys handling these -- sharp increases for your future renewals?</span>",
+      text: "Got it. now {{contact.first_name}}, we've been working with other {{account.industry}}'s in {{account.city}}, and my main job here -- is to make sure account holders like yourself aren't -- blind sided by next years' rate increases.. <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these -- sharp increases for your future renewals?</span>",
       responses: [
         { label: "It's tough / struggling", next: 'pathA_struggling' },
         { label: 'Have not renewed / contract not up yet', next: 'pathA_not_renewed' },
@@ -255,7 +263,7 @@
     },
     // === Branches from pathA ===
     pathA_struggling: {
-      text: "Totally get it — {{contact.first_name}}. A lot of {{account.industry}} teams in {{account.city}} are seeing budgets tighten. My job is to time the market windows and structure terms so {{account.name}} isn't caught off-guard by spikes. Would it help if I pulled a quick forward-rate snapshot for {{account.name}} so you can see what's moving?",
+      text: "Totally get it — {{contact.first_name}}. A lot of {{account.industry}} companies in {{account.city}} are dealing with high electricity bills and shady business practices. Do you know when your contract expires? <br><br>My job is to time the market and keep you informed so you're not off-guard by your supplier. Would it help if I gave you a free energy health check so we can get a better understanding where you're at — that way you can see what we can do to help?",
       responses: [
         { label: 'Yes, quick snapshot is helpful', next: 'discovery' },
         { label: 'What do you need from me?', next: 'discovery' },
@@ -377,7 +385,8 @@
 
   let state = {
     current: 'start',
-    history: []
+    history: [],
+    overrideContactId: null
   };
 
   // Elements
@@ -386,26 +395,49 @@
       display: document.getElementById('call-scripts-display'),
       responses: document.getElementById('call-scripts-responses'),
       backBtn: document.getElementById('call-scripts-back'),
-      restartBtn: document.getElementById('call-scripts-restart')
+      restartBtn: document.getElementById('call-scripts-restart'),
+      toolbar: document.getElementById('call-scripts-toolbar')
     };
   }
 
   function buildNodeText(key, node){
     // Default returns node.text. Some nodes get conditional text.
-    if (key !== 'pathA_not_renewed') return node.text || '';
     const data = getLiveData();
-    const hasContractEnd = !!(data.account.contractEnd || data.account.contract_end || data.account.renewalDate);
-    const hasSupplier = !!(data.account.supplier || data.account.currentSupplier);
-    const part1 = "Makes sense -- when it comes to energy, it's pretty easy to renew at the wrong time and end up overpaying.";
-    const q1 = " When does your contract expire?";
-    const q2 = " Do you know who your supplier is?";
-    const part2 = " <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take.";
-    const part3 = " <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>";
-    let text = part1;
-    if (!hasContractEnd) text += q1;
-    if (!hasSupplier) text += q2;
-    text += part2 + part3;
-    return text;
+
+    if (key === 'pathA_not_renewed') {
+      const hasContractEnd = !!(data.account.contractEnd || data.account.contract_end || data.account.renewalDate);
+      const hasSupplier = !!(data.account.supplier || data.account.currentSupplier);
+      const part1 = "Makes sense -- when it comes to energy, it's pretty easy to renew at the wrong time and end up overpaying.";
+      const q1 = " When does your contract expire?";
+      const q2 = " Do you know who your supplier is?";
+      const part2 = " <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take.";
+      const part3 = " <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>";
+      let text = part1;
+      if (!hasContractEnd) text += q1;
+      if (!hasSupplier) text += q2;
+      text += part2 + part3;
+      return text;
+    }
+
+    if (key === 'pathA_struggling') {
+      const hasContractEnd = !!(data.account.contractEnd || data.account.contract_end || data.account.renewalDate);
+      const hasSupplier = !!(data.account.supplier || data.account.currentSupplier);
+      const intro = "Totally get it — {{contact.first_name}}. A lot of {{account.industry}} companies in {{account.city}} are dealing with high electricity bills and shady business practices.";
+      let middle = '';
+      if (hasSupplier && !hasContractEnd) {
+        middle = " So I understand you guys are using {{account.supplier}} — when does your contract expire?";
+      } else if (!hasSupplier && hasContractEnd) {
+        middle = " So I understand your contract expires in {{account.contract_end}} — who is your current supplier?";
+      } else if (hasSupplier && hasContractEnd) {
+        middle = " So I understand you guys are using {{account.supplier}} till {{account.contract_end}}.";
+      } else {
+        middle = " Who's your current supplier? Do you know when your contract expires?";
+      }
+      const closing = " <br><br>My job is to time the market and keep you informed so you're not off-guard by your supplier. Would it help if I gave you a free energy health check so we can get a better understanding where you're at — that way you can see what we can do to help?";
+      return intro + middle + closing;
+    }
+
+    return node.text || '';
   }
 
   function render(){
@@ -469,29 +501,315 @@
   }
 
   function bind(){
-    const { backBtn, restartBtn } = els();
+    const { backBtn, restartBtn, toolbar } = els();
     if (backBtn && !backBtn._bound){ backBtn.addEventListener('click', back); backBtn._bound = true; }
     if (restartBtn && !restartBtn._bound){ restartBtn.addEventListener('click', restart); restartBtn._bound = true; }
+
+    // Ensure the contact search UI exists under the title
+    try { ensureContactSearchUI(); } catch(_) {}
+
+    // Inject Widgets control (square button + hoverable drawer) to the right of Restart
+    if (toolbar && !toolbar._widgetsBound) {
+      try {
+        // Create divider
+        const divider = document.createElement('span');
+        divider.className = 'toolbar-divider';
+        divider.setAttribute('aria-hidden', 'true');
+
+        // Create wrap with button and drawer
+        const wrap = document.createElement('div');
+        wrap.className = 'widgets-wrap';
+        wrap.id = 'call-scripts-widgets-wrap';
+        wrap.innerHTML = `
+          <button class="btn-primary widgets-btn" id="call-scripts-open-widgets" aria-label="Widgets" aria-haspopup="menu" aria-expanded="false" data-pc-title="Widgets">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="3" y="3" width="6" height="6"></rect>
+              <rect x="15" y="3" width="6" height="6"></rect>
+              <rect x="3" y="15" width="6" height="6"></rect>
+              <rect x="15" y="15" width="6" height="6"></rect>
+            </svg>
+          </button>
+          <div class="widgets-drawer" role="menu" aria-label="Widgets">
+            <button type="button" class="widget-item" data-widget="health" title="Energy Health Check" aria-label="Energy Health Check" role="menuitem" tabindex="-1">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </button>
+            <button type="button" class="widget-item" data-widget="deal" title="Deal Calculator" aria-label="Deal Calculator" role="menuitem" tabindex="-1">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </button>
+            <button type="button" class="widget-item" data-widget="notes" title="Notes" aria-label="Notes" role="menuitem" tabindex="-1">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M4 4h12a2 2 0 0 1 2 2v10l-4 4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+                <path d="M14 20v-4a2 2 0 0 1 2-2h4"/>
+              </svg>
+            </button>
+          </div>`;
+
+        // Insert after Restart
+        if (restartBtn && restartBtn.parentElement === toolbar) {
+          restartBtn.insertAdjacentElement('afterend', divider);
+          divider.insertAdjacentElement('afterend', wrap);
+        } else {
+          toolbar.appendChild(divider);
+          toolbar.appendChild(wrap);
+        }
+
+        // Open/close behavior mirrors Account Detail widgets
+        const btn = wrap.querySelector('#call-scripts-open-widgets');
+        const drawer = wrap.querySelector('.widgets-drawer');
+        const openNow = () => {
+          clearTimeout(wrap._closeTimer);
+          if (!wrap.classList.contains('open')) {
+            wrap.classList.add('open');
+            btn.setAttribute('aria-expanded', 'true');
+          }
+        };
+        const closeSoon = () => {
+          clearTimeout(wrap._closeTimer);
+          wrap._closeTimer = setTimeout(() => {
+            wrap.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+          }, 240);
+        };
+        if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); wrap.classList.toggle('open'); btn.setAttribute('aria-expanded', wrap.classList.contains('open') ? 'true' : 'false'); });
+        wrap.addEventListener('mouseenter', openNow);
+        wrap.addEventListener('mouseleave', closeSoon);
+        wrap.addEventListener('focusin', openNow);
+        wrap.addEventListener('focusout', (e) => { if (!wrap.contains(e.relatedTarget)) closeSoon(); });
+
+        // Item click -> open that widget only
+        if (drawer && !drawer._bound) {
+          drawer.addEventListener('click', (e) => {
+            const item = e.target.closest && e.target.closest('.widget-item');
+            if (!item) return;
+            const which = item.getAttribute('data-widget');
+            try {
+              const { contact } = getLiveData();
+              const contactId = contact && (contact.id || contact.contactId || contact._id);
+              if (!contactId) { window.crm?.showToast && window.crm.showToast('No contact detected'); return; }
+              if (which === 'health') { try { window.Widgets?.openHealth && window.Widgets.openHealth(contactId); } catch(_) {} }
+              else if (which === 'deal') { try { window.Widgets?.openDeal && window.Widgets.openDeal(contactId); } catch(_) {} }
+              else if (which === 'notes') { try { window.Widgets?.openNotes && window.Widgets.openNotes(contactId); } catch(_) {} }
+              closeSoon();
+            } catch (err) { console.warn('Widget open failed', err); }
+          });
+          drawer._bound = true;
+        }
+
+        toolbar._widgetsBound = true;
+      } catch (_) { /* noop */ }
+    }
+  }
+
+  // ===== Contact search UI (autocomplete) =====
+  function ensureContactSearchUI(){
+    const page = document.getElementById('call-scripts-page');
+    if (!page) return;
+    const header = page.querySelector('.page-header .page-title-section');
+    if (!header) return;
+    if (header.querySelector('#call-scripts-search-wrap')) return; // already added
+
+    const wrap = document.createElement('div');
+    wrap.id = 'call-scripts-search-wrap';
+    wrap.className = 'contact-search-wrap';
+    wrap.innerHTML = `
+      <div class="contact-search-inner">
+        <input type="text" id="call-scripts-contact-search" class="search-input-small" placeholder="Search contact for this call…" aria-label="Search contact" autocomplete="off"/>
+        <div id="call-scripts-search-suggestions" class="search-suggestions" role="listbox" aria-label="Contact suggestions" hidden></div>
+      </div>
+    `;
+    // Insert directly below the title
+    const title = header.querySelector('.page-title');
+    if (title && title.parentElement === header) {
+      title.insertAdjacentElement('afterend', wrap);
+    } else {
+      header.appendChild(wrap);
+    }
+
+    wireSearchHandlers();
+    // Seed from current live context
+    updateSearchFromContext();
+  }
+
+  function getAccountKeyForMatch(a){
+    return String((a && (a.accountName||a.name||a.companyName||''))||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+  }
+
+  function buildSuggestions(query){
+    const input = document.getElementById('call-scripts-contact-search');
+    const panel = document.getElementById('call-scripts-search-suggestions');
+    if (!input || !panel) return;
+    const q = String(query||'').trim().toLowerCase();
+    const people = getPeopleCache();
+    const { account, contact: liveContact } = getLiveData();
+    const accKey = getAccountKeyForMatch(account);
+
+    // Score contacts
+    const scored = people.map(p => {
+      const name = String(p.name || (p.firstName||'') + ' ' + (p.lastName||'')).trim();
+      const email = String(p.email||'').toLowerCase();
+      const phone = String(p.workDirectPhone||p.mobile||p.otherPhone||p.phone||'');
+      const company = String(p.companyName||p.company||p.accountName||'');
+      let score = 0;
+      if (accKey) {
+        const ck = getAccountKeyForMatch({ accountName: company });
+        if (ck && (ck === accKey || ck.includes(accKey) || accKey.includes(ck))) score += 50; // strong boost for same company
+      }
+      if (!q) {
+        // no query: prioritize same-company contacts and live contact
+        if (liveContact && p.id === liveContact.id) score += 25;
+      } else {
+        const qq = q;
+        if (name.toLowerCase().includes(qq)) score += 30;
+        if (email.includes(qq)) score += 20;
+        if (company.toLowerCase().includes(qq)) score += 10;
+        if (String(phone).replace(/\D/g,'').includes(qq.replace(/\D/g,''))) score += 15;
+      }
+      return { p, score, name, email, phone, company };
+    }).filter(x => x.score > 0 || !q); // when query, require matches; temporary for no-query handling below
+
+    scored.sort((a,b) => b.score - a.score);
+    let top = scored;
+    // If no query and we have an account context, prefer ONLY same-company contacts
+    if (!q && accKey) {
+      const sameCo = scored.filter(({company}) => {
+        const ck = getAccountKeyForMatch({ accountName: company });
+        return ck && (ck === accKey || ck.includes(accKey) || accKey.includes(ck));
+      });
+      if (sameCo.length) top = sameCo; // restrict to same-company when available
+    }
+    top = top.slice(0, 10);
+
+    if (top.length === 0) {
+      panel.innerHTML = '<div class="suggestion-empty">No matches</div>';
+      panel.hidden = false;
+      input.setAttribute('aria-expanded','true');
+      return;
+    }
+
+    panel.innerHTML = top.map(({p, name, email, company}) => {
+      const label = escapeHtml(name || '(No name)');
+      const sub = escapeHtml([company, email].filter(Boolean).join(' • '));
+      return `<div class="suggestion-item" role="option" data-contact-id="${escapeHtml(p.id)}">
+        <div class="sugg-name">${label}</div>
+        <div class="sugg-sub">${sub || '&nbsp;'}</div>
+      </div>`;
+    }).join('');
+    panel.hidden = false;
+    input.setAttribute('aria-expanded','true');
+  }
+
+  function closeSuggestions(){
+    const panel = document.getElementById('call-scripts-search-suggestions');
+    const input = document.getElementById('call-scripts-contact-search');
+    if (!panel) return;
+    panel.hidden = true;
+    if (input) input.setAttribute('aria-expanded','false');
+  }
+
+  function setSelectedContact(contactId){
+    state.overrideContactId = contactId ? String(contactId) : null;
+    // Update input value
+    try {
+      const input = document.getElementById('call-scripts-contact-search');
+      if (input) {
+        const people = getPeopleCache();
+        const sel = people.find(p => String(p.id||'') === String(contactId));
+        const nm = sel ? (sel.name || ((sel.firstName||'') + ' ' + (sel.lastName||''))).trim() : '';
+        input.value = nm || '';
+      }
+    } catch(_) {}
+    // Re-render scripts with new context
+    render();
+  }
+
+  function updateSearchFromContext(){
+    const input = document.getElementById('call-scripts-contact-search');
+    if (!input) return;
+    const { contact, account } = getLiveData();
+    // Auto-fill name when calling a contact directly
+    const liveName = (contact && (contact.name || ((contact.firstName||'') + ' ' + (contact.lastName||''))).trim()) || '';
+    if (liveName) input.value = liveName;
+    // If calling a company number (no live contact id but have account), pre-open suggestions with that account's contacts
+    const hasContactId = !!(contact && contact.id);
+    const hasAccount = !!(account && (account.accountName||account.name||account.companyName));
+    if (!hasContactId && hasAccount) {
+      // Open suggestions with same-company list
+      buildSuggestions('');
+    }
+  }
+
+  function wireSearchHandlers(){
+    const input = document.getElementById('call-scripts-contact-search');
+    const panel = document.getElementById('call-scripts-search-suggestions');
+    if (!input || !panel) return;
+
+    // Open on focus with company contacts if available
+    input.addEventListener('focus', () => buildSuggestions(''));
+    input.addEventListener('input', () => {
+      const val = input.value || '';
+      buildSuggestions(val);
+      if (!val.trim()) {
+        // If user clears the input, drop override and fall back to live context
+        state.overrideContactId = null;
+        render();
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { closeSuggestions(); return; }
+      if (e.key === 'Enter') {
+        // Choose first visible suggestion
+        const first = panel.querySelector('.suggestion-item');
+        if (first) {
+          const id = first.getAttribute('data-contact-id');
+          if (id) setSelectedContact(id);
+        }
+        closeSuggestions();
+        e.preventDefault();
+      }
+    });
+
+    // Click selection
+    panel.addEventListener('click', (e) => {
+      const item = e.target.closest && e.target.closest('.suggestion-item');
+      if (!item) return;
+      const id = item.getAttribute('data-contact-id');
+      if (id) setSelectedContact(id);
+      closeSuggestions();
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+      const wrap = document.getElementById('call-scripts-search-wrap');
+      if (!wrap) return;
+      if (!wrap.contains(e.target)) closeSuggestions();
+    });
   }
 
   function init(){
     bind();
     // Reset state when the page is shown
     restart();
-    // Re-render when phone widget in-call state toggles
+    // Re-render when phone widget in-call state toggles and refresh the search context
     try {
       const card = document.getElementById('phone-widget');
       if (card) {
-        const obs = new MutationObserver(() => { try { render(); } catch(_) {} });
+        const obs = new MutationObserver(() => {
+          try { render(); updateSearchFromContext(); } catch(_) {}
+        });
         obs.observe(card, { attributes: true, attributeFilter: ['class'] });
       }
-    } catch(_){}
+    } catch(_){ }
   }
 
   // Expose module
   if (!window.callScriptsModule) window.callScriptsModule = {};
   window.callScriptsModule.init = init;
-  
+
   // Eager init if user is already on the Call Scripts page at load
   document.addEventListener('DOMContentLoaded', () => {
     try {
@@ -501,4 +819,5 @@
       }
     } catch (_) { /* noop */ }
   });
+
 })();
