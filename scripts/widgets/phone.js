@@ -19,6 +19,46 @@
     return DEFAULT_BUSINESS_E164;
   }
 
+  // --- FLIP helpers to synchronize internal element shifts with container resize ---
+  function captureLayoutSnapshot(card) {
+    try {
+      if (!card) card = document.getElementById(WIDGET_ID);
+      if (!card) return [];
+      const targets = Array.from(card.querySelectorAll('.mic-status, .dialpad, .dial-actions'));
+      return targets.map(el => ({ el, top: el.getBoundingClientRect().top }));
+    } catch (_) { return []; }
+  }
+  function runFlipFromSnapshot(snapshot, card, duration = 320) {
+    try {
+      if (!snapshot || !snapshot.length) return;
+      if (!card) card = document.getElementById(WIDGET_ID);
+      requestAnimationFrame(() => {
+        try { window.__pc_lastFlipAt = Date.now(); } catch(_) {}
+        snapshot.forEach(({ el, top }) => {
+          try {
+            const newTop = el.getBoundingClientRect().top;
+            const dy = top - newTop;
+            if (Math.abs(dy) < 0.5) return;
+            el.style.willChange = 'transform';
+            el.style.transform = `translateY(${dy}px)`;
+            // Force reflow
+            void el.offsetHeight;
+            el.style.transition = `transform ${duration}ms cubic-bezier(0.4,0,0.2,1)`;
+            el.style.transform = 'translateY(0)';
+            const cleanup = () => {
+              el.style.willChange = '';
+              el.style.transition = '';
+              el.style.transform = '';
+            };
+            el.addEventListener('transitionend', cleanup, { once: true });
+          } catch(_) {}
+        });
+        // Align container height animation with child movement
+        smoothResize(card, duration);
+      });
+    } catch (_) {}
+  }
+
   // Twilio Device state management
   const TwilioRTC = (function() {
     const state = { 
@@ -223,6 +263,8 @@
                     if (inputCancel) inputCancel.value = '';
                     const titleCancel = cardCancel.querySelector('.widget-title');
                     if (titleCancel) titleCancel.innerHTML = 'Phone';
+                    // Remove in-call contact display if present
+                    try { clearContactDisplay(); } catch(_) {}
                   }
                 } catch(_) {}
                 // Ensure timers/states are reset
@@ -267,8 +309,8 @@
                   console.debug('[Phone] Setting ringing input to caller number:', number);
                   input0.value = number;
                 }
-                const title0 = card0.querySelector('.widget-title');
-                if (title0 && (meta?.name || meta?.account)) title0.innerHTML = `Phone - ${meta?.name || meta?.account}`;
+                // Replace input with contact display next to dialpad (this will also mark in-call and animate)
+                setContactDisplay(meta, number);
               }
             } catch(_) {}
 
@@ -333,8 +375,8 @@
                     console.debug('[Phone] Setting input to caller number:', number);
                     input.value = number;
                   }
-                  const title = card.querySelector('.widget-title');
-                  if (title && (meta?.name || meta?.account)) title.innerHTML = `Phone - ${meta?.name || meta?.account}`;
+                  // Show rich contact display and keep header title clean
+                  setContactDisplay(meta, number);
                 }
                 const callStartTime = Date.now();
                 const callId = `call_${callStartTime}_${(number || '').replace(/\D/g, '')}`;
@@ -378,6 +420,9 @@
                     if (input2) input2.value = '';
                     const title2 = card2.querySelector('.widget-title');
                     if (title2) title2.innerHTML = 'Phone';
+                    try { clearContactDisplay(); } catch(_) {}
+                    // Remove in-call spacing class
+                    try { card2.classList.remove('in-call'); } catch(_) {}
                   }
                   
                   // Stop live timer and restore banner
@@ -430,6 +475,8 @@
                     if (input3) input3.value = '';
                     const title3 = card3.querySelector('.widget-title');
                     if (title3) title3.innerHTML = 'Phone';
+                    try { clearContactDisplay(); } catch(_) {}
+                    try { card3.classList.remove('in-call'); } catch(_) {}
                   }
                   // Stop live timer and restore banner
                   stopLiveCallTimer(card3);
@@ -493,6 +540,8 @@
               if (inputX) inputX.value = '';
               const titleX = cardX.querySelector('.widget-title');
               if (titleX) titleX.innerHTML = 'Phone';
+              try { clearContactDisplay(); } catch(_) {}
+              try { cardX.classList.remove('in-call'); } catch(_) {}
             }
             try { stopLiveCallTimer(cardX); } catch(_) {}
             lastCallCompleted = Date.now();
@@ -623,6 +672,173 @@
     return src;
   }
 
+  // Inject minimal styles for the in-call contact display that replaces the input
+  function ensurePhoneContactStyles() {
+    if (document.getElementById('phone-contact-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'phone-contact-styles';
+    style.textContent = `
+      /* In-call contact display (replaces input during live call) */
+      .phone-contact { 
+        margin-bottom: 0px; 
+        opacity: 0; 
+        transform: translateY(-6px) scale(0.98); 
+        transition: opacity 280ms ease, transform 280ms ease; 
+      }
+      .phone-contact.--show { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+      }
+      /* Reduce space between contact and timer even more */
+      .phone-contact + .mic-status { margin-top: -12px; }
+
+      /* Input hide/show animation */
+      .phone-body .phone-display { transition: opacity 200ms ease, transform 200ms ease; }
+      .phone-body .phone-display.is-hiding { opacity: 0; transform: translateY(-4px) scale(0.98); }
+      .phone-body .phone-display.is-showing { opacity: 1; transform: translateY(0) scale(1); }
+      .phone-contact .contact-row { display: flex; align-items: center; gap: 10px; }
+      .phone-contact .contact-text { display: flex; flex-direction: column; }
+      .phone-contact .contact-name { font-weight: 700; color: var(--text-primary, #fff); }
+      .phone-contact .contact-sub { color: var(--text-secondary, #b5b5b5); font-size: 12px; }
+      .phone-contact .company-favicon { width: 20px; height: 20px; border-radius: 4px; }
+      .phone-contact .avatar-initials { width: 28px; height: 28px; border-radius: 50%; background: var(--primary-700, #ff6b35); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 12px; font-weight: 700; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Show contact display (name/account + favicon/initials) and hide the input while in a call
+  function setContactDisplay(meta, number) {
+    try {
+      ensurePhoneContactStyles();
+      const card = document.getElementById(WIDGET_ID);
+      if (!card) return;
+      // Capture layout before DOM changes (FLIP)
+      const snapshot = captureLayoutSnapshot(card);
+      const body = card.querySelector('.phone-body');
+      if (!body) return;
+      let box = body.querySelector('.phone-contact');
+      const existed = !!box;
+      if (!box) {
+        box = document.createElement('div');
+        box.className = 'phone-contact';
+        box.innerHTML = `
+          <div class="contact-row">
+            <div class="contact-avatar"></div>
+            <div class="contact-text">
+              <div class="contact-name"></div>
+              <div class="contact-sub"></div>
+            </div>
+          </div>`;
+        body.insertBefore(box, body.firstChild);
+      }
+      const input = body.querySelector('.phone-display');
+      if (input) input.style.display = 'none';
+
+      // Populate
+      const nameLine = (meta && (meta.name || meta.account)) || (currentCallContext && (currentCallContext.name || currentCallContext.company)) || '';
+      const account = (meta && (meta.account || meta.company)) || (currentCallContext && currentCallContext.company) || '';
+      const sub = [account, number].filter(Boolean).join(' • ');
+      const favicon = makeFavicon(meta && meta.domain);
+      const avatarWrap = box.querySelector('.contact-avatar');
+      if (avatarWrap) {
+        if (favicon) {
+          avatarWrap.innerHTML = `<img class="company-favicon" src="${favicon}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
+        } else {
+          const initials = (nameLine || account || number || '')
+            .split(/\s+/)
+            .map(s => s.trim()[0])
+            .filter(Boolean)
+            .slice(0, 2)
+            .join('')
+            .toUpperCase();
+          avatarWrap.innerHTML = `<span class="avatar-initials" aria-hidden="true">${initials || '•'}</span>`;
+        }
+      }
+      const nameEl = box.querySelector('.contact-name');
+      const subEl = box.querySelector('.contact-sub');
+      if (nameEl) nameEl.textContent = nameLine || number || 'On call';
+      if (subEl) subEl.textContent = sub;
+      // Animate input out then pop-in details with synchronized shift
+      const inputEl = body.querySelector('.phone-display');
+      if (inputEl && inputEl.style.display !== 'none') {
+        inputEl.classList.add('is-hiding');
+        setTimeout(() => { try { inputEl.style.display = 'none'; inputEl.classList.remove('is-hiding'); } catch(_) {} }, 200);
+      }
+      // Ensure initial state for transition and trigger reliably
+      box.classList.remove('--show');
+      // Force explicit initial values for reliability across browsers
+      try { box.style.opacity = '0'; box.style.transform = 'translateY(-6px) scale(0.98)'; } catch(_) {}
+      void box.offsetHeight; // reflow to guarantee CSS transition
+      requestAnimationFrame(() => {
+        box.classList.add('--show');
+        try { box.style.opacity = ''; box.style.transform = ''; } catch(_) {}
+        runFlipFromSnapshot(snapshot, card, 320);
+      });
+
+      // Mark in-call state and add subtle pulse on first reveal only
+      try {
+        card.classList.add('in-call');
+        if (!existed) {
+          card.classList.add('placing-call');
+          setTimeout(() => { try { card.classList.remove('placing-call'); } catch(_) {} }, 900);
+        }
+      } catch(_) {}
+
+      // Always keep header title clean (no duplicate name next to "Phone")
+      const titleEl = card.querySelector('.widget-title');
+      if (titleEl) titleEl.textContent = 'Phone';
+
+      // Height animation is handled inside runFlipFromSnapshot for sync
+    } catch (_) {}
+  }
+
+  function clearContactDisplay() {
+    try {
+      const card = document.getElementById(WIDGET_ID);
+      if (!card) return;
+      const body = card.querySelector('.phone-body');
+      if (!body) return;
+      // Capture layout before DOM changes (FLIP)
+      const snapshot = captureLayoutSnapshot(card);
+      const box = body.querySelector('.phone-contact');
+      const input = body.querySelector('.phone-display');
+      if (box) {
+        try {
+          // Animate collapse + fade instead of instant remove
+          const h = box.getBoundingClientRect().height;
+          box.style.height = h + 'px';
+          box.style.overflow = 'hidden';
+          box.style.transition = 'height 280ms cubic-bezier(0.4,0,0.2,1), margin 280ms cubic-bezier(0.4,0,0.2,1), opacity 220ms ease, transform 220ms ease';
+          requestAnimationFrame(() => {
+            box.classList.remove('--show');
+            box.style.height = '0px';
+            box.style.marginBottom = '0px';
+          });
+          // Remove after animation ends
+          const cleanup = () => { try { box.remove(); } catch(_) {} };
+          box.addEventListener('transitionend', (e) => { if (e.propertyName === 'height') cleanup(); }, { once: true });
+          setTimeout(cleanup, 360);
+        } catch(_) { box.classList.remove('--show'); }
+      }
+      if (input) {
+        // Prepare input to animate back in: start hidden state then animate to visible
+        input.style.display = '';
+        input.classList.add('is-hiding'); // start from hidden transform/opacity
+        requestAnimationFrame(() => {
+          input.classList.remove('is-hiding');
+          input.classList.add('is-showing');
+          setTimeout(() => { try { input.classList.remove('is-showing'); } catch(_) {} }, 220);
+        });
+      }
+      // Keep header title simple
+      const titleEl = card.querySelector('.widget-title');
+      if (titleEl) titleEl.textContent = 'Phone';
+      try { card.classList.remove('placing-call'); card.classList.remove('in-call'); } catch(_) {}
+      // Run FLIP shift for internal elements in sync with container height
+      runFlipFromSnapshot(snapshot, card, 320);
+    } catch (_) {}
+  }
+
   function computeTopForNotification() {
     try {
       const panel = document.getElementById('widget-panel');
@@ -722,12 +938,25 @@
     }
     if (!card) card = document.getElementById(WIDGET_ID);
     if (!card) return;
-    // restore the idle banner depending on mic permission state
+    const now = Date.now();
+    const lastFlip = (typeof window.__pc_lastFlipAt === 'number') ? window.__pc_lastFlipAt : 0;
+    const recentlyFlipped = lastFlip && (now - lastFlip) < 260;
+    // If no recent FLIP, capture snapshot so mic banner/text change is synchronized
+    const snapshot = recentlyFlipped ? null : captureLayoutSnapshot(card);
+    // Remove in-call spacing state on any call end
+    try { card.classList.remove('in-call'); } catch(_) {}
+    // Restore the idle banner depending on mic permission state
     if (TwilioRTC.state.micPermissionGranted) {
       setMicBanner(card, 'ok', 'Browser calls enabled');
     } else {
       setMicBanner(card, 'warn', 'Will call your phone - click here to retry microphone access');
     }
+    if (recentlyFlipped) {
+      // A FLIP just ran (likely from clearContactDisplay). Avoid a second animation.
+      return;
+    }
+    // Run synchronized FLIP including container height
+    runFlipFromSnapshot(snapshot, card, 300);
   }
 
   // Update microphone status UI
@@ -774,6 +1003,46 @@
     if (needed > current) {
       card.style.height = needed + 'px';
     }
+  }
+
+  // Smoothly animate the widget card's height between its current size and natural size
+  function smoothResize(card, duration = 360) {
+    try {
+      if (!card) card = document.getElementById(WIDGET_ID);
+      if (!card) return;
+      // Measure current and target heights
+      const start = card.getBoundingClientRect().height;
+      // Temporarily ensure natural height to compute target
+      const prevHeight = card.style.height;
+      const prevOverflow = card.style.overflow;
+      card.style.height = 'auto';
+      const target = card.scrollHeight;
+      // If already equal, no animation needed
+      if (Math.abs(target - start) < 1) {
+        card.style.height = prevHeight;
+        return;
+      }
+      // Prepare for transition
+      card.style.overflow = 'hidden';
+      card.style.height = start + 'px';
+      void card.offsetHeight; // reflow
+      card.style.transition = `height ${duration}ms cubic-bezier(0.4,0,0.2,1)`;
+      try { window.__pc_lastCardResizeAt = Date.now(); } catch(_) { }
+      card.style.height = target + 'px';
+      const cleanup = () => {
+        card.style.transition = '';
+        card.style.height = '';
+        card.style.overflow = prevOverflow || '';
+        card.removeEventListener('transitionend', onEnd);
+      };
+      let timer = setTimeout(cleanup, duration + 60);
+      const onEnd = (e) => {
+        if (e && e.propertyName !== 'height') return;
+        clearTimeout(timer);
+        cleanup();
+      };
+      card.addEventListener('transitionend', onEnd);
+    } catch(_) {}
   }
 
   // Microphone permission handling
@@ -1048,11 +1317,52 @@
     };
     
     // Dialpad clicks
+    // Helper: detect active call connection
+    const hasActiveCall = () => {
+      try {
+        if (isCallInProgress) return true;
+        if (TwilioRTC.state?.connection) {
+          const st = (typeof TwilioRTC.state.connection.status === 'function') ? TwilioRTC.state.connection.status() : 'open';
+          return st && st !== 'closed';
+        }
+        if (currentCall) {
+          const st2 = (typeof currentCall.status === 'function') ? currentCall.status() : 'open';
+          return st2 && st2 !== 'closed';
+        }
+      } catch(_) {}
+      return false;
+    };
+    const sendDTMF = (digit) => {
+      try {
+        const conn = currentCall || TwilioRTC.state?.connection;
+        if (conn && typeof conn.sendDigits === 'function') {
+          conn.sendDigits(String(digit));
+          console.debug('[Phone] Sent DTMF:', digit);
+        }
+        // Briefly flash the corresponding dial key for visual feedback
+        try {
+          const card = document.getElementById(WIDGET_ID);
+          if (card) {
+            const keyBtn = card.querySelector(`.dial-key[data-key="${CSS.escape(String(digit))}"]`);
+            if (keyBtn) {
+              keyBtn.classList.add('dtmf-flash');
+              setTimeout(() => { try { keyBtn.classList.remove('dtmf-flash'); } catch(_) {} }, 180);
+            }
+          }
+        } catch(_) {}
+      } catch (e) {
+        console.warn('[Phone] Failed to send DTMF:', e);
+      }
+    };
     card.querySelectorAll('.dial-key').forEach(btn => {
       btn.addEventListener('click', () => {
         const k = btn.getAttribute('data-key') || '';
-        appendChar(k);
-        trackUserInput();
+        if (hasActiveCall()) {
+          sendDTMF(k);
+        } else {
+          appendChar(k);
+          trackUserInput();
+        }
       });
     });
     
@@ -1071,9 +1381,8 @@
         if (hit) {
           const fullName = [hit.firstName, hit.lastName].filter(Boolean).join(' ') || (hit.name || '');
           if (fullName) {
-            const titleEl = card.querySelector('.widget-title');
+            // Do not modify header title anymore. Optionally store in context for later in-call display
             const comp = hit.companyName || hit.accountName || hit.company || '';
-            if (titleEl) titleEl.innerHTML = `Phone - ${fullName}${comp ? ' • ' + comp : ''}`;
             currentCallContext.name = fullName;
             currentCallContext.company = comp;
           }
@@ -1176,7 +1485,7 @@
         await logCall(number, 'browser', callId);
         
         // Handle call events
-        currentCall.on('accept', () => {
+        currentCall.on('accept', async () => {
           console.debug('[Phone] Call connected');
           isCallInProgress = true;
           currentCallContext.isActive = true;
@@ -1189,6 +1498,11 @@
           // Show live timer in banner
           const card = document.getElementById(WIDGET_ID);
           startLiveCallTimer(card);
+          // Populate in-call contact display (keep header title simple)
+          try {
+            const meta = await resolvePhoneMeta(number).catch(() => ({}));
+            setContactDisplay(meta || {}, number);
+          } catch(_) {}
           // Update call status to connected using same call ID
           updateCallStatus(number, 'connected', callStartTime, 0, twilioCallSid || callId);
         });
@@ -1237,6 +1551,8 @@
             if (input) input.value = '';
             const title = widget.querySelector('.widget-title');
             if (title) title.innerHTML = 'Phone';
+            try { clearContactDisplay(); } catch(_) {}
+            try { widget.classList.remove('in-call'); } catch(_) {}
           }
           
           // Force UI update to ensure button state is visible
@@ -1330,6 +1646,7 @@
             if (input) input.value = '';
             const title = widget.querySelector('.widget-title');
             if (title) title.innerHTML = 'Phone';
+            try { clearContactDisplay(); } catch(_) {}
           }
           
           // Clear context on error too
@@ -1537,6 +1854,7 @@
     }
     function setInCallUI(inCall) {
       if (!callBtn) return;
+      // Do not toggle in-call here; handled by setContactDisplay() once details are loaded
       if (inCall) {
         callBtn.textContent = 'Hang Up';
         callBtn.classList.remove('btn-primary');
@@ -1564,6 +1882,7 @@
         const title = card.querySelector('.widget-title');
         if (title) title.innerHTML = 'Phone';
         if (input) input.value = '';
+        try { clearContactDisplay(); } catch(_) {}
         return;
       }
 
@@ -1643,8 +1962,10 @@
         TwilioRTC.state.connection = null;
         TwilioRTC.state.pendingIncoming = null;
         
-        // Clear UI state
+        // Clear UI state (first remove contact display with a synchronized animation,
+        // then stop the live timer to avoid double height animations)
         setInCallUI(false);
+        try { clearContactDisplay(); } catch(_) {}
         stopLiveCallTimer(card);
         
         // Clear context on manual hangup
@@ -1674,6 +1995,8 @@
         if (input) input.value = '';
         const title = card.querySelector('.widget-title');
         if (title) title.innerHTML = 'Phone';
+        try { clearContactDisplay(); } catch(_) {}
+        try { const c = document.getElementById(WIDGET_ID); if (c) c.classList.remove('in-call'); } catch(_) {}
         
         return; // CRITICAL: Exit here, do NOT continue to dialing logic
       }
@@ -1688,9 +2011,21 @@
         try { window.crm?.showToast && window.crm.showToast('Invalid number. Use 10-digit US or +countrycode number.'); } catch (_) {}
         return;
       }
+      // Immediately switch button to Hang Up and mark call-in-progress so user can cancel immediately
+      isCallInProgress = true;
+      setInCallUI(true);
+      try { if (callBtn) callBtn.disabled = false; } catch(_) {}
       // update UI with normalized value and enrich title from People data
       if (input) { input.value = normalized.value; }
       enrichTitleFromPhone(normalized.value);
+      // Immediately reveal early contact display with whatever metadata we have
+      try {
+        const earlyMeta = { name: (currentCallContext && currentCallContext.name) || '', account: (currentCallContext && currentCallContext.company) || '', domain: '' };
+        setContactDisplay(earlyMeta, normalized.value);
+      } catch(_) {}
+      // Immediately switch button to Hang Up and mark call-in-progress so user can cancel immediately
+      isCallInProgress = true;
+      setInCallUI(true);
       try {
         // Determine website mode: if no API base configured, treat as marketing site
         const isMainWebsite = !window.API_BASE_URL; // No API configured means main website
@@ -1722,10 +2057,20 @@
           hasMicPermission = false;
         }
         
+        // If user already canceled during permission prompt, abort
+        if (!isCallInProgress) {
+          console.debug('[Phone] Aborting dial: user canceled before placement');
+          return;
+        }
         // Try browser calling first if microphone permission is available
         if (hasMicPermission) {
           try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
           try {
+            // If user canceled right before placing call, abort gracefully
+            if (!isCallInProgress) {
+              console.debug('[Phone] Aborting: user canceled after permission but before placing call');
+              return;
+            }
             const call = await placeBrowserCall(normalized.value);
             console.debug('[Phone] Browser call successful, no fallback needed');
             // Note: initial call logging is already done in placeBrowserCall()
@@ -1743,6 +2088,10 @@
           }
         } else {
           // Using server-based calling (browser calling disabled)
+          if (!isCallInProgress) {
+            console.debug('[Phone] Aborting: user canceled before server call');
+            return;
+          }
           console.debug('[Phone] Using server-based calling');
           try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
           try {
@@ -1798,7 +2147,8 @@
       // Do not intercept common shortcuts (paste/copy/select-all, etc.)
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (/^[0-9*#]$/.test(key)) {
-        appendChar(key);
+        if (hasActiveCall()) { sendDTMF(key); }
+        else { appendChar(key); }
         e.preventDefault();
       } else if (key === 'Backspace') {
         backspace();
@@ -1806,7 +2156,8 @@
       } else if (/^[a-zA-Z]$/.test(key)) {
         const d = letterToDigit(key);
         if (d) {
-          appendChar(d);
+          if (hasActiveCall()) { sendDTMF(d); }
+          else { appendChar(d); }
           e.preventDefault();
         }
       } else if (key === 'Enter') {
@@ -2108,14 +2459,7 @@
       if (input) {
         input.value = number;
       }
-      // Update widget header to show contact name
-      if (contactName) {
-        const title = card.querySelector('.widget-title');
-        if (title) {
-          const comp = contactCompany || currentCallContext.company || '';
-          title.innerHTML = `Phone - ${contactName}${comp ? ' • ' + comp : ''}`;
-        }
-      }
+      // Do not modify header title; in-call contact info will render inside the body instead
       // Auto-trigger call only if explicitly requested and conditions are met
       // Do NOT require contactName for auto-trigger (some contexts may not provide it)
       if (number && autoTrigger) {
