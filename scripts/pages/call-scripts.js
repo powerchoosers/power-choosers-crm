@@ -47,6 +47,58 @@
     const parts = s.split(/\s+/);
     return { first: parts[0] || '', last: parts.slice(1).join(' ') || '', full: s };
   }
+  function normName(s){
+    return String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+  }
+  function normalizeAccount(a){
+    const obj = a ? {...a} : {};
+    // Normalize supplier aliases
+    obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || obj.energySupplier || obj.electricitySupplier || obj.supplierName || '';
+    // Normalize contract end aliases
+    const end = obj.contractEnd || obj.contract_end || obj.renewalDate || obj.renewal_date || obj.contractEndDate || obj.contract_end_date || obj.contractExpiry || obj.expiration || obj.expirationDate || obj.expiresOn || '';
+    obj.contract_end = end || '';
+    obj.contractEnd = end || obj.contractEnd || '';
+    // Normalize basic fields
+    obj.name = obj.name || obj.accountName || obj.companyName || '';
+    obj.industry = obj.industry || '';
+    obj.city = obj.city || obj.billingCity || obj.locationCity || '';
+    obj.state = obj.state || obj.region || obj.billingState || '';
+    obj.website = obj.website || obj.domain || '';
+    return obj;
+  }
+  function formatDateMDY(v){
+    try {
+      if (!v) return '';
+      const d = new Date(v);
+      if (isNaN(d.getTime())) return String(v); // keep raw if unparsable
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      const yyyy = d.getFullYear();
+      return `${mm}/${dd}/${yyyy}`;
+    } catch(_) { return String(v||''); }
+  }
+  function normalizeContact(c){
+    const obj = c ? {...c} : {};
+    const nameGuess = obj.name || ((obj.firstName||obj.first_name||'') + ' ' + (obj.lastName||obj.last_name||'')).trim();
+    const sp = splitName(nameGuess);
+    obj.firstName = obj.firstName || obj.first_name || sp.first;
+    obj.lastName = obj.lastName || obj.last_name || sp.last;
+    obj.fullName = obj.fullName || obj.full_name || nameGuess;
+    obj.company = obj.company || obj.companyName || obj.accountName || obj.account_name || '';
+    obj.phone = obj.phone || obj.mobile || obj.mobile_phone || obj.workDirectPhone || obj.otherPhone || '';
+    obj.mobile = obj.mobile || obj.mobile_phone || '';
+    obj.email = obj.email || obj.work_email || obj.personal_email || '';
+    obj.title = obj.title || obj.jobTitle || obj.job_title || '';
+    // Supplier/contract fields that may exist on contact
+    obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || '';
+    const cEnd = obj.contractEnd || obj.contract_end || obj.renewalDate || obj.renewal_date || '';
+    obj.contract_end = obj.contract_end || cEnd || '';
+    obj.industry = obj.industry || '';
+    obj.city = obj.city || obj.locationCity || obj.billingCity || '';
+    obj.state = obj.state || obj.region || obj.billingState || '';
+    obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || '';
+    return obj;
+  }
   function normPhone(p){ return String(p||'').replace(/\D/g,'').slice(-10); }
   function normDomain(email){ return String(email||'').split('@')[1]?.toLowerCase() || ''; }
   function getPeopleCache(){ try { return (typeof window.getPeopleData==='function' ? (window.getPeopleData()||[]) : []); } catch(_) { return []; } }
@@ -66,6 +118,14 @@
   function findAccountForContact(contact){
     if (!contact) return null;
     const accounts = getAccountsCache();
+    // 1) Direct accountId linkage if present
+    try {
+      const accId = contact.accountId || contact.account_id || contact.account || contact.companyId;
+      if (accId) {
+        const hitById = accounts.find(a => String(a.id || a.accountId || a._id) === String(accId));
+        if (hitById) return hitById;
+      }
+    } catch(_) {}
     const clean = (s)=> String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
     const comp = clean(contact.company||contact.companyName||'');
     if (comp) {
@@ -102,11 +162,28 @@
     try {
       if (typeof state !== 'undefined' && state && state.overrideContactId) {
         const people = getPeopleCache();
-        const sel = people.find(p => String(p.id || '') === String(state.overrideContactId));
+        const sel = people.find(p => {
+          const pid = String(p.id||'');
+          const alt1 = String(p.contactId||'');
+          const alt2 = String(p._id||'');
+          const target = String(state.overrideContactId||'');
+          return pid===target || alt1===target || alt2===target;
+        });
         if (sel) contact = sel;
       }
     } catch(_) {}
+    // Normalize selected/derived contact fields so variables populate reliably
+    try { contact = normalizeContact(contact); } catch(_) {}
     try { account = findAccountForContact(contact) || {}; } catch(_) { account = {}; }
+    try { account = normalizeAccount(account); } catch(_) {}
+    // Borrow supplier/contract_end from contact if account missing them
+    if (!account.supplier && contact.supplier) account.supplier = contact.supplier;
+    if (!account.contract_end && contact.contract_end) account.contract_end = contact.contract_end;
+    if (!account.contractEnd && contact.contract_end) account.contractEnd = contact.contract_end;
+    // If no account found, fall back to using the selected contact's company for {{account.name}}
+    if (!account.name && (contact.company || contact.companyName)) {
+      account.name = contact.company || contact.companyName;
+    }
     if (!account.name && ctx.company) account.name = ctx.company;
     return { ctx, contact, account };
   }
@@ -134,17 +211,20 @@
     const data = getLiveData();
     const values = {
       'day.part': dp,
-      'contact.first_name': data.contact.firstName || data.contact.first || splitName(data.ctx.name).first || '',
-      'contact.last_name': data.contact.lastName || data.contact.last || splitName(data.ctx.name).last || '',
+      'contact.first_name': data.contact.firstName || data.contact.first || splitName(data.contact.name).first || splitName(data.ctx.name).first || '',
+      'contact.last_name': data.contact.lastName || data.contact.last || splitName(data.contact.name).last || splitName(data.ctx.name).last || '',
       'contact.full_name': data.contact.fullName || data.contact.name || data.ctx.name || '',
       'contact.phone': data.contact.phone || data.contact.mobile || data.ctx.number || '',
+      'contact.mobile': data.contact.mobile || '',
+      'contact.email': data.contact.email || '',
+      'contact.title': data.contact.title || data.contact.jobTitle || '',
       'account.name': data.account.accountName || data.account.name || data.contact.company || data.ctx.company || '',
-      'account.industry': data.account.industry || '',
-      'account.city': data.account.city || data.account.billingCity || data.account.locationCity || '',
-      'account.state': data.account.state || data.account.region || data.account.billingState || '',
-      'account.website': data.account.website || data.account.domain || '',
-      'account.supplier': data.account.supplier || data.account.currentSupplier || '',
-      'account.contract_end': data.account.contractEnd || data.account.contract_end || data.account.renewalDate || ''
+      'account.industry': data.account.industry || data.contact.industry || '',
+      'account.city': data.account.city || data.account.billingCity || data.account.locationCity || data.contact.city || '',
+      'account.state': data.account.state || data.account.region || data.account.billingState || data.contact.state || '',
+      'account.website': data.account.website || data.account.domain || normDomain(data.contact.email) || '',
+      'account.supplier': data.account.supplier || data.account.currentSupplier || data.contact.supplier || data.contact.currentSupplier || '',
+      'account.contract_end': formatDateMDY(data.account.contractEnd || data.account.contract_end || data.account.renewalDate || data.contact.contract_end || data.contact.contractEnd || '')
     };
     // Replace known tokens; render chips for contact/account if mode='chips'
     return String(str).replace(/\{\{\s*(day\.part|contact\.[a-z_]+|account\.[a-z_]+)\s*\}\}/gi, (m, key) => {
@@ -220,7 +300,7 @@
       ]
     },
     main_script_start: {
-      text: "Perfect -- So, my name is Lewis with PowerChoosers.com, and -- I understand you're responsible for electricity agreements and contracts for {{account.name}}. Is that still accurate?",
+      text: "Perfect — So, my name is Lewis with PowerChoosers.com, and — I understand you're responsible for electricity agreements and contracts for {{account.name}}. Is that still accurate?",
       responses: [
         { label: "Yes, that's me / I handle that", next: 'pathA' },
         { label: 'That would be someone else / not the right person', next: 'gatekeeper_intro' },
@@ -251,7 +331,7 @@
       ]
     },
     pathA: {
-      text: "Got it. now {{contact.first_name}}, we've been working with other {{account.industry}}'s in {{account.city}}, and my main job here -- is to make sure account holders like yourself aren't -- blind sided by next years' rate increases.. <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these -- sharp increases for your future renewals?</span>",
+      text: "Got it. now {{contact.first_name}}, we've been working with other {{account.industry}}'s in {{account.city}}, and my main job here — is to make sure account holders like yourself aren't — blind sided by next years' rate increases.. <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>",
       responses: [
         { label: "It's tough / struggling", next: 'pathA_struggling' },
         { label: 'Have not renewed / contract not up yet', next: 'pathA_not_renewed' },
@@ -263,7 +343,7 @@
     },
     // === Branches from pathA ===
     pathA_struggling: {
-      text: "Totally get it — {{contact.first_name}}. A lot of {{account.industry}} companies in {{account.city}} are dealing with high electricity bills and shady business practices. Do you know when your contract expires? <br><br>My job is to time the market and keep you informed so you're not off-guard by your supplier. Would it help if I gave you a free energy health check so we can get a better understanding where you're at — that way you can see what we can do to help?",
+      text: "Totally get it — {{contact.first_name}}. A lot of {{account.industry}} companies in {{account.city}} are dealing with high electricity bills and shady business practices. Do you know when your contract expires? <br><br>My job is to time the market and keep you informed so you're not caught off-guard by your supplier. Would it help if I offer you a free energy health check so you can get a better understanding where you're at — that way you can see what your options are?",
       responses: [
         { label: 'Yes, quick snapshot is helpful', next: 'discovery' },
         { label: 'What do you need from me?', next: 'discovery' },
@@ -271,7 +351,7 @@
       ]
     },
     pathA_not_renewed: {
-      text: "Makes sense -- when it comes to getting the best price, it's pretty easy to renew at the wrong time and end up overpaying. When does your contract expire? Do you know who your supplier is? <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take. <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>",
+      text: "Makes sense — when it comes to getting the best price, it's pretty easy to renew at the wrong time and end up overpaying. When does your contract expire? Do you know who your supplier is? <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take. <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>",
       responses: [
         { label: 'Yes — schedule health check', next: 'schedule_health_check' },
         { label: 'Send me details by email', next: 'send_details_email' },
@@ -407,16 +487,22 @@
     if (key === 'pathA_not_renewed') {
       const hasContractEnd = !!(data.account.contractEnd || data.account.contract_end || data.account.renewalDate);
       const hasSupplier = !!(data.account.supplier || data.account.currentSupplier);
-      const part1 = "Makes sense -- when it comes to energy, it's pretty easy to renew at the wrong time and end up overpaying.";
-      const q1 = " When does your contract expire?";
-      const q2 = " Do you know who your supplier is?";
-      const part2 = " <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take.";
+      const intro = "Makes sense — when it comes to energy, it's pretty easy to renew at the wrong time and end up overpaying.";
+      let middle = '';
+      if (hasSupplier && !hasContractEnd) {
+        middle = " So I understand you guys are using {{account.supplier}} — when does your contract expire?";
+      } else if (!hasSupplier && hasContractEnd) {
+        middle = " So I understand your contract expires in {{account.contract_end}} — who is your current supplier?";
+      } else if (hasSupplier && hasContractEnd) {
+        middle = " So I understand you guys are using {{account.supplier}} till {{account.contract_end}}.";
+      } else {
+        middle = " When does your contract expire? Do you know who your supplier is?";
+      }
+      const part2 = (hasSupplier && hasContractEnd)
+        ? " <br><br>We work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take."
+        : " <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take.";
       const part3 = " <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>";
-      let text = part1;
-      if (!hasContractEnd) text += q1;
-      if (!hasSupplier) text += q2;
-      text += part2 + part3;
-      return text;
+      return intro + middle + part2 + part3;
     }
 
     if (key === 'pathA_struggling') {
@@ -433,7 +519,7 @@
       } else {
         middle = " Who's your current supplier? Do you know when your contract expires?";
       }
-      const closing = " <br><br>My job is to time the market and keep you informed so you're not off-guard by your supplier. Would it help if I gave you a free energy health check so we can get a better understanding where you're at — that way you can see what we can do to help?";
+      const closing = " <br><br>My job is to time the market and keep you informed so you're not caught off-guard by your supplier. Would it help if I offer you a free energy health check so you can get a better understanding where you're at — that way you can see what your options are?";
       return intro + middle + closing;
     }
 
@@ -492,8 +578,10 @@
 
     if (display){
       const live = isLiveCall();
+      const hasOverride = !!(typeof state !== 'undefined' && state && state.overrideContactId);
       const baseText = buildNodeText(state.current, node);
-      const html = renderTemplate(baseText, live ? 'text' : 'chips');
+      const mode = (live || hasOverride) ? 'text' : 'chips';
+      const html = renderTemplate(baseText, mode);
 
       // Animate script display height change after initial render
       if (state._didInitialRender) {
@@ -711,6 +799,7 @@
     const people = getPeopleCache();
     const { account, contact: liveContact } = getLiveData();
     const accKey = getAccountKeyForMatch(account);
+    const isLive = !!(getPhoneWidgetContext()?.isActive);
 
     // Score contacts
     const scored = people.map(p => {
@@ -738,6 +827,17 @@
 
     scored.sort((a,b) => b.score - a.score);
     let top = scored;
+    // Exact/prefix match preference when NOT in a live call
+    if (q && !isLive) {
+      const qn = normName(q);
+      const exact = scored.filter(({name}) => normName(name) === qn);
+      if (exact.length) {
+        top = exact;
+      } else {
+        const prefix = scored.filter(({name}) => normName(name).startsWith(qn));
+        if (prefix.length) top = prefix;
+      }
+    }
     // If no query and we have an account context, prefer ONLY same-company contacts
     if (!q && accKey) {
       const sameCo = scored.filter(({company}) => {
@@ -756,9 +856,10 @@
     }
 
     panel.innerHTML = top.map(({p, name, email, company}) => {
+      const cid = String(p.id || p.contactId || p._id || '');
       const label = escapeHtml(name || '(No name)');
       const sub = escapeHtml([company, email].filter(Boolean).join(' • '));
-      return `<div class="suggestion-item" role="option" data-contact-id="${escapeHtml(p.id)}">
+      return `<div class="suggestion-item" role="option" data-contact-id="${escapeHtml(cid)}">
         <div class="sugg-name">${label}</div>
         <div class="sugg-sub">${sub || '&nbsp;'}</div>
       </div>`;
@@ -782,11 +883,19 @@
       const input = document.getElementById('call-scripts-contact-search');
       if (input) {
         const people = getPeopleCache();
-        const sel = people.find(p => String(p.id||'') === String(contactId));
+        const sel = people.find(p => {
+          const pid = String(p.id||'');
+          const alt1 = String(p.contactId||'');
+          const alt2 = String(p._id||'');
+          const target = String(contactId||'');
+          return pid===target || alt1===target || alt2===target;
+        });
         const nm = sel ? (sel.name || ((sel.firstName||'') + ' ' + (sel.lastName||''))).trim() : '';
         input.value = nm || '';
       }
     } catch(_) {}
+    // Close suggestions if open
+    try { closeSuggestions(); } catch(_) {}
     // Re-render scripts with new context
     render();
   }
@@ -794,6 +903,8 @@
   function updateSearchFromContext(){
     const input = document.getElementById('call-scripts-contact-search');
     if (!input) return;
+    // Do not override when user has explicitly selected a contact
+    if (typeof state !== 'undefined' && state && state.overrideContactId) return;
     const { contact, account } = getLiveData();
     // Auto-fill name when calling a contact directly
     const liveName = (contact && (contact.name || ((contact.firstName||'') + ' ' + (contact.lastName||''))).trim()) || '';
@@ -821,20 +932,58 @@
         // If user clears the input, drop override and fall back to live context
         state.overrideContactId = null;
         render();
+        return;
       }
+      // If the current input exactly matches one contact name, auto-select it
+      try {
+        const qVal = normName(val);
+        if (!qVal) return;
+        const people = getPeopleCache();
+        const exactMatches = people.filter(p => normName(p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) === qVal);
+        if (exactMatches.length === 1) {
+          setSelectedContact(exactMatches[0].id || exactMatches[0].contactId || exactMatches[0]._id);
+        }
+      } catch(_) {}
     });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { closeSuggestions(); return; }
       if (e.key === 'Enter') {
-        // Choose first visible suggestion
-        const first = panel.querySelector('.suggestion-item');
-        if (first) {
-          const id = first.getAttribute('data-contact-id');
+        // Prefer exact name match if present, otherwise choose first visible suggestion
+        const items = Array.from(panel.querySelectorAll('.suggestion-item'));
+        const qVal = normName(input.value || '');
+        const exactItem = items.find(it => normName(it.querySelector('.sugg-name')?.textContent) === qVal);
+        const pick = exactItem || items[0] || null;
+        if (pick) {
+          const id = pick.getAttribute('data-contact-id');
           if (id) setSelectedContact(id);
         }
         closeSuggestions();
         e.preventDefault();
       }
+      if (e.key === 'Tab') {
+        // On Tab, attempt an exact match selection so variables populate even without click
+        const items = Array.from(panel.querySelectorAll('.suggestion-item'));
+        const qVal = normName(input.value || '');
+        const exactItem = items.find(it => normName(it.querySelector('.sugg-name')?.textContent) === qVal);
+        if (exactItem) {
+          const id = exactItem.getAttribute('data-contact-id');
+          if (id) setSelectedContact(id);
+        }
+        closeSuggestions();
+      }
+    });
+
+    // On blur, if the input exactly matches one contact name, auto-select it
+    input.addEventListener('blur', () => {
+      try {
+        const people = getPeopleCache();
+        const qVal = normName(input.value || '');
+        if (!qVal) return;
+        const match = people.find(p => normName(p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) === qVal);
+        if (match) {
+          setSelectedContact(match.id);
+        }
+      } catch(_) {}
     });
 
     // Click selection

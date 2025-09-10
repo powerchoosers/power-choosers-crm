@@ -9,6 +9,28 @@
 
   const els = {};
 
+  // ==== Date helpers for Energy & Contract fields ====
+  function parseDateFlexible(s){
+    if (!s) return null;
+    const str = String(s).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      const d = new Date(str); return isNaN(d.getTime()) ? null : d;
+    }
+    const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+    if (mdy){ const d=new Date(parseInt(mdy[3],10), parseInt(mdy[1],10)-1, parseInt(mdy[2],10)); return isNaN(d.getTime())?null:d; }
+    const d = new Date(str); return isNaN(d.getTime()) ? null : d;
+  }
+  function toISODate(v){ const d=parseDateFlexible(v); if(!d) return ''; const yyyy=d.getFullYear(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
+  function toMDY(v){ const d=parseDateFlexible(v); if(!d) return v?String(v):''; const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); const yyyy=d.getFullYear(); return `${mm}/${dd}/${yyyy}`; }
+  function formatDateInputAsMDY(raw){
+    const digits = String(raw||'').replace(/[^0-9]/g,'').slice(0,8);
+    let out = '';
+    if (digits.length >= 1) out = digits.slice(0,2);
+    if (digits.length >= 3) out = digits.slice(0,2) + '/' + digits.slice(2,4);
+    if (digits.length >= 5) out = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4,8);
+    return out;
+  }
+
   function initDomRefs() {
     els.page = document.getElementById('account-details-page');
     els.pageContainer = els.page ? els.page.querySelector('.page-container') : null;
@@ -1059,7 +1081,7 @@
       <polyline points="7 3 7 8 15 8"/>
     </svg>`;
   }
-  
+
   // Begin inline editing for a field
   function beginEditField(wrap, field) {
     const textEl = wrap.querySelector('.info-value-text');
@@ -1070,7 +1092,9 @@
     const isMultiline = field === 'shortDescription';
     const inputControl = isMultiline
       ? `<textarea class="textarea-dark info-edit-textarea" rows="4">${escapeHtml(currentText === '--' ? '' : currentText)}</textarea>`
-      : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText)}">`;
+    : (field === 'contractEndDate' 
+      ? `<input type="date" class="info-edit-input" value="${escapeHtml(toISODate(currentText))}">`
+      : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText)}">`);
     const inputHtml = `
       ${inputControl}
       <div class="info-actions">
@@ -1097,7 +1121,7 @@
     inputWrap.className = 'info-input-wrap' + (isMultiline ? ' info-input-wrap--multiline' : '');
     inputWrap.innerHTML = inputHtml;
     
-    const input = inputWrap.querySelector(isMultiline ? '.info-edit-textarea' : '.info-edit-input');
+    const input = inputWrap.querySelector(isMultiline ? 'textarea' : 'input');
     const saveBtn = inputWrap.querySelector('.info-save');
     const cancelBtn = inputWrap.querySelector('.info-cancel');
     
@@ -1108,14 +1132,12 @@
       // Save handler
       saveBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        e.stopPropagation();
         await commitEdit(wrap, field, input.value);
       });
       
       // Cancel handler
       cancelBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        e.stopPropagation();
         cancelEdit(wrap, field, currentText);
       });
       
@@ -1132,16 +1154,33 @@
           cancelEdit(wrap, field, currentText);
         }
       });
+
+      // Only apply live MM/DD/YYYY formatting when editing plain text (not the native date input)
+      if (field === 'contractEndDate' && !isMultiline && input.type === 'text') {
+        input.addEventListener('input', () => {
+          const caret = input.selectionStart;
+          const formatted = formatDateInputAsMDY(input.value);
+          input.value = formatted;
+          try { input.selectionStart = input.selectionEnd = Math.min(formatted.length, (caret||formatted.length)); } catch(_) {}
+        });
+      }
     }
   }
-  
+
   // Commit the edit to Firestore and update UI
   async function commitEdit(wrap, field, value) {
-    await saveField(field, value);
-    updateFieldText(wrap, value);
-    cancelEdit(wrap, field, value);
+    // Convert contractEndDate to ISO for storage, display as MM/DD/YYYY via updateFieldText
+    let toSave = value;
+    if (field === 'contractEndDate') {
+      toSave = toMDY(value);
+    }
+    await saveField(field, toSave);
+    updateFieldText(wrap, toSave);
+    // Notify widgets/pages to refresh energy fields
+    try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: state.currentAccount?.id, field, value: toSave } })); } catch(_) {}
+    cancelEdit(wrap, field, toSave);
   }
-  
+
   // Cancel the edit and restore original value
   function cancelEdit(wrap, field, originalValue) {
     const inputWrap = wrap.querySelector('.info-input-wrap');
@@ -1198,6 +1237,9 @@
       const safe = escapeHtml(val);
       textEl.classList.add('info-value-text--multiline');
       textEl.innerHTML = safe ? safe.replace(/\n/g, '<br>') : '--';
+    } else if (field === 'contractEndDate') {
+      const pretty = toMDY(val);
+      textEl.textContent = pretty || '--';
     } else {
       textEl.textContent = val || '--';
     }

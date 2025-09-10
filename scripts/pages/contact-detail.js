@@ -54,8 +54,12 @@
         }
       }
     } catch(_) {}
-    if (!db) return;
-    try { await db.collection('accounts').doc(accountId).update(payload); window.crm?.showToast && window.crm.showToast('Saved'); } catch (e) { console.warn('Failed to save account field', field, e); window.crm?.showToast && window.crm.showToast('Save failed'); }
+    if (!db) { try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } })); } catch(_) {} return; }
+    try { 
+      await db.collection('accounts').doc(accountId).update(payload); 
+      window.crm?.showToast && window.crm.showToast('Saved');
+      try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } })); } catch(_) {}
+    } catch (e) { console.warn('Failed to save account field', field, e); window.crm?.showToast && window.crm.showToast('Save failed'); }
   }
 
   function injectTaskPopoverStyles(){
@@ -699,7 +703,7 @@
                   </svg>
                 </button>
                 <button class="quick-action-btn list-header-btn" id="add-contact-to-sequences" title="Add to sequence" aria-label="Add to sequence" aria-haspopup="dialog">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <polygon points="7 4 20 12 7 20 7 4"></polygon>
                   </svg>
                 </button>
@@ -1340,24 +1344,27 @@
 
     // Build appropriate input
     let input;
+    // Local date helpers
+    const parseDateFlexible = (s) => {
+      if (!s) return null; const str=String(s).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) { const d=new Date(str); return isNaN(d.getTime())?null:d; }
+      const m = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/); if (m){ const d=new Date(parseInt(m[3],10), parseInt(m[1],10)-1, parseInt(m[2],10)); return isNaN(d.getTime())?null:d; }
+      const d=new Date(str); return isNaN(d.getTime())?null:d;
+    };
+    const toISODate = (v) => { const d=parseDateFlexible(v); if(!d) return ''; const yyyy=d.getFullYear(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; };
+    const formatDateInputAsMDY = (raw) => { const digits=String(raw||'').replace(/[^0-9]/g,'').slice(0,8); let out=''; if(digits.length>=1) out=digits.slice(0,2); if(digits.length>=3) out=digits.slice(0,2)+'/'+digits.slice(2,4); if(digits.length>=5) out=digits.slice(0,2)+'/'+digits.slice(2,4)+'/'+digits.slice(4,8); return out; };
+
+    input = document.createElement('input');
+    input.className = 'input-dark info-edit-input';
     if (field === 'contractEndDate') {
-      input = document.createElement('input');
       input.type = 'date';
-      input.className = 'input-dark info-edit-input';
-      // Normalize to yyyy-mm-dd when possible
-      try {
-        const d = new Date(current);
-        if (!isNaN(d.getTime())) {
-          input.value = d.toISOString().split('T')[0];
-        }
-      } catch (_) {}
+      input.value = toISODate(current);
     } else {
-      input = document.createElement('input');
       input.type = 'text';
-      input.className = 'input-dark info-edit-input';
       input.value = current === '--' ? '' : current;
       input.placeholder = 'Enter ' + field;
     }
+    
 
     const actions = wrap.querySelector('.info-actions');
     const saveBtn = document.createElement('button');
@@ -1390,6 +1397,8 @@
       }
       await saveAccountField(field, val);
       updateFieldText(wrap, val || '');
+      // Notify other components (Health widget) to sync
+      try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: state._linkedAccountId, field, value: val } })); } catch(_) {}
     };
 
     const onKey = async (ev) => {

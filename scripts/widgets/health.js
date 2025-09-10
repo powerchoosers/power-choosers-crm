@@ -31,6 +31,54 @@
   };
   const supplierNames = Object.keys(supplierData);
 
+  // ==== Date helpers and DOM bridge ====
+  function parseDateFlexible(s){
+    if (!s) return null;
+    const str = String(s).trim();
+    // Try ISO first
+    const isoMatch = /^\d{4}-\d{2}-\d{2}$/;
+    if (isoMatch.test(str)) {
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    // Try MM/DD/YYYY
+    const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+    if (mdy) {
+      const mm = parseInt(mdy[1],10)-1, dd = parseInt(mdy[2],10), yy = parseInt(mdy[3],10);
+      const d = new Date(yy, mm, dd);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    // Fallback Date parse
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function toISODate(v){
+    const d = parseDateFlexible(v);
+    if (!d) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  function toMDY(v){
+    const d = parseDateFlexible(v);
+    if (!d) return (v ? String(v) : '');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  }
+  function readDetailFieldDOM(field){
+    try {
+      const id = document.getElementById('account-detail-view') ? 'account-detail-view' : (document.getElementById('contact-detail-view') ? 'contact-detail-view' : '');
+      if (!id) return '';
+      const root = document.getElementById(id);
+      const el = root && root.querySelector(`.info-value-wrap[data-field="${field}"] .info-value-text`);
+      const text = el ? el.textContent.trim() : '';
+      return text === '--' ? '' : text;
+    } catch(_) { return ''; }
+  }
+
   const ESTIMATED_DELIVERY_CHARGE_CENTS = 0.05;
 
   function getPanelContentEl() {
@@ -219,7 +267,10 @@
         const root = document.getElementById(scopeId);
         if (!root) return;
         const wrap = root.querySelector(`.info-value-wrap[data-field="${field}"] .info-value-text`);
-        if (wrap) wrap.textContent = (value !== undefined && value !== null && String(value).trim() !== '') ? String(value) : '--';
+        if (!wrap) return;
+        let display = (value !== undefined && value !== null && String(value).trim() !== '') ? String(value) : '';
+        if (field === 'contractEndDate' && display) display = toMDY(display);
+        wrap.textContent = display || '--';
       } catch(_) {}
     }
     function debounce(fn, ms){ let t; return function(...args){ clearTimeout(t); t = setTimeout(()=>fn.apply(this,args), ms); }; }
@@ -256,6 +307,26 @@
         };
         card.addEventListener('transitionend', onEnd);
       } catch (_) { /* noop */ }
+
+    // Live sync: listen for energy updates coming from details pages
+    const onEnergyUpdated = (e) => {
+      try {
+        const d = e.detail || {};
+        const matches = (d.entity === (entityType||'contact')) && (String(d.id||'') === String(entityId||''));
+        if (!matches) return;
+        // Update inputs if provided
+        if (d.field === 'electricitySupplier' && supplierInput) supplierInput.value = (d.value || '').trim();
+        if (d.field === 'currentRate' && currentRateInput) currentRateInput.value = (d.value || '');
+        if (d.field === 'contractEndDate' && contractEndInput) contractEndInput.value = toISODate(d.value || '');
+        // Re-run validations and resize
+        validateSection1();
+        validateSection2();
+        animateAutoHeight();
+      } catch(_) {}
+    };
+    document.addEventListener('pc:energy-updated', onEnergyUpdated);
+    // Ensure removal when widget is closed
+    card.addEventListener('health:cleanup', () => { document.removeEventListener('pc:energy-updated', onEnergyUpdated); });
     }
 
     const validateSection1 = () => {
@@ -566,6 +637,7 @@
     const debouncedSave = debounce(async () => {
       const supplierVal = (supplierInput?.value ?? '').trim();
       const rateVal = currentRateInput?.value ?? '';
+      // contractEndInput is type=date (ISO). Persist ISO but display MM/DD/YYYY on details page
       const contractVal = contractEndInput?.value ?? '';
       const patch = {
         electricitySupplier: supplierVal || null,
@@ -623,9 +695,13 @@
         const accounts = window.getAccountsData() || [];
         const account = accounts.find(a => String(a.id || '') === String(entityId));
         if (account) {
-          if (account.electricitySupplier) supplierInput.value = account.electricitySupplier;
-          if (account.currentRate || account.current_rate) currentRateInput.value = account.currentRate || account.current_rate;
-          if (account.contractEndDate || account.contract_end_date || account.contractEnd) contractEndInput.value = account.contractEndDate || account.contract_end_date || account.contractEnd;
+          // Prefer live DOM values if present on the details page
+          const domSupplier = readDetailFieldDOM('electricitySupplier') || account.electricitySupplier || '';
+          const domRate = readDetailFieldDOM('currentRate') || account.currentRate || account.current_rate || '';
+          const domContract = readDetailFieldDOM('contractEndDate') || account.contractEndDate || account.contract_end_date || account.contractEnd || '';
+          if (domSupplier) supplierInput.value = domSupplier;
+          if (domRate) currentRateInput.value = domRate;
+          if (domContract) contractEndInput.value = toISODate(domContract);
           validateSection1();
           validateSection2();
         }
@@ -633,9 +709,12 @@
         const people = window.getPeopleData() || [];
         const contact = people.find(p => String(p.id || '') === String(entityId));
         if (contact) {
-          if (contact.electricitySupplier) supplierInput.value = contact.electricitySupplier;
-          if (contact.currentRate || contact.current_rate) currentRateInput.value = contact.currentRate || contact.current_rate;
-          if (contact.contractEndDate || contact.contract_end_date || contact.contractEnd) contractEndInput.value = contact.contractEndDate || contact.contract_end_date || contact.contractEnd;
+          const domSupplier = readDetailFieldDOM('electricitySupplier') || contact.electricitySupplier || '';
+          const domRate = readDetailFieldDOM('currentRate') || contact.currentRate || contact.current_rate || '';
+          const domContract = readDetailFieldDOM('contractEndDate') || contact.contractEndDate || contact.contract_end_date || contact.contractEnd || '';
+          if (domSupplier) supplierInput.value = domSupplier;
+          if (domRate) currentRateInput.value = domRate;
+          if (domContract) contractEndInput.value = toISODate(domContract);
           validateSection1();
           validateSection2();
         }
