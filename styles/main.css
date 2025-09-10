@@ -3936,14 +3936,122 @@ html, body {
 }
 /* === Call Scripts Page === */
 #call-scripts-page .call-scripts-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-base);
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-base);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
 }
+
+/* Position Call Scripts toolbar on the top-right of the header */
+#call-scripts-page .page-header {
+  display: flex;
+  align-items: flex-start; /* align title and toolbar to the top edge */
+}
+#call-scripts-page .page-title-section {
+  flex: 1 1 auto; /* title group takes remaining space on the left */
+  display: flex;            /* stack title and search vertically */
+  flex-direction: column;
+  align-items: flex-start;  /* left-align the search bar under the title */
+  gap: var(--spacing-xs);
+}
+#call-scripts-page #call-scripts-toolbar {
+  margin-left: auto; /* push toolbar to the far right */
+  margin-top: 0; /* ensure no extra gap above */
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Make Call Scripts toolbar buttons the same height as primary buttons */
+#call-scripts-page #call-scripts-toolbar .action-btn {
+  padding: 8px var(--spacing-md); /* match .btn-primary vertical padding */
+  line-height: 1; /* consistent vertical rhythm */
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 1px divider between Restart and Widgets */
+#call-scripts-page #call-scripts-toolbar .toolbar-divider {
+  width: 1px;
+  height: 28px; /* visually matches button height */
+  background: var(--border-light);
+  border-radius: 1px;
+  display: inline-block;
+  align-self: center;
+}
+
+/* Widgets control (Call Scripts page) */
+#call-scripts-page #call-scripts-toolbar .widgets-wrap {
+  position: relative;
+}
+#call-scripts-page #call-scripts-toolbar .widgets-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; /* perfect square */
+  height: 36px; /* perfect square */
+  border-radius: var(--border-radius);
+  background: var(--grey-700);
+  border: 1px solid var(--border-light);
+  color: var(--text-inverse);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  padding: 0; /* ensure perfect square */
+}
+#call-scripts-page #call-scripts-toolbar .widgets-btn:hover {
+  background: var(--grey-600);
+  border-color: var(--grey-500);
+  transform: translateY(-1px);
+}
+#call-scripts-page #call-scripts-toolbar .widgets-btn svg { display: block; }
+
+/* Drawer */
+#call-scripts-page #call-scripts-toolbar .widgets-drawer {
+  position: absolute;
+  right: calc(100% + 8px); /* appear to the left of the button */
+  top: 50%;
+  /* Start slightly to the right and fade in so it slides left into place */
+  transform: translate(10px, -50%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--elevation-card);
+  padding: 8px 10px;
+  display: flex;            /* keep horizontal layout during animations */
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  z-index: 20;
+  transition: transform 160ms ease, opacity 160ms ease, visibility 0s linear 160ms; /* delay visibility off so it doesn't flicker */
+}
+#call-scripts-page #call-scripts-toolbar .widgets-wrap.open .widgets-drawer {
+  transform: translate(0, -50%);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+#call-scripts-page #call-scripts-toolbar .widget-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--border-radius);
+  background: var(--bg-item);
+  border: 1px solid var(--border-light);
+  color: var(--text-inverse);
+  cursor: pointer;
+}
+#call-scripts-page #call-scripts-toolbar .widget-item:hover { background: var(--grey-700); }
 
 #call-scripts-page .script-display {
     background: var(--bg-item);
@@ -3953,6 +4061,98 @@ html, body {
     min-height: 180px;
     line-height: 1.5;
     color: var(--text-primary);
+}
+
+/* === Call Scripts: Contact Search === */
+#call-scripts-page .contact-search-wrap {
+  margin-top: var(--spacing-sm);
+  align-self: flex-start; /* ensure it stays under/left of the title */
+}
+#call-scripts-page .contact-search-inner {
+  position: relative;
+  max-width: 420px;
+}
+#call-scripts-page #call-scripts-contact-search {
+  width: 100%;
+}
+#call-scripts-page .search-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  box-shadow: var(--elevation-card);
+  padding: 6px;
+  z-index: 30;
+}
+#call-scripts-page .search-suggestions[hidden] { display: none; }
+#call-scripts-page .search-suggestions .suggestion-empty {
+  padding: 8px 10px;
+  color: var(--text-muted);
+}
+#call-scripts-page .search-suggestions .suggestion-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+#call-scripts-page .search-suggestions .suggestion-item:hover {
+  background: var(--grey-700);
+}
+#call-scripts-page .search-suggestions .sugg-name {
+  font-size: 0.95rem;
+  color: var(--text-inverse);
+}
+#call-scripts-page .search-suggestions .sugg-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+/* === Call Scripts: Layout without inner card === */
+#call-scripts-page .page-container {
+  display: flex;
+  flex-direction: column;
+}
+#call-scripts-page .page-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  flex: 1 1 auto;
+  min-height: 0; /* allow flex child to shrink */
+}
+#call-scripts-page #call-scripts-display {
+  flex: 1 1 auto;
+}
+#call-scripts-page #call-scripts-responses {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-container);
+  border-top: none; /* remove dividing line between display and buttons */
+  padding: 0; /* no inner padding so the element respects outer spacing only */
+  margin-bottom: 0; /* avoid compounding with natural page spacing */
+  border-bottom-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+}
+#call-scripts-page #call-scripts-responses.full-width {
+  display: block;
+}
+
+/* Full-width single action (Dial) should span the full container width */
+#call-scripts-page #call-scripts-responses.full-width .dial-btn,
+#call-scripts-page #call-scripts-responses.full-width .response-btn {
+  width: 100%;
+  display: block;
+}
+
+/* Ensure grid items naturally fill available width without extra gutters */
+#call-scripts-page .response-buttons {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 #call-scripts-page .response-buttons {

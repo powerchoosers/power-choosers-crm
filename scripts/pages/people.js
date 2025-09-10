@@ -54,6 +54,26 @@
     }
   }
 
+  // Listen for restore event from Account Detail back button
+  if (!document._peopleRestoreBound) {
+    document.addEventListener('pc:people-restore', (ev) => {
+      try {
+        const detail = ev && ev.detail ? ev.detail : {};
+        const targetPage = Math.max(1, parseInt(detail.page || state.currentPage || 1, 10));
+        if (targetPage !== state.currentPage) {
+          state.currentPage = targetPage;
+          render();
+        }
+        const y = parseInt(detail.scroll || 0, 10);
+        // Wait a tick to ensure layout is ready, then restore scroll
+        setTimeout(() => {
+          try { window.scrollTo(0, y); } catch (_) {}
+        }, 50);
+      } catch (_) { /* noop */ }
+    });
+    document._peopleRestoreBound = true;
+  }
+
   // ===== Bulk Add-to-List popover =====
   function closeBulkListsPanel() {
     const panel = document.getElementById('people-lists-panel');
@@ -1811,6 +1831,14 @@
         const companyLink = e.target.closest && e.target.closest('.company-link');
         if (companyLink) {
           e.preventDefault();
+          // Capture return state so Account Detail can send us back here
+          try {
+            window._accountNavigationSource = 'people';
+            window._peopleReturn = {
+              page: state.currentPage,
+              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0
+            };
+          } catch (_) {}
           const dom = (companyLink.getAttribute('data-domain') || '').trim();
           const comp = (companyLink.getAttribute('data-company') || companyLink.textContent || '').trim();
           const acct = findAccountByDomainOrName(dom, comp);

@@ -18,6 +18,26 @@
     return !!els.page && !!els.mainContent;
   }
 
+  // Save a Contact field from the contact detail page
+  async function saveField(field, value) {
+    const db = window.firebaseDB;
+    const contactId = state.currentContact?.id;
+    if (!contactId || !db) return;
+    try {
+      const payload = {
+        [field]: value,
+        updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+      };
+      await db.collection('contacts').doc(contactId).update(payload);
+      // Update local state
+      try { if (state.currentContact) state.currentContact[field] = value; } catch(_) {}
+      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch(_) {}
+    } catch (e) {
+      console.warn('Failed to save contact field', field, e);
+      try { window.crm?.showToast && window.crm.showToast('Save failed'); } catch(_) {}
+    }
+  }
+
   // Save an Account field from the contact detail energy section
   async function saveAccountField(field, value) {
     const db = window.firebaseDB;

@@ -591,6 +591,27 @@
           } catch (_) { /* noop */ }
           return;
         }
+
+        // If we arrived here from People page (company link), go back to People and restore state
+        if (window._accountNavigationSource === 'people') {
+          try {
+            const restore = window._peopleReturn || {};
+            // Clear the navigation markers early to avoid leaking state
+            window._accountNavigationSource = null;
+            window._peopleReturn = null;
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              // Dispatch an event for People page to restore pagination and scroll
+              setTimeout(() => {
+                try {
+                  const ev = new CustomEvent('pc:people-restore', { detail: { page: restore.page, scroll: restore.scroll } });
+                  document.dispatchEvent(ev);
+                } catch(_) {}
+              }, 60);
+            }
+          } catch (_) { /* noop */ }
+          return;
+        }
         // Check if we came from list detail page
         if (window._accountNavigationSource === 'list-detail' && window._accountNavigationListId) {
           console.log('Returning to list detail page:', window._accountNavigationListId);
