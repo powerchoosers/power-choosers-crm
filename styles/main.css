@@ -4061,6 +4061,9 @@ html, body {
     min-height: 180px;
     line-height: 1.5;
     color: var(--text-primary);
+    font-size: 1.3rem;
+    transition: height 0.3s ease, min-height 0.3s ease;
+    overflow: hidden;
 }
 
 /* === Call Scripts: Contact Search === */
@@ -4121,7 +4124,7 @@ html, body {
 #call-scripts-page .page-content {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-md); /* keep global rhythm; responses will add explicit 25px margin */
   flex: 1 1 auto;
   min-height: 0; /* allow flex child to shrink */
 }
@@ -4130,13 +4133,15 @@ html, body {
 }
 #call-scripts-page #call-scripts-responses {
   position: sticky;
-  bottom: 0;
+  bottom: 0; /* rely on container padding for the 25px page bottom gap */
   background: var(--bg-container);
   border-top: none; /* remove dividing line between display and buttons */
   padding: 0; /* no inner padding so the element respects outer spacing only */
+  margin-top: 6px; /* half of --spacing-sm for tight spacing */
   margin-bottom: 0; /* avoid compounding with natural page spacing */
   border-bottom-left-radius: var(--border-radius);
   border-bottom-right-radius: var(--border-radius);
+  width: 100%; /* match script display width */
 }
 #call-scripts-page #call-scripts-responses.full-width {
   display: block;
@@ -4174,6 +4179,7 @@ html, body {
     padding: 12px var(--spacing-md);
     cursor: pointer;
     transition: var(--transition-fast);
+    font-size: 1.05rem;
 }
 
 #call-scripts-page .response-btn:hover,
@@ -7781,9 +7787,9 @@ th.drag-over::after {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 2px 8px;
+    padding: 5px 14px;
     border-radius: 999px;
-    font-size: 12px;
+    font-size: 15px;
     line-height: 1;
     color: var(--text-inverse);
     background: var(--orange-subtle);
