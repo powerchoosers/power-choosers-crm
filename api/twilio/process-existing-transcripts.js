@@ -1,4 +1,5 @@
 const twilio = require('twilio');
+const { admin, db } = require('../_firebase');
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -95,28 +96,29 @@ export default async function handler(req, res) {
                         aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, operatorResults);
                     }
                     
-                    // Update the call data in the central store
+                    // Update the call data directly in Firestore
                     try {
-                        const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
-                        const updateResponse = await fetch(`${base}/api/calls`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                callSid: transcript.sourceSid,
-                                transcript: transcriptText,
-                                aiInsights: aiInsights,
-                                conversationalIntelligence: {
-                                    transcriptSid: transcript.sid,
-                                    status: transcript.status,
-                                    sentences: sentences,
-                                    operatorResults: operatorResults,
-                                    serviceSid: serviceSid
-                                }
-                            })
-                        });
+                        console.log(`[Process Existing Transcripts] Updating call data for ${transcript.sid} in Firestore`);
                         
-                        if (updateResponse.ok) {
-                            console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid}`);
+                        const callData = {
+                            id: transcript.sourceSid,
+                            twilioSid: transcript.sourceSid,
+                            transcript: transcriptText,
+                            aiInsights: aiInsights,
+                            conversationalIntelligence: {
+                                transcriptSid: transcript.sid,
+                                status: transcript.status,
+                                sentences: sentences,
+                                operatorResults: operatorResults,
+                                serviceSid: serviceSid
+                            },
+                            timestamp: new Date().toISOString(),
+                            source: 'conversational-intelligence-processing'
+                        };
+                        
+                        if (db) {
+                            await db.collection('calls').doc(transcript.sourceSid).set(callData, { merge: true });
+                            console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore`);
                             results.push({
                                 transcriptSid: transcript.sid,
                                 sourceSid: transcript.sourceSid,
@@ -124,12 +126,12 @@ export default async function handler(req, res) {
                                 status: 'success'
                             });
                         } else {
-                            console.error(`[Process Existing Transcripts] Failed to update call data for ${transcript.sid}:`, updateResponse.status);
+                            console.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
                             results.push({
                                 transcriptSid: transcript.sid,
                                 sourceSid: transcript.sourceSid,
                                 status: 'failed',
-                                error: `HTTP ${updateResponse.status}`
+                                error: 'Firestore not available'
                             });
                         }
                     } catch (error) {
