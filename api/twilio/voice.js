@@ -53,7 +53,9 @@ export default function handler(req, res) {
                     language: 'en-US',
                     callback: `${base}/api/twilio/voice-intelligence`,
                     callbackMethod: 'POST'
-                }
+                },
+                // Enable Conversational Intelligence for advanced AI analysis
+                intelligenceService: process.env.TWILIO_INTELLIGENCE_SERVICE_SID
             });
             
             // Pass the original caller's number as a custom parameter
@@ -86,7 +88,9 @@ export default function handler(req, res) {
                     language: 'en-US',
                     callback: `${base}/api/twilio/voice-intelligence`,
                     callbackMethod: 'POST'
-                }
+                },
+                // Enable Conversational Intelligence for advanced AI analysis
+                intelligenceService: process.env.TWILIO_INTELLIGENCE_SERVICE_SID
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -110,7 +114,9 @@ export default function handler(req, res) {
                     language: 'en-US',
                     callback: `${base}/api/twilio/voice-intelligence`,
                     callbackMethod: 'POST'
-                }
+                },
+                // Enable Conversational Intelligence for advanced AI analysis
+                intelligenceService: process.env.TWILIO_INTELLIGENCE_SERVICE_SID
             });
             dial.client('agent');
         }

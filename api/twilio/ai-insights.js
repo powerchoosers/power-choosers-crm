@@ -87,17 +87,64 @@ export default async function handler(req, res) {
         const recording = recordings[0];
         console.log('[Twilio AI] Found recording:', recording.sid);
         
-        // Use Twilio's native transcription service (with retry)
+        // Try Conversational Intelligence first, then fallback to basic transcription
         let transcript = '';
         let aiInsights = null;
+        let conversationalIntelligence = null;
+        
         try {
-            transcript = await getTranscriptWithRetry(client, recording.sid, { attempts: 6, delayMs: 3000 });
-            if (!transcript) {
-                console.log('[Twilio AI] Transcript not ready after retries');
+            // Check if Conversational Intelligence service is configured
+            const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID;
+            
+            if (serviceSid) {
+                console.log('[Twilio AI] Using Conversational Intelligence service');
+                
+                // Try to get existing Conversational Intelligence transcript
+                const transcripts = await client.intelligence.v2.transcripts.list({
+                    serviceSid: serviceSid,
+                    sourceSid: recording.sid,
+                    limit: 1
+                });
+                
+                if (transcripts.length > 0) {
+                    const ciTranscript = await client.intelligence.v2.transcripts(transcripts[0].sid).fetch();
+                    
+                    if (ciTranscript.status === 'completed') {
+                        // Get sentences from Conversational Intelligence
+                        const sentences = await client.intelligence.v2
+                            .transcripts(ciTranscript.sid)
+                            .sentences.list();
+                        
+                        transcript = sentences.map(s => s.text).join(' ');
+                        conversationalIntelligence = {
+                            transcriptSid: ciTranscript.sid,
+                            status: ciTranscript.status,
+                            sentenceCount: sentences.length,
+                            averageConfidence: sentences.length > 0 ? 
+                                sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
+                        };
+                        
+                        console.log(`[Twilio AI] Found Conversational Intelligence transcript with ${sentences.length} sentences`);
+                    }
+                }
             }
+            
+            // Fallback to basic transcription if Conversational Intelligence not available
+            if (!transcript) {
+                console.log('[Twilio AI] Falling back to basic transcription');
+                transcript = await getTranscriptWithRetry(client, recording.sid, { attempts: 6, delayMs: 3000 });
+            }
+            
             if (transcript) {
                 aiInsights = await generateTwilioAIInsights(transcript);
+                if (conversationalIntelligence) {
+                    aiInsights.source = 'twilio-conversational-intelligence';
+                    aiInsights.conversationalIntelligence = conversationalIntelligence;
+                } else {
+                    aiInsights.source = 'twilio-basic-transcription';
+                }
             }
+            
         } catch (transcriptionError) {
             console.error('[Twilio AI] Transcription error:', transcriptionError);
             // Fallback to basic insights placeholder
@@ -109,7 +156,9 @@ export default async function handler(req, res) {
                 painPoints: [],
                 budget: 'Unclear',
                 timeline: 'Not specified',
-                decisionMakers: []
+                decisionMakers: [],
+                source: 'fallback',
+                error: transcriptionError.message
             };
         }
         
