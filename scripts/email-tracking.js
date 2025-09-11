@@ -522,7 +522,13 @@ class EmailTrackingManager {
                 }
 
                 // Show in-app notification
-                if (window.crm && typeof window.crm.showToast === 'function') {
+                if (window.ToastManager) {
+                    window.ToastManager.showEmailNotification({
+                        to: stats.to[0],
+                        subject: stats.subject,
+                        type: 'opened'
+                    });
+                } else if (window.crm && typeof window.crm.showToast === 'function') {
                     window.crm.showToast(`📧 ${notification.message}`);
                 }
 
@@ -559,7 +565,13 @@ class EmailTrackingManager {
                 }
 
                 // Show in-app notification
-                if (window.crm && typeof window.crm.showToast === 'function') {
+                if (window.ToastManager) {
+                    window.ToastManager.showEmailNotification({
+                        to: stats.to[0],
+                        subject: stats.subject,
+                        type: 'replied'
+                    });
+                } else if (window.crm && typeof window.crm.showToast === 'function') {
                     window.crm.showToast(`💬 ${notification.message}`);
                 }
 

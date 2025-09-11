@@ -149,7 +149,7 @@
         // Set up device event handlers
         state.device.on('registered', () => {
           console.debug('[TwilioRTC] Device registered and ready');
-          try { window.crm?.showToast && window.crm.showToast('Browser calling ready'); } catch(_) {}
+          // Browser calling ready
         });
 
         state.device.on('error', (error) => {
@@ -272,6 +272,27 @@
 
             // Remember connection so we can accept on click (do NOT mark as active connection yet)
             TwilioRTC.state.pendingIncoming = conn;
+
+            // Show enhanced toast notification for incoming call
+            if (window.ToastManager) {
+                const callData = {
+                    callerName: meta.name,
+                    callerNumber: number,
+                    company: meta.account,
+                    title: meta.title,
+                    city: meta.city,
+                    state: meta.state,
+                    callerIdImage: meta.domain ? makeFavicon(meta.domain) : null,
+                    carrierName: meta.carrierName,
+                    carrierType: meta.carrierType,
+                    nationalFormat: meta.nationalFormat,
+                    connection: conn
+                };
+                
+                const toastId = window.ToastManager.showCallNotification(callData);
+                callData.toastId = toastId;
+                TwilioRTC.state.pendingIncoming.toastId = toastId;
+            }
 
             // If the caller hangs up (cancels) before we accept, immediately clean up UI/state
             try {
@@ -651,7 +672,42 @@
       state.connecting = false;
     };
     
-    return { state, ensureDevice, shutdown };
+    // Accept incoming call
+    function acceptCall() {
+      if (state.pendingIncoming) {
+        console.debug('[TwilioRTC] Accepting incoming call');
+        state.pendingIncoming.accept();
+        state.connection = state.pendingIncoming;
+        state.pendingIncoming = null;
+        
+        // Remove toast notification
+        if (state.pendingIncoming && state.pendingIncoming.toastId && window.ToastManager) {
+          window.ToastManager.removeToast(state.pendingIncoming.toastId);
+        }
+        
+        return true;
+      }
+      return false;
+    }
+
+    // Decline incoming call
+    function declineCall() {
+      if (state.pendingIncoming) {
+        console.debug('[TwilioRTC] Declining incoming call');
+        state.pendingIncoming.reject();
+        state.pendingIncoming = null;
+        
+        // Remove toast notification
+        if (state.pendingIncoming && state.pendingIncoming.toastId && window.ToastManager) {
+          window.ToastManager.removeToast(state.pendingIncoming.toastId);
+        }
+        
+        return true;
+      }
+      return false;
+    }
+
+    return { state, ensureDevice, shutdown, acceptCall, declineCall };
   })();
 
   const WIDGET_ID = 'phone-widget';
@@ -684,7 +740,7 @@
 
   async function resolvePhoneMeta(number) {
     const digits = (number || '').replace(/\D/g, '');
-    const meta = { number, name: '', account: '', title: '', city: '', state: '', domain: '' };
+    const meta = { number, name: '', account: '', title: '', city: '', state: '', domain: '', callerIdImage: null };
     try {
       // App-provided resolver if available
       if (window.crm && typeof window.crm.resolvePhoneMeta === 'function') {
@@ -710,6 +766,38 @@
               state: c.state || a.state || '',
               domain: c.domain || a.domain || ''
             };
+          }
+        }
+        
+        // If no contact found, try Twilio caller ID lookup
+        if (!meta.name) {
+          try {
+            const callerLookup = await fetch(`${base}/api/twilio/caller-lookup`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ phoneNumber: number })
+            });
+            
+            if (callerLookup.ok) {
+              const lookupData = await callerLookup.json();
+              if (lookupData.success && lookupData.data) {
+                const data = lookupData.data;
+                meta.name = data.callerName || '';
+                meta.carrier = data.carrier || '';
+                meta.countryCode = data.countryCode || '';
+                meta.nationalFormat = data.nationalFormat || '';
+                
+                // If we have a carrier, we can try to get a logo
+                if (data.carrier && data.carrier.name) {
+                  meta.carrierName = data.carrier.name;
+                  meta.carrierType = data.carrier.type;
+                }
+              }
+            }
+          } catch (lookupError) {
+            console.warn('[Phone] Caller ID lookup failed:', lookupError);
           }
         }
       }
@@ -2063,7 +2151,7 @@
           }
         }
         
-        try { window.crm?.showToast && window.crm.showToast('Call ended'); } catch (_) {}
+        // Call ended
         
         // Clear the input and reset title
         if (input) input.value = '';
@@ -2138,7 +2226,7 @@
         }
         // Try browser calling first if microphone permission is available
         if (hasMicPermission) {
-          try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} from browser...`); } catch (_) {}
+          // Calling from browser
           try {
             // If user canceled right before placing call, abort gracefully
             if (!isCallInProgress) {
@@ -2365,7 +2453,7 @@
       }
     }, 50);
 
-    try { window.crm?.showToast && window.crm.showToast('Phone opened'); } catch (_) {}
+    // Phone widget opened successfully
   }
 
   // Track last call completion to prevent auto-callbacks

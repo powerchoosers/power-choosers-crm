@@ -2149,6 +2149,286 @@ html, body {
     z-index: 1000;
 }
 
+/* === ENHANCED TOAST NOTIFICATIONS === */
+.toast-container {
+    position: fixed;
+    top: calc(var(--topbar-height) + 10px);
+    right: var(--spacing-base);
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 400px;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    align-items: flex-end;
+}
+
+.toast {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 320px;
+    max-width: 400px;
+    width: auto;
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+    position: relative;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.toast.hide {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    max-height: 0;
+    overflow: hidden;
+}
+
+/* Toast type colors */
+.toast.call {
+    border-left: 4px solid var(--orange-subtle);
+}
+
+.toast.email {
+    border-left: 4px solid var(--blue-subtle);
+}
+
+.toast.save {
+    border-left: 4px solid var(--green-subtle);
+}
+
+.toast.error {
+    border-left: 4px solid var(--red-subtle);
+}
+
+.toast.warning {
+    border-left: 4px solid var(--yellow-subtle);
+}
+
+.toast.info {
+    border-left: 4px solid var(--grey-500);
+}
+
+.toast-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    color: white;
+    position: relative;
+}
+
+.toast.call .toast-icon {
+    background: var(--orange-subtle);
+}
+
+.toast.email .toast-icon {
+    background: var(--blue-subtle);
+}
+
+.toast.save .toast-icon {
+    background: var(--green-subtle);
+}
+
+.toast.error .toast-icon {
+    background: var(--red-subtle);
+}
+
+.toast.warning .toast-icon {
+    background: var(--yellow-subtle);
+}
+
+.toast.info .toast-icon {
+    background: var(--grey-500);
+}
+
+.toast-icon img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.toast-icon svg {
+    width: 20px;
+    height: 20px;
+    color: white;
+    stroke: currentColor;
+}
+
+.toast-content {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.toast-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toast-message {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toast-details {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toast-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.toast-btn {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.toast-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-medium);
+}
+
+.toast-btn.primary {
+    background: var(--orange-subtle);
+    border-color: var(--orange-subtle);
+    color: white;
+}
+
+.toast-btn.primary:hover {
+    background: #e55a2b;
+    border-color: #e55a2b;
+}
+
+.toast-btn.danger {
+    background: var(--red-subtle);
+    border-color: var(--red-subtle);
+    color: white;
+}
+
+.toast-btn.danger:hover {
+    background: #c82333;
+    border-color: #c82333;
+}
+
+.toast-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: var(--transition-fast);
+}
+
+.toast-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Call-specific toast styling */
+.toast.call .toast-content {
+    position: relative;
+}
+
+.call-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.call-btn {
+    flex: 1;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.call-btn.answer {
+    background: var(--green-subtle);
+    color: white;
+}
+
+.call-btn.answer:hover {
+    background: #218838;
+}
+
+.call-btn.decline {
+    background: var(--red-subtle);
+    color: white;
+}
+
+.call-btn.decline:hover {
+    background: #c82333;
+}
+
+.call-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
 .top-bar-left {
     display: flex;
     align-items: center;
@@ -2301,12 +2581,39 @@ html, body {
     right: 0;
     width: 380px;
     max-height: 500px;
-    background: var(--grey-100);
-    border: 1px solid var(--grey-300);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     z-index: 1000;
     overflow: hidden;
+}
+
+/* Carat pointer pointing to notification bell */
+.notification-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: 20px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--bg-item);
+    z-index: 1001;
+}
+
+.notification-dropdown::after {
+    content: '';
+    position: absolute;
+    top: -9px;
+    right: 20px;
+    width: 0;
+    height: 0;
+    border-left: 9px solid transparent;
+    border-right: 9px solid transparent;
+    border-bottom: 9px solid var(--border-light);
+    z-index: 1000;
 }
 
 .notification-header {
@@ -2314,8 +2621,8 @@ html, body {
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--grey-300);
-    background: var(--grey-200);
+    border-bottom: 1px solid var(--grey-600);
+    background: var(--bg-item);
 }
 
 .notification-header h3 {
@@ -2328,7 +2635,7 @@ html, body {
 .mark-all-read {
     background: none;
     border: none;
-    color: #3498db;
+    color: white;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -2338,7 +2645,7 @@ html, body {
 }
 
 .mark-all-read:hover {
-    background: #e3f2fd;
+    background: var(--bg-hover);
 }
 
 .notification-list {
@@ -2350,18 +2657,18 @@ html, body {
     display: flex;
     align-items: flex-start;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--grey-300);
+    border-bottom: 1px solid var(--border-light);
     cursor: pointer;
     transition: background-color 0.2s;
     position: relative;
 }
 
 .notification-item:hover {
-    background: var(--grey-200);
+    background: var(--bg-hover);
 }
 
 .notification-item.unread {
-    background: var(--grey-150);
+    background: var(--bg-item);
     border-left: 3px solid var(--blue-primary);
 }
 
@@ -2436,15 +2743,15 @@ html, body {
 
 .notification-footer {
     padding: 12px 20px;
-    border-top: 1px solid var(--grey-300);
-    background: var(--grey-200);
+    border-top: 1px solid var(--grey-600);
+    background: var(--bg-item);
     text-align: center;
 }
 
 .view-all-btn {
     background: none;
     border: none;
-    color: #3498db;
+    color: white;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -2454,29 +2761,33 @@ html, body {
 }
 
 .view-all-btn:hover {
-    background: #e3f2fd;
+    background: var(--bg-hover);
 }
 
 .notification-empty {
     padding: 40px 20px;
     text-align: center;
-    color: #95a5a6;
+    color: var(--text-muted);
 }
 
 .notification-empty-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px auto;
     opacity: 0.5;
+    color: var(--text-muted);
 }
 
 .notification-empty-text {
     font-size: 16px;
     font-weight: 500;
     margin-bottom: 8px;
+    color: var(--text-primary);
 }
 
 .notification-empty-subtext {
     font-size: 14px;
+    color: var(--text-secondary);
 }
 
 .profile-container {

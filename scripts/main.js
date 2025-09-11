@@ -508,8 +508,17 @@ class PowerChoosersCRM {
         this.showToast(`Opening ${modalType} modal...`);
     }
 
-    showToast(message) {
-        // Simple toast notification
+    showToast(message, type = 'info', options = {}) {
+        // Use the new enhanced toast manager if available
+        if (window.ToastManager) {
+            return window.ToastManager.showToast({
+                type: type,
+                message: message,
+                ...options
+            });
+        }
+        
+        // Fallback to simple toast notification
         const toast = document.createElement('div');
         toast.className = 'toast';
         toast.textContent = message;
