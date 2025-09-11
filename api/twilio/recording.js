@@ -212,7 +212,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                             .transcripts(ciTranscript.sid)
                             .sentences.list();
                         
-                        transcript = sentences.map(s => s.text).join(' ');
+                        transcript = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
                         conversationalIntelligence = {
                             transcriptSid: ciTranscript.sid,
                             status: ciTranscript.status,
@@ -221,7 +221,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                                 sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
                         };
                         
-                        console.log(`[Recording] Found Conversational Intelligence transcript with ${sentences.length} sentences`);
+                        console.log(`[Recording] Found Conversational Intelligence transcript with ${sentences.length} sentences, transcript length: ${transcript.length}`);
                     }
                 } else {
                     // Create new Conversational Intelligence transcript
@@ -250,7 +250,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                                 .transcripts(updatedTranscript.sid)
                                 .sentences.list();
                             
-                            transcript = sentences.map(s => s.text).join(' ');
+                            transcript = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
                             conversationalIntelligence = {
                                 transcriptSid: updatedTranscript.sid,
                                 status: updatedTranscript.status,
@@ -259,7 +259,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                                     sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
                             };
                             
-                            console.log(`[Recording] Conversational Intelligence transcript completed with ${sentences.length} sentences`);
+                            console.log(`[Recording] Conversational Intelligence transcript completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);
                             break;
                         }
                         

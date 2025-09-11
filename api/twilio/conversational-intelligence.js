@@ -123,15 +123,16 @@ export default async function handler(req, res) {
                     .sentences.list();
                 
                 sentences = sentencesResponse.map(s => ({
-                    text: s.text,
+                    text: s.text || '',
                     confidence: s.confidence,
                     startTime: s.startTime,
                     endTime: s.endTime,
                     channel: s.channel
                 }));
                 
-                transcriptText = sentences.map(s => s.text).join(' ');
-                console.log(`[Conversational Intelligence] Retrieved ${sentences.length} sentences`);
+                transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
+                console.log(`[Conversational Intelligence] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
+                console.log(`[Conversational Intelligence] Sample sentences:`, sentences.slice(0, 3).map(s => ({ text: s.text, confidence: s.confidence })));
             } catch (error) {
                 console.error('[Conversational Intelligence] Error fetching sentences:', error);
             }
