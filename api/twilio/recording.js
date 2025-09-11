@@ -184,47 +184,132 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         
-        // Use Twilio's native transcription service
+        // Try Conversational Intelligence first, then fallback to basic transcription
         let transcript = '';
         let aiInsights = null;
+        let conversationalIntelligence = null;
         
         try {
-            // Check if transcription already exists
-            const transcriptions = await client.transcriptions.list({ 
-                recordingSid: recordingSid,
-                limit: 1 
-            });
+            // Check if Conversational Intelligence service is configured
+            const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID;
             
-            if (transcriptions.length > 0) {
-                const t = await client.transcriptions(transcriptions[0].sid).fetch();
-                transcript = t.transcriptionText || '';
-                console.log('[Recording] Existing transcript found:', (transcript || '').substring(0, 100) + '...');
-            } else {
-                // Create new transcription using Twilio's service
-                console.log('[Recording] Creating Twilio transcription...');
-                const created = await client.transcriptions.create({
-                    recordingSid: recordingSid,
-                    languageCode: 'en-US'
+            if (serviceSid) {
+                console.log('[Recording] Using Conversational Intelligence service');
+                
+                // Try to get existing Conversational Intelligence transcript
+                const transcripts = await client.intelligence.v2.transcripts.list({
+                    serviceSid: serviceSid,
+                    sourceSid: recordingSid,
+                    limit: 1
                 });
-                // Poll for completion up to ~60s
-                let attempts = 0;
-                const maxAttempts = 12; // 12 * 5s = 60s
-                while (attempts < maxAttempts) {
-                    await new Promise(r => setTimeout(r, 5000));
-                    let t = null;
-                    try { t = await client.transcriptions(created.sid).fetch(); } catch(_) {}
-                    const text = t?.transcriptionText || '';
-                    if (text && text.trim().length > 0) {
-                        transcript = text;
-                        break;
+                
+                if (transcripts.length > 0) {
+                    const ciTranscript = await client.intelligence.v2.transcripts(transcripts[0].sid).fetch();
+                    
+                    if (ciTranscript.status === 'completed') {
+                        // Get sentences from Conversational Intelligence
+                        const sentences = await client.intelligence.v2
+                            .transcripts(ciTranscript.sid)
+                            .sentences.list();
+                        
+                        transcript = sentences.map(s => s.text).join(' ');
+                        conversationalIntelligence = {
+                            transcriptSid: ciTranscript.sid,
+                            status: ciTranscript.status,
+                            sentenceCount: sentences.length,
+                            averageConfidence: sentences.length > 0 ? 
+                                sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
+                        };
+                        
+                        console.log(`[Recording] Found Conversational Intelligence transcript with ${sentences.length} sentences`);
                     }
-                    attempts++;
-                    if (attempts % 3 === 0) console.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
-                }
-                if (transcript) {
-                    console.log('[Recording] Transcription ready:', transcript.substring(0, 100) + '...');
                 } else {
-                    console.log('[Recording] Transcription not ready within timeout');
+                    // Create new Conversational Intelligence transcript
+                    console.log('[Recording] Creating new Conversational Intelligence transcript...');
+                    const newTranscript = await client.intelligence.v2.transcripts.create({
+                        serviceSid: serviceSid,
+                        channel: {
+                            media_properties: {
+                                source_sid: recordingSid
+                            }
+                        },
+                        customerKey: callSid
+                    });
+                    
+                    console.log('[Recording] Created Conversational Intelligence transcript:', newTranscript.sid);
+                    
+                    // Wait for processing (up to 2 minutes)
+                    let attempts = 0;
+                    const maxAttempts = 20; // 20 * 6s = 120s
+                    while (attempts < maxAttempts && ['queued', 'in-progress'].includes(newTranscript.status)) {
+                        await new Promise(r => setTimeout(r, 6000));
+                        const updatedTranscript = await client.intelligence.v2.transcripts(newTranscript.sid).fetch();
+                        
+                        if (updatedTranscript.status === 'completed') {
+                            const sentences = await client.intelligence.v2
+                                .transcripts(updatedTranscript.sid)
+                                .sentences.list();
+                            
+                            transcript = sentences.map(s => s.text).join(' ');
+                            conversationalIntelligence = {
+                                transcriptSid: updatedTranscript.sid,
+                                status: updatedTranscript.status,
+                                sentenceCount: sentences.length,
+                                averageConfidence: sentences.length > 0 ? 
+                                    sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
+                            };
+                            
+                            console.log(`[Recording] Conversational Intelligence transcript completed with ${sentences.length} sentences`);
+                            break;
+                        }
+                        
+                        attempts++;
+                        if (attempts % 5 === 0) console.log(`[Recording] Waiting for Conversational Intelligence... (${attempts*6}s)`);
+                    }
+                }
+            }
+            
+            // Fallback to basic transcription if Conversational Intelligence not available or failed
+            if (!transcript) {
+                console.log('[Recording] Falling back to basic transcription');
+                
+                // Check if transcription already exists
+                const transcriptions = await client.transcriptions.list({ 
+                    recordingSid: recordingSid,
+                    limit: 1 
+                });
+                
+                if (transcriptions.length > 0) {
+                    const t = await client.transcriptions(transcriptions[0].sid).fetch();
+                    transcript = t.transcriptionText || '';
+                    console.log('[Recording] Existing transcript found:', (transcript || '').substring(0, 100) + '...');
+                } else {
+                    // Create new transcription using Twilio's service
+                    console.log('[Recording] Creating Twilio transcription...');
+                    const created = await client.transcriptions.create({
+                        recordingSid: recordingSid,
+                        languageCode: 'en-US'
+                    });
+                    // Poll for completion up to ~60s
+                    let attempts = 0;
+                    const maxAttempts = 12; // 12 * 5s = 60s
+                    while (attempts < maxAttempts) {
+                        await new Promise(r => setTimeout(r, 5000));
+                        let t = null;
+                        try { t = await client.transcriptions(created.sid).fetch(); } catch(_) {}
+                        const text = t?.transcriptionText || '';
+                        if (text && text.trim().length > 0) {
+                            transcript = text;
+                            break;
+                        }
+                        attempts++;
+                        if (attempts % 3 === 0) console.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
+                    }
+                    if (transcript) {
+                        console.log('[Recording] Transcription ready:', transcript.substring(0, 100) + '...');
+                    } else {
+                        console.log('[Recording] Transcription not ready within timeout');
+                    }
                 }
             }
             
@@ -239,6 +324,14 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                     }
                 } else {
                     aiInsights = await generateTwilioAIInsights(transcript);
+                }
+                
+                // Add Conversational Intelligence metadata if available
+                if (conversationalIntelligence) {
+                    aiInsights.source = 'twilio-conversational-intelligence';
+                    aiInsights.conversationalIntelligence = conversationalIntelligence;
+                } else {
+                    aiInsights.source = 'twilio-basic-transcription';
                 }
             }
             
