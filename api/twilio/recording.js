@@ -222,6 +222,25 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
                         };
                         
                         console.log(`[Recording] Found Conversational Intelligence transcript with ${sentences.length} sentences, transcript length: ${transcript.length}`);
+                        
+                        // FALLBACK: If Conversational Intelligence transcript is empty, try basic transcription
+                        if (!transcript) {
+                            console.log('[Recording] No Conversational Intelligence transcript text, trying basic transcription fallback...');
+                            try {
+                                const transcriptions = await client.transcriptions.list({ 
+                                    recordingSid: recordingSid,
+                                    limit: 1 
+                                });
+                                
+                                if (transcriptions.length > 0) {
+                                    const basicTranscription = await client.transcriptions(transcriptions[0].sid).fetch();
+                                    transcript = basicTranscription.transcriptionText || '';
+                                    console.log(`[Recording] Basic transcription fallback: ${transcript.length} characters`);
+                                }
+                            } catch (fallbackError) {
+                                console.warn('[Recording] Basic transcription fallback failed:', fallbackError.message);
+                            }
+                        }
                     }
                 } else {
                     // Create new Conversational Intelligence transcript

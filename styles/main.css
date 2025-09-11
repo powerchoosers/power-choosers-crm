@@ -2228,6 +2228,10 @@ html, body {
     border-left: 4px solid var(--grey-500);
 }
 
+.toast.task {
+    border-left: 4px solid var(--yellow-subtle);
+}
+
 .toast-icon {
     flex-shrink: 0;
     width: 40px;
@@ -2264,6 +2268,10 @@ html, body {
 
 .toast.info .toast-icon {
     background: var(--grey-500);
+}
+
+.toast.task .toast-icon {
+    background: var(--yellow-subtle);
 }
 
 .toast-icon img {
@@ -5860,6 +5868,18 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* When container is showing empty state, remove padding from search-empty */
+.search-results-container.showing-empty .search-empty {
+    padding: 80px 40px;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
 .search-loading {
@@ -10701,6 +10721,33 @@ input.row-select[type="checkbox"]:focus-visible {
 }
 
 .pc-tooltip.visible { visibility: visible; }
+
+/* Override browser validation tooltip styling to match global theme */
+input:invalid:not(:focus):not(:placeholder-shown) {
+  border-color: var(--border-dark) !important;
+}
+
+/* Custom validation tooltip styling - override browser default */
+input:invalid:not(:focus):not(:placeholder-shown)::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--grey-900);
+  color: var(--text-inverse);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius-sm);
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.25;
+  box-shadow: var(--elevation-card);
+  white-space: nowrap;
+  z-index: 10000;
+  margin-bottom: 4px;
+  opacity: 1;
+  pointer-events: none;
+}
 
 /* Tooltip arrow (uses same border/fill layering pattern as popovers) */
 .pc-tooltip::before,

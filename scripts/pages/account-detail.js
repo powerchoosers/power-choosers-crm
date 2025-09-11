@@ -364,6 +364,25 @@
     loadAccountActivities();
     // Load account recent calls and styles
     try { injectRecentCallsStyles(); loadRecentCallsForAccount(); } catch (_) { /* noop */ }
+    
+    // DEBUG: Add test function to manually trigger Conversational Intelligence
+    window.testConversationalIntelligence = async function(callSid) {
+      console.log('[DEBUG] Testing Conversational Intelligence for call:', callSid);
+      try {
+        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+        const response = await fetch(base + '/api/twilio/conversational-intelligence', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callSid: callSid })
+        });
+        const result = await response.json();
+        console.log('[DEBUG] Conversational Intelligence result:', result);
+        return result;
+      } catch (error) {
+        console.error('[DEBUG] Conversational Intelligence error:', error);
+        return { error: error.message };
+      }
+    };
   }
 
   // ===== Recent Calls (Account) =====
@@ -415,10 +434,33 @@
     const accountId = state.currentAccount.id;
     const accountPhone10 = String(state.currentAccount.phone || state.currentAccount.primaryPhone || state.currentAccount.mainPhone || '').replace(/\D/g,'').slice(-10);
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+    
+    // DEBUG: Log account info
+    console.log('[Account Detail] Loading calls for account:', {
+      accountId: accountId,
+      accountPhone10: accountPhone10,
+      accountName: state.currentAccount.name,
+      apiBase: base
+    });
+    
     try {
       const r = await fetch(`${base}/api/calls`);
       const j = await r.json().catch(()=>({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
+      
+      // DEBUG: Log all calls data
+      console.log('[Account Detail] All calls loaded:', {
+        totalCalls: calls.length,
+        callsWithTranscripts: calls.filter(c => c.transcript && c.transcript.length > 0).length,
+        sampleCalls: calls.slice(0, 3).map(c => ({
+          id: c.id,
+          twilioSid: c.twilioSid,
+          hasTranscript: !!c.transcript,
+          transcriptLength: c.transcript ? c.transcript.length : 0,
+          hasAI: !!c.aiInsights
+        }))
+      });
+      
       const filtered = calls.filter(c => {
         if (c.accountId && c.accountId === accountId) return true;
         const to10 = String(c.to||'').replace(/\D/g,'').slice(-10);
@@ -426,6 +468,19 @@
         if (accountPhone10 && (to10===accountPhone10 || from10===accountPhone10)) return true;
         return false;
       }).slice(0, 6);
+      
+      // DEBUG: Log filtered calls
+      console.log('[Account Detail] Filtered calls for account:', {
+        filteredCount: filtered.length,
+        filteredCalls: filtered.map(c => ({
+          id: c.id,
+          twilioSid: c.twilioSid,
+          hasTranscript: !!c.transcript,
+          transcriptLength: c.transcript ? c.transcript.length : 0,
+          hasAI: !!c.aiInsights
+        }))
+      });
+      
       if (!filtered.length){ list.innerHTML = '<div class="rc-empty">No recent calls</div>'; return; }
       list.innerHTML = filtered.map(call => rcItemHtml(call)).join('');
       list.querySelectorAll('.rc-insights').forEach(btn => {
@@ -453,6 +508,16 @@
     const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
     const durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
     const phone = escapeHtml(String(c.to||c.from||''));
+    
+    // DEBUG: Log call data being rendered
+    console.log('[Account Detail] Rendering call item:', {
+      callId: c.id,
+      twilioSid: c.twilioSid,
+      hasTranscript: !!c.transcript,
+      transcriptLength: c.transcript ? c.transcript.length : 0,
+      hasAI: !!c.aiInsights,
+      aiKeys: c.aiInsights ? Object.keys(c.aiInsights) : []
+    });
     return `
       <div class="rc-item">
         <div class="rc-meta">
@@ -520,6 +585,18 @@
     const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
     const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
     const transcriptText = r.transcript || (AI && Object.keys(AI).length ? 'Transcript processing...' : 'Transcript not available');
+    
+    // DEBUG: Log transcript data for debugging
+    console.log('[Account Detail] Call transcript debug:', {
+      callId: r.id,
+      twilioSid: r.twilioSid,
+      hasTranscript: !!r.transcript,
+      transcriptLength: r.transcript ? r.transcript.length : 0,
+      transcriptPreview: r.transcript ? r.transcript.substring(0, 100) : 'N/A',
+      hasAI: !!AI,
+      aiKeys: AI ? Object.keys(AI) : [],
+      finalTranscriptText: transcriptText
+    });
     const rec = r.audioUrl || r.recordingUrl || '';
     let proxied = '';
     if (rec) {

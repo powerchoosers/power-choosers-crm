@@ -412,46 +412,62 @@
     // Add auto-formatting to time input
     const timeInput = overlay.querySelector('#task-due-time');
     if (timeInput) {
+      // Clear placeholder on focus
+      timeInput.addEventListener('focus', (e) => {
+        if (e.target.value === '10:30 AM') {
+          e.target.value = '';
+        }
+      });
+      
       timeInput.addEventListener('input', (e) => {
-        let value = e.target.value.replace(/[^\d:APMapm\s]/g, '');
+        let value = e.target.value;
+        let cursorPos = e.target.selectionStart;
+        const originalLength = value.length;
         
-        // Remove extra spaces and normalize case
+        // Only allow digits, colon, A, P, M, and spaces
+        value = value.replace(/[^\d:APMapm\s]/g, '');
+        
+        // Don't auto-format if user is backspacing or deleting
+        if (value.length < originalLength) {
+          e.target.value = value;
+          return;
+        }
+        
+        // Auto-insert colon after 2 digits if no colon exists
+        if (/^\d{2}$/.test(value) && !value.includes(':')) {
+          value = value + ':';
+          cursorPos = 3; // Position cursor after the colon
+        }
+        
+        // Auto-insert colon after 1 digit if user types 3rd digit and no colon
+        if (/^\d{3}$/.test(value) && !value.includes(':')) {
+          value = value.slice(0, 1) + ':' + value.slice(1);
+          cursorPos = 4; // Position cursor after the colon
+        }
+        
+        // Handle 4 digits without colon (e.g., "1030")
+        if (/^\d{4}$/.test(value)) {
+          value = value.slice(0, 2) + ':' + value.slice(2);
+          cursorPos = 5; // Position cursor after the colon
+        }
+        
+        // Clean up AM/PM formatting
         value = value.replace(/\s+/g, ' ').trim();
         
-        // If user types just numbers, add AM/PM
-        if (/^\d+$/.test(value)) {
-          if (value.length <= 2) {
-            value = value + ':00 AM';
-          } else if (value.length === 3) {
-            value = value.slice(0, 1) + ':' + value.slice(1) + ' AM';
-          } else if (value.length === 4) {
-            value = value.slice(0, 2) + ':' + value.slice(2) + ' AM';
-          }
-        }
-        
-        // If user types numbers with colon but no AM/PM
-        if (/^\d{1,2}:\d{0,2}$/.test(value)) {
-          value = value + ' AM';
-        }
-        
-        // Format hours and minutes properly
-        if (/^\d{1,2}:\d{0,2}\s*[APMapm]{0,2}$/.test(value)) {
-          const parts = value.split(':');
-          let hours = parts[0];
-          let minutes = parts[1].replace(/[^\d]/g, '');
-          let ampm = value.match(/[APMapm]{2}$/)?.[0]?.toUpperCase() || 'AM';
-          
-          // Pad minutes to 2 digits
-          if (minutes.length === 1) minutes = '0' + minutes;
-          if (minutes.length === 0) minutes = '00';
-          
-          // Ensure minutes are valid
-          if (parseInt(minutes) > 59) minutes = '59';
-          
-          value = hours + ':' + minutes + ' ' + ampm;
+        // If user types AM or PM, ensure proper spacing
+        if (/AM|PM/i.test(value)) {
+          value = value.replace(/(\d{1,2}:\d{0,2})\s*(AM|PM)/i, '$1 $2');
+          value = value.replace(/(\d{1,2}:\d{2})\s*(AM|PM)/i, '$1 $2');
         }
         
         e.target.value = value;
+        
+        // Restore cursor position
+        if (cursorPos !== undefined) {
+          setTimeout(() => {
+            e.target.setSelectionRange(cursorPos, cursorPos);
+          }, 0);
+        }
       });
       
       // Handle paste events
