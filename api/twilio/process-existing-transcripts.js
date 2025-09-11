@@ -114,6 +114,7 @@ export default async function handler(req, res) {
                         const callData = {
                             id: transcript.sourceSid,
                             twilioSid: transcript.sourceSid,
+                            callSid: transcript.sourceSid,
                             transcript: transcriptText,
                             aiInsights: aiInsights,
                             conversationalIntelligence: {
@@ -123,6 +124,14 @@ export default async function handler(req, res) {
                                 operatorResults: operatorResults,
                                 serviceSid: serviceSid
                             },
+                            // Add required fields for /api/calls endpoint
+                            to: 'Unknown', // Will be updated when we have more data
+                            from: 'Unknown', // Will be updated when we have more data
+                            status: 'completed',
+                            duration: 0,
+                            callTime: new Date().toISOString(),
+                            outcome: 'Connected',
+                            aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
                             timestamp: new Date().toISOString(),
                             source: 'conversational-intelligence-processing'
                         };
@@ -217,6 +226,7 @@ export default async function handler(req, res) {
                             const callData = {
                                 id: alternativeSourceId,
                                 twilioSid: alternativeSourceId,
+                                callSid: alternativeSourceId,
                                 transcript: transcriptText,
                                 aiInsights: aiInsights,
                                 conversationalIntelligence: {
@@ -227,6 +237,14 @@ export default async function handler(req, res) {
                                     serviceSid: serviceSid,
                                     originalSourceSid: transcript.sourceSid || 'missing'
                                 },
+                                // Add required fields for /api/calls endpoint
+                                to: 'Unknown', // Will be updated when we have more data
+                                from: 'Unknown', // Will be updated when we have more data
+                                status: 'completed',
+                                duration: 0,
+                                callTime: new Date().toISOString(),
+                                outcome: 'Connected',
+                                aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
                                 timestamp: new Date().toISOString(),
                                 source: 'conversational-intelligence-processing-alternative'
                             };
