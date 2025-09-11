@@ -4070,13 +4070,19 @@ html, body {
 #call-scripts-page .contact-search-wrap {
   margin-top: var(--spacing-sm);
   align-self: flex-start; /* ensure it stays under/left of the title */
+  max-width: 100%; /* Prevent horizontal overflow */
+  overflow: visible; /* Allow suggestions to be visible outside container */
 }
 #call-scripts-page .contact-search-inner {
   position: relative;
   max-width: 420px;
+  width: 100%; /* Make it responsive */
 }
 #call-scripts-page #call-scripts-contact-search {
   width: 100%;
+  max-width: 100%; /* Prevent input from exceeding container */
+  position: relative; /* Ensure input stays in place */
+  z-index: 1; /* Lower than suggestions but above other content */
 }
 #call-scripts-page .search-suggestions {
   position: absolute;
@@ -4089,9 +4095,11 @@ html, body {
   border-radius: var(--border-radius);
   box-shadow: var(--elevation-card);
   padding: 6px;
-  z-index: 30;
+  z-index: 1000; /* Higher z-index to ensure visibility */
   max-height: 200px; /* Limit height to show ~5 suggestions */
   overflow-y: auto; /* Enable scrolling for more suggestions */
+  min-width: 100%; /* Ensure suggestions are at least as wide as input */
+  transform: translateZ(0); /* Create new stacking context to prevent interference */
 }
 #call-scripts-page .search-suggestions[hidden] { display: none; }
 #call-scripts-page .search-suggestions .suggestion-empty {
@@ -4102,18 +4110,43 @@ html, body {
   padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 #call-scripts-page .search-suggestions .suggestion-item:hover {
   background: var(--grey-700);
 }
+#call-scripts-page .search-suggestions .sugg-glyph {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--orange-subtle);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+#call-scripts-page .search-suggestions .sugg-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0; /* Allow text to wrap/truncate */
+}
 #call-scripts-page .search-suggestions .sugg-name {
   font-size: 0.95rem;
   color: var(--text-inverse);
+  font-weight: 500;
 }
-#call-scripts-page .search-suggestions .sugg-sub {
+#call-scripts-page .search-suggestions .sugg-company {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+#call-scripts-page .search-suggestions .sugg-title {
   font-size: 0.78rem;
   color: var(--text-secondary);
 }
@@ -4122,6 +4155,8 @@ html, body {
 #call-scripts-page .page-container {
   display: flex;
   flex-direction: column;
+  overflow: visible; /* Allow search suggestions to be visible */
+  max-width: 100%; /* Ensure container doesn't exceed viewport */
 }
 #call-scripts-page .page-content {
   display: flex;
@@ -4129,6 +4164,8 @@ html, body {
   gap: var(--spacing-md); /* keep global rhythm; responses will add explicit 25px margin */
   flex: 1 1 auto;
   min-height: 0; /* allow flex child to shrink */
+  overflow: visible; /* Allow search suggestions to be visible */
+  max-width: 100%; /* Ensure content doesn't exceed viewport */
 }
 #call-scripts-page #call-scripts-display {
   flex: 1 1 auto;

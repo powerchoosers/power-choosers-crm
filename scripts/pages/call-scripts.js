@@ -995,10 +995,19 @@
     panel.innerHTML = top.map(({p, name, email, company}) => {
       const cid = String(p.id || p.contactId || p._id || '');
       const label = escapeHtml(name || '(No name)');
-      const sub = escapeHtml([company, email].filter(Boolean).join(' • '));
+      const title = escapeHtml(p.title || p.jobTitle || '');
+      const companyName = escapeHtml(company || '');
+      
+      // Get first letter for glyph
+      const firstLetter = (name || '?').charAt(0).toUpperCase();
+      
       return `<div class="suggestion-item" role="option" data-contact-id="${escapeHtml(cid)}">
-        <div class="sugg-name">${label}</div>
-        <div class="sugg-sub">${sub || '&nbsp;'}</div>
+        <div class="sugg-glyph">${firstLetter}</div>
+        <div class="sugg-content">
+          <div class="sugg-name">${label}</div>
+          <div class="sugg-company">${companyName || '&nbsp;'}</div>
+          <div class="sugg-title">${title || '&nbsp;'}</div>
+        </div>
       </div>`;
     }).join('');
     panel.hidden = false;
@@ -1043,9 +1052,10 @@
     // Do not override when user has explicitly selected a contact
     if (typeof state !== 'undefined' && state && state.overrideContactId) return;
     const { contact, account } = getLiveData();
-    // Auto-fill name when calling a contact directly
-    const liveName = (contact && (contact.name || ((contact.firstName||'') + ' ' + (contact.lastName||''))).trim()) || '';
-    if (liveName) input.value = liveName;
+    // Don't auto-fill name - keep search bar empty for user to type
+    // const liveName = (contact && (contact.name || ((contact.firstName||'') + ' ' + (contact.lastName||''))).trim()) || '';
+    // if (liveName) input.value = liveName;
+    
     // If calling a company number (no live contact id but have account), pre-open suggestions with that account's contacts
     const hasContactId = !!(contact && contact.id);
     const hasAccount = !!(account && (account.accountName||account.name||account.companyName));
