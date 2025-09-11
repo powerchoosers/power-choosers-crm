@@ -373,6 +373,9 @@
               </label>
             </div>
             <div class="form-row">
+              <label>Time
+                <input type="text" name="dueTime" class="input-dark" value="10:30 AM" placeholder="10:30 AM" required />
+              </label>
               <label>Due date
                 <input type="date" name="dueDate" class="input-dark" value="${nextBiz}" required />
               </label>
@@ -416,6 +419,60 @@
     // Event handling
     const form = pop.querySelector('#contact-task-form');
     const closeBtn = pop.querySelector('#tp-close');
+    const timeInput = pop.querySelector('input[name="dueTime"]');
+    
+    // Auto-format time input
+    if (timeInput) {
+      timeInput.addEventListener('input', (e) => {
+        let value = e.target.value.replace(/[^\d:APMapm\s]/g, '');
+        
+        // Remove extra spaces and normalize case
+        value = value.replace(/\s+/g, ' ').trim();
+        
+        // If user types just numbers, add AM/PM
+        if (/^\d+$/.test(value)) {
+          if (value.length <= 2) {
+            value = value + ':00 AM';
+          } else if (value.length === 3) {
+            value = value.slice(0, 1) + ':' + value.slice(1) + ' AM';
+          } else if (value.length === 4) {
+            value = value.slice(0, 2) + ':' + value.slice(2) + ' AM';
+          }
+        }
+        
+        // If user types numbers with colon but no AM/PM
+        if (/^\d{1,2}:\d{0,2}$/.test(value)) {
+          value = value + ' AM';
+        }
+        
+        // Format hours and minutes properly
+        if (/^\d{1,2}:\d{0,2}\s*[APMapm]{0,2}$/.test(value)) {
+          const parts = value.split(':');
+          let hours = parts[0];
+          let minutes = parts[1].replace(/[^\d]/g, '');
+          let ampm = value.match(/[APMapm]{2}$/)?.[0]?.toUpperCase() || 'AM';
+          
+          // Pad minutes to 2 digits
+          if (minutes.length === 1) minutes = '0' + minutes;
+          if (minutes.length === 0) minutes = '00';
+          
+          // Ensure minutes are valid
+          if (parseInt(minutes) > 59) minutes = '59';
+          
+          value = hours + ':' + minutes + ' ' + ampm;
+        }
+        
+        e.target.value = value;
+      });
+      
+      // Handle paste events
+      timeInput.addEventListener('paste', (e) => {
+        setTimeout(() => {
+          timeInput.dispatchEvent(new Event('input'));
+        }, 0);
+      });
+    }
+    
     closeBtn?.addEventListener('click', closeContactTaskPopover);
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -423,8 +480,9 @@
       const type = String(fd.get('type') || '').trim();
       const priority = String(fd.get('priority') || '').trim();
       const dueDate = String(fd.get('dueDate') || '').trim();
+      const dueTime = String(fd.get('dueTime') || '').trim();
       const notes = String(fd.get('notes') || '').trim();
-      if (!type || !priority || !dueDate) return;
+      if (!type || !priority || !dueDate || !dueTime) return;
       const title = buildTaskTitle(type, fullName);
       const newTask = {
         id: 'task_' + Date.now(),
@@ -435,6 +493,7 @@
         type,
         priority,
         dueDate,
+        dueTime,
         status: 'pending',
         notes,
         createdAt: Date.now()
@@ -445,6 +504,19 @@
         existing.unshift(newTask);
         localStorage.setItem(key, JSON.stringify(existing));
       } catch (_) { /* noop */ }
+
+      // Save to Firebase
+      try {
+        const db = window.firebaseDB;
+        if (db) {
+          await db.collection('tasks').add({
+            ...newTask,
+            timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to save task to Firebase:', err);
+      }
 
       try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) {}
       // Notify other components
@@ -1629,7 +1701,7 @@
 
   async function commitEdit(wrap, field, value) {
     let outVal = value;
-    if (field === 'phone' || field === 'mobile') {
+    if (field === 'phone' || field === 'mobile' || field === 'companyPhone') {
       outVal = normalizePhone(value);
     }
     await saveField(field, outVal);

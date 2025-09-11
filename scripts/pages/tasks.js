@@ -231,6 +231,7 @@
     const type = escapeHtml(r.type || '');
     const pr = escapeHtml(r.priority || '');
     const due = escapeHtml(r.dueDate || '');
+    const time = escapeHtml(r.dueTime || '');
     const status = escapeHtml(r.status || '');
     return `
       <tr>
@@ -241,6 +242,7 @@
         <td><span class="type-badge ${type}">${type}</span></td>
         <td><span class="priority-badge ${pr}">${pr}</span></td>
         <td>${due}</td>
+        <td>${time}</td>
         <td><span class="status-badge ${status}">${status}</span></td>
         <td><div class="action-buttons"><button class="btn-success" data-id="${id}">${status==='completed'?'Completed':'Complete'}</button><button class="btn-text">Edit</button></div></td>
       </tr>`;
@@ -371,6 +373,11 @@
             </div>
             
             <div class="form-group">
+              <label for="task-due-time">Time *</label>
+              <input type="text" id="task-due-time" name="dueTime" value="10:30 AM" placeholder="10:30 AM" required>
+            </div>
+            
+            <div class="form-group">
               <label for="task-due-date">Due Date *</label>
               <input type="date" id="task-due-date" name="dueDate" required>
             </div>
@@ -402,20 +409,73 @@
       dueDateInput.value = today;
     }
     
+    // Add auto-formatting to time input
+    const timeInput = overlay.querySelector('#task-due-time');
+    if (timeInput) {
+      timeInput.addEventListener('input', (e) => {
+        let value = e.target.value.replace(/[^\d:APMapm\s]/g, '');
+        
+        // Remove extra spaces and normalize case
+        value = value.replace(/\s+/g, ' ').trim();
+        
+        // If user types just numbers, add AM/PM
+        if (/^\d+$/.test(value)) {
+          if (value.length <= 2) {
+            value = value + ':00 AM';
+          } else if (value.length === 3) {
+            value = value.slice(0, 1) + ':' + value.slice(1) + ' AM';
+          } else if (value.length === 4) {
+            value = value.slice(0, 2) + ':' + value.slice(2) + ' AM';
+          }
+        }
+        
+        // If user types numbers with colon but no AM/PM
+        if (/^\d{1,2}:\d{0,2}$/.test(value)) {
+          value = value + ' AM';
+        }
+        
+        // Format hours and minutes properly
+        if (/^\d{1,2}:\d{0,2}\s*[APMapm]{0,2}$/.test(value)) {
+          const parts = value.split(':');
+          let hours = parts[0];
+          let minutes = parts[1].replace(/[^\d]/g, '');
+          let ampm = value.match(/[APMapm]{2}$/)?.[0]?.toUpperCase() || 'AM';
+          
+          // Pad minutes to 2 digits
+          if (minutes.length === 1) minutes = '0' + minutes;
+          if (minutes.length === 0) minutes = '00';
+          
+          // Ensure minutes are valid
+          if (parseInt(minutes) > 59) minutes = '59';
+          
+          value = hours + ':' + minutes + ' ' + ampm;
+        }
+        
+        e.target.value = value;
+      });
+      
+      // Handle paste events
+      timeInput.addEventListener('paste', (e) => {
+        setTimeout(() => {
+          timeInput.dispatchEvent(new Event('input'));
+        }, 0);
+      });
+    }
+    
     // Event listeners
     overlay.querySelector('#cancel-create-task').addEventListener('click', close);
-    overlay.querySelector('#save-create-task').addEventListener('click', () => {
+    overlay.querySelector('#save-create-task').addEventListener('click', async () => {
       const form = overlay.querySelector('#create-task-form');
       const formData = new FormData(form);
       const taskData = Object.fromEntries(formData.entries());
       
       // Validate required fields
-      if (!taskData.title || !taskData.type || !taskData.priority || !taskData.dueDate) {
+      if (!taskData.title || !taskData.type || !taskData.priority || !taskData.dueDate || !taskData.dueTime) {
         alert('Please fill in all required fields');
         return;
       }
       
-      createTask(taskData);
+      await createTask(taskData);
       close();
     });
     
@@ -428,7 +488,7 @@
     }, 0);
   }
 
-  function createTask(taskData) {
+  async function createTask(taskData) {
     const newTask = {
       id: 'task_' + Date.now(),
       title: taskData.title,
@@ -437,6 +497,7 @@
       type: taskData.type,
       priority: taskData.priority,
       dueDate: taskData.dueDate,
+      dueTime: taskData.dueTime,
       status: 'pending',
       notes: taskData.notes || '',
       createdAt: Date.now()
@@ -453,6 +514,19 @@
       localStorage.setItem('userTasks', JSON.stringify(existingTasks));
     } catch (e) {
       console.warn('Could not save task to localStorage:', e);
+    }
+    
+    // Save to Firebase
+    try {
+      const db = window.firebaseDB;
+      if (db) {
+        await db.collection('tasks').add({
+          ...newTask,
+          timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to save task to Firebase:', err);
     }
     
     // Refresh display

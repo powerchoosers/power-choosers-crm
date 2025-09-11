@@ -98,9 +98,13 @@
                 </div>
                 <div class="profile-container">
                     <div class="profile-avatar">LP</div>
+                    <button class="btn btn-primary" id="test-email-operation" style="margin-left: 10px; font-size: 12px; padding: 6px 12px;">Test Email Ope</button>
                 </div>
             </div>
         </header>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toast-container"></div>
 
         <!-- Global Search Modal -->
         <div id="global-search-modal" class="global-search-modal" hidden>
@@ -774,6 +778,7 @@
                                                     <th>Type</th>
                                                     <th>Priority</th>
                                                     <th>Due Date</th>
+                                                    <th>Time</th>
                                                     <th>Status</th>
                                                     <th>Actions</th>
                                                 </tr>
@@ -1605,6 +1610,48 @@
     <script src="scripts/activity-manager.js"></script>
     <script src="scripts/contact-merger.js"></script>
     <script src="scripts/main.js"></script>
+    <script src="scripts/toast-manager.js"></script>
+    <script>
+        // Test the new toast notification system
+        document.addEventListener('DOMContentLoaded', function() {
+            const testBtn = document.getElementById('test-email-operation');
+            if (testBtn) {
+                testBtn.addEventListener('click', function() {
+                    // Test different types of notifications
+                    if (window.ToastManager) {
+                        // Test email notification
+                        window.ToastManager.showEmailNotification({
+                            to: 'john.doe@example.com',
+                            subject: 'Test Email Notification',
+                            type: 'opened'
+                        });
+                        
+                        // Test save notification (no sound)
+                        setTimeout(() => {
+                            window.ToastManager.showSaveNotification('Contact information updated');
+                        }, 1000);
+                        
+                        // Test info notification
+                        setTimeout(() => {
+                            window.ToastManager.showInfoNotification('System Update', 'All systems are running normally');
+                        }, 2000);
+                        
+                        // Test call notification (simulated)
+                        setTimeout(() => {
+                            window.ToastManager.showCallNotification({
+                                callerName: 'Jane Smith',
+                                callerNumber: '+1 (555) 123-4567',
+                                company: 'Acme Corp',
+                                title: 'Sales Manager',
+                                city: 'New York',
+                                state: 'NY'
+                            });
+                        }, 3000);
+                    }
+                });
+            }
+        });
+    </script>
     <script>
       (function(){
         function formatUsdPerKwh(n){

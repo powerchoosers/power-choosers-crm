@@ -790,7 +790,7 @@
             if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
               window.Widgets.callNumber(item.data.phone, item.title, false);
               if (window.crm && typeof window.crm.showToast === 'function') {
-                window.crm.showToast(`Phone opened for ${item.title}`);
+                // Phone opened for contact
               }
             }
           } else {
