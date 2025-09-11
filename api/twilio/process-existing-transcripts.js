@@ -43,6 +43,17 @@ export default async function handler(req, res) {
         
         console.log(`[Process Existing Transcripts] Found ${transcripts.length} transcripts`);
         
+        // Log sample transcript structure for debugging
+        if (transcripts.length > 0) {
+            console.log(`[Process Existing Transcripts] Sample transcript structure:`, {
+                sid: transcripts[0].sid,
+                status: transcripts[0].status,
+                sourceSid: transcripts[0].sourceSid,
+                serviceSid: transcripts[0].serviceSid,
+                availableFields: Object.keys(transcripts[0])
+            });
+        }
+        
         const results = [];
         
         for (const transcript of transcripts) {
@@ -154,14 +165,119 @@ export default async function handler(req, res) {
                     });
                 }
             } else if (transcript.status === 'completed') {
-                // Track transcripts without sourceSid
-                console.log(`[Process Existing Transcripts] Skipping transcript ${transcript.sid} - no sourceSid`);
-                results.push({
-                    transcriptSid: transcript.sid,
-                    sourceSid: 'missing',
-                    status: 'skipped',
-                    error: 'No sourceSid available'
-                });
+                // Try to find alternative source identifiers
+                let alternativeSourceId = null;
+                
+                // Check for other possible source fields
+                if (transcript.callSid) {
+                    alternativeSourceId = transcript.callSid;
+                } else if (transcript.recordingSid) {
+                    alternativeSourceId = transcript.recordingSid;
+                } else if (transcript.sid) {
+                    // Use transcript SID as fallback
+                    alternativeSourceId = transcript.sid;
+                }
+                
+                if (alternativeSourceId) {
+                    console.log(`[Process Existing Transcripts] Processing transcript ${transcript.sid} with alternative source: ${alternativeSourceId}`);
+                    
+                    try {
+                        // Get sentences
+                        let transcriptText = '';
+                        let sentences = [];
+                        try {
+                            const sentencesResponse = await client.intelligence.v2
+                                .transcripts(transcript.sid)
+                                .sentences.list();
+                            
+                            sentences = sentencesResponse.map(s => ({
+                                text: s.text || '',
+                                confidence: s.confidence,
+                                startTime: s.startTime,
+                                endTime: s.endTime,
+                                channel: s.channel
+                            }));
+                            
+                            transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
+                            console.log(`[Process Existing Transcripts] Transcript ${transcript.sid}: ${sentences.length} sentences, ${transcriptText.length} characters`);
+                        } catch (error) {
+                            console.error(`[Process Existing Transcripts] Error fetching sentences for ${transcript.sid}:`, error);
+                        }
+                        
+                        // Generate AI insights
+                        let aiInsights = null;
+                        if (transcriptText) {
+                            aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, null);
+                        }
+                        
+                        // Update the call data directly in Firestore
+                        try {
+                            console.log(`[Process Existing Transcripts] Updating call data for ${transcript.sid} in Firestore with alternative source`);
+                            
+                            const callData = {
+                                id: alternativeSourceId,
+                                twilioSid: alternativeSourceId,
+                                transcript: transcriptText,
+                                aiInsights: aiInsights,
+                                conversationalIntelligence: {
+                                    transcriptSid: transcript.sid,
+                                    status: transcript.status,
+                                    sentences: sentences,
+                                    operatorResults: null,
+                                    serviceSid: serviceSid,
+                                    originalSourceSid: transcript.sourceSid || 'missing'
+                                },
+                                timestamp: new Date().toISOString(),
+                                source: 'conversational-intelligence-processing-alternative'
+                            };
+                            
+                            if (db) {
+                                await db.collection('calls').doc(alternativeSourceId).set(callData, { merge: true });
+                                console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore with alternative source`);
+                                results.push({
+                                    transcriptSid: transcript.sid,
+                                    sourceSid: alternativeSourceId,
+                                    transcriptLength: transcriptText.length,
+                                    status: 'success-alternative'
+                                });
+                            } else {
+                                console.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
+                                results.push({
+                                    transcriptSid: transcript.sid,
+                                    sourceSid: alternativeSourceId,
+                                    status: 'failed',
+                                    error: 'Firestore not available'
+                                });
+                            }
+                        } catch (error) {
+                            console.error(`[Process Existing Transcripts] Error updating call data for ${transcript.sid}:`, error);
+                            results.push({
+                                transcriptSid: transcript.sid,
+                                sourceSid: alternativeSourceId,
+                                status: 'error',
+                                error: error.message
+                            });
+                        }
+                        
+                    } catch (error) {
+                        console.error(`[Process Existing Transcripts] Error processing transcript ${transcript.sid} with alternative source:`, error);
+                        results.push({
+                            transcriptSid: transcript.sid,
+                            sourceSid: alternativeSourceId,
+                            status: 'error',
+                            error: error.message
+                        });
+                    }
+                } else {
+                    // Track transcripts without any source identifier
+                    console.log(`[Process Existing Transcripts] Skipping transcript ${transcript.sid} - no source identifier available`);
+                    results.push({
+                        transcriptSid: transcript.sid,
+                        sourceSid: 'missing',
+                        status: 'skipped',
+                        error: 'No source identifier available'
+                    });
+                }
             }
         }
         
