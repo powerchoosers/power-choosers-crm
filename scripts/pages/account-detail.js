@@ -14,14 +14,32 @@
     if (!s) return null;
     const str = String(s).trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-      const d = new Date(str); return isNaN(d.getTime()) ? null : d;
+      // For ISO dates, parse components to avoid timezone issues
+      const parts = str.split('-');
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      return isNaN(d.getTime()) ? null : d;
     }
     const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
-    if (mdy){ const d=new Date(parseInt(mdy[3],10), parseInt(mdy[1],10)-1, parseInt(mdy[2],10)); return isNaN(d.getTime())?null:d; }
-    const d = new Date(str); return isNaN(d.getTime()) ? null : d;
+    if (mdy){ 
+      // Parse MM/DD/YYYY format directly to avoid timezone issues
+      const d = new Date(parseInt(mdy[3],10), parseInt(mdy[1],10)-1, parseInt(mdy[2],10)); 
+      return isNaN(d.getTime()) ? null : d; 
+    }
+    // Fallback Date parse - use local timezone to avoid offset issues
+    const d = new Date(str + 'T00:00:00'); return isNaN(d.getTime()) ? null : d;
   }
   function toISODate(v){ const d=parseDateFlexible(v); if(!d) return ''; const yyyy=d.getFullYear(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
-  function toMDY(v){ const d=parseDateFlexible(v); if(!d) return v?String(v):''; const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); const yyyy=d.getFullYear(); return `${mm}/${dd}/${yyyy}`; }
+  function toMDY(v){ 
+    console.log('[Account Detail] toMDY called with:', v);
+    const d=parseDateFlexible(v); 
+    if(!d) return v?String(v):''; 
+    const mm=String(d.getMonth()+1).padStart(2,'0'); 
+    const dd=String(d.getDate()).padStart(2,'0'); 
+    const yyyy=d.getFullYear(); 
+    const result = `${mm}/${dd}/${yyyy}`;
+    console.log('[Account Detail] toMDY result:', result);
+    return result;
+  }
   function formatDateInputAsMDY(raw){
     const digits = String(raw||'').replace(/[^0-9]/g,'').slice(0,8);
     let out = '';
@@ -53,6 +71,13 @@
 
     state.currentAccount = account;
     renderAccountDetail();
+    
+    // Setup energy update listener for real-time sync with Health Widget
+    try {
+      if (window.AccountDetail && window.AccountDetail.setupEnergyUpdateListener) {
+        window.AccountDetail.setupEnergyUpdateListener();
+      }
+    } catch (_) {}
   }
 
   function findAccountById(accountId) {
@@ -152,6 +177,7 @@
     const annualUsage = a.annualUsage || a.annual_usage || '';
     const currentRate = a.currentRate || a.current_rate || '';
     const contractEndDate = a.contractEndDate || a.contract_end_date || '';
+    const contractEndDateFormatted = contractEndDate ? toMDY(contractEndDate) : '';
     const sqft = a.squareFootage ?? a.sqft ?? a.square_feet ?? '';
     const occupancy = a.occupancyPct ?? a.occupancy ?? a.occupancy_percentage ?? '';
     const employees = a.employees ?? a.employeeCount ?? a.numEmployees ?? '';
@@ -249,11 +275,11 @@
 
         <div class="contact-info-section">
           <h3 class="section-title">Energy & Contract</h3>
-          <div class="info-grid">
+          <div class="info-grid" id="account-energy-grid">
             <div class="info-row"><div class="info-label">ELECTRICITY SUPPLIER</div><div class="info-value-wrap" data-field="electricitySupplier"><span class="info-value-text">${escapeHtml(electricitySupplier) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value-wrap" data-field="annualUsage"><span class="info-value-text">${escapeHtml(annualUsage) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">CURRENT RATE ($/kWh)</div><div class="info-value-wrap" data-field="currentRate"><span class="info-value-text">${escapeHtml(currentRate) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
-            <div class="info-row"><div class="info-label">CONTRACT END DATE</div><div class="info-value-wrap" data-field="contractEndDate"><span class="info-value-text">${escapeHtml(contractEndDate) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
+            <div class="info-row"><div class="info-label">CONTRACT END DATE</div><div class="info-value-wrap" data-field="contractEndDate"><span class="info-value-text">${escapeHtml(contractEndDateFormatted) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
           </div>
         </div>
 
@@ -593,6 +619,16 @@
     const backBtn = document.getElementById('back-to-accounts');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
+        // Check if we came from health widget (call scripts page)
+        const healthReturnPage = sessionStorage.getItem('health-widget-return-page');
+        if (healthReturnPage) {
+          sessionStorage.removeItem('health-widget-return-page');
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage(healthReturnPage.replace('-page', ''));
+          }
+          return;
+        }
+        
         // Special case: if we arrived here from Contact Detail's company link,
         // return back to that contact detail view.
         if (window._contactNavigationSource === 'contact-detail' && window._contactNavigationContactId) {
@@ -1094,7 +1130,7 @@
       ? `<textarea class="textarea-dark info-edit-textarea" rows="4">${escapeHtml(currentText === '--' ? '' : currentText)}</textarea>`
     : (field === 'contractEndDate' 
       ? `<input type="date" class="info-edit-input" value="${escapeHtml(toISODate(currentText))}">`
-      : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText)}">`);
+      : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText === '--' ? '' : currentText)}">`);
     const inputHtml = `
       ${inputControl}
       <div class="info-actions">
@@ -1169,11 +1205,15 @@
 
   // Commit the edit to Firestore and update UI
   async function commitEdit(wrap, field, value) {
+    console.log('[Account Detail] commitEdit called:', { field, value, type: typeof value });
     // Convert contractEndDate to ISO for storage, display as MM/DD/YYYY via updateFieldText
     let toSave = value;
     if (field === 'contractEndDate') {
+      console.log('[Account Detail] Processing contractEndDate:', { original: value });
       toSave = toMDY(value);
+      console.log('[Account Detail] Converted to MDY:', { converted: toSave });
     }
+    console.log('[Account Detail] Saving to Firebase:', { field, toSave });
     await saveField(field, toSave);
     updateFieldText(wrap, toSave);
     // Notify widgets/pages to refresh energy fields
@@ -1257,9 +1297,72 @@
     wrap.appendChild(actions);
   }
   
+  // Listen for energy updates from Health Widget to update Energy & Contract section
+  function setupEnergyUpdateListener() {
+    const onEnergyUpdated = (e) => {
+      try {
+        const d = e.detail || {};
+        console.log('[Account Detail] Received energy update event:', d, 'Current account ID:', state.currentAccount?.id);
+        // Only update if this is for the current account
+        if (d.entity === 'account' && d.id === state.currentAccount?.id) {
+          const field = d.field;
+          const value = d.value;
+          
+          // Update the Energy & Contract section display
+          const energyGrid = document.getElementById('account-energy-grid');
+          if (energyGrid) {
+            const fieldWrap = energyGrid.querySelector(`.info-value-wrap[data-field="${field}"]`);
+            if (fieldWrap) {
+              // Check if field is in editing mode
+              const isEditing = fieldWrap.classList.contains('editing');
+              
+              if (isEditing) {
+                // Update the input field value when in editing mode
+                const inputEl = fieldWrap.querySelector('.info-edit-input');
+                if (inputEl) {
+                  let inputValue = value || '';
+                  if (field === 'contractEndDate' && value) {
+                    // Convert MM/DD/YYYY to YYYY-MM-DD for date input
+                    const d = parseDateFlexible(value);
+                    if (d) {
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      inputValue = `${yyyy}-${mm}-${dd}`;
+                    }
+                  }
+                  inputEl.value = inputValue;
+                }
+              } else {
+                // Update the text element when not in editing mode
+                const textEl = fieldWrap.querySelector('.info-value .info-value-text') || fieldWrap.querySelector('.info-value-text');
+                if (textEl) {
+                  // Format the value for display
+                  let displayValue = value || '--';
+                  if (field === 'contractEndDate' && value) {
+                    displayValue = toMDY(value);
+                  }
+                  textEl.textContent = displayValue;
+                }
+              }
+            }
+          }
+        }
+      } catch(_) {}
+    };
+    
+    document.addEventListener('pc:energy-updated', onEnergyUpdated);
+    
+    // Return cleanup function
+    return () => {
+      document.removeEventListener('pc:energy-updated', onEnergyUpdated);
+    };
+  }
+
   // Export API
   window.AccountDetail = {
-    show: showAccountDetail
+    show: showAccountDetail,
+    setupEnergyUpdateListener: setupEnergyUpdateListener
   };
   // Backward-compat global alias used by some modules
   try { window.showAccountDetail = showAccountDetail; } catch (_) {}

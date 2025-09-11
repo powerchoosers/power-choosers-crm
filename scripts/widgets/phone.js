@@ -121,8 +121,30 @@
           channelCount: 1
         });
         
-        // Set default input device
-        state.device.audio.setInputDevice('default');
+        // Set input device - use first available if 'default' doesn't exist
+        try {
+          const inputDevices = state.device.audio.availableInputDevices;
+          let inputDeviceId = 'default';
+          
+          if (inputDevices && inputDevices.size > 0) {
+            const deviceIds = Array.from(inputDevices.keys());
+            console.debug('[TwilioRTC] Available input devices during init:', deviceIds);
+            
+            if (!deviceIds.includes('default') && deviceIds.length > 0) {
+              inputDeviceId = deviceIds[0];
+              console.debug('[TwilioRTC] Using first available input device:', inputDeviceId);
+            }
+          }
+          
+          await state.device.audio.setInputDevice(inputDeviceId);
+          console.debug('[TwilioRTC] Input device set to:', inputDeviceId);
+        } catch (e) {
+          console.warn('[TwilioRTC] Failed to set input device:', e);
+          // Try without any specific device
+          try {
+            await state.device.audio.unsetInputDevice();
+          } catch (_) {}
+        }
 
         // Set up device event handlers
         state.device.on('registered', () => {
@@ -204,9 +226,19 @@
 
           // Set input/output devices before accepting the call
           if (state.device.audio) {
+            // Use a more conservative approach for input device selection
             try {
-              // Use a more conservative approach for input device selection
-              await state.device.audio.setInputDevice('default');
+              const inputDevices = state.device.audio.availableInputDevices;
+              let inputDeviceId = 'default';
+              
+              if (inputDevices && inputDevices.size > 0) {
+                const deviceIds = Array.from(inputDevices.keys());
+                if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                  inputDeviceId = deviceIds[0];
+                }
+              }
+              
+              await state.device.audio.setInputDevice(inputDeviceId);
             } catch (e) {
               console.warn('[TwilioRTC] Failed to set input device for incoming call:', e);
               // Try without any specific device if default fails
@@ -350,7 +382,10 @@
                     let inputDeviceId = 'default';
                     if (inputDevices && inputDevices.size > 0) {
                       const deviceIds = Array.from(inputDevices.keys());
-                      if (!deviceIds.includes('default') && deviceIds.length > 0) inputDeviceId = deviceIds[0];
+                      if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                        inputDeviceId = deviceIds[0];
+                        console.debug('[TwilioRTC] Using first available input device for call:', inputDeviceId);
+                      }
                     }
                     await state.device.audio.setInputDevice(inputDeviceId);
                   } catch(_) {}
@@ -1428,8 +1463,15 @@
               }
             }
             
-            await device.audio.setInputDevice(inputDeviceId);
-            console.log('[Phone] Input device set to:', inputDeviceId);
+            try {
+              await device.audio.setInputDevice(inputDeviceId);
+              console.log('[Phone] Input device set to:', inputDeviceId);
+            } catch (e) {
+              console.warn('[Phone] Failed to set input device, trying without specific device:', e);
+              try {
+                await device.audio.unsetInputDevice();
+              } catch (_) {}
+            }
           } catch (e) {
             console.warn('[Phone] Failed to set input device:', e);
             // Continue without setting input device - Twilio will use browser default
@@ -1446,17 +1488,20 @@
                 const deviceIds = Array.from(outputDevices.keys());
                 console.log('[Phone] Available output devices:', deviceIds);
                 
-                // Try 'default' first, fallback to first available device
                 if (!deviceIds.includes('default') && deviceIds.length > 0) {
                   outputDeviceId = deviceIds[0];
                   console.log('[Phone] Using first available output device:', outputDeviceId);
                 }
               }
               
-              device.audio.speakerDevices.set(outputDeviceId);
-              console.log('[Phone] Output device set to:', outputDeviceId);
+              try {
+                device.audio.speakerDevices.set(outputDeviceId);
+                console.log('[Phone] Output device set to:', outputDeviceId);
+              } catch (e) {
+                console.warn('[Phone] Failed to set output device, using browser default:', e);
+              }
             } catch (e) {
-              console.warn('[Phone] Failed to set output device:', e);
+              console.warn('[Phone] Failed to access output devices:', e);
               // Continue without setting output device - Twilio will use browser default
             }
           }

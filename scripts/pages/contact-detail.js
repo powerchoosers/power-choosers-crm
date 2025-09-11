@@ -40,10 +40,19 @@
 
   // Save an Account field from the contact detail energy section
   async function saveAccountField(field, value) {
+    console.log('[Contact Detail] saveAccountField called:', { field, value });
     const db = window.firebaseDB;
     const accountId = state._linkedAccountId;
-    if (!accountId) return;
+    console.log('[Contact Detail] Linked account ID:', accountId);
+    
+    if (!accountId) {
+      console.log('[Contact Detail] No linked account ID found');
+      return;
+    }
+    
     const payload = { [field]: value, updatedAt: Date.now() };
+    console.log('[Contact Detail] Payload to save:', payload);
+    
     // Update local cache if we have it
     try {
       if (typeof window.getAccountsData === 'function') {
@@ -51,15 +60,35 @@
         const idx = accounts.findIndex(a => a.id === accountId);
         if (idx !== -1) {
           try { accounts[idx][field] = value; } catch(_) {}
+          console.log('[Contact Detail] Updated local cache for account:', accountId);
         }
       }
     } catch(_) {}
-    if (!db) { try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } })); } catch(_) {} return; }
+    
+    if (!db) { 
+      console.log('[Contact Detail] No database, dispatching energy-updated event');
+      try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } })); } catch(_) {} 
+      return; 
+    }
+    
     try { 
+      console.log('[Contact Detail] Saving to Firestore:', { accountId, payload });
       await db.collection('accounts').doc(accountId).update(payload); 
+      console.log('[Contact Detail] Firestore save successful');
       window.crm?.showToast && window.crm.showToast('Saved');
-      try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } })); } catch(_) {}
-    } catch (e) { console.warn('Failed to save account field', field, e); window.crm?.showToast && window.crm.showToast('Save failed'); }
+      console.log('[Contact Detail] Dispatching energy-updated event:', { entity: 'account', id: accountId, field, value });
+      try { 
+        const event = new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } });
+        console.log('[Contact Detail] Event created, dispatching...');
+        document.dispatchEvent(event);
+        console.log('[Contact Detail] Event dispatched successfully');
+      } catch(e) { 
+        console.log('[Contact Detail] Error dispatching event:', e);
+      }
+    } catch (e) { 
+      console.warn('[Contact Detail] Failed to save account field', field, e); 
+      window.crm?.showToast && window.crm.showToast('Save failed'); 
+    }
   }
 
   function injectTaskPopoverStyles(){
@@ -541,6 +570,13 @@
     // Enable scrollable content area while in contact detail
     if (els.page) { els.page.classList.add('contact-detail-mode'); }
     renderContactDetail();
+    
+    // Setup energy update listener for real-time sync with Health Widget
+    try {
+      if (window.ContactDetail && window.ContactDetail.setupEnergyUpdateListener) {
+        window.ContactDetail.setupEnergyUpdateListener();
+      }
+    } catch (_) {}
   }
 
   function hideToolbar() {
@@ -654,6 +690,7 @@
     const annualUsage = linkedAccount?.annualUsage || linkedAccount?.annual_usage || '';
     let currentRate = linkedAccount?.currentRate || linkedAccount?.current_rate || '';
     const contractEndDate = linkedAccount?.contractEndDate || linkedAccount?.contract_end_date || '';
+    const contractEndDateFormatted = contractEndDate ? toMDY(contractEndDate) : '';
     // Normalize currentRate like .089 -> 0.089
     if (/^\.\d+$/.test(String(currentRate))) currentRate = '0' + currentRate;
     // Ensure header styles (divider, layout) are present
@@ -774,7 +811,7 @@
             <div class="info-row"><div class="info-label">ELECTRICITY SUPPLIER</div><div class="info-value"><div class="info-value-wrap" data-field="electricitySupplier"><span class="info-value-text">${escapeHtml(electricitySupplier) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
             <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value"><div class="info-value-wrap" data-field="annualUsage"><span class="info-value-text">${escapeHtml(annualUsage) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
             <div class="info-row"><div class="info-label">CURRENT RATE ($/kWh)</div><div class="info-value"><div class="info-value-wrap" data-field="currentRate"><span class="info-value-text">${escapeHtml(currentRate) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
-            <div class="info-row"><div class="info-label">CONTRACT END DATE</div><div class="info-value"><div class="info-value-wrap" data-field="contractEndDate"><span class="info-value-text">${escapeHtml(contractEndDate) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
+            <div class="info-row"><div class="info-label">CONTRACT END DATE</div><div class="info-value"><div class="info-value-wrap" data-field="contractEndDate"><span class="info-value-text">${escapeHtml(contractEndDateFormatted) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
           </div>
         </div>
         ` : ''}
@@ -1010,6 +1047,16 @@
     const backBtn = document.getElementById('back-to-people');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
+        // Check if we came from health widget (call scripts page)
+        const healthReturnPage = sessionStorage.getItem('health-widget-return-page');
+        if (healthReturnPage) {
+          sessionStorage.removeItem('health-widget-return-page');
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage(healthReturnPage.replace('-page', ''));
+          }
+          return;
+        }
+        
         // Check if we came from account details page
         if (window._contactNavigationSource === 'account-details' && window._contactNavigationAccountId) {
           console.log('Returning to account details page:', window._contactNavigationAccountId);
@@ -1220,6 +1267,41 @@
       header._nameBound = '1';
     }
 
+    // Inline edit/copy/delete for Energy & Contract fields (Account fields shown on Contact Detail)
+    const energyGrid = document.querySelector('#contact-energy-grid');
+    if (energyGrid && !energyGrid._bound) {
+      energyGrid.addEventListener('click', async (e) => {
+        const wrap = e.target.closest?.('.info-value-wrap');
+        if (!wrap) return;
+        const field = wrap.getAttribute('data-field');
+        if (!field) return;
+
+        // Edit button: switch to input
+        const editBtn = e.target.closest('.info-edit');
+        if (editBtn) {
+          e.preventDefault();
+          beginEditAccountField(wrap, field);
+          return;
+        }
+        // Copy button
+        const copyBtn = e.target.closest('.info-copy');
+        if (copyBtn) {
+          const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
+          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          return;
+        }
+        // Delete button
+        const deleteBtn = e.target.closest('.info-delete');
+        if (deleteBtn) {
+          e.preventDefault();
+          await commitEditAccountField(wrap, field, '');
+          return;
+        }
+      });
+      energyGrid._bound = '1';
+    }
+
     // Inline edit/copy/delete for Contact Information
     const infoGrid = document.querySelector('#contact-detail-view .info-grid');
     if (infoGrid && !infoGrid._bound) {
@@ -1261,34 +1343,6 @@
       infoGrid._bound = '1';
     }
 
-    // Energy & Contract grid (edits save to Accounts collection)
-    const energyGrid = document.getElementById('contact-energy-grid');
-    if (energyGrid && !energyGrid._bound) {
-      energyGrid.addEventListener('click', async (e) => {
-        const wrap = e.target.closest?.('.info-value-wrap');
-        if (!wrap) return;
-        const field = wrap.getAttribute('data-field');
-        if (!field) return;
-
-        const editBtn = e.target.closest('.info-edit');
-        if (editBtn) { e.preventDefault(); beginEditAccountField(wrap, field); return; }
-        const copyBtn = e.target.closest('.info-copy');
-        if (copyBtn) {
-          const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
-          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
-          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
-          return;
-        }
-        const delBtn = e.target.closest('.info-delete');
-        if (delBtn) {
-          e.preventDefault();
-          await saveAccountField(field, '');
-          updateFieldText(wrap, '');
-          return;
-        }
-      });
-      energyGrid._bound = '1';
-    }
   }
 
   function beginEditField(wrap, field) {
@@ -1347,11 +1401,22 @@
     // Local date helpers
     const parseDateFlexible = (s) => {
       if (!s) return null; const str=String(s).trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) { const d=new Date(str); return isNaN(d.getTime())?null:d; }
-      const m = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/); if (m){ const d=new Date(parseInt(m[3],10), parseInt(m[1],10)-1, parseInt(m[2],10)); return isNaN(d.getTime())?null:d; }
-      const d=new Date(str); return isNaN(d.getTime())?null:d;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) { 
+        // For ISO dates, parse components to avoid timezone issues
+        const parts = str.split('-');
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const m = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/); 
+      if (m){ 
+        // Parse MM/DD/YYYY format directly to avoid timezone issues
+        const d = new Date(parseInt(m[3],10), parseInt(m[1],10)-1, parseInt(m[2],10)); 
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const d = new Date(str); return isNaN(d.getTime()) ? null : d;
     };
     const toISODate = (v) => { const d=parseDateFlexible(v); if(!d) return ''; const yyyy=d.getFullYear(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; };
+    const toMDY = (v) => { const d=parseDateFlexible(v); if(!d) return v?String(v):''; const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); const yyyy=d.getFullYear(); return `${mm}/${dd}/${yyyy}`; };
     const formatDateInputAsMDY = (raw) => { const digits=String(raw||'').replace(/[^0-9]/g,'').slice(0,8); let out=''; if(digits.length>=1) out=digits.slice(0,2); if(digits.length>=3) out=digits.slice(0,2)+'/'+digits.slice(2,4); if(digits.length>=5) out=digits.slice(0,2)+'/'+digits.slice(2,4)+'/'+digits.slice(4,8); return out; };
 
     input = document.createElement('input');
@@ -1394,6 +1459,10 @@
       if (field === 'currentRate') {
         val = String(val || '').trim();
         if (/^\.\d+$/.test(val)) val = '0' + val;
+      }
+      // Convert contractEndDate to MM/DD/YYYY format for storage consistency
+      if (field === 'contractEndDate') {
+        val = toMDY(val);
       }
       await saveAccountField(field, val);
       updateFieldText(wrap, val || '');
@@ -1564,6 +1633,20 @@
       outVal = normalizePhone(value);
     }
     await saveField(field, outVal);
+    updateFieldText(wrap, outVal);
+  }
+
+  // Commit edit for Account fields (Energy & Contract) shown on Contact Detail
+  async function commitEditAccountField(wrap, field, value) {
+    console.log('[Contact Detail] commitEditAccountField called:', { field, value, type: typeof value });
+    let outVal = value;
+    if (field === 'contractEndDate') {
+      console.log('[Contact Detail] Processing contractEndDate:', { original: value });
+      outVal = toMDY(value);
+      console.log('[Contact Detail] Converted to MDY:', { converted: outVal });
+    }
+    console.log('[Contact Detail] Saving to Firebase:', { field, outVal });
+    await saveAccountField(field, outVal);
     updateFieldText(wrap, outVal);
   }
   function cancelEdit(wrap, field, prev) {
@@ -2948,9 +3031,115 @@ async function createContactSequenceThenAdd(name) {
       .replace(/'/g, '&#039;');
   }
 
+  // Listen for energy updates from Health Widget to update Energy & Contract section
+  function setupEnergyUpdateListener() {
+    const onEnergyUpdated = (e) => {
+      try {
+        const d = e.detail || {};
+        // Only update if this is for the current contact's linked account
+        if (d.entity === 'account' && d.id === state._linkedAccountId) {
+          const field = d.field;
+          const value = d.value;
+          
+          // Update the Energy & Contract section display
+          const energyGrid = document.getElementById('contact-energy-grid');
+          if (energyGrid) {
+            const fieldWrap = energyGrid.querySelector(`.info-value-wrap[data-field="${field}"]`);
+            if (fieldWrap) {
+              // Check if field is in editing mode
+              const isEditing = fieldWrap.classList.contains('editing');
+              
+              if (isEditing) {
+                // Update the input field value when in editing mode
+                const inputEl = fieldWrap.querySelector('.info-edit-input');
+                if (inputEl) {
+                  let inputValue = value || '';
+                  if (field === 'contractEndDate' && value) {
+                    // Convert MM/DD/YYYY to YYYY-MM-DD for date input
+                    const d = parseDateFlexible(value);
+                    if (d) {
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      inputValue = `${yyyy}-${mm}-${dd}`;
+                    }
+                  }
+                  inputEl.value = inputValue;
+                }
+              } else {
+                // Update the text element when not in editing mode
+                const textEl = fieldWrap.querySelector('.info-value .info-value-text') || fieldWrap.querySelector('.info-value-text');
+                if (textEl) {
+                  // Format the value for display
+                  let displayValue = value || '--';
+                  if (field === 'contractEndDate' && value) {
+                    displayValue = toMDY(value);
+                  }
+                  textEl.textContent = displayValue;
+                }
+              }
+            }
+          }
+        }
+      } catch(_) {}
+    };
+    
+    document.addEventListener('pc:energy-updated', onEnergyUpdated);
+    
+    // Return cleanup function
+    return () => {
+      document.removeEventListener('pc:energy-updated', onEnergyUpdated);
+    };
+  }
+
+  // Add toMDY function for date formatting
+  function toMDY(v) {
+    console.log('[Contact Detail] toMDY called with:', v);
+    const d = parseDateFlexible(v);
+    if (!d) return v ? String(v) : '';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const result = `${mm}/${dd}/${yyyy}`;
+    console.log('[Contact Detail] toMDY result:', result);
+    return result;
+  }
+
+  // Add toISODate function for date input formatting
+  function toISODate(v) {
+    const d = parseDateFlexible(v);
+    if (!d) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // Add parseDateFlexible function for date parsing
+  function parseDateFlexible(s) {
+    if (!s) return null;
+    const str = String(s).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      // For ISO dates, parse components to avoid timezone issues
+      const parts = str.split('-');
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const m = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+    if (m) {
+      // Parse MM/DD/YYYY format directly to avoid timezone issues
+      const d = new Date(parseInt(m[3], 10), parseInt(m[1], 10) - 1, parseInt(m[2], 10));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    // Fallback Date parse - use local timezone to avoid offset issues
+    const d = new Date(str + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   // Export functions for use by people.js
   window.ContactDetail = {
-    show: showContactDetail
+    show: showContactDetail,
+    setupEnergyUpdateListener: setupEnergyUpdateListener
   };
 
 })();

@@ -10,6 +10,16 @@
   const MAX_LOADING_MS = 2000; // hard cap: show partial results within 2s
   // Cache last search results for quick lookups (e.g., direct navigation)
   let lastResults = null;
+  
+  // In-memory cache for search data
+  let searchCache = {
+    people: null,
+    accounts: null,
+    sequences: null,
+    deals: null,
+    lastUpdated: 0,
+    cacheTimeout: 5 * 60 * 1000 // 5 minutes
+  };
 
   const elements = {
     searchInput: null,
@@ -100,6 +110,7 @@
 
   function handleSearchInput(e) {
     const query = e.target.value.trim();
+    console.log('[Global Search] Input event triggered, query:', query);
 
     // Clear existing timeout
     if (searchTimeout) {
@@ -123,6 +134,7 @@
 
     // Debounce search
     searchTimeout = setTimeout(() => {
+      console.log('[Global Search] Performing search for:', query);
       performSearch(query);
     }, SEARCH_DELAY);
   }
@@ -146,6 +158,10 @@
     elements.searchResults.innerHTML = '';
     if (elements.searchEmpty) elements.searchEmpty.hidden = false;
     if (elements.searchModal) elements.searchModal.classList.remove('is-loading');
+    
+    // Add class to center the empty state
+    const container = document.querySelector('.search-results-container');
+    if (container) container.classList.add('showing-empty');
   }
 
   function showResults(results) {
@@ -174,6 +190,10 @@
       elements.searchResults.innerHTML = renderResults(results);
       bindResultActions();
       if (elements.searchModal) elements.searchModal.classList.remove('is-loading');
+      
+      // Remove class to restore normal scrolling
+      const container = document.querySelector('.search-results-container');
+      if (container) container.classList.remove('showing-empty');
     };
 
     const elapsed = Date.now() - loadingStartAt;
@@ -189,33 +209,62 @@
   }
 
   async function performSearch(query) {
+    console.log('[Global Search] performSearch called with:', query);
     try {
-      console.log('Performing search for:', query);
       const results = await searchAllData(query);
-      console.log('Search results:', results);
-      showResults(results);
+      console.log('[Global Search] Search results:', results);
+      
+      if (Object.keys(results).length === 0) {
+        console.log('[Global Search] No results found, showing empty state');
+        showEmptyState();
+      } else {
+        console.log('[Global Search] Results found, showing results');
+        showResults(results);
+      }
     } catch (error) {
-      console.error('Search error:', error);
-      elements.searchEmpty.hidden = false;
-      elements.searchLoading.hidden = true;
+      console.error('[Global Search] Search error:', error);
+      showEmptyState();
+    } finally {
+      if (elements.searchLoading) {
+        elements.searchLoading.hidden = true;
+      }
     }
+  }
+
+  // Cache management functions
+  function isCacheValid() {
+    return searchCache.lastUpdated > 0 && 
+           (Date.now() - searchCache.lastUpdated) < searchCache.cacheTimeout;
+  }
+  
+  function updateCache(people, accounts, sequences, deals) {
+    // Store raw data for caching, not processed results
+    searchCache.people = people;
+    searchCache.accounts = accounts;
+    searchCache.sequences = sequences;
+    searchCache.deals = deals;
+    searchCache.lastUpdated = Date.now();
+  }
+
+  // Helper function to assemble search results
+  function assemble(peep = [], acct = [], seq = [], deal = []) {
+    const out = {};
+    if (Array.isArray(peep) && peep.length) out.people = peep;
+    if (Array.isArray(acct) && acct.length) out.accounts = acct;
+    if (Array.isArray(seq) && seq.length) out.sequences = seq;
+    if (Array.isArray(deal) && deal.length) out.deals = deal;
+    return out;
   }
 
   async function searchAllData(query) {
     const normalizedQuery = query.toLowerCase();
+    console.log('[Global Search] searchAllData called with normalized query:', normalizedQuery);
+    
+    // Fetch fresh data from Firebase
     const pPeople = searchPeople(normalizedQuery);
     const pAccounts = searchAccounts(normalizedQuery);
     const pSequences = searchSequences(normalizedQuery);
     const pDeals = searchDeals(normalizedQuery);
-
-    const assemble = (peep = [], acct = [], seq = [], deal = []) => {
-      const out = {};
-      if (Array.isArray(peep) && peep.length) out.people = peep;
-      if (Array.isArray(acct) && acct.length) out.accounts = acct;
-      if (Array.isArray(seq) && seq.length) out.sequences = seq;
-      if (Array.isArray(deal) && deal.length) out.deals = deal;
-      return out;
-    };
 
     return new Promise((resolve) => {
       let done = false;
@@ -228,7 +277,11 @@
 
       Promise.all([pPeople, pAccounts, pSequences, pDeals])
         .then(([a, b, c, d]) => {
-          if (!done) { clearTimeout(capTimer); done = true; resolve(assemble(a, b, c, d)); }
+          if (!done) { 
+            clearTimeout(capTimer); 
+            done = true; 
+            resolve(assemble(a, b, c, d)); 
+          }
         })
         .catch(async () => {
           const settled = await Promise.allSettled([pPeople, pAccounts, pSequences, pDeals]);
@@ -238,17 +291,175 @@
     });
   }
 
+  // Cache-based search functions (much faster)
+  function searchPeopleFromCache(query) {
+    if (!searchCache.people) return Promise.resolve([]);
+    
+    const results = [];
+    searchCache.people.forEach(person => {
+      const nameFields = [
+        person.firstName || '',
+        person.lastName || '',
+        person.fullName || '',
+        person.name || ''
+      ];
+      const titleFields = [person.title || '', person.jobTitle || ''];
+      const companyFields = [person.company || '', person.companyName || ''];
+      const extraFields = [person.email || '', person.city || '', person.state || ''];
+      const allFields = [...nameFields, ...titleFields, ...companyFields, ...extraFields];
+      const searchableText = allFields.join(' ').toLowerCase();
+
+      let match = false;
+      if (searchableText.includes(query)) {
+        match = true;
+      } else if (person.fullName) {
+        const parts = person.fullName.toLowerCase().split(' ');
+        if (parts.some(p => p && query.includes(p))) {
+          match = true;
+        }
+      }
+      
+      if (match) {
+        results.push({
+          id: person.id,
+          type: 'person',
+          title: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unnamed Contact',
+          subtitle: [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • '),
+          data: person
+        });
+      }
+    });
+    
+    return Promise.resolve(results.slice(0, 5));
+  }
+
+  function searchAccountsFromCache(query) {
+    if (!searchCache.accounts) return Promise.resolve([]);
+    
+    const results = [];
+    searchCache.accounts.forEach(account => {
+      const isYearSearch = /^\d{4}$/.test(query);
+      const isUsageSearch = /^\d+(?:,\d{3})*(?:\.\d+)?$/.test(query);
+      
+      let matches = false;
+
+      if (isYearSearch) {
+        const contractEnd = account.contractEndDate || account.contractEnd || account.contract_end_date;
+        if (contractEnd) {
+          const endYear = new Date(contractEnd.toDate ? contractEnd.toDate() : contractEnd).getFullYear();
+          matches = endYear.toString() === query;
+        }
+      } else if (isUsageSearch) {
+        const queryNum = parseFloat(query.replace(/,/g, ''));
+        const usage = account.annualKilowattUsage || account.annualUsage || account.kilowattUsage;
+        if (usage && typeof usage === 'number') {
+          matches = usage >= queryNum;
+        }
+      } else {
+        const searchableText = [
+          account.accountName || '',
+          account.name || '',
+          account.companyName || '',
+          account.industry || '',
+          account.domain || '',
+          account.website || '',
+          account.supplier || '',
+          account.city || '',
+          account.state || ''
+        ].join(' ').toLowerCase();
+        matches = searchableText.includes(query);
+      }
+
+      if (matches) {
+        let subtitle = '';
+        if (isYearSearch) {
+          subtitle = `Contract expires ${query}`;
+        } else if (isUsageSearch) {
+          const usage = account.annualKilowattUsage || account.annualUsage || account.kilowattUsage;
+          subtitle = `${usage?.toLocaleString() || 'Unknown'} kWh annually`;
+        } else {
+          subtitle = [account.industry, account.city, account.state].filter(Boolean).join(' • ');
+        }
+
+        results.push({
+          id: account.id,
+          type: 'account',
+          title: account.accountName || account.name || account.companyName || 'Unnamed Account',
+          subtitle,
+          data: account
+        });
+      }
+    });
+    
+    return Promise.resolve(results.slice(0, 5));
+  }
+
+  function searchSequencesFromCache(query) {
+    if (!searchCache.sequences) return Promise.resolve([]);
+    
+    const results = [];
+    searchCache.sequences.forEach(sequence => {
+      const searchableText = [
+        sequence.name || '',
+        sequence.title || '',
+        sequence.createdBy || '',
+        sequence.description || ''
+      ].join(' ').toLowerCase();
+
+      if (searchableText.includes(query)) {
+        results.push({
+          id: sequence.id,
+          type: 'sequence',
+          title: sequence.name || sequence.title || 'Unnamed Sequence',
+          subtitle: sequence.description || `Created by ${sequence.createdBy || 'Unknown'}`,
+          data: sequence
+        });
+      }
+    });
+    
+    return Promise.resolve(results.slice(0, 5));
+  }
+
+  function searchDealsFromCache(query) {
+    if (!searchCache.deals) return Promise.resolve([]);
+    
+    const results = [];
+    searchCache.deals.forEach(deal => {
+      const searchableText = [
+        deal.name || '',
+        deal.title || '',
+        deal.accountName || '',
+        deal.contactName || '',
+        deal.stage || '',
+        deal.description || ''
+      ].join(' ').toLowerCase();
+
+      if (searchableText.includes(query)) {
+        results.push({
+          id: deal.id,
+          type: 'deal',
+          title: deal.name || deal.title || 'Unnamed Deal',
+          subtitle: `${deal.stage || 'No Stage'} • ${deal.accountName || 'No Account'}`,
+          data: deal
+        });
+      }
+    });
+    
+    return Promise.resolve(results.slice(0, 5));
+  }
+
   async function searchPeople(query) {
+    console.log('[Global Search] searchPeople called with query:', query);
     if (!window.firebaseDB) {
-      console.log('Firebase DB not available');
+      console.log('[Global Search] Firebase DB not available');
       return [];
     }
 
     try {
-      console.log('Searching people with query:', query);
+      console.log('[Global Search] Fetching contacts from Firebase...');
       const snapshot = await window.firebaseDB.collection('contacts').get();
       const results = [];
-      console.log('People collection size:', snapshot.size);
+      console.log('[Global Search] Contacts snapshot size:', snapshot.size);
 
       snapshot.forEach(doc => {
         const person = { id: doc.id, ...doc.data() };
@@ -265,23 +476,14 @@
         const allFields = [...nameFields, ...titleFields, ...companyFields, ...extraFields];
         const searchableText = allFields.join(' ').toLowerCase();
 
-        // Debug logging for each person
-        console.log('[SEARCH DEBUG] Query:', query, '| Person:', person);
-        console.log('[SEARCH DEBUG] Searchable text:', searchableText);
-        if (person.fullName) {
-          console.log('[SEARCH DEBUG] fullName split:', person.fullName.toLowerCase().split(' '));
-        }
-
         // Also allow searching by fullName split into first/last
         let match = false;
         if (searchableText.includes(query)) {
           match = true;
-          console.log('[SEARCH DEBUG] Direct match found.');
         } else if (person.fullName) {
           const parts = person.fullName.toLowerCase().split(' ');
           if (parts.some(p => p && query.includes(p))) {
             match = true;
-            console.log('[SEARCH DEBUG] Partial name part match found.');
           }
         }
         if (match) {
@@ -295,7 +497,6 @@
         }
       });
 
-      console.log('People search results:', results);
       return results.slice(0, 5); // Limit results
     } catch (error) {
       console.error('Error searching people:', error);
@@ -310,14 +511,11 @@
     }
 
     try {
-      console.log('Searching accounts with query:', query);
       const snapshot = await window.firebaseDB.collection('accounts').get();
       const results = [];
-      console.log('Accounts collection size:', snapshot.size);
 
       snapshot.forEach(doc => {
         const account = { id: doc.id, ...doc.data() };
-        console.log('Account data:', account);
         
         // Handle special search cases
         const isYearSearch = /^\d{4}$/.test(query);
@@ -353,12 +551,10 @@
             account.state || ''
           ].join(' ').toLowerCase();
 
-          console.log('Account searchable text:', searchableText);
           matches = searchableText.includes(query);
         }
 
         if (matches) {
-          console.log('Match found for account:', account);
           let subtitle = '';
           if (isYearSearch) {
             subtitle = `Contract expires ${query}`;
@@ -379,7 +575,6 @@
         }
       });
 
-      console.log('Accounts search results:', results);
       return results.slice(0, 5);
     } catch (error) {
       console.error('Error searching accounts:', error);

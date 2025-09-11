@@ -4090,6 +4090,8 @@ html, body {
   box-shadow: var(--elevation-card);
   padding: 6px;
   z-index: 30;
+  max-height: 200px; /* Limit height to show ~5 suggestions */
+  overflow-y: auto; /* Enable scrolling for more suggestions */
 }
 #call-scripts-page .search-suggestions[hidden] { display: none; }
 #call-scripts-page .search-suggestions .suggestion-empty {
@@ -5289,6 +5291,14 @@ html, body {
     padding-right: 0;
 }
 
+/* When showing empty state, disable scrolling and center content */
+.search-results-container.showing-empty {
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .search-loading {
     display: flex;
     align-items: center;
@@ -5659,6 +5669,55 @@ html, body {
     color: var(--text-secondary);
     margin: 4px 0 16px 0; /* minimal gap between title and subtitle */
     line-height: 1.5;
+}
+
+/* Entity Info Display */
+.health-entity-info {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.health-entity-info:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.health-entity-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+    transition: color 0.2s ease;
+}
+
+.health-entity-info:hover .health-entity-name {
+    color: var(--accent-color);
+}
+
+.health-entity-type {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+}
+
+.health-entity-info:hover .health-entity-type {
+    background: var(--accent-color);
+    color: white;
+    letter-spacing: 0.5px;
 }
 
 /* Section Pills with Enhanced Styling */
