@@ -4151,6 +4151,198 @@ html, body {
   color: var(--text-secondary);
 }
 
+/* === Live Call Insights Widget === */
+.live-call-insights-widget {
+  background: var(--bg-item);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-base);
+  margin-bottom: var(--spacing-base);
+}
+
+.live-insights-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.live-insights-header h3 {
+  margin: 0;
+  color: var(--text-inverse);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--grey-600);
+}
+
+.status-indicator.status-active {
+  background: #10b981; /* Green for active */
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.sentiment-positive {
+  background: #10b981; /* Green */
+}
+
+.status-indicator.sentiment-negative {
+  background: #ef4444; /* Red */
+}
+
+.status-indicator.sentiment-neutral {
+  background: #f59e0b; /* Yellow */
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.status-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.live-insights-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.live-transcript-section,
+.live-tips-section {
+  flex: 1;
+}
+
+.live-transcript-section h4,
+.live-tips-section h4 {
+  margin: 0 0 var(--spacing-xs) 0;
+  color: var(--text-inverse);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.transcript-container,
+.tips-container {
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-sm);
+  min-height: 120px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.transcript-placeholder,
+.tips-placeholder,
+.transcript-loading,
+.tips-loading {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: var(--spacing-sm);
+}
+
+.transcript-content {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.transcript-line {
+  margin-bottom: var(--spacing-xs);
+  padding: 2px 0;
+}
+
+.transcript-line.agent {
+  color: var(--text-inverse);
+}
+
+.transcript-line.customer {
+  color: var(--text-secondary);
+}
+
+.transcript-line .speaker {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.tip-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+  border-radius: var(--border-radius);
+  border-left: 3px solid;
+}
+
+.tip-item.tip-info {
+  background: rgba(59, 130, 246, 0.1);
+  border-left-color: #3b82f6;
+}
+
+.tip-item.tip-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-left-color: #f59e0b;
+}
+
+.tip-item.tip-success {
+  background: rgba(16, 185, 129, 0.1);
+  border-left-color: #10b981;
+}
+
+.tip-item.tip-opportunity {
+  background: rgba(139, 92, 246, 0.1);
+  border-left-color: #8b5cf6;
+}
+
+.tip-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.tip-content {
+  flex: 1;
+}
+
+.tip-message {
+  color: var(--text-inverse);
+  font-size: 0.85rem;
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+
+.tip-priority {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.tip-priority-high {
+  color: #ef4444;
+}
+
+.tip-priority-medium {
+  color: #f59e0b;
+}
+
+.tip-priority-low {
+  color: var(--text-muted);
+}
+
 /* === Call Scripts: Layout without inner card === */
 #call-scripts-page .page-container {
   display: flex;
