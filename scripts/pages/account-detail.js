@@ -1280,6 +1280,30 @@
     }
   }
 
+  // Normalize phone number to E.164 format
+  function normalizePhone(input) {
+    const raw = (input || '').toString().trim();
+    if (!raw) return '';
+    // If already in +<digits> form, keep plus and digits only
+    if (/^\+/.test(raw)) {
+      const cleaned = '+' + raw.replace(/[^\d]/g, '');
+      return cleaned;
+    }
+    const digits = raw.replace(/[^\d]/g, '');
+    if (!digits) return '';
+    // US default. If 11 and starts with 1, or exactly 10, format as +1XXXXXXXXXX
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return '+' + digits;
+    }
+    if (digits.length === 10) {
+      return '+1' + digits;
+    }
+    // If looks like international without + (e.g., 4479...), we can't infer reliably; return as-is digits
+    // Prepend + if at least 8 digits (heuristic) to help API; otherwise return original raw
+    if (digits.length >= 8) return '+' + digits;
+    return raw; // too short; leave as typed
+  }
+
   // Commit the edit to Firestore and update UI
   async function commitEdit(wrap, field, value) {
     console.log('[Account Detail] commitEdit called:', { field, value, type: typeof value });
@@ -1289,6 +1313,10 @@
       console.log('[Account Detail] Processing contractEndDate:', { original: value });
       toSave = toMDY(value);
       console.log('[Account Detail] Converted to MDY:', { converted: toSave });
+    }
+    // Normalize phone number for phone field
+    if (field === 'phone') {
+      toSave = normalizePhone(value);
     }
     console.log('[Account Detail] Saving to Firebase:', { field, toSave });
     await saveField(field, toSave);

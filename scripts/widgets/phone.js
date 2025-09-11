@@ -840,7 +840,7 @@
       .phone-contact .contact-text { display: flex; flex-direction: column; }
       .phone-contact .contact-name { font-weight: 700; color: var(--text-primary, #fff); }
       .phone-contact .contact-sub { color: var(--text-secondary, #b5b5b5); font-size: 12px; }
-      .phone-contact .company-favicon { width: 20px; height: 20px; border-radius: 4px; }
+      .phone-contact .company-favicon { width: 20px; height: 20px; border-radius: 50%; background: var(--bg-card, #383f46); padding: 2px; box-sizing: border-box; object-fit: cover; }
       .phone-contact .avatar-initials { width: 28px; height: 28px; border-radius: 50%; background: var(--primary-700, #ff6b35); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 12px; font-weight: 700; }
     `;
     document.head.appendChild(style);
@@ -1009,7 +1009,7 @@
     const favicon = makeFavicon(meta?.domain);
 
     el.innerHTML = `
-      <div class="call-avatar">${favicon ? `<img src="${favicon}" alt="" style="width:24px;height:24px;border-radius:4px;">` : '📞'}</div>
+      <div class="call-avatar">${favicon ? `<img src="${favicon}" alt="" style="width:24px;height:24px;border-radius:50%;background:var(--bg-card,#383f46);padding:3px;box-sizing:border-box;object-fit:cover;">` : '📞'}</div>
       <div class="call-meta">
         <div class="call-title">${nameLine}</div>
         <div class="call-sub">${[locLine, meta?.account && !meta?.name ? meta.account : ''].filter(Boolean).join(' • ')}</div>
