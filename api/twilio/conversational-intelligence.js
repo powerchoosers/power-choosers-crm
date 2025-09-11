@@ -133,6 +133,25 @@ export default async function handler(req, res) {
                 transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
                 console.log(`[Conversational Intelligence] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
                 console.log(`[Conversational Intelligence] Sample sentences:`, sentences.slice(0, 3).map(s => ({ text: s.text, confidence: s.confidence })));
+                
+                // FALLBACK: If Conversational Intelligence transcript is empty, try basic transcription
+                if (!transcriptText && recording) {
+                    console.log('[Conversational Intelligence] No transcript text found, trying basic transcription fallback...');
+                    try {
+                        const transcriptions = await client.transcriptions.list({ 
+                            recordingSid: recording.sid,
+                            limit: 1 
+                        });
+                        
+                        if (transcriptions.length > 0) {
+                            const basicTranscription = await client.transcriptions(transcriptions[0].sid).fetch();
+                            transcriptText = basicTranscription.transcriptionText || '';
+                            console.log(`[Conversational Intelligence] Basic transcription fallback: ${transcriptText.length} characters`);
+                        }
+                    } catch (fallbackError) {
+                        console.warn('[Conversational Intelligence] Basic transcription fallback failed:', fallbackError.message);
+                    }
+                }
             } catch (error) {
                 console.error('[Conversational Intelligence] Error fetching sentences:', error);
             }

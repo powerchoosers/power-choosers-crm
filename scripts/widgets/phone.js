@@ -1230,7 +1230,6 @@
         stream.getTracks().forEach(track => track.stop());
         TwilioRTC.state.micPermissionGranted = true;
         TwilioRTC.state.micPermissionChecked = true;
-        try { window.crm?.showToast && window.crm.showToast('Browser calls enabled'); } catch(_) {}
         return true;
       } catch (micError) {
         console.warn('[Phone] Microphone permission denied:', micError?.name, micError?.message);
