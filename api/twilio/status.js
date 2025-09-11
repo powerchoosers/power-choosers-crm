@@ -103,6 +103,19 @@ export default async function handler(req, res) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             }).catch(() => {});
+            
+            // Auto-trigger transcription for completed calls with recordings
+            if (CallStatus === 'completed' && RecordingUrl) {
+                console.log(`[Status] Auto-triggering transcription for completed call: ${CallSid}`);
+                // Trigger transcription in background (don't wait for response)
+                fetch(`${base}/api/process-call`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ callSid: CallSid })
+                }).catch(err => {
+                    console.warn(`[Status] Failed to trigger transcription for ${CallSid}:`, err?.message);
+                });
+            }
         } catch (e) {
             console.warn('[Status] Failed posting to /api/calls:', e?.message);
         }

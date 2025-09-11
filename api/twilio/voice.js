@@ -45,7 +45,15 @@ export default function handler(req, res) {
                 // Enable Twilio Voice Intelligence for real-time transcription and AI insights
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST'
+                recordingStatusCallbackMethod: 'POST',
+                // Enable Voice Intelligence for real-time insights
+                voiceIntelligence: true,
+                voiceIntelligenceInsights: {
+                    insights: 'summary,sentiment,topics,transcript',
+                    language: 'en-US',
+                    callback: `${base}/api/twilio/voice-intelligence`,
+                    callbackMethod: 'POST'
+                }
             });
             
             // Pass the original caller's number as a custom parameter
@@ -70,7 +78,15 @@ export default function handler(req, res) {
                 // Enable Twilio Voice Intelligence for real-time transcription and AI insights
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST'
+                recordingStatusCallbackMethod: 'POST',
+                // Enable Voice Intelligence for real-time insights
+                voiceIntelligence: true,
+                voiceIntelligenceInsights: {
+                    insights: 'summary,sentiment,topics,transcript',
+                    language: 'en-US',
+                    callback: `${base}/api/twilio/voice-intelligence`,
+                    callbackMethod: 'POST'
+                }
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -86,7 +102,15 @@ export default function handler(req, res) {
                 // Enable Twilio Voice Intelligence for real-time transcription and AI insights
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST'
+                recordingStatusCallbackMethod: 'POST',
+                // Enable Voice Intelligence for real-time insights
+                voiceIntelligence: true,
+                voiceIntelligenceInsights: {
+                    insights: 'summary,sentiment,topics,transcript',
+                    language: 'en-US',
+                    callback: `${base}/api/twilio/voice-intelligence`,
+                    callbackMethod: 'POST'
+                }
             });
             dial.client('agent');
         }
