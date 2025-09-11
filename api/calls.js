@@ -21,38 +21,95 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     if (req.method === 'GET') {
         // Return recent calls with AI insights (Firestore first, fallback to memory)
+        const callSidFilter = (req.query && (req.query.callSid || req.query.callsid)) || '';
         try {
             if (db) {
-                const snap = await db
-                    .collection('calls')
-                    .orderBy('timestamp', 'desc')
-                    .limit(50)
-                    .get();
-                const calls = [];
-                snap.forEach(doc => {
-                    const d = doc.data() || {};
-                    calls.push({
-                        id: d.id || doc.id,
-                        to: d.to,
-                        from: d.from,
-                        status: d.status,
-                        duration: d.duration,
-                        timestamp: d.timestamp,
-                        callTime: d.callTime || d.timestamp,
-                        durationSec: d.duration || 0,
-                        outcome: d.outcome || (d.status === 'completed' ? 'Connected' : 'No Answer'),
-                        transcript: d.transcript || '',
-                        aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
-                        aiInsights: d.aiInsights || null,
-                        audioUrl: d.recordingUrl || '',
-                        recordingUrl: d.recordingUrl || '',
-                        twilioSid: d.twilioSid || d.callSid || '',
-                        accountId: d.accountId || null,
-                        accountName: d.accountName || null,
-                        contactId: d.contactId || null,
-                        contactName: d.contactName || null
+                let calls = [];
+                if (callSidFilter) {
+                    // Try direct doc, then where query
+                    const docRef = await db.collection('calls').doc(callSidFilter).get();
+                    if (docRef.exists) {
+                        const d = docRef.data() || {};
+                        calls.push({
+                            id: d.id || docRef.id,
+                            to: d.to,
+                            from: d.from,
+                            status: d.status,
+                            duration: d.duration,
+                            timestamp: d.timestamp,
+                            callTime: d.callTime || d.timestamp,
+                            durationSec: d.duration || 0,
+                            outcome: d.outcome || (d.status === 'completed' ? 'Connected' : 'No Answer'),
+                            transcript: d.transcript || '',
+                            aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
+                            aiInsights: d.aiInsights || null,
+                            audioUrl: d.recordingUrl || '',
+                            recordingUrl: d.recordingUrl || '',
+                            twilioSid: d.twilioSid || d.callSid || '',
+                            accountId: d.accountId || null,
+                            accountName: d.accountName || null,
+                            contactId: d.contactId || null,
+                            contactName: d.contactName || null
+                        });
+                    } else {
+                        const snapSid = await db.collection('calls').where('twilioSid', '==', callSidFilter).limit(1).get();
+                        snapSid.forEach(doc => {
+                            const d = doc.data() || {};
+                            calls.push({
+                                id: d.id || doc.id,
+                                to: d.to,
+                                from: d.from,
+                                status: d.status,
+                                duration: d.duration,
+                                timestamp: d.timestamp,
+                                callTime: d.callTime || d.timestamp,
+                                durationSec: d.duration || 0,
+                                outcome: d.outcome || (d.status === 'completed' ? 'Connected' : 'No Answer'),
+                                transcript: d.transcript || '',
+                                aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
+                                aiInsights: d.aiInsights || null,
+                                audioUrl: d.recordingUrl || '',
+                                recordingUrl: d.recordingUrl || '',
+                                twilioSid: d.twilioSid || d.callSid || '',
+                                accountId: d.accountId || null,
+                                accountName: d.accountName || null,
+                                contactId: d.contactId || null,
+                                contactName: d.contactName || null
+                            });
+                        });
+                    }
+                }
+                if (!callSidFilter || calls.length === 0) {
+                    const snap = await db
+                        .collection('calls')
+                        .orderBy('timestamp', 'desc')
+                        .limit(50)
+                        .get();
+                    snap.forEach(doc => {
+                        const d = doc.data() || {};
+                        calls.push({
+                            id: d.id || doc.id,
+                            to: d.to,
+                            from: d.from,
+                            status: d.status,
+                            duration: d.duration,
+                            timestamp: d.timestamp,
+                            callTime: d.callTime || d.timestamp,
+                            durationSec: d.duration || 0,
+                            outcome: d.outcome || (d.status === 'completed' ? 'Connected' : 'No Answer'),
+                            transcript: d.transcript || '',
+                            aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
+                            aiInsights: d.aiInsights || null,
+                            audioUrl: d.recordingUrl || '',
+                            recordingUrl: d.recordingUrl || '',
+                            twilioSid: d.twilioSid || d.callSid || '',
+                            accountId: d.accountId || null,
+                            accountName: d.accountName || null,
+                            contactId: d.contactId || null,
+                            contactName: d.contactName || null
+                        });
                     });
-                });
+                }
                 // Deduplicate by twilioSid (or id) to avoid showing multiple rows for the same call
                 const dedupe = (arr) => {
                     const map = new Map();
@@ -86,9 +143,12 @@ export default async function handler(req, res) {
             console.warn('[Calls] Firestore GET failed, falling back to memory:', e?.message);
         }
 
-        const calls = Array.from(callStore.values())
+        let calls = Array.from(callStore.values())
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
             .slice(0, 50);
+        if (callSidFilter) {
+            calls = calls.filter(c => c && ((c.twilioSid && c.twilioSid === callSidFilter) || (c.id && c.id === callSidFilter)));
+        }
         // Dedupe memory results similar to Firestore path
         const dedupeMem = (arr) => {
             const map = new Map();

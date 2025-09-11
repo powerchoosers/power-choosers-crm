@@ -320,3 +320,4 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
         };
     }
 }
+

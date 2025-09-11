@@ -394,6 +394,17 @@
                 isCallInProgress = true;
                 // Store the connection reference
                 TwilioRTC.state.connection = conn;
+                // Dispatch inbound call-start events
+                let incomingCallSid = null;
+                try {
+                  const pp = (conn && (conn.parameters || conn._parameters)) || {};
+                  incomingCallSid = pp.CallSid || pp.callSid || null;
+                } catch(_) {}
+                try {
+                  document.dispatchEvent(new CustomEvent('callStarted', { detail: { callSid: incomingCallSid } }));
+                  const el = document.getElementById(WIDGET_ID);
+                  if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'in-call', callSid: incomingCallSid } }));
+                } catch(_) {}
                 currentCallContext = { number: number, name: meta?.name || '', isActive: true };
                 // Start live timer banner
                 startLiveCallTimer(document.getElementById(WIDGET_ID));
@@ -425,6 +436,12 @@
                   console.debug('[TwilioRTC] Incoming call disconnected - cleaning up UI');
                   const callEndTime = Date.now();
                   const duration = Math.floor((callEndTime - callStartTime) / 1000);
+                  // Notify widgets of call end
+                  try {
+                    document.dispatchEvent(new CustomEvent('callEnded', { detail: { callSid: incomingCallSid, duration } }));
+                    const el = document.getElementById(WIDGET_ID);
+                    if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'idle', callSid: incomingCallSid } }));
+                  } catch(_) {}
                   
                   // IMMEDIATE state clearing to prevent issues
                   const disconnectTime = Date.now();
@@ -1540,6 +1557,12 @@
             twilioCallSid = p.CallSid || p.callSid || null;
             if (twilioCallSid) console.debug('[Phone] Captured Twilio CallSid:', twilioCallSid);
           } catch(_) {}
+          // Notify widgets that a call started
+          try {
+            document.dispatchEvent(new CustomEvent('callStarted', { detail: { callSid: twilioCallSid || callId } }));
+            const el = document.getElementById(WIDGET_ID);
+            if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'in-call', callSid: twilioCallSid || callId } }));
+          } catch(_) {}
           // Show live timer in banner
           const card = document.getElementById(WIDGET_ID);
           startLiveCallTimer(card);
@@ -1556,6 +1579,12 @@
           console.debug('[Phone] Call disconnected');
           const callEndTime = Date.now();
           const duration = Math.floor((callEndTime - callStartTime) / 1000);
+          // Notify widgets that the call ended
+          try {
+            document.dispatchEvent(new CustomEvent('callEnded', { detail: { callSid: twilioCallSid || callId, duration } }));
+            const el = document.getElementById(WIDGET_ID);
+            if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'idle', callSid: twilioCallSid || callId } }));
+          } catch(_) {}
           
           // IMMEDIATELY set cooldown and clear context to prevent auto-redial
           const disconnectTime = Date.now();
