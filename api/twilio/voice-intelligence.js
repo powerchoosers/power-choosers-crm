@@ -93,7 +93,7 @@ function generateLiveTips(insights) {
     return tips.slice(0, 3); // Return top 3 most relevant tips
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
     // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });

@@ -10,6 +10,8 @@ class LiveCallInsights {
         this.tipsContainer = null;
         this.pollingInterval = null;
         this.lastUpdateTime = null;
+        this.lastPollOk = null;        // null | boolean
+        this.lastHadMatch = null;      // null | boolean
     }
 
     init() {
@@ -21,10 +23,11 @@ class LiveCallInsights {
         // Create the live insights widget
         const widget = document.createElement('div');
         widget.id = 'live-call-insights';
-        widget.className = 'live-call-insights-widget';
+        // Use shared widget container class for consistent padding and theme
+        widget.className = 'live-call-insights-widget widget-card';
         widget.innerHTML = `
-            <div class="live-insights-header">
-                <h3>Live Call Insights</h3>
+            <div class="live-insights-header widget-card-header">
+                <h3 class="widget-title">Live Call Insights</h3>
                 <div class="live-status">
                     <span class="status-indicator"></span>
                     <span class="status-text">Inactive</span>
@@ -46,10 +49,10 @@ class LiveCallInsights {
             </div>
         `;
 
-        // Add to the widget panel
-        const widgetPanel = document.querySelector('.widget-panel');
-        if (widgetPanel) {
-            widgetPanel.appendChild(widget);
+        // Add to the widget panel, preferring the inner `.widget-content` container for consistent padding
+        const widgetContainer = document.querySelector('.widget-panel .widget-content') || document.querySelector('.widget-panel');
+        if (widgetContainer) {
+            widgetContainer.appendChild(widget);
         }
 
         this.insightsContainer = widget;
@@ -128,12 +131,34 @@ class LiveCallInsights {
             const response = await fetch(`/api/calls?callSid=${this.currentCallSid}`);
             const data = await response.json();
 
-            if (data.ok && data.calls && data.calls.length > 0) {
-                const call = data.calls[0];
-                this.updateLiveData(call);
+            if (data && data.ok && Array.isArray(data.calls)) {
+                const calls = data.calls;
+                // Try to find the exact call by twilioSid or id
+                let call = null;
+                if (this.currentCallSid) {
+                    call = calls.find(c => c.twilioSid === this.currentCallSid || c.id === this.currentCallSid) || null;
+                }
+                // Fallback to most recent if not found
+                if (!call && calls.length > 0) {
+                    call = calls[0];
+                }
+                // Update status indicator based on match
+                this.lastPollOk = true;
+                this.lastHadMatch = !!call;
+                this.renderStatusBadge();
+
+                if (call) {
+                    this.updateLiveData(call);
+                }
+            } else {
+                // Unexpected payload shape
+                this.lastPollOk = false;
+                this.renderStatusBadge('error');
             }
         } catch (error) {
             console.warn('[Live Insights] Failed to fetch insights:', error);
+            this.lastPollOk = false;
+            this.renderStatusBadge('error');
         }
     }
 
@@ -217,7 +242,10 @@ class LiveCallInsights {
     updateSentiment(sentiment) {
         const statusIndicator = this.insightsContainer.querySelector('.status-indicator');
         if (statusIndicator) {
-            statusIndicator.className = `status-indicator sentiment-${sentiment}`;
+            // Preserve existing classes (like status-*) and only update sentiment-*
+            const classes = Array.from(statusIndicator.classList);
+            classes.filter(c => c.startsWith('sentiment-')).forEach(c => statusIndicator.classList.remove(c));
+            statusIndicator.classList.add(`sentiment-${sentiment}`);
         }
     }
 
@@ -226,11 +254,39 @@ class LiveCallInsights {
         const statusText = this.insightsContainer.querySelector('.status-text');
         
         if (statusIndicator) {
-            statusIndicator.className = `status-indicator status-${status}`;
+            // Preserve existing sentiment-* while toggling status-*
+            const toRemove = Array.from(statusIndicator.classList).filter(c => c.startsWith('status-'));
+            toRemove.forEach(c => statusIndicator.classList.remove(c));
+            statusIndicator.classList.add(`status-${status}`);
         }
         if (statusText) {
             statusText.textContent = text;
         }
+    }
+
+    // Derive a human-readable status from polling and match states
+    renderStatusBadge(forceStatus = null) {
+        if (!this.insightsContainer) return;
+        if (!this.isActive) { this.updateStatus('inactive', 'Inactive'); return; }
+
+        // Allow forcing explicit error state from catch
+        if (forceStatus === 'error') { this.updateStatus('error', 'Offline'); return; }
+
+        // Evaluate from latest polling
+        if (this.lastPollOk === false) {
+            this.updateStatus('error', 'Offline');
+            return;
+        }
+        if (this.lastPollOk === true && this.lastHadMatch === true) {
+            this.updateStatus('active', 'Live');
+            return;
+        }
+        if (this.lastPollOk === true && this.lastHadMatch === false) {
+            this.updateStatus('waiting', 'Waiting');
+            return;
+        }
+        // Unknown state
+        this.updateStatus('inactive', 'Inactive');
     }
 }
 
@@ -244,3 +300,4 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = LiveCallInsights;
 }
+

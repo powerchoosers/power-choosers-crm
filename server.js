@@ -220,13 +220,16 @@ async function handleApiTwilioAIInsights(req, res) {
 }
 
 async function handleApiCalls(req, res) {
-  const proxyUrl = `${API_BASE_URL}/api/calls`;
+  // Preserve query params when proxying to Vercel (e.g., ?callSid=...)
+  const parsed = url.parse(req.url, true);
+  const proxyBase = `${API_BASE_URL}/api/calls`;
+  const proxyUrlGet = `${proxyBase}${parsed.search || ''}`;
   
   try {
     if (req.method === 'POST') {
       // Handle POST requests (logging calls)
       const body = await readJsonBody(req);
-      const response = await fetch(proxyUrl, {
+      const response = await fetch(proxyBase, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -236,8 +239,8 @@ async function handleApiCalls(req, res) {
       res.writeHead(response.status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
     } else {
-      // Handle GET requests (fetching calls)
-      const response = await fetch(proxyUrl);
+      // Handle GET requests (fetching calls) with query passthrough
+      const response = await fetch(proxyUrlGet);
       const data = await response.json();
       
       res.writeHead(response.status, { 'Content-Type': 'application/json' });
