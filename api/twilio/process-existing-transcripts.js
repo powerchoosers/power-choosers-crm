@@ -46,9 +46,9 @@ export default async function handler(req, res) {
         const results = [];
         
         for (const transcript of transcripts) {
-            if (transcript.status === 'completed') {
+            if (transcript.status === 'completed' && transcript.sourceSid && transcript.sourceSid.trim()) {
                 try {
-                    console.log(`[Process Existing Transcripts] Processing transcript: ${transcript.sid}`);
+                    console.log(`[Process Existing Transcripts] Processing transcript: ${transcript.sid} for source: ${transcript.sourceSid}`);
                     
                     // Get sentences
                     let transcriptText = '';
@@ -148,10 +148,20 @@ export default async function handler(req, res) {
                     console.error(`[Process Existing Transcripts] Error processing transcript ${transcript.sid}:`, error);
                     results.push({
                         transcriptSid: transcript.sid,
+                        sourceSid: transcript.sourceSid || 'unknown',
                         status: 'error',
                         error: error.message
                     });
                 }
+            } else if (transcript.status === 'completed') {
+                // Track transcripts without sourceSid
+                console.log(`[Process Existing Transcripts] Skipping transcript ${transcript.sid} - no sourceSid`);
+                results.push({
+                    transcriptSid: transcript.sid,
+                    sourceSid: 'missing',
+                    status: 'skipped',
+                    error: 'No sourceSid available'
+                });
             }
         }
         
