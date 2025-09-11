@@ -39,7 +39,14 @@ export default function handler(req, res) {
             // Enable Twilio Voice Intelligence for real-time transcription and AI insights
             record: 'record-from-answer',
             recordingStatusCallback: `${base}/api/twilio/recording`,
-            recordingStatusCallbackMethod: 'POST'
+            recordingStatusCallbackMethod: 'POST',
+            // Enable Voice Intelligence for real-time transcription
+            voiceIntelligence: true,
+            voiceIntelligenceOptions: {
+                voiceIntelligenceInsights: ['summary', 'sentiment', 'topics'],
+                voiceIntelligenceInsightsCallback: `${base}/api/twilio/voice-intelligence`,
+                voiceIntelligenceInsightsCallbackMethod: 'POST'
+            }
         });
         
         // Add the target number with no retry logic

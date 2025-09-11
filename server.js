@@ -100,6 +100,28 @@ async function handleApiTwilioLanguageWebhook(req, res) {
   }
 }
 
+async function handleApiTwilioVoiceIntelligence(req, res) {
+  try {
+    const parsedUrl = url.parse(req.url, true);
+    const proxyUrl = `${API_BASE_URL}/api/twilio/voice-intelligence${parsedUrl.search || ''}`;
+    
+    const body = await readJsonBody(req);
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Twilio Voice Intelligence] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
 // Helper function for reading request body
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -309,6 +331,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/twilio/language-webhook') {
     return handleApiTwilioLanguageWebhook(req, res);
+  }
+  if (pathname === '/api/twilio/voice-intelligence') {
+    return handleApiTwilioVoiceIntelligence(req, res);
   }
   if (pathname === '/api/twilio/ai-insights') {
     return handleApiTwilioAIInsights(req, res);

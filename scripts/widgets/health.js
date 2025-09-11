@@ -38,7 +38,9 @@
     // Try ISO first
     const isoMatch = /^\d{4}-\d{2}-\d{2}$/;
     if (isoMatch.test(str)) {
-      const d = new Date(str);
+      // For ISO dates, parse components to avoid timezone issues
+      const parts = str.split('-');
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
       return isNaN(d.getTime()) ? null : d;
     }
     // Try MM/DD/YYYY
@@ -48,8 +50,8 @@
       const d = new Date(yy, mm, dd);
       return isNaN(d.getTime()) ? null : d;
     }
-    // Fallback Date parse
-    const d = new Date(str);
+    // Fallback Date parse - use local timezone to avoid offset issues
+    const d = new Date(str + 'T00:00:00');
     return isNaN(d.getTime()) ? null : d;
   }
   function toISODate(v){
@@ -71,12 +73,91 @@
   function readDetailFieldDOM(field){
     try {
       const id = document.getElementById('account-detail-view') ? 'account-detail-view' : (document.getElementById('contact-detail-view') ? 'contact-detail-view' : '');
-      if (!id) return '';
+      console.log('[Health Widget] readDetailFieldDOM for field:', field, 'detail view:', id);
+      if (!id) {
+        console.log('[Health Widget] No detail view found');
+        return '';
+      }
       const root = document.getElementById(id);
       const el = root && root.querySelector(`.info-value-wrap[data-field="${field}"] .info-value-text`);
       const text = el ? el.textContent.trim() : '';
-      return text === '--' ? '' : text;
-    } catch(_) { return ''; }
+      const result = text === '--' ? '' : text;
+      console.log('[Health Widget] readDetailFieldDOM result:', { field, text, result });
+      return result;
+    } catch(e) { 
+      console.log('[Health Widget] Error in readDetailFieldDOM:', e);
+      return ''; 
+    }
+  }
+
+  function getLinkedAccountId(currentEntityType, currentEntityId) {
+    try {
+      console.log('[Health Widget] getLinkedAccountId called');
+      
+      // First try to get from window.ContactDetail.state._linkedAccountId
+      if (window.ContactDetail && window.ContactDetail.state) {
+        console.log('[Health Widget] ContactDetail.state exists:', !!window.ContactDetail.state);
+        console.log('[Health Widget] ContactDetail.state._linkedAccountId:', window.ContactDetail.state._linkedAccountId);
+        if (window.ContactDetail.state._linkedAccountId) {
+          const accountId = window.ContactDetail.state._linkedAccountId;
+          console.log('[Health Widget] Found account ID from ContactDetail.state:', accountId);
+          return accountId;
+        }
+      } else {
+        console.log('[Health Widget] ContactDetail or state not available');
+      }
+      
+      // Fallback: Try to get from the current contact's accountId field
+      if (currentEntityType === 'contact' && currentEntityId && typeof window.getPeopleData === 'function') {
+        console.log('[Health Widget] Attempting fallback method - getPeopleData available:', typeof window.getPeopleData);
+        const people = window.getPeopleData() || [];
+        console.log('[Health Widget] People data length:', people.length);
+        const contact = people.find(p => String(p.id || '') === String(currentEntityId));
+        console.log('[Health Widget] Found contact:', !!contact, 'Contact data:', contact);
+        if (contact && (contact.accountId || contact.account_id)) {
+          const accountId = contact.accountId || contact.account_id;
+          console.log('[Health Widget] Found account ID from contact data:', accountId);
+          return accountId;
+        } else {
+          console.log('[Health Widget] No accountId found in contact data');
+        }
+      } else {
+        console.log('[Health Widget] Fallback conditions not met:', {
+          isContact: currentEntityType === 'contact',
+          hasEntityId: !!currentEntityId,
+          hasGetPeopleData: typeof window.getPeopleData === 'function'
+        });
+      }
+      
+      // Try to get the linked account ID from the contact detail page DOM
+      const contactDetailView = document.getElementById('contact-detail-view');
+      console.log('[Health Widget] contact-detail-view found:', !!contactDetailView);
+      
+      if (contactDetailView) {
+        // Look for the linked account ID in the contact detail state or DOM
+        const accountLink = contactDetailView.querySelector('[data-account-id]');
+        console.log('[Health Widget] accountLink element found:', !!accountLink);
+        if (accountLink) {
+          const accountId = accountLink.getAttribute('data-account-id');
+          console.log('[Health Widget] Found account ID from DOM:', accountId);
+          return accountId;
+        }
+        
+        // Try to find account ID from the company link
+        const companyLink = contactDetailView.querySelector('#contact-company-link');
+        if (companyLink) {
+          console.log('[Health Widget] Found company link, but no account ID attribute');
+        }
+        
+        console.log('[Health Widget] No account ID found in DOM');
+      } else {
+        console.log('[Health Widget] No contact-detail-view found');
+      }
+      return null;
+    } catch(e) { 
+      console.log('[Health Widget] Error in getLinkedAccountId:', e);
+      return null; 
+    }
   }
 
   const ESTIMATED_DELIVERY_CHARGE_CENTS = 0.05;
@@ -147,6 +228,10 @@
         <button type="button" class="btn-text health-close" title="Close" aria-label="Close">×</button>
       </div>
       <div class="health-body">
+        <div class="health-entity-info" id="health-entity-info">
+          <div class="health-entity-name" id="health-entity-name">Loading...</div>
+          <div class="health-entity-type">${entityType === 'account' ? 'Account' : 'Contact'}</div>
+        </div>
         <p class="health-subtitle">Calculate potential savings analysis based on key ${entityType} details.</p>
         
         <div class="health-form-sections">
@@ -237,6 +322,50 @@
     return card;
   }
 
+  // Helper to read detail page DOM elements
+  function readDetailFieldDOM(field) {
+    const contactDetail = document.getElementById('contact-detail-view');
+    const accountDetail = document.getElementById('account-detail-view');
+
+    let fieldWrap = null;
+    if (contactDetail) {
+      fieldWrap = contactDetail.querySelector(`[data-field="${field}"]`);
+    }
+    if (!fieldWrap && accountDetail) {
+      fieldWrap = accountDetail.querySelector(`[data-field="${field}"]`);
+    }
+
+    if (fieldWrap) {
+      const valueEl = fieldWrap.querySelector('.value');
+      if (valueEl) {
+        const text = valueEl.textContent?.trim() || '';
+        return text === '--' ? '' : text;
+      }
+    }
+    return '';
+  }
+
+  // Helper to update detail page DOM elements
+  function updateDetailFieldDOM(field, value) {
+    const contactDetail = document.getElementById('contact-detail-view');
+    const accountDetail = document.getElementById('account-detail-view');
+
+    let fieldWrap = null;
+    if (contactDetail) {
+      fieldWrap = contactDetail.querySelector(`[data-field="${field}"]`);
+    }
+    if (!fieldWrap && accountDetail) {
+      fieldWrap = accountDetail.querySelector(`[data-field="${field}"]`);
+    }
+
+    if (fieldWrap) {
+      const valueEl = fieldWrap.querySelector('.value');
+      if (valueEl) {
+        valueEl.textContent = value !== null ? String(value) : '--';
+      }
+    }
+  }
+
   function setupHealthCardEvents(card, entityId, entityType) {
     const closeBtn = card.querySelector('.health-close');
     const calculateBtn = card.querySelector('#health-calculate-btn');
@@ -245,6 +374,7 @@
     // Form inputs
     const supplierInput = card.querySelector('#health-supplier');
     const monthlyBillInput = card.querySelector('#health-monthly-bill');
+    const annualUsageInput = card.querySelector('#health-annual-usage');
     const currentRateInput = card.querySelector('#health-current-rate');
     const contractEndInput = card.querySelector('#health-contract-end');
     const sellRateInput = card.querySelector('#health-sell-rate');
@@ -266,13 +396,42 @@
         const scopeId = entityType === 'account' ? 'account-detail-view' : 'contact-detail-view';
         const root = document.getElementById(scopeId);
         if (!root) return;
-        const wrap = root.querySelector(`.info-value-wrap[data-field="${field}"] .info-value-text`);
-        if (!wrap) return;
-        let display = (value !== undefined && value !== null && String(value).trim() !== '') ? String(value) : '';
-        if (field === 'contractEndDate' && display) display = toMDY(display);
-        wrap.textContent = display || '--';
+        
+        const fieldWrap = root.querySelector(`.info-value-wrap[data-field="${field}"]`);
+        if (!fieldWrap) return;
+        
+        // Check if field is in editing mode
+        const isEditing = fieldWrap.classList.contains('editing');
+        
+        if (isEditing) {
+          // Update the input field value when in editing mode
+          const inputEl = fieldWrap.querySelector('.info-edit-input');
+          if (inputEl) {
+            let inputValue = value || '';
+            if (field === 'contractEndDate' && value) {
+              // Convert MM/DD/YYYY to YYYY-MM-DD for date input
+              const d = parseDateFlexible(value);
+              if (d) {
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                inputValue = `${yyyy}-${mm}-${dd}`;
+              }
+            }
+            inputEl.value = inputValue;
+          }
+        } else {
+          // Update the text element when not in editing mode
+          const textEl = fieldWrap.querySelector('.info-value .info-value-text') || fieldWrap.querySelector('.info-value-text');
+          if (textEl) {
+            let display = (value !== undefined && value !== null && String(value).trim() !== '') ? String(value) : '';
+            if (field === 'contractEndDate' && display) display = toMDY(display);
+            textEl.textContent = display || '--';
+          }
+        }
       } catch(_) {}
     }
+    
     function debounce(fn, ms){ let t; return function(...args){ clearTimeout(t); t = setTimeout(()=>fn.apply(this,args), ms); }; }
 
     const formatNumber = num => Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -307,27 +466,80 @@
         };
         card.addEventListener('transitionend', onEnd);
       } catch (_) { /* noop */ }
+    }
 
-    // Live sync: listen for energy updates coming from details pages
+    // Listen for energy updates from detail pages to populate widget inputs
     const onEnergyUpdated = (e) => {
       try {
         const d = e.detail || {};
-        const matches = (d.entity === (entityType||'contact')) && (String(d.id||'') === String(entityId||''));
-        if (!matches) return;
-        // Update inputs if provided
-        if (d.field === 'electricitySupplier' && supplierInput) supplierInput.value = (d.value || '').trim();
-        if (d.field === 'currentRate' && currentRateInput) currentRateInput.value = (d.value || '');
-        if (d.field === 'contractEndDate' && contractEndInput) contractEndInput.value = toISODate(d.value || '');
-        // Re-run validations and resize
+        console.log('[Health Widget] Received energy-updated event:', d);
+        console.log('[Health Widget] Current entityType:', entityType, 'entityId:', entityId);
+        
+        // For contacts, energy data is stored in the linked account, so we need to check both
+        let matches = false;
+        if (entityType === 'contact') {
+          // Check if this is an account update for the linked account
+          const linkedAccountId = getLinkedAccountId(entityType, entityId);
+          console.log('[Health Widget] Contact mode - linkedAccountId:', linkedAccountId);
+          matches = (d.entity === 'account') && (String(d.id||'') === String(linkedAccountId||''));
+          console.log('[Health Widget] Contact mode - matches:', matches, 'event entity:', d.entity, 'event id:', d.id, 'linked id:', linkedAccountId);
+        } else {
+          // For accounts, match directly
+          matches = (d.entity === entityType) && (String(d.id||'') === String(entityId||''));
+          console.log('[Health Widget] Account mode - matches:', matches, 'event entity:', d.entity, 'event id:', d.id, 'current id:', entityId);
+        }
+        if (!matches) {
+          console.log('[Health Widget] Event does not match, ignoring');
+          return;
+        }
+        
+        console.log('[Health Widget] Event matches! Updating widget inputs for field:', d.field, 'value:', d.value);
+        
+        // Update widget inputs based on the field that was updated
+        console.log('[Health Widget] Updating widget inputs for field:', d.field, 'value:', d.value);
+        if (d.field === 'electricitySupplier' && supplierInput) {
+          supplierInput.value = (d.value || '').trim();
+          console.log('[Health Widget] Updated supplier input to:', supplierInput.value);
+        }
+        if (d.field === 'annualUsage' && annualUsageInput) {
+          annualUsageInput.value = (d.value || '').trim();
+          console.log('[Health Widget] Updated annual usage input to:', annualUsageInput.value);
+        }
+        if (d.field === 'currentRate' && currentRateInput) {
+          currentRateInput.value = (d.value || '');
+          console.log('[Health Widget] Updated current rate input to:', currentRateInput.value);
+        }
+        if (d.field === 'contractEndDate' && contractEndInput) {
+          const contractVal = d.value || '';
+          console.log('[Health Widget] Contract end date update - raw value:', contractVal);
+          // Date inputs require YYYY-MM-DD format, not MM/DD/YYYY
+          const formattedValue = contractVal ? toISODate(contractVal) : '';
+          console.log('[Health Widget] Contract end date update - formatted value (ISO):', formattedValue);
+          contractEndInput.value = formattedValue;
+          console.log('[Health Widget] Updated contract end input to:', contractEndInput.value);
+        }
+        
+        // Re-run validations to update UI state
         validateSection1();
         validateSection2();
-        animateAutoHeight();
       } catch(_) {}
     };
+    
+    console.log('[Health Widget] Setting up pc:energy-updated event listener');
+    
+    // Remove any existing listener to prevent duplicates
+    document.removeEventListener('pc:energy-updated', onEnergyUpdated);
     document.addEventListener('pc:energy-updated', onEnergyUpdated);
-    // Ensure removal when widget is closed
-    card.addEventListener('health:cleanup', () => { document.removeEventListener('pc:energy-updated', onEnergyUpdated); });
-    }
+    
+    // Add a small delay to ensure event listener is fully registered
+    setTimeout(() => {
+      console.log('[Health Widget] Event listener setup complete');
+    }, 100);
+    
+    // Clean up listener when widget is closed
+    card.addEventListener('health:cleanup', () => { 
+      document.removeEventListener('pc:energy-updated', onEnergyUpdated); 
+    });
 
     const validateSection1 = () => {
       const supplierValue = supplierInput.value.trim();
@@ -617,6 +829,98 @@
     if (contractEndInput) contractEndInput.addEventListener('input', validateSection2);
     if (sellRateInput) sellRateInput.addEventListener('input', validateSection2);
 
+    // Real-time updates to detail page AND Firebase
+    if (supplierInput) {
+      supplierInput.addEventListener('input', () => {
+        const value = supplierInput.value.trim() || null;
+        updateDetailFieldDOM('electricitySupplier', value);
+        saveToFirebase('electricitySupplier', value);
+      });
+    }
+
+    if (annualUsageInput) {
+      annualUsageInput.addEventListener('input', () => {
+        const value = annualUsageInput.value.trim() || null;
+        updateDetailFieldDOM('annualUsage', value);
+        saveToFirebase('annualUsage', value);
+      });
+    }
+
+    if (currentRateInput) {
+      currentRateInput.addEventListener('input', () => {
+        const value = currentRateInput.value !== '' ? currentRateInput.value : null;
+        updateDetailFieldDOM('currentRate', value);
+        saveToFirebase('currentRate', value);
+      });
+    }
+
+    if (contractEndInput) {
+      contractEndInput.addEventListener('input', () => {
+        const contractVal = contractEndInput.value;
+        const contractValFormatted = contractVal ? toMDY(contractVal) : null;
+        updateDetailFieldDOM('contractEndDate', contractValFormatted);
+        saveToFirebase('contractEndDate', contractValFormatted);
+      });
+    }
+
+    // Save to Firebase function
+    async function saveToFirebase(field, value) {
+      try {
+        console.log('[Health Widget] Saving to Firebase:', { field, value, entityType, entityId });
+        
+        let targetEntityId = entityId;
+        let targetEntityType = entityType;
+        
+        // For contacts, save to the linked account
+        if (entityType === 'contact') {
+          const linkedAccountId = getLinkedAccountId(entityType, entityId);
+          if (linkedAccountId) {
+            targetEntityId = linkedAccountId;
+            targetEntityType = 'account';
+            console.log('[Health Widget] Contact mode - saving to linked account:', linkedAccountId);
+          } else {
+            console.log('[Health Widget] No linked account found for contact');
+            return;
+          }
+        }
+        
+        const db = window.firebaseDB;
+        if (!db) {
+          console.log('[Health Widget] No Firebase database available');
+          return;
+        }
+        
+        const payload = { [field]: value, updatedAt: Date.now() };
+        console.log('[Health Widget] Saving payload:', { targetEntityId, payload });
+        
+        await db.collection('accounts').doc(targetEntityId).update(payload);
+        console.log('[Health Widget] Firebase save successful');
+        
+        // Update local cache if available
+        if (typeof window.getAccountsData === 'function') {
+          const accounts = window.getAccountsData() || [];
+          const idx = accounts.findIndex(a => a.id === targetEntityId);
+          if (idx !== -1) {
+            try { accounts[idx][field] = value; } catch(_) {}
+            console.log('[Health Widget] Updated local cache for account:', targetEntityId);
+          }
+        }
+        
+        // Dispatch energy-updated event to sync other components
+        try { 
+          const eventDetail = { entity: 'account', id: targetEntityId, field, value };
+          console.log('[Health Widget] About to dispatch energy-updated event:', eventDetail);
+          document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: eventDetail })); 
+          console.log('[Health Widget] Dispatched energy-updated event successfully');
+        } catch(e) { 
+          console.log('[Health Widget] Error dispatching event:', e);
+        }
+        
+      } catch (error) {
+        console.error('[Health Widget] Error saving to Firebase:', error);
+      }
+    }
+
     // Two-way sync helpers
     async function applyPatchAndUpdateCaches(patch){
       await saveEntityFields(patch);
@@ -631,94 +935,190 @@
           if (obj) Object.assign(obj, patch);
         }
       } catch(_) {}
+      
+      // Dispatch energy-updated events for each field to notify details pages
+      try {
+        Object.keys(patch).forEach(field => {
+          if (['electricitySupplier', 'currentRate', 'contractEndDate'].includes(field)) {
+            document.dispatchEvent(new CustomEvent('pc:energy-updated', {
+              detail: {
+                entity: entityType,
+                id: entityId,
+                field: field,
+                value: patch[field]
+              }
+            }));
+          }
+        });
+      } catch(_) {}
     }
 
-    // Debounced save for continuous typing
-    const debouncedSave = debounce(async () => {
-      const supplierVal = (supplierInput?.value ?? '').trim();
-      const rateVal = currentRateInput?.value ?? '';
-      // contractEndInput is type=date (ISO). Persist ISO but display MM/DD/YYYY on details page
-      const contractVal = contractEndInput?.value ?? '';
-      const patch = {
-        electricitySupplier: supplierVal || null,
-        currentRate: rateVal !== '' ? rateVal : null,
-        contractEndDate: contractVal || null
-      };
-      updateDetailFieldDOM('electricitySupplier', supplierVal || null);
-      updateDetailFieldDOM('currentRate', rateVal !== '' ? rateVal : null);
-      updateDetailFieldDOM('contractEndDate', contractVal || null);
-      await applyPatchAndUpdateCaches(patch);
-    }, 500);
-
-    // Immediate save on blur/change to avoid losing edits on re-render
-    async function immediateSave(){
+    // Simplified save - only on blur to prevent crashes
+    async function simpleSave(){
       try {
         const supplierVal = (supplierInput?.value ?? '').trim();
         const rateVal = currentRateInput?.value ?? '';
         const contractVal = contractEndInput?.value ?? '';
+        const contractValFormatted = contractVal ? toMDY(contractVal) : null;
         const patch = {
           electricitySupplier: supplierVal || null,
           currentRate: rateVal !== '' ? rateVal : null,
-          contractEndDate: contractVal || null
+          contractEndDate: contractValFormatted
         };
-        updateDetailFieldDOM('electricitySupplier', supplierVal || null);
-        updateDetailFieldDOM('currentRate', rateVal !== '' ? rateVal : null);
-        updateDetailFieldDOM('contractEndDate', contractVal || null);
+        
         await applyPatchAndUpdateCaches(patch);
         try { window.crm?.showToast && window.crm.showToast('Saved'); } catch(_) {}
       } catch(_) {}
     }
 
-    if (supplierInput){
-      supplierInput.addEventListener('input', debouncedSave);
-      supplierInput.addEventListener('change', immediateSave);
-      supplierInput.addEventListener('blur', immediateSave);
-    }
-    if (currentRateInput){
-      currentRateInput.addEventListener('input', debouncedSave);
-      currentRateInput.addEventListener('change', immediateSave);
-      currentRateInput.addEventListener('blur', immediateSave);
-    }
-    if (contractEndInput){
-      contractEndInput.addEventListener('input', debouncedSave);
-      contractEndInput.addEventListener('change', immediateSave);
-      contractEndInput.addEventListener('blur', immediateSave);
+    // Only save on blur to prevent crashes
+    if (supplierInput) supplierInput.addEventListener('blur', simpleSave);
+    if (currentRateInput) currentRateInput.addEventListener('blur', simpleSave);
+    if (contractEndInput) contractEndInput.addEventListener('blur', simpleSave);
+
+    // Add click handler to entity info for navigation
+    const entityInfoEl = card.querySelector('#health-entity-info');
+    if (entityInfoEl) {
+      entityInfoEl.addEventListener('click', () => {
+        try {
+          // Store current page for back navigation
+          const currentPage = document.querySelector('.page.active')?.id || 'call-scripts-page';
+          sessionStorage.setItem('health-widget-return-page', currentPage);
+          
+          // Navigate to the appropriate details page
+          if (entityType === 'account' && entityId) {
+            // Navigate to account details
+            if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+              window.AccountDetail.show(entityId);
+            }
+          } else if (entityType === 'contact' && entityId) {
+            // Navigate to people page first, then show contact detail
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              // Use requestAnimationFrame to ensure the page has started loading
+              requestAnimationFrame(() => {
+                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                  window.ContactDetail.show(entityId);
+                }
+              });
+            }
+          } else if (entityId) {
+            // Default to contact if entityType is unclear
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              requestAnimationFrame(() => {
+                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                  window.ContactDetail.show(entityId);
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error('[Health Widget] Navigation error:', error);
+        }
+      });
     }
 
     // Initialize
     activateSection(1);
     updateButton();
 
+    // Update entity name display
+    const updateEntityName = () => {
+      try {
+        const entityNameEl = card.querySelector('#health-entity-name');
+        if (!entityNameEl) return;
+        
+        if (entityType === 'account' && typeof window.getAccountsData === 'function') {
+          const accounts = window.getAccountsData() || [];
+          const account = accounts.find(a => String(a.id || '') === String(entityId));
+          if (account) {
+            const name = account.accountName || account.name || account.companyName || 'Unknown Account';
+            entityNameEl.textContent = name;
+          } else {
+            entityNameEl.textContent = 'Account Not Found';
+          }
+        } else if (entityType === 'contact' && typeof window.getPeopleData === 'function') {
+          const people = window.getPeopleData() || [];
+          const contact = people.find(p => String(p.id || '') === String(entityId));
+          if (contact) {
+            const name = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown Contact';
+            entityNameEl.textContent = name;
+          } else {
+            entityNameEl.textContent = 'Contact Not Found';
+          }
+        }
+      } catch (_) {
+        const entityNameEl = card.querySelector('#health-entity-name');
+        if (entityNameEl) entityNameEl.textContent = 'Error Loading';
+      }
+    };
+
     // Pre-populate from entity data if available (supplier, current rate, contract end)
     try {
+      console.log('[Health Widget] Pre-populating widget data for entityType:', entityType, 'entityId:', entityId);
+      console.log('[Health Widget] Widget initialization context - window.ContactDetail exists:', !!window.ContactDetail);
+      console.log('[Health Widget] Widget initialization context - window.AccountDetail exists:', !!window.AccountDetail);
+      if (window.ContactDetail && window.ContactDetail.state) {
+        console.log('[Health Widget] ContactDetail.state._linkedAccountId:', window.ContactDetail.state._linkedAccountId);
+      }
+      
+      // Update entity name first
+      updateEntityName();
+      
+      // Priority 1: Read from detail page DOM (most current data)
+      const domSupplier = readDetailFieldDOM('electricitySupplier');
+      const domRate = readDetailFieldDOM('currentRate');
+      const domContract = readDetailFieldDOM('contractEndDate');
+      
+      console.log('[Health Widget] DOM data read:', { domSupplier, domRate, domContract });
+      
+      // Priority 2: For contacts, try to read from linked account data
+      let supplier = domSupplier;
+      let rate = domRate;
+      let contract = domContract;
+      
+      if (entityType === 'contact' && (!supplier || !rate || !contract)) {
+        const linkedAccountId = getLinkedAccountId(entityType, entityId);
+        if (linkedAccountId && typeof window.getAccountsData === 'function') {
+          const accounts = window.getAccountsData() || [];
+          const linkedAccount = accounts.find(a => String(a.id || '') === String(linkedAccountId));
+          if (linkedAccount) {
+            console.log('[Health Widget] Found linked account data:', linkedAccount);
+            if (!supplier && linkedAccount.electricitySupplier) supplier = linkedAccount.electricitySupplier;
+            if (!rate && linkedAccount.currentRate) rate = linkedAccount.currentRate;
+            if (!contract && linkedAccount.contractEndDate) contract = linkedAccount.contractEndDate;
+            console.log('[Health Widget] Updated from linked account:', { supplier, rate, contract });
+          }
+        }
+      }
+      
+      if (!supplier || !rate || !contract) {
       if (entityType === 'account' && typeof window.getAccountsData === 'function') {
         const accounts = window.getAccountsData() || [];
         const account = accounts.find(a => String(a.id || '') === String(entityId));
         if (account) {
-          // Prefer live DOM values if present on the details page
-          const domSupplier = readDetailFieldDOM('electricitySupplier') || account.electricitySupplier || '';
-          const domRate = readDetailFieldDOM('currentRate') || account.currentRate || account.current_rate || '';
-          const domContract = readDetailFieldDOM('contractEndDate') || account.contractEndDate || account.contract_end_date || account.contractEnd || '';
-          if (domSupplier) supplierInput.value = domSupplier;
-          if (domRate) currentRateInput.value = domRate;
-          if (domContract) contractEndInput.value = toISODate(domContract);
-          validateSection1();
-          validateSection2();
+            supplier = supplier || account.electricitySupplier || account.supplier || account.currentSupplier || '';
+            rate = rate || account.currentRate || account.current_rate || '';
+            contract = contract || account.contractEndDate || account.contract_end_date || account.contractEnd || account.contract_end || '';
         }
       } else if (entityType === 'contact' && typeof window.getPeopleData === 'function') {
         const people = window.getPeopleData() || [];
         const contact = people.find(p => String(p.id || '') === String(entityId));
         if (contact) {
-          const domSupplier = readDetailFieldDOM('electricitySupplier') || contact.electricitySupplier || '';
-          const domRate = readDetailFieldDOM('currentRate') || contact.currentRate || contact.current_rate || '';
-          const domContract = readDetailFieldDOM('contractEndDate') || contact.contractEndDate || contact.contract_end_date || contact.contractEnd || '';
-          if (domSupplier) supplierInput.value = domSupplier;
-          if (domRate) currentRateInput.value = domRate;
-          if (domContract) contractEndInput.value = toISODate(domContract);
-          validateSection1();
-          validateSection2();
+            supplier = supplier || contact.electricitySupplier || contact.supplier || contact.currentSupplier || '';
+            rate = rate || contact.currentRate || contact.current_rate || '';
+            contract = contract || contact.contractEndDate || contact.contract_end_date || contact.contractEnd || contact.contract_end || '';
+          }
         }
       }
+      
+      // Set the values
+      if (supplier) supplierInput.value = supplier;
+      if (rate) currentRateInput.value = rate;
+      if (contract) contractEndInput.value = toISODate(contract);
+      validateSection1();
+      validateSection2();
     } catch (_) { /* noop */ }
 
     // If Firestore has a saved result, show it immediately (auto-open results)
@@ -904,5 +1304,26 @@
   // Expose close and is-open helpers for toggle behavior
   window.Widgets.closeHealth = closeHealthWidget;
   window.Widgets.isHealthOpen = function () { return !!document.getElementById(WIDGET_ID); };
+
+  // Test function for debugging - can be called from browser console
+  window.testHealthWidget = function() {
+    console.log('[Health Widget] Test function called');
+    console.log('[Health Widget] Current entityType:', entityType);
+    console.log('[Health Widget] Current entityId:', entityId);
+    console.log('[Health Widget] getLinkedAccountId test:', getLinkedAccountId(entityType, entityId));
+    console.log('[Health Widget] Widget element exists:', !!document.getElementById('energy-health-widget'));
+    console.log('[Health Widget] ContactDetail exists:', !!window.ContactDetail);
+    console.log('[Health Widget] ContactDetail.state exists:', !!(window.ContactDetail && window.ContactDetail.state));
+    console.log('[Health Widget] getPeopleData exists:', typeof window.getPeopleData);
+    return {
+      entityType,
+      entityId,
+      linkedAccountId: getLinkedAccountId(entityType, entityId),
+      widgetExists: !!document.getElementById('energy-health-widget'),
+      contactDetailExists: !!window.ContactDetail,
+      contactDetailStateExists: !!(window.ContactDetail && window.ContactDetail.state),
+      getPeopleDataExists: typeof window.getPeopleData
+    };
+  };
 
 })();

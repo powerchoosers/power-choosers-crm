@@ -69,8 +69,58 @@
   function formatDateMDY(v){
     try {
       if (!v) return '';
-      const d = new Date(v);
+      
+      // Use the same robust date parsing logic as account-detail.js
+      const str = String(v).trim();
+      let d;
+      
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        // For ISO dates, parse components to avoid timezone issues
+        const parts = str.split('-');
+        d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      } else {
+        const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+        if (mdy) {
+          // Parse MM/DD/YYYY format directly to avoid timezone issues
+          d = new Date(parseInt(mdy[3], 10), parseInt(mdy[1], 10) - 1, parseInt(mdy[2], 10));
+        } else {
+          // Fallback Date parse - use local timezone to avoid offset issues
+          d = new Date(str + 'T00:00:00');
+        }
+      }
+      
       if (isNaN(d.getTime())) return String(v); // keep raw if unparsable
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      const yyyy = d.getFullYear();
+      return `${mm}/${dd}/${yyyy}`;
+    } catch(_) { return String(v||''); }
+  }
+  
+  function toMDY(v){
+    try {
+      if (!v) return '';
+      
+      // Use the same robust date parsing logic as account-detail.js
+      const str = String(v).trim();
+      let d;
+      
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        // For ISO dates, parse components to avoid timezone issues
+        const parts = str.split('-');
+        d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      } else {
+        const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+        if (mdy) {
+          // Parse MM/DD/YYYY format directly to avoid timezone issues
+          d = new Date(parseInt(mdy[3], 10), parseInt(mdy[1], 10) - 1, parseInt(mdy[2], 10));
+        } else {
+          // Fallback Date parse - use local timezone to avoid offset issues
+          d = new Date(str + 'T00:00:00');
+        }
+      }
+      
+      if (isNaN(d.getTime())) return String(v);
       const mm = String(d.getMonth()+1).padStart(2,'0');
       const dd = String(d.getDate()).padStart(2,'0');
       const yyyy = d.getFullYear();
@@ -145,6 +195,58 @@
     }
     return null;
   }
+  // Cache for DOM reads to improve performance
+  let domCache = {};
+  let lastCacheTime = 0;
+  const CACHE_DURATION_MS = 500; // Cache DOM reads for 500ms
+
+  // Clear DOM cache when needed
+  function clearDOMCache() {
+    domCache = {};
+    lastCacheTime = 0;
+  }
+
+  // Read energy data from detail page DOM elements for real-time updates
+  function readDetailFieldDOM(field){
+    try {
+      const now = Date.now();
+      const cacheKey = `dom_${field}`;
+      
+      // Return cached value if still valid
+      if (domCache[cacheKey] && (now - lastCacheTime) < CACHE_DURATION_MS) {
+        return domCache[cacheKey];
+      }
+      
+      // Check both contact and account detail views
+      const contactDetail = document.getElementById('contact-detail-view');
+      const accountDetail = document.getElementById('account-detail-view');
+      
+      let fieldWrap = null;
+      if (contactDetail) {
+        fieldWrap = contactDetail.querySelector(`.info-value-wrap[data-field="${field}"]`);
+      }
+      if (!fieldWrap && accountDetail) {
+        fieldWrap = accountDetail.querySelector(`.info-value-wrap[data-field="${field}"]`);
+      }
+      
+      let result = '';
+      if (fieldWrap) {
+        const textEl = fieldWrap.querySelector('.info-value .info-value-text') || fieldWrap.querySelector('.info-value-text');
+        if (textEl) {
+          const text = textEl.textContent?.trim() || '';
+          result = text === '--' ? '' : text;
+        }
+      }
+      
+      // Cache the result
+      domCache[cacheKey] = result;
+      lastCacheTime = now;
+      
+      return result;
+    } catch(_) {}
+    return '';
+  }
+
   function getLiveData(){
     const ctx = getPhoneWidgetContext();
     const nameParts = splitName(ctx.name || '');
@@ -180,6 +282,27 @@
     if (!account.supplier && contact.supplier) account.supplier = contact.supplier;
     if (!account.contract_end && contact.contract_end) account.contract_end = contact.contract_end;
     if (!account.contractEnd && contact.contract_end) account.contractEnd = contact.contract_end;
+    
+    // Also read from detail page DOM elements for real-time updates
+    try {
+      const detailSupplier = readDetailFieldDOM('electricitySupplier');
+      const detailContractEnd = readDetailFieldDOM('contractEndDate');
+      console.log('[Call Scripts] Reading from DOM - Supplier:', detailSupplier, 'Contract End:', detailContractEnd);
+      
+      // Also check health widget inputs if they exist
+      const healthSupplier = document.querySelector('#health-supplier')?.value?.trim();
+      const healthContractEnd = document.querySelector('#health-contract-end')?.value;
+      
+      // Use health widget data if available, otherwise use detail page data
+      const finalSupplier = healthSupplier || detailSupplier;
+      const finalContractEnd = healthContractEnd ? toMDY(healthContractEnd) : detailContractEnd;
+      
+      if (finalSupplier) account.supplier = finalSupplier;
+      if (finalContractEnd) {
+        account.contract_end = finalContractEnd;
+        account.contractEnd = finalContractEnd;
+      }
+    } catch(_) {}
     // If no account found, fall back to using the selected contact's company for {{account.name}}
     if (!account.name && (contact.company || contact.companyName)) {
       account.name = contact.company || contact.companyName;
@@ -209,6 +332,7 @@
     if (!str) return '';
     const dp = dayPart();
     const data = getLiveData();
+    console.log('[Call Scripts] Render template data:', data);
     const values = {
       'day.part': dp,
       'contact.first_name': data.contact.firstName || data.contact.first || splitName(data.contact.name).first || splitName(data.ctx.name).first || '',
@@ -226,16 +350,14 @@
       'account.supplier': data.account.supplier || data.account.currentSupplier || data.contact.supplier || data.contact.currentSupplier || '',
       'account.contract_end': formatDateMDY(data.account.contractEnd || data.account.contract_end || data.account.renewalDate || data.contact.contract_end || data.contact.contractEnd || '')
     };
-    // Replace known tokens; render chips for contact/account if mode='chips'
-    return String(str).replace(/\{\{\s*(day\.part|contact\.[a-z_]+|account\.[a-z_]+)\s*\}\}/gi, (m, key) => {
-      const k = key.toLowerCase();
-      const v = values[k] || '';
-      if (mode === 'text') return escapeHtml(v || '');
-      // chips mode
-      if (k === 'day.part') return escapeHtml(dp);
-      const [scope, sub] = k.split('.');
-      return chip(scope, sub);
-    });
+    
+    // Always render actual values instead of placeholders for better user experience
+    let result = String(str);
+    for (const [key, value] of Object.entries(values)) {
+      const pattern = new RegExp(`\\{\\{\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\}\\}`, 'gi');
+      result = result.replace(pattern, escapeHtml(value || ''));
+    }
+    return result;
   }
   function isLiveCall(){
     try {
@@ -487,40 +609,58 @@
     if (key === 'pathA_not_renewed') {
       const hasContractEnd = !!(data.account.contractEnd || data.account.contract_end || data.account.renewalDate);
       const hasSupplier = !!(data.account.supplier || data.account.currentSupplier);
+      console.log('[Call Scripts] pathA_not_renewed - hasSupplier:', hasSupplier, 'hasContractEnd:', hasContractEnd);
+      console.log('[Call Scripts] pathA_not_renewed - supplier:', data.account.supplier, 'contract_end:', data.account.contract_end);
+      
       const intro = "Makes sense — when it comes to energy, it's pretty easy to renew at the wrong time and end up overpaying.";
       let middle = '';
       if (hasSupplier && !hasContractEnd) {
         middle = " So I understand you guys are using {{account.supplier}} — when does your contract expire?";
+        console.log('[Call Scripts] Using variant: Supplier only');
       } else if (!hasSupplier && hasContractEnd) {
         middle = " So I understand your contract expires in {{account.contract_end}} — who is your current supplier?";
+        console.log('[Call Scripts] Using variant: Contract end only');
       } else if (hasSupplier && hasContractEnd) {
         middle = " So I understand you guys are using {{account.supplier}} till {{account.contract_end}}.";
+        console.log('[Call Scripts] Using variant: Both supplier and contract end');
       } else {
         middle = " When does your contract expire? Do you know who your supplier is?";
+        console.log('[Call Scripts] Using variant: Neither supplier nor contract end');
       }
       const part2 = (hasSupplier && hasContractEnd)
-        ? " <br><br>We work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take."
-        : " <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take.";
+        ? " <br><br>We work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you're forced to take."
+        : " <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you're forced to take.";
       const part3 = " <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>";
-      return intro + middle + part2 + part3;
+      const result = intro + middle + part2 + part3;
+      console.log('[Call Scripts] Generated script text:', result);
+      return result;
     }
 
     if (key === 'pathA_struggling') {
       const hasContractEnd = !!(data.account.contractEnd || data.account.contract_end || data.account.renewalDate);
       const hasSupplier = !!(data.account.supplier || data.account.currentSupplier);
+      console.log('[Call Scripts] pathA_struggling - hasSupplier:', hasSupplier, 'hasContractEnd:', hasContractEnd);
+      console.log('[Call Scripts] pathA_struggling - supplier:', data.account.supplier, 'contract_end:', data.account.contract_end);
+      
       const intro = "Totally get it — {{contact.first_name}}. A lot of {{account.industry}} companies in {{account.city}} are dealing with high electricity bills and shady business practices.";
       let middle = '';
       if (hasSupplier && !hasContractEnd) {
         middle = " So I understand you guys are using {{account.supplier}} — when does your contract expire?";
+        console.log('[Call Scripts] Using variant: Supplier only');
       } else if (!hasSupplier && hasContractEnd) {
         middle = " So I understand your contract expires in {{account.contract_end}} — who is your current supplier?";
+        console.log('[Call Scripts] Using variant: Contract end only');
       } else if (hasSupplier && hasContractEnd) {
         middle = " So I understand you guys are using {{account.supplier}} till {{account.contract_end}}.";
+        console.log('[Call Scripts] Using variant: Both supplier and contract end');
       } else {
         middle = " Who's your current supplier? Do you know when your contract expires?";
+        console.log('[Call Scripts] Using variant: Neither supplier nor contract end');
       }
       const closing = " <br><br>My job is to time the market and keep you informed so you're not caught off-guard by your supplier. Would it help if I offer you a free energy health check so you can get a better understanding where you're at — that way you can see what your options are?";
-      return intro + middle + closing;
+      const result = intro + middle + closing;
+      console.log('[Call Scripts] Generated script text:', result);
+      return result;
     }
 
     return node.text || '';
@@ -577,11 +717,8 @@
     const node = FLOW[state.current] || FLOW.start;
 
     if (display){
-      const live = isLiveCall();
-      const hasOverride = !!(typeof state !== 'undefined' && state && state.overrideContactId);
       const baseText = buildNodeText(state.current, node);
-      const mode = (live || hasOverride) ? 'text' : 'chips';
-      const html = renderTemplate(baseText, mode);
+      const html = renderTemplate(baseText, 'text');
 
       // Animate script display height change after initial render
       if (state._didInitialRender) {
@@ -846,7 +983,7 @@
       });
       if (sameCo.length) top = sameCo; // restrict to same-company when available
     }
-    top = top.slice(0, 10);
+    top = top.slice(0, 5);
 
     if (top.length === 0) {
       panel.innerHTML = '<div class="suggestion-empty">No matches</div>';
@@ -913,8 +1050,8 @@
     const hasContactId = !!(contact && contact.id);
     const hasAccount = !!(account && (account.accountName||account.name||account.companyName));
     if (!hasContactId && hasAccount) {
-      // Open suggestions with same-company list
-      buildSuggestions('');
+      // Don't auto-open suggestions - let user type to search
+      // buildSuggestions('');
     }
   }
 
@@ -923,8 +1060,13 @@
     const panel = document.getElementById('call-scripts-search-suggestions');
     if (!input || !panel) return;
 
-    // Open on focus with company contacts if available
-    input.addEventListener('focus', () => buildSuggestions(''));
+    // Don't auto-show suggestions on focus - only show when user types
+    input.addEventListener('focus', () => {
+      // Only show suggestions if there's already text in the input
+      if (input.value.trim()) {
+        buildSuggestions(input.value);
+      }
+    });
     input.addEventListener('input', () => {
       const val = input.value || '';
       buildSuggestions(val);
@@ -1017,6 +1159,68 @@
         obs.observe(card, { attributes: true, attributeFilter: ['class'] });
       }
     } catch(_){ }
+    
+    // Listen for energy updates from Health Widget to refresh call scripts
+    setupEnergyUpdateListener();
+  }
+
+  // Listen for energy updates from Health Widget to refresh call scripts in real-time
+  function setupEnergyUpdateListener() {
+    let lastUpdateTime = 0;
+    const UPDATE_THROTTLE_MS = 3000; // Increased throttle to prevent infinite loops
+    
+    const onEnergyUpdated = (e) => {
+      try {
+        const now = Date.now();
+        if (now - lastUpdateTime < UPDATE_THROTTLE_MS) {
+          return; // Throttle rapid updates
+        }
+        lastUpdateTime = now;
+        
+        const d = e.detail || {};
+        console.log('[Call Scripts] Received energy update:', d);
+        
+        // Check if this update is relevant to the current contact/account
+        const liveData = getLiveData();
+        const currentContactId = liveData.contact?.id || liveData.contact?.contactId || liveData.contact?._id;
+        const currentAccountId = liveData.account?.id || liveData.account?.accountId || liveData.account?._id;
+        
+        console.log('[Call Scripts] Current contact ID:', currentContactId, 'Current account ID:', currentAccountId);
+        
+        // Update if it's for the current contact or account
+        const isRelevant = (d.entity === 'contact' && String(d.id) === String(currentContactId)) ||
+                          (d.entity === 'account' && String(d.id) === String(currentAccountId));
+        
+        console.log('[Call Scripts] Is relevant update:', isRelevant);
+        
+        if (isRelevant) {
+          console.log('[Call Scripts] Re-rendering scripts with updated energy data');
+          // Clear DOM cache to ensure fresh data is read
+          clearDOMCache();
+          // Re-render the call scripts to reflect the updated energy data
+          render();
+        }
+      } catch(_) {}
+    };
+    
+    document.addEventListener('pc:energy-updated', onEnergyUpdated);
+    
+    // Clean up listener when page is hidden
+    const page = document.getElementById('call-scripts-page');
+    if (page) {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+            const isHidden = !page.classList.contains('active');
+            if (isHidden) {
+              document.removeEventListener('pc:energy-updated', onEnergyUpdated);
+              observer.disconnect();
+            }
+          }
+        });
+      });
+      observer.observe(page, { attributes: true, attributeFilter: ['class'] });
+    }
   }
 
   // Expose module
