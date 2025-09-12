@@ -391,26 +391,86 @@ export default async function handler(req, res) {
     }
     
     if (req.method === 'DELETE') {
-        // Delete a call by ID
-        const { id } = req.body || {};
-        if (!id) {
-            return res.status(400).json({ error: 'Call ID is required' });
+        // Delete a call by ID (robust: by doc id, by twilioSid, or by stored id field)
+        const { id, twilioSid } = req.body || {};
+        const candidates = [id, twilioSid].filter(Boolean);
+        if (candidates.length === 0) {
+            return res.status(400).json({ error: 'Call identifier is required (id or twilioSid)' });
         }
         
         try {
+            let deletedDocId = null;
             if (db) {
-                // Delete from Firestore
-                await db.collection('calls').doc(id).delete();
-                console.log(`[Calls][DELETE] Deleted call ${id} from Firestore`);
+                const col = db.collection('calls');
+
+                // 1) Try exact document ID(s)
+                for (const cand of candidates) {
+                    try {
+                        const ref = col.doc(cand);
+                        const snap = await ref.get();
+                        if (snap.exists) {
+                            await ref.delete();
+                            deletedDocId = cand;
+                            console.log(`[Calls][DELETE] Deleted call ${cand} by doc id`);
+                            break;
+                        }
+                    } catch (e) {
+                        // continue to other strategies
+                    }
+                }
+
+                // 2) Try where twilioSid == candidate
+                if (!deletedDocId) {
+                    for (const cand of candidates) {
+                        const q = await col.where('twilioSid', '==', cand).limit(1).get();
+                        if (!q.empty) {
+                            const doc = q.docs[0];
+                            await col.doc(doc.id).delete();
+                            deletedDocId = doc.id;
+                            console.log(`[Calls][DELETE] Deleted call ${doc.id} by twilioSid=${cand}`);
+                            break;
+                        }
+                    }
+                }
+
+                // 3) Try where id field == candidate
+                if (!deletedDocId) {
+                    for (const cand of candidates) {
+                        const q = await col.where('id', '==', cand).limit(1).get();
+                        if (!q.empty) {
+                            const doc = q.docs[0];
+                            await col.doc(doc.id).delete();
+                            deletedDocId = doc.id;
+                            console.log(`[Calls][DELETE] Deleted call ${doc.id} by stored id field=${cand}`);
+                            break;
+                        }
+                    }
+                }
             }
             
-            // Also remove from in-memory store if it exists
-            if (callStore.has(id)) {
-                callStore.delete(id);
-                console.log(`[Calls][DELETE] Deleted call ${id} from memory store`);
+            // Also remove from in-memory store if it exists (try by id and by twilioSid)
+            for (const cand of candidates) {
+                if (callStore.has(cand)) {
+                    callStore.delete(cand);
+                    console.log(`[Calls][DELETE] Deleted call ${cand} from memory store (key match)`);
+                } else {
+                    // try matching by field
+                    for (const [k, v] of callStore.entries()) {
+                        if (!v) continue;
+                        if (v.twilioSid === cand || v.id === cand) {
+                            callStore.delete(k);
+                            console.log(`[Calls][DELETE] Deleted call ${k} from memory store (field match)`);
+                            break;
+                        }
+                    }
+                }
             }
             
-            return res.status(200).json({ success: true, message: 'Call deleted successfully' });
+            if (!deletedDocId && db) {
+                return res.status(404).json({ success: false, error: 'Call not found for deletion' });
+            }
+            
+            return res.status(200).json({ success: true, message: 'Call deleted successfully', id: deletedDocId || id || twilioSid });
             
         } catch (error) {
             console.error('[Calls][DELETE] Error deleting call:', error);
