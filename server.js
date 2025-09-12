@@ -65,6 +65,127 @@ async function handleApiGeminiEmail(req, res) {
   }
 }
 
+// Helper to read raw request body without JSON parsing (for Twilio webhooks)
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => {
+      data += chunk;
+      if (data.length > 5e6) { // 5MB guard for webhooks
+        req.connection.destroy();
+        reject(new Error('Payload too large'));
+      }
+    });
+    req.on('end', () => resolve(data));
+    req.on('error', reject);
+  });
+}
+
+// Proxy Twilio Voice webhook (returns TwiML XML)
+async function handleApiTwilioVoice(req, res, parsedUrl) {
+  try {
+    const proxyUrl = `${API_BASE_URL}/api/twilio/voice${parsedUrl.search || ''}`;
+    if (req.method === 'GET') {
+      const upstream = await fetch(proxyUrl);
+      const text = await upstream.text();
+      res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'text/xml' });
+      res.end(text);
+      return;
+    }
+    if (req.method === 'POST') {
+      const raw = await readRawBody(req);
+      const contentType = req.headers['content-type'] || 'application/x-www-form-urlencoded';
+      const upstream = await fetch(proxyUrl, { method: 'POST', headers: { 'Content-Type': contentType }, body: raw });
+      const text = await upstream.text();
+      res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'text/xml' });
+      res.end(text);
+      return;
+    }
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+  } catch (error) {
+    console.error('[Twilio Voice] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
+// Proxy Twilio Recording status webhook
+async function handleApiTwilioRecording(req, res) {
+  try {
+    const proxyUrl = `${API_BASE_URL}/api/twilio/recording`;
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+    const raw = await readRawBody(req);
+    const contentType = req.headers['content-type'] || 'application/x-www-form-urlencoded';
+    const upstream = await fetch(proxyUrl, { method: 'POST', headers: { 'Content-Type': contentType }, body: raw });
+    const text = await upstream.text();
+    // Twilio expects 200 JSON typically from our API
+    res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json' });
+    res.end(text);
+  } catch (error) {
+    console.error('[Twilio Recording] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
+// Proxy Twilio Conversational Intelligence processing endpoint
+async function handleApiTwilioConversationalIntelligence(req, res) {
+  try {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+    const body = await readJsonBody(req);
+    const upstream = await fetch(`${API_BASE_URL}/api/twilio/conversational-intelligence`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const text = await upstream.text();
+    let payload;
+    try { payload = text ? JSON.parse(text) : {}; } catch (_) { payload = { ok: false, body: text }; }
+    res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(payload));
+  } catch (error) {
+    console.error('[Twilio CI] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
+// Proxy Twilio Conversational Intelligence webhook (Twilio -> our API)
+async function handleApiTwilioConversationalIntelligenceWebhook(req, res) {
+  try {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+    // Twilio may send urlencoded or JSON; forward as-is
+    const raw = await readRawBody(req);
+    const contentType = req.headers['content-type'] || 'application/x-www-form-urlencoded';
+    const upstream = await fetch(`${API_BASE_URL}/api/twilio/conversational-intelligence-webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': contentType },
+      body: raw
+    });
+    const text = await upstream.text();
+    // Our upstream returns JSON
+    res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json' });
+    res.end(text);
+  } catch (error) {
+    console.error('[Twilio CI Webhook] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
 async function handleApiTwilioLanguageWebhook(req, res) {
   try {
     const parsedUrl = url.parse(req.url, true);
