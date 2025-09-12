@@ -201,7 +201,9 @@ async function generateTwilioAIInsights(transcript) {
         // For now, we'll use a simple analysis approach
         // In the future, this could be enhanced with Twilio's AI services
         
-        const words = transcript.toLowerCase().split(/\s+/);
+        const text = (transcript || '').toString();
+        const lower = text.toLowerCase();
+        const words = lower.split(/\s+/).filter(Boolean);
         const wordCount = words.length;
         
         // Basic sentiment analysis based on keywords
@@ -216,11 +218,11 @@ async function generateTwilioAIInsights(transcript) {
         else if (negativeCount > positiveCount) sentiment = 'Negative';
         
         // Extract key topics based on common business terms
-        const businessTopics = ['price', 'cost', 'budget', 'contract', 'agreement', 'proposal', 'quote', 'timeline', 'schedule', 'meeting', 'demo', 'trial'];
+        const businessTopics = ['price','cost','budget','contract','agreement','proposal','quote','timeline','schedule','meeting','demo','trial','supplier','rate'];
         const keyTopics = businessTopics.filter(topic => words.includes(topic));
         
         // Extract potential next steps
-        const nextStepKeywords = ['call', 'email', 'meeting', 'demo', 'proposal', 'quote', 'follow', 'schedule', 'send', 'review'];
+        const nextStepKeywords = ['call','email','meeting','demo','proposal','quote','follow','schedule','send','review'];
         const nextSteps = nextStepKeywords.filter(step => words.includes(step));
         
         // Extract potential pain points
@@ -228,22 +230,36 @@ async function generateTwilioAIInsights(transcript) {
         const painPoints = painKeywords.filter(pain => words.includes(pain));
         
         // Check for budget discussion
-        const budgetKeywords = ['budget', 'cost', 'price', 'expensive', 'cheap', 'afford', 'money', 'dollar', 'payment'];
-        const budgetDiscussed = budgetKeywords.some(keyword => words.includes(keyword));
+        const budgetDiscussed = /(budget|cost|price|expensive|cheap|afford|payment|invoice)/i.test(text);
         
         // Check for timeline discussion
-        const timelineKeywords = ['when', 'timeline', 'schedule', 'deadline', 'urgent', 'soon', 'quickly', 'time'];
-        const timelineMentioned = timelineKeywords.some(keyword => words.includes(keyword));
+        const timelineMentioned = /(when|timeline|schedule|deadline|urgent|soon|quickly|time)/i.test(text);
+        
+        // Light extraction for contract details
+        const contract = { currentRate: '', rateType: '', supplier: '', contractEnd: '', usageKWh: '', contractLength: '' };
+        const rateMatch = text.match(/\$?\s?(\d{1,2}(?:\.\d{1,3})?)\s*\/?\s*kwh/i);
+        if (rateMatch) contract.currentRate = `$${Number(rateMatch[1]).toFixed(3)}/kWh`.replace(/\.000\/kWh$/, '/kWh');
+        const rateTypeMatch = lower.match(/\b(fixed|variable|indexed)\b/);
+        if (rateTypeMatch) contract.rateType = rateTypeMatch[1];
+        const supplierMatch = text.match(/\b(?:with|from|using|on)\s+([A-Z][A-Za-z&\- ]{2,40})\b/);
+        if (supplierMatch) contract.supplier = supplierMatch[1].trim();
+        const endMatch = text.match(/(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t)?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[ ,]*\s*(20\d{2})/i);
+        if (endMatch) contract.contractEnd = `${endMatch[1]} ${endMatch[2]}`;
+        const usageMatch = text.match(/(\d{2,3}[,\.]?\d{3}|\d{4,6})\s*(kwh|kw\s*h|kilowatt\s*hours)/i);
+        if (usageMatch) contract.usageKWh = usageMatch[1].replace(/\./g,',') + ' kWh';
+        const lengthMatch = text.match(/(\d{1,2})\s*(month|months|mo|year|years|yr|yrs)/i);
+        if (lengthMatch) contract.contractLength = /year/i.test(lengthMatch[2]) ? `${lengthMatch[1]} year${lengthMatch[1]==='1'?'':'s'}` : `${lengthMatch[1]} months`;
         
         return {
-            summary: `Call transcript contains ${wordCount} words. ${sentiment} sentiment detected. ${keyTopics.length > 0 ? 'Key topics: ' + keyTopics.join(', ') : 'General discussion.'}`,
-            sentiment: sentiment,
-            keyTopics: keyTopics.length > 0 ? keyTopics : ['General business discussion'],
-            nextSteps: nextSteps.length > 0 ? nextSteps : ['Follow up call'],
-            painPoints: painPoints.length > 0 ? painPoints : [],
+            summary: `Call transcript contains ${wordCount} words. ${sentiment} sentiment detected. ${keyTopics.length ? 'Key topics: ' + keyTopics.join(', ') : 'General discussion.'}`,
+            sentiment,
+            keyTopics: keyTopics.length ? keyTopics : ['General business discussion'],
+            nextSteps: nextSteps.length ? nextSteps : ['Follow up call'],
+            painPoints,
             budget: budgetDiscussed ? 'Discussed' : 'Not Mentioned',
             timeline: timelineMentioned ? 'Timeline discussed' : 'Not specified',
-            decisionMakers: [] // Could be enhanced with name detection
+            decisionMakers: [],
+            contract
         };
         
     } catch (error) {
@@ -256,7 +272,8 @@ async function generateTwilioAIInsights(transcript) {
             painPoints: [],
             budget: 'Unclear',
             timeline: 'Not specified',
-            decisionMakers: []
+            decisionMakers: [],
+            contract: { currentRate:'', rateType:'', supplier:'', contractEnd:'', usageKWh:'', contractLength:'' }
         };
     }
 }
