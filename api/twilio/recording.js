@@ -177,7 +177,7 @@ export default async function handler(req, res) {
     }
 }
 
-async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
+async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, baseUrl) {
     try {
         console.log('[Recording] Starting Twilio AI processing for:', callSid);
         
@@ -381,7 +381,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
         
         // Also upsert transcript and insights into /api/calls for the UI
         try {
-            const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
+            const base = baseUrl || process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') || 'https://power-choosers-crm.vercel.app';
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
