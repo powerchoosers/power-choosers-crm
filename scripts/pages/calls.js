@@ -190,6 +190,38 @@
       #calls-bulk-actions .action-btn-sm svg { display: block; }
       #calls-bulk-actions .action-btn-sm span { display: inline-block; white-space: nowrap; }
       #calls-bulk-actions #bulk-ai svg { transform: translateY(2px); }
+
+      /* Delete confirmation popover */
+      .delete-popover {
+        position: fixed; z-index: 960; background: var(--bg-modal, #262a30);
+        color: var(--text-inverse); border: 1px solid var(--grey-700);
+        border-radius: var(--border-radius); box-shadow: var(--shadow-xl);
+        padding: 0; min-width: 280px; max-width: 360px;
+      }
+      .delete-popover::before {
+        content: ''; position: absolute; top: -6px; left: var(--arrow-left, 50%);
+        width: 12px; height: 12px; background: var(--bg-modal, #262a30);
+        border: 1px solid var(--grey-700); border-bottom: none; border-right: none;
+        transform: rotate(45deg); transform-origin: center;
+      }
+      .delete-popover-inner { padding: 20px; }
+      .delete-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-inverse); }
+      .btn-row { display: flex; justify-content: flex-end; gap: 8px; }
+      .btn-cancel, .btn-danger {
+        padding: 8px 16px; border-radius: var(--border-radius-sm); font-size: 14px;
+        font-weight: 500; cursor: pointer; border: 1px solid transparent;
+        transition: all 0.2s ease;
+      }
+      .btn-cancel {
+        background: var(--bg-item); color: var(--text-inverse);
+        border-color: var(--border-light);
+      }
+      .btn-cancel:hover { background: var(--grey-700); border-color: var(--grey-600); }
+      .btn-danger {
+        background: var(--red-muted); color: var(--text-inverse);
+        border-color: var(--red-subtle);
+      }
+      .btn-danger:hover { background: var(--red-600); border-color: var(--red-500); }
     `;
     document.head.appendChild(style);
   }
@@ -858,7 +890,153 @@
     container.querySelector('#bulk-addlist').addEventListener('click', () => console.log('Bulk add to list', Array.from(state.selected)));
     container.querySelector('#bulk-export').addEventListener('click', () => console.log('Bulk export', Array.from(state.selected)));
     container.querySelector('#bulk-ai').addEventListener('click', () => console.log('Bulk research with AI', Array.from(state.selected)));
-    container.querySelector('#bulk-delete').addEventListener('click', () => console.log('Bulk delete', Array.from(state.selected)));
+    container.querySelector('#bulk-delete').addEventListener('click', () => openBulkDeleteConfirm());
+  }
+
+  // ===== Bulk Delete Confirmation Modal =====
+  let _onDelKeydown = null;
+  let _onDelOutside = null;
+  
+  function closeBulkDeleteConfirm() {
+    const pop = document.getElementById('calls-delete-popover');
+    const backdrop = document.getElementById('calls-delete-backdrop');
+    if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    if (_onDelKeydown) { document.removeEventListener('keydown', _onDelKeydown); _onDelKeydown = null; }
+    if (_onDelOutside) { document.removeEventListener('mousedown', _onDelOutside, true); _onDelOutside = null; }
+  }
+
+  function openBulkDeleteConfirm() {
+    if (document.getElementById('calls-delete-popover')) return;
+    const bar = els.page && els.page.querySelector('#calls-bulk-actions');
+    if (!bar) return;
+    const delBtn = bar.querySelector('#bulk-delete');
+    
+    // Backdrop for click-away
+    const backdrop = document.createElement('div');
+    backdrop.id = 'calls-delete-backdrop';
+    backdrop.style.position = 'fixed';
+    backdrop.style.inset = '0';
+    backdrop.style.background = 'transparent';
+    backdrop.style.zIndex = '955';
+    document.body.appendChild(backdrop);
+
+    const pop = document.createElement('div');
+    pop.id = 'calls-delete-popover';
+    pop.className = 'delete-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Confirm delete');
+    pop.dataset.placement = 'bottom';
+    pop.innerHTML = `
+      <div class="delete-popover-inner">
+        <div class="delete-title">Delete ${state.selected.size} ${state.selected.size===1?'call':'calls'}?</div>
+        <div class="btn-row">
+          <button type="button" id="del-cancel" class="btn-cancel">Cancel</button>
+          <button type="button" id="del-confirm" class="btn-danger">Delete</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(pop);
+
+    // Position under the delete button and center horizontally to its center
+    const anchorRect = (delBtn || bar).getBoundingClientRect();
+    const preferredLeft = anchorRect.left + (anchorRect.width / 2) - (pop.offsetWidth / 2);
+    const clampedLeft = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, preferredLeft));
+    const top = anchorRect.bottom + 8; // fixed, viewport coords
+    pop.style.top = `${Math.round(top)}px`;
+    pop.style.left = `${Math.round(clampedLeft)}px`;
+    // Arrow: center to the button's center within the popover, clamped to popover width
+    const rawArrowLeft = (anchorRect.left + (anchorRect.width / 2)) - clampedLeft;
+    const maxArrow = Math.max(0, pop.offsetWidth - 12);
+    const clampedArrow = Math.max(12, Math.min(maxArrow, rawArrowLeft));
+    pop.style.setProperty('--arrow-left', `${Math.round(clampedArrow)}px`);
+
+    const cancel = pop.querySelector('#del-cancel');
+    const confirm = pop.querySelector('#del-confirm');
+    if (cancel) cancel.addEventListener('click', () => closeBulkDeleteConfirm());
+    if (confirm) confirm.addEventListener('click', async () => {
+      closeBulkDeleteConfirm();
+      await deleteSelectedCalls();
+    });
+
+    // Focus mgmt and esc
+    const f = confirm || cancel;
+    f && f.focus && f.focus();
+    _onDelKeydown = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeBulkDeleteConfirm(); }
+    };
+    document.addEventListener('keydown', _onDelKeydown);
+    _onDelOutside = (e) => {
+      const t = e.target;
+      if (!pop.contains(t)) closeBulkDeleteConfirm();
+    };
+    document.addEventListener('mousedown', _onDelOutside, true);
+  }
+
+  // Delete selected calls from Firestore and local state
+  async function deleteSelectedCalls() {
+    const ids = Array.from(state.selected || []);
+    if (!ids.length) return;
+    
+    // Show progress toast
+    const progressToast = window.crm?.showProgressToast ? 
+      window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'call' : 'calls'}...`, ids.length, 0) : null;
+    
+    let failed = 0;
+    let completed = 0;
+    
+    try {
+      // Delete from Firestore
+      for (const id of ids) {
+        try {
+          const response = await fetch(`${window.API_BASE_URL}/api/calls`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+          });
+          
+          if (response.ok) {
+            completed++;
+            // Update progress toast
+            if (progressToast && typeof progressToast.update === 'function') {
+              progressToast.update(completed, ids.length);
+            }
+          } else {
+            failed++;
+            console.error(`Failed to delete call ${id}:`, response.statusText);
+          }
+        } catch (error) {
+          failed++;
+          console.error(`Error deleting call ${id}:`, error);
+        }
+      }
+      
+      // Clear selection and refresh
+      state.selected.clear();
+      hideBulkBar();
+      await loadData(); // Refresh the data
+      
+      // Show completion toast
+      if (progressToast && typeof progressToast.complete === 'function') {
+        progressToast.complete();
+      }
+      
+      if (failed > 0) {
+        window.crm?.showToast ? window.crm.showToast(`Deleted ${completed} calls, ${failed} failed`, 'warning') : 
+          console.warn(`Deleted ${completed} calls, ${failed} failed`);
+      } else {
+        window.crm?.showToast ? window.crm.showToast(`Successfully deleted ${completed} ${completed === 1 ? 'call' : 'calls'}`, 'success') :
+          console.log(`Successfully deleted ${completed} calls`);
+      }
+      
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      if (progressToast && typeof progressToast.error === 'function') {
+        progressToast.error();
+      }
+      window.crm?.showToast ? window.crm.showToast('Failed to delete calls', 'error') :
+        console.error('Failed to delete calls');
+    }
   }
 
   function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); /* buttons removed */ }
