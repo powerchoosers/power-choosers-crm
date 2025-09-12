@@ -131,6 +131,11 @@ export default async function handler(req, res) {
                         merged.accountName = pick.accountName || prev.accountName || null;
                         merged.contactId = pick.contactId || prev.contactId || null;
                         merged.contactName = pick.contactName || prev.contactName || null;
+                        // Prefer non-empty transcript and present aiInsights
+                        const prevTranscript = (prev.transcript || '').trim();
+                        const currTranscript = (c.transcript || '').trim();
+                        merged.transcript = currTranscript || prevTranscript || '';
+                        merged.aiInsights = c.aiInsights || prev.aiInsights || null;
                         map.set(key, merged);
                     }
                     return Array.from(map.values());
