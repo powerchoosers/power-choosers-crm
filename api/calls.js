@@ -83,7 +83,7 @@ export default async function handler(req, res) {
                     const snap = await db
                         .collection('calls')
                         .orderBy('timestamp', 'desc')
-                        .limit(50)
+                        .limit(200)
                         .get();
                     snap.forEach(doc => {
                         const d = doc.data() || {};
