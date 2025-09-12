@@ -137,14 +137,25 @@ export default async function handler(req, res) {
                         };
                         
                         if (db) {
-                            await db.collection('calls').doc(transcript.sourceSid).set(callData, { merge: true });
-                            console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore`);
-                            results.push({
-                                transcriptSid: transcript.sid,
-                                sourceSid: transcript.sourceSid,
-                                transcriptLength: transcriptText.length,
-                                status: 'success'
-                            });
+                            try {
+                                console.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${transcript.sourceSid}'`);
+                                await db.collection('calls').doc(transcript.sourceSid).set(callData, { merge: true });
+                                console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore`);
+                                results.push({
+                                    transcriptSid: transcript.sid,
+                                    sourceSid: transcript.sourceSid,
+                                    transcriptLength: transcriptText.length,
+                                    status: 'success'
+                                });
+                            } catch (firestoreError) {
+                                console.error(`[Process Existing Transcripts] Firestore write error for ${transcript.sid}:`, firestoreError);
+                                results.push({
+                                    transcriptSid: transcript.sid,
+                                    sourceSid: transcript.sourceSid,
+                                    status: 'firestore-error',
+                                    error: firestoreError.message
+                                });
+                            }
                         } else {
                             console.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
                             results.push({
@@ -249,7 +260,9 @@ export default async function handler(req, res) {
                                 source: 'conversational-intelligence-processing-alternative'
                             };
                             
-                            if (db) {
+                        if (db) {
+                            try {
+                                console.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${alternativeSourceId}'`);
                                 await db.collection('calls').doc(alternativeSourceId).set(callData, { merge: true });
                                 console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore with alternative source`);
                                 results.push({
@@ -258,15 +271,24 @@ export default async function handler(req, res) {
                                     transcriptLength: transcriptText.length,
                                     status: 'success-alternative'
                                 });
-                            } else {
-                                console.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
+                            } catch (firestoreError) {
+                                console.error(`[Process Existing Transcripts] Firestore write error for ${transcript.sid}:`, firestoreError);
                                 results.push({
                                     transcriptSid: transcript.sid,
                                     sourceSid: alternativeSourceId,
-                                    status: 'failed',
-                                    error: 'Firestore not available'
+                                    status: 'firestore-error',
+                                    error: firestoreError.message
                                 });
                             }
+                        } else {
+                            console.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
+                            results.push({
+                                transcriptSid: transcript.sid,
+                                sourceSid: alternativeSourceId,
+                                status: 'failed',
+                                error: 'Firestore not available'
+                            });
+                        }
                         } catch (error) {
                             console.error(`[Process Existing Transcripts] Error updating call data for ${transcript.sid}:`, error);
                             results.push({
