@@ -73,6 +73,7 @@ export default async function handler(req, res) {
                     if (recordings.length > 0) {
                         recordingUrl = recordings[0].uri.replace('.json', '.mp3');
                         recordingSid = recordings[0].sid;
+                        console.log(`[Cleanup] Found recording for ${call.sid}: ${recordingSid}`);
                     }
                 } catch (recordingError) {
                     console.log(`[Cleanup] No recording for call ${call.sid}`);
