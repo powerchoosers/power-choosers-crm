@@ -307,8 +307,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS' && (
     pathname === '/api/twilio/token' ||
     pathname === '/api/twilio/call' ||
+    pathname === '/api/twilio/voice' ||
     pathname === '/api/calls' ||
     pathname === '/api/twilio/language-webhook' ||
+    pathname === '/api/twilio/conversational-intelligence' ||
+    pathname === '/api/twilio/conversational-intelligence-webhook' ||
+    pathname === '/api/twilio/recording' ||
     pathname === '/api/twilio/ai-insights' ||
     pathname === '/api/energy-news' ||
     pathname === '/api/search' ||
@@ -332,11 +336,23 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/twilio/call') {
     return handleApiTwilioCall(req, res);
   }
+  if (pathname === '/api/twilio/voice') {
+    return handleApiTwilioVoice(req, res, parsedUrl);
+  }
   if (pathname === '/api/twilio/language-webhook') {
     return handleApiTwilioLanguageWebhook(req, res);
   }
   if (pathname === '/api/twilio/voice-intelligence') {
     return handleApiTwilioVoiceIntelligence(req, res);
+  }
+  if (pathname === '/api/twilio/conversational-intelligence') {
+    return handleApiTwilioConversationalIntelligence(req, res);
+  }
+  if (pathname === '/api/twilio/conversational-intelligence-webhook') {
+    return handleApiTwilioConversationalIntelligenceWebhook(req, res);
+  }
+  if (pathname === '/api/twilio/recording') {
+    return handleApiTwilioRecording(req, res);
   }
   if (pathname === '/api/twilio/ai-insights') {
     return handleApiTwilioAIInsights(req, res);
