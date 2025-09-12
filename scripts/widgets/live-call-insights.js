@@ -165,7 +165,7 @@ class LiveCallInsights {
     updateLiveData(call) {
         // Update transcript
         if (call.transcript && call.transcript.length > 0) {
-            this.updateTranscript(call.transcript);
+            this.updateTranscript(call.transcript, call.aiInsights || {});
         }
 
         // Update AI tips
@@ -179,9 +179,9 @@ class LiveCallInsights {
         }
     }
 
-    updateTranscript(transcript) {
-        // Format transcript with speaker labels
-        const formattedTranscript = this.formatTranscript(transcript);
+    updateTranscript(transcript, ai = {}) {
+        // Format transcript with speaker labels and timestamps
+        const formattedTranscript = this.formatTranscript(transcript, ai);
         this.transcriptContainer.innerHTML = `
             <div class="transcript-content">
                 ${formattedTranscript}
@@ -189,23 +189,40 @@ class LiveCallInsights {
         `;
     }
 
-    formatTranscript(transcript) {
-        // Simple formatting - in a real implementation, you'd want more sophisticated speaker diarization
-        const lines = transcript.split('\n').filter(line => line.trim());
-        return lines.map(line => {
-            if (line.includes(':')) {
-                const [speaker, ...text] = line.split(':');
-                const isAgent = speaker.toLowerCase().includes('agent') || speaker.toLowerCase().includes('rep');
-                return `
-                    <div class="transcript-line ${isAgent ? 'agent' : 'customer'}">
-                        <span class="speaker">${speaker.trim()}:</span>
-                        <span class="text">${text.join(':').trim()}</span>
-                    </div>
-                `;
-            } else {
-                return `<div class="transcript-line">${line}</div>`;
-            }
-        }).join('');
+    // Helpers to align with Calls/Contact pages
+    toMMSS(seconds) {
+        const s = Number(seconds) || 0; const m = Math.floor(s/60); const ss = s % 60; return `${m}:${String(ss).padStart(2,'0')}`;
+    }
+    parseSpeakerTranscript(text) {
+        const out = []; if (!text) return out; const lines = String(text).split(/\r?\n/);
+        for (const raw of lines) {
+            const line = raw.trim(); if (!line) continue;
+            // "Speaker 0:03: ..." or "Agent 1:23: ..."
+            let m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+(\d+):(\d{2}):\s*(.*)$/);
+            // "Speaker 1 0:45: ..." (optional id before time)
+            if (!m) { m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+\d+\s+(\d+):(\d{2}):\s*(.*)$/); if (m) { m = [m[0], m[1], m[2], m[3], m[4]]; } }
+            if (m) { const label = m[1].trim(); const mm = parseInt(m[2],10)||0; const ss = parseInt(m[3],10)||0; const txt = m[4]||''; out.push({ label, t:mm*60+ss, text:txt }); continue; }
+            out.push({ label:'', t:null, text:line });
+        }
+        return out;
+    }
+    formatTranscript(transcript, ai = {}) {
+        // Prefer structured speakerTurns when available
+        const turns = Array.isArray(ai.speakerTurns) ? ai.speakerTurns : [];
+        if (turns.length) {
+            return turns.map(t => {
+                const role = t.role === 'agent' ? 'Agent' : (t.role === 'customer' ? 'Customer' : 'Speaker');
+                return `<div class="transcript-line ${t.role||''}"><span class="speaker">${role} ${this.toMMSS(Number(t.t)||0)}:</span> <span class="text">${(t.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></div>`;
+            }).join('');
+        }
+        // Parse labeled lines with timestamps if present
+        const parsed = this.parseSpeakerTranscript(transcript || '');
+        if (parsed.some(p => p.label && p.t != null)) {
+            return parsed.map(p => p.label ? `<div class="transcript-line"><span class="speaker">${p.label} ${this.toMMSS(p.t)}:</span> <span class="text">${(p.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></div>` : `<div class="transcript-line"><span class="text">${(p.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></div>`).join('');
+        }
+        // Fallback: simple line-by-line
+        const lines = String(transcript||'').split('\n').filter(line => line.trim());
+        return lines.map(line => `<div class="transcript-line">${line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('');
     }
 
     updateTips(tips) {
