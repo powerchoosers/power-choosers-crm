@@ -271,7 +271,7 @@
   async function loadData() {
     // 1) Try to load real calls from backend if API_BASE_URL is set
     try {
-      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      const base = (window.API_BASE_URL || 'https://power-choosers-crm.vercel.app').replace(/\/$/, '');
       if (base) {
         console.log('[Calls] Loading real call data from:', `${base}/api/calls`);
         const r = await fetch(`${base}/api/calls`, { method: 'GET' });
@@ -984,15 +984,20 @@
     
     let failed = 0;
     let completed = 0;
+
+    // Resolve API endpoint with safe fallback
+    const base = (window.API_BASE_URL || 'https://power-choosers-crm.vercel.app').replace(/\/$/, '');
+    const url = `${base}/api/calls`;
     
     try {
-      // Delete from Firestore
+      // Delete from backend
       for (const id of ids) {
         try {
-          const response = await fetch(`${window.API_BASE_URL}/api/calls`, {
+          const response = await fetch(url, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id })
+            // Send both id and twilioSid to maximize backend match chances
+            body: JSON.stringify({ id, twilioSid: id })
           });
           
           if (response.ok) {
@@ -1003,7 +1008,7 @@
             }
           } else {
             failed++;
-            console.error(`Failed to delete call ${id}:`, response.statusText);
+            console.error(`Failed to delete call ${id}:`, response.status, await response.text().catch(()=>''));
           }
         } catch (error) {
           failed++;
