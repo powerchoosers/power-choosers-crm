@@ -749,56 +749,70 @@
     } catch(_) {}
   }
   function insightsContentHtml(r){
-    const aiInsights = r.aiInsights || {};
-    const sentiment = aiInsights.sentiment || 'Unknown';
-    const keyTopics = Array.isArray(aiInsights.keyTopics) ? aiInsights.keyTopics : [];
-    const nextStepsArr = Array.isArray(aiInsights.nextSteps) ? aiInsights.nextSteps : [];
-    const painPointsArr = Array.isArray(aiInsights.painPoints) ? aiInsights.painPoints : [];
-    const budget = aiInsights.budget || 'Not discussed';
-    const timeline = aiInsights.timeline || 'Not specified';
+    // Normalize AI payload (supports snake_case from Twilio Operator and camelCase)
+    const A = r.aiInsights || {};
+    const get = (obj, keys, d='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; };
+    const toArr = (v)=> Array.isArray(v)?v:(v? [v]:[]);
 
-    // Energy & Contract
-    const contract = aiInsights.contract || {};
-    const rate = contract.currentRate || contract.rate || '';
-    const supplier = contract.supplier || contract.utility || '';
-    const contractEnd = contract.contractEnd || contract.endDate || '';
-    const usage = contract.usageKWh || contract.usage || '';
-    const rateType = contract.rateType || '';
-    const contractLength = contract.contractLength || '';
+    const contract = (()=>{ const c = A.contract || {}; return {
+      currentRate: get(c, ['currentRate','current_rate','rate']),
+      rateType: get(c, ['rateType','rate_type']),
+      supplier: get(c, ['supplier','utility']),
+      contractEnd: get(c, ['contractEnd','contract_end','endDate']),
+      usageKWh: get(c, ['usageKWh','usage_k_wh','usage']),
+      contractLength: get(c, ['contractLength','contract_length'])
+    }; })();
 
-    // Operators / flags
-    const flags = aiInsights.flags || {};
-    const disposition = aiInsights.disposition || '';
-    const nonEnglish = flags.nonEnglish || flags.isNonEnglish || false;
-    const voicemail = flags.voicemailDetected || flags.voicemail || false;
-    const transfer = flags.callTransfer || flags.transferred || false;
-    const dnc = flags.doNotContact || flags.dnc || false;
-    const escalation = flags.escalationRequest || flags.escalation || false;
-    const recordingDisclosure = flags.recordingDisclosure || false;
-    const entities = Array.isArray(aiInsights.entities) ? aiInsights.entities : [];
+    const sentiment = get(A, ['sentiment'], 'Unknown');
+    const disposition = get(A, ['disposition'], '');
+    const keyTopics = toArr(get(A, ['keyTopics','key_topics'], []));
+    const nextStepsArr = toArr(get(A, ['nextSteps','next_steps'], []));
+    const painPointsArr = toArr(get(A, ['painPoints','pain_points'], []));
+    const budget = get(A, ['budget'], 'Not Mentioned');
+    const timeline = get(A, ['timeline'], 'Not specified');
+    const entities = toArr(get(A, ['entities'], []));
+    const flags = get(A, ['flags'], {});
 
-    // Handle real API data that might not have AI insights yet
+    // Summary paragraph: prefer AI summary; otherwise build one
+    let summaryText = get(A, ['summary'], r.aiSummary || '');
+    if (!summaryText) {
+      const topics = keyTopics.slice(0,3).join(', ');
+      summaryText = `Conversation summary${topics?` — ${topics}`:''}. Sentiment: ${sentiment}. ${timeline && timeline!=='Not specified' ? `Timeline: ${timeline}.` : ''}`.trim();
+    }
+
+    // Transcript rendering: prefer structured speaker turns
+    const turns = Array.isArray(A.speakerTurns) ? A.speakerTurns : [];
+    const toMMSS = (s)=>{ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; };
+    let transcriptHtml = '';
+    if (turns.length){
+      transcriptHtml = turns.map(t=>{
+        const role = t.role==='agent' ? 'Agent' : (t.role==='customer' ? 'Customer' : 'Speaker');
+        return `<div class=\"transcript-line ${t.role||''}\"><span class=\"speaker\">${role} ${toMMSS(Number(t.t)||0)}:</span> <span class=\"text\">${escapeHtml(t.text||'')}</span></div>`;
+      }).join('');
+    } else {
+      const fallback = r.transcript || (r.aiInsights ? 'Transcript processing...' : 'Transcript not available');
+      transcriptHtml = escapeHtml(fallback);
+    }
+
     const hasAIInsights = r.aiInsights && Object.keys(r.aiInsights).length > 0;
-    const summaryText = r.aiSummary || (hasAIInsights ? 'AI analysis in progress...' : 'No summary available');
-    const transcriptText = r.transcript || (hasAIInsights ? 'Transcript processing...' : 'Transcript not available');
 
     const chipsHtml = [
-      `<span class="pc-chip ${sentiment==='Positive'?'ok':sentiment==='Negative'?'danger':'info'}">Sentiment: ${escapeHtml(sentiment)}</span>`,
-      disposition ? `<span class="pc-chip info">Disposition: ${escapeHtml(disposition)}</span>` : '',
-      nonEnglish ? '<span class="pc-chip warn">Non‑English</span>' : '',
-      voicemail ? '<span class="pc-chip warn">Voicemail</span>' : '',
-      transfer ? '<span class="pc-chip info">Transferred</span>' : '',
-      dnc ? '<span class="pc-chip danger">Do Not Contact</span>' : '',
-      recordingDisclosure ? '<span class="pc-chip ok">Recording Disclosure</span>' : ''
+      `<span class=\"pc-chip ${sentiment==='Positive'?'ok':sentiment==='Negative'?'danger':'info'}\">Sentiment: ${escapeHtml(sentiment)}</span>`,
+      disposition ? `<span class=\"pc-chip info\">Disposition: ${escapeHtml(disposition)}</span>` : '',
+      (flags.nonEnglish||flags.isNonEnglish) ? '<span class=\"pc-chip warn\">Non‑English</span>' : '',
+      (flags.voicemailDetected||flags.voicemail) ? '<span class=\"pc-chip warn\">Voicemail</span>' : '',
+      (flags.callTransfer||flags.transferred) ? '<span class=\"pc-chip info\">Transferred</span>' : '',
+      (flags.doNotContact||flags.dnc) ? '<span class=\"pc-chip danger\">Do Not Contact</span>' : '',
+      flags.recordingDisclosure ? '<span class=\"pc-chip ok\">Recording Disclosure</span>' : ''
     ].filter(Boolean).join('');
 
-    const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class="pc-chip">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
+    const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class=\"pc-chip\">None</span>';
     const nextStepsHtml = nextStepsArr.length ? nextStepsArr.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
     const painHtml = painPointsArr.length ? painPointsArr.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
-    const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class="pc-chip">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class="pc-chip">None</span>';
+    const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class=\"pc-chip\">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class=\"pc-chip\">None</span>';
 
     return `
-      <div class="pc-sec-grid">
+      <div class=\"pc-sec-grid\">
         <div class="pc-col-left">
           <div class="pc-card">
             <h4>
@@ -814,7 +828,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
               Call Transcript
             </h4>
-            <div class="pc-transcript">${escapeHtml(transcriptText)}</div>
+            <div class=\"pc-transcript\">${transcriptHtml}</div>
           </div>
         </div>
 
@@ -835,14 +849,14 @@
               Energy & Contract Details
             </h4>
             <div class="pc-kv">
-              <div class="k">Current rate</div><div class="v">${escapeHtml(rate || 'Unknown')}</div>
-              <div class="k">Supplier/Utility</div><div class="v">${escapeHtml(supplier || 'Unknown')}</div>
-              <div class="k">Contract end</div><div class="v">${escapeHtml(contractEnd || 'Not discussed')}</div>
-              <div class="k">Usage</div><div class="v">${escapeHtml(String(usage || 'Not provided'))}</div>
-              <div class="k">Rate type</div><div class="v">${escapeHtml(rateType || 'Unknown')}</div>
-              <div class="k">Term</div><div class="v">${escapeHtml(String(contractLength || 'Unknown'))}</div>
-              <div class="k">Budget</div><div class="v">${escapeHtml(budget)}</div>
-              <div class="k">Timeline</div><div class="v">${escapeHtml(timeline)}</div>
+              <div class=\"k\">Current rate</div><div class=\"v\">${escapeHtml(contract.currentRate || 'Unknown')}</div>
+              <div class=\"k\">Supplier/Utility</div><div class=\"v\">${escapeHtml(contract.supplier || 'Unknown')}</div>
+              <div class=\"k\">Contract end</div><div class=\"v\">${escapeHtml(contract.contractEnd || 'Not discussed')}</div>
+              <div class=\"k\">Usage</div><div class=\"v\">${escapeHtml(String(contract.usageKWh || 'Not provided'))}</div>
+              <div class=\"k\">Rate type</div><div class=\"v\">${escapeHtml(contract.rateType || 'Unknown')}</div>
+              <div class=\"k\">Term</div><div class=\"v\">${escapeHtml(String(contract.contractLength || 'Unknown'))}</div>
+              <div class=\"k\">Budget</div><div class=\"v\">${escapeHtml(budget)}</div>
+              <div class=\"k\">Timeline</div><div class=\"v\">${escapeHtml(timeline)}</div>
             </div>
           </div>
 
