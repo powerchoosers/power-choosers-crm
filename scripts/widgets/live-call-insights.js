@@ -168,9 +168,12 @@ class LiveCallInsights {
             this.updateTranscript(call.transcript, call.aiInsights || {});
         }
 
-        // Update AI tips
-        if (call.aiInsights && call.aiInsights.liveTips) {
-            this.updateTips(call.aiInsights.liveTips);
+        // Generate and update AI tips from actual insights
+        if (call.aiInsights) {
+            const liveTips = this.generateLiveTips(call.aiInsights);
+            if (liveTips.length > 0) {
+                this.updateTips(liveTips);
+            }
         }
 
         // Update sentiment indicator
@@ -223,6 +226,87 @@ class LiveCallInsights {
         // Fallback: simple line-by-line
         const lines = String(transcript||'').split('\n').filter(line => line.trim());
         return lines.map(line => `<div class="transcript-line">${line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('');
+    }
+
+    generateLiveTips(aiInsights) {
+        const tips = [];
+        
+        // Generate tips from AI insights
+        if (aiInsights.sentiment) {
+            let sentimentTip = {
+                type: aiInsights.sentiment === 'Positive' ? 'success' : aiInsights.sentiment === 'Negative' ? 'warning' : 'info',
+                priority: 'medium',
+                message: `Customer sentiment: ${aiInsights.sentiment}`
+            };
+            tips.push(sentimentTip);
+        }
+        
+        // Key topics
+        if (aiInsights.keyTopics && Array.isArray(aiInsights.keyTopics) && aiInsights.keyTopics.length > 0) {
+            const topics = Array.isArray(aiInsights.keyTopics[0]) ? aiInsights.keyTopics.map(t => typeof t === 'object' ? t.topic || t : t) : aiInsights.keyTopics;
+            tips.push({
+                type: 'info',
+                priority: 'high',
+                message: `Key topics: ${topics.slice(0, 3).join(', ')}`
+            });
+        }
+        
+        // Next steps
+        if (aiInsights.nextSteps && Array.isArray(aiInsights.nextSteps) && aiInsights.nextSteps.length > 0) {
+            tips.push({
+                type: 'opportunity',
+                priority: 'high',
+                message: `Suggested next steps: ${aiInsights.nextSteps.slice(0, 3).join(', ')}`
+            });
+        }
+        
+        // Pain points
+        if (aiInsights.painPoints && Array.isArray(aiInsights.painPoints) && aiInsights.painPoints.length > 0) {
+            tips.push({
+                type: 'warning',
+                priority: 'high',
+                message: `Customer concerns: ${aiInsights.painPoints.slice(0, 2).join(', ')}`
+            });
+        }
+        
+        // Budget discussion
+        if (aiInsights.budget && aiInsights.budget !== 'Not Mentioned') {
+            tips.push({
+                type: 'success',
+                priority: 'medium',
+                message: `Budget status: ${aiInsights.budget}`
+            });
+        }
+        
+        // Timeline
+        if (aiInsights.timeline && aiInsights.timeline !== 'Not specified') {
+            tips.push({
+                type: 'info',
+                priority: 'medium',
+                message: `Timeline: ${aiInsights.timeline}`
+            });
+        }
+        
+        // Contract information
+        if (aiInsights.contract) {
+            const contract = aiInsights.contract;
+            if (contract.currentRate) {
+                tips.push({
+                    type: 'info',
+                    priority: 'high',
+                    message: `Current rate: ${contract.currentRate}`
+                });
+            }
+            if (contract.contractEnd) {
+                tips.push({
+                    type: 'opportunity',
+                    priority: 'high',
+                    message: `Contract expires: ${contract.contractEnd}`
+                });
+            }
+        }
+        
+        return tips;
     }
 
     updateTips(tips) {
