@@ -324,22 +324,53 @@
               }
             }
 
-            // Contact title resolution
+            // Contact title resolution with fallback and debugging
             let contactTitle = '';
-            if (c.contactId) {
+            
+            // Try from call data first
+            if (c.contactTitle) {
+              contactTitle = c.contactTitle;
+              debug.titleSource = 'api.contactTitle';
+            }
+            
+            // Try from contact ID lookup
+            if (!contactTitle && c.contactId) {
               const pc = getContactById(c.contactId);
-              if (pc && pc.title) { contactTitle = pc.title; debug.titleSource = 'people.byId'; }
+              if (pc && pc.title) { 
+                contactTitle = pc.title; 
+                debug.titleSource = 'people.byId'; 
+              }
             }
-            if (!contactTitle) {
+            
+            // Try from phone to contact map
+            if (!contactTitle && party) {
               const m = phoneToContact.get(party);
-              if (m && m.title) { contactTitle = m.title; debug.titleSource = 'people.byPhone'; }
+              if (m && m.title) { 
+                contactTitle = m.title; 
+                debug.titleSource = 'people.byPhone'; 
+              }
             }
-            if (!contactTitle) {
+            
+            // Try from account lookup
+            if (!contactTitle && party) {
               const acct = findAccountByPhone(party);
               if (acct){
                 const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
-                if (p && p.title) { contactTitle = p.title; debug.titleSource = 'account.recentContact'; }
+                if (p && p.title) { 
+                  contactTitle = p.title; 
+                  debug.titleSource = 'account.recentContact'; 
+                }
               }
+            }
+            
+            // Debug logging for title resolution issues
+            if (window.CRM_DEBUG_CALLS && !contactTitle && (c.contactId || party)) {
+              console.debug('[Calls][title] No title found for:', {
+                callId: id,
+                contactId: c.contactId,
+                party,
+                phoneMapSize: phoneToContact.size
+              });
             }
 
             // Company resolution
@@ -386,8 +417,21 @@
               audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
             };
 
+            // Enhanced debugging for title issues
             if (window.CRM_DEBUG_CALLS) {
-              try { console.debug('[Calls][map]', { ...debug, contactName, contactTitle, company, duration: row.durationSec, outcome: row.outcome, audio: !!row.audioUrl }); } catch(_) {}
+              try { 
+                console.debug('[Calls][map]', { 
+                  ...debug, 
+                  contactName, 
+                  contactTitle, 
+                  company, 
+                  duration: row.durationSec, 
+                  outcome: row.outcome, 
+                  audio: !!row.audioUrl,
+                  hasTitle: !!contactTitle,
+                  originalContactTitle: c.contactTitle
+                }); 
+              } catch(_) {}
             }
 
             return row;
@@ -398,9 +442,6 @@
         } else {
           console.log('[Calls] API returned no calls or error:', j);
         }
-      } else {
-        console.log('[Calls] No API_BASE_URL configured, using demo data');
-      }
     } catch (error) { 
       console.warn('[Calls] Failed to load real call data:', error);
       console.log('[Calls] Falling back to demo data');
@@ -1198,6 +1239,41 @@
         console.error('DELETE Test Error:', error);
         return null;
       }
+    },
+    debugTitles: function() {
+      console.log('=== Calls Title Debug Info ===');
+      console.log('Current calls data:', state.data?.length || 0, 'calls');
+      console.log('Filtered calls:', state.filtered?.length || 0, 'calls');
+      
+      const callsWithoutTitle = (state.data || []).filter(call => !call.contactTitle);
+      const callsWithTitle = (state.data || []).filter(call => !!call.contactTitle);
+      
+      console.log('Calls without title:', callsWithoutTitle.length);
+      console.log('Calls with title:', callsWithTitle.length);
+      
+      if (callsWithoutTitle.length > 0) {
+        console.log('Sample calls without title:', callsWithoutTitle.slice(0, 3).map(c => ({
+          id: c.id,
+          contactName: c.contactName,
+          contactTitle: c.contactTitle,
+          company: c.company
+        })));
+      }
+      
+      if (callsWithTitle.length > 0) {
+        console.log('Sample calls with title:', callsWithTitle.slice(0, 3).map(c => ({
+          id: c.id,
+          contactName: c.contactName,
+          contactTitle: c.contactTitle,
+          company: c.company
+        })));
+      }
+      
+      // Enable debugging for next render
+      window.CRM_DEBUG_CALLS = true;
+      console.log('Enabled CRM_DEBUG_CALLS - refresh the page or reload data to see detailed logs');
+      
+      return { withTitle: callsWithTitle.length, withoutTitle: callsWithoutTitle.length };
     }
   };
   
