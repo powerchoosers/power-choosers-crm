@@ -978,6 +978,8 @@
     const ids = Array.from(state.selected || []);
     if (!ids.length) return;
     
+    console.log('[Bulk Delete] Starting deletion of', ids.length, 'calls:', ids);
+    
     // Show progress toast
     const progressToast = window.crm?.showProgressToast ? 
       window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'call' : 'calls'}...`, ids.length, 0) : null;
@@ -988,31 +990,44 @@
     // Resolve API endpoint with safe fallback
     const base = (window.API_BASE_URL || 'https://power-choosers-crm.vercel.app').replace(/\/$/, '');
     const url = `${base}/api/calls`;
+    console.log('[Bulk Delete] Using endpoint:', url);
     
     try {
       // Delete from backend
       for (const id of ids) {
         try {
+          console.log(`[Bulk Delete] Deleting call: ${id}`);
+          const requestBody = { id, twilioSid: id };
+          console.log(`[Bulk Delete] Request body:`, requestBody);
+          
           const response = await fetch(url, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             // Send both id and twilioSid to maximize backend match chances
-            body: JSON.stringify({ id, twilioSid: id })
+            body: JSON.stringify(requestBody)
+          });
+          
+          console.log(`[Bulk Delete] Response for ${id}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok
           });
           
           if (response.ok) {
             completed++;
+            console.log(`[Bulk Delete] Successfully deleted call ${id}`);
             // Update progress toast
             if (progressToast && typeof progressToast.update === 'function') {
               progressToast.update(completed, ids.length);
             }
           } else {
             failed++;
-            console.error(`Failed to delete call ${id}:`, response.status, await response.text().catch(()=>''));
+            const errorText = await response.text().catch(()=>'');
+            console.error(`[Bulk Delete] Failed to delete call ${id}:`, response.status, errorText);
           }
         } catch (error) {
           failed++;
-          console.error(`Error deleting call ${id}:`, error);
+          console.error(`[Bulk Delete] Error deleting call ${id}:`, error);
         }
       }
       
