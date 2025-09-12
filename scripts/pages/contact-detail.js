@@ -2007,6 +2007,36 @@
     const nextSteps = Array.isArray(AI.nextSteps) ? AI.nextSteps : [];
     const pain = Array.isArray(AI.painPoints) ? AI.painPoints : [];
     const flags = AI.flags || {};
+
+    // Helper to normalize values across snake_case and camelCase keys
+    const get = (obj, keys, d='') => { for (const k of keys){ const v = obj && obj[k]; if (v !== undefined && v !== null && v !== '') return v; } return d; };
+
+    // Transcript rendering with speaker/timestamp lines
+    const toMMSS = (s)=>{ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; };
+    function parseSpeakerTranscript(text){
+      const out=[]; if(!text) return out; const lines=String(text).split(/\r?\n/);
+      for(const raw of lines){
+        const line = raw.trim(); if(!line) continue;
+        let m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+(\d+):(\d{2}):\s*(.*)$/);
+        if(!m){ m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+\d+\s+(\d+):(\d{2}):\s*(.*)$/); if(m){ m=[m[0],m[1],m[2],m[3],m[4]]; } }
+        if(m){ const label=m[1].trim(); const mm=parseInt(m[2],10)||0; const ss=parseInt(m[3],10)||0; const txt=m[4]||''; out.push({label, t:mm*60+ss, text:txt}); continue; }
+        out.push({label:'', t:null, text:line});
+      }
+      return out;
+    }
+    function renderTranscriptHtml(A, raw){
+      const turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
+      if(turns.length){
+        return turns.map(t=>{ const role=t.role==='agent'?'Agent':(t.role==='customer'?'Customer':'Speaker'); return `<div class=\"transcript-line ${t.role||''}\"><span class=\"speaker\">${role} ${toMMSS(Number(t.t)||0)}:</span> <span class=\"text\">${escapeHtml(t.text||'')}</span></div>`; }).join('');
+      }
+      const parsed = parseSpeakerTranscript(raw||'');
+      if(parsed.some(p=>p.label && p.t!=null)){
+        return parsed.map(p=> p.label ? `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(p.label)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>` : `<div class=\"transcript-line\"><span class=\"text\">${escapeHtml(p.text||'')}</span></div>` ).join('');
+      }
+      const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
+      return escapeHtml(fallback);
+    }
+
     const chips = [
       `<span class=\"pc-chip ${sentiment==='Positive'?'ok':sentiment==='Negative'?'danger':'info'}\">Sentiment: ${escapeHtml(sentiment)}</span>`,
       disposition ? `<span class=\"pc-chip info\">Disposition: ${escapeHtml(disposition)}</span>` : '',
@@ -2019,7 +2049,7 @@
     const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
     const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
     const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
-    const transcriptText = r.transcript || (AI && Object.keys(AI).length ? 'Transcript processing...' : 'Transcript not available');
+    const transcriptHtml = renderTranscriptHtml(AI, r.transcript);
     const rawRec = r.audioUrl || r.recordingUrl || '';
     let audioSrc = '';
     if (rawRec) {
@@ -2036,14 +2066,14 @@
 
     // Energy & Contract details
     const contract = AI.contract || {};
-    const rate = contract.currentRate || contract.rate || 'Unknown';
-    const supplier = contract.supplier || contract.utility || 'Unknown';
-    const contractEnd = contract.contractEnd || contract.endDate || 'Not discussed';
-    const usage = (contract.usageKWh || contract.usage || 'Not provided')+'';
-    const rateType = contract.rateType || 'Unknown';
-    const contractLength = (contract.contractLength || 'Unknown')+'';
-    const budget = AI.budget || 'Unclear';
-    const timeline = AI.timeline || 'Not specified';
+    const rate = get(contract, ['currentRate','current_rate','rate'], 'Unknown');
+    const supplier = get(contract, ['supplier','utility'], 'Unknown');
+    const contractEnd = get(contract, ['contractEnd','contract_end','endDate'], 'Not discussed');
+    const usage = String(get(contract, ['usageKWh','usage_k_wh','usage'], 'Not provided'));
+    const rateType = get(contract, ['rateType','rate_type'], 'Unknown');
+    const contractLength = String(get(contract, ['contractLength','contract_length'], 'Unknown'));
+    const budget = get(AI, ['budget'], 'Unclear');
+    const timeline = get(AI, ['timeline'], 'Not specified');
     const entities = Array.isArray(AI.entities) ? AI.entities : [];
     const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class="pc-chip">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class="pc-chip">None</span>';
     return `
@@ -2062,7 +2092,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
               Call Transcript
             </h4>
-            <div class="pc-transcript">${escapeHtml(transcriptText)}</div>
+            <div class=\"pc-transcript\">${transcriptHtml}</div>
           </div>
         </div>
         <div>

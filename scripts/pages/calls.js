@@ -791,19 +791,35 @@
       summaryText = `Conversation summary${topics?` — ${topics}`:''}. Sentiment: ${sentiment}. ${timeline && timeline!=='Not specified' ? `Timeline: ${timeline}.` : ''}`.trim();
     }
 
-    // Transcript rendering: prefer structured speaker turns
-    const turns = Array.isArray(A.speakerTurns) ? A.speakerTurns : [];
+    // Transcript rendering with consistent speaker/timestamp lines across pages
     const toMMSS = (s)=>{ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; };
-    let transcriptHtml = '';
-    if (turns.length){
-      transcriptHtml = turns.map(t=>{
-        const role = t.role==='agent' ? 'Agent' : (t.role==='customer' ? 'Customer' : 'Speaker');
-        return `<div class=\"transcript-line ${t.role||''}\"><span class=\"speaker\">${role} ${toMMSS(Number(t.t)||0)}:</span> <span class=\"text\">${escapeHtml(t.text||'')}</span></div>`;
-      }).join('');
-    } else {
-      const fallback = r.transcript || (r.aiInsights ? 'Transcript processing...' : 'Transcript not available');
-      transcriptHtml = escapeHtml(fallback);
+    function parseSpeakerTranscript(text){
+      const out=[]; if(!text) return out; const lines=String(text).split(/\r?\n/);
+      for(const raw of lines){
+        const line = raw.trim(); if(!line) continue;
+        // Pattern: "Agent 1:23: text" or "Speaker 0:03: text"
+        let m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+(\d+):(\d{2}):\s*(.*)$/);
+        // Pattern: "Speaker 1 0:45: text" (optional speaker id before time)
+        if(!m){ m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+\d+\s+(\d+):(\d{2}):\s*(.*)$/); if(m) { m = [m[0], m[1], m[2], m[3], m[4]]; } }
+        if(m){ const label=m[1].trim(); const mm=parseInt(m[2],10)||0; const ss=parseInt(m[3],10)||0; const txt=m[4]||''; out.push({label, t:mm*60+ss, text:txt}); continue; }
+        // Fallback: keep as free text line
+        out.push({label:'', t:null, text:line});
+      }
+      return out;
     }
+    function renderTranscriptHtml(A, raw){
+      const turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
+      if(turns.length){
+        return turns.map(t=>{ const role = t.role==='agent'?'Agent':(t.role==='customer'?'Customer':'Speaker'); return `<div class=\"transcript-line ${t.role||''}\"><span class=\"speaker\">${role} ${toMMSS(Number(t.t)||0)}:</span> <span class=\"text\">${escapeHtml(t.text||'')}</span></div>`; }).join('');
+      }
+      const parsed = parseSpeakerTranscript(raw||'');
+      if(parsed.some(p=>p.label && p.t!=null)){
+        return parsed.map(p=> p.label ? `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(p.label)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>` : `<div class=\"transcript-line\"><span class=\"text\">${escapeHtml(p.text||'')}</span></div>` ).join('');
+      }
+      const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
+      return escapeHtml(fallback);
+    }
+    const transcriptHtml = renderTranscriptHtml(A, r.transcript);
 
     const hasAIInsights = r.aiInsights && Object.keys(r.aiInsights).length > 0;
 
