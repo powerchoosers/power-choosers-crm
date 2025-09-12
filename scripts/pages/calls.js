@@ -269,11 +269,10 @@
   function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=>N(x)===N(t))) { arr.push(t); const d = chips.find(x=>x.k===k); if (d) renderChips(d); } }
 
   async function loadData() {
-    // 1) Try to load real calls from backend if API_BASE_URL is set
+    // 1) Try to load real calls from backend - always use production for calls data
     try {
-      const base = (window.API_BASE_URL || 'https://power-choosers-crm.vercel.app').replace(/\/$/, '');
-      if (base) {
-        console.log('[Calls] Loading real call data from:', `${base}/api/calls`);
+      const base = 'https://power-choosers-crm.vercel.app';
+      console.log('[Calls] Loading real call data from:', `${base}/api/calls`);
         const r = await fetch(`${base}/api/calls`, { method: 'GET' });
         const j = await r.json().catch(()=>({}));
         if (r.ok && j && j.ok && Array.isArray(j.calls)) {
@@ -987,8 +986,8 @@
     let failed = 0;
     let completed = 0;
 
-    // Resolve API endpoint with safe fallback
-    const base = (window.API_BASE_URL || 'https://power-choosers-crm.vercel.app').replace(/\/$/, '');
+    // Always use production API for calls (critical data operations)
+    const base = 'https://power-choosers-crm.vercel.app';
     const url = `${base}/api/calls`;
     console.log('[Bulk Delete] Using endpoint:', url);
     
@@ -1168,7 +1167,38 @@
   window.callsModule = { 
     loadData, 
     startAutoRefresh, 
-    stopAutoRefresh
+    stopAutoRefresh,
+    // Debug functions
+    testApiEndpoint: async function() {
+      const base = 'https://power-choosers-crm.vercel.app';
+      console.log('Testing API endpoint:', `${base}/api/calls`);
+      try {
+        const response = await fetch(`${base}/api/calls`);
+        const data = await response.json();
+        console.log('API Test Result:', { status: response.status, ok: response.ok, calls: data.calls?.length || 0 });
+        return data;
+      } catch (error) {
+        console.error('API Test Error:', error);
+        return null;
+      }
+    },
+    deleteTestCall: async function(callId) {
+      const base = 'https://power-choosers-crm.vercel.app';
+      console.log('Testing DELETE for call:', callId);
+      try {
+        const response = await fetch(`${base}/api/calls`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: callId, twilioSid: callId })
+        });
+        const result = await response.text();
+        console.log('DELETE Test Result:', { status: response.status, ok: response.ok, response: result });
+        return result;
+      } catch (error) {
+        console.error('DELETE Test Error:', error);
+        return null;
+      }
+    }
   };
   
   document.addEventListener('DOMContentLoaded', init);
