@@ -390,6 +390,34 @@ export default async function handler(req, res) {
         });
     }
     
+    if (req.method === 'DELETE') {
+        // Delete a call by ID
+        const { id } = req.body || {};
+        if (!id) {
+            return res.status(400).json({ error: 'Call ID is required' });
+        }
+        
+        try {
+            if (db) {
+                // Delete from Firestore
+                await db.collection('calls').doc(id).delete();
+                console.log(`[Calls][DELETE] Deleted call ${id} from Firestore`);
+            }
+            
+            // Also remove from in-memory store if it exists
+            if (callStore.has(id)) {
+                callStore.delete(id);
+                console.log(`[Calls][DELETE] Deleted call ${id} from memory store`);
+            }
+            
+            return res.status(200).json({ success: true, message: 'Call deleted successfully' });
+            
+        } catch (error) {
+            console.error('[Calls][DELETE] Error deleting call:', error);
+            return res.status(500).json({ error: 'Failed to delete call', details: error.message });
+        }
+    }
+    
     return res.status(405).json({ error: 'Method not allowed' });
 }
 
