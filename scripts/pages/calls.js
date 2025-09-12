@@ -715,13 +715,24 @@
     const md=document.createElement('div'); md.className='pc-insights-modal';
     md.innerHTML = `
       <div class="pc-insights-header">
-        <div class="pc-insights-title">Call insights for ${escapeHtml(r.contactName || r.to || '')}</div>
-        <button type="button" class="pc-insights-close" aria-label="Close">Close</button>
+            <div class="pc-insights-title">Call insights for ${escapeHtml(r.contactName || r.to || '')}</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" class="pc-insights-close" aria-label="Close">Close</button>
+          <button type="button" class="pc-insights-close" id="copy-summary" aria-label="Copy summary">Copy</button>
+        </div>
       </div>
       <div class="pc-insights-body">${insightsContentHtml(r)}</div>
     `;
     document.body.appendChild(bd); document.body.appendChild(md);
     md.querySelector('.pc-insights-close').addEventListener('click', closeInsightsModal);
+    const copyBtn = md.querySelector('#copy-summary');
+    if (copyBtn) copyBtn.addEventListener('click', ()=>{
+      try{
+        const text = md.querySelector('.pc-insights-body')?.innerText || '';
+        navigator.clipboard.writeText(text);
+        (window.crm && window.crm.showToast) ? window.crm.showToast('Summary copied') : null;
+      }catch(_){ /* ignore */ }
+    });
     document.addEventListener('keydown', escClose);
 
     // Background fetch: if transcript is missing but we have a Twilio SID, try to generate/fetch it
@@ -841,6 +852,20 @@
             <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
             ${r.audioUrl ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
             ${hasAIInsights ? '<div style="color:var(--orange-subtle); font-size:12px; margin-top:4px;">✓ AI analysis completed</div>' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">AI analysis in progress...</div>'}
+          </div>
+
+          <!-- Highlights Bar -->
+          <div class="pc-card" style="margin-top:14px;">
+            <h4>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="14" rx="2"/></svg>
+              Highlights
+            </h4>
+            <div class="pc-chips">
+              ${contract.supplier ? `<span class="pc-chip">Supplier: ${escapeHtml(contract.supplier)}</span>` : ''}
+              ${contract.contractEnd ? `<span class="pc-chip">Contract end: ${escapeHtml(contract.contractEnd)}</span>` : ''}
+              ${budget ? `<span class="pc-chip">Budget: ${escapeHtml(budget)}</span>` : ''}
+              ${timeline ? `<span class="pc-chip">Next: ${escapeHtml(timeline)}</span>` : ''}
+            </div>
           </div>
 
           <div class="pc-card" style="margin-top:14px;">
