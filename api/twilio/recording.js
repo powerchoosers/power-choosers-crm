@@ -407,8 +407,21 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                 decisionMakers: []
             };
         }
-
         
+        // Ensure we return some AI object even if transcript is empty
+        if (!aiInsights) {
+            aiInsights = {
+                summary: transcript ? `Call transcript contains ${String(transcript).split(/\s+/).filter(Boolean).length} words.` : 'Call transcription processing in progress',
+                sentiment: 'Unknown',
+                keyTopics: ['Call analysis'],
+                nextSteps: ['Follow up'],
+                painPoints: [],
+                budget: 'Unclear',
+                timeline: 'Not specified',
+                decisionMakers: [],
+                contract: { currentRate:'', rateType:'', supplier:'', contractEnd:'', usageKWh:'', contractLength:'' }
+            };
+        }
         
         // Update call data
         const callData = callStore.get(callSid);
