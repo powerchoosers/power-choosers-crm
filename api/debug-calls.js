@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         }
         
         // Get all calls from Firestore
-        const snap = await db.collection('calls').get();
+        const snap = await db.collection('calls').limit(200).get();
         const calls = [];
         
         snap.forEach(doc => {
