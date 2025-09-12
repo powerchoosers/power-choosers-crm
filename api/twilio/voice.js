@@ -42,21 +42,15 @@ export default function handler(req, res) {
                 timeLimit: 14400,
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete`,
-                // Enable Twilio Voice Intelligence for real-time transcription and AI insights
+                // Recording configuration (schema-compliant)
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
                 recordingStatusCallbackMethod: 'POST',
-                // Enable Voice Intelligence for real-time insights
-                voiceIntelligence: true,
-                voiceIntelligenceInsights: {
-                    insights: 'summary,sentiment,topics,transcript',
-                    language: 'en-US',
-                    callback: `${base}/api/twilio/voice-intelligence`,
-                    callbackMethod: 'POST'
-                },
-                // Enable Conversational Intelligence for advanced AI analysis
-                intelligenceService: process.env.TWILIO_INTELLIGENCE_SERVICE_SID
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
+            // Small prompt to keep caller informed
+            try { twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.'); } catch(_) {}
             
             // Pass the original caller's number as a custom parameter
             const client = dial.client('agent');
@@ -77,20 +71,12 @@ export default function handler(req, res) {
                 hangupOnStar: false,
                 timeLimit: 14400,
                 action: `${base}/api/twilio/dial-complete`,
-                // Enable Twilio Voice Intelligence for real-time transcription and AI insights
+                // Recording configuration (schema-compliant)
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
                 recordingStatusCallbackMethod: 'POST',
-                // Enable Voice Intelligence for real-time insights
-                voiceIntelligence: true,
-                voiceIntelligenceInsights: {
-                    insights: 'summary,sentiment,topics,transcript',
-                    language: 'en-US',
-                    callback: `${base}/api/twilio/voice-intelligence`,
-                    callbackMethod: 'POST'
-                },
-                // Enable Conversational Intelligence for advanced AI analysis
-                intelligenceService: process.env.TWILIO_INTELLIGENCE_SERVICE_SID
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -103,20 +89,12 @@ export default function handler(req, res) {
                 answerOnBridge: true,
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete`,
-                // Enable Twilio Voice Intelligence for real-time transcription and AI insights
+                // Recording configuration (schema-compliant)
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
                 recordingStatusCallbackMethod: 'POST',
-                // Enable Voice Intelligence for real-time insights
-                voiceIntelligence: true,
-                voiceIntelligenceInsights: {
-                    insights: 'summary,sentiment,topics,transcript',
-                    language: 'en-US',
-                    callback: `${base}/api/twilio/voice-intelligence`,
-                    callbackMethod: 'POST'
-                },
-                // Enable Conversational Intelligence for advanced AI analysis
-                intelligenceService: process.env.TWILIO_INTELLIGENCE_SERVICE_SID
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
             dial.client('agent');
         }

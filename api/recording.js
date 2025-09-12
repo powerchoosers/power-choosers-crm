@@ -29,13 +29,30 @@ export default async function handler(req, res) {
       return res.status(twilioResp.status).json({ error: `Failed to fetch recording (${twilioResp.status})` });
     }
 
-    // Determine content type, default to audio/mpeg
+    // Stream through with original content-type to avoid any quality loss
     const contentType = twilioResp.headers.get('content-type') || 'audio/mpeg';
-    const buf = Buffer.from(await twilioResp.arrayBuffer());
-
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    res.status(200).send(buf);
+
+    // Pipe the body without re-encoding
+    const reader = twilioResp.body.getReader();
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        function push() {
+          reader.read().then(({ done, value }) => {
+            if (done) { controller.close(); return; }
+            controller.enqueue(value);
+            push();
+          });
+        }
+        push();
+      }
+    });
+
+    return new Response(stream).arrayBuffer().then(buf => {
+      res.status(200).send(Buffer.from(buf));
+    });
   } catch (err) {
     console.error('[Recording Proxy] Error:', err);
     res.status(500).json({ error: 'Recording proxy failed', message: err?.message });
