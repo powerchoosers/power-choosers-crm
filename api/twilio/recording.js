@@ -207,14 +207,40 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                 
                 if (transcripts.length > 0) {
                     const ciTranscript = await client.intelligence.v2.transcripts(transcripts[0].sid).fetch();
-                    
-                    if (ciTranscript.status === 'completed') {
+
+                    // If transcript exists but isn't completed yet, poll until completion (up to 2 minutes)
+                    if (['queued', 'in-progress'].includes((ciTranscript.status || '').toLowerCase())) {
+                        console.log('[Recording] Existing CI transcript found but not completed — polling...');
+                        let attempts = 0;
+                        const maxAttempts = 20; // 20 * 6s = 120s
+                        let polled = ciTranscript;
+                        while (attempts < maxAttempts && ['queued', 'in-progress'].includes((polled.status || '').toLowerCase())) {
+                            await new Promise(r => setTimeout(r, 6000));
+                            polled = await client.intelligence.v2.transcripts(ciTranscript.sid).fetch();
+                            attempts++;
+                            if (attempts % 5 === 0) console.log(`[Recording] Waiting for existing CI transcript... (${attempts*6}s)`);
+                        }
+                        if ((polled.status || '').toLowerCase() === 'completed') {
+                            const sentences = await client.intelligence.v2
+                                .transcripts(polled.sid)
+                                .sentences.list();
+                            transcript = sentences.map(s => (s && typeof s.text === 'string' ? s.text.trim() : '')).filter(Boolean).join(' ');
+                            conversationalIntelligence = {
+                                transcriptSid: polled.sid,
+                                status: polled.status,
+                                sentenceCount: sentences.length,
+                                averageConfidence: sentences.length > 0 ?
+                                    sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
+                            };
+                            console.log(`[Recording] CI transcript (existing) completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);
+                        }
+                    } else if ((ciTranscript.status || '').toLowerCase() === 'completed') {
                         // Get sentences from Conversational Intelligence
                         const sentences = await client.intelligence.v2
                             .transcripts(ciTranscript.sid)
                             .sentences.list();
                         
-                        transcript = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
+                        transcript = sentences.map(s => (s && typeof s.text === 'string' ? s.text.trim() : '')).filter(Boolean).join(' ');
                         conversationalIntelligence = {
                             transcriptSid: ciTranscript.sid,
                             status: ciTranscript.status,
@@ -224,24 +250,39 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         };
                         
                         console.log(`[Recording] Found Conversational Intelligence transcript with ${sentences.length} sentences, transcript length: ${transcript.length}`);
-                        
-                        // FALLBACK: If Conversational Intelligence transcript is empty, try basic transcription
-                        if (!transcript) {
-                            console.log('[Recording] No Conversational Intelligence transcript text, trying basic transcription fallback...');
-                            try {
-                                const transcriptions = await client.transcriptions.list({ 
-                                    recordingSid: recordingSid,
-                                    limit: 1 
-                                });
-                                
-                                if (transcriptions.length > 0) {
+                    }
+
+                    // FALLBACK: If Conversational Intelligence transcript is empty, try basic transcription (only if API available)
+                    if (!transcript) {
+                        console.log('[Recording] No CI transcript text, trying basic transcription fallback (if supported by SDK)...');
+                        try {
+                            if (client.transcriptions && typeof client.transcriptions.list === 'function') {
+                                const transcriptions = await client.transcriptions.list({ recordingSid: recordingSid, limit: 1 });
+                                if (transcriptions.length > 0 && typeof client.transcriptions === 'function') {
                                     const basicTranscription = await client.transcriptions(transcriptions[0].sid).fetch();
-                                    transcript = basicTranscription.transcriptionText || '';
+                                    transcript = (basicTranscription && basicTranscription.transcriptionText) || '';
                                     console.log(`[Recording] Basic transcription fallback: ${transcript.length} characters`);
+                                } else if (client.transcriptions && typeof client.transcriptions.create === 'function') {
+                                    // Some SDK versions support create
+                                    const created = await client.transcriptions.create({ recordingSid: recordingSid, languageCode: 'en-US' });
+                                    let attempts = 0; const maxAttempts = 12;
+                                    while (attempts < maxAttempts) {
+                                        await new Promise(r => setTimeout(r, 5000));
+                                        let t = null;
+                                        try { t = await client.transcriptions(created.sid).fetch(); } catch(_) {}
+                                        const text = t?.transcriptionText || '';
+                                        if (text && text.trim().length > 0) { transcript = text; break; }
+                                        attempts++;
+                                        if (attempts % 3 === 0) console.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
+                                    }
+                                } else {
+                                    console.warn('[Recording] Transcriptions API not available in current Twilio SDK version');
                                 }
-                            } catch (fallbackError) {
-                                console.warn('[Recording] Basic transcription fallback failed:', fallbackError.message);
+                            } else {
+                                console.warn('[Recording] Transcriptions API not present on client');
                             }
+                        } catch (fallbackError) {
+                            console.warn('[Recording] Basic transcription fallback failed:', fallbackError.message);
                         }
                     }
                 } else {
@@ -271,7 +312,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 .transcripts(updatedTranscript.sid)
                                 .sentences.list();
                             
-                            transcript = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
+                            transcript = sentences.map(s => (s && typeof s.text === 'string' ? s.text.trim() : '')).filter(Boolean).join(' ');
                             conversationalIntelligence = {
                                 transcriptSid: updatedTranscript.sid,
                                 status: updatedTranscript.status,
@@ -293,44 +334,40 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
             // Fallback to basic transcription if Conversational Intelligence not available or failed
             if (!transcript) {
                 console.log('[Recording] Falling back to basic transcription');
-                
-                // Check if transcription already exists
-                const transcriptions = await client.transcriptions.list({ 
-                    recordingSid: recordingSid,
-                    limit: 1 
-                });
-                
-                if (transcriptions.length > 0) {
-                    const t = await client.transcriptions(transcriptions[0].sid).fetch();
-                    transcript = t.transcriptionText || '';
-                    console.log('[Recording] Existing transcript found:', (transcript || '').substring(0, 100) + '...');
-                } else {
-                    // Create new transcription using Twilio's service
-                    console.log('[Recording] Creating Twilio transcription...');
-                    const created = await client.transcriptions.create({
-                        recordingSid: recordingSid,
-                        languageCode: 'en-US'
-                    });
-                    // Poll for completion up to ~60s
-                    let attempts = 0;
-                    const maxAttempts = 12; // 12 * 5s = 60s
-                    while (attempts < maxAttempts) {
-                        await new Promise(r => setTimeout(r, 5000));
-                        let t = null;
-                        try { t = await client.transcriptions(created.sid).fetch(); } catch(_) {}
-                        const text = t?.transcriptionText || '';
-                        if (text && text.trim().length > 0) {
-                            transcript = text;
-                            break;
+                try {
+                    if (client.transcriptions && typeof client.transcriptions.list === 'function') {
+                        // Check if transcription already exists
+                        const transcriptions = await client.transcriptions.list({ recordingSid: recordingSid, limit: 1 });
+                        if (transcriptions.length > 0 && typeof client.transcriptions === 'function') {
+                            const t = await client.transcriptions(transcriptions[0].sid).fetch();
+                            transcript = t.transcriptionText || '';
+                            console.log('[Recording] Existing transcript found:', (transcript || '').substring(0, 100) + '...');
+                        } else if (client.transcriptions && typeof client.transcriptions.create === 'function') {
+                            // Create new transcription using Twilio's service
+                            console.log('[Recording] Creating Twilio transcription via SDK...');
+                            const created = await client.transcriptions.create({ recordingSid: recordingSid, languageCode: 'en-US' });
+                            // Poll for completion up to ~60s
+                            let attempts = 0;
+                            const maxAttempts = 12; // 12 * 5s = 60s
+                            while (attempts < maxAttempts) {
+                                await new Promise(r => setTimeout(r, 5000));
+                                let t = null;
+                                try { t = await client.transcriptions(created.sid).fetch(); } catch(_) {}
+                                const text = t?.transcriptionText || '';
+                                if (text && text.trim().length > 0) { transcript = text; break; }
+                                attempts++;
+                                if (attempts % 3 === 0) console.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
+                            }
+                            if (transcript) console.log('[Recording] Transcription ready:', transcript.substring(0, 100) + '...');
+                            else console.log('[Recording] Transcription not ready within timeout');
+                        } else {
+                            console.warn('[Recording] Transcriptions API not available in this Twilio SDK runtime');
                         }
-                        attempts++;
-                        if (attempts % 3 === 0) console.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
-                    }
-                    if (transcript) {
-                        console.log('[Recording] Transcription ready:', transcript.substring(0, 100) + '...');
                     } else {
-                        console.log('[Recording] Transcription not ready within timeout');
+                        console.warn('[Recording] Transcriptions API not present on client');
                     }
+                } catch (e) {
+                    console.warn('[Recording] Basic transcription fallback failed:', e?.message);
                 }
             }
             
