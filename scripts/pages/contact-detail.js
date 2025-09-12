@@ -2065,10 +2065,20 @@
     const hasAI = AI && Object.keys(AI).length > 0;
 
     // Energy & Contract details
+    // Friendly long date formatter, e.g., "April 19, 2026"
+    function toLongDate(v){
+      try{
+        const d = parseDateFlexible(v);
+        if(!d) return v || '';
+        return d.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+      }catch(_){ return v || ''; }
+    }
+
     const contract = AI.contract || {};
     const rate = get(contract, ['currentRate','current_rate','rate'], 'Unknown');
     const supplier = get(contract, ['supplier','utility'], 'Unknown');
     const contractEnd = get(contract, ['contractEnd','contract_end','endDate'], 'Not discussed');
+    const contractEndDisplay = contractEnd ? toLongDate(contractEnd) : 'Not discussed';
     const usage = String(get(contract, ['usageKWh','usage_k_wh','usage'], 'Not provided'));
     const rateType = get(contract, ['rateType','rate_type'], 'Unknown');
     const contractLength = String(get(contract, ['contractLength','contract_length'], 'Unknown'));
@@ -2113,7 +2123,7 @@
             <div class="pc-kv">
               <div class="k">Current rate</div><div class="v">${escapeHtml(rate)}</div>
               <div class="k">Supplier/Utility</div><div class="v">${escapeHtml(supplier)}</div>
-              <div class="k">Contract end</div><div class="v">${escapeHtml(contractEnd)}</div>
+              <div class=\"k\">Contract end</div><div class=\"v\">${escapeHtml(contractEndDisplay)}</div>
               <div class="k">Usage</div><div class="v">${escapeHtml(usage)}</div>
               <div class="k">Rate type</div><div class="v">${escapeHtml(rateType)}</div>
               <div class="k">Term</div><div class="v">${escapeHtml(contractLength)}</div>
