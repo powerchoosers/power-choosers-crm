@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         }
         
         // Get all calls from Firestore
-        const snap = await db.collection('calls').limit(10).get();
+        const snap = await db.collection('calls').limit(100).get();
         const calls = [];
         
         snap.forEach(doc => {
@@ -45,10 +45,20 @@ export default async function handler(req, res) {
         
         console.log(`[Debug Calls] Found ${calls.length} calls in Firestore`);
         
+        // Count calls by source
+        const sourceCounts = {};
+        calls.forEach(call => {
+            const source = call.source || 'unknown';
+            sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+        });
+        
+        console.log(`[Debug Calls] Source breakdown:`, sourceCounts);
+        
         return res.status(200).json({
             success: true,
             totalCalls: calls.length,
-            calls: calls
+            calls: calls,
+            sourceCounts: sourceCounts
         });
         
     } catch (error) {
