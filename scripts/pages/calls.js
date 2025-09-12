@@ -929,7 +929,7 @@
     pop.dataset.placement = 'bottom';
     pop.innerHTML = `
       <div class="delete-popover-inner">
-        <div class="delete-title">Delete ${state.selected.size} ${state.selected.size===1?'call':'calls'}?</div>
+        <div class="delete-title">Delete ${state.selected.size} ${state.selected.size===1 ? 'call' : 'calls'}?</div>
         <div class="btn-row">
           <button type="button" id="del-cancel" class="btn-cancel">Cancel</button>
           <button type="button" id="del-confirm" class="btn-danger">Delete</button>
