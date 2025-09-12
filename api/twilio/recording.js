@@ -221,10 +221,23 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             if (attempts % 5 === 0) console.log(`[Recording] Waiting for existing CI transcript... (${attempts*6}s)`);
                         }
                         if ((polled.status || '').toLowerCase() === 'completed') {
-                            const sentences = await client.intelligence.v2
-                                .transcripts(polled.sid)
-                                .sentences.list();
-                            transcript = sentences.map(s => (s && typeof s.text === 'string' ? s.text.trim() : '')).filter(Boolean).join(' ');
+                        const sentences = await client.intelligence.v2
+                            .transcripts(polled.sid)
+                            .sentences.list();
+                        const pickText = (s) => {
+                            if (!s || typeof s !== 'object') return '';
+                            const candidates = [s.text, s.sentence, s.body, s.content, s.transcript];
+                            for (const c of candidates) { if (typeof c === 'string' && c.trim()) return c.trim(); }
+                            if (Array.isArray(s.words)) {
+                                const w = s.words.map(w => (w && (w.text || w.word || w.value || '')).toString().trim()).filter(Boolean).join(' ');
+                                if (w) return w;
+                            }
+                            return '';
+                        };
+                        transcript = sentences.map(pickText).filter(Boolean).join(' ');
+                        if (!transcript && sentences && sentences.length) {
+                            try { console.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
+                        }
                             conversationalIntelligence = {
                                 transcriptSid: polled.sid,
                                 status: polled.status,
@@ -239,8 +252,20 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         const sentences = await client.intelligence.v2
                             .transcripts(ciTranscript.sid)
                             .sentences.list();
-                        
-                        transcript = sentences.map(s => (s && typeof s.text === 'string' ? s.text.trim() : '')).filter(Boolean).join(' ');
+                        const pickText = (s) => {
+                            if (!s || typeof s !== 'object') return '';
+                            const candidates = [s.text, s.sentence, s.body, s.content, s.transcript];
+                            for (const c of candidates) { if (typeof c === 'string' && c.trim()) return c.trim(); }
+                            if (Array.isArray(s.words)) {
+                                const w = s.words.map(w => (w && (w.text || w.word || w.value || '')).toString().trim()).filter(Boolean).join(' ');
+                                if (w) return w;
+                            }
+                            return '';
+                        };
+                        transcript = sentences.map(pickText).filter(Boolean).join(' ');
+                        if (!transcript && sentences && sentences.length) {
+                            try { console.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
+                        }
                         conversationalIntelligence = {
                             transcriptSid: ciTranscript.sid,
                             status: ciTranscript.status,
@@ -311,8 +336,20 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             const sentences = await client.intelligence.v2
                                 .transcripts(updatedTranscript.sid)
                                 .sentences.list();
-                            
-                            transcript = sentences.map(s => (s && typeof s.text === 'string' ? s.text.trim() : '')).filter(Boolean).join(' ');
+                            const pickText = (s) => {
+                                if (!s || typeof s !== 'object') return '';
+                                const candidates = [s.text, s.sentence, s.body, s.content, s.transcript];
+                                for (const c of candidates) { if (typeof c === 'string' && c.trim()) return c.trim(); }
+                                if (Array.isArray(s.words)) {
+                                    const w = s.words.map(w => (w && (w.text || w.word || w.value || '')).toString().trim()).filter(Boolean).join(' ');
+                                    if (w) return w;
+                                }
+                                return '';
+                            };
+                            transcript = sentences.map(pickText).filter(Boolean).join(' ');
+                            if (!transcript && sentences && sentences.length) {
+                                try { console.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
+                            }
                             conversationalIntelligence = {
                                 transcriptSid: updatedTranscript.sid,
                                 status: updatedTranscript.status,
