@@ -352,6 +352,27 @@ export default async function handler(req, res) {
             }
         }
         
+        // Merge aiInsights if provided (do not wipe existing fields with empty strings)
+        const mergedInsights = (()=>{
+            const curr = existingCall.aiInsights || {};
+            const inc = aiInsights || {};
+            if (!aiInsights) return curr;
+            const deep = (a,b)=>{
+                if (!b) return a;
+                const out = { ...a };
+                for (const k of Object.keys(b)){
+                    const v = b[k];
+                    if (v == null) continue;
+                    if (typeof v === 'object' && !Array.isArray(v)) out[k] = deep(a[k]||{}, v);
+                    else if (Array.isArray(v)) out[k] = v.length ? v : (a[k]||v);
+                    else if (typeof v === 'string') out[k] = v.trim()!=='' ? v : (a[k]||'');
+                    else out[k] = v;
+                }
+                return out;
+            };
+            return deep(curr, inc);
+        })();
+
         const callData = {
             ...existingCall,
             id: callId,
@@ -361,7 +382,7 @@ export default async function handler(req, res) {
             duration: _duration,
             timestamp: timestamp || callTime || existingCall.timestamp || new Date().toISOString(),
             transcript: transcript || existingCall.transcript,
-            aiInsights: aiInsights || existingCall.aiInsights,
+            aiInsights: mergedInsights,
             recordingUrl: recordingUrl || existingCall.recordingUrl,
             twilioSid: callSid || existingCall.twilioSid || null,
             // Persist context if provided

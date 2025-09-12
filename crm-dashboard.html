@@ -40,6 +40,21 @@
           }
         })();
     </script>
+    <script>
+        // Optional: Configure your Twilio/Business phone numbers so Calls page can identify the counterparty correctly
+        // Set via devtools once and it will persist (example):
+        // localStorage.setItem('CRM_BUSINESS_NUMBERS', JSON.stringify(['+18176630380', '+19728342317']))
+        (function(){
+          try {
+            const raw = localStorage.getItem('CRM_BUSINESS_NUMBERS');
+            const nums = Array.isArray(JSON.parse(raw || '[]')) ? JSON.parse(raw || '[]') : [];
+            if (nums.length) {
+              window.CRM_BUSINESS_NUMBERS = nums;
+              console.log('[CRM] Business numbers:', nums);
+            }
+          } catch (e) { /* ignore */ }
+        })();
+    </script>
 </head>
 <body>
     <div class="app-container">

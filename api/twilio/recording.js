@@ -468,8 +468,16 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                 } else {
                     aiInsights.source = 'twilio-basic-transcription';
                 }
-                // Attach speaker turns if we built them
-                try { if (typeof speakerTurns !== 'undefined' && Array.isArray(speakerTurns) && speakerTurns.length) aiInsights.speakerTurns = speakerTurns; } catch(_) {}
+            // Attach speaker turns if we built them
+            try { if (typeof speakerTurns !== 'undefined' && Array.isArray(speakerTurns) && speakerTurns.length) aiInsights.speakerTurns = speakerTurns; } catch(_) {}
+            // Prefer Twilio CI sentence-based summary if Operator didn’t provide
+            try {
+                if ((!aiInsights.summary || !aiInsights.summary.trim()) && speakerTurns && speakerTurns.length) {
+                    const first = speakerTurns[0]?.text || '';
+                    const last = speakerTurns[speakerTurns.length-1]?.text || '';
+                    aiInsights.summary = (first && last) ? `${first} … ${last}` : aiInsights.summary;
+                }
+            } catch(_) {}
             }
             
         } catch (transcriptionError) {
