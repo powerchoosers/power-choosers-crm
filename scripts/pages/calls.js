@@ -41,11 +41,86 @@
   // Find account by phone using Accounts data
   function findAccountByPhone(phone10){
     try{
-      if (typeof window.getAccountsData !== 'function') return null;
-      const accounts = window.getAccountsData() || [];
-      const hit = accounts.find(a=> normPhone(a.phone||a.primaryPhone||a.mainPhone) === phone10);
-      return hit || null;
+      if (typeof window.getAccountsData === 'function'){
+        const accounts = window.getAccountsData() || [];
+        const hit = accounts.find(a=> normPhone(a.phone||a.primaryPhone||a.mainPhone) === phone10);
+        if (hit) return hit;
+      }
+      // Fallback: attempt lightweight Firestore lookup once and cache
+      if (phone10 && window.firebaseDB && !findAccountByPhone._cache) {
+        findAccountByPhone._cache = { ready:false, map:new Map() };
+        (async ()=>{
+          try{
+            const snap = await window.firebaseDB.collection('accounts').limit(500).get();
+            snap.forEach(doc=>{
+              const d = doc.data()||{};
+              const ph = normPhone(d.phone||d.primaryPhone||d.mainPhone);
+              if (ph && !findAccountByPhone._cache.map.has(ph)) findAccountByPhone._cache.map.set(ph,{ id:doc.id, ...d });
+            });
+            findAccountByPhone._cache.ready = true;
+          }catch(_){ /* ignore */ }
+        })();
+      }
+      if (findAccountByPhone._cache && findAccountByPhone._cache.ready){
+        return findAccountByPhone._cache.map.get(phone10) || null;
+      }
+      return null;
     }catch(_){ return null; }
+  }
+
+  // Build a phone -> {name,title,company} map from People. Tries in-memory first then Firestore.
+  let _phoneToContactCache = null;
+  async function buildPhoneToContactMap(){
+    if (_phoneToContactCache) return _phoneToContactCache;
+    try{
+      // 1) Use in-memory dataset if available
+      if (typeof window.getPeopleData === 'function'){
+        const people = window.getPeopleData() || [];
+        if (Array.isArray(people) && people.length){
+          const map = new Map();
+          const norm = (p)=>(p||'').toString().replace(/\D/g,'').slice(-10);
+          for (const c of people){
+            const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || (c.name||'');
+            const title = c.title || '';
+            const company = c.companyName || '';
+            const phones = [c.phone, c.mobile].map(norm).filter(Boolean);
+            for (const ph of phones) if (ph && !map.has(ph)) map.set(ph,{ name, title, company });
+          }
+          _phoneToContactCache = map; return map;
+        }
+      }
+      // 2) Fallback to Firestore (limited) to populate essential mappings
+      if (window.firebaseDB){
+        const map = new Map();
+        const norm = (p)=>(p||'').toString().replace(/\D/g,'').slice(-10);
+        // Query contacts with phone
+        try{
+          const snap1 = await window.firebaseDB.collection('contacts').where('phone','!=',null).limit(500).get();
+          snap1.forEach(doc=>{
+            const d = doc.data()||{};
+            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
+            const title = d.title || '';
+            const company = d.companyName || d.accountName || '';
+            const ph = norm(d.phone);
+            if (ph && !map.has(ph)) map.set(ph,{ name, title, company });
+          });
+        }catch(_){ /* ignore */ }
+        // Query contacts with mobile
+        try{
+          const snap2 = await window.firebaseDB.collection('contacts').where('mobile','!=',null).limit(500).get();
+          snap2.forEach(doc=>{
+            const d = doc.data()||{};
+            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
+            const title = d.title || '';
+            const company = d.companyName || d.accountName || '';
+            const ph = norm(d.mobile);
+            if (ph && !map.has(ph)) map.set(ph,{ name, title, company });
+          });
+        }catch(_){ /* ignore */ }
+        _phoneToContactCache = map; return map;
+      }
+    }catch(_){ }
+    return new Map();
   }
 
   // Choose most recently active contact in an account (best-effort)
@@ -269,30 +344,15 @@
   function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=>N(x)===N(t))) { arr.push(t); const d = chips.find(x=>x.k===k); if (d) renderChips(d); } }
 
   async function loadData() {
-    // 1) Try to load real calls from backend - always use production for calls data
+    // 1) Try to load real calls from backend - use current origin by default
     try {
-      const base = 'https://power-choosers-crm.vercel.app';
+      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       console.log('[Calls] Loading real call data from:', `${base}/api/calls`);
         const r = await fetch(`${base}/api/calls`, { method: 'GET' });
         const j = await r.json().catch(()=>({}));
         if (r.ok && j && j.ok && Array.isArray(j.calls)) {
-          // Build quick phone → contact map from People data (if available)
-          const phoneToContact = (() => {
-            try {
-              if (typeof window.getPeopleData !== 'function') return new Map();
-              const people = window.getPeopleData() || [];
-              const map = new Map();
-              const norm = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
-              for (const c of people) {
-                const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || (c.name || '');
-                const title = c.title || '';
-                const company = c.companyName || '';
-                const phones = [c.phone, c.mobile].map(norm).filter(Boolean);
-                for (const ph of phones) if (ph && !map.has(ph)) map.set(ph, { name, title, company });
-              }
-              return map;
-            } catch (_) { return new Map(); }
-          })();
+          // Build quick phone → contact map from People data (if available), else Firestore
+          const phoneToContact = await buildPhoneToContactMap();
 
           console.log('[Calls] Found', j.calls.length, 'real calls from API');
           const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
