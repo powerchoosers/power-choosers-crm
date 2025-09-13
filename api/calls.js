@@ -224,6 +224,52 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (req.method === 'DELETE') {
+      // Support bulk or single delete by Call SID (id)
+      let body = {};
+      try { body = await readJson(req); } catch(_) { body = {}; }
+      const ids = [];
+      const pushId = (v) => { if (typeof v === 'string' && v.trim()) ids.push(v.trim()); };
+      pushId(body.id);
+      pushId(body.callSid);
+      pushId(body.twilioSid);
+      if (Array.isArray(body.ids)) body.ids.forEach(pushId);
+
+      // Resolve to valid Call SIDs only
+      const resolved = [];
+      for (const raw of ids) {
+        let sid = raw;
+        if (!isCallSid(sid)) {
+          try { sid = await resolveToCallSid({ callSid: raw, recordingSid: body.recordingSid, transcriptSid: body.transcriptSid }); } catch(_) {}
+        }
+        if (isCallSid(sid)) resolved.push(sid);
+      }
+
+      if (db) {
+        let deleted = 0;
+        for (const sid of resolved) {
+          try {
+            await db.collection('calls').doc(sid).delete();
+            deleted++;
+          } catch(_) {}
+        }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: true, deleted, requested: resolved.length }));
+        return;
+      }
+
+      // Memory fallback
+      let deleted = 0;
+      for (const sid of resolved) {
+        if (memoryStore.has(sid)) { memoryStore.delete(sid); deleted++; }
+      }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: true, deleted, requested: resolved.length }));
+      return;
+    }
+
     if (req.method === 'POST') {
       const payload = await readJson(req);
 
