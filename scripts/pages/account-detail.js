@@ -1,5 +1,7 @@
 'use strict';
 
+// Use shared supplier data from global scope
+
 // Account Detail page module
 (function () {
   const state = {
@@ -565,7 +567,141 @@
   function animateCollapse(el, done){ const h=el.scrollHeight; el.style.height=h+'px'; el.style.opacity='1'; requestAnimationFrame(()=>{ el.classList.add('collapsing'); el.style.transition='height 140ms ease, opacity 140ms ease'; el.style.height='0px'; el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('collapsing'); done&&done(); },160); }); }
   function insightsInlineHtml(r){
     const AI = r.aiInsights || {};
-    const summaryText = r.aiSummary || (AI && Object.keys(AI).length ? 'AI analysis in progress...' : 'No summary available');
+    
+    // Fallback extraction from raw transcript for missing/incorrect fields
+    function extractFromTranscript(text){
+      const out = {};
+      if (!text || typeof text !== 'string') return out;
+      const s = text;
+
+      // Current rate (e.g., 0.07, $0.07, 7 cents)
+      let m = s.match(/(?:current\s+rate\s*(?:is|:)?\s*)?(\$?0?\.[0-9]{2,3})\b/i);
+      if (!m) m = s.match(/\$\s*([0-9]+(?:\.[0-9]+)?)\s*(?:per\s*kwh|\/\s*kwh)?/i);
+      if (!m) m = s.match(/([0-9]+)\s*cents\b/i);
+      if (m) {
+        let rate = m[1];
+        if (/cents/i.test(m[0])) rate = (parseFloat(rate)/100).toFixed(2);
+        if (rate && !rate.startsWith('$')) rate = rate;
+        out.currentRate = rate.replace(/\s+/g,'');
+      }
+
+      // Supplier / Utility (e.g., "Supplier is T X U")
+      m = s.match(/\b(?:supplier|provider|utility)\s*(?:is|:)?\s*([A-Za-z .&-]{2,30})/i);
+      if (m) {
+        let sup = m[1].trim();
+        // Normalize spaced letters like "T X U" -> "TXU"
+        if (/^(?:[A-Za-z]\s+){1,}[A-Za-z]$/.test(sup)) sup = sup.replace(/\s+/g, '');
+        out.supplier = sup.toUpperCase();
+      }
+
+      // Contract end date (e.g., April nineteenth, 20 26)
+      const ordMap = {
+        'first':1,'second':2,'third':3,'fourth':4,'fifth':5,'sixth':6,'seventh':7,'eighth':8,'ninth':9,'tenth':10,
+        'eleventh':11,'twelfth':12,'thirteenth':13,'fourteenth':14,'fifteenth':15,'sixteenth':16,'seventeenth':17,'eighteenth':18,'nineteenth':19,
+        'twentieth':20,'twenty first':21,'twenty-first':21,'twenty second':22,'twenty-second':22,'twenty third':23,'twenty-third':23,
+        'twenty fourth':24,'twenty-fourth':24,'twenty fifth':25,'twenty-fifth':25,'twenty sixth':26,'twenty-sixth':26,'twenty seventh':27,'twenty-seventh':27,
+        'twenty eighth':28,'twenty-eighth':28,'twenty ninth':29,'twenty-ninth':29,'thirtieth':30,'thirty first':31,'thirty-first':31
+      };
+      m = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+([A-Za-z\- ]+|\d{1,2})(?:,\s*)?(\d{2}\s?\d{2}|\d{4})/i);
+      if (m) {
+        const month = m[1];
+        let dayRaw = String(m[2]).toLowerCase().trim();
+        let yearRaw = String(m[3]).replace(/\s+/g,'');
+        let dayNum = parseInt(dayRaw,10);
+        if (isNaN(dayNum)) {
+          // Try ordinal words
+          dayNum = ordMap[dayRaw] || null;
+        }
+        if (dayNum && yearRaw.length === 4) {
+          out.contractEnd = `${month} ${dayNum}, ${yearRaw}`;
+        }
+      }
+
+      // Usage (e.g., 100,000 kilo watts/year or kWh)
+      m = s.match(/(\d[\d,\.]{2,})\s*(?:kwh|kilowatt(?:-)?hours?|kilo\s*watts?)\b/i);
+      if (!m) m = s.match(/(?:using|usage)\s*(?:is|:)?\s*(\d[\d,\.]{2,})/i);
+      if (m) {
+        const raw = m[1].replace(/[,\s]/g,'');
+        const num = parseInt(raw,10);
+        if (!isNaN(num)) out.usageKWh = String(num);
+      }
+
+      // Term (e.g., For 5 years)
+      m = s.match(/\b(\d{1,2})\s*years?\b/i);
+      if (m) out.contractLength = `${m[1]} years`;
+
+      // Budget / Monthly bill (e.g., 1,000 dollars a month)
+      m = s.match(/monthly\s*(?:bill|budget)[^\d]*\$?([\d,]+)\b/i);
+      if (!m) m = s.match(/\$?([\d,]+)\s*(?:dollars?)\s*(?:a|per)\s*month/i);
+      if (m) out.budget = `$${m[1].replace(/[,\s]/g,',')}/month`;
+
+      // Timeline (simple phrases)
+      m = s.match(/\b(next\s+week(?:\s+on\s+\w+)?|tomorrow|this\s+\w+|next\s+\w+)\b/i);
+      if (m) out.timeline = m[1].replace(/\s+/g,' ').trim();
+
+      return out;
+    }
+    
+    // Build comprehensive summary with bullet points
+    let summaryText = r.aiSummary || '';
+    if (!summaryText && AI && Object.keys(AI).length) {
+      const contract = AI.contract || {};
+      const supplier = get(contract, ['supplier'], '');
+      const rate = get(contract, ['current_rate'], '');
+      const usage = get(contract, ['usage_k_wh'], '');
+      const contractEnd = get(contract, ['contract_end'], '');
+      const keyTopics = toArr(AI.keyTopics || []);
+      const nextSteps = toArr(AI.nextSteps || []);
+      const painPoints = toArr(AI.painPoints || []);
+      const budget = AI.budget || '';
+      const timeline = AI.timeline || '';
+      const sentiment = AI.sentiment || 'Unknown';
+      const disposition = AI.disposition || 'Unknown';
+      
+      // Create paragraph summary
+      let paragraph = `Call with ${disposition.toLowerCase()} disposition`;
+      if (supplier && supplier !== 'Unknown') {
+        paragraph += ` regarding energy services with ${supplier}`;
+      } else {
+        paragraph += ` about energy services`;
+      }
+      paragraph += `. ${sentiment} sentiment detected.`;
+      
+      // Create bullet points
+      const bullets = [];
+      if (supplier && supplier !== 'Unknown') {
+        bullets.push(`Current supplier: ${supplier}`);
+      }
+      if (rate && rate !== 'Unknown') {
+        bullets.push(`Current rate: ${rate}`);
+      }
+      if (usage && usage !== 'Not provided') {
+        bullets.push(`Usage: ${usage}`);
+      }
+      if (contractEnd && contractEnd !== 'Not discussed') {
+        bullets.push(`Contract expires: ${contractEnd}`);
+      }
+      if (keyTopics.length > 0) {
+        bullets.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
+      }
+      if (nextSteps.length > 0) {
+        bullets.push(`Next steps: ${nextSteps.slice(0,2).join(', ')}`);
+      }
+      if (painPoints.length > 0) {
+        bullets.push(`Pain points: ${painPoints.slice(0,2).join(', ')}`);
+      }
+      if (budget && budget !== 'Unclear' && budget !== '') {
+        bullets.push(`Budget: ${budget}`);
+      }
+      if (timeline && timeline !== 'Not specified' && timeline !== '') {
+        bullets.push(`Timeline: ${timeline}`);
+      }
+      
+      // Combine paragraph and bullets
+      summaryText = paragraph + (bullets.length > 0 ? ' • ' + bullets.join(' • ') : '');
+    } else if (!summaryText) {
+      summaryText = 'No summary available';
+    }
     const sentiment = AI.sentiment || 'Unknown';
     const disposition = AI.disposition || '';
     const keyTopics = Array.isArray(AI.keyTopics) ? AI.keyTopics : [];
@@ -612,14 +748,24 @@
 
     // Energy & Contract + Entities to mirror Calls modal
     const contract = AI.contract || {};
-    const rate = contract.currentRate || contract.rate || 'Unknown';
-    const supplier = contract.supplier || contract.utility || 'Unknown';
-    const contractEnd = contract.contractEnd || contract.endDate || 'Not discussed';
-    const usage = (contract.usageKWh || contract.usage || 'Not provided')+'';
-    const rateType = contract.rateType || 'Unknown';
-    const contractLength = (contract.contractLength || 'Unknown')+'';
-    const budget = AI.budget || 'Unclear';
-    const timeline = AI.timeline || 'Not specified';
+    let rate = contract.currentRate || contract.rate || 'Unknown';
+    let supplier = contract.supplier || contract.utility || 'Unknown';
+    let contractEnd = contract.contractEnd || contract.endDate || 'Not discussed';
+    let usage = (contract.usageKWh || contract.usage || 'Not provided')+'';
+    let rateType = contract.rateType || 'Unknown';
+    let contractLength = (contract.contractLength || 'Unknown')+'';
+    let budget = AI.budget || 'Unclear';
+    let timeline = AI.timeline || 'Not specified';
+    
+    // Merge transcript-derived values when AI fields are missing or clearly wrong
+    const fx = extractFromTranscript(r.transcript || '');
+    if ((!rate || String(rate).trim()==='' || rate === 'Unknown') && fx.currentRate) rate = fx.currentRate;
+    if ((!supplier || String(supplier).trim()==='' || supplier === 'Unknown' || /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(String(supplier))) && fx.supplier) supplier = fx.supplier;
+    if ((!contractEnd || String(contractEnd).trim()==='' || contractEnd === 'Not discussed') && fx.contractEnd) contractEnd = fx.contractEnd;
+    if ((!usage || String(usage).trim()==='' || usage === 'Not provided') && fx.usageKWh) usage = fx.usageKWh;
+    if ((!contractLength || String(contractLength).trim()==='' || contractLength === 'Unknown') && fx.contractLength) contractLength = fx.contractLength;
+    if ((!budget || /unclear|not\s+mentioned/i.test(budget)) && fx.budget) budget = fx.budget;
+    if ((!timeline || /not\s+specified|discussed/i.test(timeline)) && fx.timeline) timeline = fx.timeline;
     const entities = Array.isArray(AI.entities) ? AI.entities : [];
     const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class=\"pc-chip\">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class=\"pc-chip\">None</span>';
     return `
@@ -1203,11 +1349,12 @@
     const currentText = textEl.textContent || '';
     
     const isMultiline = field === 'shortDescription';
+    const isSupplierField = field === 'electricitySupplier';
     const inputControl = isMultiline
       ? `<textarea class="textarea-dark info-edit-textarea" rows="4">${escapeHtml(currentText === '--' ? '' : currentText)}</textarea>`
     : (field === 'contractEndDate' 
       ? `<input type="date" class="info-edit-input" value="${escapeHtml(toISODate(currentText))}">`
-      : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText === '--' ? '' : currentText)}">`);
+      : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText === '--' ? '' : currentText)}"${isSupplierField ? ' list="account-supplier-list"' : ''}>`);
     const inputHtml = `
       ${inputControl}
       <div class="info-actions">
@@ -1240,6 +1387,12 @@
     
     if (input && saveBtn && cancelBtn) {
       wrap.appendChild(inputWrap);
+      
+      // Add supplier suggestions for electricity supplier field
+      if (isSupplierField) {
+        window.addSupplierSuggestions(input, 'account-supplier-list');
+      }
+      
       input.focus();
       
       // Save handler

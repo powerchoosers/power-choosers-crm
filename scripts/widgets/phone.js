@@ -446,7 +446,7 @@
                   setContactDisplay(meta, number);
                 }
                 const callStartTime = Date.now();
-                const callId = `call_${callStartTime}_${(number || '').replace(/\D/g, '')}`;
+                const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
                 if (typeof updateCallStatus === 'function') {
                   updateCallStatus(number, 'connected', callStartTime, 0, callId, number, 'incoming');
                 } else {
@@ -1627,7 +1627,7 @@
         
         // Track call start time and generate consistent call ID
         const callStartTime = Date.now();
-        const callId = `call_${callStartTime}_${number.replace(/\D/g, '')}`;
+        const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
         let twilioCallSid = null;
         
         // Log initial call
@@ -1963,7 +1963,7 @@
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         if (!base) return;
         
-        const callSid = callId || `call_${startTime}_${phoneNumber.replace(/\D/g, '')}`;
+        const callSid = callId || `call_${startTime}_${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = new Date(startTime).toISOString();
         
         // For incoming calls, use the caller's number as 'from' and business number as 'to'

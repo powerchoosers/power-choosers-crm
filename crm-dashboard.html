@@ -1278,9 +1278,9 @@
                         <div class="widget-card">
                             <h4 class="widget-title">Quick Actions</h4>
                             <div class="quick-actions">
-                                <button class="action-btn">Add Contact</button>
-                                <button class="action-btn">Add Account</button>
-                                <button class="action-btn">Bulk Import CSV</button>
+                                <button class="action-btn" data-action="create" data-type="contact">Add Contact</button>
+                                <button class="action-btn" data-action="create" data-type="account">Add Account</button>
+                                <button class="action-btn" data-action="create" data-type="bulk-import">Bulk Import CSV</button>
                             </div>
                         </div>
 
@@ -1338,24 +1338,45 @@
                 <h3 id="add-contact-title">Add Contact</h3>
                 <button class="pc-modal__close" data-close="contact" aria-label="Close">×</button>
             </div>
-            <form id="form-add-contact" class="pc-modal__body">
-                <div class="form-row">
-                    <label>First name<input type="text" name="firstName" required class="input-dark" /></label>
-                    <label>Last name<input type="text" name="lastName" required class="input-dark" /></label>
+            <form id="form-add-contact">
+                <div class="pc-modal__body">
+                    <div class="form-row">
+                        <label>First name<input type="text" name="firstName" required class="input-dark" /></label>
+                        <label>Last name<input type="text" name="lastName" required class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Title<input type="text" name="title" class="input-dark" /></label>
+                        <label>Company<input type="text" name="companyName" class="input-dark" placeholder="Exact account name" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Email<input type="email" name="email" class="input-dark" /></label>
+                        <label>Email Status<select name="emailStatus" class="input-dark"><option value="">Not Verified</option><option value="verified">Verified</option></select></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Mobile Phone<input type="tel" name="mobile" class="input-dark" /></label>
+                        <label>Work Direct Phone<input type="tel" name="workDirectPhone" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Other Phone<input type="tel" name="otherPhone" class="input-dark" /></label>
+                        <label>City<input type="text" name="city" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>State<input type="text" name="state" class="input-dark" /></label>
+                        <label>Industry<input type="text" name="industry" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Seniority<input type="text" name="seniority" class="input-dark" /></label>
+                        <label>Department<input type="text" name="department" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>LinkedIn URL<input type="url" name="linkedin" class="input-dark" /></label>
+                    </div>
                 </div>
-                <div class="form-row">
-                    <label>Title<input type="text" name="title" class="input-dark" /></label>
-                    <label>Company<input type="text" name="companyName" class="input-dark" placeholder="Exact account name" /></label>
-                </div>
-                <div class="form-row">
-                    <label>Email<input type="email" name="email" class="input-dark" /></label>
-                    <label>Phone<input type="text" name="phone" class="input-dark" /></label>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-text" data-close="contact">Cancel</button>
+                    <button type="submit" class="btn-primary">Create contact</button>
                 </div>
             </form>
-            <div class="pc-modal__footer">
-                <button type="button" class="btn-text" data-close="contact">Cancel</button>
-                <button type="submit" class="btn-primary">Create contact</button>
-            </div>
         </div>
     </div>
 
@@ -1367,24 +1388,45 @@
                 <h3 id="add-account-title">Add Account</h3>
                 <button class="pc-modal__close" data-close="account" aria-label="Close">×</button>
             </div>
-            <form id="form-add-account" class="pc-modal__body">
-                <div class="form-row">
-                    <label>Account name<input type="text" name="accountName" required class="input-dark" /></label>
-                    <label>Industry<input type="text" name="industry" class="input-dark" /></label>
+            <form id="form-add-account">
+                <div class="pc-modal__body">
+                    <div class="form-row">
+                        <label>Account name<input type="text" name="accountName" required class="input-dark" /></label>
+                        <label>Industry<input type="text" name="industry" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Website<input type="text" name="website" class="input-dark" placeholder="https://example.com" /></label>
+                        <label>Phone<input type="text" name="phone" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>City<input type="text" name="city" class="input-dark" /></label>
+                        <label>State<input type="text" name="state" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>LinkedIn URL<input type="url" name="linkedin" class="input-dark" /></label>
+                        <label>Square Footage<input type="number" name="squareFootage" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Occupancy %<input type="number" name="occupancyPct" class="input-dark" min="0" max="100" /></label>
+                        <label>Employees<input type="number" name="employees" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Short Description<textarea name="shortDescription" class="input-dark" rows="3"></textarea></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Electricity Supplier<input type="text" name="electricitySupplier" class="input-dark" /></label>
+                        <label>Annual Usage (kWh)<input type="number" name="annualUsage" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Current Rate ($/kWh)<input type="number" name="currentRate" class="input-dark" step="0.001" /></label>
+                        <label>Contract End Date<input type="date" name="contractEndDate" class="input-dark" /></label>
+                    </div>
                 </div>
-                <div class="form-row">
-                    <label>Website<input type="text" name="website" class="input-dark" placeholder="https://example.com" /></label>
-                    <label>Phone<input type="text" name="phone" class="input-dark" /></label>
-                </div>
-                <div class="form-row">
-                    <label>City<input type="text" name="city" class="input-dark" /></label>
-                    <label>State<input type="text" name="state" class="input-dark" /></label>
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-text" data-close="account">Cancel</button>
+                    <button type="submit" class="btn-primary">Create account</button>
                 </div>
             </form>
-            <div class="pc-modal__footer">
-                <button type="button" class="btn-text" data-close="account">Cancel</button>
-                <button type="submit" class="btn-primary">Create account</button>
-            </div>
         </div>
     </div>
 
@@ -1578,6 +1620,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="scripts/firebase.js"></script>
+    <script src="scripts/supplier-data.js"></script>
     <!-- API Base URL (global) -->
     <script>
       (function(){
