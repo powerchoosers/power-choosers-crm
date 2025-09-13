@@ -115,29 +115,16 @@ export default async function handler(req, res) {
                             .transcripts(ciTranscript.sid)
                             .sentences.list();
                         
-                        // Map into our normalized sentence objects
-                        const mapped = (sentences || []).map(s => ({
-                            text: s.text || '',
-                            confidence: s.confidence,
-                            startTime: s.startTime,
-                            endTime: s.endTime,
-                            channel: s.channel
-                        }));
-
-                        transcript = mapped.map(s => s.text).join(' ');
+                        transcript = sentences.map(s => s.text).join(' ');
                         conversationalIntelligence = {
                             transcriptSid: ciTranscript.sid,
                             status: ciTranscript.status,
-                            sentenceCount: mapped.length,
-                            averageConfidence: mapped.length > 0 ? 
-                                mapped.reduce((acc, s) => acc + (s.confidence || 0), 0) / mapped.length : 0
+                            sentenceCount: sentences.length,
+                            averageConfidence: sentences.length > 0 ? 
+                                sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
                         };
                         
                         console.log(`[Twilio AI] Found Conversational Intelligence transcript with ${sentences.length} sentences`);
-
-                        // If we generate aiInsights below, attach speakerTurns using channel mapping
-                        // We will compute them after aiInsights is created
-                        conversationalIntelligence._sentencesForTurns = mapped;
                     }
                 }
             }
@@ -153,21 +140,6 @@ export default async function handler(req, res) {
                 if (conversationalIntelligence) {
                     aiInsights.source = 'twilio-conversational-intelligence';
                     aiInsights.conversationalIntelligence = conversationalIntelligence;
-                    // Attach speakerTurns if CI sentences are present
-                    const sents = conversationalIntelligence._sentencesForTurns || [];
-                    if (Array.isArray(sents) && sents.length) {
-                        aiInsights.speakerTurns = sents.map(s => {
-                            const timeInSeconds = Math.floor(s.startTime || 0);
-                            const role = s.channel === 1 ? 'agent' : 'customer';
-                            return {
-                                t: timeInSeconds,
-                                role: role,
-                                text: s.text || '',
-                                channel: s.channel,
-                                confidence: s.confidence
-                            };
-                        });
-                    }
                 } else {
                     aiInsights.source = 'twilio-basic-transcription';
                 }

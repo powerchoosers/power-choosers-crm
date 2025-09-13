@@ -39,7 +39,7 @@ export default async function handler(req, res) {
                             timestamp: d.timestamp,
                             callTime: d.callTime || d.timestamp,
                             durationSec: d.duration || 0,
-                            outcome: d.outcome || (d.status === 'completed' ? 'Connected' : (d.status === 'in-progress' || d.status === 'connected' || d.status === 'ringing' ? 'Connected' : 'No Answer')),
+                            outcome: d.outcome || (d.status === 'completed' ? 'Connected' : 'No Answer'),
                             transcript: d.transcript || '',
                             aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
                             aiInsights: d.aiInsights || null,
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
                                 timestamp: d.timestamp,
                                 callTime: d.callTime || d.timestamp,
                                 durationSec: d.duration || 0,
-                                outcome: d.outcome || (d.status === 'completed' ? 'Connected' : (d.status === 'in-progress' || d.status === 'connected' || d.status === 'ringing' ? 'Connected' : 'No Answer')),
+                                outcome: d.outcome || (d.status === 'completed' ? 'Connected' : 'No Answer'),
                                 transcript: d.transcript || '',
                                 aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
                                 aiInsights: d.aiInsights || null,
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
                             timestamp: d.timestamp,
                             callTime: d.callTime || d.timestamp,
                             durationSec: d.duration || 0,
-                            outcome: d.outcome || (d.status === 'completed' ? 'Connected' : (d.status === 'in-progress' || d.status === 'connected' || d.status === 'ringing' ? 'Connected' : 'No Answer')),
+                            outcome: d.outcome || (d.status === 'completed' ? 'Connected' : 'No Answer'),
                             transcript: d.transcript || '',
                             aiSummary: (d.aiInsights && d.aiInsights.summary) || d.aiSummary || '',
                             aiInsights: d.aiInsights || null,
@@ -110,99 +110,36 @@ export default async function handler(req, res) {
                         });
                     });
                 }
-                // Deduplicate by robust key:
-                // - If a Twilio SID exists, group by it.
-                // - Else, group by counterparty and a 5-minute time bucket to collapse placeholders.
+                // Deduplicate by twilioSid (or id) to avoid showing multiple rows for the same call
                 const dedupe = (arr) => {
-                    const bySid = new Map();
-                    const byPair = new Map();
-                    const buckets = new Set();
-                    const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-                    const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
-                    const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
-                        .split(',').map(norm).filter(Boolean);
-                    const isBiz = (p) => !!p && bizList.includes(p);
-                    const otherParty = (toRaw, fromRaw) => {
-                        const to = norm(isClient(toRaw) ? '' : toRaw);
-                        const from = norm(isClient(fromRaw) ? '' : fromRaw);
-                        if (isBiz(to) && !isBiz(from)) return from;
-                        if (isBiz(from) && !isBiz(to)) return to;
-                        return to || from || '';
-                    };
-                    const ensureGroup = (sid, pairKey) => {
-                        let g = null;
-                        if (sid && bySid.has(sid)) g = bySid.get(sid);
-                        else if (pairKey && byPair.has(pairKey)) g = byPair.get(pairKey);
-                        if (!g) { g = []; }
-                        if (sid) bySid.set(sid, g);
-                        if (pairKey) byPair.set(pairKey, g);
-                        buckets.add(g);
-                        return g;
-                    };
+                    const map = new Map();
                     for (const c of arr) {
-                        const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
-                        const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0; // 5-min bucket
-                        const toN = norm(isClient(c.to) ? '' : c.to);
-                        const fromN = norm(isClient(c.from) ? '' : c.from);
-                        const pair = [toN, fromN].filter(Boolean).sort().join('~');
-                        const pairKey = pair ? `pair:${pair}:b:${bucket}` : null;
-                        const sid = c.twilioSid ? String(c.twilioSid) : '';
-                        const g = ensureGroup(sid, pairKey);
-                        g.push(c);
+                        const key = c.twilioSid || c.id;
+                        if (!map.has(key)) { map.set(key, c); continue; }
+                        const prev = map.get(key);
+                        const aHasRec = !!c.recordingUrl;
+                        const bHasRec = !!prev.recordingUrl;
+                        const pick = aHasRec && !bHasRec ? c : (!aHasRec && bHasRec ? prev : ((c.durationSec||0) > (prev.durationSec||0) ? c : (new Date(c.timestamp) > new Date(prev.timestamp) ? c : prev)));
+                        const merged = { ...prev, ...c };
+                        merged.id = pick.id; // prefer the picked id for stability
+                        merged.recordingUrl = pick.recordingUrl || prev.recordingUrl || '';
+                        merged.audioUrl = merged.recordingUrl;
+                        merged.durationSec = pick.durationSec || prev.durationSec || 0;
+                        merged.duration = pick.duration || prev.duration || merged.durationSec || 0;
+                        merged.status = pick.status || prev.status;
+                        merged.accountId = pick.accountId || prev.accountId || null;
+                        merged.accountName = pick.accountName || prev.accountName || null;
+                        merged.contactId = pick.contactId || prev.contactId || null;
+                        merged.contactName = pick.contactName || prev.contactName || null;
+                        // Prefer non-empty transcript and present aiInsights
+                        const prevTranscript = (prev.transcript || '').trim();
+                        const currTranscript = (c.transcript || '').trim();
+                        merged.transcript = currTranscript || prevTranscript || '';
+                        merged.aiInsights = c.aiInsights || prev.aiInsights || null;
+                        map.set(key, merged);
                     }
-                    const out = [];
-                    for (const list of Array.from(buckets.values())) {
-                        if (list.length === 1) { out.push(list[0]); continue; }
-                        // Pick best representative
-                        const score = (x) => {
-                            const tlen = (x.transcript || '').trim().length;
-                            const aiTurns = Array.isArray(x.aiInsights?.speakerTurns) ? x.aiInsights.speakerTurns.length : 0;
-                            const hasRec = x.recordingUrl ? 1 : 0;
-                            const dur = Number(x.durationSec || x.duration || 0) || 0;
-                            const ts = new Date(x.timestamp || x.callTime || 0).getTime() || 0;
-                            const statusW = /completed/i.test(String(x.status||'')) ? 3 : (/in-?progress|connected|ringing/i.test(String(x.status||'')) ? 1 : 0);
-                            return hasRec*10000 + aiTurns*500 + tlen + dur*5 + statusW*200 + ts/100000;
-                        };
-                        let best = list[0];
-                        for (let i=1;i<list.length;i++){ if (score(list[i]) > score(best)) best = list[i]; }
-                        // Merge fields conservatively
-                        const merged = list.reduce((acc, cur) => {
-                            const pick = (v, w) => (v == null || v === '' ? w : v);
-                            const longer = (a,b) => (String(a||'').length >= String(b||'').length ? a : b);
-                            return {
-                                ...acc,
-                                id: acc.id || cur.id,
-                                to: pick(acc.to, cur.to),
-                                from: pick(acc.from, cur.from),
-                                status: pick(acc.status, cur.status),
-                                duration: Number(acc.duration || 0) >= Number(cur.duration || 0) ? acc.duration : cur.duration,
-                                durationSec: Number(acc.durationSec || acc.duration || 0) >= Number(cur.durationSec || cur.duration || 0) ? (acc.durationSec||acc.duration||0) : (cur.durationSec||cur.duration||0),
-                                timestamp: new Date(acc.timestamp||0) > new Date(cur.timestamp||0) ? acc.timestamp : cur.timestamp,
-                                recordingUrl: acc.recordingUrl || cur.recordingUrl || '',
-                                audioUrl: acc.audioUrl || cur.audioUrl || acc.recordingUrl || cur.recordingUrl || '',
-                                accountId: pick(acc.accountId, cur.accountId),
-                                accountName: pick(acc.accountName, cur.accountName),
-                                contactId: pick(acc.contactId, cur.contactId),
-                                contactName: pick(acc.contactName, cur.contactName),
-                                transcript: longer(acc.transcript, cur.transcript),
-                                aiInsights: (Array.isArray(cur?.aiInsights?.speakerTurns) && cur.aiInsights.speakerTurns.length > (acc?.aiInsights?.speakerTurns?.length||0)) ? cur.aiInsights : (acc.aiInsights || cur.aiInsights || null),
-                                twilioSid: acc.twilioSid || cur.twilioSid || ''
-                            };
-                        }, best);
-                        out.push(merged);
-                    }
-                    return out;
+                    return Array.from(map.values());
                 };
-                // Debug duplicate keys before dedupe
-                try {
-                    const keyCounts = new Map();
-                    for (const c of calls) {
-                        const k = c.twilioSid || c.id;
-                        keyCounts.set(k, (keyCounts.get(k)||0)+1);
-                    }
-                    const dups = Array.from(keyCounts.entries()).filter(([,n])=>n>1).map(([k,n])=>({ key:k, count:n }));
-                    if (dups.length) console.warn('[Calls][GET] duplicate keys before dedupe:', dups.slice(0,10));
-                } catch(_) {}
                 const pruned = dedupe(calls);
                 try { console.log('[Calls][GET] returning %d calls (deduped from %d)', pruned.length, calls.length); } catch(_) {}
                 return res.status(200).json({ ok: true, calls: pruned });
@@ -217,75 +154,28 @@ export default async function handler(req, res) {
         if (callSidFilter) {
             calls = calls.filter(c => c && ((c.twilioSid && c.twilioSid === callSidFilter) || (c.id && c.id === callSidFilter)));
         }
-        // Dedupe memory results similar to Firestore path (same grouping rules)
+        // Dedupe memory results similar to Firestore path
         const dedupeMem = (arr) => {
-            const bySid = new Map();
-            const byPair = new Map();
-            const buckets = new Set();
-            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-            const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
-            const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
-                .split(',').map(norm).filter(Boolean);
-            const isBiz = (p) => !!p && bizList.includes(p);
-            const ensureGroup = (sid, pairKey) => {
-                let g = null;
-                if (sid && bySid.has(sid)) g = bySid.get(sid);
-                else if (pairKey && byPair.has(pairKey)) g = byPair.get(pairKey);
-                if (!g) { g = []; }
-                if (sid) bySid.set(sid, g);
-                if (pairKey) byPair.set(pairKey, g);
-                buckets.add(g);
-                return g;
-            };
+            const map = new Map();
             for (const c of arr) {
-                const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
-                const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0;
-                const toN = norm(isClient(c.to) ? '' : c.to);
-                const fromN = norm(isClient(c.from) ? '' : c.from);
-                const pair = [toN, fromN].filter(Boolean).sort().join('~');
-                const pairKey = pair ? `pair:${pair}:b:${bucket}` : null;
-                const sid = c.twilioSid ? String(c.twilioSid) : '';
-                const g = ensureGroup(sid, pairKey);
-                g.push(c);
+                const key = c.twilioSid || c.id;
+                if (!map.has(key)) { map.set(key, c); continue; }
+                const prev = map.get(key);
+                const aHasRec = !!c.recordingUrl;
+                const bHasRec = !!prev.recordingUrl;
+                const pick = aHasRec && !bHasRec ? c : (!aHasRec && bHasRec ? prev : ((c.duration||0) > (prev.duration||0) ? c : (new Date(c.timestamp) > new Date(prev.timestamp) ? c : prev)));
+                const merged = { ...prev, ...c };
+                merged.id = pick.id;
+                merged.recordingUrl = pick.recordingUrl || prev.recordingUrl || '';
+                merged.duration = pick.duration || prev.duration || 0;
+                merged.status = pick.status || prev.status;
+                merged.accountId = pick.accountId || prev.accountId || null;
+                merged.accountName = pick.accountName || prev.accountName || null;
+                merged.contactId = pick.contactId || prev.contactId || null;
+                merged.contactName = pick.contactName || prev.contactName || null;
+                map.set(key, merged);
             }
-            const out = [];
-            const score = (x) => {
-                const tlen = (x.transcript || '').trim().length;
-                const aiTurns = Array.isArray(x.aiInsights?.speakerTurns) ? x.aiInsights.speakerTurns.length : 0;
-                const hasRec = x.recordingUrl ? 1 : 0;
-                const dur = Number(x.duration || 0) || 0;
-                const ts = new Date(x.timestamp || x.callTime || 0).getTime() || 0;
-                const statusW = /completed/i.test(String(x.status||'')) ? 3 : (/in-?progress|connected|ringing/i.test(String(x.status||'')) ? 1 : 0);
-                return hasRec*10000 + aiTurns*500 + tlen + dur*5 + statusW*200 + ts/100000;
-            };
-            for (const list of Array.from(buckets.values())) {
-                if (list.length === 1) { out.push(list[0]); continue; }
-                let best = list[0];
-                for (let i=1;i<list.length;i++){ if (score(list[i]) > score(best)) best = list[i]; }
-                const merged = list.reduce((acc, cur) => {
-                    const pick = (v, w) => (v == null || v === '' ? w : v);
-                    const longer = (a,b) => (String(a||'').length >= String(b||'').length ? a : b);
-                    return {
-                        ...acc,
-                        id: acc.id || cur.id,
-                        to: pick(acc.to, cur.to),
-                        from: pick(acc.from, cur.from),
-                        status: pick(acc.status, cur.status),
-                        duration: Number(acc.duration || 0) >= Number(cur.duration || 0) ? acc.duration : cur.duration,
-                        timestamp: new Date(acc.timestamp||0) > new Date(cur.timestamp||0) ? acc.timestamp : cur.timestamp,
-                        recordingUrl: acc.recordingUrl || cur.recordingUrl || '',
-                        accountId: pick(acc.accountId, cur.accountId),
-                        accountName: pick(acc.accountName, cur.accountName),
-                        contactId: pick(acc.contactId, cur.contactId),
-                        contactName: pick(acc.contactName, cur.contactName),
-                        transcript: longer(acc.transcript, cur.transcript),
-                        aiInsights: (Array.isArray(cur?.aiInsights?.speakerTurns) && cur.aiInsights.speakerTurns.length > (acc?.aiInsights?.speakerTurns?.length||0)) ? cur.aiInsights : (acc.aiInsights || cur.aiInsights || null),
-                        twilioSid: acc.twilioSid || cur.twilioSid || ''
-                    };
-                }, best);
-                out.push(merged);
-            }
-            return out;
+            return Array.from(map.values());
         };
         const memPruned = dedupeMem(calls);
         return res.status(200).json({
@@ -299,7 +189,7 @@ export default async function handler(req, res) {
                 timestamp: call.timestamp,
                 callTime: call.timestamp,
                 durationSec: call.duration || 0,
-                outcome: call.status === 'completed' ? 'Connected' : (call.status === 'in-progress' || call.status === 'connected' || call.status === 'ringing' ? 'Connected' : 'No Answer'),
+                outcome: call.status === 'completed' ? 'Connected' : 'No Answer',
                 transcript: call.transcript || '',
                 aiSummary: call.aiInsights?.summary || '',
                 aiInsights: call.aiInsights || null,
@@ -319,8 +209,7 @@ export default async function handler(req, res) {
         const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl, timestamp, callTime, accountId, accountName, contactId, contactName, source, targetPhone, businessPhone } = req.body || {};
         const _rid = `r${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
         try {
-            const _etype = callSid ? 'callSid-update' : 'placeholder';
-            console.log('[Calls][POST][%s] body (%s):', _rid, _etype, {
+            console.log('[Calls][POST][%s] body:', _rid, {
                 callSid, to, from, status, duration, timestamp, callTime, accountId, accountName, contactId, contactName, source, targetPhone, businessPhone,
                 hasTranscript: !!transcript, hasAI: !!aiInsights, hasRecording: !!recordingUrl
             });
@@ -330,8 +219,6 @@ export default async function handler(req, res) {
         
         // Get existing call data or create new
         let existingCall = callStore.get(callId) || {};
-        // Track placeholder to delete if we upgrade it to canonical callSid
-        let deleteOldId = null;
 
         // Helper: normalize phone (10-digit) and strip Twilio client prefix
         const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
@@ -377,155 +264,73 @@ export default async function handler(req, res) {
                     console.warn('[Calls][POST][%s] Firestore twilioSid lookup failed:', _rid, e?.message);
                 }
             }
-            
-            // Prepare best-available to/from for upgrade matching (fetch Twilio Call if needed)
-            let matchTo = to;
-            let matchFrom = from;
-            if ((!matchTo || !matchFrom) && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-                try {
-                    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-                    const call = await client.calls(callSid).fetch();
-                    matchTo = matchTo || call.to;
-                    matchFrom = matchFrom || call.from;
-                    try { console.log('[Calls][POST][%s] Fetched Call resource for upgrade match to=%s from=%s', _rid, matchTo, matchFrom); } catch(_) {}
-                } catch (e) {
-                    console.warn('[Calls][POST][%s] Twilio Call fetch failed for upgrade match:', _rid, e?.message);
-                }
-            }
-
-            // 2b) If we have a callSid but no exact match, try to UPGRADE a recent placeholder row (no twilioSid) to this callSid
-            if ((!existingCall || !existingCall.id) && callSid) {
-                try {
-                    const now = Date.now();
-                    const incomingTs = new Date(timestamp || callTime || now).getTime() || now;
-                    const UPGRADE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-                    const targetCounterparty = (targetPhone && norm(targetPhone)) || otherParty(matchTo, matchFrom);
-                    let best = null; let bestTs = -1; let bestKey = null;
-                    // scan memory placeholders
-                    for (const [k,v] of callStore.entries()) {
-                        try {
-                            if (!v || v.twilioSid) continue; // only placeholders
-                            const ts = new Date(v.timestamp || v.callTime || 0).getTime();
-                            if (!ts || Math.abs(incomingTs - ts) > UPGRADE_WINDOW_MS) continue;
-                            const candCp = otherParty(v.to, v.from);
-                            if (!candCp || candCp !== targetCounterparty) continue;
-                            const hasMedia = !!(v.recordingUrl || (v.transcript && String(v.transcript).trim()!==''));
-                            if (hasMedia) continue; // don't upgrade finished calls
-                            const score = (ts || 0);
-                            if (score > bestTs) { bestTs = score; best = v; bestKey = k; }
-                        } catch(_) {}
-                    }
-                    if (best && best.id) {
-                        try { console.log('[Calls][POST][%s] Upgrading placeholder (memory) id=%s -> callSid=%s (counterparty=%s)', _rid, best.id, callSid, targetCounterparty); } catch(_) {}
-                        existingCall = best; // merge from placeholder
-                        deleteOldId = best.id !== callSid ? best.id : null;
-                        callId = callSid; // canonicalize
-                    }
-                    // Firestore upgrade scan
-                    if ((!existingCall || !existingCall.id) && db) {
-                        try {
-                            const sinceIso = new Date(Date.now() - UPGRADE_WINDOW_MS).toISOString();
-                            const snap = await db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(25).get();
-                            let fbBest = null; let fbScore = -1;
-                            snap.forEach(doc => {
-                                const d = doc.data() || {};
-                                if (d.twilioSid) return; // skip real rows
-                                const ts = new Date(d.timestamp || d.callTime || 0).getTime();
-                                if (!ts || Math.abs(incomingTs - ts) > UPGRADE_WINDOW_MS) return;
-                                const candCp = otherParty(d.to, d.from);
-                                if (!candCp || candCp !== targetCounterparty) return;
-                                const hasMedia = !!(d.recordingUrl || (d.transcript && String(d.transcript).trim()!==''));
-                                if (hasMedia) return;
-                                const score = (ts || 0);
-                                if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
-                            });
-                            if (fbBest && fbBest.id) {
-                                try { console.log('[Calls][POST][%s] Firestore upgrade placeholder id=%s -> callSid=%s (counterparty=%s)', _rid, fbBest.id, callSid, targetCounterparty); } catch(_) {}
-                                existingCall = fbBest;
-                                deleteOldId = fbBest.id !== callSid ? fbBest.id : null;
-                                callId = callSid;
-                            }
-                        } catch (fe) {
-                            console.warn('[Calls][POST][%s] Firestore upgrade scan failed:', _rid, fe?.message);
-                        }
-                    }
-                } catch(_) {}
-            }
-            // 3) Fallback to window-based counterparty matching (ONLY when no callSid and candidate is clearly in-progress)
+            // 3) Fallback to window-based counterparty matching (STRICT when explicit IDs are provided)
             try {
-                if (!callSid) {
-                    const now = Date.now();
-                    const incomingTs = new Date(timestamp || callTime || now).getTime() || now;
-                    const MERGE_WINDOW_MS = 90 * 1000; // 90 seconds
-                    const isInProgressStatus = (s)=>['queued','initiated','ringing','in-progress','connected','busy','no-answer','canceled'].includes(String(s||'').toLowerCase());
-
-                    // If caller provided a clear targetPhone, prefer it as counterparty
-                    const targetCounterparty = (targetPhone && norm(targetPhone)) || otherParty(to, from);
-                    try { console.log('[Calls][POST][%s] bizList=%j targetCounterparty=%s', _rid, bizList, targetCounterparty); } catch(_) {}
-                    let best = null;
-                    let bestTs = -1;
-                    for (const v of callStore.values()) {
-                        try {
-                            const ts = new Date(v.timestamp || v.callTime || 0).getTime();
-                            if (!ts || Math.abs(incomingTs - ts) > MERGE_WINDOW_MS) continue; // narrow window
-                            const candCounterparty = otherParty(v.to, v.from);
-                            const partyMatch = !!candCounterparty && candCounterparty === targetCounterparty;
-                            if (!partyMatch) continue;
-                            // Only merge into candidates that are in-progress and missing a recording/transcript
-                            const vStatus = String(v.status||'');
-                            const vInProgress = isInProgressStatus(vStatus);
-                            const vHasMedia = !!(v.recordingUrl || (v.transcript && String(v.transcript).trim()!==''));
-                            if (!vInProgress || vHasMedia) continue;
-                            // If explicit attribution provided, require it to match to avoid cross-company flips
-                            const requireIdMatch = !!(accountId || contactId);
-                            const idMatchStrict = ((accountId && v.accountId === accountId) || (contactId && v.contactId === contactId)) ? 1 : 0;
-                            if (requireIdMatch && !idMatchStrict) continue;
-                            const idBoost = idMatchStrict;
-                            const score = (ts || 0) + (idBoost * 1000);
-                            if (score > bestTs) { bestTs = score; best = v; }
-                            try { console.log('[Calls][POST][%s] candidate id=%s ts=%s cp=%s vStatus=%s hasMedia=%s idMatch=%s', _rid, v.id, new Date(ts).toISOString(), candCounterparty, vStatus, vHasMedia, !!idBoost); } catch(_) {}
-                        } catch (_) {}
-                    }
-                    if (best && best.id) {
-                        try { console.log('[Calls][POST][%s] Merging into existing in-progress id=%s (no callSid yet)', _rid, best.id); } catch(_) {}
-                        callId = best.id;
-                        existingCall = best;
-                    }
-                    // If not found in memory, try Firestore recent rows
-                    if ((!existingCall || !existingCall.id) && db) {
-                        try {
-                            const sinceIso = new Date(Date.now() - (2 * MERGE_WINDOW_MS)).toISOString();
-                            let query = db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(25);
-                            const snap = await query.get();
-                            let fbBest = null;
-                            let fbScore = -1;
-                            snap.forEach(doc => {
-                                const d = doc.data() || {};
-                                const ts = new Date(d.timestamp || d.callTime || 0).getTime();
-                                const candCp = otherParty(d.to, d.from);
-                                const partyMatch = !!candCp && candCp === targetCounterparty;
-                                if (!partyMatch) return;
-                                const dInProgress = isInProgressStatus(d.status);
-                                const dHasMedia = !!(d.recordingUrl || (d.transcript && String(d.transcript).trim()!==''));
-                                if (!dInProgress || dHasMedia) return;
-                                const requireIdMatch = !!(accountId || contactId);
-                                const idMatchStrict = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
-                                if (requireIdMatch && !idMatchStrict) return;
-                                const idBoost = idMatchStrict;
-                                const score = (ts || 0) + (idBoost * 1000);
-                                if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
-                                try { console.log('[Calls][POST][%s] FS cand id=%s ts=%s cp=%s status=%s hasMedia=%s idMatch=%s', _rid, doc.id, new Date(ts).toISOString(), candCp, d.status, dHasMedia, !!idBoost); } catch(_) {}
-                            });
-                            if (fbBest && fbBest.id) {
-                                callId = fbBest.id;
-                                existingCall = fbBest;
-                                try { console.log('[Calls][POST][%s] Firestore in-progress merge target id=%s', _rid, callId); } catch(_) {}
-                            } else {
-                                try { console.log('[Calls][POST][%s] No Firestore in-progress merge target found', _rid); } catch(_) {}
-                            }
-                        } catch (fe) {
-                            console.warn('[Calls][POST][%s] Firestore merge search failed:', _rid, fe?.message);
+                const now = Date.now();
+                // If caller provided a clear targetPhone, prefer it as counterparty
+                const targetCounterparty = (targetPhone && norm(targetPhone)) || otherParty(to, from);
+                try { console.log('[Calls][POST][%s] bizList=%j targetCounterparty=%s', _rid, bizList, targetCounterparty); } catch(_) {}
+                let best = null;
+                let bestTs = -1;
+                for (const v of callStore.values()) {
+                    try {
+                        const ts = new Date(v.timestamp || v.callTime || 0).getTime();
+                        if (!ts || Math.abs(now - ts) > 5 * 60 * 1000) continue; // within 5 minutes
+                        const candCounterparty = otherParty(v.to, v.from);
+                        // Match exact counterparty only (avoid matching shared business number)
+                        const partyMatch = !!candCounterparty && candCounterparty === targetCounterparty;
+                        // If explicit attribution provided, require it to match to avoid cross-company flips
+                        const requireIdMatch = !!(accountId || contactId);
+                        const idMatchStrict = ((accountId && v.accountId === accountId) || (contactId && v.contactId === contactId)) ? 1 : 0;
+                        if (requireIdMatch && !idMatchStrict) continue;
+                        if (!partyMatch) continue;
+                        // Strong preference: same account/contact id if provided
+                        const idBoost = idMatchStrict;
+                        // Prefer newer timestamps, then missing recording, then id match boost
+                        const score = (ts || 0) + ( (!v.recordingUrl ? 1 : 0) * 1 ) + (idBoost * 1000);
+                        if (score > bestTs) {
+                            bestTs = score; best = v;
                         }
+                        try { console.log('[Calls][POST][%s] candidate id=%s ts=%s candCounterparty=%s score=%s hasRec=%s idMatch=%s', _rid, v.id, new Date(ts).toISOString(), candCounterparty, score, !!v.recordingUrl, !!idBoost); } catch(_) {}
+                    } catch (_) {}
+                }
+                if (best && best.id) {
+                    // Always merge into the existing best row to maintain a single call record
+                    try { console.log('[Calls][POST][%s] Merging into existing id=%s for callSid=%s', _rid, best.id, callSid); } catch(_) {}
+                    callId = best.id;
+                    existingCall = best;
+                }
+                // If not found in memory, try Firestore recent rows
+                if ((!existingCall || !existingCall.id) && db) {
+                    try {
+                        const sinceIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+                        let query = db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(25);
+                        const snap = await query.get();
+                        let fbBest = null;
+                        let fbScore = -1;
+                        snap.forEach(doc => {
+                            const d = doc.data() || {};
+                            const ts = new Date(d.timestamp || d.callTime || 0).getTime();
+                            const candCp = otherParty(d.to, d.from);
+                            const partyMatch = !!candCp && candCp === targetCounterparty;
+                            const requireIdMatch = !!(accountId || contactId);
+                            const idMatchStrict = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
+                            if (requireIdMatch && !idMatchStrict) return;
+                            if (!partyMatch) return;
+                            const idBoost = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
+                            const score = (ts || 0) + ((!d.recordingUrl ? 1 : 0) * 1) + (idBoost * 1000);
+                            if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
+                            try { console.log('[Calls][POST][%s] FS cand id=%s ts=%s cp=%s score=%s hasRec=%s idMatch=%s', _rid, doc.id, new Date(ts).toISOString(), candCp, score, !!d.recordingUrl, !!idBoost); } catch(_) {}
+                        });
+                        if (fbBest && fbBest.id) {
+                            callId = fbBest.id;
+                            existingCall = fbBest;
+                            try { console.log('[Calls][POST][%s] Firestore merge target id=%s', _rid, callId); } catch(_) {}
+                        } else {
+                            try { console.log('[Calls][POST][%s] No Firestore merge target found', _rid); } catch(_) {}
+                        }
+                    } catch (fe) {
+                        console.warn('[Calls][POST][%s] Firestore merge search failed:', _rid, fe?.message);
                     }
                 }
             } catch (_) {}
@@ -590,61 +395,13 @@ export default async function handler(req, res) {
             businessPhone: businessPhone || existingCall.businessPhone || null
         };
         try {
-            const stAI = !!callData.aiInsights;
-            const stTurns = Array.isArray(callData.aiInsights?.speakerTurns) ? callData.aiInsights.speakerTurns.length : 0;
-            console.log('[Calls][POST][%s] UPSERT id=%s twilioSid=%s status=%s duration=%s hasRec=%s accId=%s conId=%s ai=%s speakerTurns=%s', _rid, callData.id, callData.twilioSid, callData.status, callData.duration, !!callData.recordingUrl, callData.accountId, callData.contactId, stAI, stTurns);
+            console.log('[Calls][POST][%s] UPSERT id=%s twilioSid=%s status=%s duration=%s hasRec=%s accId=%s conId=%s', _rid, callData.id, callData.twilioSid, callData.status, callData.duration, !!callData.recordingUrl, callData.accountId, callData.contactId);
         } catch(_) {}
         
         // Persist to Firestore if available
         try {
             if (db) {
                 await db.collection('calls').doc(callId).set(callData, { merge: true });
-                // If we upgraded from a placeholder, delete the old doc to avoid duplicates
-                if (deleteOldId && deleteOldId !== callId) {
-                    try {
-                        await db.collection('calls').doc(deleteOldId).delete();
-                        try { console.log('[Calls][POST][%s] Deleted placeholder doc id=%s after upgrade', _rid, deleteOldId); } catch(_) {}
-                    } catch (delErr) {
-                        console.warn('[Calls][POST][%s] Failed to delete placeholder doc id=%s: %s', _rid, deleteOldId, delErr?.message);
-                    }
-                }
-                // Final safety cleanup: remove any recent placeholder duplicates for the same counterparty/contact
-                try {
-                    const CLEAN_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-                    const now = Date.now();
-                    const incomingTs = new Date(callData.timestamp || callData.callTime || now).getTime() || now;
-                    const sinceIso = new Date(Date.now() - CLEAN_WINDOW_MS).toISOString();
-                    const snapshot = await db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(50).get();
-                    const targetCounterparty = otherParty(callData.to, callData.from);
-                    const toDelete = [];
-                    snapshot.forEach(doc => {
-                        if (doc.id === callId) return;
-                        const d = doc.data() || {};
-                        if (d.twilioSid) return;
-                        // If contactId matches, that's a strong signal
-                        const contactMatch = !!(callData.contactId && d.contactId && d.contactId === callData.contactId);
-                        const ts = new Date(d.timestamp || d.callTime || 0).getTime();
-                        if (!ts || Math.abs(incomingTs - ts) > CLEAN_WINDOW_MS) return;
-                        const candCp = otherParty(d.to, d.from);
-                        const cpMatch = !!candCp && !!targetCounterparty && candCp === targetCounterparty;
-                        const hasMedia = !!(d.recordingUrl || (d.transcript && String(d.transcript).trim()!==''));
-                        if (hasMedia) return;
-                        if (contactMatch || cpMatch) {
-                            toDelete.push(doc.id);
-                        }
-                    });
-                    for (const delId of toDelete) {
-                        if (delId === callId) continue;
-                        try {
-                            await db.collection('calls').doc(delId).delete();
-                            try { console.log('[Calls][POST][%s] Cleanup deleted stray placeholder id=%s (match contact/counterparty)', _rid, delId); } catch(_) {}
-                        } catch (delErr) {
-                            console.warn('[Calls][POST][%s] Cleanup failed to delete id=%s: %s', _rid, delId, delErr?.message);
-                        }
-                    }
-                } catch (cleanupErr) {
-                    console.warn('[Calls][POST][%s] Cleanup scan error: %s', _rid, cleanupErr?.message);
-                }
             }
         } catch (e) {
             console.warn('[Calls] Firestore POST failed, storing in memory only:', e?.message);
@@ -652,14 +409,6 @@ export default async function handler(req, res) {
         
         // Always upsert into in-memory store as a fallback cache
         callStore.set(callId, callData);
-        // Remove placeholder from memory if we upgraded
-        try {
-            if (deleteOldId && deleteOldId !== callId) {
-                for (const [k, v] of callStore.entries()) {
-                    if (v && v.id === deleteOldId) { callStore.delete(k); break; }
-                }
-            }
-        } catch(_) {}
         
         return res.status(200).json({
             ok: true,
