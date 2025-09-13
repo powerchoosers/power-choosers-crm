@@ -41,22 +41,28 @@ export default async function handler(req, res){
 
     // Build aiInsights by normalizing snake_case to camelCase
     const contractIn = op.contract || {};
+    console.log('[Webhook Debug] Original operator contract data:', contractIn);
+    console.log('[Webhook Debug] Full operator data (op):', JSON.stringify(op, null, 2));
     const contract = {
       currentRate: pick(contractIn, ['currentRate','current_rate','rate']),
       rateType: pick(contractIn, ['rateType','rate_type']),
       supplier: pick(contractIn, ['supplier']),
       contractEnd: pick(contractIn, ['contractEnd','contract_end']),
-      usageKWh: pick(contractIn, ['usageK_wh','usage_k_wh','usageKWh','usage']),
+      usageKWh: pick(contractIn, ['usage_k_wh','usageK_wh','usageKWh','usage']),
       contractLength: pick(contractIn, ['contractLength','contract_length'])
     };
 
     // Guard supplier: ignore weekday strings accidentally extracted
     const WEEKDAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+    console.log('[Webhook Debug] Original supplier:', contract.supplier);
     if (contract.supplier && WEEKDAYS.includes(String(contract.supplier).toLowerCase())) {
+      console.log('[Webhook Debug] Filtering out weekday supplier:', contract.supplier);
       contract.supplier = '';
     }
+    console.log('[Webhook Debug] Final supplier:', contract.supplier);
 
     const aiInsights = {
+      source: 'twilio-operator',
       sentiment: pick(op, ['sentiment'], 'Unknown'),
       disposition: pick(op, ['disposition'], ''),
       keyTopics: toArr(pick(op, ['key_topics','keyTopics'], [])),

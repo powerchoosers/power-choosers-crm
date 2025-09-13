@@ -11,25 +11,9 @@
   let currentAccountId = null;
   let currentEntityType = 'contact'; // 'contact' or 'account'
 
-  // Supplier data from the original file
-  const supplierData = {
-    "NRG": { bbbRating: "A+", popularity: 4, customerService: 3 },
-    "TXU": { bbbRating: "A+", popularity: 5, customerService: 4 },
-    "APG & E": { bbbRating: "Unaccredited", popularity: 2, customerService: 3 },
-    "Reliant": { bbbRating: "A+", popularity: 5, customerService: 3 },
-    "Hudson": { bbbRating: "Unaccredited", popularity: 2, customerService: 2 },
-    "Green Mountain": { bbbRating: "Unaccredited", popularity: 3, customerService: 2 },
-    "Constellation": { bbbRating: "A+", popularity: 4, customerService: 4 },
-    "Tara Energy": { bbbRating: "Unaccredited", popularity: 2, customerService: 3 },
-    "Cirro": { bbbRating: "A+", popularity: 3, customerService: 4 },
-    "Engie": { bbbRating: "A+", popularity: 3, customerService: 1 },
-    "Gexa": { bbbRating: "Unaccredited", popularity: 4, customerService: 2 },
-    "Freepoint": { bbbRating: "A+", popularity: 1, customerService: 3 },
-    "Shell Energy": { bbbRating: "Unaccredited", popularity: 3, customerService: 2 },
-    "Ironhorse": { bbbRating: "4.0 stars", popularity: 1, customerService: 3 },
-    "Ammper Power": { bbbRating: "Unaccredited", popularity: 1, customerService: 1 }
-  };
-  const supplierNames = Object.keys(supplierData);
+  // Use shared supplier data from global scope
+  const supplierData = window.SupplierData;
+  const supplierNames = window.SupplierNames;
 
   // ==== Date helpers and DOM bridge ====
   function parseDateFlexible(s){

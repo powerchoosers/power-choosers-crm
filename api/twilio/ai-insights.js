@@ -241,8 +241,15 @@ async function generateTwilioAIInsights(transcript) {
         if (rateMatch) contract.currentRate = `$${Number(rateMatch[1]).toFixed(3)}/kWh`.replace(/\.000\/kWh$/, '/kWh');
         const rateTypeMatch = lower.match(/\b(fixed|variable|indexed)\b/);
         if (rateTypeMatch) contract.rateType = rateTypeMatch[1];
-        const supplierMatch = text.match(/\b(?:with|from|using|on)\s+([A-Z][A-Za-z&\- ]{2,40})\b/);
-        if (supplierMatch) contract.supplier = supplierMatch[1].trim();
+        // Extract supplier cautiously; avoid capturing weekdays (e.g., "on Thursday")
+        const WEEKDAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        const supplierMatch = text.match(/\b(?:with|from|using|by)\s+([A-Z][A-Za-z&\- ]{2,40})\b/);
+        if (supplierMatch) {
+            const candidateSupplier = supplierMatch[1].trim();
+            if (!WEEKDAYS.includes(candidateSupplier.toLowerCase())) {
+                contract.supplier = candidateSupplier;
+            }
+        }
         const endMatch = text.match(/(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t)?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[ ,]*\s*(20\d{2})/i);
         if (endMatch) contract.contractEnd = `${endMatch[1]} ${endMatch[2]}`;
         const usageMatch = text.match(/(\d{2,3}[,\.]?\d{3}|\d{4,6})\s*(kwh|kw\s*h|kilowatt\s*hours)/i);

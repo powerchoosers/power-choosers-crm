@@ -243,6 +243,17 @@
       /* Ensure positioning context and avoid clipping */
       #calls-page .table-container { position: relative; overflow: visible; }
 
+      /* Disabled insights button styles */
+      .qa-btn.insights-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+      }
+      .qa-btn.insights-btn.disabled:hover {
+        background: var(--grey-800);
+        border-color: var(--grey-700);
+      }
+
       /* Bulk actions bar inside table container */
       #calls-bulk-actions.bulk-actions-modal {
         position: absolute;
@@ -607,7 +618,13 @@
   function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
     // row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
-    els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',()=>openInsightsModal(btn.getAttribute('data-id'))));
+    els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',(e)=>{
+      if(btn.disabled) {
+        e.preventDefault();
+        return;
+      }
+      openInsightsModal(btn.getAttribute('data-id'));
+    }));
     // header select state
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
@@ -643,7 +660,7 @@
       <td>${dur}</td>
       <td><span class="outcome-badge outcome-${outcome.toLowerCase().replace(' ', '-')}">${outcome}</span></td>
       <td class="qa-cell"><div class="qa-actions">
-        <button type="button" class="qa-btn insights-btn" data-id="${id}" aria-label="View insights" title="View AI insights">${svgIcon('insights')}</button>
+        <button type="button" class="qa-btn insights-btn ${(!r.transcript || !r.aiInsights || Object.keys(r.aiInsights).length === 0) ? 'disabled' : ''}" data-id="${id}" aria-label="View insights" title="${(!r.transcript || !r.aiInsights || Object.keys(r.aiInsights).length === 0) ? 'Insights processing...' : 'View AI insights'}" ${(!r.transcript || !r.aiInsights || Object.keys(r.aiInsights).length === 0) ? 'disabled' : ''}>${svgIcon('insights')}</button>
       </div></td>
       <td class="qa-cell"><div class="qa-actions">
         <button type="button" class="qa-btn" data-action="addlist" data-id="${id}" aria-label="Add to list" title="Add to list">${svgIcon('addlist')}</button>
@@ -762,33 +779,170 @@
   function insightsContentHtml(r){
     // Normalize AI payload (supports snake_case from Twilio Operator and camelCase)
     const A = r.aiInsights || {};
+    console.log('[Insights Debug] Full AI insights object:', A);
     const get = (obj, keys, d='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; };
     const toArr = (v)=> Array.isArray(v)?v:(v? [v]:[]);
 
-    const contract = (()=>{ const c = A.contract || {}; return {
-      currentRate: get(c, ['currentRate','current_rate','rate']),
-      rateType: get(c, ['rateType','rate_type']),
-      supplier: get(c, ['supplier','utility']),
-      contractEnd: get(c, ['contractEnd','contract_end','endDate']),
-      usageKWh: get(c, ['usageKWh','usage_k_wh','usage']),
-      contractLength: get(c, ['contractLength','contract_length'])
-    }; })();
+    // Fallback extraction from raw transcript for missing/incorrect fields
+    function extractFromTranscript(text){
+      const out = {};
+      if (!text || typeof text !== 'string') return out;
+      const s = text;
+
+      // Current rate (e.g., 0.07, $0.07, 7 cents)
+      let m = s.match(/(?:current\s+rate\s*(?:is|:)?\s*)?(\$?0?\.[0-9]{2,3})\b/i);
+      if (!m) m = s.match(/\$\s*([0-9]+(?:\.[0-9]+)?)\s*(?:per\s*kwh|\/\s*kwh)?/i);
+      if (!m) m = s.match(/([0-9]+)\s*cents\b/i);
+      if (m) {
+        let rate = m[1];
+        if (/cents/i.test(m[0])) rate = (parseFloat(rate)/100).toFixed(2);
+        if (rate && !rate.startsWith('$')) rate = rate;
+        out.currentRate = rate.replace(/\s+/g,'');
+      }
+
+      // Supplier / Utility (e.g., "Supplier is T X U")
+      m = s.match(/\b(?:supplier|provider|utility)\s*(?:is|:)?\s*([A-Za-z .&-]{2,30})/i);
+      if (m) {
+        let sup = m[1].trim();
+        // Normalize spaced letters like "T X U" -> "TXU"
+        if (/^(?:[A-Za-z]\s+){1,}[A-Za-z]$/.test(sup)) sup = sup.replace(/\s+/g, '');
+        out.supplier = sup.toUpperCase();
+      }
+
+      // Contract end date (e.g., April nineteenth, 20 26)
+      const ordMap = {
+        'first':1,'second':2,'third':3,'fourth':4,'fifth':5,'sixth':6,'seventh':7,'eighth':8,'ninth':9,'tenth':10,
+        'eleventh':11,'twelfth':12,'thirteenth':13,'fourteenth':14,'fifteenth':15,'sixteenth':16,'seventeenth':17,'eighteenth':18,'nineteenth':19,
+        'twentieth':20,'twenty first':21,'twenty-first':21,'twenty second':22,'twenty-second':22,'twenty third':23,'twenty-third':23,
+        'twenty fourth':24,'twenty-fourth':24,'twenty fifth':25,'twenty-fifth':25,'twenty sixth':26,'twenty-sixth':26,'twenty seventh':27,'twenty-seventh':27,
+        'twenty eighth':28,'twenty-eighth':28,'twenty ninth':29,'twenty-ninth':29,'thirtieth':30,'thirty first':31,'thirty-first':31
+      };
+      m = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+([A-Za-z\- ]+|\d{1,2})(?:,\s*)?(\d{2}\s?\d{2}|\d{4})/i);
+      if (m) {
+        const month = m[1];
+        let dayRaw = String(m[2]).toLowerCase().trim();
+        let yearRaw = String(m[3]).replace(/\s+/g,'');
+        let dayNum = parseInt(dayRaw,10);
+        if (isNaN(dayNum)) {
+          // Try ordinal words
+          dayNum = ordMap[dayRaw] || null;
+        }
+        if (dayNum && yearRaw.length === 4) {
+          out.contractEnd = `${month} ${dayNum}, ${yearRaw}`;
+        }
+      }
+
+      // Usage (e.g., 100,000 kilo watts/year or kWh)
+      m = s.match(/(\d[\d,\.]{2,})\s*(?:kwh|kilowatt(?:-)?hours?|kilo\s*watts?)\b/i);
+      if (!m) m = s.match(/(?:using|usage)\s*(?:is|:)?\s*(\d[\d,\.]{2,})/i);
+      if (m) {
+        const raw = m[1].replace(/[,\s]/g,'');
+        const num = parseInt(raw,10);
+        if (!isNaN(num)) out.usageKWh = String(num);
+      }
+
+      // Term (e.g., For 5 years)
+      m = s.match(/\b(\d{1,2})\s*years?\b/i);
+      if (m) out.contractLength = `${m[1]} years`;
+
+      // Budget / Monthly bill (e.g., 1,000 dollars a month)
+      m = s.match(/monthly\s*(?:bill|budget)[^\d]*\$?([\d,]+)\b/i);
+      if (!m) m = s.match(/\$?([\d,]+)\s*(?:dollars?)\s*(?:a|per)\s*month/i);
+      if (m) out.budget = `$${m[1].replace(/[,\s]/g,',')}/month`;
+
+      // Timeline (simple phrases)
+      m = s.match(/\b(next\s+week(?:\s+on\s+\w+)?|tomorrow|this\s+\w+|next\s+\w+)\b/i);
+      if (m) out.timeline = m[1].replace(/\s+/g,' ').trim();
+
+      return out;
+    }
+
+    const contract = (()=>{ const c = A.contract || {}; 
+      console.log('[Insights Debug] Contract object:', c);
+      const result = {
+        currentRate: get(c, ['currentRate','current_rate','rate']),
+        rateType: get(c, ['rateType','rate_type']),
+        supplier: get(c, ['supplier','utility']),
+        contractEnd: get(c, ['contractEnd','contract_end','endDate']),
+        usageKWh: get(c, ['usageKWh','usage_k_wh','usage']),
+        contractLength: get(c, ['contractLength','contract_length'])
+      };
+      console.log('[Insights Debug] Mapped contract:', result);
+      return result;
+    })();
 
     const sentiment = get(A, ['sentiment'], 'Unknown');
     const disposition = get(A, ['disposition'], '');
     const keyTopics = toArr(get(A, ['keyTopics','key_topics'], []));
     const nextStepsArr = toArr(get(A, ['nextSteps','next_steps'], []));
     const painPointsArr = toArr(get(A, ['painPoints','pain_points'], []));
-    const budget = get(A, ['budget'], 'Not Mentioned');
-    const timeline = get(A, ['timeline'], 'Not specified');
+    let budget = get(A, ['budget'], 'Not Mentioned');
+    let timeline = get(A, ['timeline'], 'Not specified');
+    
+    // Merge transcript-derived values when AI fields are missing or clearly wrong
+    const fx = extractFromTranscript(r.transcript || '');
+    const C = { ...contract };
+    if ((!C.currentRate || String(C.currentRate).trim()==='') && fx.currentRate) C.currentRate = fx.currentRate;
+    if ((!C.supplier || /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(String(C.supplier))) && fx.supplier) C.supplier = fx.supplier;
+    if ((!C.contractEnd || String(C.contractEnd).trim()==='') && fx.contractEnd) C.contractEnd = fx.contractEnd;
+    if ((!C.usageKWh || String(C.usageKWh).trim()==='') && fx.usageKWh) C.usageKWh = fx.usageKWh;
+    if ((!C.contractLength || String(C.contractLength).trim()==='') && fx.contractLength) C.contractLength = fx.contractLength;
+    if ((!budget || /not\s+mentioned/i.test(budget)) && fx.budget) budget = fx.budget;
+    if ((!timeline || /discussed|not\s+specified/i.test(timeline)) && fx.timeline) timeline = fx.timeline;
     const entities = toArr(get(A, ['entities'], []));
     const flags = get(A, ['flags'], {});
 
     // Summary paragraph: prefer AI summary; otherwise build one
     let summaryText = get(A, ['summary'], r.aiSummary || '');
     if (!summaryText) {
-      const topics = keyTopics.slice(0,3).join(', ');
-      summaryText = `Conversation summary${topics?` — ${topics}`:''}. Sentiment: ${sentiment}. ${timeline && timeline!=='Not specified' ? `Timeline: ${timeline}.` : ''}`.trim();
+      // Build comprehensive summary with bullet points
+      const contract = get(A, ['contract'], {});
+      const supplier = get(contract, ['supplier'], '');
+      const rate = get(contract, ['current_rate'], '');
+      const usage = get(contract, ['usage_k_wh'], '');
+      const contractEnd = get(contract, ['contract_end'], '');
+      
+      // Create paragraph summary
+      let paragraph = `Call with ${disposition.toLowerCase()} disposition`;
+      if (supplier && supplier !== 'Unknown') {
+        paragraph += ` regarding energy services with ${supplier}`;
+      } else {
+        paragraph += ` about energy services`;
+      }
+      paragraph += `. ${sentiment} sentiment detected.`;
+      
+      // Create bullet points
+      const bullets = [];
+      if (supplier && supplier !== 'Unknown') {
+        bullets.push(`Current supplier: ${supplier}`);
+      }
+      if (rate && rate !== 'Unknown') {
+        bullets.push(`Current rate: ${rate}`);
+      }
+      if (usage && usage !== 'Not provided') {
+        bullets.push(`Usage: ${usage}`);
+      }
+      if (contractEnd && contractEnd !== 'Not discussed') {
+        bullets.push(`Contract expires: ${contractEnd}`);
+      }
+      if (keyTopics.length > 0) {
+        bullets.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
+      }
+      if (nextSteps.length > 0) {
+        bullets.push(`Next steps: ${nextSteps.slice(0,2).join(', ')}`);
+      }
+      if (painPoints.length > 0) {
+        bullets.push(`Pain points: ${painPoints.slice(0,2).join(', ')}`);
+      }
+      if (budget && budget !== 'Unclear' && budget !== '') {
+        bullets.push(`Budget: ${budget}`);
+      }
+      if (timeline && timeline !== 'Not specified' && timeline !== '') {
+        bullets.push(`Timeline: ${timeline}`);
+      }
+      
+      // Combine paragraph and bullets
+      summaryText = paragraph + (bullets.length > 0 ? ' • ' + bullets.join(' • ') : '');
     }
 
     // Transcript rendering with consistent speaker/timestamp lines across pages
@@ -877,8 +1031,8 @@
               Highlights
             </h4>
             <div class="pc-chips">
-              ${contract.supplier ? `<span class="pc-chip">Supplier: ${escapeHtml(contract.supplier)}</span>` : ''}
-              ${contract.contractEnd ? `<span class="pc-chip">Contract end: ${escapeHtml(contract.contractEnd)}</span>` : ''}
+              ${C.supplier ? `<span class="pc-chip">Supplier: ${escapeHtml(C.supplier)}</span>` : ''}
+              ${C.contractEnd ? `<span class="pc-chip">Contract end: ${escapeHtml(C.contractEnd)}</span>` : ''}
               ${budget ? `<span class="pc-chip">Budget: ${escapeHtml(budget)}</span>` : ''}
               ${timeline ? `<span class="pc-chip">Next: ${escapeHtml(timeline)}</span>` : ''}
             </div>
@@ -890,12 +1044,12 @@
               Energy & Contract Details
             </h4>
             <div class="pc-kv">
-              <div class=\"k\">Current rate</div><div class=\"v\">${escapeHtml(contract.currentRate || 'Unknown')}</div>
-              <div class=\"k\">Supplier/Utility</div><div class=\"v\">${escapeHtml(contract.supplier || 'Unknown')}</div>
-              <div class=\"k\">Contract end</div><div class=\"v\">${escapeHtml(contract.contractEnd || 'Not discussed')}</div>
-              <div class=\"k\">Usage</div><div class=\"v\">${escapeHtml(String(contract.usageKWh || 'Not provided'))}</div>
-              <div class=\"k\">Rate type</div><div class=\"v\">${escapeHtml(contract.rateType || 'Unknown')}</div>
-              <div class=\"k\">Term</div><div class=\"v\">${escapeHtml(String(contract.contractLength || 'Unknown'))}</div>
+              <div class=\"k\">Current rate</div><div class=\"v\">${escapeHtml(C.currentRate || 'Unknown')}</div>
+              <div class=\"k\">Supplier/Utility</div><div class=\"v\">${escapeHtml(C.supplier || 'Unknown')}</div>
+              <div class=\"k\">Contract end</div><div class=\"v\">${escapeHtml(C.contractEnd || 'Not discussed')}</div>
+              <div class=\"k\">Usage</div><div class=\"v\">${escapeHtml(String(C.usageKWh || 'Not provided'))}</div>
+              <div class=\"k\">Rate type</div><div class=\"v\">${escapeHtml(C.rateType || 'Unknown')}</div>
+              <div class=\"k\">Term</div><div class=\"v\">${escapeHtml(String(C.contractLength || 'Unknown'))}</div>
               <div class=\"k\">Budget</div><div class=\"v\">${escapeHtml(budget)}</div>
               <div class=\"k\">Timeline</div><div class=\"v\">${escapeHtml(timeline)}</div>
             </div>
