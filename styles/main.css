@@ -8476,11 +8476,15 @@ th.drag-over::after {
     padding: 0; /* Remove padding for SVG icon */
     background: var(--bg-item, #3a3f46);
     color: var(--text-primary); /* Ensure icon color is visible */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .company-favicon.company-favicon--fallback svg {
     width: 20px; /* Adjust SVG size within the 28px circle */
     height: 20px;
+    display: block;
 }
 
 /* === VARIABLES MODAL === */
