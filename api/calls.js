@@ -131,7 +131,7 @@ export default async function handler(req, res) {
                         const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
                         const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0; // 5-min bucket
                         const cp = otherParty(c.to, c.from);
-                        const k = c.twilioSid ? `sid:${c.twilioSid}` : `cp:${cp}:b:${bucket}:ci:${c.contactId||''}`;
+                        const k = c.twilioSid ? `sid:${c.twilioSid}` : `cp:${cp}:b:${bucket}`;
                         const list = groups.get(k) || [];
                         list.push(c);
                         groups.set(k, list);
