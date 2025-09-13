@@ -633,11 +633,16 @@
     return raw; // too short; leave as typed
   }
 
-  function showContactDetail(contactId) {
+  function showContactDetail(contactId, tempContact) {
     if (!initDomRefs()) return;
     
-    // Find contact in people data
-    const contact = findContactById(contactId);
+    // Find contact in people data, or use provided temporary contact
+    let contact = null;
+    if (tempContact && typeof tempContact === 'object') {
+      contact = tempContact;
+    } else {
+      contact = findContactById(contactId);
+    }
     if (!contact) {
       console.error('Contact not found:', contactId);
       return;
@@ -2180,7 +2185,7 @@
         <div>
           <div class="ip-card">
             <h4>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
               Call Recording
             </h4>
             <div style="color:var(--text-secondary); font-style:italic;">${audio}</div>
