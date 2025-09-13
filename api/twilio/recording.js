@@ -1,4 +1,5 @@
 const twilio = require('twilio');
+const { resolveToCallSid, isCallSid } = require('../_twilio-ids');
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -91,6 +92,13 @@ export default async function handler(req, res) {
         }
 
         if (RecordingStatus === 'completed' && (effectiveRecordingUrl || RecordingUrl)) {
+            // Resolve a reliable Call SID to avoid duplicate rows keyed by recording/transcript IDs
+            let finalCallSid = (CallSid && isCallSid(CallSid)) ? CallSid : null;
+            if (!finalCallSid) {
+                try {
+                    finalCallSid = await resolveToCallSid({ callSid: CallSid, recordingSid: effectiveRecordingSid || RecordingSid });
+                } catch (_) {}
+            }
             // Ensure we have a direct mp3 URL for playback
             const rawUrl = effectiveRecordingUrl || RecordingUrl;
             const recordingMp3Url = rawUrl.endsWith('.mp3') ? rawUrl : `${rawUrl}.mp3`;
@@ -119,10 +127,10 @@ export default async function handler(req, res) {
             try {
                 // Attempt to fetch Call resource so we can include to/from
                 let callResource = null;
-                if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && CallSid) {
+                if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && finalCallSid) {
                     try {
                         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-                        callResource = await client.calls(CallSid).fetch();
+                        callResource = await client.calls(finalCallSid).fetch();
                     } catch (fe) {
                         console.warn('[Recording] Could not fetch Call resource:', fe?.message);
                     }
@@ -140,29 +148,37 @@ export default async function handler(req, res) {
                 const businessPhone = isBiz(to10) ? callResource?.to : (isBiz(from10) ? callResource?.from : (envBiz[0] || ''));
                 const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
 
-                await fetch(`${baseUrl}/api/calls`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        callSid: CallSid,
-                        to: callResource?.to || undefined,
-                        from: callResource?.from || undefined,
-                        status: 'completed',
-                        duration: parseInt(RecordingDuration) || parseInt(callResource?.duration, 10) || 0,
-                        recordingUrl: recordingMp3Url,
-                        source: 'twilio-recording-webhook',
-                        targetPhone: targetPhone || undefined,
-                        businessPhone: businessPhone || undefined
-                    })
-                }).catch(() => {});
-                console.log('[Recording] Posted initial call data to /api/calls for', CallSid);
+                if (finalCallSid) {
+                    await fetch(`${baseUrl}/api/calls`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            callSid: finalCallSid,
+                            to: callResource?.to || undefined,
+                            from: callResource?.from || undefined,
+                            status: 'completed',
+                            duration: parseInt(RecordingDuration) || parseInt(callResource?.duration, 10) || 0,
+                            recordingUrl: recordingMp3Url,
+                            source: 'twilio-recording-webhook',
+                            targetPhone: targetPhone || undefined,
+                            businessPhone: businessPhone || undefined
+                        })
+                    }).catch(() => {});
+                    console.log('[Recording] Posted initial call data to /api/calls for', finalCallSid);
+                } else {
+                    console.warn('[Recording] Skipping initial /api/calls post due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
+                }
             } catch (e) {
                 console.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
             }
 
             // Trigger Twilio native transcription and AI analysis
             try {
-                await processRecordingWithTwilio(recordingMp3Url, CallSid, effectiveRecordingSid || RecordingSid, baseUrl);
+                if (finalCallSid) {
+                    await processRecordingWithTwilio(recordingMp3Url, finalCallSid, effectiveRecordingSid || RecordingSid, baseUrl);
+                } else {
+                    console.warn('[Recording] Skipping processing due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
+                }
             } catch (error) {
                 console.error('[Recording] Processing error:', error);
             }

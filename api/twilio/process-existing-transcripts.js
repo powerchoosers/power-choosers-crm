@@ -1,5 +1,6 @@
 const twilio = require('twilio');
 const { admin, db } = require('../_firebase');
+const { resolveToCallSid, isCallSid } = require('../_twilio-ids');
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -107,72 +108,54 @@ export default async function handler(req, res) {
                         aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, operatorResults);
                     }
                     
-                    // Update the call data directly in Firestore
+                    // Update the call data directly in Firestore (only with a valid Call SID)
                     try {
-                        console.log(`[Process Existing Transcripts] Updating call data for ${transcript.sid} in Firestore`);
-                        
-                        const callData = {
-                            id: transcript.sourceSid,
-                            twilioSid: transcript.sourceSid,
-                            callSid: transcript.sourceSid,
-                            transcript: transcriptText,
-                            aiInsights: aiInsights,
-                            conversationalIntelligence: {
-                                transcriptSid: transcript.sid,
-                                status: transcript.status,
-                                sentences: sentences,
-                                operatorResults: operatorResults,
-                                serviceSid: serviceSid
-                            },
-                            // Add required fields for /api/calls endpoint
-                            to: 'Unknown', // Will be updated when we have more data
-                            from: 'Unknown', // Will be updated when we have more data
-                            status: 'completed',
-                            duration: 0,
-                            callTime: new Date().toISOString(),
-                            outcome: 'Connected',
-                            aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
-                            timestamp: new Date().toISOString(),
-                            source: 'conversational-intelligence-processing'
-                        };
-                        
-                        if (db) {
-                            try {
-                                console.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${transcript.sourceSid}'`);
-                                await db.collection('calls').doc(transcript.sourceSid).set(callData, { merge: true });
-                                console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore`);
-                                results.push({
+                        // Resolve a true Call SID to avoid creating rows keyed by Recording/Transcript SIDs
+                        let finalCallSid = null;
+                        try {
+                            finalCallSid = await resolveToCallSid({ callSid: transcript.sourceSid, recordingSid: transcript.sourceSid, transcriptSid: transcript.sid });
+                        } catch (_) {}
+
+                        if (!finalCallSid) {
+                            console.warn(`[Process Existing Transcripts] Skipping Firestore update for ${transcript.sid}: unresolved Call SID (sourceSid=${transcript.sourceSid})`);
+                            results.push({ transcriptSid: transcript.sid, sourceSid: transcript.sourceSid, status: 'skipped', error: 'Unresolved Call SID' });
+                        } else if (db) {
+                            console.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${finalCallSid}'`);
+                            const callData = {
+                                id: finalCallSid,
+                                twilioSid: finalCallSid,
+                                callSid: finalCallSid,
+                                transcript: transcriptText,
+                                aiInsights: aiInsights,
+                                conversationalIntelligence: {
                                     transcriptSid: transcript.sid,
-                                    sourceSid: transcript.sourceSid,
-                                    transcriptLength: transcriptText.length,
-                                    status: 'success'
-                                });
-                            } catch (firestoreError) {
-                                console.error(`[Process Existing Transcripts] Firestore write error for ${transcript.sid}:`, firestoreError);
-                                results.push({
-                                    transcriptSid: transcript.sid,
-                                    sourceSid: transcript.sourceSid,
-                                    status: 'firestore-error',
-                                    error: firestoreError.message
-                                });
-                            }
+                                    status: transcript.status,
+                                    sentences: sentences,
+                                    operatorResults: operatorResults,
+                                    serviceSid: serviceSid,
+                                    originalSourceSid: transcript.sourceSid || 'missing'
+                                },
+                                // Minimal placeholders; real to/from/duration will be merged by other webhooks
+                                to: 'Unknown',
+                                from: 'Unknown',
+                                status: 'completed',
+                                duration: 0,
+                                callTime: new Date().toISOString(),
+                                outcome: 'Connected',
+                                aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
+                                timestamp: new Date().toISOString(),
+                                source: 'conversational-intelligence-processing'
+                            };
+                            await db.collection('calls').doc(finalCallSid).set(callData, { merge: true });
+                            console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore`);
+                            results.push({ transcriptSid: transcript.sid, sourceSid: finalCallSid, transcriptLength: transcriptText.length, status: 'success' });
                         } else {
                             console.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
-                            results.push({
-                                transcriptSid: transcript.sid,
-                                sourceSid: transcript.sourceSid,
-                                status: 'failed',
-                                error: 'Firestore not available'
-                            });
+                            results.push({ transcriptSid: transcript.sid, sourceSid: transcript.sourceSid, status: 'failed', error: 'Firestore not available' });
                         }
                     } catch (error) {
                         console.error(`[Process Existing Transcripts] Error updating call data for ${transcript.sid}:`, error);
-                        results.push({
-                            transcriptSid: transcript.sid,
-                            sourceSid: transcript.sourceSid,
-                            status: 'error',
-                            error: error.message
-                        });
+                        results.push({ transcriptSid: transcript.sid, sourceSid: transcript.sourceSid, status: 'error', error: error.message });
                     }
                     
                 } catch (error) {
@@ -230,73 +213,52 @@ export default async function handler(req, res) {
                             aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, null);
                         }
                         
-                        // Update the call data directly in Firestore
+                        // Update the call data directly in Firestore (only with a valid Call SID)
                         try {
-                            console.log(`[Process Existing Transcripts] Updating call data for ${transcript.sid} in Firestore with alternative source`);
-                            
-                            const callData = {
-                                id: alternativeSourceId,
-                                twilioSid: alternativeSourceId,
-                                callSid: alternativeSourceId,
-                                transcript: transcriptText,
-                                aiInsights: aiInsights,
-                                conversationalIntelligence: {
-                                    transcriptSid: transcript.sid,
-                                    status: transcript.status,
-                                    sentences: sentences,
-                                    operatorResults: null,
-                                    serviceSid: serviceSid,
-                                    originalSourceSid: transcript.sourceSid || 'missing'
-                                },
-                                // Add required fields for /api/calls endpoint
-                                to: 'Unknown', // Will be updated when we have more data
-                                from: 'Unknown', // Will be updated when we have more data
-                                status: 'completed',
-                                duration: 0,
-                                callTime: new Date().toISOString(),
-                                outcome: 'Connected',
-                                aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
-                                timestamp: new Date().toISOString(),
-                                source: 'conversational-intelligence-processing-alternative'
-                            };
-                            
-                        if (db) {
+                            let finalCallSid = null;
                             try {
-                                console.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${alternativeSourceId}'`);
-                                await db.collection('calls').doc(alternativeSourceId).set(callData, { merge: true });
-                                console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore with alternative source`);
-                                results.push({
-                                    transcriptSid: transcript.sid,
-                                    sourceSid: alternativeSourceId,
-                                    transcriptLength: transcriptText.length,
-                                    status: 'success-alternative'
-                                });
-                            } catch (firestoreError) {
-                                console.error(`[Process Existing Transcripts] Firestore write error for ${transcript.sid}:`, firestoreError);
-                                results.push({
-                                    transcriptSid: transcript.sid,
-                                    sourceSid: alternativeSourceId,
-                                    status: 'firestore-error',
-                                    error: firestoreError.message
-                                });
+                                finalCallSid = await resolveToCallSid({ callSid: alternativeSourceId, recordingSid: alternativeSourceId, transcriptSid: transcript.sid });
+                            } catch (_) {}
+
+                            if (!finalCallSid) {
+                                console.warn(`[Process Existing Transcripts] Skipping Firestore update for ${transcript.sid} (alt source): unresolved Call SID (alt=${alternativeSourceId})`);
+                                results.push({ transcriptSid: transcript.sid, sourceSid: alternativeSourceId, status: 'skipped', error: 'Unresolved Call SID' });
+                            } else if (db) {
+                                console.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${finalCallSid}' (alt)`);
+                                const callData = {
+                                    id: finalCallSid,
+                                    twilioSid: finalCallSid,
+                                    callSid: finalCallSid,
+                                    transcript: transcriptText,
+                                    aiInsights: aiInsights,
+                                    conversationalIntelligence: {
+                                        transcriptSid: transcript.sid,
+                                        status: transcript.status,
+                                        sentences: sentences,
+                                        operatorResults: null,
+                                        serviceSid: serviceSid,
+                                        originalSourceSid: transcript.sourceSid || 'missing'
+                                    },
+                                    to: 'Unknown',
+                                    from: 'Unknown',
+                                    status: 'completed',
+                                    duration: 0,
+                                    callTime: new Date().toISOString(),
+                                    outcome: 'Connected',
+                                    aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
+                                    timestamp: new Date().toISOString(),
+                                    source: 'conversational-intelligence-processing-alternative'
+                                };
+                                await db.collection('calls').doc(finalCallSid).set(callData, { merge: true });
+                                console.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore (alt)`);
+                                results.push({ transcriptSid: transcript.sid, sourceSid: finalCallSid, transcriptLength: transcriptText.length, status: 'success-alternative' });
+                            } else {
+                                console.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
+                                results.push({ transcriptSid: transcript.sid, sourceSid: alternativeSourceId, status: 'failed', error: 'Firestore not available' });
                             }
-                        } else {
-                            console.error(`[Process Existing Transcripts] Firestore not available for ${transcript.sid}`);
-                            results.push({
-                                transcriptSid: transcript.sid,
-                                sourceSid: alternativeSourceId,
-                                status: 'failed',
-                                error: 'Firestore not available'
-                            });
-                        }
                         } catch (error) {
                             console.error(`[Process Existing Transcripts] Error updating call data for ${transcript.sid}:`, error);
-                            results.push({
-                                transcriptSid: transcript.sid,
-                                sourceSid: alternativeSourceId,
-                                status: 'error',
-                                error: error.message
-                            });
+                            results.push({ transcriptSid: transcript.sid, sourceSid: alternativeSourceId, status: 'error', error: error.message });
                         }
                         
                     } catch (error) {
