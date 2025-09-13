@@ -789,10 +789,13 @@ async function handleApiSearch(req, res, parsedUrl) {
   
   try {
     const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    const raw = await response.text();
+    let payload;
+    let contentType = response.headers.get('content-type') || 'application/json';
+    try { payload = raw ? JSON.parse(raw) : {}; }
+    catch (_) { payload = { ok: false, body: raw }; contentType = 'application/json'; }
+    res.writeHead(response.status, { 'Content-Type': contentType });
+    res.end(JSON.stringify(payload));
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
