@@ -787,8 +787,54 @@
     // Summary paragraph: prefer AI summary; otherwise build one
     let summaryText = get(A, ['summary'], r.aiSummary || '');
     if (!summaryText) {
-      const topics = keyTopics.slice(0,3).join(', ');
-      summaryText = `Conversation summary${topics?` — ${topics}`:''}. Sentiment: ${sentiment}. ${timeline && timeline!=='Not specified' ? `Timeline: ${timeline}.` : ''}`.trim();
+      // Build comprehensive summary with bullet points
+      const contract = get(A, ['contract'], {});
+      const supplier = get(contract, ['supplier'], '');
+      const rate = get(contract, ['current_rate'], '');
+      const usage = get(contract, ['usage_k_wh'], '');
+      const contractEnd = get(contract, ['contract_end'], '');
+      
+      // Create paragraph summary
+      let paragraph = `Call with ${disposition.toLowerCase()} disposition`;
+      if (supplier && supplier !== 'Unknown') {
+        paragraph += ` regarding energy services with ${supplier}`;
+      } else {
+        paragraph += ` about energy services`;
+      }
+      paragraph += `. ${sentiment} sentiment detected.`;
+      
+      // Create bullet points
+      const bullets = [];
+      if (supplier && supplier !== 'Unknown') {
+        bullets.push(`Current supplier: ${supplier}`);
+      }
+      if (rate && rate !== 'Unknown') {
+        bullets.push(`Current rate: ${rate}`);
+      }
+      if (usage && usage !== 'Not provided') {
+        bullets.push(`Usage: ${usage}`);
+      }
+      if (contractEnd && contractEnd !== 'Not discussed') {
+        bullets.push(`Contract expires: ${contractEnd}`);
+      }
+      if (keyTopics.length > 0) {
+        bullets.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
+      }
+      if (nextSteps.length > 0) {
+        bullets.push(`Next steps: ${nextSteps.slice(0,2).join(', ')}`);
+      }
+      if (painPoints.length > 0) {
+        bullets.push(`Pain points: ${painPoints.slice(0,2).join(', ')}`);
+      }
+      if (budget && budget !== 'Unclear' && budget !== '') {
+        bullets.push(`Budget: ${budget}`);
+      }
+      if (timeline && timeline !== 'Not specified' && timeline !== '') {
+        bullets.push(`Timeline: ${timeline}`);
+      }
+      
+      // Combine paragraph and bullets
+      summaryText = paragraph + (bullets.length > 0 ? ' • ' + bullets.join(' • ') : '');
     }
 
     // Transcript rendering with consistent speaker/timestamp lines across pages
