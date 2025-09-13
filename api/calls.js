@@ -114,7 +114,9 @@ export default async function handler(req, res) {
                 // - If a Twilio SID exists, group by it.
                 // - Else, group by counterparty and a 5-minute time bucket to collapse placeholders.
                 const dedupe = (arr) => {
-                    const groups = new Map();
+                    const bySid = new Map();
+                    const byPair = new Map();
+                    const buckets = new Set();
                     const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
                     const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
                     const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
@@ -127,17 +129,29 @@ export default async function handler(req, res) {
                         if (isBiz(from) && !isBiz(to)) return to;
                         return to || from || '';
                     };
+                    const ensureGroup = (sid, pairKey) => {
+                        let g = null;
+                        if (sid && bySid.has(sid)) g = bySid.get(sid);
+                        else if (pairKey && byPair.has(pairKey)) g = byPair.get(pairKey);
+                        if (!g) { g = []; }
+                        if (sid) bySid.set(sid, g);
+                        if (pairKey) byPair.set(pairKey, g);
+                        buckets.add(g);
+                        return g;
+                    };
                     for (const c of arr) {
                         const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
                         const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0; // 5-min bucket
-                        const cp = otherParty(c.to, c.from);
-                        const k = c.twilioSid ? `sid:${c.twilioSid}` : `cp:${cp}:b:${bucket}`;
-                        const list = groups.get(k) || [];
-                        list.push(c);
-                        groups.set(k, list);
+                        const toN = norm(isClient(c.to) ? '' : c.to);
+                        const fromN = norm(isClient(c.from) ? '' : c.from);
+                        const pair = [toN, fromN].filter(Boolean).sort().join('~');
+                        const pairKey = pair ? `pair:${pair}:b:${bucket}` : null;
+                        const sid = c.twilioSid ? String(c.twilioSid) : '';
+                        const g = ensureGroup(sid, pairKey);
+                        g.push(c);
                     }
                     const out = [];
-                    for (const [, list] of groups) {
+                    for (const list of Array.from(buckets.values())) {
                         if (list.length === 1) { out.push(list[0]); continue; }
                         // Pick best representative
                         const score = (x) => {
@@ -205,27 +219,34 @@ export default async function handler(req, res) {
         }
         // Dedupe memory results similar to Firestore path (same grouping rules)
         const dedupeMem = (arr) => {
-            const groups = new Map();
+            const bySid = new Map();
+            const byPair = new Map();
+            const buckets = new Set();
             const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
             const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
             const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
                 .split(',').map(norm).filter(Boolean);
             const isBiz = (p) => !!p && bizList.includes(p);
-            const otherParty = (toRaw, fromRaw) => {
-                const to = norm(isClient(toRaw) ? '' : toRaw);
-                const from = norm(isClient(fromRaw) ? '' : fromRaw);
-                if (isBiz(to) && !isBiz(from)) return from;
-                if (isBiz(from) && !isBiz(to)) return to;
-                return to || from || '';
+            const ensureGroup = (sid, pairKey) => {
+                let g = null;
+                if (sid && bySid.has(sid)) g = bySid.get(sid);
+                else if (pairKey && byPair.has(pairKey)) g = byPair.get(pairKey);
+                if (!g) { g = []; }
+                if (sid) bySid.set(sid, g);
+                if (pairKey) byPair.set(pairKey, g);
+                buckets.add(g);
+                return g;
             };
             for (const c of arr) {
                 const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
                 const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0;
-                const cp = otherParty(c.to, c.from);
-                const k = c.twilioSid ? `sid:${c.twilioSid}` : `cp:${cp}:b:${bucket}`;
-                const list = groups.get(k) || [];
-                list.push(c);
-                groups.set(k, list);
+                const toN = norm(isClient(c.to) ? '' : c.to);
+                const fromN = norm(isClient(c.from) ? '' : c.from);
+                const pair = [toN, fromN].filter(Boolean).sort().join('~');
+                const pairKey = pair ? `pair:${pair}:b:${bucket}` : null;
+                const sid = c.twilioSid ? String(c.twilioSid) : '';
+                const g = ensureGroup(sid, pairKey);
+                g.push(c);
             }
             const out = [];
             const score = (x) => {
@@ -237,7 +258,7 @@ export default async function handler(req, res) {
                 const statusW = /completed/i.test(String(x.status||'')) ? 3 : (/in-?progress|connected|ringing/i.test(String(x.status||'')) ? 1 : 0);
                 return hasRec*10000 + aiTurns*500 + tlen + dur*5 + statusW*200 + ts/100000;
             };
-            for (const [, list] of groups) {
+            for (const list of Array.from(buckets.values())) {
                 if (list.length === 1) { out.push(list[0]); continue; }
                 let best = list[0];
                 for (let i=1;i<list.length;i++){ if (score(list[i]) > score(best)) best = list[i]; }
