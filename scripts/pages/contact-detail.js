@@ -1186,6 +1186,19 @@
           return;
         }
         
+        // Check if we came from calls page
+        if (window._contactNavigationSource === 'calls') {
+          console.log('Returning to calls page from contact detail');
+          // Clear the navigation source first
+          window._contactNavigationSource = null;
+          window._contactNavigationContactId = null;
+          // Navigate back to calls page
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('calls');
+          }
+          return;
+        }
+        
         // Default behavior: return to people page
         // Show the People toolbar/header again
         showToolbar();

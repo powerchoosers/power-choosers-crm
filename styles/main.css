@@ -3869,6 +3869,102 @@ html, body {
     margin-top: auto; /* push footer to bottom of table container */
 }
 
+/* === CALLS PAGE STYLES === */
+/* Contact name styling - match People page base colors */
+#calls-table .name-cell {
+    color: var(--grey-400);
+    font-weight: 400;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+#calls-table .name-cell:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+#calls-table .name-cell:focus {
+    outline: none;
+}
+
+#calls-table .name-cell:focus-visible {
+    outline: 2px solid var(--orange-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Contact name layout */
+#calls-table .name-cell .name-cell__wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#calls-table .name-cell .avatar-initials {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--orange-subtle);
+    color: #fff;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 12px;
+}
+
+#calls-table .name-cell .name-text {
+    display: inline-block;
+}
+
+/* Company name styling - match People page base colors */
+#calls-table .company-link {
+    color: var(--grey-400);
+    font-weight: 400;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+#calls-table .company-link:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+#calls-table .company-link:focus {
+    outline: none;
+}
+
+#calls-table .company-link:focus-visible {
+    outline: 2px solid var(--orange-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Company name layout */
+#calls-table .company-link .company-cell__wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#calls-table .company-link .company-favicon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-item, #3a3f46);
+    padding: 2px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+#calls-table .company-link .company-name {
+    display: inline-block;
+}
+
 /* === SEQUENCES PAGE TABLE LAYOUT (pin footer to bottom) === */
 #sequences-page .page-container {
     display: flex;
@@ -4118,12 +4214,12 @@ html, body {
 }
 
 #list-detail-table .company-favicon {
-    width: 16px;
-    height: 16px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-card, #383f46);
+    background: var(--bg-item, #3a3f46);
     padding: 2px;
     box-sizing: border-box;
 }
@@ -8081,12 +8177,12 @@ th.drag-over::after {
     gap: 8px;
 }
 #people-table td .company-favicon {
-    width: 16px;
-    height: 16px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-card, #383f46);
+    background: var(--bg-item, #3a3f46);
     padding: 2px;
     box-sizing: border-box;
 }
@@ -8121,12 +8217,12 @@ th.drag-over::after {
     gap: 8px;
 }
 #accounts-table .name-cell .company-favicon {
-    width: 16px;
-    height: 16px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-card, #383f46);
+    background: var(--bg-item, #3a3f46);
     padding: 2px;
     box-sizing: border-box;
 }
@@ -8362,14 +8458,29 @@ th.drag-over::after {
     gap: 8px;
 }
 #people-table .company-favicon {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
+    background: var(--bg-item, #3a3f46);
+    padding: 2px;
+    box-sizing: border-box;
 }
 #people-table .company-name {
     display: inline-block;
+}
+
+/* Fallback favicon styling */
+.company-favicon.company-favicon--fallback {
+    padding: 0; /* Remove padding for SVG icon */
+    background: var(--bg-item, #3a3f46);
+    color: var(--text-primary); /* Ensure icon color is visible */
+}
+
+.company-favicon.company-favicon--fallback svg {
+    width: 20px; /* Adjust SVG size within the 28px circle */
+    height: 20px;
 }
 
 /* === VARIABLES MODAL === */
