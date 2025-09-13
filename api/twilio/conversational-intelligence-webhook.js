@@ -1,4 +1,5 @@
 const { URLSearchParams } = require('url');
+const { resolveToCallSid, isCallSid } = require('../_twilio-ids');
 
 function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -202,30 +203,37 @@ export default async function handler(req, res) {
                 aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, operatorResults);
             }
             
-            // Update the call data in the central store
+            // Update the call data in the central store (ensure we use a real Call SID to avoid duplicates)
             try {
                 const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
-                const updateResponse = await fetch(`${base}/api/calls`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        callSid: CallSid || transcript.sourceSid,
-                        transcript: transcriptText,
-                        aiInsights: aiInsights,
-                        conversationalIntelligence: {
-                            transcriptSid: TranscriptSid,
-                            status: transcript.status,
-                            sentences: sentences,
-                            operatorResults: operatorResults,
-                            serviceSid: ServiceSid
-                        }
-                    })
-                });
-                
-                if (updateResponse.ok) {
-                    console.log('[Conversational Intelligence Webhook] Successfully updated call data');
+                const resolved = await resolveToCallSid({ callSid: CallSid, recordingSid: RecordingSid, transcriptSid: TranscriptSid });
+                const finalCallSid = resolved || (isCallSid(CallSid) ? CallSid : null);
+
+                if (!finalCallSid) {
+                    console.warn('[Conversational Intelligence Webhook] Skipping /api/calls update: unresolved Call SID', { CallSid, RecordingSid, TranscriptSid });
                 } else {
-                    console.error('[Conversational Intelligence Webhook] Failed to update call data:', updateResponse.status);
+                    const updateResponse = await fetch(`${base}/api/calls`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            callSid: finalCallSid,
+                            transcript: transcriptText,
+                            aiInsights: aiInsights,
+                            conversationalIntelligence: {
+                                transcriptSid: TranscriptSid,
+                                status: transcript.status,
+                                sentences: sentences,
+                                operatorResults: operatorResults,
+                                serviceSid: ServiceSid
+                            }
+                        })
+                    });
+                    
+                    if (updateResponse.ok) {
+                        console.log('[Conversational Intelligence Webhook] Successfully updated call data');
+                    } else {
+                        console.error('[Conversational Intelligence Webhook] Failed to update call data:', updateResponse.status);
+                    }
                 }
             } catch (error) {
                 console.error('[Conversational Intelligence Webhook] Error updating call data:', error);
