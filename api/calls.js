@@ -219,6 +219,8 @@ export default async function handler(req, res) {
         
         // Get existing call data or create new
         let existingCall = callStore.get(callId) || {};
+        // Track placeholder to delete if we upgrade it to canonical callSid
+        let deleteOldId = null;
 
         // Helper: normalize phone (10-digit) and strip Twilio client prefix
         const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
@@ -263,6 +265,80 @@ export default async function handler(req, res) {
                 } catch(e) {
                     console.warn('[Calls][POST][%s] Firestore twilioSid lookup failed:', _rid, e?.message);
                 }
+            }
+            
+            // Prepare best-available to/from for upgrade matching (fetch Twilio Call if needed)
+            let matchTo = to;
+            let matchFrom = from;
+            if ((!matchTo || !matchFrom) && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+                try {
+                    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                    const call = await client.calls(callSid).fetch();
+                    matchTo = matchTo || call.to;
+                    matchFrom = matchFrom || call.from;
+                    try { console.log('[Calls][POST][%s] Fetched Call resource for upgrade match to=%s from=%s', _rid, matchTo, matchFrom); } catch(_) {}
+                } catch (e) {
+                    console.warn('[Calls][POST][%s] Twilio Call fetch failed for upgrade match:', _rid, e?.message);
+                }
+            }
+
+            // 2b) If we have a callSid but no exact match, try to UPGRADE a recent placeholder row (no twilioSid) to this callSid
+            if ((!existingCall || !existingCall.id) && callSid) {
+                try {
+                    const now = Date.now();
+                    const incomingTs = new Date(timestamp || callTime || now).getTime() || now;
+                    const UPGRADE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+                    const targetCounterparty = (targetPhone && norm(targetPhone)) || otherParty(matchTo, matchFrom);
+                    let best = null; let bestTs = -1; let bestKey = null;
+                    // scan memory placeholders
+                    for (const [k,v] of callStore.entries()) {
+                        try {
+                            if (!v || v.twilioSid) continue; // only placeholders
+                            const ts = new Date(v.timestamp || v.callTime || 0).getTime();
+                            if (!ts || Math.abs(incomingTs - ts) > UPGRADE_WINDOW_MS) continue;
+                            const candCp = otherParty(v.to, v.from);
+                            if (!candCp || candCp !== targetCounterparty) continue;
+                            const hasMedia = !!(v.recordingUrl || (v.transcript && String(v.transcript).trim()!==''));
+                            if (hasMedia) continue; // don't upgrade finished calls
+                            const score = (ts || 0);
+                            if (score > bestTs) { bestTs = score; best = v; bestKey = k; }
+                        } catch(_) {}
+                    }
+                    if (best && best.id) {
+                        try { console.log('[Calls][POST][%s] Upgrading placeholder id=%s -> callSid=%s', _rid, best.id, callSid); } catch(_) {}
+                        existingCall = best; // merge from placeholder
+                        deleteOldId = best.id !== callSid ? best.id : null;
+                        callId = callSid; // canonicalize
+                    }
+                    // Firestore upgrade scan
+                    if ((!existingCall || !existingCall.id) && db) {
+                        try {
+                            const sinceIso = new Date(Date.now() - UPGRADE_WINDOW_MS).toISOString();
+                            const snap = await db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(25).get();
+                            let fbBest = null; let fbScore = -1;
+                            snap.forEach(doc => {
+                                const d = doc.data() || {};
+                                if (d.twilioSid) return; // skip real rows
+                                const ts = new Date(d.timestamp || d.callTime || 0).getTime();
+                                if (!ts || Math.abs(incomingTs - ts) > UPGRADE_WINDOW_MS) return;
+                                const candCp = otherParty(d.to, d.from);
+                                if (!candCp || candCp !== targetCounterparty) return;
+                                const hasMedia = !!(d.recordingUrl || (d.transcript && String(d.transcript).trim()!==''));
+                                if (hasMedia) return;
+                                const score = (ts || 0);
+                                if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
+                            });
+                            if (fbBest && fbBest.id) {
+                                try { console.log('[Calls][POST][%s] Firestore upgrade placeholder id=%s -> callSid=%s', _rid, fbBest.id, callSid); } catch(_) {}
+                                existingCall = fbBest;
+                                deleteOldId = fbBest.id !== callSid ? fbBest.id : null;
+                                callId = callSid;
+                            }
+                        } catch (fe) {
+                            console.warn('[Calls][POST][%s] Firestore upgrade scan failed:', _rid, fe?.message);
+                        }
+                    }
+                } catch(_) {}
             }
             // 3) Fallback to window-based counterparty matching (ONLY when no callSid and candidate is clearly in-progress)
             try {
@@ -410,6 +486,52 @@ export default async function handler(req, res) {
         try {
             if (db) {
                 await db.collection('calls').doc(callId).set(callData, { merge: true });
+                // If we upgraded from a placeholder, delete the old doc to avoid duplicates
+                if (deleteOldId && deleteOldId !== callId) {
+                    try {
+                        await db.collection('calls').doc(deleteOldId).delete();
+                        try { console.log('[Calls][POST][%s] Deleted placeholder doc id=%s after upgrade', _rid, deleteOldId); } catch(_) {}
+                    } catch (delErr) {
+                        console.warn('[Calls][POST][%s] Failed to delete placeholder doc id=%s: %s', _rid, deleteOldId, delErr?.message);
+                    }
+                }
+                // Final safety cleanup: remove any recent placeholder duplicates for the same counterparty/contact
+                try {
+                    const CLEAN_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+                    const now = Date.now();
+                    const incomingTs = new Date(callData.timestamp || callData.callTime || now).getTime() || now;
+                    const sinceIso = new Date(Date.now() - CLEAN_WINDOW_MS).toISOString();
+                    const snapshot = await db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(50).get();
+                    const targetCounterparty = otherParty(callData.to, callData.from);
+                    const toDelete = [];
+                    snapshot.forEach(doc => {
+                        if (doc.id === callId) return;
+                        const d = doc.data() || {};
+                        if (d.twilioSid) return;
+                        // If contactId matches, that's a strong signal
+                        const contactMatch = !!(callData.contactId && d.contactId && d.contactId === callData.contactId);
+                        const ts = new Date(d.timestamp || d.callTime || 0).getTime();
+                        if (!ts || Math.abs(incomingTs - ts) > CLEAN_WINDOW_MS) return;
+                        const candCp = otherParty(d.to, d.from);
+                        const cpMatch = !!candCp && !!targetCounterparty && candCp === targetCounterparty;
+                        const hasMedia = !!(d.recordingUrl || (d.transcript && String(d.transcript).trim()!==''));
+                        if (hasMedia) return;
+                        if (contactMatch || cpMatch) {
+                            toDelete.push(doc.id);
+                        }
+                    });
+                    for (const delId of toDelete) {
+                        if (delId === callId) continue;
+                        try {
+                            await db.collection('calls').doc(delId).delete();
+                            try { console.log('[Calls][POST][%s] Cleanup deleted stray placeholder id=%s', _rid, delId); } catch(_) {}
+                        } catch (delErr) {
+                            console.warn('[Calls][POST][%s] Cleanup failed to delete id=%s: %s', _rid, delId, delErr?.message);
+                        }
+                    }
+                } catch (cleanupErr) {
+                    console.warn('[Calls][POST][%s] Cleanup scan error: %s', _rid, cleanupErr?.message);
+                }
             }
         } catch (e) {
             console.warn('[Calls] Firestore POST failed, storing in memory only:', e?.message);
@@ -417,6 +539,14 @@ export default async function handler(req, res) {
         
         // Always upsert into in-memory store as a fallback cache
         callStore.set(callId, callData);
+        // Remove placeholder from memory if we upgraded
+        try {
+            if (deleteOldId && deleteOldId !== callId) {
+                for (const [k, v] of callStore.entries()) {
+                    if (v && v.id === deleteOldId) { callStore.delete(k); break; }
+                }
+            }
+        } catch(_) {}
         
         return res.status(200).json({
             ok: true,
