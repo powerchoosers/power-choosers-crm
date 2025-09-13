@@ -1,4 +1,5 @@
 const twilio = require('twilio');
+const { isCallSid } = require('./_twilio-ids');
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -23,8 +24,8 @@ export default async function handler(req, res) {
     try {
         const { callSid, recordingUrl } = req.body;
         
-        if (!callSid) {
-            return res.status(400).json({ error: 'CallSid is required' });
+        if (!callSid || !isCallSid(callSid)) {
+            return res.status(400).json({ error: 'Valid CallSid is required' });
         }
         
         console.log('[Process Call] Starting AI processing for:', callSid);
