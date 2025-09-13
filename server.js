@@ -36,52 +36,6 @@ console.log(`[Server] API Base URL: ${API_BASE_URL}`);
 
 async function handleApiGeminiEmail(req, res) {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
-
-// Local stub for Twilio caller lookup to avoid 404s during testing
-async function handleApiTwilioCallerLookup(req, res) {
-  try {
-    if (req.method !== 'POST') {
-      res.writeHead(405, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'Method not allowed' }));
-      return;
-    }
-    // Read and ignore body for now – we don't have a local lookup provider
-    try { await readJsonBody(req); } catch(_) {}
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: false, data: null, message: 'Local caller lookup not configured' }));
-  } catch (error) {
-    console.warn('[Caller Lookup] Local stub error:', error?.message || error);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: false, data: null }));
-  }
-}
-
-// Proxy Twilio Operator webhook (separate from CI transcript webhook)
-async function handleApiTwilioOperatorWebhook(req, res) {
-  try {
-    if (req.method !== 'POST') {
-      res.writeHead(405, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Method not allowed' }));
-      return;
-    }
-    // Twilio may send urlencoded or JSON; forward as-is
-    const raw = await readRawBody(req);
-    const contentType = req.headers['content-type'] || 'application/x-www-form-urlencoded';
-    const upstream = await fetch(`${API_BASE_URL}/api/twilio/operator-webhook`, {
-      method: 'POST',
-      headers: { 'Content-Type': contentType },
-      body: raw
-    });
-    const text = await upstream.text();
-    // Our upstream returns JSON
-    res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json' });
-    res.end(text);
-  } catch (error) {
-    console.error('[Twilio Operator Webhook] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
-  }
-}
   if (req.method !== 'POST') { res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' })); return; }
   
   // Proxy to Vercel deployment since local server doesn't have API key
@@ -410,80 +364,6 @@ async function handleApiCalls(req, res) {
       const response = await fetch(proxyUrlGet);
       const data = await response.json();
       
-      // Local post-processing: dedupe placeholder duplicates for UI stability
-      try {
-        if (data && Array.isArray(data.calls)) {
-          const arr = data.calls;
-          const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-          const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
-          const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
-            .split(',').map(norm).filter(Boolean);
-          const isBiz = (p) => !!p && bizList.includes(p);
-          const otherParty = (toRaw, fromRaw) => {
-            const to = norm(isClient(toRaw) ? '' : toRaw);
-            const from = norm(isClient(fromRaw) ? '' : fromRaw);
-            if (isBiz(to) && !isBiz(from)) return from;
-            if (isBiz(from) && !isBiz(to)) return to;
-            return to || from || '';
-          };
-          const groups = new Map();
-          for (const c of arr) {
-            const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
-            const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0;
-            const toN = norm(isClient(c.to) ? '' : c.to);
-            const fromN = norm(isClient(c.from) ? '' : c.from);
-            const cp = otherParty(c.to, c.from);
-            // Build a stable pair key regardless of direction for placeholders
-            const pair = [toN, fromN].filter(Boolean).sort().join('~');
-            const k = c.twilioSid ? `sid:${c.twilioSid}` : (pair ? `pair:${pair}:b:${bucket}` : `cp:${cp}:b:${bucket}`);
-            const list = groups.get(k) || [];
-            list.push(c);
-            groups.set(k, list);
-          }
-          const score = (x) => {
-            const tlen = (x.transcript || '').trim().length;
-            const aiTurns = Array.isArray(x.aiInsights?.speakerTurns) ? x.aiInsights.speakerTurns.length : 0;
-            const hasRec = x.recordingUrl ? 1 : 0;
-            const dur = Number(x.durationSec || x.duration || 0) || 0;
-            const ts = new Date(x.timestamp || x.callTime || 0).getTime() || 0;
-            const statusW = /completed/i.test(String(x.status||'')) ? 3 : (/in-?progress|connected|ringing/i.test(String(x.status||'')) ? 1 : 0);
-            return hasRec*10000 + aiTurns*500 + tlen + dur*5 + statusW*200 + ts/100000;
-          };
-          const out = [];
-          for (const [, list] of groups) {
-            if (list.length === 1) { out.push(list[0]); continue; }
-            let best = list[0];
-            for (let i=1;i<list.length;i++){ if (score(list[i]) > score(best)) best = list[i]; }
-            const merged = list.reduce((acc, cur) => {
-              const pick = (v, w) => (v == null || v === '' ? w : v);
-              const longer = (a,b) => (String(a||'').length >= String(b||'').length ? a : b);
-              return {
-                ...acc,
-                id: acc.id || cur.id,
-                to: pick(acc.to, cur.to),
-                from: pick(acc.from, cur.from),
-                status: pick(acc.status, cur.status),
-                duration: Number(acc.duration || 0) >= Number(cur.duration || 0) ? acc.duration : cur.duration,
-                durationSec: Number(acc.durationSec || acc.duration || 0) >= Number(cur.durationSec || cur.duration || 0) ? (acc.durationSec||acc.duration||0) : (cur.durationSec||cur.duration||0),
-                timestamp: new Date(acc.timestamp||0) > new Date(cur.timestamp||0) ? acc.timestamp : cur.timestamp,
-                recordingUrl: acc.recordingUrl || cur.recordingUrl || '',
-                audioUrl: acc.audioUrl || cur.audioUrl || acc.recordingUrl || cur.recordingUrl || '',
-                accountId: pick(acc.accountId, cur.accountId),
-                accountName: pick(acc.accountName, cur.accountName),
-                contactId: pick(acc.contactId, cur.contactId),
-                contactName: pick(acc.contactName, cur.contactName),
-                transcript: longer(acc.transcript, cur.transcript),
-                aiInsights: (Array.isArray(cur?.aiInsights?.speakerTurns) && cur.aiInsights.speakerTurns.length > (acc?.aiInsights?.speakerTurns?.length||0)) ? cur.aiInsights : (acc.aiInsights || cur.aiInsights || null),
-                twilioSid: acc.twilioSid || cur.twilioSid || ''
-              };
-            }, best);
-            out.push(merged);
-          }
-          data.calls = out;
-        }
-      } catch (e) {
-        console.warn('[Server] Local dedupe failed:', e?.message || e);
-      }
       res.writeHead(response.status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
     }
@@ -553,7 +433,6 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/language-webhook' ||
     pathname === '/api/twilio/conversational-intelligence' ||
     pathname === '/api/twilio/conversational-intelligence-webhook' ||
-    pathname === '/api/twilio/operator-webhook' ||
     pathname === '/api/twilio/recording' ||
     pathname === '/api/twilio/ai-insights' ||
     pathname === '/api/energy-news' ||
@@ -593,21 +472,11 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/twilio/conversational-intelligence-webhook') {
     return handleApiTwilioConversationalIntelligenceWebhook(req, res);
   }
-  if (pathname === '/api/twilio/operator-webhook') {
-    return handleApiTwilioOperatorWebhook(req, res);
-  }
   if (pathname === '/api/twilio/recording') {
     return handleApiTwilioRecording(req, res);
   }
   if (pathname === '/api/twilio/ai-insights') {
     return handleApiTwilioAIInsights(req, res);
-  }
-  if (pathname === '/api/twilio/caller-lookup') {
-    // Local stubbed lookup to avoid 404 during testing
-    try { await readJsonBody(req); } catch(_) {}
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: false, data: null, message: 'Local caller lookup not configured' }));
-    return;
   }
   if (pathname === '/api/calls') {
     return handleApiCalls(req, res);
@@ -789,13 +658,10 @@ async function handleApiSearch(req, res, parsedUrl) {
   
   try {
     const response = await fetch(proxyUrl);
-    const raw = await response.text();
-    let payload;
-    let contentType = response.headers.get('content-type') || 'application/json';
-    try { payload = raw ? JSON.parse(raw) : {}; }
-    catch (_) { payload = { ok: false, body: raw }; contentType = 'application/json'; }
-    res.writeHead(response.status, { 'Content-Type': contentType });
-    res.end(JSON.stringify(payload));
+    const data = await response.json();
+    
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
