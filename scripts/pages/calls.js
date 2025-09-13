@@ -1172,52 +1172,13 @@
       return out;
     }
     function renderTranscriptHtml(A, raw){
-      const contactFirst = String(r.contactName||'').trim().split(/\s+/)[0] || 'customer';
       const turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
       if(turns.length){
-        // Group consecutive turns by role and relabel speakers (agent/customer)
-        const groups = [];
-        for(const t of turns){
-          const roleRaw = String(t.role||'').toLowerCase();
-          const label = roleRaw==='agent' ? 'agent' : (roleRaw==='customer' ? contactFirst : 'Speaker');
-          const roleClass = roleRaw==='agent' ? 'agent' : (roleRaw==='customer' ? 'customer' : '');
-          const text = String(t.text||'');
-          const time = Number(t.t)||0;
-          const last = groups[groups.length-1];
-          if(last && last.label===label && last.roleClass===roleClass){
-            last.texts.push(text);
-            if(time>last.endTime) last.endTime = time;
-          } else {
-            groups.push({ label, roleClass, startTime: time, endTime: time, texts: [text] });
-          }
-        }
-        return groups.map(g=>`<div class=\"transcript-line ${g.roleClass}\"><span class=\"speaker\">${escapeHtml(g.label)} ${toMMSS(g.startTime)}:</span> <span class=\"text\">${escapeHtml(g.texts.join(' '))}</span></div>`).join('');
+        return turns.map(t=>{ const role = t.role==='agent'?'Agent':(t.role==='customer'?'Customer':'Speaker'); return `<div class=\"transcript-line ${t.role||''}\"><span class=\"speaker\">${role} ${toMMSS(Number(t.t)||0)}:</span> <span class=\"text\">${escapeHtml(t.text||'')}</span></div>`; }).join('');
       }
       const parsed = parseSpeakerTranscript(raw||'');
       if(parsed.some(p=>p.label && p.t!=null)){
-        // Normalize labels and group consecutive lines by speaker label
-        const normalize = (s)=>{
-          const x = String(s||'').trim();
-          if(/^agent$/i.test(x) || /^rep$/i.test(x) || /^sales/i.test(x)) return 'agent';
-          if(/^customer$/i.test(x) || /^contact$/i.test(x)) return contactFirst;
-          if(/^speaker\b/i.test(x)) return 'Speaker';
-          return x;
-        };
-        const groups = [];
-        for(const p of parsed){
-          const labelN = normalize(p.label);
-          const roleClass = labelN==='agent' ? 'agent' : (labelN===contactFirst ? 'customer' : '');
-          const text = String(p.text||'');
-          const time = Number(p.t)||0;
-          const last = groups[groups.length-1];
-          if(last && last.label===labelN && last.roleClass===roleClass){
-            last.texts.push(text);
-            if(time>last.endTime) last.endTime = time;
-          } else {
-            groups.push({ label: labelN, roleClass, startTime: time, endTime: time, texts: [text] });
-          }
-        }
-        return groups.map(g=>`<div class=\"transcript-line ${g.roleClass}\"><span class=\"speaker\">${escapeHtml(g.label)} ${toMMSS(g.startTime)}:</span> <span class=\"text\">${escapeHtml(g.texts.join(' '))}</span></div>`).join('');
+        return parsed.map(p=> p.label ? `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(p.label)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>` : `<div class=\"transcript-line\"><span class=\"text\">${escapeHtml(p.text||'')}</span></div>` ).join('');
       }
       const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
       return escapeHtml(fallback);
