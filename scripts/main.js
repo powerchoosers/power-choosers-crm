@@ -2619,15 +2619,6 @@ class PowerChoosersCRM {
 // Initialize CRM when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.crm = new PowerChoosersCRM();
-    // Provide global fallback icon for accounts (used when favicon missing)
-    if (!window.__pcAccountsIcon) {
-        window.__pcAccountsIcon = function(){
-            const span = document.createElement('span');
-            span.className = 'company-favicon company-favicon--fallback';
-            span.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg>';
-            return span.outerHTML;
-        };
-    }
     if (typeof initGlobalSearch === 'function') {
         initGlobalSearch();
     } else if (window.initGlobalSearch) {

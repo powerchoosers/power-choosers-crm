@@ -371,40 +371,10 @@
             const id = c.id || `call_${Date.now()}_${idx}`;
             const party = pickCounterparty(c);
             const debug = { id, to: c.to, from: c.from, party, accountId: c.accountId || null, contactId: c.contactId || null };
-            
-            // Debug: Log the raw API call data to see what's available (remove in production)
-            // console.log('[Calls] Raw API call data:', c);
-            // console.log('[Calls] Available people data:', typeof window.getPeopleData === 'function' ? window.getPeopleData()?.length : 'getPeopleData not available');
 
             // Contact name resolution
             let contactName = '';
-            let resolvedContactId = c.contactId || null;
-            
-            if (c.contactName) { 
-              contactName = c.contactName; 
-              debug.contactSource = 'api.contactName';
-              
-              // Try to find contact ID by name if not provided
-              if (!resolvedContactId && typeof window.getPeopleData === 'function') {
-                const people = window.getPeopleData() || [];
-                // console.log('[Calls] Searching for contact by name:', contactName, 'in', people.length, 'people');
-                const foundContact = people.find(p => {
-                  const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ');
-                  const match = fullName === contactName || p.name === contactName;
-                  // if (match) {
-                  //   console.log('[Calls] Found matching contact:', p);
-                  // }
-                  return match;
-                });
-                if (foundContact) {
-                  resolvedContactId = foundContact.id;
-                  debug.contactIdSource = 'people.byName';
-                  // console.log('[Calls] Resolved contactId from name lookup:', resolvedContactId);
-                } else {
-                  // console.log('[Calls] No matching contact found for name:', contactName);
-                }
-              }
-            }
+            if (c.contactName) { contactName = c.contactName; debug.contactSource = 'api.contactName'; }
             else if (c.contactId) {
               const pc = getContactById(c.contactId);
               const full = pc ? ([pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '') : '';
@@ -412,14 +382,7 @@
             }
             if (!contactName) {
               const m = phoneToContact.get(party);
-              if (m && m.name) { 
-                contactName = m.name; 
-                debug.contactSource = 'people.byPhone';
-                if (!resolvedContactId && m.id) {
-                  resolvedContactId = m.id;
-                  debug.contactIdSource = 'phoneMap.byPhone';
-                }
-              }
+              if (m && m.name) { contactName = m.name; debug.contactSource = 'people.byPhone'; }
             }
             if (!contactName) {
               const acct = findAccountByPhone(party);
@@ -427,21 +390,10 @@
                 const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
                 if (p){
                   const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
-                  if (full) { 
-                    contactName = full; 
-                    debug.contactSource = 'account.recentContact';
-                    if (!resolvedContactId) {
-                      resolvedContactId = p.id;
-                      debug.contactIdSource = 'account.recentContact';
-                    }
-                  }
+                  if (full) { contactName = full; debug.contactSource = 'account.recentContact'; }
                 }
               }
             }
-            
-            // Debug: Log the resolved contact ID (remove in production)
-            // console.log('[Calls] Resolved contactId:', resolvedContactId, 'for contactName:', contactName);
-            // console.log('[Calls] Debug info:', debug);
 
             // Contact title resolution with fallback and debugging
             let contactTitle = '';
@@ -517,7 +469,6 @@
 
             const row = {
               id,
-              contactId: resolvedContactId,
               contactName,
               contactTitle,
               company,
@@ -593,7 +544,6 @@
       
       rows.push({ 
         id:'call_'+i, 
-        contactId: `demo_contact_${i}`, // Demo contact ID for testing
         contactName:`Contact ${i}`, 
         contactTitle:titles[j], 
         company:cos[j], 
@@ -634,28 +584,6 @@
   function updateFilterCount(){ if(!els.count) return; const n = Object.values(state.tokens).reduce((a,b)=>a+(b?b.length:0),0)+(els.hasEmail&&els.hasEmail.checked?1:0)+(els.hasPhone&&els.hasPhone.checked?1:0); if(n){ els.count.textContent=String(n); els.count.removeAttribute('hidden'); } else { els.count.textContent='0'; els.count.setAttribute('hidden',''); } }
 
   function getPageItems(){ const s=(state.currentPage-1)*state.pageSize; return state.filtered.slice(s,s+state.pageSize); }
-  
-  // Navigation helper functions (following project rules)
-  function getCurrentFilters() {
-    return {
-      hasEmail: els.hasEmail ? els.hasEmail.checked : false,
-      hasPhone: els.hasPhone ? els.hasPhone.checked : false,
-      tokens: { ...state.tokens }
-    };
-  }
-  
-  function getSelectedItems() {
-    return Array.from(state.selected);
-  }
-  
-  function getCurrentSort() {
-    // Calls page doesn't have sorting yet, but return empty for consistency
-    return null;
-  }
-  
-  function getCurrentSearch() {
-    return els.quickSearch ? els.quickSearch.value : '';
-  }
   function paginate(){ 
     if(!els.pag) return; 
     const total=state.filtered.length; 
@@ -687,13 +615,7 @@
     }
   }
 
-  function render(){ if(!els.tbody) return; const rows=getPageItems(); 
-    // Debug: Log first row to see if contactId is present (remove in production)
-    // if (rows.length > 0) {
-    //   console.log('[Calls] First row data:', rows[0]);
-    //   console.log('[Calls] First row contactId:', rows[0].contactId);
-    // }
-    els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
+  function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
     // row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
     els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',(e)=>{
@@ -703,116 +625,11 @@
       }
       openInsightsModal(btn.getAttribute('data-id'));
     }));
-    
-    // Navigation event handlers (following project rules)
-    els.tbody.querySelectorAll('.name-cell').forEach(cell => {
-      cell.addEventListener('click', (e) => {
-        e.preventDefault();
-        const contactId = cell.getAttribute('data-contact-id');
-        console.log('[Calls] Contact name clicked, contactId:', contactId);
-        
-        console.log('[Calls] ContactDetail module available:', !!window.ContactDetail);
-        console.log('[Calls] ContactDetail.show function available:', !!(window.ContactDetail && typeof window.ContactDetail.show === 'function'));
-        
-        if (contactId && contactId.trim()) {
-          // Store navigation source before navigating (using same pattern as other pages)
-          window._contactNavigationSource = 'calls';
-          window._contactNavigationContactId = contactId;
-          
-          console.log('[Calls] Navigation source stored for contact:', window._contactNavigationSource, contactId);
-          
-          // Navigate to contact detail
-          if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-            console.log('[Calls] Navigating to ContactDetail with ID:', contactId);
-            // Navigate to people page first, then show contact detail (same pattern as account-detail.js)
-            if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('people');
-              // Use requestAnimationFrame to ensure the page has started loading
-              requestAnimationFrame(() => {
-                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                  console.log('[Calls] Showing contact detail:', contactId);
-                  try {
-                    window.ContactDetail.show(contactId);
-                  } catch (error) {
-                    console.error('[Calls] Error showing contact detail:', error);
-                  }
-                } else {
-                  console.log('[Calls] ContactDetail not available after navigation');
-                }
-              });
-            }
-          } else {
-            console.log('[Calls] ContactDetail not available, trying fallback navigation');
-            // Fallback: navigate to people page
-            if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('people');
-            }
-          }
-        } else {
-          console.log('[Calls] No contact ID available for navigation, contactId:', contactId);
-        }
-      });
-    });
-    
-    els.tbody.querySelectorAll('.company-link').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const companyName = link.getAttribute('data-company');
-        console.log('[Calls] Company name clicked, companyName:', companyName);
-        
-        if (companyName && companyName.trim()) {
-          // Store navigation source before navigating (using same pattern as other pages)
-          window._accountNavigationSource = 'calls';
-          window._callsReturn = {
-            page: state.currentPage,
-            scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-            filters: getCurrentFilters(),
-            selectedItems: getSelectedItems(),
-            sortColumn: getCurrentSort(),
-            searchTerm: getCurrentSearch()
-          };
-          
-          console.log('[Calls] Navigation source stored for company:', window._accountNavigationSource, window._callsReturn);
-          
-          // Navigate to account detail
-          if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-            // Try to find account by name first
-            if (typeof window.getAccountsData === 'function') {
-              const accounts = window.getAccountsData() || [];
-              const account = accounts.find(acc => acc.accountName === companyName || acc.name === companyName);
-              if (account && account.id) {
-                console.log('[Calls] Found account, navigating to AccountDetail with ID:', account.id);
-                window.AccountDetail.show(account.id);
-                return;
-              }
-            }
-            console.log('[Calls] Account not found, trying fallback navigation');
-            // Fallback: navigate to account details page
-            if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('account-details');
-            }
-          } else {
-            console.log('[Calls] AccountDetail not available, trying fallback navigation');
-            // Fallback: navigate to accounts page
-            if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('accounts');
-            }
-          }
-        } else {
-          console.log('[Calls] No company name available for navigation');
-        }
-      });
-    });
-    
     // header select state
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
 
   function rowHtml(r){
-    // Debug: Log the row data being processed (remove in production)
-    // console.log('[Calls] rowHtml processing row:', r);
-    // console.log('[Calls] rowHtml contactId:', r.contactId);
-    
     const dur = `${Math.floor(r.durationSec/60)}m ${r.durationSec%60}s`;
     const id = escapeHtml(r.id);
     const name = escapeHtml(r.contactName || r.to || '');
@@ -833,39 +650,12 @@
     const budget = aiInsights.budget || 'Not discussed';
     const timeline = aiInsights.timeline || 'Not specified';
     
-    // Compute initials for contact avatar (following project rules)
-    const initials = (() => {
-      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-      const chars = parts.length > 1 ? [parts[0][0], parts[parts.length - 1][0]] : (parts[0] ? [parts[0][0]] : []);
-      const str = chars.join('').toUpperCase();
-      if (str) return str;
-      const phone = String(r.to || r.from || '').trim();
-      return phone ? phone[0].toUpperCase() : '?';
-    })();
-    
-    // Compute favicon domain for company (following project rules)
-    const favDomain = (() => {
-      // Try to find the account for this company to get its domain
-      if (typeof window.getAccountsData === 'function') {
-        const accounts = window.getAccountsData() || [];
-        const account = accounts.find(acc => acc.accountName === company || acc.name === company);
-        if (account) {
-          let d = String(account.domain || account.website || '').trim();
-          if (/^https?:\/\//i.test(d)) {
-            try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
-          }
-          return d ? d.replace(/^www\./i, '') : '';
-        }
-      }
-      return '';
-    })();
-    
     return `
     <tr>
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
-      <td class="name-cell" data-contact-id="${r.contactId || ''}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${name}</span></div></td>
+      <td>${name}</td>
       <td>${title}</td>
-      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.replaceWith(window.__pcAccountsIcon())" />` : `${window.__pcAccountsIcon()}`}<span class="company-name">${company}</span></span></a></td>
+      <td>${company}</td>
       <td>${callTimeStr}</td>
       <td>${dur}</td>
       <td><span class="outcome-badge outcome-${outcome.toLowerCase().replace(' ', '-')}">${outcome}</span></td>
@@ -993,80 +783,6 @@
     const get = (obj, keys, d='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; };
     const toArr = (v)=> Array.isArray(v)?v:(v? [v]:[]);
 
-    // Fallback extraction from raw transcript for missing/incorrect fields
-    function extractFromTranscript(text){
-      const out = {};
-      if (!text || typeof text !== 'string') return out;
-      const s = text;
-
-      // Current rate (e.g., 0.07, $0.07, 7 cents)
-      let m = s.match(/(?:current\s+rate\s*(?:is|:)?\s*)?(\$?0?\.[0-9]{2,3})\b/i);
-      if (!m) m = s.match(/\$\s*([0-9]+(?:\.[0-9]+)?)\s*(?:per\s*kwh|\/\s*kwh)?/i);
-      if (!m) m = s.match(/([0-9]+)\s*cents\b/i);
-      if (m) {
-        let rate = m[1];
-        if (/cents/i.test(m[0])) rate = (parseFloat(rate)/100).toFixed(2);
-        if (rate && !rate.startsWith('$')) rate = rate;
-        out.currentRate = rate.replace(/\s+/g,'');
-      }
-
-      // Supplier / Utility (e.g., "Supplier is T X U")
-      m = s.match(/\b(?:supplier|provider|utility)\s*(?:is|:)?\s*([A-Za-z .&-]{2,30})/i);
-      if (m) {
-        let sup = m[1].trim();
-        // Normalize spaced letters like "T X U" -> "TXU"
-        if (/^(?:[A-Za-z]\s+){1,}[A-Za-z]$/.test(sup)) sup = sup.replace(/\s+/g, '');
-        out.supplier = sup.toUpperCase();
-      }
-
-      // Contract end date (e.g., April nineteenth, 20 26)
-      const ordMap = {
-        'first':1,'second':2,'third':3,'fourth':4,'fifth':5,'sixth':6,'seventh':7,'eighth':8,'ninth':9,'tenth':10,
-        'eleventh':11,'twelfth':12,'thirteenth':13,'fourteenth':14,'fifteenth':15,'sixteenth':16,'seventeenth':17,'eighteenth':18,'nineteenth':19,
-        'twentieth':20,'twenty first':21,'twenty-first':21,'twenty second':22,'twenty-second':22,'twenty third':23,'twenty-third':23,
-        'twenty fourth':24,'twenty-fourth':24,'twenty fifth':25,'twenty-fifth':25,'twenty sixth':26,'twenty-sixth':26,'twenty seventh':27,'twenty-seventh':27,
-        'twenty eighth':28,'twenty-eighth':28,'twenty ninth':29,'twenty-ninth':29,'thirtieth':30,'thirty first':31,'thirty-first':31
-      };
-      m = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+([A-Za-z\- ]+|\d{1,2})(?:,\s*)?(\d{2}\s?\d{2}|\d{4})/i);
-      if (m) {
-        const month = m[1];
-        let dayRaw = String(m[2]).toLowerCase().trim();
-        let yearRaw = String(m[3]).replace(/\s+/g,'');
-        let dayNum = parseInt(dayRaw,10);
-        if (isNaN(dayNum)) {
-          // Try ordinal words
-          dayNum = ordMap[dayRaw] || null;
-        }
-        if (dayNum && yearRaw.length === 4) {
-          out.contractEnd = `${month} ${dayNum}, ${yearRaw}`;
-        }
-      }
-
-      // Usage (e.g., 100,000 kilo watts/year or kWh)
-      m = s.match(/(\d[\d,\.]{2,})\s*(?:kwh|kilowatt(?:-)?hours?|kilo\s*watts?)\b/i);
-      if (!m) m = s.match(/(?:using|usage)\s*(?:is|:)?\s*(\d[\d,\.]{2,})/i);
-      if (m) {
-        const raw = m[1].replace(/[,\s]/g,'');
-        const num = parseInt(raw,10);
-        if (!isNaN(num)) out.usageKWh = String(num);
-      }
-
-      // Term (e.g., For 5 years)
-      m = s.match(/\b(\d{1,2})\s*years?\b/i);
-      if (m) out.contractLength = `${m[1]} years`;
-
-      // Budget / Monthly bill (e.g., 1,000 dollars a month)
-      m = s.match(/monthly\s*(?:bill|budget)[^\d]*\$?([\d,]+)\b/i);
-      if (!m) m = s.match(/\$?([\d,]+)\s*(?:dollars?)\s*(?:a|per)\s*month/i);
-      if (m) out.budget = `$${m[1].replace(/[,\s]/g,',')}/month`;
-
-      // Timeline (simple phrases)
-      m = s.match(/\b(next\s+week(?:\s+on\s+\w+)?|tomorrow|this\s+\w+|next\s+\w+)\b/i);
-      if (m) out.timeline = m[1].replace(/\s+/g,' ').trim();
-
-      return out;
-    }
-
     const contract = (()=>{ const c = A.contract || {}; 
       console.log('[Insights Debug] Contract object:', c);
       const result = {
@@ -1086,19 +802,8 @@
     const keyTopics = toArr(get(A, ['keyTopics','key_topics'], []));
     const nextStepsArr = toArr(get(A, ['nextSteps','next_steps'], []));
     const painPointsArr = toArr(get(A, ['painPoints','pain_points'], []));
-    let budget = get(A, ['budget'], 'Not Mentioned');
-    let timeline = get(A, ['timeline'], 'Not specified');
-    
-    // Merge transcript-derived values when AI fields are missing or clearly wrong
-    const fx = extractFromTranscript(r.transcript || '');
-    const C = { ...contract };
-    if ((!C.currentRate || String(C.currentRate).trim()==='') && fx.currentRate) C.currentRate = fx.currentRate;
-    if ((!C.supplier || /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(String(C.supplier))) && fx.supplier) C.supplier = fx.supplier;
-    if ((!C.contractEnd || String(C.contractEnd).trim()==='') && fx.contractEnd) C.contractEnd = fx.contractEnd;
-    if ((!C.usageKWh || String(C.usageKWh).trim()==='') && fx.usageKWh) C.usageKWh = fx.usageKWh;
-    if ((!C.contractLength || String(C.contractLength).trim()==='') && fx.contractLength) C.contractLength = fx.contractLength;
-    if ((!budget || /not\s+mentioned/i.test(budget)) && fx.budget) budget = fx.budget;
-    if ((!timeline || /discussed|not\s+specified/i.test(timeline)) && fx.timeline) timeline = fx.timeline;
+    const budget = get(A, ['budget'], 'Not Mentioned');
+    const timeline = get(A, ['timeline'], 'Not specified');
     const entities = toArr(get(A, ['entities'], []));
     const flags = get(A, ['flags'], {});
 
@@ -1241,8 +946,8 @@
               Highlights
             </h4>
             <div class="pc-chips">
-              ${C.supplier ? `<span class="pc-chip">Supplier: ${escapeHtml(C.supplier)}</span>` : ''}
-              ${C.contractEnd ? `<span class="pc-chip">Contract end: ${escapeHtml(C.contractEnd)}</span>` : ''}
+              ${contract.supplier ? `<span class="pc-chip">Supplier: ${escapeHtml(contract.supplier)}</span>` : ''}
+              ${contract.contractEnd ? `<span class="pc-chip">Contract end: ${escapeHtml(contract.contractEnd)}</span>` : ''}
               ${budget ? `<span class="pc-chip">Budget: ${escapeHtml(budget)}</span>` : ''}
               ${timeline ? `<span class="pc-chip">Next: ${escapeHtml(timeline)}</span>` : ''}
             </div>
@@ -1254,12 +959,12 @@
               Energy & Contract Details
             </h4>
             <div class="pc-kv">
-              <div class=\"k\">Current rate</div><div class=\"v\">${escapeHtml(C.currentRate || 'Unknown')}</div>
-              <div class=\"k\">Supplier/Utility</div><div class=\"v\">${escapeHtml(C.supplier || 'Unknown')}</div>
-              <div class=\"k\">Contract end</div><div class=\"v\">${escapeHtml(C.contractEnd || 'Not discussed')}</div>
-              <div class=\"k\">Usage</div><div class=\"v\">${escapeHtml(String(C.usageKWh || 'Not provided'))}</div>
-              <div class=\"k\">Rate type</div><div class=\"v\">${escapeHtml(C.rateType || 'Unknown')}</div>
-              <div class=\"k\">Term</div><div class=\"v\">${escapeHtml(String(C.contractLength || 'Unknown'))}</div>
+              <div class=\"k\">Current rate</div><div class=\"v\">${escapeHtml(contract.currentRate || 'Unknown')}</div>
+              <div class=\"k\">Supplier/Utility</div><div class=\"v\">${escapeHtml(contract.supplier || 'Unknown')}</div>
+              <div class=\"k\">Contract end</div><div class=\"v\">${escapeHtml(contract.contractEnd || 'Not discussed')}</div>
+              <div class=\"k\">Usage</div><div class=\"v\">${escapeHtml(String(contract.usageKWh || 'Not provided'))}</div>
+              <div class=\"k\">Rate type</div><div class=\"v\">${escapeHtml(contract.rateType || 'Unknown')}</div>
+              <div class=\"k\">Term</div><div class=\"v\">${escapeHtml(String(contract.contractLength || 'Unknown'))}</div>
               <div class=\"k\">Budget</div><div class=\"v\">${escapeHtml(budget)}</div>
               <div class=\"k\">Timeline</div><div class=\"v\">${escapeHtml(timeline)}</div>
             </div>
@@ -1578,58 +1283,7 @@
     }
   }
 
-  function init(){ 
-    if(!initDomRefs()) return; 
-    attachEvents(); 
-    injectCallsBulkStyles(); 
-    loadData(); 
-    
-    // Listen for restore events from back navigation
-    document.addEventListener('pc:calls-restore', (e) => {
-      const { page, scroll, filters, selectedItems, searchTerm } = e.detail || {};
-      console.log('[Calls] Restoring state from back navigation:', e.detail);
-      
-      // Restore pagination
-      if (page && page > 0) {
-        state.currentPage = page;
-      }
-      
-      // Restore scroll position
-      if (scroll && scroll > 0) {
-        setTimeout(() => {
-          window.scrollTo(0, scroll);
-        }, 100);
-      }
-      
-      // Restore filters
-      if (filters) {
-        if (filters.hasEmail !== undefined && els.hasEmail) {
-          els.hasEmail.checked = filters.hasEmail;
-        }
-        if (filters.hasPhone !== undefined && els.hasPhone) {
-          els.hasPhone.checked = filters.hasPhone;
-        }
-        if (filters.tokens) {
-          state.tokens = { ...filters.tokens };
-          chips.forEach(renderChips);
-        }
-        updateFilterCount();
-        applyFilters();
-      }
-      
-      // Restore selected items
-      if (selectedItems && Array.isArray(selectedItems)) {
-        state.selected.clear();
-        selectedItems.forEach(id => state.selected.add(id));
-        updateBulkBar();
-      }
-      
-      // Restore search term
-      if (searchTerm && els.quickSearch) {
-        els.quickSearch.value = searchTerm;
-      }
-    });
-  }
+  function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); /* buttons removed */ }
   
   // Manual refresh only - no auto-refresh to prevent UI disruption
   let refreshInterval = null;
