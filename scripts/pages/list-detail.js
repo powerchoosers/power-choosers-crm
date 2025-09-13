@@ -1109,7 +1109,7 @@
             }
             return '';
           })();
-          html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : ''}<span class="company-name">${company}</span></span></a></td>`;
+          html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(window.__pcAccountsIcon())" />` : `${window.__pcAccountsIcon()}`}<span class="company-name">${company}</span></span></a></td>`;
           break;
         case 'email':
           html += `<td>${email}</td>`;

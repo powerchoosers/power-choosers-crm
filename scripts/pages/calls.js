@@ -371,10 +371,40 @@
             const id = c.id || `call_${Date.now()}_${idx}`;
             const party = pickCounterparty(c);
             const debug = { id, to: c.to, from: c.from, party, accountId: c.accountId || null, contactId: c.contactId || null };
+            
+            // Debug: Log the raw API call data to see what's available (remove in production)
+            // console.log('[Calls] Raw API call data:', c);
+            // console.log('[Calls] Available people data:', typeof window.getPeopleData === 'function' ? window.getPeopleData()?.length : 'getPeopleData not available');
 
             // Contact name resolution
             let contactName = '';
-            if (c.contactName) { contactName = c.contactName; debug.contactSource = 'api.contactName'; }
+            let resolvedContactId = c.contactId || null;
+            
+            if (c.contactName) { 
+              contactName = c.contactName; 
+              debug.contactSource = 'api.contactName';
+              
+              // Try to find contact ID by name if not provided
+              if (!resolvedContactId && typeof window.getPeopleData === 'function') {
+                const people = window.getPeopleData() || [];
+                // console.log('[Calls] Searching for contact by name:', contactName, 'in', people.length, 'people');
+                const foundContact = people.find(p => {
+                  const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ');
+                  const match = fullName === contactName || p.name === contactName;
+                  // if (match) {
+                  //   console.log('[Calls] Found matching contact:', p);
+                  // }
+                  return match;
+                });
+                if (foundContact) {
+                  resolvedContactId = foundContact.id;
+                  debug.contactIdSource = 'people.byName';
+                  // console.log('[Calls] Resolved contactId from name lookup:', resolvedContactId);
+                } else {
+                  // console.log('[Calls] No matching contact found for name:', contactName);
+                }
+              }
+            }
             else if (c.contactId) {
               const pc = getContactById(c.contactId);
               const full = pc ? ([pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '') : '';
@@ -382,7 +412,14 @@
             }
             if (!contactName) {
               const m = phoneToContact.get(party);
-              if (m && m.name) { contactName = m.name; debug.contactSource = 'people.byPhone'; }
+              if (m && m.name) { 
+                contactName = m.name; 
+                debug.contactSource = 'people.byPhone';
+                if (!resolvedContactId && m.id) {
+                  resolvedContactId = m.id;
+                  debug.contactIdSource = 'phoneMap.byPhone';
+                }
+              }
             }
             if (!contactName) {
               const acct = findAccountByPhone(party);
@@ -390,10 +427,21 @@
                 const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
                 if (p){
                   const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
-                  if (full) { contactName = full; debug.contactSource = 'account.recentContact'; }
+                  if (full) { 
+                    contactName = full; 
+                    debug.contactSource = 'account.recentContact';
+                    if (!resolvedContactId) {
+                      resolvedContactId = p.id;
+                      debug.contactIdSource = 'account.recentContact';
+                    }
+                  }
                 }
               }
             }
+            
+            // Debug: Log the resolved contact ID (remove in production)
+            // console.log('[Calls] Resolved contactId:', resolvedContactId, 'for contactName:', contactName);
+            // console.log('[Calls] Debug info:', debug);
 
             // Contact title resolution with fallback and debugging
             let contactTitle = '';
@@ -469,6 +517,7 @@
 
             const row = {
               id,
+              contactId: resolvedContactId,
               contactName,
               contactTitle,
               company,
@@ -544,6 +593,7 @@
       
       rows.push({ 
         id:'call_'+i, 
+        contactId: `demo_contact_${i}`, // Demo contact ID for testing
         contactName:`Contact ${i}`, 
         contactTitle:titles[j], 
         company:cos[j], 
@@ -584,6 +634,28 @@
   function updateFilterCount(){ if(!els.count) return; const n = Object.values(state.tokens).reduce((a,b)=>a+(b?b.length:0),0)+(els.hasEmail&&els.hasEmail.checked?1:0)+(els.hasPhone&&els.hasPhone.checked?1:0); if(n){ els.count.textContent=String(n); els.count.removeAttribute('hidden'); } else { els.count.textContent='0'; els.count.setAttribute('hidden',''); } }
 
   function getPageItems(){ const s=(state.currentPage-1)*state.pageSize; return state.filtered.slice(s,s+state.pageSize); }
+  
+  // Navigation helper functions (following project rules)
+  function getCurrentFilters() {
+    return {
+      hasEmail: els.hasEmail ? els.hasEmail.checked : false,
+      hasPhone: els.hasPhone ? els.hasPhone.checked : false,
+      tokens: { ...state.tokens }
+    };
+  }
+  
+  function getSelectedItems() {
+    return Array.from(state.selected);
+  }
+  
+  function getCurrentSort() {
+    // Calls page doesn't have sorting yet, but return empty for consistency
+    return null;
+  }
+  
+  function getCurrentSearch() {
+    return els.quickSearch ? els.quickSearch.value : '';
+  }
   function paginate(){ 
     if(!els.pag) return; 
     const total=state.filtered.length; 
@@ -615,7 +687,13 @@
     }
   }
 
-  function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
+  function render(){ if(!els.tbody) return; const rows=getPageItems(); 
+    // Debug: Log first row to see if contactId is present (remove in production)
+    // if (rows.length > 0) {
+    //   console.log('[Calls] First row data:', rows[0]);
+    //   console.log('[Calls] First row contactId:', rows[0].contactId);
+    // }
+    els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
     // row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
     els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',(e)=>{
@@ -625,11 +703,116 @@
       }
       openInsightsModal(btn.getAttribute('data-id'));
     }));
+    
+    // Navigation event handlers (following project rules)
+    els.tbody.querySelectorAll('.name-cell').forEach(cell => {
+      cell.addEventListener('click', (e) => {
+        e.preventDefault();
+        const contactId = cell.getAttribute('data-contact-id');
+        console.log('[Calls] Contact name clicked, contactId:', contactId);
+        
+        console.log('[Calls] ContactDetail module available:', !!window.ContactDetail);
+        console.log('[Calls] ContactDetail.show function available:', !!(window.ContactDetail && typeof window.ContactDetail.show === 'function'));
+        
+        if (contactId && contactId.trim()) {
+          // Store navigation source before navigating (using same pattern as other pages)
+          window._contactNavigationSource = 'calls';
+          window._contactNavigationContactId = contactId;
+          
+          console.log('[Calls] Navigation source stored for contact:', window._contactNavigationSource, contactId);
+          
+          // Navigate to contact detail
+          if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+            console.log('[Calls] Navigating to ContactDetail with ID:', contactId);
+            // Navigate to people page first, then show contact detail (same pattern as account-detail.js)
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              // Use requestAnimationFrame to ensure the page has started loading
+              requestAnimationFrame(() => {
+                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                  console.log('[Calls] Showing contact detail:', contactId);
+                  try {
+                    window.ContactDetail.show(contactId);
+                  } catch (error) {
+                    console.error('[Calls] Error showing contact detail:', error);
+                  }
+                } else {
+                  console.log('[Calls] ContactDetail not available after navigation');
+                }
+              });
+            }
+          } else {
+            console.log('[Calls] ContactDetail not available, trying fallback navigation');
+            // Fallback: navigate to people page
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+            }
+          }
+        } else {
+          console.log('[Calls] No contact ID available for navigation, contactId:', contactId);
+        }
+      });
+    });
+    
+    els.tbody.querySelectorAll('.company-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const companyName = link.getAttribute('data-company');
+        console.log('[Calls] Company name clicked, companyName:', companyName);
+        
+        if (companyName && companyName.trim()) {
+          // Store navigation source before navigating (using same pattern as other pages)
+          window._accountNavigationSource = 'calls';
+          window._callsReturn = {
+            page: state.currentPage,
+            scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+            filters: getCurrentFilters(),
+            selectedItems: getSelectedItems(),
+            sortColumn: getCurrentSort(),
+            searchTerm: getCurrentSearch()
+          };
+          
+          console.log('[Calls] Navigation source stored for company:', window._accountNavigationSource, window._callsReturn);
+          
+          // Navigate to account detail
+          if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+            // Try to find account by name first
+            if (typeof window.getAccountsData === 'function') {
+              const accounts = window.getAccountsData() || [];
+              const account = accounts.find(acc => acc.accountName === companyName || acc.name === companyName);
+              if (account && account.id) {
+                console.log('[Calls] Found account, navigating to AccountDetail with ID:', account.id);
+                window.AccountDetail.show(account.id);
+                return;
+              }
+            }
+            console.log('[Calls] Account not found, trying fallback navigation');
+            // Fallback: navigate to account details page
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('account-details');
+            }
+          } else {
+            console.log('[Calls] AccountDetail not available, trying fallback navigation');
+            // Fallback: navigate to accounts page
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('accounts');
+            }
+          }
+        } else {
+          console.log('[Calls] No company name available for navigation');
+        }
+      });
+    });
+    
     // header select state
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
 
   function rowHtml(r){
+    // Debug: Log the row data being processed (remove in production)
+    // console.log('[Calls] rowHtml processing row:', r);
+    // console.log('[Calls] rowHtml contactId:', r.contactId);
+    
     const dur = `${Math.floor(r.durationSec/60)}m ${r.durationSec%60}s`;
     const id = escapeHtml(r.id);
     const name = escapeHtml(r.contactName || r.to || '');
@@ -650,12 +833,39 @@
     const budget = aiInsights.budget || 'Not discussed';
     const timeline = aiInsights.timeline || 'Not specified';
     
+    // Compute initials for contact avatar (following project rules)
+    const initials = (() => {
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+      const chars = parts.length > 1 ? [parts[0][0], parts[parts.length - 1][0]] : (parts[0] ? [parts[0][0]] : []);
+      const str = chars.join('').toUpperCase();
+      if (str) return str;
+      const phone = String(r.to || r.from || '').trim();
+      return phone ? phone[0].toUpperCase() : '?';
+    })();
+    
+    // Compute favicon domain for company (following project rules)
+    const favDomain = (() => {
+      // Try to find the account for this company to get its domain
+      if (typeof window.getAccountsData === 'function') {
+        const accounts = window.getAccountsData() || [];
+        const account = accounts.find(acc => acc.accountName === company || acc.name === company);
+        if (account) {
+          let d = String(account.domain || account.website || '').trim();
+          if (/^https?:\/\//i.test(d)) {
+            try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
+          }
+          return d ? d.replace(/^www\./i, '') : '';
+        }
+      }
+      return '';
+    })();
+    
     return `
     <tr>
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
-      <td>${name}</td>
+      <td class="name-cell" data-contact-id="${r.contactId || ''}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${name}</span></div></td>
       <td>${title}</td>
-      <td>${company}</td>
+      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.replaceWith(window.__pcAccountsIcon())" />` : `${window.__pcAccountsIcon()}`}<span class="company-name">${company}</span></span></a></td>
       <td>${callTimeStr}</td>
       <td>${dur}</td>
       <td><span class="outcome-badge outcome-${outcome.toLowerCase().replace(' ', '-')}">${outcome}</span></td>
@@ -962,13 +1172,52 @@
       return out;
     }
     function renderTranscriptHtml(A, raw){
+      const contactFirst = String(r.contactName||'').trim().split(/\s+/)[0] || 'customer';
       const turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
       if(turns.length){
-        return turns.map(t=>{ const role = t.role==='agent'?'Agent':(t.role==='customer'?'Customer':'Speaker'); return `<div class=\"transcript-line ${t.role||''}\"><span class=\"speaker\">${role} ${toMMSS(Number(t.t)||0)}:</span> <span class=\"text\">${escapeHtml(t.text||'')}</span></div>`; }).join('');
+        // Group consecutive turns by role and relabel speakers (agent/customer)
+        const groups = [];
+        for(const t of turns){
+          const roleRaw = String(t.role||'').toLowerCase();
+          const label = roleRaw==='agent' ? 'agent' : (roleRaw==='customer' ? contactFirst : 'Speaker');
+          const roleClass = roleRaw==='agent' ? 'agent' : (roleRaw==='customer' ? 'customer' : '');
+          const text = String(t.text||'');
+          const time = Number(t.t)||0;
+          const last = groups[groups.length-1];
+          if(last && last.label===label && last.roleClass===roleClass){
+            last.texts.push(text);
+            if(time>last.endTime) last.endTime = time;
+          } else {
+            groups.push({ label, roleClass, startTime: time, endTime: time, texts: [text] });
+          }
+        }
+        return groups.map(g=>`<div class=\"transcript-line ${g.roleClass}\"><span class=\"speaker\">${escapeHtml(g.label)} ${toMMSS(g.startTime)}:</span> <span class=\"text\">${escapeHtml(g.texts.join(' '))}</span></div>`).join('');
       }
       const parsed = parseSpeakerTranscript(raw||'');
       if(parsed.some(p=>p.label && p.t!=null)){
-        return parsed.map(p=> p.label ? `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(p.label)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>` : `<div class=\"transcript-line\"><span class=\"text\">${escapeHtml(p.text||'')}</span></div>` ).join('');
+        // Normalize labels and group consecutive lines by speaker label
+        const normalize = (s)=>{
+          const x = String(s||'').trim();
+          if(/^agent$/i.test(x) || /^rep$/i.test(x) || /^sales/i.test(x)) return 'agent';
+          if(/^customer$/i.test(x) || /^contact$/i.test(x)) return contactFirst;
+          if(/^speaker\b/i.test(x)) return 'Speaker';
+          return x;
+        };
+        const groups = [];
+        for(const p of parsed){
+          const labelN = normalize(p.label);
+          const roleClass = labelN==='agent' ? 'agent' : (labelN===contactFirst ? 'customer' : '');
+          const text = String(p.text||'');
+          const time = Number(p.t)||0;
+          const last = groups[groups.length-1];
+          if(last && last.label===labelN && last.roleClass===roleClass){
+            last.texts.push(text);
+            if(time>last.endTime) last.endTime = time;
+          } else {
+            groups.push({ label: labelN, roleClass, startTime: time, endTime: time, texts: [text] });
+          }
+        }
+        return groups.map(g=>`<div class=\"transcript-line ${g.roleClass}\"><span class=\"speaker\">${escapeHtml(g.label)} ${toMMSS(g.startTime)}:</span> <span class=\"text\">${escapeHtml(g.texts.join(' '))}</span></div>`).join('');
       }
       const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
       return escapeHtml(fallback);
@@ -1368,7 +1617,58 @@
     }
   }
 
-  function init(){ if(!initDomRefs()) return; attachEvents(); injectCallsBulkStyles(); loadData(); /* buttons removed */ }
+  function init(){ 
+    if(!initDomRefs()) return; 
+    attachEvents(); 
+    injectCallsBulkStyles(); 
+    loadData(); 
+    
+    // Listen for restore events from back navigation
+    document.addEventListener('pc:calls-restore', (e) => {
+      const { page, scroll, filters, selectedItems, searchTerm } = e.detail || {};
+      console.log('[Calls] Restoring state from back navigation:', e.detail);
+      
+      // Restore pagination
+      if (page && page > 0) {
+        state.currentPage = page;
+      }
+      
+      // Restore scroll position
+      if (scroll && scroll > 0) {
+        setTimeout(() => {
+          window.scrollTo(0, scroll);
+        }, 100);
+      }
+      
+      // Restore filters
+      if (filters) {
+        if (filters.hasEmail !== undefined && els.hasEmail) {
+          els.hasEmail.checked = filters.hasEmail;
+        }
+        if (filters.hasPhone !== undefined && els.hasPhone) {
+          els.hasPhone.checked = filters.hasPhone;
+        }
+        if (filters.tokens) {
+          state.tokens = { ...filters.tokens };
+          chips.forEach(renderChips);
+        }
+        updateFilterCount();
+        applyFilters();
+      }
+      
+      // Restore selected items
+      if (selectedItems && Array.isArray(selectedItems)) {
+        state.selected.clear();
+        selectedItems.forEach(id => state.selected.add(id));
+        updateBulkBar();
+      }
+      
+      // Restore search term
+      if (searchTerm && els.quickSearch) {
+        els.quickSearch.value = searchTerm;
+      }
+    });
+  }
   
   // Manual refresh only - no auto-refresh to prevent UI disruption
   let refreshInterval = null;
