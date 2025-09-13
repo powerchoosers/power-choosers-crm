@@ -430,8 +430,12 @@ async function handleApiCalls(req, res) {
           for (const c of arr) {
             const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
             const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0;
+            const toN = norm(isClient(c.to) ? '' : c.to);
+            const fromN = norm(isClient(c.from) ? '' : c.from);
             const cp = otherParty(c.to, c.from);
-            const k = c.twilioSid ? `sid:${c.twilioSid}` : `cp:${cp}:b:${bucket}`;
+            // Build a stable pair key regardless of direction for placeholders
+            const pair = [toN, fromN].filter(Boolean).sort().join('~');
+            const k = c.twilioSid ? `sid:${c.twilioSid}` : (pair ? `pair:${pair}:b:${bucket}` : `cp:${cp}:b:${bucket}`);
             const list = groups.get(k) || [];
             list.push(c);
             groups.set(k, list);
