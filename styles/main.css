@@ -7215,7 +7215,7 @@ html, body {
     height: 40px;
     border-radius: 50%;
     display: block;
-    background: var(--bg-card, #383f46);
+    background: var(--bg-item, #3a3f46);
     padding: 4px;
     box-sizing: border-box;
     object-fit: cover;
