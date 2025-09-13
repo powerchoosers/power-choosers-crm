@@ -355,6 +355,9 @@
   function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=>N(x)===N(t))) { arr.push(t); const d = chips.find(x=>x.k===k); if (d) renderChips(d); } }
 
   async function loadData() {
+    // Enable debugging for contact ID resolution
+    window.CRM_DEBUG_CALLS = true;
+    
     // 1) Try to load real calls from backend - use current origin by default
     try {
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
@@ -375,6 +378,15 @@
             // Contact name resolution
             let contactName = '';
             let resolvedContactId = c.contactId || null;
+            
+            // Debug logging for contact ID resolution
+            if (window.CRM_DEBUG_CALLS) {
+              console.log('[Calls][contactId] Starting resolution:', {
+                originalContactId: c.contactId,
+                contactName: c.contactName,
+                resolvedContactId
+              });
+            }
             
             if (c.contactName) { 
               contactName = c.contactName; 
@@ -499,6 +511,25 @@
             // Pretty print phone
             const contactPhone = party ? `+1 (${party.slice(0,3)}) ${party.slice(3,6)}-${party.slice(6)}` : '';
 
+            // Fallback: Generate a contact ID if none was found
+            if (!resolvedContactId && contactName) {
+              // Create a temporary contact ID for calls without existing contacts
+              resolvedContactId = `call_contact_${id}_${Date.now()}`;
+              if (window.CRM_DEBUG_CALLS) {
+                console.log('[Calls][contactId] Generated fallback contact ID:', resolvedContactId);
+              }
+            }
+            
+            // Debug logging for final contact ID
+            if (window.CRM_DEBUG_CALLS) {
+              console.log('[Calls][contactId] Final resolution:', {
+                id,
+                resolvedContactId,
+                contactName,
+                originalContactId: c.contactId
+              });
+            }
+            
             const row = {
               id,
               contactId: resolvedContactId,
@@ -683,7 +714,10 @@
     }));
     
     // Navigation event handlers (following project rules)
+    console.log('[Calls] Attaching event listeners to', els.tbody.querySelectorAll('.name-cell').length, 'name cells');
     els.tbody.querySelectorAll('.name-cell').forEach(cell => {
+      const contactId = cell.getAttribute('data-contact-id');
+      console.log('[Calls] Found name cell with contactId:', contactId, 'HTML:', cell.outerHTML.substring(0, 100));
       cell.addEventListener('click', (e) => {
         e.preventDefault();
         const contactId = cell.getAttribute('data-contact-id');
@@ -698,31 +732,67 @@
           
           console.log('[Calls] Navigation source stored for contact:', window._contactNavigationSource, contactId);
           
-          // Navigate to contact detail
-          if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-            console.log('[Calls] Navigating to ContactDetail with ID:', contactId);
-            // Navigate to people page first, then show contact detail (same pattern as account-detail.js)
+          // Check if this is a generated contact ID (from calls without existing contacts)
+          if (contactId.startsWith('call_contact_')) {
+            console.log('[Calls] Generated contact ID detected, creating contact detail from call data');
+            // For generated contact IDs, we need to create a contact detail from the call data
+            // Navigate to people page first, then create a temporary contact detail
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('people');
               // Use requestAnimationFrame to ensure the page has started loading
               requestAnimationFrame(() => {
-                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                  console.log('[Calls] Showing contact detail:', contactId);
-                  try {
-                    window.ContactDetail.show(contactId);
-                  } catch (error) {
-                    console.error('[Calls] Error showing contact detail:', error);
+                // Create a temporary contact object from the call data
+                const callRow = state.filtered.find(r => r.contactId === contactId);
+                const tempContact = callRow ? {
+                  id: contactId,
+                  firstName: callRow.contactName.split(' ')[0] || '',
+                  lastName: callRow.contactName.split(' ').slice(1).join(' ') || '',
+                  name: callRow.contactName,
+                  email: callRow.contactEmail || '',
+                  phone: callRow.contactPhone || '',
+                  company: callRow.company || '',
+                  title: callRow.contactTitle || ''
+                } : null;
+
+                const start = Date.now();
+                const tryOpen = () => {
+                  if (tempContact && window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                    console.log('[Calls] Showing temporary contact detail (generated ID):', contactId);
+                    try { window.ContactDetail.show(contactId, tempContact); } catch (error) { console.error('[Calls] Error showing temporary contact detail:', error); }
+                    return;
                   }
-                } else {
-                  console.log('[Calls] ContactDetail not available after navigation');
-                }
+                  if (Date.now() - start < 2000) { setTimeout(tryOpen, 80); }
+                };
+                tryOpen();
               });
             }
           } else {
-            console.log('[Calls] ContactDetail not available, trying fallback navigation');
-            // Fallback: navigate to people page
-            if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('people');
+            // Navigate to contact detail for existing contacts
+            if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+              console.log('[Calls] Navigating to ContactDetail with ID:', contactId);
+              // Navigate to people page first, then show contact detail (same pattern as account-detail.js)
+              if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                window.crm.navigateToPage('people');
+                // Use requestAnimationFrame to ensure the page has started loading
+                requestAnimationFrame(() => {
+                  if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                    console.log('[Calls] Showing contact detail:', contactId);
+                    try {
+                      window.ContactDetail.show(contactId);
+                    } catch (error) {
+                      console.error('[Calls] Error showing contact detail:', error);
+                    }
+                  } else {
+                    console.log('[Calls] ContactDetail not available after navigation');
+                  }
+                });
+              }
+            } else {
+              console.log('[Calls] ContactDetail not available, trying fallback navigation');
+              // Fallback: navigate to people page
+              if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                window.crm.navigateToPage('people');
+              }
             }
           }
         } else {

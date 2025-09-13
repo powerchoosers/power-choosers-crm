@@ -96,7 +96,7 @@ async function upsertCallInFirestore(payload) {
     return null;
   }
 
-  // Compute normalized phone context
+  // Compute normalized phone context (for enrichment only; do NOT merge across calls)
   const context = pickBusinessAndTarget({
     to: payload.to,
     from: payload.from,
@@ -104,40 +104,12 @@ async function upsertCallInFirestore(payload) {
     businessPhone: payload.businessPhone
   });
 
+  // Strict policy: upsert by Call SID only; do not cross-merge by phone pair
   // Try exact doc first
   const currentSnap = await db.collection('calls').doc(callId).get();
   const current = currentSnap.exists ? (currentSnap.data() || {}) : {};
 
-  // Dedupe: search recent calls and merge into existing record with same phone pair
-  let primaryId = callId;
-  try {
-    const recentSnap = await db.collection('calls').orderBy('timestamp', 'desc').limit(50).get();
-    const recent = [];
-    recentSnap.forEach((doc) => recent.push({ id: doc.id, ...(doc.data() || {}) }));
-    const target10 = String(context.targetPhone || '').replace(/\D/g, '').slice(-10);
-    const biz10 = norm10(context.businessPhone);
-    const isSamePair = (d) => {
-      const t = norm10(d.targetPhone || d.to);
-      const b = norm10(d.businessPhone || d.from);
-      return !!t && !!b && t === target10 && b === biz10;
-    };
-    const windowMs = 10 * 60 * 1000; // 10 minutes
-    const nowMs = Date.now();
-    const candidates = recent.filter((d) => isSamePair(d) && Math.abs(new Date(d.timestamp || d.callTime || nowIso).getTime() - nowMs) < windowMs);
-    if (candidates.length) {
-      // Choose best existing doc: prefer one with recording or longer duration
-      candidates.sort((a, b) => {
-        const ar = a.recordingUrl ? 1 : 0; const br = b.recordingUrl ? 1 : 0;
-        if (ar !== br) return br - ar;
-        const ad = parseInt(a.duration || a.durationSec || 0, 10);
-        const bd = parseInt(b.duration || b.durationSec || 0, 10);
-        if (ad !== bd) return bd - ad;
-        return new Date(b.timestamp || b.callTime || 0) - new Date(a.timestamp || a.callTime || 0);
-      });
-      const best = candidates[0];
-      if (best && best.id) primaryId = best.id; // merge into best existing
-    }
-  } catch (_) {}
+  const primaryId = callId;
 
   const merged = {
     ...current,
@@ -171,10 +143,6 @@ async function upsertCallInFirestore(payload) {
 
   await db.collection('calls').doc(primaryId).set(merged, { merge: true });
 
-  // Optional cleanup: if we merged into a different document than the incoming Call SID, delete the other to prevent dupes
-  if (primaryId !== callId) {
-    try { await db.collection('calls').doc(callId).delete(); } catch(_) {}
-  }
   return normalizeCallForResponse(merged);
 }
 
@@ -308,7 +276,7 @@ export default async function handler(req, res) {
         return;
       }
 
-      // Memory fallback upsert: only by valid Call SID; also dedupe by phone pair in recent entries
+      // Memory fallback upsert: only by valid Call SID; no cross-call merging
       if (!isCallSid(callId)) {
         res.statusCode = 202;
         res.setHeader('Content-Type', 'application/json');
@@ -318,25 +286,7 @@ export default async function handler(req, res) {
 
       const nowIso = new Date().toISOString();
       const context = pickBusinessAndTarget({ to: payload.to, from: payload.from, targetPhone: payload.targetPhone, businessPhone: payload.businessPhone });
-      // Find candidate by same phone pair within 10 minutes
-      let primaryId = callId;
-      try {
-        const entries = Array.from(memoryStore.values());
-        const target10 = norm10(context.targetPhone);
-        const biz10 = norm10(context.businessPhone);
-        const windowMs = 10 * 60 * 1000; const nowMs = Date.now();
-        const candidates = entries.filter(d => norm10(d.targetPhone || d.to) === target10 && norm10(d.businessPhone || d.from) === biz10 && Math.abs(new Date(d.timestamp || d.callTime || nowIso).getTime() - nowMs) < windowMs);
-        if (candidates.length) {
-          candidates.sort((a, b) => {
-            const ar = a.recordingUrl ? 1 : 0; const br = b.recordingUrl ? 1 : 0;
-            if (ar !== br) return br - ar;
-            const ad = parseInt(a.duration || a.durationSec || 0, 10);
-            const bd = parseInt(b.duration || b.durationSec || 0, 10);
-            return bd - ad;
-          });
-          if (candidates[0] && candidates[0].id) primaryId = candidates[0].id;
-        }
-      } catch(_) {}
+      const primaryId = callId;
       const existing = memoryStore.get(primaryId) || {};
       const merged = {
         ...existing,
