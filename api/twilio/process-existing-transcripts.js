@@ -416,6 +416,23 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             };
         }
         
+        // Create speaker turns with proper channel identification
+        const speakerTurns = Array.isArray(sentences) ? sentences.map(s => {
+            // Channel 0 is typically the customer, channel 1 is the agent/business
+            // startTime is in seconds
+            const timeInSeconds = Math.floor(s.startTime || 0);
+            const role = s.channel === 1 ? 'agent' : 'customer';
+            // Optional label retained for parity
+            const label = s.channel === 1 ? 'Agent' : 'Customer';
+            return {
+                t: timeInSeconds,
+                role: role,
+                text: s.text || '',
+                channel: s.channel,
+                confidence: s.confidence
+            };
+        }) : [];
+
         return {
             summary: `Advanced AI analysis of ${wordCount}-word conversation. ${sentiment} sentiment detected (${(sentimentScore * 100).toFixed(1)}% confidence). ${detectedTopics.length > 0 ? 'Key topics: ' + detectedTopics.map(t => t.topic).join(', ') : 'General business discussion.'}`,
             sentiment: sentiment,
@@ -429,6 +446,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             wordCount: wordCount,
             sentenceCount: sentences.length,
             averageConfidence: sentences.length > 0 ? sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0,
+            speakerTurns: speakerTurns,
             source: 'twilio-conversational-intelligence',
             ...enhancedInsights
         };
