@@ -565,66 +565,7 @@
   function animateCollapse(el, done){ const h=el.scrollHeight; el.style.height=h+'px'; el.style.opacity='1'; requestAnimationFrame(()=>{ el.classList.add('collapsing'); el.style.transition='height 140ms ease, opacity 140ms ease'; el.style.height='0px'; el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('collapsing'); done&&done(); },160); }); }
   function insightsInlineHtml(r){
     const AI = r.aiInsights || {};
-    // Build comprehensive summary with bullet points
-    let summaryText = r.aiSummary || '';
-    if (!summaryText && AI && Object.keys(AI).length) {
-      const contract = AI.contract || {};
-      const supplier = get(contract, ['supplier'], '');
-      const rate = get(contract, ['current_rate'], '');
-      const usage = get(contract, ['usage_k_wh'], '');
-      const contractEnd = get(contract, ['contract_end'], '');
-      const keyTopics = toArr(AI.keyTopics || []);
-      const nextSteps = toArr(AI.nextSteps || []);
-      const painPoints = toArr(AI.painPoints || []);
-      const budget = AI.budget || '';
-      const timeline = AI.timeline || '';
-      const sentiment = AI.sentiment || 'Unknown';
-      const disposition = AI.disposition || 'Unknown';
-      
-      // Create paragraph summary
-      let paragraph = `Call with ${disposition.toLowerCase()} disposition`;
-      if (supplier && supplier !== 'Unknown') {
-        paragraph += ` regarding energy services with ${supplier}`;
-      } else {
-        paragraph += ` about energy services`;
-      }
-      paragraph += `. ${sentiment} sentiment detected.`;
-      
-      // Create bullet points
-      const bullets = [];
-      if (supplier && supplier !== 'Unknown') {
-        bullets.push(`Current supplier: ${supplier}`);
-      }
-      if (rate && rate !== 'Unknown') {
-        bullets.push(`Current rate: ${rate}`);
-      }
-      if (usage && usage !== 'Not provided') {
-        bullets.push(`Usage: ${usage}`);
-      }
-      if (contractEnd && contractEnd !== 'Not discussed') {
-        bullets.push(`Contract expires: ${contractEnd}`);
-      }
-      if (keyTopics.length > 0) {
-        bullets.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
-      }
-      if (nextSteps.length > 0) {
-        bullets.push(`Next steps: ${nextSteps.slice(0,2).join(', ')}`);
-      }
-      if (painPoints.length > 0) {
-        bullets.push(`Pain points: ${painPoints.slice(0,2).join(', ')}`);
-      }
-      if (budget && budget !== 'Unclear' && budget !== '') {
-        bullets.push(`Budget: ${budget}`);
-      }
-      if (timeline && timeline !== 'Not specified' && timeline !== '') {
-        bullets.push(`Timeline: ${timeline}`);
-      }
-      
-      // Combine paragraph and bullets
-      summaryText = paragraph + (bullets.length > 0 ? ' • ' + bullets.join(' • ') : '');
-    } else if (!summaryText) {
-      summaryText = 'No summary available';
-    }
+    const summaryText = r.aiSummary || (AI && Object.keys(AI).length ? 'AI analysis in progress...' : 'No summary available');
     const sentiment = AI.sentiment || 'Unknown';
     const disposition = AI.disposition || '';
     const keyTopics = Array.isArray(AI.keyTopics) ? AI.keyTopics : [];
