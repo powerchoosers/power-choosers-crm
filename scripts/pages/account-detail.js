@@ -917,6 +917,27 @@
           return;
         }
         
+        // Check if we came from calls page
+        if (window._accountNavigationSource === 'calls') {
+          try {
+            const restore = window._callsReturn || {};
+            // Clear the navigation markers early to avoid leaking state
+            window._accountNavigationSource = null;
+            window._callsReturn = null;
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('calls');
+              // Dispatch an event for Calls page to restore pagination and scroll
+              setTimeout(() => {
+                try {
+                  const ev = new CustomEvent('pc:calls-restore', { detail: { page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm } });
+                  document.dispatchEvent(ev);
+                } catch(_) {}
+              }, 60);
+            }
+          } catch (_) { /* noop */ }
+          return;
+        }
+        
         // Default behavior: return to accounts page
         try { window.crm && window.crm.navigateToPage('accounts'); } catch (e) { /* noop */ }
         // Rebind accounts page dynamic handlers

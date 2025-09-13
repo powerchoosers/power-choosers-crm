@@ -4118,12 +4118,12 @@ html, body {
 }
 
 #list-detail-table .company-favicon {
-    width: 16px;
-    height: 16px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-card, #383f46);
+    background: var(--bg-item, #3a3f46);
     padding: 2px;
     box-sizing: border-box;
 }
@@ -4982,6 +4982,44 @@ html, body {
 
 @media (max-width: 560px) {
     .pc-modal__dialog { width: calc(100vw - 20px); }
+}
+
+.pc-modal__dialog {}
+
+/* Add Contact/Account modal: wider, shorter, scrollable body with fixed header/footer */
+#modal-add-contact .pc-modal__dialog,
+#modal-add-account .pc-modal__dialog {
+    width: 760px;
+    max-width: calc(100vw - 40px);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#modal-add-contact form,
+#modal-add-account form {
+    display: flex;
+    flex-direction: column;
+    /* Allow inner flex children to shrink for proper scrolling */
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+#modal-add-contact .pc-modal__header,
+#modal-add-account .pc-modal__header {
+    flex: 0 0 auto;
+}
+
+#modal-add-contact .pc-modal__body,
+#modal-add-account .pc-modal__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#modal-add-contact .pc-modal__footer,
+#modal-add-account .pc-modal__footer {
+    flex: 0 0 auto;
 }
 
 .btn-danger {
@@ -7062,6 +7100,104 @@ html, body {
     border-radius: 6px;
 }
 
+/* === CALLS PAGE STYLES === */
+/* Calls table: contact name with avatar initials */
+#calls-table .name-cell {
+    color: var(--grey-400);
+    font-weight: 400;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: inline-block;
+}
+
+#calls-table .name-cell:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+#calls-table .name-cell:focus {
+    outline: none;
+}
+
+#calls-table .name-cell:focus-visible {
+    outline: 2px solid var(--orange-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+#calls-table .name-cell .name-cell__wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#calls-table .name-cell .avatar-initials {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--orange-subtle);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    line-height: 1;
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+#calls-table .name-cell .name-text {
+    display: inline-block;
+}
+
+/* Calls table: company favicon + name */
+#calls-table .company-link {
+    color: var(--grey-400);
+    font-weight: 400;
+    text-decoration: none;
+    cursor: pointer;
+    outline: none;
+    transition: var(--transition-fast);
+    display: inline-block;
+}
+
+#calls-table .company-link:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+#calls-table .company-link:focus {
+    outline: none;
+}
+
+#calls-table .company-link:focus-visible {
+    outline: 2px solid var(--orange-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+#calls-table .company-link .company-cell__wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#calls-table .company-favicon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+    background: var(--bg-item, #3a3f46);
+    padding: 2px;
+    box-sizing: border-box;
+}
+
+#calls-table .company-name {
+    display: inline-block;
+}
+
 /* === CONTACT DETAIL STYLES === */
 .contact-detail {
     display: contents; /* flatten wrapper: children render directly in parent flow */
@@ -7119,7 +7255,7 @@ html, body {
     height: 40px;
     border-radius: 50%;
     display: block;
-    background: var(--bg-card, #383f46);
+    background: var(--bg-item, #3a3f46);
     padding: 4px;
     box-sizing: border-box;
     object-fit: cover;
@@ -8081,12 +8217,12 @@ th.drag-over::after {
     gap: 8px;
 }
 #people-table td .company-favicon {
-    width: 16px;
-    height: 16px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-card, #383f46);
+    background: var(--bg-item, #3a3f46);
     padding: 2px;
     box-sizing: border-box;
 }
@@ -8121,14 +8257,22 @@ th.drag-over::after {
     gap: 8px;
 }
 #accounts-table .name-cell .company-favicon {
-    width: 16px;
-    height: 16px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-card, #383f46);
+    background: var(--bg-item, #3a3f46);
     padding: 2px;
     box-sizing: border-box;
+}
+
+/* Fallback company favicon: center the sidebar Accounts icon inside the circle */
+.company-favicon.company-favicon--fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
 }
 #accounts-table .name-cell .name-text {
     display: inline-block;
@@ -8362,11 +8506,14 @@ th.drag-over::after {
     gap: 8px;
 }
 #people-table .company-favicon {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
+    background: var(--bg-item, #3a3f46);
+    padding: 2px;
+    box-sizing: border-box;
 }
 #people-table .company-name {
     display: inline-block;
@@ -11454,4 +11601,71 @@ div[id="account-contacts-list"] .contact-item .contact-name {
         text-align: center;
         transform: rotate(90deg);
     }
+}
+
+/* === MODAL INPUT FIELD IMPROVEMENTS === */
+/* Ensure consistent sizing for all modal input fields */
+.pc-modal .input-dark {
+    width: 100%;
+    min-width: 200px;
+    height: 42px;
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    box-sizing: border-box;
+}
+
+/* Form row layout improvements */
+.pc-modal .form-row {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.pc-modal .form-row label {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.pc-modal .form-row label input {
+    flex: 1;
+}
+
+/* Ensure equal width columns in form rows */
+.pc-modal .form-row label:first-child,
+.pc-modal .form-row label:last-child {
+    flex: 1 1 50%;
+}
+
+/* Modal body padding consistency */
+.pc-modal .pc-modal__body {
+    padding: var(--spacing-base);
+}
+
+/* Modal footer button styling improvements */
+.pc-modal .pc-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-base);
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-container);
+}
+
+.pc-modal .pc-modal__footer .btn-primary {
+    min-width: 120px;
+    height: 40px;
+    padding: 0 var(--spacing-md);
+    font-weight: 500;
+}
+
+.pc-modal .pc-modal__footer .btn-text {
+    min-width: 80px;
+    height: 40px;
+    padding: 0 var(--spacing-md);
 }
