@@ -14,6 +14,7 @@ function corsMiddleware(req, res, next) {
 }
 
 const { db } = require('./_firebase');
+const { resolveToCallSid, isCallSid } = require('./_twilio-ids');
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
@@ -50,6 +51,21 @@ function normalizeCallForResponse(call) {
   };
 }
 
+function norm10(v) {
+  try { return (v == null ? '' : String(v)).replace(/\D/g, '').slice(-10); } catch(_) { return ''; }
+}
+
+function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
+  const to10 = norm10(to);
+  const from10 = norm10(from);
+  const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+    .split(',').map(norm10).filter(Boolean);
+  const isBiz = (p) => !!p && envBiz.includes(p);
+  const biz = businessPhone || (isBiz(to10) ? to : (isBiz(from10) ? from : ''));
+  const tgt = targetPhone || (isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10)));
+  return { businessPhone: biz || '', targetPhone: tgt || '' };
+}
+
 async function getCallsFromFirestore(limit = 50) {
   if (!db) return null;
   const snap = await db.collection('calls').orderBy('timestamp', 'desc').limit(limit).get();
@@ -64,16 +80,70 @@ async function getCallsFromFirestore(limit = 50) {
 async function upsertCallInFirestore(payload) {
   if (!db) return null;
   const nowIso = new Date().toISOString();
-  const id = (payload.callSid && String(payload.callSid)) || (payload.twilioSid && String(payload.twilioSid)) || (payload.id && String(payload.id));
-  const callId = id || `call_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  // Resolve a proper Twilio Call SID. Never create a document without a valid Call SID.
+  let callId = (payload.callSid && String(payload.callSid)) || '';
+  if (!isCallSid(callId)) {
+    try {
+      callId = await resolveToCallSid({
+        callSid: payload.callSid,
+        recordingSid: payload.recordingSid,
+        transcriptSid: payload.transcriptSid
+      });
+    } catch (_) {}
+  }
+  if (!isCallSid(callId)) {
+    // No valid Call SID → do not persist to Firestore
+    return null;
+  }
 
-  const current = (await db.collection('calls').doc(callId).get()).data() || {};
+  // Compute normalized phone context
+  const context = pickBusinessAndTarget({
+    to: payload.to,
+    from: payload.from,
+    targetPhone: payload.targetPhone,
+    businessPhone: payload.businessPhone
+  });
+
+  // Try exact doc first
+  const currentSnap = await db.collection('calls').doc(callId).get();
+  const current = currentSnap.exists ? (currentSnap.data() || {}) : {};
+
+  // Dedupe: search recent calls and merge into existing record with same phone pair
+  let primaryId = callId;
+  try {
+    const recentSnap = await db.collection('calls').orderBy('timestamp', 'desc').limit(50).get();
+    const recent = [];
+    recentSnap.forEach((doc) => recent.push({ id: doc.id, ...(doc.data() || {}) }));
+    const target10 = String(context.targetPhone || '').replace(/\D/g, '').slice(-10);
+    const biz10 = norm10(context.businessPhone);
+    const isSamePair = (d) => {
+      const t = norm10(d.targetPhone || d.to);
+      const b = norm10(d.businessPhone || d.from);
+      return !!t && !!b && t === target10 && b === biz10;
+    };
+    const windowMs = 10 * 60 * 1000; // 10 minutes
+    const nowMs = Date.now();
+    const candidates = recent.filter((d) => isSamePair(d) && Math.abs(new Date(d.timestamp || d.callTime || nowIso).getTime() - nowMs) < windowMs);
+    if (candidates.length) {
+      // Choose best existing doc: prefer one with recording or longer duration
+      candidates.sort((a, b) => {
+        const ar = a.recordingUrl ? 1 : 0; const br = b.recordingUrl ? 1 : 0;
+        if (ar !== br) return br - ar;
+        const ad = parseInt(a.duration || a.durationSec || 0, 10);
+        const bd = parseInt(b.duration || b.durationSec || 0, 10);
+        if (ad !== bd) return bd - ad;
+        return new Date(b.timestamp || b.callTime || 0) - new Date(a.timestamp || a.callTime || 0);
+      });
+      const best = candidates[0];
+      if (best && best.id) primaryId = best.id; // merge into best existing
+    }
+  } catch (_) {}
 
   const merged = {
     ...current,
-    id: callId,
-    callSid: payload.callSid || current.callSid || callId,
-    twilioSid: payload.callSid || payload.twilioSid || current.twilioSid || callId,
+    id: primaryId,
+    callSid: primaryId,
+    twilioSid: primaryId,
     to: payload.to != null ? payload.to : current.to,
     from: payload.from != null ? payload.from : current.from,
     status: payload.status || current.status || 'initiated',
@@ -92,14 +162,19 @@ async function upsertCallInFirestore(payload) {
     accountName: payload.accountName != null ? payload.accountName : current.accountName,
     contactId: payload.contactId != null ? payload.contactId : current.contactId,
     contactName: payload.contactName != null ? payload.contactName : current.contactName,
-    targetPhone: payload.targetPhone != null ? payload.targetPhone : current.targetPhone,
-    businessPhone: payload.businessPhone != null ? payload.businessPhone : current.businessPhone,
+    targetPhone: (payload.targetPhone != null ? payload.targetPhone : (current.targetPhone || context.targetPhone)) || '',
+    businessPhone: (payload.businessPhone != null ? payload.businessPhone : (current.businessPhone || context.businessPhone)) || '',
     source: payload.source || current.source || 'unknown',
     updatedAt: nowIso,
     createdAt: current.createdAt || nowIso
   };
 
-  await db.collection('calls').doc(callId).set(merged, { merge: true });
+  await db.collection('calls').doc(primaryId).set(merged, { merge: true });
+
+  // Optional cleanup: if we merged into a different document than the incoming Call SID, delete the other to prevent dupes
+  if (primaryId !== callId) {
+    try { await db.collection('calls').doc(callId).delete(); } catch(_) {}
+  }
   return normalizeCallForResponse(merged);
 }
 
@@ -152,24 +227,68 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const payload = await readJson(req);
 
+      // Strict de-dup policy: only persist when we have a valid Twilio Call SID
+      let callId = (payload.callSid && String(payload.callSid)) || '';
+      if (!isCallSid(callId)) {
+        try {
+          callId = await resolveToCallSid({
+            callSid: payload.callSid,
+            recordingSid: payload.recordingSid,
+            transcriptSid: payload.transcriptSid
+          });
+        } catch (_) {}
+      }
+
       if (db) {
-        const saved = await upsertCallInFirestore(payload);
+        const saved = await upsertCallInFirestore({ ...payload, callSid: callId || payload.callSid });
+        if (!saved) {
+          // No valid Call SID yet; acknowledge but do not create a row
+          res.statusCode = 202;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, pending: true, reason: 'Awaiting valid Call SID' }));
+          return;
+        }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ ok: true, call: saved }));
         return;
       }
 
-      // Memory fallback upsert
+      // Memory fallback upsert: only by valid Call SID; also dedupe by phone pair in recent entries
+      if (!isCallSid(callId)) {
+        res.statusCode = 202;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: true, pending: true, reason: 'Awaiting valid Call SID' }));
+        return;
+      }
+
       const nowIso = new Date().toISOString();
-      const id = (payload.callSid && String(payload.callSid)) || (payload.twilioSid && String(payload.twilioSid)) || (payload.id && String(payload.id));
-      const callId = id || `call_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-      const existing = memoryStore.get(callId) || {};
+      const context = pickBusinessAndTarget({ to: payload.to, from: payload.from, targetPhone: payload.targetPhone, businessPhone: payload.businessPhone });
+      // Find candidate by same phone pair within 10 minutes
+      let primaryId = callId;
+      try {
+        const entries = Array.from(memoryStore.values());
+        const target10 = norm10(context.targetPhone);
+        const biz10 = norm10(context.businessPhone);
+        const windowMs = 10 * 60 * 1000; const nowMs = Date.now();
+        const candidates = entries.filter(d => norm10(d.targetPhone || d.to) === target10 && norm10(d.businessPhone || d.from) === biz10 && Math.abs(new Date(d.timestamp || d.callTime || nowIso).getTime() - nowMs) < windowMs);
+        if (candidates.length) {
+          candidates.sort((a, b) => {
+            const ar = a.recordingUrl ? 1 : 0; const br = b.recordingUrl ? 1 : 0;
+            if (ar !== br) return br - ar;
+            const ad = parseInt(a.duration || a.durationSec || 0, 10);
+            const bd = parseInt(b.duration || b.durationSec || 0, 10);
+            return bd - ad;
+          });
+          if (candidates[0] && candidates[0].id) primaryId = candidates[0].id;
+        }
+      } catch(_) {}
+      const existing = memoryStore.get(primaryId) || {};
       const merged = {
         ...existing,
-        id: callId,
-        callSid: payload.callSid || existing.callSid || callId,
-        twilioSid: payload.callSid || payload.twilioSid || existing.twilioSid || callId,
+        id: primaryId,
+        callSid: primaryId,
+        twilioSid: primaryId,
         to: payload.to != null ? payload.to : existing.to,
         from: payload.from != null ? payload.from : existing.from,
         status: payload.status || existing.status || 'initiated',
@@ -182,9 +301,11 @@ export default async function handler(req, res) {
         aiInsights: payload.aiInsights != null ? payload.aiInsights : existing.aiInsights || null,
         aiSummary: payload.aiSummary != null ? payload.aiSummary : existing.aiSummary,
         recordingUrl: payload.recordingUrl != null ? payload.recordingUrl : existing.recordingUrl,
+        businessPhone: context.businessPhone || existing.businessPhone || '',
+        targetPhone: context.targetPhone || existing.targetPhone || '',
         source: payload.source || existing.source || 'unknown'
       };
-      memoryStore.set(callId, merged);
+      memoryStore.set(primaryId, merged);
 
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
