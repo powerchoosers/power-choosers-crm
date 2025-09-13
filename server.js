@@ -598,6 +598,13 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/twilio/ai-insights') {
     return handleApiTwilioAIInsights(req, res);
   }
+  if (pathname === '/api/twilio/caller-lookup') {
+    // Local stubbed lookup to avoid 404 during testing
+    try { await readJsonBody(req); } catch(_) {}
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, data: null, message: 'Local caller lookup not configured' }));
+    return;
+  }
   if (pathname === '/api/calls') {
     return handleApiCalls(req, res);
   }
