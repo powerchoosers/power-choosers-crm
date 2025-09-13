@@ -688,6 +688,8 @@
         e.preventDefault();
         const contactId = cell.getAttribute('data-contact-id');
         console.log('[Calls] Contact name clicked, contactId:', contactId);
+        console.log('[Calls] ContactDetail module available:', !!window.ContactDetail);
+        console.log('[Calls] ContactDetail.show function available:', !!(window.ContactDetail && typeof window.ContactDetail.show === 'function'));
         
         if (contactId && contactId.trim()) {
           // Store navigation source before navigating (using same pattern as other pages)

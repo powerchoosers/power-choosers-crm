@@ -3,7 +3,7 @@
 
 function corsMiddleware(req, res, next) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -234,8 +234,14 @@ export default async function handler(req, res) {
       pushId(body.callSid);
       pushId(body.twilioSid);
       if (Array.isArray(body.ids)) body.ids.forEach(pushId);
+      // If no body (e.g., some clients send query ids), check query param
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const qId = urlObj.searchParams.get('id');
+      const qCallSid = urlObj.searchParams.get('callSid');
+      const qTwilio = urlObj.searchParams.get('twilioSid');
+      [qId, qCallSid, qTwilio].forEach(pushId);
 
-      // Resolve to valid Call SIDs only
+      // Resolve to valid Call SIDs; also keep raw ids list to purge legacy docs
       const resolved = [];
       for (const raw of ids) {
         let sid = raw;
@@ -247,26 +253,28 @@ export default async function handler(req, res) {
 
       if (db) {
         let deleted = 0;
+        // Delete exact Call SID docs
         for (const sid of resolved) {
-          try {
-            await db.collection('calls').doc(sid).delete();
-            deleted++;
-          } catch(_) {}
+          try { await db.collection('calls').doc(sid).delete(); deleted++; } catch(_) {}
+        }
+        // Attempt cleanup of any legacy/non-SID ids that match raw inputs
+        for (const raw of ids) {
+          if (isCallSid(raw)) continue;
+          try { await db.collection('calls').doc(raw).delete(); deleted++; } catch(_) {}
         }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ ok: true, deleted, requested: resolved.length }));
+        res.end(JSON.stringify({ ok: true, deleted, requested: ids.length }));
         return;
       }
 
       // Memory fallback
       let deleted = 0;
-      for (const sid of resolved) {
-        if (memoryStore.has(sid)) { memoryStore.delete(sid); deleted++; }
-      }
+      for (const sid of resolved) { if (memoryStore.has(sid)) { memoryStore.delete(sid); deleted++; } }
+      for (const raw of ids) { if (!isCallSid(raw) && memoryStore.has(raw)) { memoryStore.delete(raw); deleted++; } }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true, deleted, requested: resolved.length }));
+      res.end(JSON.stringify({ ok: true, deleted, requested: ids.length }));
       return;
     }
 
