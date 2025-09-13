@@ -264,73 +264,81 @@ export default async function handler(req, res) {
                     console.warn('[Calls][POST][%s] Firestore twilioSid lookup failed:', _rid, e?.message);
                 }
             }
-            // 3) Fallback to window-based counterparty matching (STRICT when explicit IDs are provided)
+            // 3) Fallback to window-based counterparty matching (ONLY when no callSid and candidate is clearly in-progress)
             try {
-                const now = Date.now();
-                // If caller provided a clear targetPhone, prefer it as counterparty
-                const targetCounterparty = (targetPhone && norm(targetPhone)) || otherParty(to, from);
-                try { console.log('[Calls][POST][%s] bizList=%j targetCounterparty=%s', _rid, bizList, targetCounterparty); } catch(_) {}
-                let best = null;
-                let bestTs = -1;
-                for (const v of callStore.values()) {
-                    try {
-                        const ts = new Date(v.timestamp || v.callTime || 0).getTime();
-                        if (!ts || Math.abs(now - ts) > 5 * 60 * 1000) continue; // within 5 minutes
-                        const candCounterparty = otherParty(v.to, v.from);
-                        // Match exact counterparty only (avoid matching shared business number)
-                        const partyMatch = !!candCounterparty && candCounterparty === targetCounterparty;
-                        // If explicit attribution provided, require it to match to avoid cross-company flips
-                        const requireIdMatch = !!(accountId || contactId);
-                        const idMatchStrict = ((accountId && v.accountId === accountId) || (contactId && v.contactId === contactId)) ? 1 : 0;
-                        if (requireIdMatch && !idMatchStrict) continue;
-                        if (!partyMatch) continue;
-                        // Strong preference: same account/contact id if provided
-                        const idBoost = idMatchStrict;
-                        // Prefer newer timestamps, then missing recording, then id match boost
-                        const score = (ts || 0) + ( (!v.recordingUrl ? 1 : 0) * 1 ) + (idBoost * 1000);
-                        if (score > bestTs) {
-                            bestTs = score; best = v;
-                        }
-                        try { console.log('[Calls][POST][%s] candidate id=%s ts=%s candCounterparty=%s score=%s hasRec=%s idMatch=%s', _rid, v.id, new Date(ts).toISOString(), candCounterparty, score, !!v.recordingUrl, !!idBoost); } catch(_) {}
-                    } catch (_) {}
-                }
-                if (best && best.id) {
-                    // Always merge into the existing best row to maintain a single call record
-                    try { console.log('[Calls][POST][%s] Merging into existing id=%s for callSid=%s', _rid, best.id, callSid); } catch(_) {}
-                    callId = best.id;
-                    existingCall = best;
-                }
-                // If not found in memory, try Firestore recent rows
-                if ((!existingCall || !existingCall.id) && db) {
-                    try {
-                        const sinceIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-                        let query = db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(25);
-                        const snap = await query.get();
-                        let fbBest = null;
-                        let fbScore = -1;
-                        snap.forEach(doc => {
-                            const d = doc.data() || {};
-                            const ts = new Date(d.timestamp || d.callTime || 0).getTime();
-                            const candCp = otherParty(d.to, d.from);
-                            const partyMatch = !!candCp && candCp === targetCounterparty;
+                if (!callSid) {
+                    const now = Date.now();
+                    const incomingTs = new Date(timestamp || callTime || now).getTime() || now;
+                    const MERGE_WINDOW_MS = 90 * 1000; // 90 seconds
+                    const isInProgressStatus = (s)=>['queued','initiated','ringing','in-progress','connected','busy','no-answer','canceled'].includes(String(s||'').toLowerCase());
+
+                    // If caller provided a clear targetPhone, prefer it as counterparty
+                    const targetCounterparty = (targetPhone && norm(targetPhone)) || otherParty(to, from);
+                    try { console.log('[Calls][POST][%s] bizList=%j targetCounterparty=%s', _rid, bizList, targetCounterparty); } catch(_) {}
+                    let best = null;
+                    let bestTs = -1;
+                    for (const v of callStore.values()) {
+                        try {
+                            const ts = new Date(v.timestamp || v.callTime || 0).getTime();
+                            if (!ts || Math.abs(incomingTs - ts) > MERGE_WINDOW_MS) continue; // narrow window
+                            const candCounterparty = otherParty(v.to, v.from);
+                            const partyMatch = !!candCounterparty && candCounterparty === targetCounterparty;
+                            if (!partyMatch) continue;
+                            // Only merge into candidates that are in-progress and missing a recording/transcript
+                            const vStatus = String(v.status||'');
+                            const vInProgress = isInProgressStatus(vStatus);
+                            const vHasMedia = !!(v.recordingUrl || (v.transcript && String(v.transcript).trim()!==''));
+                            if (!vInProgress || vHasMedia) continue;
+                            // If explicit attribution provided, require it to match to avoid cross-company flips
                             const requireIdMatch = !!(accountId || contactId);
-                            const idMatchStrict = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
-                            if (requireIdMatch && !idMatchStrict) return;
-                            if (!partyMatch) return;
-                            const idBoost = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
-                            const score = (ts || 0) + ((!d.recordingUrl ? 1 : 0) * 1) + (idBoost * 1000);
-                            if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
-                            try { console.log('[Calls][POST][%s] FS cand id=%s ts=%s cp=%s score=%s hasRec=%s idMatch=%s', _rid, doc.id, new Date(ts).toISOString(), candCp, score, !!d.recordingUrl, !!idBoost); } catch(_) {}
-                        });
-                        if (fbBest && fbBest.id) {
-                            callId = fbBest.id;
-                            existingCall = fbBest;
-                            try { console.log('[Calls][POST][%s] Firestore merge target id=%s', _rid, callId); } catch(_) {}
-                        } else {
-                            try { console.log('[Calls][POST][%s] No Firestore merge target found', _rid); } catch(_) {}
+                            const idMatchStrict = ((accountId && v.accountId === accountId) || (contactId && v.contactId === contactId)) ? 1 : 0;
+                            if (requireIdMatch && !idMatchStrict) continue;
+                            const idBoost = idMatchStrict;
+                            const score = (ts || 0) + (idBoost * 1000);
+                            if (score > bestTs) { bestTs = score; best = v; }
+                            try { console.log('[Calls][POST][%s] candidate id=%s ts=%s cp=%s vStatus=%s hasMedia=%s idMatch=%s', _rid, v.id, new Date(ts).toISOString(), candCounterparty, vStatus, vHasMedia, !!idBoost); } catch(_) {}
+                        } catch (_) {}
+                    }
+                    if (best && best.id) {
+                        try { console.log('[Calls][POST][%s] Merging into existing in-progress id=%s (no callSid yet)', _rid, best.id); } catch(_) {}
+                        callId = best.id;
+                        existingCall = best;
+                    }
+                    // If not found in memory, try Firestore recent rows
+                    if ((!existingCall || !existingCall.id) && db) {
+                        try {
+                            const sinceIso = new Date(Date.now() - (2 * MERGE_WINDOW_MS)).toISOString();
+                            let query = db.collection('calls').where('timestamp', '>=', sinceIso).orderBy('timestamp', 'desc').limit(25);
+                            const snap = await query.get();
+                            let fbBest = null;
+                            let fbScore = -1;
+                            snap.forEach(doc => {
+                                const d = doc.data() || {};
+                                const ts = new Date(d.timestamp || d.callTime || 0).getTime();
+                                const candCp = otherParty(d.to, d.from);
+                                const partyMatch = !!candCp && candCp === targetCounterparty;
+                                if (!partyMatch) return;
+                                const dInProgress = isInProgressStatus(d.status);
+                                const dHasMedia = !!(d.recordingUrl || (d.transcript && String(d.transcript).trim()!==''));
+                                if (!dInProgress || dHasMedia) return;
+                                const requireIdMatch = !!(accountId || contactId);
+                                const idMatchStrict = ((accountId && d.accountId === accountId) || (contactId && d.contactId === contactId)) ? 1 : 0;
+                                if (requireIdMatch && !idMatchStrict) return;
+                                const idBoost = idMatchStrict;
+                                const score = (ts || 0) + (idBoost * 1000);
+                                if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
+                                try { console.log('[Calls][POST][%s] FS cand id=%s ts=%s cp=%s status=%s hasMedia=%s idMatch=%s', _rid, doc.id, new Date(ts).toISOString(), candCp, d.status, dHasMedia, !!idBoost); } catch(_) {}
+                            });
+                            if (fbBest && fbBest.id) {
+                                callId = fbBest.id;
+                                existingCall = fbBest;
+                                try { console.log('[Calls][POST][%s] Firestore in-progress merge target id=%s', _rid, callId); } catch(_) {}
+                            } else {
+                                try { console.log('[Calls][POST][%s] No Firestore in-progress merge target found', _rid); } catch(_) {}
+                            }
+                        } catch (fe) {
+                            console.warn('[Calls][POST][%s] Firestore merge search failed:', _rid, fe?.message);
                         }
-                    } catch (fe) {
-                        console.warn('[Calls][POST][%s] Firestore merge search failed:', _rid, fe?.message);
                     }
                 }
             } catch (_) {}
