@@ -140,6 +140,16 @@ export default async function handler(req, res) {
                     }
                     return Array.from(map.values());
                 };
+                // Debug duplicate keys before dedupe
+                try {
+                    const keyCounts = new Map();
+                    for (const c of calls) {
+                        const k = c.twilioSid || c.id;
+                        keyCounts.set(k, (keyCounts.get(k)||0)+1);
+                    }
+                    const dups = Array.from(keyCounts.entries()).filter(([,n])=>n>1).map(([k,n])=>({ key:k, count:n }));
+                    if (dups.length) console.warn('[Calls][GET] duplicate keys before dedupe:', dups.slice(0,10));
+                } catch(_) {}
                 const pruned = dedupe(calls);
                 try { console.log('[Calls][GET] returning %d calls (deduped from %d)', pruned.length, calls.length); } catch(_) {}
                 return res.status(200).json({ ok: true, calls: pruned });
@@ -209,7 +219,8 @@ export default async function handler(req, res) {
         const { callSid, to, from, status, duration, transcript, aiInsights, recordingUrl, timestamp, callTime, accountId, accountName, contactId, contactName, source, targetPhone, businessPhone } = req.body || {};
         const _rid = `r${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
         try {
-            console.log('[Calls][POST][%s] body:', _rid, {
+            const _etype = callSid ? 'callSid-update' : 'placeholder';
+            console.log('[Calls][POST][%s] body (%s):', _rid, _etype, {
                 callSid, to, from, status, duration, timestamp, callTime, accountId, accountName, contactId, contactName, source, targetPhone, businessPhone,
                 hasTranscript: !!transcript, hasAI: !!aiInsights, hasRecording: !!recordingUrl
             });
@@ -305,7 +316,7 @@ export default async function handler(req, res) {
                         } catch(_) {}
                     }
                     if (best && best.id) {
-                        try { console.log('[Calls][POST][%s] Upgrading placeholder id=%s -> callSid=%s', _rid, best.id, callSid); } catch(_) {}
+                        try { console.log('[Calls][POST][%s] Upgrading placeholder (memory) id=%s -> callSid=%s (counterparty=%s)', _rid, best.id, callSid, targetCounterparty); } catch(_) {}
                         existingCall = best; // merge from placeholder
                         deleteOldId = best.id !== callSid ? best.id : null;
                         callId = callSid; // canonicalize
@@ -329,7 +340,7 @@ export default async function handler(req, res) {
                                 if (score > fbScore) { fbScore = score; fbBest = { id: doc.id, ...d }; }
                             });
                             if (fbBest && fbBest.id) {
-                                try { console.log('[Calls][POST][%s] Firestore upgrade placeholder id=%s -> callSid=%s', _rid, fbBest.id, callSid); } catch(_) {}
+                                try { console.log('[Calls][POST][%s] Firestore upgrade placeholder id=%s -> callSid=%s (counterparty=%s)', _rid, fbBest.id, callSid, targetCounterparty); } catch(_) {}
                                 existingCall = fbBest;
                                 deleteOldId = fbBest.id !== callSid ? fbBest.id : null;
                                 callId = callSid;
@@ -479,7 +490,9 @@ export default async function handler(req, res) {
             businessPhone: businessPhone || existingCall.businessPhone || null
         };
         try {
-            console.log('[Calls][POST][%s] UPSERT id=%s twilioSid=%s status=%s duration=%s hasRec=%s accId=%s conId=%s', _rid, callData.id, callData.twilioSid, callData.status, callData.duration, !!callData.recordingUrl, callData.accountId, callData.contactId);
+            const stAI = !!callData.aiInsights;
+            const stTurns = Array.isArray(callData.aiInsights?.speakerTurns) ? callData.aiInsights.speakerTurns.length : 0;
+            console.log('[Calls][POST][%s] UPSERT id=%s twilioSid=%s status=%s duration=%s hasRec=%s accId=%s conId=%s ai=%s speakerTurns=%s', _rid, callData.id, callData.twilioSid, callData.status, callData.duration, !!callData.recordingUrl, callData.accountId, callData.contactId, stAI, stTurns);
         } catch(_) {}
         
         // Persist to Firestore if available
@@ -524,7 +537,7 @@ export default async function handler(req, res) {
                         if (delId === callId) continue;
                         try {
                             await db.collection('calls').doc(delId).delete();
-                            try { console.log('[Calls][POST][%s] Cleanup deleted stray placeholder id=%s', _rid, delId); } catch(_) {}
+                            try { console.log('[Calls][POST][%s] Cleanup deleted stray placeholder id=%s (match contact/counterparty)', _rid, delId); } catch(_) {}
                         } catch (delErr) {
                             console.warn('[Calls][POST][%s] Cleanup failed to delete id=%s: %s', _rid, delId, delErr?.message);
                         }
