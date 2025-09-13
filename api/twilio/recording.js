@@ -286,13 +286,16 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         for (const s of sentences) {
                             const txt = pickText(s);
                             if (!txt) continue;
-                            const rawRole = (s.channel || s.speaker || s.role || '').toString().toLowerCase();
-                            let role = '';
-                            if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
-                            else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                            const ch = (s.channel != null ? Number(s.channel) : NaN);
+                            let role = (ch === 1) ? 'agent' : (ch === 0 ? 'customer' : '');
+                            if (!role) {
+                                const rawRole = (s.speaker || s.role || '').toString().toLowerCase();
+                                if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
+                                else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                            }
                             const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                             const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
-                            turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
+                            turns.push({ t: Math.max(0, Math.round(t)), role, text: txt, channel: s.channel, confidence: s.confidence });
                         }
                         if (turns.length) speakerTurns = turns;
                         transcript = turns.map(x => x.text).join(' ');

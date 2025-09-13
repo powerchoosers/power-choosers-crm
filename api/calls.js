@@ -110,35 +110,74 @@ export default async function handler(req, res) {
                         });
                     });
                 }
-                // Deduplicate by twilioSid (or id) to avoid showing multiple rows for the same call
+                // Deduplicate by robust key:
+                // - If a Twilio SID exists, group by it.
+                // - Else, group by counterparty and a 5-minute time bucket to collapse placeholders.
                 const dedupe = (arr) => {
-                    const map = new Map();
+                    const groups = new Map();
+                    const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+                    const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
+                    const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+                        .split(',').map(norm).filter(Boolean);
+                    const isBiz = (p) => !!p && bizList.includes(p);
+                    const otherParty = (toRaw, fromRaw) => {
+                        const to = norm(isClient(toRaw) ? '' : toRaw);
+                        const from = norm(isClient(fromRaw) ? '' : fromRaw);
+                        if (isBiz(to) && !isBiz(from)) return from;
+                        if (isBiz(from) && !isBiz(to)) return to;
+                        return to || from || '';
+                    };
                     for (const c of arr) {
-                        const key = c.twilioSid || c.id;
-                        if (!map.has(key)) { map.set(key, c); continue; }
-                        const prev = map.get(key);
-                        const aHasRec = !!c.recordingUrl;
-                        const bHasRec = !!prev.recordingUrl;
-                        const pick = aHasRec && !bHasRec ? c : (!aHasRec && bHasRec ? prev : ((c.durationSec||0) > (prev.durationSec||0) ? c : (new Date(c.timestamp) > new Date(prev.timestamp) ? c : prev)));
-                        const merged = { ...prev, ...c };
-                        merged.id = pick.id; // prefer the picked id for stability
-                        merged.recordingUrl = pick.recordingUrl || prev.recordingUrl || '';
-                        merged.audioUrl = merged.recordingUrl;
-                        merged.durationSec = pick.durationSec || prev.durationSec || 0;
-                        merged.duration = pick.duration || prev.duration || merged.durationSec || 0;
-                        merged.status = pick.status || prev.status;
-                        merged.accountId = pick.accountId || prev.accountId || null;
-                        merged.accountName = pick.accountName || prev.accountName || null;
-                        merged.contactId = pick.contactId || prev.contactId || null;
-                        merged.contactName = pick.contactName || prev.contactName || null;
-                        // Prefer non-empty transcript and present aiInsights
-                        const prevTranscript = (prev.transcript || '').trim();
-                        const currTranscript = (c.transcript || '').trim();
-                        merged.transcript = currTranscript || prevTranscript || '';
-                        merged.aiInsights = c.aiInsights || prev.aiInsights || null;
-                        map.set(key, merged);
+                        const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
+                        const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0; // 5-min bucket
+                        const cp = otherParty(c.to, c.from);
+                        const k = c.twilioSid ? `sid:${c.twilioSid}` : `cp:${cp}:b:${bucket}:ci:${c.contactId||''}`;
+                        const list = groups.get(k) || [];
+                        list.push(c);
+                        groups.set(k, list);
                     }
-                    return Array.from(map.values());
+                    const out = [];
+                    for (const [, list] of groups) {
+                        if (list.length === 1) { out.push(list[0]); continue; }
+                        // Pick best representative
+                        const score = (x) => {
+                            const tlen = (x.transcript || '').trim().length;
+                            const aiTurns = Array.isArray(x.aiInsights?.speakerTurns) ? x.aiInsights.speakerTurns.length : 0;
+                            const hasRec = x.recordingUrl ? 1 : 0;
+                            const dur = Number(x.durationSec || x.duration || 0) || 0;
+                            const ts = new Date(x.timestamp || x.callTime || 0).getTime() || 0;
+                            const statusW = /completed/i.test(String(x.status||'')) ? 3 : (/in-?progress|connected|ringing/i.test(String(x.status||'')) ? 1 : 0);
+                            return hasRec*10000 + aiTurns*500 + tlen + dur*5 + statusW*200 + ts/100000;
+                        };
+                        let best = list[0];
+                        for (let i=1;i<list.length;i++){ if (score(list[i]) > score(best)) best = list[i]; }
+                        // Merge fields conservatively
+                        const merged = list.reduce((acc, cur) => {
+                            const pick = (v, w) => (v == null || v === '' ? w : v);
+                            const longer = (a,b) => (String(a||'').length >= String(b||'').length ? a : b);
+                            return {
+                                ...acc,
+                                id: acc.id || cur.id,
+                                to: pick(acc.to, cur.to),
+                                from: pick(acc.from, cur.from),
+                                status: pick(acc.status, cur.status),
+                                duration: Number(acc.duration || 0) >= Number(cur.duration || 0) ? acc.duration : cur.duration,
+                                durationSec: Number(acc.durationSec || acc.duration || 0) >= Number(cur.durationSec || cur.duration || 0) ? (acc.durationSec||acc.duration||0) : (cur.durationSec||cur.duration||0),
+                                timestamp: new Date(acc.timestamp||0) > new Date(cur.timestamp||0) ? acc.timestamp : cur.timestamp,
+                                recordingUrl: acc.recordingUrl || cur.recordingUrl || '',
+                                audioUrl: acc.audioUrl || cur.audioUrl || acc.recordingUrl || cur.recordingUrl || '',
+                                accountId: pick(acc.accountId, cur.accountId),
+                                accountName: pick(acc.accountName, cur.accountName),
+                                contactId: pick(acc.contactId, cur.contactId),
+                                contactName: pick(acc.contactName, cur.contactName),
+                                transcript: longer(acc.transcript, cur.transcript),
+                                aiInsights: (Array.isArray(cur?.aiInsights?.speakerTurns) && cur.aiInsights.speakerTurns.length > (acc?.aiInsights?.speakerTurns?.length||0)) ? cur.aiInsights : (acc.aiInsights || cur.aiInsights || null),
+                                twilioSid: acc.twilioSid || cur.twilioSid || ''
+                            };
+                        }, best);
+                        out.push(merged);
+                    }
+                    return out;
                 };
                 // Debug duplicate keys before dedupe
                 try {
@@ -164,28 +203,68 @@ export default async function handler(req, res) {
         if (callSidFilter) {
             calls = calls.filter(c => c && ((c.twilioSid && c.twilioSid === callSidFilter) || (c.id && c.id === callSidFilter)));
         }
-        // Dedupe memory results similar to Firestore path
+        // Dedupe memory results similar to Firestore path (same grouping rules)
         const dedupeMem = (arr) => {
-            const map = new Map();
+            const groups = new Map();
+            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+            const isClient = (s) => typeof s === 'string' && s.startsWith('client:');
+            const bizList = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+                .split(',').map(norm).filter(Boolean);
+            const isBiz = (p) => !!p && bizList.includes(p);
+            const otherParty = (toRaw, fromRaw) => {
+                const to = norm(isClient(toRaw) ? '' : toRaw);
+                const from = norm(isClient(fromRaw) ? '' : fromRaw);
+                if (isBiz(to) && !isBiz(from)) return from;
+                if (isBiz(from) && !isBiz(to)) return to;
+                return to || from || '';
+            };
             for (const c of arr) {
-                const key = c.twilioSid || c.id;
-                if (!map.has(key)) { map.set(key, c); continue; }
-                const prev = map.get(key);
-                const aHasRec = !!c.recordingUrl;
-                const bHasRec = !!prev.recordingUrl;
-                const pick = aHasRec && !bHasRec ? c : (!aHasRec && bHasRec ? prev : ((c.duration||0) > (prev.duration||0) ? c : (new Date(c.timestamp) > new Date(prev.timestamp) ? c : prev)));
-                const merged = { ...prev, ...c };
-                merged.id = pick.id;
-                merged.recordingUrl = pick.recordingUrl || prev.recordingUrl || '';
-                merged.duration = pick.duration || prev.duration || 0;
-                merged.status = pick.status || prev.status;
-                merged.accountId = pick.accountId || prev.accountId || null;
-                merged.accountName = pick.accountName || prev.accountName || null;
-                merged.contactId = pick.contactId || prev.contactId || null;
-                merged.contactName = pick.contactName || prev.contactName || null;
-                map.set(key, merged);
+                const ts = new Date(c.timestamp || c.callTime || 0).getTime() || 0;
+                const bucket = ts ? Math.floor(ts / (5 * 60 * 1000)) : 0;
+                const cp = otherParty(c.to, c.from);
+                const k = c.twilioSid ? `sid:${c.twilioSid}` : `cp:${cp}:b:${bucket}:ci:${c.contactId||''}`;
+                const list = groups.get(k) || [];
+                list.push(c);
+                groups.set(k, list);
             }
-            return Array.from(map.values());
+            const out = [];
+            const score = (x) => {
+                const tlen = (x.transcript || '').trim().length;
+                const aiTurns = Array.isArray(x.aiInsights?.speakerTurns) ? x.aiInsights.speakerTurns.length : 0;
+                const hasRec = x.recordingUrl ? 1 : 0;
+                const dur = Number(x.duration || 0) || 0;
+                const ts = new Date(x.timestamp || x.callTime || 0).getTime() || 0;
+                const statusW = /completed/i.test(String(x.status||'')) ? 3 : (/in-?progress|connected|ringing/i.test(String(x.status||'')) ? 1 : 0);
+                return hasRec*10000 + aiTurns*500 + tlen + dur*5 + statusW*200 + ts/100000;
+            };
+            for (const [, list] of groups) {
+                if (list.length === 1) { out.push(list[0]); continue; }
+                let best = list[0];
+                for (let i=1;i<list.length;i++){ if (score(list[i]) > score(best)) best = list[i]; }
+                const merged = list.reduce((acc, cur) => {
+                    const pick = (v, w) => (v == null || v === '' ? w : v);
+                    const longer = (a,b) => (String(a||'').length >= String(b||'').length ? a : b);
+                    return {
+                        ...acc,
+                        id: acc.id || cur.id,
+                        to: pick(acc.to, cur.to),
+                        from: pick(acc.from, cur.from),
+                        status: pick(acc.status, cur.status),
+                        duration: Number(acc.duration || 0) >= Number(cur.duration || 0) ? acc.duration : cur.duration,
+                        timestamp: new Date(acc.timestamp||0) > new Date(cur.timestamp||0) ? acc.timestamp : cur.timestamp,
+                        recordingUrl: acc.recordingUrl || cur.recordingUrl || '',
+                        accountId: pick(acc.accountId, cur.accountId),
+                        accountName: pick(acc.accountName, cur.accountName),
+                        contactId: pick(acc.contactId, cur.contactId),
+                        contactName: pick(acc.contactName, cur.contactName),
+                        transcript: longer(acc.transcript, cur.transcript),
+                        aiInsights: (Array.isArray(cur?.aiInsights?.speakerTurns) && cur.aiInsights.speakerTurns.length > (acc?.aiInsights?.speakerTurns?.length||0)) ? cur.aiInsights : (acc.aiInsights || cur.aiInsights || null),
+                        twilioSid: acc.twilioSid || cur.twilioSid || ''
+                    };
+                }, best);
+                out.push(merged);
+            }
+            return out;
         };
         const memPruned = dedupeMem(calls);
         return res.status(200).json({
