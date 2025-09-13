@@ -1,7 +1,5 @@
 'use strict';
 
-// Use shared supplier data from global scope
-
 // Contact Detail page module: displays individual contact information Apollo-style
 (function () {
   const state = {
@@ -1188,19 +1186,6 @@
           return;
         }
         
-        // Check if we came from calls page
-        if (window._contactNavigationSource === 'calls') {
-          console.log('Returning to calls page from contact detail');
-          // Clear the navigation source first
-          window._contactNavigationSource = null;
-          window._contactNavigationContactId = null;
-          // Navigate back to calls page
-          if (window.crm && typeof window.crm.navigateToPage === 'function') {
-            window.crm.navigateToPage('calls');
-          }
-          return;
-        }
-        
         // Default behavior: return to people page
         // Show the People toolbar/header again
         showToolbar();
@@ -1464,11 +1449,6 @@
     input.className = 'input-dark info-edit-input';
     input.value = current === '--' ? '' : current;
     input.placeholder = 'Enter ' + field;
-    
-    // Add supplier suggestions for electricity supplier field
-    if (field === 'electricitySupplier') {
-      window.addSupplierSuggestions(input, 'contact-supplier-list');
-    }
     const actions = wrap.querySelector('.info-actions');
     const saveBtn = document.createElement('button');
     saveBtn.className = 'icon-btn-sm info-save';
@@ -1536,11 +1516,6 @@
       input.type = 'text';
       input.value = current === '--' ? '' : current;
       input.placeholder = 'Enter ' + field;
-    }
-    
-    // Add supplier suggestions for electricity supplier field
-    if (field === 'electricitySupplier') {
-      window.addSupplierSuggestions(input, 'contact-supplier-list');
     }
     
 
@@ -2025,81 +2000,6 @@
   }
   function insightsInlineHtml(r){
     const AI = r.aiInsights || {};
-    
-    // Fallback extraction from raw transcript for missing/incorrect fields
-    function extractFromTranscript(text){
-      const out = {};
-      if (!text || typeof text !== 'string') return out;
-      const s = text;
-
-      // Current rate (e.g., 0.07, $0.07, 7 cents)
-      let m = s.match(/(?:current\s+rate\s*(?:is|:)?\s*)?(\$?0?\.[0-9]{2,3})\b/i);
-      if (!m) m = s.match(/\$\s*([0-9]+(?:\.[0-9]+)?)\s*(?:per\s*kwh|\/\s*kwh)?/i);
-      if (!m) m = s.match(/([0-9]+)\s*cents\b/i);
-      if (m) {
-        let rate = m[1];
-        if (/cents/i.test(m[0])) rate = (parseFloat(rate)/100).toFixed(2);
-        if (rate && !rate.startsWith('$')) rate = rate;
-        out.currentRate = rate.replace(/\s+/g,'');
-      }
-
-      // Supplier / Utility (e.g., "Supplier is T X U")
-      m = s.match(/\b(?:supplier|provider|utility)\s*(?:is|:)?\s*([A-Za-z .&-]{2,30})/i);
-      if (m) {
-        let sup = m[1].trim();
-        // Normalize spaced letters like "T X U" -> "TXU"
-        if (/^(?:[A-Za-z]\s+){1,}[A-Za-z]$/.test(sup)) sup = sup.replace(/\s+/g, '');
-        out.supplier = sup.toUpperCase();
-      }
-
-      // Contract end date (e.g., April nineteenth, 20 26)
-      const ordMap = {
-        'first':1,'second':2,'third':3,'fourth':4,'fifth':5,'sixth':6,'seventh':7,'eighth':8,'ninth':9,'tenth':10,
-        'eleventh':11,'twelfth':12,'thirteenth':13,'fourteenth':14,'fifteenth':15,'sixteenth':16,'seventeenth':17,'eighteenth':18,'nineteenth':19,
-        'twentieth':20,'twenty first':21,'twenty-first':21,'twenty second':22,'twenty-second':22,'twenty third':23,'twenty-third':23,
-        'twenty fourth':24,'twenty-fourth':24,'twenty fifth':25,'twenty-fifth':25,'twenty sixth':26,'twenty-sixth':26,'twenty seventh':27,'twenty-seventh':27,
-        'twenty eighth':28,'twenty-eighth':28,'twenty ninth':29,'twenty-ninth':29,'thirtieth':30,'thirty first':31,'thirty-first':31
-      };
-      m = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+([A-Za-z\- ]+|\d{1,2})(?:,\s*)?(\d{2}\s?\d{2}|\d{4})/i);
-      if (m) {
-        const month = m[1];
-        let dayRaw = String(m[2]).toLowerCase().trim();
-        let yearRaw = String(m[3]).replace(/\s+/g,'');
-        let dayNum = parseInt(dayRaw,10);
-        if (isNaN(dayNum)) {
-          // Try ordinal words
-          dayNum = ordMap[dayRaw] || null;
-        }
-        if (dayNum && yearRaw.length === 4) {
-          out.contractEnd = `${month} ${dayNum}, ${yearRaw}`;
-        }
-      }
-
-      // Usage (e.g., 100,000 kilo watts/year or kWh)
-      m = s.match(/(\d[\d,\.]{2,})\s*(?:kwh|kilowatt(?:-)?hours?|kilo\s*watts?)\b/i);
-      if (!m) m = s.match(/(?:using|usage)\s*(?:is|:)?\s*(\d[\d,\.]{2,})/i);
-      if (m) {
-        const raw = m[1].replace(/[,\s]/g,'');
-        const num = parseInt(raw,10);
-        if (!isNaN(num)) out.usageKWh = String(num);
-      }
-
-      // Term (e.g., For 5 years)
-      m = s.match(/\b(\d{1,2})\s*years?\b/i);
-      if (m) out.contractLength = `${m[1]} years`;
-
-      // Budget / Monthly bill (e.g., 1,000 dollars a month)
-      m = s.match(/monthly\s*(?:bill|budget)[^\d]*\$?([\d,]+)\b/i);
-      if (!m) m = s.match(/\$?([\d,]+)\s*(?:dollars?)\s*(?:a|per)\s*month/i);
-      if (m) out.budget = `$${m[1].replace(/[,\s]/g,',')}/month`;
-
-      // Timeline (simple phrases)
-      m = s.match(/\b(next\s+week(?:\s+on\s+\w+)?|tomorrow|this\s+\w+|next\s+\w+)\b/i);
-      if (m) out.timeline = m[1].replace(/\s+/g,' ').trim();
-
-      return out;
-    }
-    
     // Build comprehensive summary with bullet points
     let summaryText = r.aiSummary || '';
     if (!summaryText && AI && Object.keys(AI).length) {
@@ -2234,26 +2134,15 @@
     }
 
     const contract = AI.contract || {};
-    let rate = get(contract, ['currentRate','current_rate','rate'], 'Unknown');
-    let supplier = get(contract, ['supplier','utility'], 'Unknown');
-    let contractEnd = get(contract, ['contractEnd','contract_end','endDate'], 'Not discussed');
-    let usage = String(get(contract, ['usageKWh','usage_k_wh','usage'], 'Not provided'));
-    let rateType = get(contract, ['rateType','rate_type'], 'Unknown');
-    let contractLength = String(get(contract, ['contractLength','contract_length'], 'Unknown'));
-    let budget = get(AI, ['budget'], 'Unclear');
-    let timeline = get(AI, ['timeline'], 'Not specified');
-    
-    // Merge transcript-derived values when AI fields are missing or clearly wrong
-    const fx = extractFromTranscript(r.transcript || '');
-    if ((!rate || String(rate).trim()==='' || rate === 'Unknown') && fx.currentRate) rate = fx.currentRate;
-    if ((!supplier || String(supplier).trim()==='' || supplier === 'Unknown' || /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(String(supplier))) && fx.supplier) supplier = fx.supplier;
-    if ((!contractEnd || String(contractEnd).trim()==='' || contractEnd === 'Not discussed') && fx.contractEnd) contractEnd = fx.contractEnd;
-    if ((!usage || String(usage).trim()==='' || usage === 'Not provided') && fx.usageKWh) usage = fx.usageKWh;
-    if ((!contractLength || String(contractLength).trim()==='' || contractLength === 'Unknown') && fx.contractLength) contractLength = fx.contractLength;
-    if ((!budget || /unclear|not\s+mentioned/i.test(budget)) && fx.budget) budget = fx.budget;
-    if ((!timeline || /not\s+specified|discussed/i.test(timeline)) && fx.timeline) timeline = fx.timeline;
-    
+    const rate = get(contract, ['currentRate','current_rate','rate'], 'Unknown');
+    const supplier = get(contract, ['supplier','utility'], 'Unknown');
+    const contractEnd = get(contract, ['contractEnd','contract_end','endDate'], 'Not discussed');
     const contractEndDisplay = contractEnd ? toLongDate(contractEnd) : 'Not discussed';
+    const usage = String(get(contract, ['usageKWh','usage_k_wh','usage'], 'Not provided'));
+    const rateType = get(contract, ['rateType','rate_type'], 'Unknown');
+    const contractLength = String(get(contract, ['contractLength','contract_length'], 'Unknown'));
+    const budget = get(AI, ['budget'], 'Unclear');
+    const timeline = get(AI, ['timeline'], 'Not specified');
     const entities = Array.isArray(AI.entities) ? AI.entities : [];
     const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class="pc-chip">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class="pc-chip">None</span>';
     return `
