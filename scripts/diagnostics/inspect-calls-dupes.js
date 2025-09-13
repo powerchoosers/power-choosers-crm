@@ -22,7 +22,8 @@ function isClient(s) { return typeof s === 'string' && s.startsWith('client:'); 
 
 async function main() {
   const base = (process.argv[2] || process.env.API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
-  const url = `${base}/api/calls`;
+  const callSid = (process.argv[3] || '').trim();
+  const url = callSid ? `${base}/api/calls?callSid=${encodeURIComponent(callSid)}` : `${base}/api/calls`;
   const { status, text } = await fetchText(url);
   let j = null;
   try { j = text ? JSON.parse(text) : null; } catch (_) {}
@@ -32,6 +33,16 @@ async function main() {
     process.exit(0);
   }
   const calls = j.calls;
+  if (callSid) {
+    console.log('FILTER_CALL_SID=' + callSid);
+    console.log('MATCHES=' + calls.length);
+    calls.forEach((c,i)=>{
+      const turns = Array.isArray(c?.aiInsights?.speakerTurns) ? c.aiInsights.speakerTurns.length : 0;
+      const dur = c.durationSec || c.duration || 0;
+      const hasRec = c.audioUrl || c.recordingUrl ? 'rec' : 'norec';
+      console.log(`[#${i+1}] id=${c.id} sid=${c.twilioSid||''} status=${c.status||''} dur=${dur} ts=${c.timestamp||c.callTime||''} ${hasRec} turns=${turns} to=${c.to||''} from=${c.from||''}`);
+    });
+  }
   const groups = new Map();
   for (const c of calls) {
     const to = norm(isClient(c.to) ? '' : c.to);
