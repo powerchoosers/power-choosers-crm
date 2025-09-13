@@ -239,15 +239,21 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         for (const s of sentences) {
                             const txt = pickText(s);
                             if (!txt) continue;
-                            const rawRole = (s.channel || s.speaker || s.role || '').toString().toLowerCase();
-                            let role = '';
-                            if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
-                            else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                            const ch = (s.channel != null ? Number(s.channel) : NaN);
+                            let role = (ch === 1) ? 'agent' : (ch === 0 ? 'customer' : '');
+                            if (!role) {
+                                const rawRole = (s.speaker || s.role || '').toString().toLowerCase();
+                                if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
+                                else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                            }
                             const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                             const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
-                            turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
+                            turns.push({ t: Math.max(0, Math.round(t)), role, text: txt, channel: s.channel, confidence: s.confidence });
                         }
-                        if (turns.length) speakerTurns = turns;
+                        if (turns.length) {
+                            speakerTurns = turns;
+                            try { console.log('[Recording][CI] speakerTurns built (existing):', { count: turns.length, sample: turns.slice(0,2) }); } catch(_) {}
+                        }
                         transcript = turns.map(x => x.text).join(' ');
                         if (!transcript && sentences && sentences.length) {
                             try { console.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
@@ -377,15 +383,21 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             for (const s of sentences) {
                                 const txt = pickText(s);
                                 if (!txt) continue;
-                                const rawRole = (s.channel || s.speaker || s.role || '').toString().toLowerCase();
-                                let role = '';
-                                if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
-                                else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                                const ch = (s.channel != null ? Number(s.channel) : NaN);
+                                let role = (ch === 1) ? 'agent' : (ch === 0 ? 'customer' : '');
+                                if (!role) {
+                                    const rawRole = (s.speaker || s.role || '').toString().toLowerCase();
+                                    if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
+                                    else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                                }
                                 const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                                 const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
-                                turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
+                                turns.push({ t: Math.max(0, Math.round(t)), role, text: txt, channel: s.channel, confidence: s.confidence });
                             }
-                            if (turns.length) speakerTurns = turns;
+                            if (turns.length) {
+                                speakerTurns = turns;
+                                try { console.log('[Recording][CI] speakerTurns built (new):', { count: turns.length, sample: turns.slice(0,2) }); } catch(_) {}
+                            }
                             transcript = turns.map(x => x.text).join(' ');
                             if (!transcript && sentences && sentences.length) {
                                 try { console.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
@@ -469,7 +481,14 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                     aiInsights.source = 'twilio-basic-transcription';
                 }
             // Attach speaker turns if we built them
-            try { if (typeof speakerTurns !== 'undefined' && Array.isArray(speakerTurns) && speakerTurns.length) aiInsights.speakerTurns = speakerTurns; } catch(_) {}
+            try { 
+                if (typeof speakerTurns !== 'undefined' && Array.isArray(speakerTurns) && speakerTurns.length) {
+                    aiInsights.speakerTurns = speakerTurns;
+                    console.log('[Recording] Attaching speakerTurns to aiInsights:', speakerTurns.length);
+                } else {
+                    console.log('[Recording] No speakerTurns to attach');
+                }
+            } catch(_) {}
             // Prefer Twilio CI sentence-based summary if Operator didn’t provide
             try {
                 if ((!aiInsights.summary || !aiInsights.summary.trim()) && speakerTurns && speakerTurns.length) {
@@ -530,6 +549,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                     aiInsights
                 })
             }).catch(() => {});
+            try { console.log('[Recording] Posted transcript/insights to /api/calls', { callSid, transcriptLen: (transcript||'').length, speakerTurns: Array.isArray(aiInsights?.speakerTurns)?aiInsights.speakerTurns.length:0 }); } catch(_) {}
         } catch (e) {
             console.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
         }
