@@ -1323,6 +1323,19 @@
       wrap.appendChild(inputWrap);
       input.focus();
       
+      // Add supplier suggestions for electricity supplier field
+      if (field === 'electricitySupplier') {
+        console.log('[Account Detail] Adding supplier suggestions for field:', field);
+        console.log('[Account Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
+        console.log('[Account Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
+        if (window.addSupplierSuggestions) {
+          window.addSupplierSuggestions(input, 'account-supplier-list');
+          console.log('[Account Detail] Supplier suggestions added to input');
+        } else {
+          console.warn('[Account Detail] window.addSupplierSuggestions not available');
+        }
+      }
+      
       // Save handler
       saveBtn.addEventListener('click', async (e) => {
         e.preventDefault();

@@ -72,20 +72,28 @@
 
   // Function to add supplier suggestions to an input field
   window.addSupplierSuggestions = function(inputElement, datalistId) {
-    if (!inputElement || !datalistId) return;
+    console.log('[Supplier Data] addSupplierSuggestions called with:', { inputElement, datalistId });
+    if (!inputElement || !datalistId) {
+      console.warn('[Supplier Data] Missing inputElement or datalistId');
+      return;
+    }
 
     // Create datalist if it doesn't exist
     let datalist = document.getElementById(datalistId);
     if (!datalist) {
+      console.log('[Supplier Data] Creating new datalist with ID:', datalistId);
       datalist = document.createElement('datalist');
       datalist.id = datalistId;
       document.body.appendChild(datalist);
+    } else {
+      console.log('[Supplier Data] Using existing datalist with ID:', datalistId);
     }
 
     // Clear existing options
     datalist.innerHTML = '';
 
     // Add supplier options
+    console.log('[Supplier Data] Adding', window.SupplierNames.length, 'supplier options');
     window.SupplierNames.forEach(supplier => {
       const option = document.createElement('option');
       option.value = supplier;
@@ -94,6 +102,7 @@
 
     // Connect input to datalist
     inputElement.setAttribute('list', datalistId);
+    console.log('[Supplier Data] Connected input to datalist, list attribute set to:', datalistId);
   };
 
   // Function to get supplier info by name
@@ -131,5 +140,10 @@
   };
 
   console.log('Supplier data loaded:', window.SupplierNames.length, 'suppliers available');
+  console.log('Supplier data functions available:', {
+    addSupplierSuggestions: typeof window.addSupplierSuggestions,
+    getSupplierInfo: typeof window.getSupplierInfo,
+    searchSuppliers: typeof window.searchSuppliers
+  });
 
 })();
