@@ -342,6 +342,7 @@ class ActivityManager {
       if (window.firebaseDB) {
         const snapshot = await window.firebaseDB.collection('contacts')
           .where('notes', '>', '')
+          .orderBy('notes')
           .orderBy('notesUpdatedAt', 'desc')
           .limit(50)
           .get();
@@ -362,6 +363,7 @@ class ActivityManager {
       if (window.firebaseDB) {
         const snapshot = await window.firebaseDB.collection('accounts')
           .where('notes', '>', '')
+          .orderBy('notes')
           .orderBy('notesUpdatedAt', 'desc')
           .limit(50)
           .get();
