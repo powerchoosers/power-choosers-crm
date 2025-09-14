@@ -1467,6 +1467,19 @@
     input.className = 'input-dark info-edit-input';
     input.value = current === '--' ? '' : current;
     input.placeholder = 'Enter ' + field;
+    
+    // Add supplier suggestions for electricity supplier field
+    if (field === 'electricitySupplier') {
+      console.log('[Contact Detail] Adding supplier suggestions for field:', field);
+      console.log('[Contact Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
+      console.log('[Contact Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
+      if (window.addSupplierSuggestions) {
+        window.addSupplierSuggestions(input, 'contact-supplier-list');
+        console.log('[Contact Detail] Supplier suggestions added to input');
+      } else {
+        console.warn('[Contact Detail] window.addSupplierSuggestions not available');
+      }
+    }
     const actions = wrap.querySelector('.info-actions');
     const saveBtn = document.createElement('button');
     saveBtn.className = 'icon-btn-sm info-save';
