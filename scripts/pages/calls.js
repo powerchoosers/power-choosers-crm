@@ -357,6 +357,7 @@
   async function loadData() {
     // Enable debugging for contact ID resolution
     window.CRM_DEBUG_CALLS = true;
+    console.log('[Calls] Debug mode enabled - will show detailed contact data mapping');
     
     // 1) Try to load real calls from backend - use current origin by default
     try {
@@ -369,6 +370,7 @@
           const phoneToContact = await buildPhoneToContactMap();
 
           console.log('[Calls] Found', j.calls.length, 'real calls from API');
+          console.log('[Calls] Sample call data from API:', j.calls[0]);
           const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
           const rows = j.calls.map((c, idx) => {
             const id = c.id || `call_${Date.now()}_${idx}`;
@@ -530,19 +532,78 @@
               });
             }
             
+            // Try to get additional contact information from existing contact data
+            let contactEmail = '';
+            let contactCity = '';
+            let contactState = '';
+            let industry = '';
+            let accountEmployees = null;
+            let visitorDomain = '';
+            
+            // If we have a resolved contact ID, try to get more data from the contact
+            if (resolvedContactId && !resolvedContactId.startsWith('call_contact_')) {
+              const existingContact = getContactById(resolvedContactId);
+              if (existingContact) {
+                contactEmail = existingContact.email || '';
+                contactCity = existingContact.city || '';
+                contactState = existingContact.state || '';
+                industry = existingContact.industry || '';
+                accountEmployees = existingContact.accountEmployees || null;
+                visitorDomain = existingContact.visitorDomain || '';
+              }
+            }
+            
+            // Try to find contact by phone number in people data
+            if (!contactEmail && party && typeof window.getPeopleData === 'function') {
+              const people = window.getPeopleData() || [];
+              const norm = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
+              const partyNorm = norm(party);
+              
+              console.log('[Calls] Looking for contact by phone:', party, 'Normalized:', partyNorm, 'People data count:', people.length);
+              
+              const foundContact = people.find(p => {
+                const phoneNorm = norm(p.phone || p.mobile);
+                return phoneNorm === partyNorm;
+              });
+              
+              if (foundContact) {
+                contactEmail = foundContact.email || '';
+                contactCity = foundContact.city || '';
+                contactState = foundContact.state || '';
+                industry = foundContact.industry || '';
+                accountEmployees = foundContact.accountEmployees || null;
+                visitorDomain = foundContact.visitorDomain || '';
+                console.log('[Calls] Found contact by phone in people data:', foundContact.name, 'Phone:', party, 'Email:', contactEmail, 'City:', contactCity);
+              } else {
+                console.log('[Calls] No contact found by phone:', party, 'in people data');
+              }
+            }
+            
+            // Try to get account information if we have a company
+            if (company && !contactEmail && !contactCity && !contactState && !industry) {
+              const account = getAccountById(c.accountId) || findAccountByPhone(party);
+              if (account) {
+                contactCity = account.city || '';
+                contactState = account.state || '';
+                industry = account.industry || '';
+                accountEmployees = account.employees || account.employeeCount || account.numEmployees || null;
+                visitorDomain = account.domain || account.website || '';
+              }
+            }
+
             const row = {
               id,
               contactId: resolvedContactId,
               contactName,
               contactTitle,
               company,
-              contactEmail: '',
+              contactEmail,
               contactPhone,
-              contactCity: '',
-              contactState: '',
-              accountEmployees: null,
-              industry: '',
-              visitorDomain: '',
+              contactCity,
+              contactState,
+              accountEmployees,
+              industry,
+              visitorDomain,
               callTime: c.callTime || new Date().toISOString(),
               durationSec: c.durationSec || 0,
               outcome: c.outcome || '',
@@ -564,7 +625,13 @@
                   outcome: row.outcome, 
                   audio: !!row.audioUrl,
                   hasTitle: !!contactTitle,
-                  originalContactTitle: c.contactTitle
+                  originalContactTitle: c.contactTitle,
+                  // Debug the populated fields
+                  contactEmail: row.contactEmail,
+                  contactCity: row.contactCity,
+                  contactState: row.contactState,
+                  industry: row.industry,
+                  accountEmployees: row.accountEmployees
                 }); 
               } catch(_) {}
             }
@@ -750,8 +817,13 @@
                   name: callRow.contactName,
                   email: callRow.contactEmail || '',
                   phone: callRow.contactPhone || '',
+                  mobile: callRow.contactPhone || '',
+                  companyName: callRow.company || '',
                   company: callRow.company || '',
-                  title: callRow.contactTitle || ''
+                  title: callRow.contactTitle || '',
+                  city: callRow.contactCity || '',
+                  state: callRow.contactState || '',
+                  industry: callRow.industry || ''
                 } : null;
 
                 const start = Date.now();
@@ -782,8 +854,19 @@
                       const callContact = getCallContactById(contactId);
                       if (callContact) {
                         console.log('[Calls] Passing contact data from calls:', callContact);
+                        console.log('[Calls] Contact data fields:', {
+                          email: callContact.email,
+                          phone: callContact.phone,
+                          mobile: callContact.mobile,
+                          companyName: callContact.companyName,
+                          title: callContact.title,
+                          city: callContact.city,
+                          state: callContact.state,
+                          industry: callContact.industry
+                        });
                         window.ContactDetail.show(contactId, callContact);
                       } else {
+                        console.log('[Calls] No contact data found for:', contactId);
                         window.ContactDetail.show(contactId);
                       }
                     } catch (error) {
@@ -1716,23 +1799,38 @@
     // First try to find in current calls data
     const callData = state.data.find(call => call.contactId === contactId);
     if (callData) {
+      console.log('[Calls] getCallContactById - callData:', callData);
+      
       // Convert call data to contact format
-      return {
+      const contactData = {
         id: contactId,
         firstName: callData.contactName ? callData.contactName.split(' ')[0] : '',
         lastName: callData.contactName ? callData.contactName.split(' ').slice(1).join(' ') : '',
         name: callData.contactName || '',
         email: callData.contactEmail || '',
         phone: callData.contactPhone || '',
-        mobile: callData.contactPhone || '',
-        companyName: callData.company || '',
+        mobile: callData.contactPhone || '', // Use same as phone
+        companyName: callData.company || '', // Map company to companyName (contact detail page expects this)
+        company: callData.company || '', // Also keep company field
         title: callData.contactTitle || '',
         city: callData.contactCity || '',
         state: callData.contactState || '',
         industry: callData.industry || '',
         accountEmployees: callData.accountEmployees || null,
-        visitorDomain: callData.visitorDomain || ''
+        visitorDomain: callData.visitorDomain || '',
+        // Add additional fields that might be needed
+        seniority: '',
+        department: '',
+        // Try to get account information if available
+        accountId: callData.accountId || null,
+        // Add call-specific information that might be useful
+        lastCallTime: callData.callTime || '',
+        lastCallOutcome: callData.outcome || '',
+        lastCallDuration: callData.durationSec || 0
       };
+      
+      console.log('[Calls] getCallContactById - converted contactData:', contactData);
+      return contactData;
     }
     
     return null;
@@ -1809,6 +1907,19 @@
       console.log('Enabled CRM_DEBUG_CALLS - refresh the page or reload data to see detailed logs');
       
       return { withTitle: callsWithTitle.length, withoutTitle: callsWithoutTitle.length };
+    },
+    debugContactData: function(contactId) {
+      console.log('=== Contact Data Debug for:', contactId, '===');
+      const callData = state.data.find(call => call.contactId === contactId);
+      if (callData) {
+        console.log('Call data found:', callData);
+        const contactData = getCallContactById(contactId);
+        console.log('Converted contact data:', contactData);
+        return { callData, contactData };
+      } else {
+        console.log('No call data found for contact ID:', contactId);
+        return null;
+      }
     }
   };
   

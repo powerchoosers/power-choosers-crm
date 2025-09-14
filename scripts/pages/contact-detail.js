@@ -672,6 +672,17 @@
     if (tempContact && typeof tempContact === 'object') {
       contact = tempContact;
       console.log('[ContactDetail] Using provided temporary contact:', contact);
+      console.log('[ContactDetail] Contact fields:', {
+        email: contact.email,
+        phone: contact.phone,
+        mobile: contact.mobile,
+        companyName: contact.companyName,
+        title: contact.title,
+        city: contact.city,
+        state: contact.state,
+        industry: contact.industry
+      });
+      console.log('[ContactDetail] Full contact object:', JSON.stringify(contact, null, 2));
     } else {
       contact = findContactById(contactId);
       if (!contact) {
