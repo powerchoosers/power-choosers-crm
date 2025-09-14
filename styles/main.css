@@ -5013,14 +5013,25 @@ html, body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 520px;
+    width: 760px;
     max-width: calc(100vw - 40px);
+    max-height: 78vh;
     background: var(--bg-card);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     box-shadow: var(--elevation-card);
     color: var(--text-inverse);
     overflow: hidden; /* keep rounded corners on children */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Modal form takes full height and manages body/footer layout */
+.pc-modal__form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0; /* Allow flex child to shrink */
 }
 .pc-modal__header {
     display: flex;
@@ -5031,7 +5042,12 @@ html, body {
 }
 .pc-modal__header .card-title { margin: 0; font-size: 1.1rem; letter-spacing: 0.2px; }
 /* .pc-modal__close styles moved to standardized close button section above */
-.pc-modal__body { padding: var(--spacing-lg); }
+.pc-modal__body { 
+    padding: var(--spacing-lg); 
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0; /* Allow flex child to shrink */
+}
 .pc-modal__body label { display:block; margin-bottom: 6px; }
 .pc-modal__body .help-text { color: var(--text-muted); font-size: 0.8rem; margin-top: 6px; }
 .pc-modal input[type="text"] {
@@ -5060,6 +5076,8 @@ html, body {
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-sm);
+    flex-shrink: 0; /* Prevent footer from shrinking */
+    border-top: 1px solid var(--border-light);
 }
 .pc-modal .btn-primary:disabled {
     opacity: 0.6;
@@ -11610,10 +11628,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     flex: 1 1 50%;
 }
 
-/* Modal body padding consistency */
-.pc-modal .pc-modal__body {
-    padding: var(--spacing-base);
-}
 
 /* Modal footer button styling improvements */
 .pc-modal .pc-modal__footer {
