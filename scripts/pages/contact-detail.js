@@ -7,7 +7,9 @@
     activities: [],
     loaded: false,
     // Snapshot of People page content to restore on back navigation
-    prevPeopleContent: ''
+    prevPeopleContent: '',
+    // When user explicitly chooses a phone type, prefer rendering that type as primary
+    preferredPhoneField: ''
   };
 
   const els = {};
@@ -22,18 +24,28 @@
   async function saveField(field, value) {
     const db = window.firebaseDB;
     const contactId = state.currentContact?.id;
-    if (!contactId || !db) return;
+    console.log('[Contact Detail] saveField called with:', { field, value, contactId, db: !!db });
+    
+    if (!contactId || !db) {
+      console.warn('[Contact Detail] Missing contactId or db:', { contactId, db: !!db });
+      return;
+    }
+    
     try {
       const payload = {
         [field]: value,
         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
       };
+      console.log('[Contact Detail] Saving to Firebase with payload:', payload);
+      
       await db.collection('contacts').doc(contactId).update(payload);
+      console.log('[Contact Detail] Firebase save successful');
+      
       // Update local state
       try { if (state.currentContact) state.currentContact[field] = value; } catch(_) {}
       try { window.crm?.showToast && window.crm.showToast('Saved'); } catch(_) {}
     } catch (e) {
-      console.warn('Failed to save contact field', field, e);
+      console.error('[Contact Detail] Failed to save contact field', field, e);
       try { window.crm?.showToast && window.crm.showToast('Save failed'); } catch(_) {}
     }
   }
@@ -76,6 +88,25 @@
       await db.collection('accounts').doc(accountId).update(payload); 
       console.log('[Contact Detail] Firestore save successful');
       window.crm?.showToast && window.crm.showToast('Saved');
+      // Opportunistically update Health widget inputs immediately for better UX
+      try {
+        if (field === 'electricitySupplier') {
+          const supplierEl = document.querySelector('#health-supplier');
+          if (supplierEl) supplierEl.value = String(value || '').trim();
+        }
+        if (field === 'annualUsage') {
+          const usageEl = document.querySelector('#health-annual-usage');
+          if (usageEl) usageEl.value = String(value || '').trim();
+        }
+        if (field === 'currentRate') {
+          const rateEl = document.querySelector('#health-current-rate');
+          if (rateEl) rateEl.value = String(value || '').trim();
+        }
+        if (field === 'contractEndDate') {
+          const endEl = document.querySelector('#health-contract-end');
+          if (endEl) endEl.value = String(value || '').trim();
+        }
+      } catch (_) {}
       console.log('[Contact Detail] Dispatching energy-updated event:', { entity: 'account', id: accountId, field, value });
       try { 
         const event = new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } });
@@ -640,10 +671,47 @@
     let contact = null;
     if (tempContact && typeof tempContact === 'object') {
       contact = tempContact;
+      console.log('[ContactDetail] Using provided temporary contact:', contact);
     } else {
       contact = findContactById(contactId);
+      if (!contact) {
+        console.log('[ContactDetail] Contact not found in cache, trying calls data for:', contactId);
+        // Try to get contact from calls data as fallback
+        if (window.callsModule && window.callsModule.getCallContactById) {
+          contact = window.callsModule.getCallContactById(contactId);
+          if (contact) {
+            console.log('[ContactDetail] Found contact in calls data:', contact);
+          }
+        }
+      }
     }
+    
     if (!contact) {
+      console.log('[ContactDetail] Contact not found in cache, trying Firestore for:', contactId);
+      // Try to load from Firestore as final fallback
+      if (window.firebaseDB && contactId && !contactId.startsWith('call_contact_')) {
+        try {
+          window.firebaseDB.collection('contacts').doc(contactId).get().then((doc) => {
+            if (doc.exists) {
+              const data = doc.data();
+              const firestoreContact = {
+                id: contactId,
+                ...data
+              };
+              console.log('[ContactDetail] Loaded contact from Firestore:', firestoreContact);
+              // Show the contact detail with the Firestore data
+              showContactDetail(contactId, firestoreContact);
+            } else {
+              console.error('[ContactDetail] Contact not found in Firestore:', contactId);
+            }
+          }).catch((error) => {
+            console.error('[ContactDetail] Error loading from Firestore:', error);
+          });
+          return; // Exit early, will be handled by the async callback
+        } catch (error) {
+          console.error('[ContactDetail] Error accessing Firestore:', error);
+        }
+      }
       console.error('Contact not found:', contactId);
       return;
     }
@@ -692,8 +760,36 @@
     // Access people.js data if available
     if (window.getPeopleData) {
       const peopleData = window.getPeopleData();
-      return peopleData.find(c => c.id === contactId);
+      const found = peopleData.find(c => c.id === contactId);
+      if (found) {
+        return found;
+      }
     }
+    
+    // If not found in people data cache, try to find in calls data
+    // This handles cases where contacts are accessed from calls page
+    if (window.callsModule && window.callsModule.getCallContactById) {
+      const callContact = window.callsModule.getCallContactById(contactId);
+      if (callContact) {
+        return callContact;
+      }
+    }
+    
+    // Fallback: try to find by name in people data (for generated contact IDs)
+    if (contactId && contactId.startsWith('call_contact_') && window.getPeopleData) {
+      const peopleData = window.getPeopleData();
+      // Extract contact name from the call data if possible
+      // This is a best-effort fallback for generated contact IDs
+      console.log('[ContactDetail] Generated contact ID detected, trying fallback lookup');
+    }
+    
+    // Final fallback: try to load from Firestore if available
+    if (window.firebaseDB && contactId && !contactId.startsWith('call_contact_')) {
+      console.log('[ContactDetail] Trying to load contact from Firestore:', contactId);
+      // This is async, so we'll handle it in the calling function
+      // For now, return null and let the calling function handle the async load
+    }
+    
     return null;
   }
 
@@ -781,6 +877,7 @@
     try { state._linkedAccountId = linkedAccount?.id || null; } catch (_) {}
     const electricitySupplier = linkedAccount?.electricitySupplier || '';
     const annualUsage = linkedAccount?.annualUsage || linkedAccount?.annual_usage || '';
+    const annualUsageFormatted = annualUsage ? String(annualUsage).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '';
     let currentRate = linkedAccount?.currentRate || linkedAccount?.current_rate || '';
     const contractEndDate = linkedAccount?.contractEndDate || linkedAccount?.contract_end_date || '';
     const contractEndDateFormatted = contractEndDate ? toMDY(contractEndDate) : '';
@@ -811,7 +908,7 @@
                     <button type="button" class="icon-btn-sm title-clear" title="Clear name">${svgTrash()}</button>
                   </div>
                 </div>
-                <div class="contact-subtitle">${title ? escapeHtml(title) : ''}${title && company ? ' at ' : ''}${company ? `<a href="#account-details" class="company-link" id="contact-company-link" title="View account details">${escapeHtml(company)}</a>` : ''}</div>
+                <div class="contact-subtitle">${title ? escapeHtml(title) : ''}${title && company ? ' at ' : ''}${company ? `<a href="#account-details" class="company-link" id="contact-company-link" title="View account details" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>` : ''}</div>
               </div>
               <button class="quick-action-btn linkedin-header-btn" data-action="linkedin">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -902,7 +999,7 @@
           <h3 class="section-title">Energy & Contract</h3>
           <div class="info-grid" id="contact-energy-grid">
             <div class="info-row"><div class="info-label">ELECTRICITY SUPPLIER</div><div class="info-value"><div class="info-value-wrap" data-field="electricitySupplier"><span class="info-value-text">${escapeHtml(electricitySupplier) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
-            <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value"><div class="info-value-wrap" data-field="annualUsage"><span class="info-value-text">${escapeHtml(annualUsage) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
+            <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value"><div class="info-value-wrap" data-field="annualUsage"><span class="info-value-text">${escapeHtml(annualUsageFormatted) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
             <div class="info-row"><div class="info-label">CURRENT RATE ($/kWh)</div><div class="info-value"><div class="info-value-wrap" data-field="currentRate"><span class="info-value-text">${escapeHtml(currentRate) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
             <div class="info-row"><div class="info-label">CONTRACT END DATE</div><div class="info-value"><div class="info-value-wrap" data-field="contractEndDate"><span class="info-value-text">${escapeHtml(contractEndDateFormatted) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
           </div>
@@ -1068,6 +1165,13 @@
   }
 
   function getPrimaryPhoneData(contact) {
+    // If a preferred field was chosen during edit, honor it for the next render
+    if (state.preferredPhoneField) {
+      const f = state.preferredPhoneField;
+      if (f === 'mobile' && contact.mobile) return { value: contact.mobile, type: 'mobile', field: 'mobile' };
+      if (f === 'workDirectPhone' && contact.workDirectPhone) return { value: contact.workDirectPhone, type: 'work direct', field: 'workDirectPhone' };
+      if (f === 'otherPhone' && contact.otherPhone) return { value: contact.otherPhone, type: 'other', field: 'otherPhone' };
+    }
     // Priority: Mobile > Work Direct > Other
     if (contact.mobile) {
       return { value: contact.mobile, type: 'mobile', field: 'mobile' };
@@ -1438,7 +1542,32 @@
         const delBtn = e.target.closest('.info-delete');
         if (delBtn) {
           e.preventDefault();
-          // Open confirmation popover anchored to the delete icon
+          // Special handling for phone: clear the underlying phone field (mobile/workDirectPhone/otherPhone)
+          if (field === 'phone') {
+            const infoRow = wrap.closest('.info-row');
+            const phoneType = (infoRow?.getAttribute('data-phone-type') || '').toLowerCase();
+            const typeToField = {
+              'mobile': 'mobile',
+              'work direct': 'workDirectPhone',
+              'other': 'otherPhone'
+            };
+            const clearField = typeToField[phoneType] || 'mobile';
+            openDeleteConfirmPopover(delBtn, async () => {
+              await saveField(clearField, '');
+              // Update local contact and re-render the phone row
+              try { if (state.currentContact) state.currentContact[clearField] = ''; } catch(_) {}
+              const phoneRow = infoRow;
+              if (phoneRow) {
+                const newPhoneRow = renderPhoneRow(state.currentContact || {});
+                const temp = document.createElement('div');
+                temp.innerHTML = newPhoneRow;
+                const newEl = temp.firstElementChild;
+                phoneRow.parentElement.replaceChild(newEl, phoneRow);
+              }
+            });
+            return;
+          }
+          // Default: clear simple fields
           openDeleteConfirmPopover(delBtn, async () => {
             await saveField(field, '');
             updateFieldText(wrap, '');
@@ -1549,6 +1678,38 @@
       input.placeholder = 'Enter ' + field;
     }
     
+    // Add comma formatting for annual usage field
+    if (field === 'annualUsage') {
+      // Remove commas from current value for editing
+      const cleanValue = (current === '--' ? '' : current).replace(/,/g, '');
+      input.value = cleanValue;
+      
+      // Add input event listener for comma formatting
+      input.addEventListener('input', (e) => {
+        const cursorPos = e.target.selectionStart;
+        const value = e.target.value.replace(/[^0-9]/g, ''); // Remove non-digits
+        const formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        e.target.value = formatted;
+        
+        // Restore cursor position after formatting
+        const newCursorPos = cursorPos + (formatted.length - e.target.value.length);
+        e.target.setSelectionRange(newCursorPos, newCursorPos);
+      });
+    }
+    
+    // Add supplier suggestions for electricity supplier field
+    if (field === 'electricitySupplier') {
+      console.log('[Contact Detail] Adding supplier suggestions for account field:', field);
+      console.log('[Contact Detail] window.addSupplierSuggestions available:', !!window.addSupplierSuggestions);
+      console.log('[Contact Detail] window.SupplierNames available:', !!window.SupplierNames, 'count:', window.SupplierNames?.length);
+      if (window.addSupplierSuggestions) {
+        window.addSupplierSuggestions(input, 'contact-account-supplier-list');
+        console.log('[Contact Detail] Supplier suggestions added to account field input');
+      } else {
+        console.warn('[Contact Detail] window.addSupplierSuggestions not available for account field');
+      }
+    }
+    
 
     const actions = wrap.querySelector('.info-actions');
     const saveBtn = document.createElement('button');
@@ -1579,14 +1740,29 @@
         val = String(val || '').trim();
         if (/^\.\d+$/.test(val)) val = '0' + val;
       }
+      // Remove commas from annual usage before saving
+      if (field === 'annualUsage') {
+        val = val.replace(/,/g, '');
+      }
       // Convert contractEndDate to MM/DD/YYYY format for storage consistency
       if (field === 'contractEndDate') {
         val = toMDY(val);
       }
       await saveAccountField(field, val);
-      updateFieldText(wrap, val || '');
+      // For annual usage, show formatted value with commas
+      const displayValue = field === 'annualUsage' && val ? 
+        String(val).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',') : 
+        val || '';
+      updateFieldText(wrap, displayValue);
       // Notify other components (Health widget) to sync
-      try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: state._linkedAccountId, field, value: val } })); } catch(_) {}
+      try { 
+        const eventDetail = { entity: 'account', id: state._linkedAccountId, field, value: val };
+        console.log('[Contact Detail] Dispatching energy-updated event from commit:', eventDetail);
+        console.log('[Contact Detail] Event detail for supplier field:', { field, value: val, entity: 'account', id: state._linkedAccountId });
+        document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: eventDetail })); 
+      } catch(e) { 
+        console.error('[Contact Detail] Error dispatching energy-updated event:', e);
+      }
     };
 
     const onKey = async (ev) => {
@@ -1604,8 +1780,15 @@
     const contact = state.currentContact;
     if (!contact) return;
     
-    // Get all available phone numbers
+    // Preserve original UI so Cancel can restore without persisting
+    const originalValue = wrap.querySelector('.info-value-text')?.textContent || '';
+    const labelEl = wrap.closest('.info-row')?.querySelector('.info-label');
+    const originalLabel = labelEl ? labelEl.textContent : '';
+    
+    // Get all available phone numbers and add missing options
     const phoneOptions = [];
+    
+    // Add existing phone numbers
     if (contact.mobile) {
       phoneOptions.push({ type: 'mobile', value: contact.mobile, field: 'mobile' });
     }
@@ -1616,32 +1799,90 @@
       phoneOptions.push({ type: 'other', value: contact.otherPhone, field: 'otherPhone' });
     }
     
-    // If no phone numbers exist, show input for new mobile number
+    // Add missing phone type options
+    if (!contact.mobile) {
+      phoneOptions.push({ type: 'add mobile', value: '', field: 'mobile', isAdd: true });
+    }
+    if (!contact.workDirectPhone) {
+      phoneOptions.push({ type: 'add work direct', value: '', field: 'workDirectPhone', isAdd: true });
+    }
+    if (!contact.otherPhone) {
+      phoneOptions.push({ type: 'add other', value: '', field: 'otherPhone', isAdd: true });
+    }
+    
+    // If no phone numbers exist at all, default to mobile
     if (phoneOptions.length === 0) {
       phoneOptions.push({ type: 'mobile', value: '', field: 'mobile' });
     }
+    
+    console.log('[Contact Detail] Phone options created:', phoneOptions);
     
     wrap.classList.add('editing');
     
     // Create dropdown
     const dropdown = document.createElement('div');
     dropdown.className = 'phone-dropdown';
+    dropdown.style.display = 'block';
+    dropdown.style.position = 'absolute';
+    dropdown.style.top = '100%';
+    dropdown.style.left = '50%';
+    dropdown.style.transform = 'translateX(-50%)';
+    dropdown.style.width = '220px';
+    dropdown.style.minWidth = '200px';
+    dropdown.style.zIndex = '1000';
+    dropdown.style.background = 'var(--bg-card)';
+    dropdown.style.border = '1px solid var(--border-light)';
+    dropdown.style.borderRadius = 'var(--border-radius-sm)';
+    dropdown.style.boxShadow = 'var(--elevation-card)';
+    dropdown.style.marginTop = '4px';
+    dropdown.style.maxHeight = '200px';
+    dropdown.style.overflowY = 'auto';
+    console.log('[Contact Detail] Created phone dropdown with', phoneOptions.length, 'options');
     
     phoneOptions.forEach((option, index) => {
       const item = document.createElement('div');
       item.className = 'phone-dropdown-item';
       if (index === 0) item.classList.add('selected');
       
+      // Add inline styles to ensure proper styling
+      item.style.display = 'flex';
+      item.style.alignItems = 'center';
+      item.style.justifyContent = 'space-between';
+      item.style.padding = '8px 12px';
+      item.style.cursor = 'pointer';
+      item.style.borderBottom = '1px solid var(--border-light)';
+      item.style.transition = 'background-color 0.2s ease';
+      item.style.color = 'var(--text-primary)';
+      
+      if (index === 0) {
+        item.style.background = 'var(--primary-700)';
+        item.style.color = 'white';
+      }
+      
+      const displayText = option.isAdd ? 'Click to add' : (option.value || 'Click to add');
+      const typeText = option.isAdd ? option.type.toUpperCase() : option.type.toUpperCase();
+      
       item.innerHTML = `
-        <span class="phone-type">${escapeHtml(option.type.toUpperCase())}</span>
-        <span class="phone-number">${escapeHtml(option.value || 'Click to add')}</span>
+        <span class="phone-type" style="font-weight: 600; font-size: 0.85rem; text-transform: uppercase;">${escapeHtml(typeText)}</span>
+        <span class="phone-number" style="font-size: 0.9rem; color: ${index === 0 ? 'rgba(255, 255, 255, 0.9)' : 'var(--text-secondary)'};">${escapeHtml(displayText)}</span>
       `;
       
+      console.log('[Contact Detail] Created dropdown item:', option.type, option.value);
+      
       item.addEventListener('click', () => {
+        console.log('[Contact Detail] Phone dropdown item clicked:', option);
+        
         // Remove selected class from all items
-        dropdown.querySelectorAll('.phone-dropdown-item').forEach(el => el.classList.remove('selected'));
+        dropdown.querySelectorAll('.phone-dropdown-item').forEach(el => {
+          el.classList.remove('selected');
+          el.style.background = '';
+          el.style.color = 'var(--text-primary)';
+        });
+        
         // Add selected class to clicked item
         item.classList.add('selected');
+        item.style.background = 'var(--primary-700)';
+        item.style.color = 'white';
         
         // Update the input value
         const input = wrap.querySelector('.info-edit-input');
@@ -1649,6 +1890,27 @@
           input.value = option.value;
           input.dataset.selectedType = option.type;
           input.dataset.selectedField = option.field;
+          console.log('[Contact Detail] Input updated:', {
+            value: input.value,
+            selectedType: input.dataset.selectedType,
+            selectedField: input.dataset.selectedField
+          });
+        }
+        
+        // Update the field label to show visual confirmation
+        const fieldLabel = wrap.closest('.info-row')?.querySelector('.info-label');
+        if (fieldLabel) {
+          const typeLabels = {
+            'mobile': 'MOBILE',
+            'add mobile': 'MOBILE',
+            'work direct': 'WORK DIRECT',
+            'add work direct': 'WORK DIRECT',
+            'other': 'OTHER PHONE',
+            'add other': 'OTHER PHONE'
+          };
+          const newLabel = typeLabels[option.type] || 'PHONE';
+          fieldLabel.textContent = newLabel;
+          console.log('[Contact Detail] Field label updated to:', newLabel);
         }
       });
       
@@ -1667,8 +1929,10 @@
     // Create input wrapper
     const inputWrap = document.createElement('div');
     inputWrap.className = 'phone-input-wrap';
+    inputWrap.style.position = 'relative'; // Ensure relative positioning for dropdown
     inputWrap.appendChild(input);
     inputWrap.appendChild(dropdown);
+    console.log('[Contact Detail] Created input wrapper and appended dropdown');
     
     // Create actions
     const actions = wrap.querySelector('.info-actions');
@@ -1707,10 +1971,18 @@
     
     input.addEventListener('keydown', onKey);
     saveBtn.addEventListener('click', async () => { 
+      console.log('[Contact Detail] Save button clicked with:', {
+        value: input.value,
+        selectedField: input.dataset.selectedField,
+        selectedType: input.dataset.selectedType
+      });
       await commitPhoneEdit(wrap, input.value, input.dataset.selectedField, input.dataset.selectedType); 
     });
     cancelBtn.addEventListener('click', () => { 
-      cancelEdit(wrap, 'phone', wrap.querySelector('.info-value-text')?.textContent || ''); 
+      // Restore original label and value; do not save
+      if (labelEl && originalLabel) labelEl.textContent = originalLabel;
+      state.preferredPhoneField = '';
+      cancelEdit(wrap, 'phone', originalValue); 
     });
     
     // Close dropdown when clicking outside
@@ -1728,22 +2000,48 @@
 
   async function commitPhoneEdit(wrap, value, field, type) {
     const normalizedValue = normalizePhone(value);
+    console.log('[Contact Detail] commitPhoneEdit called with:', { value, field, type, normalizedValue });
+    
+    console.log('[Contact Detail] Calling saveField with:', { field, normalizedValue });
     await saveField(field, normalizedValue);
+    // Remember the chosen field so the primary row reflects it on re-render
+    state.preferredPhoneField = field;
     
     // Update the contact data
     if (state.currentContact) {
       state.currentContact[field] = normalizedValue;
+      console.log('[Contact Detail] Updated contact data:', state.currentContact[field]);
     }
+    
+    // Update the field display to show the new field name and value
+    const fieldLabel = wrap.closest('.info-row')?.querySelector('.info-label');
+    if (fieldLabel) {
+      // Update the field label to show the selected type
+      const typeLabels = {
+        'mobile': 'MOBILE',
+        'workDirectPhone': 'WORK DIRECT',
+        'otherPhone': 'OTHER PHONE'
+      };
+      fieldLabel.textContent = typeLabels[field] || 'PHONE';
+      console.log('[Contact Detail] Updated field label to:', fieldLabel.textContent);
+    }
+    
+    // Update the field value display
+    updateFieldText(wrap, normalizedValue);
+    console.log('[Contact Detail] Updated field text to:', normalizedValue);
     
     // Re-render the phone row with new primary phone
     const phoneRow = wrap.closest('.info-row');
     if (phoneRow) {
+      console.log('[Contact Detail] Re-rendering phone row');
       const newPhoneRow = renderPhoneRow(state.currentContact);
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = newPhoneRow;
       const newRow = tempDiv.firstElementChild;
       phoneRow.parentElement.replaceChild(newRow, phoneRow);
     }
+    // Clear preferred override after re-render so subsequent loads use normal priority
+    setTimeout(() => { state.preferredPhoneField = ''; }, 0);
   }
 
   async function commitEdit(wrap, field, value) {
@@ -2261,7 +2559,17 @@
 
   function updateFieldText(wrap, value) {
     if (!wrap) return;
-    const text = (value && String(value).trim()) ? escapeHtml(String(value)) : '--';
+    let text = (value && String(value).trim()) ? escapeHtml(String(value)) : '--';
+    
+    // Add comma formatting for annual usage display
+    const field = wrap.getAttribute('data-field');
+    if (field === 'annualUsage' && value && String(value).trim()) {
+      const numericValue = String(value).replace(/[^0-9]/g, '');
+      if (numericValue) {
+        text = escapeHtml(numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ','));
+      }
+    }
+    
     const span = document.createElement('span');
     span.className = 'info-value-text';
     span.innerHTML = text;
@@ -3293,6 +3601,10 @@ async function createContactSequenceThenAdd(name) {
                   if (field === 'contractEndDate' && value) {
                     displayValue = toMDY(value);
                   }
+                  if (field === 'annualUsage' && value != null && String(value).trim() !== '') {
+                    const numeric = String(value).replace(/[^0-9]/g, '');
+                    displayValue = numeric ? numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '--';
+                  }
                   textEl.textContent = displayValue;
                 }
               }
@@ -3357,7 +3669,9 @@ async function createContactSequenceThenAdd(name) {
   // Export functions for use by people.js
   window.ContactDetail = {
     show: showContactDetail,
-    setupEnergyUpdateListener: setupEnergyUpdateListener
+    setupEnergyUpdateListener: setupEnergyUpdateListener,
+    // Expose internal state for widgets to read linked account id
+    state: state
   };
 
 })();

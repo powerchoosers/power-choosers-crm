@@ -778,7 +778,14 @@
                   if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                     console.log('[Calls] Showing contact detail:', contactId);
                     try {
-                      window.ContactDetail.show(contactId);
+                      // Try to get contact data from calls first, then fall back to just ID
+                      const callContact = getCallContactById(contactId);
+                      if (callContact) {
+                        console.log('[Calls] Passing contact data from calls:', callContact);
+                        window.ContactDetail.show(contactId, callContact);
+                      } else {
+                        window.ContactDetail.show(contactId);
+                      }
                     } catch (error) {
                       console.error('[Calls] Error showing contact detail:', error);
                     }
@@ -1702,11 +1709,41 @@
     }
   }
   
+  // Helper function to get contact data by ID from calls data
+  function getCallContactById(contactId) {
+    if (!contactId) return null;
+    
+    // First try to find in current calls data
+    const callData = state.data.find(call => call.contactId === contactId);
+    if (callData) {
+      // Convert call data to contact format
+      return {
+        id: contactId,
+        firstName: callData.contactName ? callData.contactName.split(' ')[0] : '',
+        lastName: callData.contactName ? callData.contactName.split(' ').slice(1).join(' ') : '',
+        name: callData.contactName || '',
+        email: callData.contactEmail || '',
+        phone: callData.contactPhone || '',
+        mobile: callData.contactPhone || '',
+        companyName: callData.company || '',
+        title: callData.contactTitle || '',
+        city: callData.contactCity || '',
+        state: callData.contactState || '',
+        industry: callData.industry || '',
+        accountEmployees: callData.accountEmployees || null,
+        visitorDomain: callData.visitorDomain || ''
+      };
+    }
+    
+    return null;
+  }
+
   // Expose loadData and controls for external use
   window.callsModule = { 
     loadData, 
     startAutoRefresh, 
     stopAutoRefresh,
+    getCallContactById,
     // Debug functions
     testApiEndpoint: async function() {
       const base = 'https://power-choosers-crm.vercel.app';

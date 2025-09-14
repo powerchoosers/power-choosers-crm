@@ -117,21 +117,41 @@
       const contactDetailView = document.getElementById('contact-detail-view');
       console.log('[Health Widget] contact-detail-view found:', !!contactDetailView);
       
+      // Broad DOM scan: anywhere on the page
+      const anyAccountLink = document.querySelector('[data-account-id]');
+      console.log('[Health Widget] Global data-account-id element found:', !!anyAccountLink, anyAccountLink);
+      if (anyAccountLink) {
+        const accountId = anyAccountLink.getAttribute('data-account-id');
+        console.log('[Health Widget] Found account ID from global DOM scan:', accountId);
+        return accountId;
+      }
+      
       if (contactDetailView) {
-        // Look for the linked account ID in the contact detail state or DOM
+        // Look for the linked account ID inside the contact view
         const accountLink = contactDetailView.querySelector('[data-account-id]');
-        console.log('[Health Widget] accountLink element found:', !!accountLink);
+        console.log('[Health Widget] accountLink element found inside contact view:', !!accountLink);
         if (accountLink) {
           const accountId = accountLink.getAttribute('data-account-id');
-          console.log('[Health Widget] Found account ID from DOM:', accountId);
+          console.log('[Health Widget] Found account ID from contact view DOM:', accountId);
           return accountId;
         }
         
-        // Try to find account ID from the company link
-        const companyLink = contactDetailView.querySelector('#contact-company-link');
-        if (companyLink) {
-          console.log('[Health Widget] Found company link, but no account ID attribute');
-        }
+        // Try to find account ID by matching company name with accounts cache
+        try {
+          const companyLink = contactDetailView.querySelector('#contact-company-link');
+          const companyName = companyLink ? (companyLink.getAttribute('data-account-name') || companyLink.textContent || '').trim() : '';
+          console.log('[Health Widget] Company name from DOM for fallback:', companyName);
+          if (companyName && typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData() || [];
+            const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+            const key = norm(companyName);
+            const match = accounts.find(a => norm(a.accountName || a.name || a.companyName) === key);
+            if (match && match.id) {
+              console.log('[Health Widget] Matched account by company name fallback:', match.id, match);
+              return match.id;
+            }
+          }
+        } catch(e) { console.log('[Health Widget] Company name fallback error:', e); }
         
         console.log('[Health Widget] No account ID found in DOM');
       } else {
@@ -371,8 +391,16 @@
     async function saveEntityFields(patch){
       try {
         if (!window.firebaseDB || !entityId) return;
-        const coll = getCollectionName();
-        await window.firebaseDB.collection(coll).doc(String(entityId)).set(patch, { merge: true });
+        const db = window.firebaseDB;
+        // For contact context, always persist Energy fields to the LINKED ACCOUNT
+        if (entityType === 'contact') {
+          const linkedAccountId = getLinkedAccountId(entityType, entityId);
+          if (!linkedAccountId) { console.warn('[Health] No linked account id found for contact; skipping save'); return; }
+          await db.collection('accounts').doc(String(linkedAccountId)).set(patch, { merge: true });
+          return;
+        }
+        // Default: account context saves to accounts
+        await db.collection('accounts').doc(String(entityId)).set(patch, { merge: true });
       } catch (e) { console.warn('[Health] saveEntityFields failed', e); }
     }
     function updateDetailFieldDOM(field, value){
@@ -482,6 +510,7 @@
         // Update widget inputs based on the field that was updated
         console.log('[Health Widget] Updating widget inputs for field:', d.field, 'value:', d.value);
         if (d.field === 'electricitySupplier' && supplierInput) {
+          console.log('[Health Widget] Updating supplier input from:', supplierInput.value, 'to:', (d.value || '').trim());
           supplierInput.value = (d.value || '').trim();
           console.log('[Health Widget] Updated supplier input to:', supplierInput.value);
         }
@@ -908,14 +937,21 @@
     // Two-way sync helpers
     async function applyPatchAndUpdateCaches(patch){
       await saveEntityFields(patch);
+      let targetEntity = 'account';
+      let targetId = entityId;
       try {
-        if (entityType === 'account' && typeof window.getAccountsData === 'function'){
+        if (entityType === 'contact') {
+          const linkedAccountId = getLinkedAccountId(entityType, entityId);
+          if (linkedAccountId) targetId = linkedAccountId;
+          // Update account cache since we persist to account when in contact context
+          if (typeof window.getAccountsData === 'function'){
+            const arr = window.getAccountsData() || [];
+            const obj = arr.find(a => String(a.id||'') === String(targetId));
+            if (obj) Object.assign(obj, patch);
+          }
+        } else if (entityType === 'account' && typeof window.getAccountsData === 'function'){
           const arr = window.getAccountsData() || [];
           const obj = arr.find(a => String(a.id||'') === String(entityId));
-          if (obj) Object.assign(obj, patch);
-        } else if (entityType === 'contact' && typeof window.getPeopleData === 'function'){
-          const arr = window.getPeopleData() || [];
-          const obj = arr.find(p => String(p.id||'') === String(entityId));
           if (obj) Object.assign(obj, patch);
         }
       } catch(_) {}
@@ -926,8 +962,8 @@
           if (['electricitySupplier', 'currentRate', 'contractEndDate'].includes(field)) {
             document.dispatchEvent(new CustomEvent('pc:energy-updated', {
               detail: {
-                entity: entityType,
-                id: entityId,
+                entity: targetEntity,
+                id: targetId,
                 field: field,
                 value: patch[field]
               }

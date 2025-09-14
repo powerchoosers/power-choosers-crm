@@ -277,7 +277,7 @@
           <h3 class="section-title">Energy & Contract</h3>
           <div class="info-grid" id="account-energy-grid">
             <div class="info-row"><div class="info-label">ELECTRICITY SUPPLIER</div><div class="info-value-wrap" data-field="electricitySupplier"><span class="info-value-text">${escapeHtml(electricitySupplier) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
-            <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value-wrap" data-field="annualUsage"><span class="info-value-text">${escapeHtml(annualUsage) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
+            <div class="info-row"><div class="info-label">ANNUAL USAGE</div><div class="info-value-wrap" data-field="annualUsage"><span class="info-value-text">${annualUsage ? escapeHtml(String(annualUsage).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')) : '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">CURRENT RATE ($/kWh)</div><div class="info-value-wrap" data-field="currentRate"><span class="info-value-text">${escapeHtml(currentRate) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">CONTRACT END DATE</div><div class="info-value-wrap" data-field="contractEndDate"><span class="info-value-text">${escapeHtml(contractEndDateFormatted) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
           </div>
@@ -1323,6 +1323,26 @@
       wrap.appendChild(inputWrap);
       input.focus();
       
+      // Live comma formatting for annual usage (mirror contact details UX)
+      if (field === 'annualUsage') {
+        // Seed input with digits only (strip commas)
+        const seed = (currentText === '--' ? '' : currentText).replace(/,/g, '');
+        input.value = seed;
+        input.addEventListener('input', (e) => {
+          const el = e.target;
+          const raw = String(el.value || '').replace(/[^0-9]/g, '');
+          const beforeLen = String(el.value || '').length;
+          const caret = el.selectionStart || 0;
+          const formatted = raw.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+          el.value = formatted;
+          // Best-effort caret restore
+          const afterLen = formatted.length;
+          const delta = afterLen - beforeLen;
+          const nextCaret = Math.max(0, Math.min(afterLen, caret + delta));
+          try { el.setSelectionRange(nextCaret, nextCaret); } catch (_) {}
+        });
+      }
+      
       // Add supplier suggestions for electricity supplier field
       if (field === 'electricitySupplier') {
         console.log('[Account Detail] Adding supplier suggestions for field:', field);
@@ -1479,6 +1499,9 @@
     } else if (field === 'contractEndDate') {
       const pretty = toMDY(val);
       textEl.textContent = pretty || '--';
+    } else if (field === 'annualUsage' && val) {
+      const numeric = String(val).replace(/[^0-9]/g, '');
+      textEl.textContent = numeric ? numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '--';
     } else {
       textEl.textContent = val || '--';
     }
