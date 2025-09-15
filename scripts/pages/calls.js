@@ -1609,6 +1609,30 @@
         </div>
       </div>`
   }
+  // Expose a helper for email generator to get the most relevant transcript for a recipient
+  try {
+    window.getRecentCallForEmail = function(recipient){
+      try {
+        const email = String(recipient?.email || '').toLowerCase();
+        const name = String(recipient?.name || recipient?.fullName || '').toLowerCase();
+        const calls = Array.isArray(window.__callsData) ? window.__callsData : [];
+        // Prefer most recent completed call with transcript that matches email or contact name
+        const now = Date.now();
+        const scored = calls.map(c => {
+          let score = 0;
+          const t = (new Date(c.timestamp || c.callTime || 0)).getTime() || 0;
+          score += Math.max(0, (t ? (t / 1e13) : 0));
+          if (c.transcript && String(c.transcript).trim()) score += 10;
+          const cName = String(c.contactName || '').toLowerCase();
+          const cEmail = String(c.contactEmail || '').toLowerCase();
+          if (email && cEmail && cEmail === email) score += 5;
+          if (name && cName && cName.includes(name.split(' ')[0] || '')) score += 2;
+          return { c, score };
+        }).sort((a,b)=>b.score-a.score);
+        return scored.length ? scored[0].c : null;
+      } catch(_) { return null; }
+    }
+  } catch(_) { /* noop */ }
 
   // Bulk selection popover (refined with backdrop and cleanup)
   function openBulkPopover(){

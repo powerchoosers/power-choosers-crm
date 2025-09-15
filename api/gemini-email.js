@@ -13,7 +13,7 @@ function cors(req, res) {
   return false;
 }
 
-function buildSystemPrompt({ mode, recipient, to, prompt }) {
+function buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle }) {
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
   const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
@@ -23,6 +23,7 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
   const industry = r.industry || '';
   const linkedin = r.linkedin || '';
   const energy = r.energy || {};
+  const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 2000);
   const usage = energy.usage || '';
   const supplier = energy.supplier || '';
   const contractEnd = energy.contractEnd || '';
@@ -120,10 +121,6 @@ CRITICAL RULES (ZERO TOLERANCE FOR VIOLATIONS):
 - Avoid hallucinations; if unsure, keep it generic
 - Do not include handlebars-like placeholders (e.g., {{first_name}}). Use natural text
 - NEVER end sentences with incomplete phrases like "improving your?" or "discuss your?" - always complete the thought
-- ALWAYS write complete, grammatically correct sentences
-- NEVER use fragments or incomplete thoughts
-- Each paragraph should be 1-2 complete sentences maximum
-- Use proper punctuation and capitalization
 - Before sending, mentally check: "Have I used any phrase or sentence twice?" If yes, rewrite
 
 PERSONAL TOUCH REQUIREMENT:
@@ -154,7 +151,8 @@ CONTEXT AWARENESS:
 - Energy (if relevant): usage=${usage || 'n/a'}; supplier=${supplier || 'n/a'}; currentRate=${currentRate || 'n/a'}; contractEnd=${contractEndLabel || 'n/a'}
 - LinkedIn: ${linkedin || 'n/a'}
 - Notes (free text, optional): ${notes || 'n/a'}
-- Colleague contact: ${colleagueInfo?.found ? colleagueInfo.name : 'none found'}`;
+- Colleague contact: ${colleagueInfo?.found ? colleagueInfo.name : 'none found'}
+- Transcript (top priority; summarize and use insights, do not quote sensitive specifics): ${transcript ? (transcript.slice(0, 600) + (transcript.length > 600 ? '…' : '')) : 'n/a'}`;
 
   const bizContext = `About Power Choosers (for positioning only): ${companyOverview}`;
 
@@ -187,6 +185,18 @@ CONTEXT AWARENESS:
 - Mention one or two of our offerings most relevant to this contact (procurement, renewals/contracting, bill management, or efficiency) without overloading the email.
 - Keep it skimmable and client-friendly.
  - Avoid opening with generic statements (e.g., "we work with 100+ suppliers"). Lead with the most relevant point for the reader.`;
+
+  const variationDirectives = `Variation directives:
+- STYLE seed (hint, may be "auto"): ${style || 'auto'}; SUBJECT seed: ${subjectStyle || 'auto'}.
+- If STYLE is "auto", pick one style at random each time:
+  • hook_question: open with a sharp question that ties to a transcript insight or pain point
+  • value_bullets: second paragraph uses 2–3 bullet points (HTML <ul><li>…</li></ul>; plain text use •) for benefits or steps
+  • proof_point: include one brief proof point (e.g., recent result, supplier count) without sounding generic
+  • risk_focus: highlight one timely risk (renewal timing, above‑market rate) tied to their situation
+  • timeline_focus: emphasize timing (e.g., contract end Month YYYY) and next steps
+- If SUBJECT is "auto", vary subject types between: question, outcome‑oriented, time‑sensitive, pain‑point specific.
+- Avoid repeating the same opening or subject phrasing across runs.
+- If transcript provided, derive the HOOK from the transcript first (top priority), then supplement with notes and energy fields.`;
 
   const specificHandling = `SPECIFIC PROMPT HANDLING:
   - "Warm intro after a call": Reference the call once (what we discussed), then propose specific next steps and suggest two time windows for a follow-up. Keep it concise.
@@ -270,6 +280,7 @@ ${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist
     notesGuidelines,
     subjectGuidelines,
     bodyGuidelines,
+    variationDirectives,
     specificHandling,
     outputStyle,
     instructions
@@ -283,8 +294,8 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) return res.status(400).json({ error: 'Missing GEMINI_API_KEY' });
 
-    const { prompt, mode = 'standard', recipient = null, to = '' } = req.body || {};
-    const sys = buildSystemPrompt({ mode, recipient, to, prompt });
+    const { prompt, mode = 'standard', recipient = null, to = '', style = 'auto', subjectStyle = 'auto' } = req.body || {};
+    const sys = buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle });
 
     // Google Generative Language API (Gemini 1.5 Pro)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
@@ -296,12 +307,10 @@ export default async function handler(req, res) {
         }
       ],
       generationConfig: {
-        temperature: 0.6, // Slightly lower for more consistency
-        topK: 32, // Reduced for more focused responses
-        topP: 0.85, // Slightly lower for better quality
-        maxOutputTokens: 2048,
-        candidateCount: 1,
-        stopSequences: ['Subject:', '---', 'END']
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.9,
+        maxOutputTokens: 2048
       }
     };
 
