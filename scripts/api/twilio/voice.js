@@ -33,10 +33,12 @@ export default function handler(req, res) {
             answerOnBridge: true,
             hangupOnStar: false,
             timeLimit: 14400, // 4 hours max call duration
-            // Recording disabled temporarily to fix voice transmission issue
-            // record: 'record-from-answer-dual',  // Use this instead if you need recording
-            // recordingStatusCallback: `${base}/api/twilio/recording`,
-            // recordingStatusCallbackEvent: 'completed',
+            // Recording enabled with dual channels and both tracks for quality + diarization
+            record: 'record-from-answer',
+            recordingStatusCallback: `${base}/api/twilio/recording`,
+            recordingStatusCallbackMethod: 'POST',
+            recordingChannels: 'dual',
+            recordingTrack: 'both',
             // Add action URL to track call completion
             action: `${base}/api/twilio/status`
         });

@@ -8,7 +8,7 @@
 
   // Business phone number for fallback calls
   const DEFAULT_BUSINESS_E164 = '+18176630380';
-  const BUSINESS_PHONE = '8176630380'; // legacy fallback without formatting
+  const BUSINESS_PHONE = '817-663-0380'; // legacy fallback without formatting
   function getBusinessNumberE164(){
     try {
       const arr = (window.CRM_BUSINESS_NUMBERS || []).filter(Boolean);
@@ -118,7 +118,7 @@
           noiseSuppression: true,
           autoGainControl: true,
           sampleRate: 48000,
-          channelCount: 1
+          channelCount: 2
         });
         
         // Set input device - use first available if 'default' doesn't exist
