@@ -405,7 +405,12 @@ class EmailManager {
                     html2 = this.replaceVariablesInHtml(html2, enrichedRecipient);
                     if (subjectInput) {
                         subjectInput.classList.remove('fade-in');
-                        subjectInput.value = subject2 || '';
+                        try {
+                            const improved2 = this.improveSubject(subject2, enrichedRecipient);
+                            subjectInput.value = improved2 || subject2 || '';
+                        } catch (_) {
+                            subjectInput.value = subject2 || '';
+                        }
                         requestAnimationFrame(() => subjectInput.classList.add('fade-in'));
                     }
                     if (mode === 'html') {
@@ -442,7 +447,12 @@ class EmailManager {
             // Subject
             if (subjectInput) {
                 subjectInput.classList.remove('fade-in');
-                subjectInput.value = subject || '';
+                try {
+                    const improved = this.improveSubject(subject, enrichedRecipient);
+                    subjectInput.value = improved || subject || '';
+                } catch (_) {
+                    subjectInput.value = subject || '';
+                }
                 // Trigger fade-in
                 requestAnimationFrame(() => subjectInput.classList.add('fade-in'));
             }
@@ -917,7 +927,54 @@ class EmailManager {
         }
 
         // Standard mode (rich text editor fragment)
+        // Improve generic subjects with name/company and energy data
+        try {
+            subject = this.improveSubject(subject, recipient) || subject;
+        } catch(_) { /* noop */ }
         return { subject, html: contentHtml };
+    }
+
+    // Strengthen generic subjects with name/company and energy details; vary patterns slightly
+    improveSubject(subject, recipient) {
+        try {
+            const sub = String(subject || '').trim();
+            const r = recipient || {};
+            const name = (r.fullName || r.name || '').split(' ')[0] || '';
+            const company = r.company || r.account?.name || '';
+            const energy = r.energy || r.account?.energy || {};
+            const supplier = energy.supplier || '';
+            const rate = energy.currentRate ? String(energy.currentRate).replace(/^\./, '0.') : '';
+            const end = energy.contractEnd || '';
+            const toMonthYear = (val) => {
+                const s = String(val || '').trim();
+                if (!s) return '';
+                const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                const d = new Date(s);
+                if (!isNaN(d.getTime())) return `${months[d.getMonth()]} ${d.getFullYear()}`;
+                const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+                if (m1) { const m = Math.max(1, Math.min(12, parseInt(m1[1], 10))); return `${months[m - 1]} ${m1[3]}`; }
+                const m2 = s.match(/^(\d{4})[\-](\d{1,2})[\-](\d{1,2})$/);
+                if (m2) { const m = Math.max(1, Math.min(12, parseInt(m2[2], 10))); return `${months[m - 1]} ${m2[1]}`; }
+                const m3 = s.match(/^(\d{1,2})[\/\-](\d{4})$/);
+                if (m3) { const m = Math.max(1, Math.min(12, parseInt(m3[1], 10))); return `${months[m - 1]} ${m3[2]}`; }
+                const m4 = s.match(/([A-Za-z]+)\s+(\d{4})/);
+                if (m4) return `${m4[1]} ${m4[2]}`;
+                const y = s.match(/(19\d{2}|20\d{2})/);
+                if (y) return y[1];
+                return '';
+            };
+            const endLabel = toMonthYear(end);
+            const looksGeneric = /^(subject\s*:\s*)?(re:|fwd:)?\s*(hi|hello|catching up|follow\s*up|quick note|unknown)\b/i.test(sub) || sub.length < 8;
+            if (!looksGeneric) return sub;
+            const variants = [];
+            if (name && company && supplier && endLabel) variants.push(`${name} — ${company}: ${supplier} until ${endLabel}`);
+            if (company && endLabel) variants.push(`${company} — plan before ${endLabel}`);
+            if (name && rate) variants.push(`${name} — options vs ${rate} $/kWh`);
+            if (company) variants.push(`${company} — energy options`);
+            if (name) variants.push(`${name} — quick energy check`);
+            variants.push('Energy options and next steps');
+            return variants[Math.floor(Math.random() * variants.length)];
+        } catch(_) { return subject; }
     }
 
     // Replace any {{contact./account./sender.}} tokens and .var-chip spans with real values
