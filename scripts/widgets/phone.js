@@ -2624,13 +2624,19 @@
     }
     window.lastCallNumberTime = now;
     
-    // Set current call context
+    // Set current call context - clear previous context first
     currentCallContext = {
       number: number,
       name: contactName,
-      company: contactCompany || (currentCallContext && currentCallContext.company) || '',
+      company: contactCompany || '',
+      accountId: null,
+      accountName: null,
+      contactId: null,
+      contactName: null,
       isActive: autoTrigger // Mark as active only if we're auto-triggering
     };
+    
+    console.debug('[Phone Widget] Call context set in callNumber:', currentCallContext);
     
     // Open phone widget if not already open
     if (!document.getElementById(WIDGET_ID)) {
@@ -2681,12 +2687,25 @@
   window.Widgets.setCallContext = function(ctx){
     try {
       ctx = ctx || {};
+      console.debug('[Phone Widget] Setting call context:', ctx);
+      
+      // Clear previous context first to prevent stale data
+      currentCallContext.accountId = null;
+      currentCallContext.accountName = null;
+      currentCallContext.contactId = null;
+      currentCallContext.contactName = null;
+      currentCallContext.company = '';
+      currentCallContext.name = '';
+      
+      // Set new context
       currentCallContext.accountId = ctx.accountId || null;
       currentCallContext.accountName = ctx.accountName || null;
       currentCallContext.contactId = ctx.contactId || null;
       currentCallContext.contactName = ctx.contactName || null;
       if (ctx.company) currentCallContext.company = ctx.company;
       if (ctx.name) currentCallContext.name = ctx.name;
+      
+      console.debug('[Phone Widget] Call context updated:', currentCallContext);
     } catch(_) {}
   };
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };

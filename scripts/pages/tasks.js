@@ -643,4 +643,17 @@
   }
   
   document.addEventListener('DOMContentLoaded', init);
+
+  // Expose minimal API for cross-page creation and auto-task events
+  try {
+    window.Tasks = window.Tasks || {};
+    window.Tasks.createTask = createTask;
+    window.createTask = window.createTask || createTask;
+    window.addEventListener('pc:auto-task', async (e) => {
+      try {
+        const payload = (e && e.detail) || {};
+        await createTask(payload);
+      } catch(_) {}
+    });
+  } catch(_) {}
 })();

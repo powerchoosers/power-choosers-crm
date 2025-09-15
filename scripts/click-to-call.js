@@ -72,6 +72,10 @@
       if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
         // Mark the exact time of the user click to prove a fresh gesture
         try { window.Widgets._lastClickToCallAt = Date.now(); } catch(_) {}
+        
+        // Set proper call context before making the call
+        setCallContextFromCurrentPage(phoneElement, contactName);
+        
         // Always auto-trigger for click-to-call, but mark it as a user-initiated click
         console.debug('[ClickToCall] User clicked phone number - auto-triggering call');
         window.Widgets.callNumber(cleanPhone, contactName, true, 'click-to-call');
@@ -135,6 +139,82 @@
     } catch (_) { /* noop */ }
 
     return '';
+  }
+
+  function setCallContextFromCurrentPage(phoneElement, contactName) {
+    if (!window.Widgets || typeof window.Widgets.setCallContext !== 'function') {
+      console.warn('[ClickToCall] Phone widget setCallContext not available');
+      return;
+    }
+
+    const context = {
+      contactName: contactName || '',
+      name: contactName || '',
+      company: '',
+      accountId: null,
+      accountName: null,
+      contactId: null
+    };
+
+    // Try to extract context from table row
+    const row = phoneElement.closest('tr');
+    if (row) {
+      // Get contact ID if available
+      const contactId = row.getAttribute('data-contact-id') || 
+                       row.querySelector('[data-contact-id]')?.getAttribute('data-contact-id');
+      if (contactId) context.contactId = contactId;
+
+      // Get account ID if available
+      const accountId = row.getAttribute('data-account-id') || 
+                       row.querySelector('[data-account-id]')?.getAttribute('data-account-id');
+      if (accountId) context.accountId = accountId;
+
+      // Get company/account name
+      const companyEl = row.querySelector('.company-link, .account-name, .company-cell');
+      if (companyEl) {
+        const companyName = companyEl.textContent?.trim() || companyEl.getAttribute('data-company');
+        if (companyName && companyName !== 'N/A') {
+          context.company = companyName;
+          context.accountName = companyName;
+        }
+      }
+    }
+
+    // Try to get context from contact detail page
+    try {
+      if (document.getElementById('contact-detail-view')) {
+        const contactDetail = window.ContactDetail;
+        if (contactDetail && contactDetail.state && contactDetail.state.currentContact) {
+          const contact = contactDetail.state.currentContact;
+          context.contactId = contact.id || contact.contactId || contact._id;
+          context.contactName = contact.name || contact.firstName + ' ' + contact.lastName;
+          context.name = context.contactName;
+          context.company = contact.company || contact.companyName || contact.account;
+          context.accountName = context.company;
+          
+          // Try to get linked account ID
+          if (contactDetail.state._linkedAccountId) {
+            context.accountId = contactDetail.state._linkedAccountId;
+          }
+        }
+      }
+    } catch (_) { /* noop */ }
+
+    // Try to get context from account detail page
+    try {
+      if (document.getElementById('account-detail-view')) {
+        const accountDetail = window.AccountDetail;
+        if (accountDetail && accountDetail.state && accountDetail.state.currentAccount) {
+          const account = accountDetail.state.currentAccount;
+          context.accountId = account.id || account.accountId || account._id;
+          context.accountName = account.name || account.accountName;
+          context.company = context.accountName;
+        }
+      }
+    } catch (_) { /* noop */ }
+
+    console.debug('[ClickToCall] Setting call context:', context);
+    window.Widgets.setCallContext(context);
   }
 
   function processTablePhoneNumbers() {
