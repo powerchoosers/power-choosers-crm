@@ -325,7 +325,9 @@ class EmailManager {
                             id: acct.id,
                             name: acct.accountName || acct.name || acct.companyName || '',
                             industry: acct.industry || '',
-                            domain: acct.domain || acct.website || ''
+                            domain: acct.domain || acct.website || '',
+                            city: acct.city || acct.billingCity || acct.locationCity || '',
+                            state: acct.state || acct.billingState || acct.region || ''
                         };
                         // Merge: prefer existing recipient.energy if set; otherwise use account values
                         const rE = enrichedRecipient.energy || {};
