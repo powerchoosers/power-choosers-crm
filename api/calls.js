@@ -48,7 +48,7 @@ function normalizeCallForResponse(call) {
     aiSummary: (call.aiInsights && call.aiInsights.summary) || call.aiSummary || '',
     aiInsights: call.aiInsights || null,
     audioUrl: call.recordingUrl || call.audioUrl || '',
-    conversationalIntelligence: call.conversationalIntelligence || null
+    conversationalIntelligence: call.conversationalIntelligence || (call.aiInsights && call.aiInsights.conversationalIntelligence) || null
   };
 }
 
@@ -129,7 +129,7 @@ async function upsertCallInFirestore(payload) {
     aiInsights: payload.aiInsights != null ? payload.aiInsights : current.aiInsights || null,
     aiSummary: payload.aiSummary != null ? payload.aiSummary : current.aiSummary,
     recordingUrl: payload.recordingUrl != null ? payload.recordingUrl : current.recordingUrl,
-    conversationalIntelligence: payload.conversationalIntelligence != null ? payload.conversationalIntelligence : current.conversationalIntelligence,
+    conversationalIntelligence: (payload.conversationalIntelligence != null ? payload.conversationalIntelligence : (payload.aiInsights && payload.aiInsights.conversationalIntelligence)) != null ? (payload.conversationalIntelligence || (payload.aiInsights && payload.aiInsights.conversationalIntelligence)) : current.conversationalIntelligence,
 
     // CRM context passthrough
     accountId: payload.accountId != null ? payload.accountId : current.accountId,
