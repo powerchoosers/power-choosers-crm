@@ -1794,7 +1794,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     if (summarySource) {
       const parts = String(summarySource).split('•');
       summaryText = (parts[0] || summarySource).trim();
-    } else {
+      } else {
       summaryText = `Conversation ${disposition ? `(${disposition.toLowerCase()}) ` : ''}about energy services. ${sentiment} sentiment detected.`;
     }
 
@@ -1841,6 +1841,42 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           }
         } catch(_) {}
       }
+      // If we have turns but roles are blank/unknown, alternate roles agent/customer
+      if (turns.length) {
+        const hasKnownRoles = turns.some(t => t && (t.role === 'agent' || t.role === 'customer'));
+        if (!hasKnownRoles) {
+          let next = 'customer';
+          turns = turns.map(t => ({
+            t: Number(t.t) || 0,
+            role: next === 'agent' ? 'agent' : 'customer',
+            text: t.text || ''
+          })).map(u => { next = (next === 'agent' ? 'customer' : 'agent'); return u; });
+        }
+      }
+      // Helper: heuristic splitter when only one generic "Speaker" or no diarization at all
+      function heuristicSplitByPunctuation(text){
+        const out=[]; if(!text) return out; const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
+        let t = String(text).replace(/\s+/g,' ').trim();
+        // Normalize common filler tokens as gentle boundaries
+        t = t.replace(/\[(?:hes|noise|crosstalk)\]/gi, '. ');
+        // Hard split on sentence punctuation
+        let segs = t.split(/(?<=[\.\?\!])\s+(?=[A-Z0-9])/g);
+        if (segs.length <= 1) {
+          // Soft split every ~12-20 words if no punctuation
+          const words = t.split(/\s+/); const chunks=[]; let cur=[];
+          for (const w of words){
+            cur.push(w);
+            if (cur.length >= 16){ chunks.push(cur.join(' ')); cur=[]; }
+          }
+          if (cur.length) chunks.push(cur.join(' '));
+          segs = chunks;
+        }
+        let role = 'customer';
+        for (const s of segs){
+          const txt = (s||'').trim(); if(!txt) continue; const label = role==='agent' ? 'You' : contactFirst; out.push({ label, text: txt }); role = (role==='agent') ? 'customer' : 'agent';
+        }
+        return out;
+      }
       if(turns.length){
         const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
         const groups = [];
@@ -1866,11 +1902,22 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       const parsed = parseSpeakerTranscript(raw||'');
       if(parsed.some(p=>p.label && p.t!=null)){
         const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
+        // Heuristic diarization when labels are all "Speaker": alternate roles by turn order
+        let toggle = 'customer'; // start with customer speaking
         return parsed.map(p=> {
           if (!p.label) return `<div class=\"transcript-line\"><span class=\"text\">${escapeHtml(p.text||'')}</span></div>`;
-          const lbl = /^speaker\b/i.test(p.label) ? contactFirst : p.label;
-          return `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(lbl)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>`;
+          let roleLabel = p.label;
+          if (/^speaker\b/i.test(roleLabel)) {
+            roleLabel = (toggle === 'agent') ? 'You' : contactFirst;
+            toggle = (toggle === 'agent') ? 'customer' : 'agent';
+          }
+          return `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(roleLabel)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>`;
         }).join('');
+      }
+      // Final heuristic: split by punctuation and alternate roles
+      const heur = heuristicSplitByPunctuation(raw||'');
+      if (heur.length){
+        return heur.map(h => `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(h.label)}:</span> <span class=\"text\">${escapeHtml(h.text)}</span></div>`).join('');
       }
       const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
       return escapeHtml(fallback);
