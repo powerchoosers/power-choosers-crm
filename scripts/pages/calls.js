@@ -924,6 +924,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               transcript: c.transcript || '',
               aiSummary: c.aiSummary || '',
               aiInsights: c.aiInsights || null,
+              conversationalIntelligence: c.conversationalIntelligence || null,
               audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
             };
 
