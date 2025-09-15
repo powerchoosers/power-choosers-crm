@@ -1206,8 +1206,8 @@ class EmailManager {
             for (const p of prompts) {
                 // Include transcript and randomized styles for logging as well
                 const styleOptions2 = ['hook_question','value_bullets','proof_point','risk_focus','timeline_focus'];
-                const subjStyles2 = ['question','outcome','time_sensitive','pain_point'];
-                const payload = { prompt: p, mode, recipient: enrichedRecipient, to: toInput?.value || '', style: styleOptions2[Math.floor(Math.random() * styleOptions2.length)], subjectStyle: subjStyles2[Math.floor(Math.random() * subjStyles2.length)] };
+                const subjStyles2 = ['question','curiosity','metric','time_sensitive','pain_point','proof_point'];
+                const payload = { prompt: p, mode, recipient: enrichedRecipient, to: toInput?.value || '', style: styleOptions2[Math.floor(Math.random() * styleOptions2.length)], subjectStyle: subjStyles2[Math.floor(Math.random() * subjStyles2.length)], subjectSeed: `${Date.now()}_${Math.random().toString(36).slice(2,8)}` };
                 try {
                     const res = await fetch(genUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     const data = await res.json().catch(() => null);
@@ -1218,11 +1218,18 @@ class EmailManager {
                         html = this.adjustWarmIntroHtml(html);
                     }
                     html = this.replaceVariablesInHtml(html, enrichedRecipient);
-                    console.groupCollapsed(`[AI][LogAll] ${p}`);
-                    console.log('Subject:', formatted.subject);
-                    console.log('Raw output (first 600):', String(output).slice(0,600));
-                    console.log('HTML after adjustments:', html);
-                    console.groupEnd();
+                    const subjectImproved = (this.improveSubject(formatted.subject, enrichedRecipient) || formatted.subject || '').trim();
+                    const energy = enrichedRecipient?.energy || {};
+                    const log = {
+                        prompt: p,
+                        style: payload.style,
+                        subjectStyle: payload.subjectStyle,
+                        subject: subjectImproved,
+                        energy: { supplier: energy.supplier || '', currentRate: energy.currentRate || '', contractEnd: energy.contractEnd || '' },
+                        preview: String(output).slice(0, 300),
+                        date: new Date().toISOString()
+                    };
+                    console.log('[AI][BatchLog]', log);
                 } catch (err) {
                     console.warn('[AI][LogAll] Failed for prompt:', p, err);
                 }
