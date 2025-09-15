@@ -2681,6 +2681,60 @@
     return true;
   };
 
+  // Stereo/Mono toggle state
+  let preferStereo = true;
+
+  // Patch UI: add a mono/stereo toggle to the left of the call on/off button if present
+  try {
+    const card = document.getElementById(WIDGET_ID) || document.body;
+    const ensureToggle = () => {
+      const widget = document.getElementById(WIDGET_ID);
+      if (!widget) return;
+      const footer = widget.querySelector('.phone-footer') || widget;
+      if (footer && !footer.querySelector('.stereo-toggle')){
+        const btn = document.createElement('button');
+        btn.className = 'stereo-toggle';
+        btn.type = 'button';
+        btn.style.marginRight = '8px';
+        btn.style.height = '32px';
+        btn.style.padding = '0 10px';
+        btn.style.borderRadius = '8px';
+        btn.style.border = '1px solid var(--border-light)';
+        btn.style.background = 'var(--bg-item)';
+        btn.style.color = 'var(--text-primary)';
+        const label = () => `Audio: ${preferStereo ? 'Stereo' : 'Mono'}`;
+        btn.textContent = label();
+        btn.addEventListener('click', async () => {
+          preferStereo = !preferStereo;
+          btn.textContent = label();
+          try {
+            // Apply to device audio constraints immediately
+            const device = await TwilioRTC.ensureDevice();
+            if (device && device.audio && typeof device.audio.setAudioConstraints === 'function'){
+              await device.audio.setAudioConstraints({
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 48000,
+                channelCount: preferStereo ? 2 : 1
+              });
+            }
+          } catch(_) {}
+        });
+        // Insert before the main call button if found
+        const callBtn = widget.querySelector('.call-btn-start') || footer.firstChild;
+        if (callBtn && callBtn.parentNode){
+          callBtn.parentNode.insertBefore(btn, callBtn);
+        } else {
+          footer.appendChild(btn);
+        }
+      }
+    };
+    // Try now and after slight delay (widget may render after)
+    setTimeout(ensureToggle, 200);
+    setTimeout(ensureToggle, 800);
+  } catch(_) {}
+
   window.Widgets.openPhone = openPhone;
   window.Widgets.closePhone = closePhoneWidget;
   // Allow pages to set the current call context (account/contact attribution)
@@ -2747,8 +2801,11 @@
       const n = (number || '').trim();
       if (!n) throw new Error('Missing number');
       const device = await TwilioRTC.ensureDevice();
+      // Prefer stereo at connection level via rtcConstraints when supported
+      const rtcConstraints = { audio: { channelCount: preferStereo ? 2 : 1 } };
       const connection = await device.connect({
-        params: { To: n, From: BUSINESS_PHONE }
+        params: { To: n, From: BUSINESS_PHONE },
+        rtcConstraints
       });
       return connection;
     };
