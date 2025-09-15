@@ -277,7 +277,7 @@ class EmailManager {
         const prompt = aiBar?.querySelector('.ai-prompt')?.value?.trim() || '';
         const toInput = compose?.querySelector('#compose-to');
         const subjectInput = compose?.querySelector('#compose-subject');
-        const recipient = this._selectedRecipient || null;
+        let recipient = this._selectedRecipient || null;
         if (!editor) return;
 
         // Close AI bar immediately
@@ -292,6 +292,15 @@ class EmailManager {
         try {
             const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
             const genUrl = `${base}/api/gemini-email`;
+
+            // Resolve recipient by email if not selected or missing core fields
+            try {
+                const toVal = toInput?.value || '';
+                if ((!recipient || !recipient.name || !recipient.company) && toVal) {
+                    const resolved = await this.lookupPersonByEmail(toVal);
+                    if (resolved) recipient = resolved;
+                }
+            } catch (_) { /* noop */ }
 
             // Enrich recipient with account energy details when available (ensures Gemini sees known values)
             let enrichedRecipient = recipient ? JSON.parse(JSON.stringify(recipient)) : null;
@@ -316,10 +325,10 @@ class EmailManager {
                     }
                     if (acct) {
                         const acctEnergy = {
-                            supplier: acct.electricitySupplier || acct.supplier || '',
-                            currentRate: acct.currentRate || acct.rate || '',
-                            usage: acct.annual_kwh || acct.kwh || '',
-                            contractEnd: acct.contractEndDate || acct.contractEnd || acct.contract_end_date || ''
+                            supplier: acct.electricitySupplier || '',
+                            currentRate: acct.currentRate || '',
+                            usage: acct.annualUsage || '',
+                            contractEnd: acct.contractEndDate || ''
                         };
                         enrichedRecipient.account = enrichedRecipient.account || {
                             id: acct.id,
@@ -329,19 +338,9 @@ class EmailManager {
                             city: acct.city || acct.billingCity || acct.locationCity || '',
                             state: acct.state || acct.billingState || acct.region || ''
                         };
-                        // Merge: prefer existing recipient.energy if set; otherwise use account values
-                        const rE = enrichedRecipient.energy || {};
-                        const merged = {
-                            supplier: rE.supplier || acctEnergy.supplier || '',
-                            currentRate: rE.currentRate || acctEnergy.currentRate || '',
-                            usage: rE.usage || acctEnergy.usage || '',
-                            contractEnd: rE.contractEnd || acctEnergy.contractEnd || ''
-                        };
-                        // Normalize currentRate like .089 -> 0.089 (do not force $ here; model will format)
-                        if (/^\.\d+$/.test(String(merged.currentRate))) {
-                            merged.currentRate = '0' + merged.currentRate;
-                        }
-                        enrichedRecipient.energy = merged;
+                        let rate = String(acctEnergy.currentRate || '').trim();
+                        if (/^\.\d+$/.test(rate)) rate = '0' + rate;
+                        enrichedRecipient.energy = { ...acctEnergy, currentRate: rate };
                     }
                 }
             } catch (e) { console.warn('[AI] Could not enrich recipient energy from accounts', e); }
@@ -357,10 +356,11 @@ class EmailManager {
             // Add style randomization hints for variation
             const styleOptions = ['hook_question','value_bullets','proof_point','risk_focus','timeline_focus'];
             const randomStyle = styleOptions[Math.floor(Math.random() * styleOptions.length)];
-            const subjStyles = ['question','outcome','time_sensitive','pain_point'];
+            const subjStyles = ['question','curiosity','metric','time_sensitive','pain_point','proof_point'];
             const randomSubj = subjStyles[Math.floor(Math.random() * subjStyles.length)];
+            const subjectSeed = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 
-            const payload = { prompt, mode, recipient: enrichedRecipient, to: toInput?.value || '', style: randomStyle, subjectStyle: randomSubj };
+            const payload = { prompt, mode, recipient: enrichedRecipient, to: toInput?.value || '', style: randomStyle, subjectStyle: randomSubj, subjectSeed };
             let res;
             try {
                 res = await fetch(genUrl, {
@@ -446,7 +446,7 @@ class EmailManager {
 
             // Subject
             if (subjectInput) {
-                subjectInput.classList.remove('fade-in');
+                subjectInput.classList.remove('fade-in'); subjectInput.classList.add('is-loading');
                 try {
                     const improved = this.improveSubject(subject, enrichedRecipient);
                     subjectInput.value = improved || subject || '';
@@ -454,7 +454,7 @@ class EmailManager {
                     subjectInput.value = subject || '';
                 }
                 // Trigger fade-in
-                requestAnimationFrame(() => subjectInput.classList.add('fade-in'));
+                requestAnimationFrame(() => { subjectInput.classList.add('fade-in'); subjectInput.classList.remove('is-loading'); });
             }
 
             // Body
@@ -548,7 +548,8 @@ class EmailManager {
         // Prepare greeting (no template tokens fallback)
         const nameSource = (recipient?.fullName || recipient?.name || '').trim();
         const firstName = (nameSource.split(' ')[0] || '').trim();
-        const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
+        const companyName = (recipient?.company || recipient?.account?.name || '').trim();
+        const greeting = firstName ? `Hi ${firstName},` : (companyName ? `Hi ${companyName} team,` : 'Hi,');
 
         // Remove greeting lines anywhere and cut from the first closing onward
         const lines = body.split('\n');
@@ -612,8 +613,30 @@ class EmailManager {
             body = body.replace(datePattern, (m) => toMonthYear(m));
         } catch (_) { /* noop */ }
 
-        // Build HTML paragraphs (and ensure energy details are referenced if available)
+        // Build HTML paragraphs from body
         let paras = body.split(/\n\n/).map(p => p.trim()).filter(Boolean);
+
+        // Force-insert a standardized Energy line and (optional) pain point right after the greeting
+        try {
+            const e = recipient?.energy || {};
+            const supplier = String(e.supplier || '').trim();
+            const rate = String(e.currentRate || '').trim();
+            const end = String(e.contractEnd || '').trim();
+            const endLabel = toMonthYear(end);
+            const aiPP = recipient?.aiInsights && Array.isArray(recipient.aiInsights.painPoints) ? recipient.aiInsights.painPoints[0] : '';
+            const notesPP = String(recipient?.notes || recipient?.account?.notes || '').match(/pain\s*point\s*:\s*([^\n]+)/i)?.[1] || '';
+            const painPoint = String(aiPP || notesPP || '').trim();
+            const parts = [];
+            if (supplier) parts.push(`Supplier ${supplier}`);
+            if (rate) parts.push(`Current rate ${rate.startsWith('$') ? rate : `$${rate}`}/kWh`);
+            if (endLabel) parts.push(`Contract end ${endLabel}`);
+            const energyLine = parts.length ? `Per your account: ${parts.join(' | ')}.` : '';
+            const painLine = painPoint ? `Noted focus: ${painPoint}.` : '';
+            if (energyLine || painLine) {
+                // Place these as the first content paragraph
+                paras.unshift([energyLine, painLine].filter(Boolean).join(' '));
+            }
+        } catch (_) { /* noop */ }
 
         // Expand inline bullet text into proper bullet lines for Invoice Requests
         try {
@@ -1515,7 +1538,7 @@ class EmailManager {
                 // Use non-specific facility size; exact sqft will not be echoed by AI
                 squareFootage: person.squareFootage || person.square_footage || person.buildingSize || person.sqft || account?.squareFootage || account?.sqft || account?.square_feet || '',
                 energy: {
-                    usage: person.energyUsage || person.annual_kwh || person.kwh || account?.annual_kwh || account?.kwh || '',
+                    usage: person.energyUsage || person.annualUsage || person.annual_kwh || person.kwh || account?.annualUsage || account?.annual_kwh || account?.kwh || '',
                     supplier: person.energySupplier || person.supplier || person.contractSupplier || account?.electricitySupplier || account?.supplier || '',
                     currentRate: person.currentRate || person.rate || account?.currentRate || account?.rate || '',
                     contractEnd: person.contractEnd || person.contract_end || person.contractEndDate || account?.contractEndDate || account?.contractEnd || account?.contract_end_date || ''
@@ -1621,6 +1644,77 @@ class EmailManager {
         } catch (e) {
             console.warn('[ComposeAutocomplete] fetchContactsForCompose failed; returning []', e);
             return [];
+        }
+    }
+
+    // Lookup contact by email and enrich with account details
+    async lookupPersonByEmail(email) {
+        try {
+            const e = String(email || '').trim().toLowerCase();
+            if (!e || !window.firebaseDB) return null;
+            let snap;
+            try {
+                snap = await window.firebaseDB.collection('contacts').where('email', '==', e).limit(1).get();
+            } catch (_) {
+                snap = null;
+            }
+            if (!snap || snap.empty) {
+                try {
+                    snap = await window.firebaseDB.collection('people').where('email', '==', e).limit(1).get();
+                } catch (_) {
+                    snap = null;
+                }
+            }
+            if (!snap || snap.empty) return null;
+            const doc = snap.docs[0];
+            const person = { id: doc.id, ...(doc.data ? doc.data() : {}) };
+            // Attempt to match an account
+            const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+            let account = null;
+            const personAccountId = person.accountId || person.account_id || person.companyId || person.company_id || '';
+            const personCompany = person.company || person.companyName || person.accountName || '';
+            const personDomain = e.split('@')[1] || '';
+            if (personAccountId) {
+                account = accounts.find(a => String(a.id || '') === String(personAccountId)) || null;
+            }
+            if (!account && personCompany) {
+                const cmp = String(personCompany).toLowerCase().trim();
+                account = accounts.find(a => String(a.accountName || a.name || a.companyName || '').toLowerCase().trim() === cmp) || null;
+            }
+            if (!account && personDomain) {
+                account = accounts.find(a => {
+                    const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
+                    return d && personDomain.endsWith(d);
+                }) || null;
+            }
+            return {
+                id: person.id,
+                name: person.fullName || person.name || `${person.firstName || person.first_name || ''} ${person.lastName || person.last_name || ''}`.trim(),
+                fullName: person.fullName || person.full_name || '',
+                firstName: person.firstName || person.first_name || '',
+                lastName: person.lastName || person.last_name || '',
+                email: e,
+                company: person.company || person.companyName || person.accountName || (account?.accountName || account?.name || account?.companyName) || '',
+                title: person.title || person.jobTitle || person.role || '',
+                industry: person.industry || person.sector || account?.industry || '',
+                energy: {
+                    usage: person.energyUsage || person.annual_kwh || person.kwh || account?.annual_kwh || account?.kwh || '',
+                    supplier: person.energySupplier || person.supplier || person.contractSupplier || account?.electricitySupplier || account?.supplier || '',
+                    currentRate: person.currentRate || person.rate || account?.currentRate || account?.rate || '',
+                    contractEnd: person.contractEnd || person.contract_end || person.contractEndDate || account?.contractEndDate || account?.contractEnd || account?.contract_end_date || ''
+                },
+                account: account ? {
+                    id: account.id,
+                    name: account.accountName || account.name || account.companyName || '',
+                    industry: account.industry || '',
+                    domain: account.domain || account.website || '',
+                    city: account.city || account.billingCity || account.locationCity || '',
+                    state: account.state || account.billingState || account.region || ''
+                } : null
+            };
+        } catch (e) {
+            console.warn('[Compose] lookupPersonByEmail failed', e);
+            return null;
         }
     }
 

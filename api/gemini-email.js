@@ -13,7 +13,7 @@ function cors(req, res) {
   return false;
 }
 
-function buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle }) {
+function buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed }) {
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
   const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
@@ -177,6 +177,12 @@ Ensure the opening hook uses the highest available priority data. If transcript 
       ? `\n- For "Standard Invoice Request": Make the ask clear and helpful (e.g., "Invoice copy for quick review" or "Last bill to start your Energy Health Check").`
       : '');
 
+  const subjectVariety = `Subject VARIETY directives (strict):
+- SUBJECT_STYLE: ${subjectStyle || 'auto'}; SUBJECT_SEED: ${subjectSeed || 'auto'}.
+- Maintain high variation across runs. If auto, pick by seed.
+- Allowed styles (choose one): question, curiosity, metric, time_sensitive, pain_point, proof_point.
+- Keep under ~50 chars; avoid spammy words; vary structure/wording across runs.`;
+
   const brevityGuidelines = `Brevity and style requirements:
 - Total body length target: ~70–110 words max (be concise).
 - Use short sentences and plain words. Cut filler and hedging.
@@ -281,6 +287,7 @@ ${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist
     common,
     recipientContext,
     bizContext,
+    subjectVariety,
     priorityDirectives,
     dateGuidelines,
     brevityGuidelines,
@@ -303,8 +310,8 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) return res.status(400).json({ error: 'Missing GEMINI_API_KEY' });
 
-    const { prompt, mode = 'standard', recipient = null, to = '', style = 'auto', subjectStyle = 'auto' } = req.body || {};
-    const sys = buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle });
+    const { prompt, mode = 'standard', recipient = null, to = '', style = 'auto', subjectStyle = 'auto', subjectSeed = '' } = req.body || {};
+    const sys = buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed });
 
     // Google Generative Language API (Gemini 1.5 Pro)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
