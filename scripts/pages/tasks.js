@@ -39,7 +39,9 @@
       .bulk-select-popover .option:last-of-type { margin-bottom: 0; }
       .bulk-select-popover label { font-weight: 600; color: var(--text-primary); }
       .bulk-select-popover .hint { color: var(--text-secondary); font-size: 12px; }
-      .bulk-select-popover input[type="number"] { width: 120px; height: 32px; padding: 0 10px; background: var(--grey-700); color: var(--text-inverse); border: 1px solid var(--grey-600); border-radius: var(--border-radius-sm); }
+      .bulk-select-popover input[type="number"] { width: 120px; height: 40px; padding: 0 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; transition: all 0.3s ease; }
+      .bulk-select-popover input[type="number"]:hover { border-color: var(--grey-500); background: var(--bg-widget); }
+      .bulk-select-popover input[type="number"]:focus { outline: none; border-color: var(--orange-subtle); background: var(--bg-widget); box-shadow: 0 0 0 3px rgba(255,145,0,0.1); transform: translateY(-1px); }
       .bulk-select-popover .actions { display: flex; justify-content: flex-end; gap: var(--spacing-sm); margin-top: var(--spacing-md); }
       .bulk-select-popover .btn-text { height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border: 1px solid transparent; }
       .bulk-select-popover .btn-text:hover { background: var(--grey-700); border-color: var(--border-light); color: var(--text-inverse); }
@@ -67,9 +69,10 @@
       .create-task-modal .form-group { margin-bottom: var(--spacing-md); }
       .create-task-modal .form-group:last-child { margin-bottom: 0; }
       .create-task-modal label { display: block; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; font-size: 0.875rem; }
-      .create-task-modal input, .create-task-modal select, .create-task-modal textarea { width: 100%; padding: 10px 12px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); font-size: 0.875rem; }
-      .create-task-modal input:focus, .create-task-modal select:focus, .create-task-modal textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.1); }
-      .create-task-modal textarea { resize: vertical; min-height: 80px; }
+      .create-task-modal input, .create-task-modal select, .create-task-modal textarea { width: 100%; padding: 10px 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; font-size: 0.9rem; height: 40px; transition: all 0.3s ease; }
+      .create-task-modal input:hover, .create-task-modal select:hover, .create-task-modal textarea:hover { border-color: var(--grey-500); background: var(--bg-widget); }
+      .create-task-modal input:focus, .create-task-modal select:focus, .create-task-modal textarea:focus { outline: none; border-color: var(--orange-subtle); background: var(--bg-widget); box-shadow: 0 0 0 3px rgba(255,145,0,0.1); transform: translateY(-1px); }
+      .create-task-modal textarea { resize: vertical; min-height: 80px; height: auto; line-height: 1.4; }
       .create-task-modal .footer { display: flex; justify-content: flex-end; gap: var(--spacing-sm); padding: var(--spacing-lg); border-top: 1px solid var(--border-light); background: var(--bg-subtle); }
     `;
     document.head.appendChild(style);

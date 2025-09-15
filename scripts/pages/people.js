@@ -54,22 +54,72 @@
     }
   }
 
-  // Listen for restore event from Account Detail back button
+  // Listen for restore event from back button navigation
   if (!document._peopleRestoreBound) {
     document.addEventListener('pc:people-restore', (ev) => {
       try {
         const detail = ev && ev.detail ? ev.detail : {};
-        const targetPage = Math.max(1, parseInt(detail.page || state.currentPage || 1, 10));
+        console.log('[People] Restoring state from back button:', detail);
+        
+        // Restore pagination
+        const targetPage = Math.max(1, parseInt(detail.currentPage || detail.page || state.currentPage || 1, 10));
         if (targetPage !== state.currentPage) {
           state.currentPage = targetPage;
-          render();
         }
+        
+        // Restore filters
+        if (detail.filters) {
+          const filters = detail.filters;
+          if (filters.titleTokens) state.titleTokens = [...filters.titleTokens];
+          if (filters.companyTokens) state.companyTokens = [...filters.companyTokens];
+          if (filters.cityTokens) state.cityTokens = [...filters.cityTokens];
+          if (filters.stateTokens) state.stateTokens = [...filters.stateTokens];
+          if (filters.employeesTokens) state.employeesTokens = [...filters.employeesTokens];
+          if (filters.industryTokens) state.industryTokens = [...filters.industryTokens];
+          if (filters.visitorDomainTokens) state.visitorDomainTokens = [...filters.visitorDomainTokens];
+          if (filters.seniorityTokens) state.seniorityTokens = [...filters.seniorityTokens];
+          if (filters.departmentTokens) state.departmentTokens = [...filters.departmentTokens];
+          if (filters.hasEmail !== undefined) state.hasEmail = filters.hasEmail;
+          if (filters.hasPhone !== undefined) state.hasPhone = filters.hasPhone;
+        }
+        
+        // Restore search term
+        if (detail.searchTerm && els.quickSearch) {
+          els.quickSearch.value = detail.searchTerm;
+        }
+        
+        // Restore sorting
+        if (detail.sortColumn) state.sortColumn = detail.sortColumn;
+        if (detail.sortDirection) state.sortDirection = detail.sortDirection;
+        
+        // Re-render with restored state
+        render();
+        
+        // Restore scroll position
         const y = parseInt(detail.scroll || 0, 10);
-        // Wait a tick to ensure layout is ready, then restore scroll
         setTimeout(() => {
           try { window.scrollTo(0, y); } catch (_) {}
-        }, 50);
-      } catch (_) { /* noop */ }
+        }, 100);
+        
+        // Restore selected items
+        if (detail.selectedItems && Array.isArray(detail.selectedItems)) {
+          setTimeout(() => {
+            try {
+              detail.selectedItems.forEach(id => {
+                const checkbox = document.querySelector(`input[data-contact-id="${id}"]`);
+                if (checkbox && !checkbox.checked) {
+                  checkbox.checked = true;
+                  checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              });
+            } catch (_) {}
+          }, 150);
+        }
+        
+        console.log('[People] State restored successfully');
+      } catch (e) { 
+        console.error('[People] Error restoring state:', e);
+      }
     });
     document._peopleRestoreBound = true;
   }
@@ -339,6 +389,285 @@
     return document.getElementById(id);
   }
 
+  // ===== DEBUG HELPERS (temporary) =====
+  function _debugCheckChip(where, containerOrChip) {
+    try {
+      const chip = containerOrChip && containerOrChip.classList && containerOrChip.classList.contains('chip')
+        ? containerOrChip
+        : (containerOrChip ? containerOrChip.querySelector('.chip') : null);
+      if (!chip) {
+        console.log('[Filters][DEBUG]', where, 'no chips present');
+        return;
+      }
+      const cs = window.getComputedStyle(chip);
+      console.log('[Filters][DEBUG]', where, 'chip computed styles', {
+        background: cs.backgroundColor,
+        backgroundImage: cs.backgroundImage,
+        borderColor: cs.borderTopColor,
+        color: cs.color,
+        className: chip.className,
+        style: chip.getAttribute('style'),
+        tagName: chip.tagName,
+        parentElement: chip.parentElement?.className
+      });
+      // Also log the CSS variable values
+      console.log('[Filters][DEBUG] CSS variables', {
+        orangePrimary: cs.getPropertyValue('--orange-primary'),
+        textInverse: cs.getPropertyValue('--text-inverse')
+      });
+    } catch (e) {
+      console.warn('[Filters][DEBUG] chip style error', e);
+    }
+  }
+
+  function _debugSetupInputs(scopeEl) {
+    try {
+      const root = scopeEl || document.getElementById('people-filters') || document;
+      const inputs = root.querySelectorAll('.chip-input-field');
+      inputs.forEach((inp) => {
+        inp.setAttribute('autocomplete', 'off');
+        inp.setAttribute('autocapitalize', 'off');
+        inp.setAttribute('autocorrect', 'off');
+        inp.setAttribute('spellcheck', 'false');
+        inp.setAttribute('aria-autocomplete', 'list');
+        console.log('[Filters][DEBUG] input attrs', inp.id, {
+          autocomplete: inp.autocomplete,
+          autocapitalize: inp.getAttribute('autocapitalize'),
+          autocorrect: inp.getAttribute('autocorrect'),
+          spellcheck: inp.getAttribute('spellcheck')
+        });
+      });
+    } catch (e) {
+      console.warn('[Filters][DEBUG] input attr error', e);
+    }
+  }
+
+  function _debugObserveChips() {
+    try {
+      const root = document.getElementById('people-filters');
+      if (!root) return;
+      const obs = new MutationObserver((muts) => {
+        muts.forEach((m) => {
+          m.addedNodes.forEach((n) => {
+            if (n.nodeType === 1 && n.classList && n.classList.contains('chip')) {
+              _debugCheckChip('mutation', n);
+            }
+          });
+        });
+      });
+      obs.observe(root, { childList: true, subtree: true });
+      console.log('[Filters][DEBUG] chip observer active');
+    } catch (e) {
+      console.warn('[Filters][DEBUG] observer error', e);
+    }
+  }
+
+  // Activate debug once DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { _debugSetupInputs(); _debugObserveChips(); _debugFlexLayout(); });
+  } else {
+    _debugSetupInputs();
+    _debugObserveChips();
+    _debugFlexLayout();
+  }
+
+  // Debug function to track flex layout changes
+  function _debugFlexLayout() {
+    try {
+      const cityContainer = document.querySelector('#people-filters .chip-input');
+      if (cityContainer) {
+        const resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            console.log('[Flex Debug] Container resized:', {
+              width: entry.contentRect.width,
+              height: entry.contentRect.height,
+              target: entry.target.className
+            });
+          }
+        });
+        resizeObserver.observe(cityContainer);
+        
+        // Also observe the input field
+        const inputField = cityContainer.querySelector('.chip-input-field');
+        if (inputField) {
+          resizeObserver.observe(inputField);
+        }
+      }
+    } catch (e) {
+      console.warn('[Flex Debug] Error setting up flex layout observer:', e);
+    }
+  }
+
+  // Helper function to add removal animation to chip remove buttons
+  function addChipRemoveAnimation(container, tokens, renderFunction) {
+    if (!container) return;
+    const fieldId = (container && container.id) ? container.id : '(unknown-field)';
+    container.querySelectorAll('.chip-remove').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const i = parseInt(btn.getAttribute('data-idx') || '-1', 10);
+        if (!isNaN(i) && !btn.disabled) {
+          // Disable button to prevent double-clicks
+          btn.disabled = true;
+          
+          // Add removal animation
+          const chip = btn.closest('.chip');
+          if (chip && !chip.classList.contains('chip-removing')) {
+            // If another chip is already removing, ignore to avoid layout churn
+            const existing = container.querySelector('.chip-removing');
+            if (existing && existing !== chip) {
+              try { console.warn('[Chips][skip-second-remove]', fieldId, { index: i }); } catch(_) {}
+              return;
+            }
+            // If this chip is already removing, ignore
+            if (chip.classList.contains('chip-removing')) {
+              try { console.warn('[Chips][already-removing]', fieldId, { index: i }); } catch(_) {}
+              return;
+            }
+            try { console.log('[Chips][remove-click]', fieldId, { index: i, tokensBefore: (tokens||[]).slice() }); } catch(_) {}
+            // Log pre-layout chip rects
+            try {
+              const rects = Array.from(container.querySelectorAll('.chip')).map((c, idx) => ({ idx, left: c.getBoundingClientRect().left, width: c.offsetWidth, removing: c.classList.contains('chip-removing') }));
+              console.log('[Chips][pre-layout]', fieldId, rects);
+            } catch(_) {}
+            // Set explicit starting width so width -> 0 is smooth
+            try { chip.style.width = chip.offsetWidth + 'px'; /* force reflow */ void chip.offsetWidth; } catch(_) {}
+            requestAnimationFrame(() => {
+              chip.classList.add('chip-removing');
+            });
+            // After transition, remove chip from tokens and re-render
+            let handled = false;
+            const onTransitionEnd = (ev) => {
+              // Only handle once, and only for the width transition of this chip
+              if (handled) return;
+              if (ev && ev.target !== chip) return;
+              if (ev && ev.propertyName && ev.propertyName !== 'width') return;
+              handled = true;
+              chip.removeEventListener('transitionend', onTransitionEnd);
+              try { tokens.splice(i, 1); } catch (_) {}
+               try { console.log('[Chips][removed]', fieldId, { index: i, tokensAfter: (tokens||[]).slice() }); } catch(_) {}
+               // Log post-layout intention (new tokens)
+               try { console.log('[Chips][re-render]', fieldId, { remaining: tokens.slice() }); } catch(_) {}
+               console.log('[Chips][calling-renderFunction]', fieldId, 'about to call renderFunction');
+               renderFunction();
+               console.log('[Chips][calling-applyFilters]', fieldId, 'about to call applyFilters');
+               applyFilters();
+            };
+            chip.addEventListener('transitionend', onTransitionEnd);
+            // Fallback in case transitionend doesn't fire
+            setTimeout(() => { onTransitionEnd(); }, 300);
+          }
+        }
+      });
+    });
+  }
+
+  // Helper function to add a single new chip with animation
+  function addNewChipWithAnimation(container, token, tokens, renderFunction) {
+    if (!container) return;
+    
+    // Debug: Log container state before adding chip
+    const containerRect = container.getBoundingClientRect();
+    const containerStyle = window.getComputedStyle(container);
+    const inputField = container.querySelector('.chip-input-field');
+    const inputRect = inputField ? inputField.getBoundingClientRect() : null;
+    const inputStyle = inputField ? window.getComputedStyle(inputField) : null;
+    
+    console.log('[Flex Debug] Before adding chip:', {
+      containerWidth: containerRect.width,
+      containerHeight: containerRect.height,
+      containerFlexWrap: containerStyle.flexWrap,
+      containerAlignItems: containerStyle.alignItems,
+      containerAlignContent: containerStyle.alignContent,
+      inputWidth: inputRect ? inputRect.width : 'N/A',
+      inputFlex: inputStyle ? inputStyle.flex : 'N/A',
+      inputFlexShrink: inputStyle ? inputStyle.flexShrink : 'N/A',
+      inputMaxWidth: inputStyle ? inputStyle.maxWidth : 'N/A',
+      existingChips: container.querySelectorAll('.chip').length,
+      token: token
+    });
+    
+    const chipHTML = `
+      <span class="chip chip-new" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${tokens.length}">
+        <span class="chip-label">${escapeHtml(token)}</span>
+        <button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(token)}" data-idx="${tokens.length}">&#215;</button>
+      </span>
+    `;
+    container.insertAdjacentHTML('beforeend', chipHTML);
+    
+    // Debug: Log container state after adding chip
+    setTimeout(() => {
+      const newContainerRect = container.getBoundingClientRect();
+      const newInputRect = inputField ? inputField.getBoundingClientRect() : null;
+      const newChip = container.lastElementChild;
+      const chipRect = newChip ? newChip.getBoundingClientRect() : null;
+      
+      // Debug: Check if input field is still in DOM
+      const inputStillExists = container.contains(inputField);
+      const inputDisplay = inputField ? window.getComputedStyle(inputField).display : 'N/A';
+      const inputVisibility = inputField ? window.getComputedStyle(inputField).visibility : 'N/A';
+      
+      console.log('[Flex Debug] After adding chip:', {
+        containerWidth: newContainerRect.width,
+        containerHeight: newContainerRect.height,
+        inputWidth: newInputRect ? newInputRect.width : 'N/A',
+        inputTop: newInputRect ? newInputRect.top : 'N/A',
+        chipWidth: chipRect ? chipRect.width : 'N/A',
+        chipTop: chipRect ? chipRect.top : 'N/A',
+        inputBelowChip: newInputRect && chipRect ? newInputRect.top > chipRect.top : 'N/A',
+        totalChips: container.querySelectorAll('.chip').length,
+        inputStillInDOM: inputStillExists,
+        inputDisplay: inputDisplay,
+        inputVisibility: inputVisibility
+      });
+    }, 10);
+    
+    // Add event listener to the new chip
+    const newChip = container.lastElementChild;
+    const removeBtn = newChip.querySelector('.chip-remove');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const i = parseInt(removeBtn.getAttribute('data-idx') || '-1', 10);
+        if (!isNaN(i) && !removeBtn.disabled) {
+          // Disable button to prevent double-clicks
+          removeBtn.disabled = true;
+          
+          const chip = removeBtn.closest('.chip');
+          if (chip && !chip.classList.contains('chip-removing')) {
+            try { console.log('[Chips][remove-click]', (container && container.id) || '(unknown-field)', { index: i, tokensBefore: (tokens||[]).slice() }); } catch(_) {}
+            try { chip.style.width = chip.offsetWidth + 'px'; void chip.offsetWidth; } catch(_) {}
+            requestAnimationFrame(() => { chip.classList.add('chip-removing'); });
+            let handled = false;
+            const onTransitionEnd = (ev) => {
+              if (handled) return;
+              if (ev && ev.target !== chip) return;
+              if (ev && ev.propertyName && ev.propertyName !== 'width') return;
+              handled = true;
+              chip.removeEventListener('transitionend', onTransitionEnd);
+              try { tokens.splice(i, 1); } catch (_) {}
+              try { console.log('[Chips][removed]', (container && container.id) || '(unknown-field)', { index: i, tokensAfter: (tokens||[]).slice() }); } catch(_) {}
+              renderFunction();
+              applyFilters();
+            };
+            chip.addEventListener('transitionend', onTransitionEnd);
+            setTimeout(() => { onTransitionEnd(); }, 300);
+          }
+        }
+      });
+    }
+    
+    // Remove the animation class after animation completes
+    setTimeout(() => {
+      newChip.classList.remove('chip-new');
+      newChip.classList.add('chip-existing');
+    }, 300);
+  }
+
   // Inject CRM-themed styles for People bulk popover and actions bar
   function injectPeopleBulkStyles() {
     if (document.getElementById('people-bulk-styles')) return; // prevent duplicate injection
@@ -393,7 +722,7 @@
       #people-sequence-panel, #people-lists-panel { position: fixed; z-index: 901; width: min(560px, 92vw);
         background: var(--bg-modal, #262a30) !important; color: var(--text-inverse); border: 1px solid var(--grey-700);
         border-radius: var(--border-radius); box-shadow: var(--shadow-xl);
-        transform: translateY(-8px); opacity: 0; transition: transform .16s ease, opacity .16s ease; overflow: hidden;
+        transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease; overflow: hidden;
         background-clip: padding-box; clip-path: inset(0 round var(--border-radius)); isolation: isolate; }
       #people-sequence-panel.--show, #people-lists-panel.--show { transform: translateY(0); opacity: 1; }
       #people-sequence-panel .seq-header, #people-lists-panel .list-header { padding: 14px 16px; border-bottom: 1px solid var(--grey-700); font-weight: 700; background: var(--bg-modal, #262a30) !important; }
@@ -796,9 +1125,17 @@
         const isHidden = els.filterPanel.hasAttribute('hidden');
         if (isHidden) {
           els.filterPanel.removeAttribute('hidden');
+          // Add show class after a small delay to ensure the element is visible
+          setTimeout(() => {
+            els.filterPanel.classList.add('show');
+          }, 10);
           if (els.filterText) els.filterText.textContent = 'Hide Filters';
         } else {
-          els.filterPanel.setAttribute('hidden', '');
+          // Remove show class first, then hide after animation
+          els.filterPanel.classList.remove('show');
+          setTimeout(() => {
+            els.filterPanel.setAttribute('hidden', '');
+          }, 300); // Match the CSS transition duration
           if (els.filterText) els.filterText.textContent = 'Show Filters';
         }
       });
@@ -823,6 +1160,9 @@
 
   // Title chip behaviors
     if (els.fTitle) {
+      // Reduce browser autofill by briefly toggling readonly
+      els.fTitle.addEventListener('focus', () => { try { els.fTitle.setAttribute('readonly',''); setTimeout(()=>{ els.fTitle.removeAttribute('readonly'); }, 40); } catch(_){} });
+      els.fTitle.setAttribute('name', 'no-autofill-filter-title');
       els.fTitle.addEventListener('input', () => updateTitleSuggestions());
       els.fTitle.addEventListener('keydown', (e) => {
         const val = (els.fTitle.value || '').trim();
@@ -833,6 +1173,20 @@
             els.fTitle.value = '';
             hideTitleSuggestions();
             applyFilters();
+            try {
+              const el = els.fTitle;
+              if (el) {
+                el.focus();
+                requestAnimationFrame(() => {
+                  if (document.activeElement !== el) {
+                    console.log('[Filters][DEBUG] Refocus retry (title) after Enter');
+                    el.focus();
+                  } else {
+                    console.log('[Filters][DEBUG] Focus OK (title) after Enter');
+                  }
+                });
+              }
+            } catch (_) {}
           }
         } else if (e.key === 'Backspace') {
           if (!val && state.titleTokens.length > 0) {
@@ -847,6 +1201,34 @@
           if (ev.target === els.titleChipWrap) els.fTitle.focus();
         });
       }
+    }
+    // Helper: collapse chip input when not focused and empty
+    function _attachChipCollapse(wrapEl, inputEl, keyName) {
+      try {
+        if (!wrapEl || !inputEl) return;
+        const setCollapsed = (on) => {
+          if (on) wrapEl.classList.add('collapsed'); else wrapEl.classList.remove('collapsed');
+          try { console.log('[Filters][DEBUG] collapse', keyName || wrapEl.id || wrapEl.className, '=>', on); } catch(_) {}
+        };
+        const update = () => {
+          const focused = document.activeElement === inputEl;
+          const empty = !(inputEl.value || '').trim();
+          // Only collapse when there are chips present; keep input visible
+          // when there are no chips so placeholder remains visible.
+          const hasChips = !!wrapEl.querySelector('.chip');
+          setCollapsed(!focused && empty && hasChips);
+        };
+        inputEl.addEventListener('focus', () => { setCollapsed(false); });
+        inputEl.addEventListener('blur', () => { setTimeout(update, 0); });
+        wrapEl.addEventListener('click', (ev) => {
+          if (ev.target === wrapEl) {
+            setCollapsed(false);
+            inputEl.focus();
+          }
+        });
+        // Initial state
+        update();
+      } catch (_) {}
     }
     if (els.titleClear) {
       els.titleClear.addEventListener('click', () => {
@@ -866,7 +1248,49 @@
         if (els.fTitle) els.fTitle.value = '';
         hideTitleSuggestions();
         applyFilters();
+        try {
+          const el = els.fTitle;
+          if (el) {
+            el.focus();
+            requestAnimationFrame(() => {
+              if (document.activeElement !== el) {
+                console.log('[Filters][DEBUG] Refocus retry (title) after suggestion');
+                el.focus();
+              } else {
+                console.log('[Filters][DEBUG] Focus OK (title) after suggestion');
+              }
+            });
+          }
+        } catch (_) {}
       });
+    }
+    // City chip behaviors – strengthen autofill suppression on the input itself
+    if (els.fCity) {
+      // Extra autofill suppression
+      try {
+        els.fCity.setAttribute('name', 'no-autofill-filter-city');
+        els.fCity.setAttribute('autocomplete', 'new-password');
+        els.fCity.setAttribute('autocapitalize', 'off');
+        els.fCity.setAttribute('autocorrect', 'off');
+        els.fCity.setAttribute('spellcheck', 'false');
+      } catch (_) {}
+      // Brief readonly on focus to block Chrome address overlay
+      els.fCity.addEventListener('focus', () => {
+        console.log('[Flex Debug] City input focused');
+        try { els.fCity.setAttribute('readonly', ''); setTimeout(() => { els.fCity.removeAttribute('readonly'); }, 40); } catch (_) {}
+      });
+      
+      // Debug: Track input field size changes
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          console.log('[Flex Debug] City input resized:', {
+            width: entry.contentRect.width,
+            height: entry.contentRect.height,
+            target: entry.target.className
+          });
+        }
+      });
+      resizeObserver.observe(els.fCity);
     }
     // Company chip behaviors
     if (els.fCompany) {
@@ -880,6 +1304,20 @@
             els.fCompany.value = '';
             hideCompanySuggestions();
             applyFilters();
+            try {
+              const el = els.fCompany;
+              if (el) {
+                el.focus();
+                requestAnimationFrame(() => {
+                  if (document.activeElement !== el) {
+                    console.log('[Filters][DEBUG] Refocus retry (company) after Enter');
+                    el.focus();
+                  } else {
+                    console.log('[Filters][DEBUG] Focus OK (company) after Enter');
+                  }
+                });
+              }
+            } catch (_) {}
           }
         } else if (e.key === 'Backspace') {
           if (!val && state.companyTokens.length > 0) {
@@ -913,6 +1351,20 @@
         if (els.fCompany) els.fCompany.value = '';
         hideCompanySuggestions();
         applyFilters();
+        try {
+          const el = els.fCompany;
+          if (el) {
+            el.focus();
+            requestAnimationFrame(() => {
+              if (document.activeElement !== el) {
+                console.log('[Filters][DEBUG] Refocus retry (company) after suggestion');
+                el.focus();
+              } else {
+                console.log('[Filters][DEBUG] Focus OK (company) after suggestion');
+              }
+            });
+          }
+        } catch (_) {}
       });
     }
     // City chip behaviors
@@ -922,11 +1374,26 @@
         const val = (els.fCity.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
           if (val) {
+            console.log('[Flex Debug] Enter/Comma pressed, adding city token:', val);
             e.preventDefault();
             addCityToken(val);
             els.fCity.value = '';
             hideCitySuggestions();
             applyFilters();
+            try {
+              const el = els.fCity;
+              if (el) {
+                el.focus();
+                requestAnimationFrame(() => {
+                  if (document.activeElement !== el) {
+                    console.log('[Filters][DEBUG] Refocus retry (city) after Enter');
+                    el.focus();
+                  } else {
+                    console.log('[Filters][DEBUG] Focus OK (city) after Enter');
+                  }
+                });
+              }
+            } catch (_) {}
           }
         } else if (e.key === 'Backspace') {
           if (!val && state.cityTokens.length > 0) { e.preventDefault(); removeLastCityToken(); applyFilters(); }
@@ -940,15 +1407,25 @@
       els.cityClear.addEventListener('click', () => { clearCityTokens(); if (els.fCity) els.fCity.value = ''; hideCitySuggestions(); applyFilters(); els.fCity?.focus(); });
     }
     if (els.citySuggest) {
-      els.citySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg') || ''; addCityToken(label); if (els.fCity) els.fCity.value = ''; hideCitySuggestions(); applyFilters(); });
+      els.citySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg') || ''; addCityToken(label); if (els.fCity) els.fCity.value = ''; hideCitySuggestions(); applyFilters(); try { const el = els.fCity; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (city) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (city) after suggestion'); } }); } } catch (_) {} });
     }
+    // Attach collapse/expand behavior for all chip inputs
+    _attachChipCollapse(els.titleChipWrap, els.fTitle, 'title');
+    _attachChipCollapse(els.companyChipWrap, els.fCompany, 'company');
+    _attachChipCollapse(els.cityChipWrap, els.fCity, 'city');
+    _attachChipCollapse(els.stateChipWrap, els.fState, 'state');
+    _attachChipCollapse(els.employeesChipWrap, els.fEmployees, 'employees');
+    _attachChipCollapse(els.industryChipWrap, els.fIndustry, 'industry');
+    _attachChipCollapse(els.visitorDomainChipWrap, els.fVisitorDomain, 'visitorDomain');
+    _attachChipCollapse(els.seniorityChipWrap, els.fSeniority, 'seniority');
+    _attachChipCollapse(els.departmentChipWrap, els.fDepartment, 'department');
     // State chip behaviors
     if (els.fState) {
       els.fState.addEventListener('input', () => updateStateSuggestions());
       els.fState.addEventListener('keydown', (e) => {
         const val = (els.fState.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addStateToken(val); els.fState.value = ''; hideStateSuggestions(); applyFilters(); }
+          if (val) { e.preventDefault(); addStateToken(val); els.fState.value = ''; hideStateSuggestions(); applyFilters(); try { const el = els.fState; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (state) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (state) after Enter'); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.stateTokens.length > 0) { e.preventDefault(); removeLastStateToken(); applyFilters(); }
         }
@@ -956,14 +1433,14 @@
       if (els.stateChipWrap) { els.stateChipWrap.addEventListener('click', (ev) => { if (ev.target === els.stateChipWrap) els.fState.focus(); }); }
     }
     if (els.stateClear) { els.stateClear.addEventListener('click', () => { clearStateTokens(); if (els.fState) els.fState.value=''; hideStateSuggestions(); applyFilters(); els.fState?.focus(); }); }
-    if (els.stateSuggest) { els.stateSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addStateToken(label); if (els.fState) els.fState.value=''; hideStateSuggestions(); applyFilters(); }); }
+    if (els.stateSuggest) { els.stateSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addStateToken(label); if (els.fState) els.fState.value=''; hideStateSuggestions(); applyFilters(); try { const el = els.fState; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (state) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (state) after suggestion'); } }); } } catch (_) {} }); }
     // Employees chip behaviors
     if (els.fEmployees) {
       els.fEmployees.addEventListener('input', () => updateEmployeesSuggestions());
       els.fEmployees.addEventListener('keydown', (e) => {
         const val = (els.fEmployees.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addEmployeesToken(val); els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); }
+          if (val) { e.preventDefault(); addEmployeesToken(val); els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); try { const el = els.fEmployees; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (employees) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (employees) after Enter'); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.employeesTokens.length > 0) { e.preventDefault(); removeLastEmployeesToken(); applyFilters(); }
         }
@@ -971,14 +1448,14 @@
       if (els.employeesChipWrap) { els.employeesChipWrap.addEventListener('click', (ev) => { if (ev.target === els.employeesChipWrap) els.fEmployees.focus(); }); }
     }
     if (els.employeesClear) { els.employeesClear.addEventListener('click', () => { clearEmployeesTokens(); if (els.fEmployees) els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); els.fEmployees?.focus(); }); }
-    if (els.employeesSuggest) { els.employeesSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addEmployeesToken(label); if (els.fEmployees) els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); }); }
+    if (els.employeesSuggest) { els.employeesSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addEmployeesToken(label); if (els.fEmployees) els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); try { const el = els.fEmployees; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (employees) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (employees) after suggestion'); } }); } } catch (_) {} }); }
     // Industry chip behaviors
     if (els.fIndustry) {
       els.fIndustry.addEventListener('input', () => updateIndustrySuggestions());
       els.fIndustry.addEventListener('keydown', (e) => {
         const val = (els.fIndustry.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addIndustryToken(val); els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); }
+          if (val) { e.preventDefault(); addIndustryToken(val); els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); try { const el = els.fIndustry; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (industry) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (industry) after Enter'); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.industryTokens.length > 0) { e.preventDefault(); removeLastIndustryToken(); applyFilters(); }
         }
@@ -986,14 +1463,14 @@
       if (els.industryChipWrap) { els.industryChipWrap.addEventListener('click', (ev) => { if (ev.target === els.industryChipWrap) els.fIndustry.focus(); }); }
     }
     if (els.industryClear) { els.industryClear.addEventListener('click', () => { clearIndustryTokens(); if (els.fIndustry) els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); els.fIndustry?.focus(); }); }
-    if (els.industrySuggest) { els.industrySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addIndustryToken(label); if (els.fIndustry) els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); }); }
+    if (els.industrySuggest) { els.industrySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addIndustryToken(label); if (els.fIndustry) els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); try { const el = els.fIndustry; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (industry) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (industry) after suggestion'); } }); } } catch (_) {} }); }
     // Visitor domain chip behaviors
     if (els.fVisitorDomain) {
       els.fVisitorDomain.addEventListener('input', () => updateVisitorDomainSuggestions());
       els.fVisitorDomain.addEventListener('keydown', (e) => {
         const val = (els.fVisitorDomain.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addVisitorDomainToken(val); els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); }
+          if (val) { e.preventDefault(); addVisitorDomainToken(val); els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); try { const el = els.fVisitorDomain; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (visitorDomain) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (visitorDomain) after Enter'); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.visitorDomainTokens.length > 0) { e.preventDefault(); removeLastVisitorDomainToken(); applyFilters(); }
         }
@@ -1001,35 +1478,35 @@
       if (els.visitorDomainChipWrap) { els.visitorDomainChipWrap.addEventListener('click', (ev) => { if (ev.target === els.visitorDomainChipWrap) els.fVisitorDomain.focus(); }); }
     }
     if (els.visitorDomainClear) { els.visitorDomainClear.addEventListener('click', () => { clearVisitorDomainTokens(); if (els.fVisitorDomain) els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); els.fVisitorDomain?.focus(); }); }
-    if (els.visitorDomainSuggest) { els.visitorDomainSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addVisitorDomainToken(label); if (els.fVisitorDomain) els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); }); }
+    if (els.visitorDomainSuggest) { els.visitorDomainSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addVisitorDomainToken(label); if (els.fVisitorDomain) els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); try { const el = els.fVisitorDomain; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (visitorDomain) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (visitorDomain) after suggestion'); } }); } } catch (_) {} }); }
     // Seniority chip behaviors
     if (els.fSeniority) {
       els.fSeniority.addEventListener('input', () => updateSenioritySuggestions());
       els.fSeniority.addEventListener('keydown', (e) => {
         const val = (els.fSeniority.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addSeniorityToken(val); els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); }
+          if (val) { e.preventDefault(); addSeniorityToken(val); els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); try { const el = els.fSeniority; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (seniority) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (seniority) after Enter'); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.seniorityTokens.length > 0) { e.preventDefault(); removeLastSeniorityToken(); applyFilters(); }
         }
       });
     }
     if (els.seniorityClear) { els.seniorityClear.addEventListener('click', () => { clearSeniorityTokens(); if (els.fSeniority) els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); els.fSeniority?.focus(); }); }
-    if (els.senioritySuggest) { els.senioritySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addSeniorityToken(label); if (els.fSeniority) els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); }); }
+    if (els.senioritySuggest) { els.senioritySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addSeniorityToken(label); if (els.fSeniority) els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); try { const el = els.fSeniority; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (seniority) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (seniority) after suggestion'); } }); } } catch (_) {} }); }
     // Department chip behaviors
     if (els.fDepartment) {
       els.fDepartment.addEventListener('input', () => updateDepartmentSuggestions());
       els.fDepartment.addEventListener('keydown', (e) => {
         const val = (els.fDepartment.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addDepartmentToken(val); els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); }
+          if (val) { e.preventDefault(); addDepartmentToken(val); els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); try { const el = els.fDepartment; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (department) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (department) after Enter'); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.departmentTokens.length > 0) { e.preventDefault(); removeLastDepartmentToken(); applyFilters(); }
         }
       });
     }
     if (els.departmentClear) { els.departmentClear.addEventListener('click', () => { clearDepartmentTokens(); if (els.fDepartment) els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); els.fDepartment?.focus(); }); }
-    if (els.departmentSuggest) { els.departmentSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addDepartmentToken(label); if (els.fDepartment) els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); }); }
+    if (els.departmentSuggest) { els.departmentSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addDepartmentToken(label); if (els.fDepartment) els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); try { const el = els.fDepartment; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (department) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (department) after suggestion'); } }); } } catch (_) {} }); }
     [els.fHasEmail, els.fHasPhone].forEach((chk) => {
       if (chk) chk.addEventListener('change', reFilter);
     });
@@ -1363,21 +1840,67 @@
   }
   function renderCityChips() {
     if (!els.cityChips) return;
-    els.cityChips.innerHTML = state.cityTokens.map((t, idx) => `
-      <span class="chip" data-idx="${idx}">
+    console.log('[Chips][renderCityChips] called with tokens:', state.cityTokens.slice());
+    const chipHTML = state.cityTokens.map((t, idx) => `
+      <span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}">
         <span class="chip-label">${escapeHtml(t)}</span>
         <button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button>
       </span>
     `).join('');
-    els.cityChips.querySelectorAll('.chip-remove').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const i = parseInt(btn.getAttribute('data-idx')||'-1',10);
-        if (!isNaN(i)) { state.cityTokens.splice(i,1); renderCityChips(); applyFilters(); }
-      });
-    });
+    console.log('[Filters][DEBUG] renderCityChips HTML:', chipHTML);
+    els.cityChips.innerHTML = chipHTML;
+    // Use the shared transition-based removal to avoid last-chip flicker
+    addChipRemoveAnimation(els.cityChips, state.cityTokens, renderCityChips);
     if (els.cityClear) { if (state.cityTokens.length>0) els.cityClear.removeAttribute('hidden'); else els.cityClear.setAttribute('hidden',''); }
+    // Hide placeholder when chips exist (works even if :has() is unsupported)
+    if (els.fCity) {
+      if (state.cityTokens.length > 0) {
+        if (els.fCity.getAttribute('data-ph') == null) {
+          els.fCity.setAttribute('data-ph', els.fCity.getAttribute('placeholder') || '');
+        }
+        els.fCity.setAttribute('placeholder', '');
+      } else {
+        const prev = els.fCity.getAttribute('data-ph') || 'e.g., Austin, Dallas';
+        els.fCity.setAttribute('placeholder', prev);
+      }
+      try { console.log('[Filters][DEBUG] city placeholder', els.fCity.getAttribute('placeholder')); } catch(_) {}
+    }
   }
-  function addCityToken(label){ const t=label.trim(); if(!t) return; const exists=state.cityTokens.some((x)=>normalize(x)===normalize(t)); if(!exists){ state.cityTokens.push(t); renderCityChips(); } }
+  function addCityToken(label){ 
+    const t=label.trim(); 
+    if(!t) return; 
+    const exists=state.cityTokens.some((x)=>normalize(x)===normalize(t)); 
+    if(!exists){ 
+      console.log('[Flex Debug] Adding city token:', {
+        token: t,
+        currentTokens: state.cityTokens.length,
+        willBeTokens: state.cityTokens.length + 1
+      });
+      
+      state.cityTokens.push(t); 
+      addNewChipWithAnimation(els.cityChips, t, state.cityTokens, renderCityChips);
+      
+      // Update clear button visibility
+      if (els.cityClear) {
+        if (state.cityTokens.length > 0) els.cityClear.removeAttribute('hidden');
+        else els.cityClear.setAttribute('hidden', '');
+      }
+      // Hide placeholder when chips exist
+      if (els.fCity) {
+        if (state.cityTokens.length > 0) {
+          if (els.fCity.getAttribute('data-ph') == null) {
+            els.fCity.setAttribute('data-ph', els.fCity.getAttribute('placeholder') || '');
+          }
+          els.fCity.setAttribute('placeholder', '');
+        } else {
+          const prev = els.fCity.getAttribute('data-ph') || 'e.g., Austin, Dallas';
+          els.fCity.setAttribute('placeholder', prev);
+        }
+      }
+    } else {
+      console.log('[Flex Debug] City token already exists:', t);
+    }
+  }
   function removeLastCityToken(){ if(state.cityTokens.length===0) return; state.cityTokens.pop(); renderCityChips(); }
   function clearCityTokens(){ if(state.cityTokens.length===0) return; state.cityTokens=[]; renderCityChips(); }
   function updateCitySuggestions(){ if(!els.citySuggest) return; const q=normalize(els.fCity?els.fCity.value:''); if(!q){ hideCitySuggestions(); return; } const items=[]; for(let i=0;i<state.cityPool.length && items.length<8;i++){ const s=state.cityPool[i]; if(normalize(s).includes(q) && !state.cityTokens.some((x)=>normalize(x)===normalize(s))) items.push(s); } if(items.length===0){ hideCitySuggestions(); return; } els.citySuggest.innerHTML = items.map((s)=>`<div class="item" data-sugg="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join(''); els.citySuggest.removeAttribute('hidden'); }
@@ -1385,7 +1908,12 @@
 
   // ===== State chip-input helpers =====
   function buildStateSuggestionPool(){ const set=new Set(); const pool=[]; for(const c of state.data){ const v=(c.state || c.locationState || '').toString().trim(); if(!v) continue; const key=normalize(v); if(!set.has(key)){ set.add(key); pool.push(v);} if(pool.length>2000) break; } state.statePool=pool; }
-  function renderStateChips(){ if(!els.stateChips) return; els.stateChips.innerHTML = state.stateTokens.map((t,idx)=>`<span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); els.stateChips.querySelectorAll('.chip-remove').forEach((btn)=>{ btn.addEventListener('click',()=>{ const i=parseInt(btn.getAttribute('data-idx')||'-1',10); if(!isNaN(i)){ state.stateTokens.splice(i,1); renderStateChips(); applyFilters(); } });}); if(els.stateClear){ if(state.stateTokens.length>0) els.stateClear.removeAttribute('hidden'); else els.stateClear.setAttribute('hidden',''); } }
+  function renderStateChips(){ 
+    if(!els.stateChips) return; 
+    els.stateChips.innerHTML = state.stateTokens.map((t,idx)=>`<span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); 
+    addChipRemoveAnimation(els.stateChips, state.stateTokens, renderStateChips);
+    if(els.stateClear){ if(state.stateTokens.length>0) els.stateClear.removeAttribute('hidden'); else els.stateClear.setAttribute('hidden',''); } 
+  }
   function addStateToken(label){ const t=label.trim(); if(!t) return; const exists=state.stateTokens.some((x)=>normalize(x)===normalize(t)); if(!exists){ state.stateTokens.push(t); renderStateChips(); } }
   function removeLastStateToken(){ if(state.stateTokens.length===0) return; state.stateTokens.pop(); renderStateChips(); }
   function clearStateTokens(){ if(state.stateTokens.length===0) return; state.stateTokens=[]; renderStateChips(); }
@@ -1397,21 +1925,12 @@
   function renderEmployeesChips(){
     if(!els.employeesChips) return;
     els.employeesChips.innerHTML = state.employeesTokens.map((t,idx)=>`
-      <span class="chip" data-idx="${idx}">
+      <span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}">
         <span class="chip-label">${escapeHtml(t)}</span>
         <button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button>
       </span>
     `).join('');
-    els.employeesChips.querySelectorAll('.chip-remove').forEach((btn)=>{
-      btn.addEventListener('click',()=>{
-        const i=parseInt(btn.getAttribute('data-idx')||'-1',10);
-        if(!isNaN(i)){
-          state.employeesTokens.splice(i,1);
-          renderEmployeesChips();
-          applyFilters();
-        }
-      });
-    });
+    addChipRemoveAnimation(els.employeesChips, state.employeesTokens, renderEmployeesChips);
     if(els.employeesClear){
       if(state.employeesTokens.length>0) els.employeesClear.removeAttribute('hidden');
       else els.employeesClear.setAttribute('hidden','');
@@ -1425,7 +1944,12 @@
 
   // ===== Industry chip-input helpers =====
   function buildIndustrySuggestionPool(){ const set=new Set(); const pool=[]; for(const c of state.data){ const v=(c.industry || c.companyIndustry || '').toString().trim(); if(!v) continue; const key=normalize(v); if(!set.has(key)){ set.add(key); pool.push(v);} if(pool.length>2000) break; } state.industryPool=pool; }
-  function renderIndustryChips(){ if(!els.industryChips) return; els.industryChips.innerHTML = state.industryTokens.map((t,idx)=>`<span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); els.industryChips.querySelectorAll('.chip-remove').forEach((btn)=>{ btn.addEventListener('click',()=>{ const i=parseInt(btn.getAttribute('data-idx')||'-1',10); if(!isNaN(i)){ state.industryTokens.splice(i,1); renderIndustryChips(); applyFilters(); } });}); if(els.industryClear){ if(state.industryTokens.length>0) els.industryClear.removeAttribute('hidden'); else els.industryClear.setAttribute('hidden',''); } }
+  function renderIndustryChips(){ 
+    if(!els.industryChips) return; 
+    els.industryChips.innerHTML = state.industryTokens.map((t,idx)=>`<span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); 
+    addChipRemoveAnimation(els.industryChips, state.industryTokens, renderIndustryChips);
+    if(els.industryClear){ if(state.industryTokens.length>0) els.industryClear.removeAttribute('hidden'); else els.industryClear.setAttribute('hidden',''); } 
+  }
   function addIndustryToken(label){ const t=label.trim(); if(!t) return; const exists=state.industryTokens.some((x)=>normalize(x)===normalize(t)); if(!exists){ state.industryTokens.push(t); renderIndustryChips(); } }
   function removeLastIndustryToken(){ if(state.industryTokens.length===0) return; state.industryTokens.pop(); renderIndustryChips(); }
   function clearIndustryTokens(){ if(state.industryTokens.length===0) return; state.industryTokens=[]; renderIndustryChips(); }
@@ -1445,9 +1969,24 @@
   }
   function buildSenioritySuggestionPool(){ const set=new Set(); const pool=[]; for(const c of state.data){ const v=(c.seniority || '').toString().trim(); if(!v) continue; const key=normalize(v); if(!set.has(key)){ set.add(key); pool.push(v);} if(pool.length>2000) break; } state.seniorityPool=pool; }
   function buildDepartmentSuggestionPool(){ const set=new Set(); const pool=[]; for(const c of state.data){ const v=(c.department || '').toString().trim(); if(!v) continue; const key=normalize(v); if(!set.has(key)){ set.add(key); pool.push(v);} if(pool.length>2000) break; } state.departmentPool=pool; }
-  function renderVisitorDomainChips(){ if(!els.visitorDomainChips) return; els.visitorDomainChips.innerHTML = state.visitorDomainTokens.map((t,idx)=>`<span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); els.visitorDomainChips.querySelectorAll('.chip-remove').forEach((btn)=>{ btn.addEventListener('click',()=>{ const i=parseInt(btn.getAttribute('data-idx')||'-1',10); if(!isNaN(i)){ state.visitorDomainTokens.splice(i,1); renderVisitorDomainChips(); applyFilters(); } });}); if(els.visitorDomainClear){ if(state.visitorDomainTokens.length>0) els.visitorDomainClear.removeAttribute('hidden'); else els.visitorDomainClear.setAttribute('hidden',''); } }
-  function renderSeniorityChips(){ if(!els.seniorityChips) return; els.seniorityChips.innerHTML = state.seniorityTokens.map((t,idx)=>`<span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); els.seniorityChips.querySelectorAll('.chip-remove').forEach((btn)=>{ btn.addEventListener('click',()=>{ const i=parseInt(btn.getAttribute('data-idx')||'-1',10); if(!isNaN(i)){ state.seniorityTokens.splice(i,1); renderSeniorityChips(); applyFilters(); } });}); if(els.seniorityClear){ if(state.seniorityTokens.length>0) els.seniorityClear.removeAttribute('hidden'); else els.seniorityClear.setAttribute('hidden',''); } }
-  function renderDepartmentChips(){ if(!els.departmentChips) return; els.departmentChips.innerHTML = state.departmentTokens.map((t,idx)=>`<span class="chip" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); els.departmentChips.querySelectorAll('.chip-remove').forEach((btn)=>{ btn.addEventListener('click',()=>{ const i=parseInt(btn.getAttribute('data-idx')||'-1',10); if(!isNaN(i)){ state.departmentTokens.splice(i,1); renderDepartmentChips(); applyFilters(); } });}); if(els.departmentClear){ if(state.departmentTokens.length>0) els.departmentClear.removeAttribute('hidden'); else els.departmentClear.setAttribute('hidden',''); } }
+  function renderVisitorDomainChips(){ 
+    if(!els.visitorDomainChips) return; 
+    els.visitorDomainChips.innerHTML = state.visitorDomainTokens.map((t,idx)=>`<span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); 
+    addChipRemoveAnimation(els.visitorDomainChips, state.visitorDomainTokens, renderVisitorDomainChips);
+    if(els.visitorDomainClear){ if(state.visitorDomainTokens.length>0) els.visitorDomainClear.removeAttribute('hidden'); else els.visitorDomainClear.setAttribute('hidden',''); } 
+  }
+  function renderSeniorityChips(){ 
+    if(!els.seniorityChips) return; 
+    els.seniorityChips.innerHTML = state.seniorityTokens.map((t,idx)=>`<span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); 
+    addChipRemoveAnimation(els.seniorityChips, state.seniorityTokens, renderSeniorityChips);
+    if(els.seniorityClear){ if(state.seniorityTokens.length>0) els.seniorityClear.removeAttribute('hidden'); else els.seniorityClear.setAttribute('hidden',''); } 
+  }
+  function renderDepartmentChips(){ 
+    if(!els.departmentChips) return; 
+    els.departmentChips.innerHTML = state.departmentTokens.map((t,idx)=>`<span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}"><span class="chip-label">${escapeHtml(t)}</span><button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button></span>`).join(''); 
+    addChipRemoveAnimation(els.departmentChips, state.departmentTokens, renderDepartmentChips);
+    if(els.departmentClear){ if(state.departmentTokens.length>0) els.departmentClear.removeAttribute('hidden'); else els.departmentClear.setAttribute('hidden',''); } 
+  }
   function addVisitorDomainToken(label){ const t=label.trim(); if(!t) return; const exists=state.visitorDomainTokens.some((x)=>normalize(x)===normalize(t)); if(!exists){ state.visitorDomainTokens.push(t); renderVisitorDomainChips(); } }
   function removeLastVisitorDomainToken(){ if(state.visitorDomainTokens.length===0) return; state.visitorDomainTokens.pop(); renderVisitorDomainChips(); }
   function clearVisitorDomainTokens(){ if(state.visitorDomainTokens.length===0) return; state.visitorDomainTokens=[]; renderVisitorDomainChips(); }
@@ -1480,21 +2019,12 @@
   function renderTitleChips() {
     if (!els.titleChips) return;
     els.titleChips.innerHTML = state.titleTokens.map((t, idx) => `
-      <span class="chip" data-idx="${idx}">
+      <span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}">
         <span class="chip-label">${escapeHtml(t)}</span>
         <button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button>
       </span>
     `).join('');
-    els.titleChips.querySelectorAll('.chip-remove').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const i = parseInt(btn.getAttribute('data-idx') || '-1', 10);
-        if (!isNaN(i)) {
-          state.titleTokens.splice(i, 1);
-          renderTitleChips();
-          applyFilters();
-        }
-      });
-    });
+    addChipRemoveAnimation(els.titleChips, state.titleTokens, renderTitleChips);
     if (els.titleClear) {
       if (state.titleTokens.length > 0) els.titleClear.removeAttribute('hidden');
       else els.titleClear.setAttribute('hidden', '');
@@ -1538,21 +2068,12 @@
   function renderCompanyChips() {
     if (!els.companyChips) return;
     els.companyChips.innerHTML = state.companyTokens.map((t, idx) => `
-      <span class="chip" data-idx="${idx}">
+      <span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}">
         <span class="chip-label">${escapeHtml(t)}</span>
         <button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button>
       </span>
     `).join('');
-    els.companyChips.querySelectorAll('.chip-remove').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const i = parseInt(btn.getAttribute('data-idx') || '-1', 10);
-        if (!isNaN(i)) {
-          state.companyTokens.splice(i, 1);
-          renderCompanyChips();
-          applyFilters();
-        }
-      });
-    });
+    addChipRemoveAnimation(els.companyChips, state.companyTokens, renderCompanyChips);
     if (els.companyClear) {
       if (state.companyTokens.length > 0) els.companyClear.removeAttribute('hidden');
       else els.companyClear.setAttribute('hidden', '');
@@ -1747,6 +2268,32 @@
       .replaceAll("'", '&#039;');
   }
 
+  function getCurrentState(){
+    return {
+      page: 'people',
+      scroll: window.scrollY || 0,
+      currentPage: state.currentPage || 1,
+      filters: {
+        titleTokens: [...state.titleTokens],
+        companyTokens: [...state.companyTokens],
+        cityTokens: [...state.cityTokens],
+        stateTokens: [...state.stateTokens],
+        employeesTokens: [...state.employeesTokens],
+        industryTokens: [...state.industryTokens],
+        visitorDomainTokens: [...state.visitorDomainTokens],
+        seniorityTokens: [...state.seniorityTokens],
+        departmentTokens: [...state.departmentTokens],
+        hasEmail: state.hasEmail,
+        hasPhone: state.hasPhone
+      },
+      searchTerm: els.quickSearch?.value || '',
+      selectedItems: getSelectedContacts().map(c => c.id || c.contactId || c._id),
+      sortColumn: state.sortColumn || '',
+      sortDirection: state.sortDirection || 'asc',
+      timestamp: Date.now()
+    };
+  }
+
   function init() {
     if (!initDomRefs()) return; // Not on this page
     attachEvents();
@@ -1758,7 +2305,7 @@
     refreshPeopleHeaderOrder();
     // Export for other modules if needed
     if (typeof window !== 'undefined') {
-      window.peopleModule = { init, loadDataOnce, applyFilters, state, rebindDynamic };
+      window.peopleModule = { init, loadDataOnce, applyFilters, state, rebindDynamic, getCurrentState };
       // Export contacts data for contact-detail module
       window.getPeopleData = () => state.data;
     }
@@ -2804,9 +3351,23 @@
       if (els.selectAll) { els.selectAll.checked = false; els.selectAll.indeterminate = false; }
     });
     const addListBtn = container.querySelector('#bulk-addlist');
-    if (addListBtn) addListBtn.addEventListener('click', () => openBulkListsPanel());
+    if (addListBtn) addListBtn.addEventListener('click', () => {
+      // Toggle behavior: close if already open
+      if (document.getElementById('people-lists-panel')) {
+        closeBulkListsPanel();
+      } else {
+        openBulkListsPanel();
+      }
+    });
     const seqBtn = container.querySelector('#bulk-sequence');
-    if (seqBtn) seqBtn.addEventListener('click', () => openBulkSequencePanel());
+    if (seqBtn) seqBtn.addEventListener('click', () => {
+      // Toggle behavior: close if already open
+      if (document.getElementById('people-sequence-panel')) {
+        closeBulkSequencePanel();
+      } else {
+        openBulkSequencePanel();
+      }
+    });
     const exportBtn = container.querySelector('#bulk-export');
     if (exportBtn) exportBtn.addEventListener('click', () => exportSelectedToCSV());
     const deleteBtn = container.querySelector('#bulk-delete');

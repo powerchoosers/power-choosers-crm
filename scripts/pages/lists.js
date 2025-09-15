@@ -951,10 +951,70 @@
     init();
   }
 
+  function getCurrentState(){
+    return {
+      page: 'lists',
+      scroll: window.scrollY || 0,
+      currentPage: state.currentPage || 1,
+      filters: {
+        // Add any list-specific filters here
+      },
+      searchTerm: els.quickSearch?.value || '',
+      selectedItems: getSelectedItems().map(i => i.id || i._id),
+      sortColumn: state.sortColumn || '',
+      sortDirection: state.sortDirection || 'asc',
+      timestamp: Date.now()
+    };
+  }
+
+  // Listen for restore event from back button navigation
+  if (!document._listsRestoreBound) {
+    document.addEventListener('pc:lists-restore', (ev) => {
+      try {
+        const detail = ev && ev.detail ? ev.detail : {};
+        console.log('[Lists] Restoring state from back button:', detail);
+        
+        // Restore pagination
+        const targetPage = Math.max(1, parseInt(detail.currentPage || detail.page || state.currentPage || 1, 10));
+        if (targetPage !== state.currentPage) {
+          state.currentPage = targetPage;
+        }
+        
+        // Restore search term
+        if (detail.searchTerm && els.quickSearch) {
+          els.quickSearch.value = detail.searchTerm;
+        }
+        
+        // Restore sorting
+        if (detail.sortColumn) state.sortColumn = detail.sortColumn;
+        if (detail.sortDirection) state.sortDirection = detail.sortDirection;
+        
+        // Re-render with restored state
+        render();
+        
+        // Restore scroll position
+        const y = parseInt(detail.scroll || 0, 10);
+        setTimeout(() => {
+          try { window.scrollTo(0, y); } catch (_) {}
+        }, 100);
+        
+        console.log('[Lists] State restored successfully');
+      } catch (e) { 
+        console.error('[Lists] Error restoring state:', e);
+      }
+    });
+    document._listsRestoreBound = true;
+  }
+
   // Expose programmatic API for Lists Overview to open/close detail view
   window.ListsView = {
     open: openDetail,
     close: closeDetail,
+  };
+
+  // Expose module for navigation state tracking
+  window.listsModule = {
+    getCurrentState
   };
 
   // ===== Suggestion pool builders =====
