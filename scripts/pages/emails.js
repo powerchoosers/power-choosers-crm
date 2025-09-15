@@ -344,7 +344,21 @@ class EmailManager {
                 }
             } catch (e) { console.warn('[AI] Could not enrich recipient energy from accounts', e); }
 
-            const payload = { prompt, mode, recipient: enrichedRecipient, to: toInput?.value || '' };
+            // Pull recent call transcript for this recipient if available
+            try {
+                const recentCall = (typeof window.getRecentCallForEmail === 'function') ? (window.getRecentCallForEmail(enrichedRecipient) || null) : null;
+                if (recentCall && recentCall.transcript) {
+                    enrichedRecipient.transcript = String(recentCall.transcript || '').slice(0, 2000);
+                }
+            } catch(_) { /* noop */ }
+
+            // Add style randomization hints for variation
+            const styleOptions = ['hook_question','value_bullets','proof_point','risk_focus','timeline_focus'];
+            const randomStyle = styleOptions[Math.floor(Math.random() * styleOptions.length)];
+            const subjStyles = ['question','outcome','time_sensitive','pain_point'];
+            const randomSubj = subjStyles[Math.floor(Math.random() * subjStyles.length)];
+
+            const payload = { prompt, mode, recipient: enrichedRecipient, to: toInput?.value || '', style: randomStyle, subjectStyle: randomSubj };
             let res;
             try {
                 res = await fetch(genUrl, {
@@ -1108,7 +1122,10 @@ class EmailManager {
 
             console.group('[AI][LogAll] Starting batch');
             for (const p of prompts) {
-                const payload = { prompt: p, mode, recipient: enrichedRecipient, to: toInput?.value || '' };
+                // Include transcript and randomized styles for logging as well
+                const styleOptions2 = ['hook_question','value_bullets','proof_point','risk_focus','timeline_focus'];
+                const subjStyles2 = ['question','outcome','time_sensitive','pain_point'];
+                const payload = { prompt: p, mode, recipient: enrichedRecipient, to: toInput?.value || '', style: styleOptions2[Math.floor(Math.random() * styleOptions2.length)], subjectStyle: subjStyles2[Math.floor(Math.random() * subjStyles2.length)] };
                 try {
                     const res = await fetch(genUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     const data = await res.json().catch(() => null);
@@ -1162,205 +1179,23 @@ class EmailManager {
                 editor.innerHTML = cleaned;
             }
             
-            // Comprehensive sentence completion and quality fixes
+            // Fix incomplete sentences ending with "your?" or similar
             const paragraphs = editor.querySelectorAll('p');
             paragraphs.forEach(p => {
-                let text = p.textContent || '';
-                let needsUpdate = false;
-                
-                // Fix incomplete sentences ending with "your?" or similar
+                const text = p.textContent || '';
                 if (text.trim().endsWith('your?') || text.trim().endsWith('your')) {
+                    // Try to complete the sentence based on context
                     if (text.includes('improving your')) {
-                        text = text.replace(/improving your\??$/, 'improving your energy procurement process.');
-                        needsUpdate = true;
+                        p.textContent = text.replace(/improving your\??$/, 'improving your energy procurement process.');
                     } else if (text.includes('discuss your')) {
-                        text = text.replace(/discuss your\??$/, 'discuss your specific energy needs.');
-                        needsUpdate = true;
-                    } else if (text.includes('help with your')) {
-                        text = text.replace(/help with your\??$/, 'help with your energy management.');
-                        needsUpdate = true;
-                    } else if (text.includes('options for your')) {
-                        text = text.replace(/options for your\??$/, 'options for your energy procurement.');
-                        needsUpdate = true;
+                        p.textContent = text.replace(/discuss your\??$/, 'discuss your specific energy needs.');
                     } else {
-                        text = text.replace(/your\??$/, 'your situation.');
-                        needsUpdate = true;
+                        p.textContent = text.replace(/your\??$/, 'your situation.');
                     }
-                }
-                
-                // Fix other common incomplete patterns
-                if (text.trim().endsWith('to') || text.trim().endsWith('for') || text.trim().endsWith('with')) {
-                    text = text.replace(/\s+(to|for|with)\s*$/, '.');
-                    needsUpdate = true;
-                }
-                
-                // Fix sentences ending with incomplete questions
-                if (text.trim().endsWith('?') && text.length < 20) {
-                    // Likely incomplete question, try to complete based on context
-                    if (text.includes('schedule') || text.includes('call')) {
-                        text = text.replace(/\?$/, ' a brief call?');
-                        needsUpdate = true;
-                    } else if (text.includes('discuss') || text.includes('review')) {
-                        text = text.replace(/\?$/, ' your energy needs?');
-                        needsUpdate = true;
-                    }
-                }
-                
-                // Fix missing punctuation
-                if (text.trim() && !text.trim().match(/[.!?]$/)) {
-                    text = text.trim() + '.';
-                    needsUpdate = true;
-                }
-                
-                // Fix double punctuation
-                text = text.replace(/[.!?]{2,}/g, (match) => match[0]);
-                
-                // Fix capitalization issues
-                text = text.replace(/^([a-z])/, (match, letter) => letter.toUpperCase());
-                
-                if (needsUpdate) {
-                    p.textContent = text;
                 }
             });
-            
-            // Ensure proper email structure
-            this.ensureEmailStructure(editor);
-            
         } catch (e) {
             console.warn('[AI] cleanupIncompleteSentences failed', e);
-        }
-    }
-    
-    // Ensure proper email structure with greeting, body, and closing
-    ensureEmailStructure(editor) {
-        try {
-            const paragraphs = Array.from(editor.querySelectorAll('p'));
-            if (paragraphs.length === 0) return;
-            
-            // Check if we have a proper greeting
-            const firstPara = paragraphs[0];
-            const firstText = firstPara.textContent || '';
-            if (!/^(hi|hello|hey)\b/i.test(firstText.trim())) {
-                // Add a greeting if missing
-                const nameMatch = firstText.match(/^([A-Z][a-z]+),?\s*/);
-                const name = nameMatch ? nameMatch[1] : 'there';
-                const greeting = document.createElement('p');
-                greeting.textContent = `Hi ${name},`;
-                greeting.style.margin = '0 0 16px 0;';
-                editor.insertBefore(greeting, firstPara);
-            }
-            
-            // Check if we have a proper closing
-            const lastPara = paragraphs[paragraphs.length - 1];
-            const lastText = lastPara.textContent || '';
-            if (!/best regards/i.test(lastText.toLowerCase())) {
-                // Add closing if missing
-                const closing = document.createElement('p');
-                closing.textContent = 'Best regards,';
-                closing.style.margin = '0 0 16px 0;';
-                editor.appendChild(closing);
-                
-                const signature = document.createElement('p');
-                signature.textContent = 'Power Choosers Team';
-                signature.style.margin = '0 0 16px 0;';
-                editor.appendChild(signature);
-            }
-            
-        } catch (e) {
-            console.warn('[AI] ensureEmailStructure failed', e);
-        }
-    }
-    
-    // Validate email quality and return a score (0-1)
-    validateEmailQuality(editor) {
-        try {
-            if (!editor) return 1.0;
-            
-            const paragraphs = Array.from(editor.querySelectorAll('p'));
-            if (paragraphs.length === 0) return 0.0;
-            
-            let score = 1.0;
-            let issues = [];
-            
-            // Check for proper greeting
-            const firstPara = paragraphs[0];
-            const firstText = firstPara.textContent || '';
-            if (!/^(hi|hello|hey)\b/i.test(firstText.trim())) {
-                score -= 0.2;
-                issues.push('Missing proper greeting');
-            }
-            
-            // Check for proper closing
-            const lastPara = paragraphs[paragraphs.length - 1];
-            const lastText = lastPara.textContent || '';
-            if (!/best regards/i.test(lastText.toLowerCase())) {
-                score -= 0.2;
-                issues.push('Missing proper closing');
-            }
-            
-            // Check for incomplete sentences
-            paragraphs.forEach((p, index) => {
-                const text = p.textContent || '';
-                
-                // Skip greeting and closing paragraphs
-                if (index === 0 || index === paragraphs.length - 1) return;
-                
-                if (text.trim().endsWith('your?') || text.trim().endsWith('your')) {
-                    score -= 0.3;
-                    issues.push('Incomplete sentence detected');
-                }
-                
-                if (text.trim().endsWith('to') || text.trim().endsWith('for') || text.trim().endsWith('with')) {
-                    score -= 0.2;
-                    issues.push('Incomplete sentence ending');
-                }
-                
-                if (text.trim() && !text.trim().match(/[.!?]$/)) {
-                    score -= 0.1;
-                    issues.push('Missing punctuation');
-                }
-                
-                if (text.length < 10) {
-                    score -= 0.1;
-                    issues.push('Very short paragraph');
-                }
-            });
-            
-            // Check for HTML entities
-            const htmlContent = editor.innerHTML;
-            if (/&#39;|&apos;|&quot;|&amp;|&lt;|&gt;/.test(htmlContent)) {
-                score -= 0.1;
-                issues.push('HTML entities detected');
-            }
-            
-            // Check for duplicate content
-            const allText = paragraphs.map(p => p.textContent || '').join(' ').toLowerCase();
-            const words = allText.split(/\s+/);
-            const uniqueWords = new Set(words);
-            if (words.length > 0 && uniqueWords.size / words.length < 0.7) {
-                score -= 0.2;
-                issues.push('High repetition detected');
-            }
-            
-            // Check for proper length (not too short, not too long)
-            const totalLength = allText.length;
-            if (totalLength < 100) {
-                score -= 0.2;
-                issues.push('Email too short');
-            } else if (totalLength > 800) {
-                score -= 0.1;
-                issues.push('Email too long');
-            }
-            
-            if (issues.length > 0) {
-                console.log('[AI] Email quality issues:', issues);
-            }
-            
-            return Math.max(0, Math.min(1, score));
-            
-        } catch (e) {
-            console.warn('[AI] validateEmailQuality failed', e);
-            return 0.5; // Default to medium quality if validation fails
         }
     }
 
@@ -1373,14 +1208,6 @@ class EmailManager {
             
             // Clean up incomplete sentences and HTML entities
             this.cleanupIncompleteSentences(editor);
-            
-            // Validate email quality and potentially retry if poor
-            const qualityScore = this.validateEmailQuality(editor);
-            if (qualityScore < 0.7) {
-                console.warn('[AI] Low quality email detected, score:', qualityScore);
-                // Could implement retry logic here if needed
-            }
-            
             const nameEsc = firstName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const isGreeting = (t) => {
                 const s = String(t || '').trim();
