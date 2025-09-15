@@ -83,8 +83,8 @@
             const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || (c.name||'');
             const title = c.title || '';
             const company = c.companyName || '';
-            const phones = [c.phone, c.mobile].map(norm).filter(Boolean);
-            for (const ph of phones) if (ph && !map.has(ph)) map.set(ph,{ name, title, company });
+            const phones = [c.workDirectPhone, c.mobile, c.otherPhone, c.phone].map(norm).filter(Boolean);
+            for (const ph of phones) if (ph && !map.has(ph)) map.set(ph,{ id: c.id, name, title, company });
           }
           _phoneToContactCache = map; return map;
         }
@@ -102,7 +102,7 @@
             const title = d.title || '';
             const company = d.companyName || d.accountName || '';
             const ph = norm(d.phone);
-            if (ph && !map.has(ph)) map.set(ph,{ name, title, company });
+            if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
           });
         }catch(_){ /* ignore */ }
         // Query contacts with mobile
@@ -114,7 +114,31 @@
             const title = d.title || '';
             const company = d.companyName || d.accountName || '';
             const ph = norm(d.mobile);
-            if (ph && !map.has(ph)) map.set(ph,{ name, title, company });
+            if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
+          });
+        }catch(_){ /* ignore */ }
+        // Query contacts with workDirectPhone
+        try{
+          const snap3 = await window.firebaseDB.collection('contacts').where('workDirectPhone','!=',null).limit(500).get();
+          snap3.forEach(doc=>{
+            const d = doc.data()||{};
+            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
+            const title = d.title || '';
+            const company = d.companyName || d.accountName || '';
+            const ph = norm(d.workDirectPhone);
+            if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
+          });
+        }catch(_){ /* ignore */ }
+        // Query contacts with otherPhone
+        try{
+          const snap4 = await window.firebaseDB.collection('contacts').where('otherPhone','!=',null).limit(500).get();
+          snap4.forEach(doc=>{
+            const d = doc.data()||{};
+            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
+            const title = d.title || '';
+            const company = d.companyName || d.accountName || '';
+            const ph = norm(d.otherPhone);
+            if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
           });
         }catch(_){ /* ignore */ }
         _phoneToContactCache = map; return map;
@@ -830,30 +854,35 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             }
             
             // Try to find contact by phone number in people data
-            if (!contactEmail && party && typeof window.getPeopleData === 'function') {
+            if (typeof window.getPeopleData === 'function') {
               const people = window.getPeopleData() || [];
               const norm = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
-              const partyNorm = norm(party);
+              const lookupNum = counter10 || party;
+              const partyNorm = norm(lookupNum);
               
-              console.log('[Calls] Looking for contact by phone:', party, 'Normalized:', partyNorm, 'People data count:', people.length);
+              console.log('[Calls] Looking for contact by phone:', lookupNum, 'Normalized:', partyNorm, 'People data count:', people.length);
               
               const foundContact = people.find(p => {
-                const phoneNorm = norm(p.phone || p.mobile);
-                return phoneNorm === partyNorm;
+                const phoneNorms = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone].map(norm);
+                return phoneNorms.includes(partyNorm);
               });
               
               if (foundContact) {
-                contactEmail = foundContact.email || '';
-                contactCity = foundContact.city || '';
-                contactState = foundContact.state || '';
-                contactSeniority = foundContact.seniority || '';
-                contactDepartment = foundContact.department || '';
-                industry = foundContact.industry || '';
-                accountEmployees = foundContact.accountEmployees || null;
-                visitorDomain = foundContact.visitorDomain || '';
-                console.log('[Calls] Found contact by phone in people data:', foundContact.name, 'Phone:', party, 'Email:', contactEmail, 'City:', contactCity);
+                if (!contactName) contactName = [foundContact.firstName, foundContact.lastName].filter(Boolean).join(' ') || foundContact.name || '';
+                if (!resolvedContactId && foundContact.id) resolvedContactId = foundContact.id;
+                if (!contactTitle && foundContact.title) contactTitle = foundContact.title;
+                if (!company) company = foundContact.companyName || foundContact.accountName || foundContact.company || '';
+                contactEmail = contactEmail || foundContact.email || '';
+                contactCity = contactCity || foundContact.city || '';
+                contactState = contactState || foundContact.state || '';
+                contactSeniority = contactSeniority || foundContact.seniority || '';
+                contactDepartment = contactDepartment || foundContact.department || '';
+                industry = industry || foundContact.industry || '';
+                accountEmployees = accountEmployees || foundContact.accountEmployees || null;
+                visitorDomain = visitorDomain || foundContact.visitorDomain || '';
+                console.log('[Calls] Found contact by phone in people data:', contactName, 'Phone:', lookupNum, 'Email:', contactEmail, 'City:', contactCity);
               } else {
-                console.log('[Calls] No contact found by phone:', party, 'in people data');
+                console.log('[Calls] No contact found by phone:', lookupNum, 'in people data');
               }
             }
             
@@ -1318,7 +1347,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
       <td class="name-cell" data-contact-id="${r.contactId || ''}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${name}</span></div></td>
       <td>${title}</td>
-      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.replaceWith((window.__pcAccountsIcon && window.__pcAccountsIcon()) || document.createRange().createContextualFragment(\'${safeAccountIcon}\').firstChild)" />` : `${safeAccountIcon}`}<span class="company-name">${company}</span></span></a></td>
+      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none'; var fb=this.nextElementSibling; if(fb){ fb.style.display='inline-block'; }" />${safeAccountIcon.replace('display:inline-block','display:none')}` : `${safeAccountIcon}`}<span class="company-name">${company}</span></span></a></td>
       <td>${numberCell}</td>
       <td>${directionCell || '—'}</td>
       <td>${callTimeStr}</td>
@@ -1386,6 +1415,84 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     document.removeEventListener('keydown', escClose);
   }
   function escClose(e){ if(e.key==='Escape') closeInsightsModal(); }
+  // Normalize supplier tokens in free text (e.g., "T X U" → "TXU", "N R G" → "NRG")
+  function normalizeSupplierTokens(s){
+    try {
+      if (!s) return '';
+      let out = String(s);
+      // Common spaced-letter patterns
+      out = out.replace(/\bT\s*X\s*U\b/gi, 'TXU');
+      out = out.replace(/\bN\s*R\s*G\b/gi, 'NRG');
+      // ASR mis-hear of TXU as "T X you"
+      out = out.replace(/\bT\s*X\s*you\b/gi, 'TXU');
+      return out;
+    } catch(_) { return String(s||''); }
+  }
+
+  // Extract normalized contract fields from AI insights
+  function extractContractFromAI(ai){
+    const A = ai || {};
+    const get = (obj, keys, d='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; };
+    const c = A.contract || {};
+    const result = {
+      currentRate: get(c, ['currentRate','current_rate','rate'], ''),
+      rateType: get(c, ['rateType','rate_type'], ''),
+      supplier: normalizeSupplierTokens(get(c, ['supplier','utility'], '')),
+      contractEnd: get(c, ['contractEnd','contract_end','endDate'], ''),
+      usageKWh: get(c, ['usageKWh','usage_k_wh','usage'], ''),
+      contractLength: get(c, ['contractLength','contract_length'], '')
+    };
+    return result;
+  }
+
+  // Resolve account ID for a call row using direct id or by company name lookup
+  function resolveAccountIdForCall(r){
+    try { if (r && r.accountId) return r.accountId; } catch(_) {}
+    try {
+      const company = String(r && r.company || '').trim();
+      if (!company) return '';
+      if (typeof window.getAccountsData === 'function'){
+        const accounts = window.getAccountsData() || [];
+        const acc = accounts.find(a => (a.accountName === company) || (a.name === company));
+        return acc && acc.id ? acc.id : '';
+      }
+    } catch(_) {}
+    return '';
+  }
+
+  // Persist extracted contract fields to the linked Account and notify UI
+  async function persistEnergyFromAI(r){
+    try {
+      if (!r || !r.aiInsights || r._energySaved) return;
+      const contract = extractContractFromAI(r.aiInsights);
+      const payload = {};
+      if (contract.supplier && contract.supplier !== 'Unknown') payload.electricitySupplier = contract.supplier;
+      if (contract.currentRate && contract.currentRate !== 'Unknown') payload.currentRate = contract.currentRate;
+      if (contract.contractEnd && contract.contractEnd !== 'Not discussed') payload.contractEndDate = contract.contractEnd;
+      if (!Object.keys(payload).length) return;
+      const accountId = resolveAccountIdForCall(r);
+      if (!accountId) return;
+      const db = window.firebaseDB;
+      if (!db || !db.collection) return;
+      await db.collection('accounts').doc(accountId).update(payload);
+      // Toast
+      try {
+        if (window.ToastManager && window.ToastManager.showSaveNotification) {
+          window.ToastManager.showSaveNotification('Energy contract details saved');
+        } else if (window.crm && window.crm.showToast) {
+          window.crm.showToast('Saved');
+        }
+      } catch(_) {}
+      // Dispatch energy-updated events per field
+      try {
+        for (const [field, value] of Object.entries(payload)){
+          document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } }));
+        }
+      } catch(_) {}
+      r._energySaved = true;
+    } catch(e){ console.warn('[Calls] persistEnergyFromAI error:', e); }
+  }
+
   function openInsightsModal(id){
     injectInsightsModalStyles();
     console.log('[Call Insights] Opening modal for ID:', id);
@@ -1444,6 +1551,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     });
     document.addEventListener('keydown', escClose);
 
+    // Persist Energy & Contract fields to Account (supplier, current rate, contract end) once per call
+    persistEnergyFromAI(r);
+
     // Background fetch: if transcript is missing but we have a Twilio SID, try to generate/fetch it
     try {
       const candidateSid = r.twilioSid || r.callSid || (typeof r.id==='string' && /^CA[0-9a-zA-Z]+$/.test(r.id) ? r.id : '');
@@ -1475,19 +1585,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     const get = (obj, keys, d='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; };
     const toArr = (v)=> Array.isArray(v)?v:(v? [v]:[]);
 
-    const contract = (()=>{ const c = A.contract || {}; 
-      console.log('[Insights Debug] Contract object:', c);
-      const result = {
-        currentRate: get(c, ['currentRate','current_rate','rate']),
-        rateType: get(c, ['rateType','rate_type']),
-        supplier: get(c, ['supplier','utility']),
-        contractEnd: get(c, ['contractEnd','contract_end','endDate']),
-        usageKWh: get(c, ['usageKWh','usage_k_wh','usage']),
-        contractLength: get(c, ['contractLength','contract_length'])
-      };
-      console.log('[Insights Debug] Mapped contract:', result);
-      return result;
-    })();
+    const contract = (()=>{ const mapped = extractContractFromAI(A); console.log('[Insights Debug] Mapped contract:', mapped); return mapped; })();
 
     const sentiment = get(A, ['sentiment'], 'Unknown');
     const disposition = get(A, ['disposition'], '');
@@ -1499,57 +1597,25 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     const entities = toArr(get(A, ['entities'], []));
     const flags = get(A, ['flags'], {});
 
-    // Summary paragraph: prefer AI summary; otherwise build one
-    let summaryText = get(A, ['summary'], r.aiSummary || '');
-    if (!summaryText) {
-      // Build comprehensive summary with bullet points
-      const contract = get(A, ['contract'], {});
-      const supplier = get(contract, ['supplier'], '');
-      const rate = get(contract, ['current_rate'], '');
-      const usage = get(contract, ['usage_k_wh'], '');
-      const contractEnd = get(contract, ['contract_end'], '');
-      
-      // Create paragraph summary
-      let paragraph = `Call with ${disposition.toLowerCase()} disposition`;
-      if (supplier && supplier !== 'Unknown') {
-        paragraph += ` regarding energy services with ${supplier}`;
-      } else {
-        paragraph += ` about energy services`;
-      }
-      paragraph += `. ${sentiment} sentiment detected.`;
-      
-      // Create bullet points
-      const bullets = [];
-      if (supplier && supplier !== 'Unknown') {
-        bullets.push(`Current supplier: ${supplier}`);
-      }
-      if (rate && rate !== 'Unknown') {
-        bullets.push(`Current rate: ${rate}`);
-      }
-      if (usage && usage !== 'Not provided') {
-        bullets.push(`Usage: ${usage}`);
-      }
-      if (contractEnd && contractEnd !== 'Not discussed') {
-        bullets.push(`Contract expires: ${contractEnd}`);
-      }
-      if (keyTopics.length > 0) {
-        bullets.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
-      }
-      if (nextSteps.length > 0) {
-        bullets.push(`Next steps: ${nextSteps.slice(0,2).join(', ')}`);
-      }
-      if (painPoints.length > 0) {
-        bullets.push(`Pain points: ${painPoints.slice(0,2).join(', ')}`);
-      }
-      if (budget && budget !== 'Unclear' && budget !== '') {
-        bullets.push(`Budget: ${budget}`);
-      }
-      if (timeline && timeline !== 'Not specified' && timeline !== '') {
-        bullets.push(`Timeline: ${timeline}`);
-      }
-      
-      // Combine paragraph and bullets
-      summaryText = paragraph + (bullets.length > 0 ? ' • ' + bullets.join(' • ') : '');
+    // Summary paragraph + bullet points rendering
+    let summarySource = get(A, ['summary'], r.aiSummary || '');
+    let paragraphText = '';
+    let bulletPoints = [];
+    if (summarySource) {
+      const parts = summarySource.split('•').map(s=>s.trim()).filter(Boolean);
+      paragraphText = parts.length ? parts[0] : summarySource;
+      bulletPoints = parts.slice(1);
+    } else {
+      paragraphText = `Call ${disposition ? `(${disposition.toLowerCase()}) ` : ''}about energy services. ${sentiment} sentiment detected.`;
+      if (contract.supplier && contract.supplier !== 'Unknown') bulletPoints.push(`Current supplier: ${contract.supplier}`);
+      if (contract.currentRate && contract.currentRate !== 'Unknown') bulletPoints.push(`Current rate: ${contract.currentRate}`);
+      if (contract.usageKWh && contract.usageKWh !== 'Not provided') bulletPoints.push(`Usage: ${contract.usageKWh}`);
+      if (contract.contractEnd && contract.contractEnd !== 'Not discussed') bulletPoints.push(`Contract expires: ${contract.contractEnd}`);
+      if (keyTopics.length) bulletPoints.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
+      if (nextStepsArr.length) bulletPoints.push(`Next steps: ${nextStepsArr.slice(0,2).join(', ')}`);
+      if (painPointsArr.length) bulletPoints.push(`Pain points: ${painPointsArr.slice(0,2).join(', ')}`);
+      if (budget && budget !== 'Unclear') bulletPoints.push(`Budget: ${budget}`);
+      if (timeline && timeline !== 'Not specified') bulletPoints.push(`Timeline: ${timeline}`);
     }
 
     // Transcript rendering with consistent speaker/timestamp lines across pages
@@ -1571,16 +1637,40 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     function renderTranscriptHtml(A, raw){
       const turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
       if(turns.length){
-        return turns.map(t=>{ const role = t.role==='agent'?'Agent':(t.role==='customer'?'Customer':'Speaker'); return `<div class=\"transcript-line ${t.role||''}\"><span class=\"speaker\">${role} ${toMMSS(Number(t.t)||0)}:</span> <span class=\"text\">${escapeHtml(t.text||'')}</span></div>`; }).join('');
+        const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
+        const groups = [];
+        let current = null;
+        for (const t of turns){
+          const roleKey = t.role==='agent' ? 'agent' : (t.role==='customer' ? 'customer' : 'other');
+          const text = normalizeSupplierTokens(t.text || '');
+          const ts = Number(t.t) || 0;
+          if (current && current.role === roleKey){
+            current.texts.push(text);
+            current.end = ts;
+          } else {
+            if (current) groups.push(current);
+            current = { role: roleKey, start: ts, end: ts, texts: [text] };
+          }
+        }
+        if (current) groups.push(current);
+        return groups.map(g => {
+          const label = g.role === 'agent' ? 'You' : (g.role === 'customer' ? contactFirst : 'Speaker');
+          return `<div class=\"transcript-line ${g.role}\"><span class=\"speaker\">${label} ${toMMSS(g.start)}:</span> <span class=\"text\">${escapeHtml(g.texts.join(' ').trim())}</span></div>`;
+        }).join('');
       }
       const parsed = parseSpeakerTranscript(raw||'');
       if(parsed.some(p=>p.label && p.t!=null)){
-        return parsed.map(p=> p.label ? `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(p.label)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>` : `<div class=\"transcript-line\"><span class=\"text\">${escapeHtml(p.text||'')}</span></div>` ).join('');
+        const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
+        return parsed.map(p=> {
+          if (!p.label) return `<div class=\"transcript-line\"><span class=\"text\">${escapeHtml(p.text||'')}</span></div>`;
+          const lbl = /^speaker\b/i.test(p.label) ? contactFirst : p.label;
+          return `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(lbl)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>`;
+        }).join('');
       }
       const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
       return escapeHtml(fallback);
     }
-    const transcriptHtml = renderTranscriptHtml(A, r.transcript);
+    const transcriptHtml = renderTranscriptHtml(A, normalizeSupplierTokens(r.transcript || ''));
 
     const hasAIInsights = r.aiInsights && Object.keys(r.aiInsights).length > 0;
 
@@ -1608,7 +1698,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               AI Call Summary
             </h4>
             <div class="pc-chips" style="margin:6px 0 12px 0;">${chipsHtml}</div>
-            <div style="color:var(--text-secondary); line-height:1.5;">${escapeHtml(summaryText)}</div>
+            <div style="color:var(--text-secondary); line-height:1.5;">
+              <p>${escapeHtml(paragraphText)}</p>
+              ${bulletPoints.length ? `<ul style="margin:8px 0 0 16px;">${bulletPoints.map(b=>`<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
+            </div>
           </div>
 
           <div class="pc-card" style="margin-top:14px;">
@@ -1623,7 +1716,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         <div class="pc-col-right">
           <div class="pc-card">
             <h4>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
               Call Recording
             </h4>
             <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
@@ -2209,18 +2302,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         title: callData.contactTitle || '',
         city: callData.contactCity || '',
         state: callData.contactState || '',
-        industry: callData.industry || '',
-        accountEmployees: callData.accountEmployees || null,
-        visitorDomain: callData.visitorDomain || '',
-        // Add additional fields that might be needed
-        seniority: '',
-        department: '',
-        // Try to get account information if available
-        accountId: callData.accountId || null,
-        // Add call-specific information that might be useful
-        lastCallTime: callData.callTime || '',
-        lastCallOutcome: callData.outcome || '',
-        lastCallDuration: callData.durationSec || 0
+        seniority: callData.contactSeniority || '',
+        department: callData.contactDepartment || '',
+        industry: callData.industry || ''
       };
       
       console.log('[Calls] getCallContactById - converted contactData:', contactData);

@@ -1367,14 +1367,38 @@
     return { ok: false, value: '' };
   }
 
+  function getBusinessNumber() {
+    // Get the current business number from environment or default
+    // This will be dynamic when more numbers are added
+    return '817-663-0380'; // Default number for now
+  }
+
+  function formatPhoneNumber(phone) {
+    // Format phone number for display (e.g., +18176630380 -> 817-663-0380)
+    if (!phone) return '';
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+    } else if (digits.length === 10) {
+      return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    return phone;
+  }
+
   function makeCard() {
     const card = document.createElement('div');
     card.className = 'widget-card phone-card';
     card.id = WIDGET_ID;
 
+    const businessNumber = getBusinessNumber();
+    const formattedNumber = formatPhoneNumber(businessNumber);
+
     card.innerHTML = `
       <div class="widget-card-header">
-        <h4 class="widget-title">Phone</h4>
+        <div class="phone-title-container">
+          <h4 class="widget-title">Phone</h4>
+          <span class="my-number-info">• My Number: ${formattedNumber}</span>
+        </div>
         <button type="button" class="btn-text notes-close phone-close" aria-label="Close" data-pc-title="Close" aria-describedby="pc-tooltip">×</button>
       </div>
       <div class="phone-body">

@@ -2398,27 +2398,78 @@ class PowerChoosersCRM {
         const tasksList = document.querySelector('.tasks-list');
         if (!tasksList) return;
 
-        // Get today's date in YYYY-MM-DD format
-        const today = new Date().toISOString().split('T')[0];
+        // Helpers (scoped to this method)
+        const parseDateStrict = (dateStr) => {
+            if (!dateStr) return null;
+            try {
+                if (dateStr.includes('/')) {
+                    const [mm, dd, yyyy] = dateStr.split('/').map(n => parseInt(n, 10));
+                    if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+                } else if (dateStr.includes('-')) {
+                    const [yyyy, mm, dd] = dateStr.split('-').map(n => parseInt(n, 10));
+                    if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+                }
+                const d = new Date(dateStr);
+                if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            } catch (_) { /* noop */ }
+            return null;
+        };
+        const parseTimeToMinutes = (timeStr) => {
+            if (!timeStr || typeof timeStr !== 'string') return NaN;
+            const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (!m) return NaN;
+            let h = parseInt(m[1], 10);
+            const mins = parseInt(m[2], 10);
+            const ap = m[3].toUpperCase();
+            if (h === 12) h = 0;
+            if (ap === 'PM') h += 12;
+            return h * 60 + mins;
+        };
+
+        // Today's local midnight
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
         // Load user tasks from localStorage
         let todaysTasks = [];
         try {
             const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
             todaysTasks = userTasks.filter(task => {
-                // Filter for today's tasks that are pending
-                return task.dueDate === today && task.status === 'pending';
+                if (task.status !== 'pending') return false;
+                const d = parseDateStrict(task.dueDate);
+                if (!d) return false;
+                return d.getTime() <= today.getTime(); // due today or overdue
             });
         } catch (e) {
             console.warn('Could not load user tasks for Today\'s Tasks widget:', e);
         }
 
-        // Sort by priority (high, medium, low) and then by creation time
-        const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+        // Sort by due date/time (earliest to latest)
         todaysTasks.sort((a, b) => {
-            const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
-            if (priorityDiff !== 0) return priorityDiff;
-            return (b.createdAt || 0) - (a.createdAt || 0);
+            const da = parseDateStrict(a.dueDate);
+            const db = parseDateStrict(b.dueDate);
+            if (da && db) {
+                const dd = da - db;
+                if (dd !== 0) return dd;
+            } else if (da && !db) {
+                return -1;
+            } else if (!da && db) {
+                return 1;
+            }
+
+            const ta = parseTimeToMinutes(a.dueTime);
+            const tb = parseTimeToMinutes(b.dueTime);
+            const taValid = !isNaN(ta), tbValid = !isNaN(tb);
+            if (taValid && tbValid) {
+                const td = ta - tb; if (td !== 0) return td;
+            } else if (taValid && !tbValid) {
+                return -1;
+            } else if (!taValid && tbValid) {
+                return 1;
+            }
+
+            // Final tiebreaker: creation time (oldest first to keep stability)
+            return (a.createdAt || 0) - (b.createdAt || 0);
         });
 
         // Initialize pagination state if not exists
@@ -2452,7 +2503,7 @@ class PowerChoosersCRM {
             `;
         } else {
             tasksHtml = pageTasks.map(task => {
-                const timeText = this.getTaskTimeText(task.dueDate);
+                const timeText = this.getTaskTimeText(task);
                 return `
                     <div class="task-item" data-task-id="${task.id}">
                         <div class="task-info">
@@ -2503,21 +2554,31 @@ class PowerChoosersCRM {
         });
     }
 
-    getTaskTimeText(dueDate) {
+    getTaskTimeText(task) {
         const today = new Date();
-        const due = new Date(dueDate);
+        const due = new Date(task.dueDate);
         const diffTime = due - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+        let timeText = '';
         if (diffDays === 0) {
-            return 'Due today';
+            timeText = 'Due today';
         } else if (diffDays === 1) {
-            return 'Due tomorrow';
+            timeText = 'Due tomorrow';
         } else if (diffDays > 1) {
-            return `Due in ${diffDays} days`;
+            timeText = `Due in ${diffDays} days`;
         } else {
-            return 'Overdue';
+            timeText = 'Overdue';
         }
+
+        // Add time if available
+        if (task.dueTime) {
+            // Format time (assuming it's in HH:MM format)
+            const time = task.dueTime;
+            timeText += ` at ${time}`;
+        }
+
+        return timeText;
     }
 
     escapeHtml(str) {

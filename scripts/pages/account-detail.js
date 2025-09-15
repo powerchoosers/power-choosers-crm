@@ -97,6 +97,53 @@
     return null;
   }
 
+  function injectSectionHeaderStyles() {
+    if (document.getElementById('account-section-header-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'account-section-header-styles';
+    style.textContent = `
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--spacing-md);
+      }
+      .section-header .section-title {
+        margin: 0;
+      }
+      .add-contact-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: var(--border-radius);
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        color: var(--text-inverse);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .add-contact-btn:hover { 
+        background: var(--bg-secondary);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .add-contact-btn:focus-visible {
+        outline: 2px solid var(--orange-muted);
+        outline-offset: 2px;
+      }
+      .add-contact-btn svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+        pointer-events: none;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function renderAccountContacts(account) {
     if (!account || !window.getPeopleData) {
       return '<div class="contacts-placeholder">No contacts found</div>';
@@ -163,6 +210,9 @@
 
   function renderAccountDetail() {
     if (!state.currentAccount || !els.mainContent) return;
+    
+    // Inject section header styles if not already present
+    injectSectionHeaderStyles();
 
     const a = state.currentAccount;
     const name = a.accountName || a.name || a.companyName || 'Unknown Account';
@@ -293,7 +343,15 @@
         </div>
 
         <div class="contact-info-section">
-          <h3 class="section-title">Contacts</h3>
+          <div class="section-header">
+            <h3 class="section-title">Contacts</h3>
+            <button class="widget-item add-contact-btn" id="add-contact-to-account" title="Add Contact" aria-label="Add Contact">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
           <div class="contacts-list" id="account-contacts-list">
             ${renderAccountContacts(a)}
           </div>
@@ -497,6 +555,24 @@
         const pretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
         c.direction = c.direction || direction;
         c.counterpartyPretty = c.counterpartyPretty || pretty;
+        // Fill missing account/contact names from current context
+        try {
+          if (!c.accountName) {
+            const a = state.currentAccount || {};
+            const acctName = a.accountName || a.name || a.companyName || '';
+            if (acctName) c.accountName = acctName;
+          }
+          if (!c.contactName && typeof window.getPeopleData === 'function') {
+            // pick a recent contact for this account
+            const people = window.getPeopleData() || [];
+            const list = people.filter(p=> p && (p.accountId===accountId || p.accountID===accountId));
+            if (list.length) {
+              const p = list[0];
+              const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
+              if (full) c.contactName = full;
+            }
+          }
+        } catch(_) {}
         try { console.log('[Account Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
       });
       list.innerHTML = filtered.map(call => rcItemHtml(call)).join('');
@@ -720,7 +796,7 @@
         <div>
           <div class=\"ip-card\">
             <h4>
-              <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polygon points=\"11 5 6 9 2 9 2 15 6 15 11 19 11 5\"></polygon><path d=\"M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07\"></path></svg>
+              <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>
               Call Recording
             </h4>
             <div style=\"color:var(--text-secondary); font-style:italic;\">${audio}</div>
@@ -756,6 +832,28 @@
     return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
   }
 
+  function openAddContactModal() {
+    // Use the main CRM's modal opening function to ensure proper event binding
+    if (window.crm && typeof window.crm.createAddContactModal === 'function') {
+      // Pre-fill the company name before opening the modal
+      const modal = document.getElementById('modal-add-contact');
+      if (modal && state.currentAccount) {
+        const companyInput = modal.querySelector('input[name="companyName"]');
+        if (companyInput) {
+          const accountName = state.currentAccount.accountName || state.currentAccount.name || state.currentAccount.companyName;
+          if (accountName) {
+            companyInput.value = accountName;
+          }
+        }
+      }
+      
+      // Open the modal using the proper function
+      window.crm.createAddContactModal();
+    } else {
+      console.error('CRM createAddContactModal function not available');
+    }
+  }
+
   function attachAccountDetailEvents() {
     // Listen for activity refresh events
     document.addEventListener('pc:activities-refresh', (e) => {
@@ -765,6 +863,19 @@
         if (window.ActivityManager) {
           const activityManager = new window.ActivityManager();
           activityManager.renderActivities('account-activity-timeline', 'account', entityId);
+        }
+      }
+    });
+
+    // Listen for contact creation events to refresh the contacts list
+    document.addEventListener('pc:contact-created', (e) => {
+      if (state.currentAccount) {
+        // Refresh the contacts list
+        const contactsList = document.getElementById('account-contacts-list');
+        if (contactsList) {
+          contactsList.innerHTML = renderAccountContacts(state.currentAccount);
+          // Re-bind event handlers for the new contact items
+          bindContactItemEvents();
         }
       }
     });
@@ -914,6 +1025,15 @@
       });
     }
 
+    // Add contact button
+    const addContactBtn = document.getElementById('add-contact-to-account');
+    if (addContactBtn) {
+      addContactBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openAddContactModal();
+      });
+    }
+
     // Widget drawer item clicks
     const widgetsDrawer = document.querySelector('#account-detail-header .widgets-drawer');
     if (widgetsDrawer && !widgetsDrawer._bound) {
@@ -995,6 +1115,11 @@
       });
     });
 
+    // Bind contact item events
+    bindContactItemEvents();
+  }
+
+  function bindContactItemEvents() {
     // Make contact containers clickable to open contact details
     const contactItems = document.querySelectorAll('.contact-item');
     contactItems.forEach(item => {
