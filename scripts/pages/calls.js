@@ -1470,6 +1470,20 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     return out;
   }
 
+  function findSupplierInTextFromKnown(text){
+    try {
+      if (!text) return '';
+      const known = Array.from(getKnownSuppliers());
+      const hay = normalizeSupplierTokens(String(text));
+      let found = '';
+      for (const name of known){
+        const rx = new RegExp(`\\b${name.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&')}\\b`, 'i');
+        if (rx.test(hay)) found = name; // last match wins (use later mention)
+      }
+      return canonicalizeSupplierName(found);
+    } catch(_) { return ''; }
+  }
+
   function acceptSupplierName(s){
     const canon = canonicalizeSupplierName(s);
     if (!canon) return '';
@@ -1521,13 +1535,23 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     else if (/\bindex(ed)?\b/i.test(t)) out.rateType = 'indexed';
     // Supplier
     try {
-      const supCand = t.match(/\b(?:supplier|utility)\b[^\n\r]{0,40}?([A-Za-z &]+)\b/i)?.[1] || '';
-      const accepted = acceptSupplierName(supCand);
+      const near = t.match(/\b(?:supplier|utility)\b[^\n\r]{0,60}?([A-Za-z &]+)\b/i)?.[1] || '';
+      let accepted = acceptSupplierName(near);
+      if (!accepted) accepted = findSupplierInTextFromKnown(t);
       if (accepted) out.supplier = accepted;
     } catch(_) {}
     // Usage
     try {
-      const u = t.match(/\b([\d,.]{4,})\s*(kwh|kilowatt\s*hours?)\b/i);
+      let u = t.match(/\b([\d,.]{4,})\s*(kwh|kilowatt\s*hours?)\b/i);
+      if (!u) {
+        // Near the word usage/annual usage without unit
+        const near = t.match(/\b(annual\s+usage|usage)\b[^\n\r]{0,30}?([\d,.]{4,})/i);
+        if (near) u = [near[0], near[2], 'kwh'];
+        else {
+          const nearYear = t.match(/\b([\d,.]{4,})\b[^\n\r]{0,10}\b(for the year|per year|a year)\b/i);
+          if (nearYear) u = [nearYear[0], nearYear[1], 'kwh'];
+        }
+      }
       if (u) {
         const num = u[1].replace(/[,\s]/g,'');
         const formatted = Number(num).toLocaleString();
@@ -1582,6 +1606,18 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       usageKWh: primary.usageKWh || fallback.usageKWh,
       contractLength: primary.contractLength || fallback.contractLength
     };
+  }
+
+  function extractBudgetFromTranscript(text){
+    try {
+      if(!text) return '';
+      const s = String(text).replace(/(\d)\s+(\d)/g,'$1$2');
+      const m = s.match(/\b(\$?\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\b\s*(dollars)?\s*(a|per|\/)?\s*(month|mo\.?|mth|year|yr\.?)/i);
+      if (!m) return '';
+      const amt = m[1].startsWith('$') ? m[1] : ('$'+m[1]);
+      const per = /year|yr/i.test(m[4]||'') ? '/year' : '/month';
+      return `${amt}${per}`;
+    } catch(_) { return ''; }
   }
 
   // Resolve account ID for a call row using direct id or by company name lookup
@@ -1705,6 +1741,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
 
     // Persist Energy & Contract fields to Account (supplier, current rate, contract end) once per call
     persistEnergyFromAI(r);
+    // Auto-create follow-up task if timeline date/time detected
+    try { createFollowupTaskFromTimeline(r, r.aiInsights || {}); } catch(_) {}
 
     // Background fetch: if transcript is missing but we have a Twilio SID, try to generate/fetch it
     try {
@@ -1744,25 +1782,20 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     const keyTopics = toArr(get(A, ['keyTopics','key_topics'], []));
     const nextStepsArr = toArr(get(A, ['nextSteps','next_steps'], []));
     const painPointsArr = toArr(get(A, ['painPoints','pain_points'], []));
-    const budget = get(A, ['budget'], 'Not Mentioned');
+    const budget = get(A, ['budget'], '') || extractBudgetFromTranscript(r.transcript || '');
     const timeline = get(A, ['timeline'], 'Not specified');
     const entities = toArr(get(A, ['entities'], []));
     const flags = get(A, ['flags'], {});
 
     // Always build UI summary from structured data
-    let paragraphText = `Conversation ${disposition ? `(${disposition.toLowerCase()}) ` : ''}about energy services. ${sentiment} sentiment detected.`;
-    const bulletPoints = [];
-    if (contract.supplier) bulletPoints.push(`Current supplier: ${contract.supplier}`);
-    if (contract.currentRate) bulletPoints.push(`Current rate: ${contract.currentRate}`);
-    if (contract.usageKWh) bulletPoints.push(`Usage: ${contract.usageKWh}`);
-    if (contract.contractEnd) bulletPoints.push(`Contract expires: ${contract.contractEnd}`);
-    if (contract.rateType) bulletPoints.push(`Rate type: ${contract.rateType}`);
-    if (contract.contractLength) bulletPoints.push(`Term: ${contract.contractLength}`);
-    if (keyTopics.length) bulletPoints.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
-    if (nextStepsArr.length) bulletPoints.push(`Next steps: ${nextStepsArr.slice(0,2).join(', ')}`);
-    if (painPointsArr.length) bulletPoints.push(`Pain points: ${painPointsArr.slice(0,2).join(', ')}`);
-    if (budget && budget !== 'Unclear') bulletPoints.push(`Budget: ${budget}`);
-    if (timeline && timeline !== 'Not specified') bulletPoints.push(`Timeline: ${timeline}`);
+    let summarySource = get(A, ['summary','conversation_summary','Conversation Summary'], r.aiSummary || '');
+    let summaryText = '';
+    if (summarySource) {
+      const parts = String(summarySource).split('•');
+      summaryText = (parts[0] || summarySource).trim();
+    } else {
+      summaryText = `Conversation ${disposition ? `(${disposition.toLowerCase()}) ` : ''}about energy services. ${sentiment} sentiment detected.`;
+    }
 
     // Transcript rendering with consistent speaker/timestamp lines across pages
     const toMMSS = (s)=>{ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; };
@@ -1869,10 +1902,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               AI Call Summary
             </h4>
             <div class="pc-chips" style="margin:6px 0 12px 0;">${chipsHtml}</div>
-            <div style="color:var(--text-secondary); line-height:1.5;">
-              <p>${escapeHtml(paragraphText)}</p>
-              ${bulletPoints.length ? `<ul style="margin:8px 0 0 16px;">${bulletPoints.map(b=>`<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
-            </div>
+            <div style="color:var(--text-secondary); line-height:1.5;">${escapeHtml(summaryText)}</div>
           </div>
 
           <div class="pc-card" style="margin-top:14px;">
@@ -2591,3 +2621,89 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   
   document.addEventListener('DOMContentLoaded', init);
 })();
+
+  function parseTimelineToTask(text){
+    try{
+      if(!text) return null;
+      const t = String(text);
+      // Date: try explicit month day year first, then weekday + day, else today
+      let s = t.replace(/(\d)\s+(\d)/g,'$1$2');
+      let m = s.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+([0-9]{1,2}|[A-Za-z\- ]{3,15})(?:st|nd|rd|th)?\s*,?\s*(20\d{2})?/i);
+      let year = new Date().getFullYear();
+      let month = null; let day = null;
+      if(m){
+        month = m[1];
+        if(/^[A-Za-z]/.test(m[2])){ const maybe = wordOrdinalToNumber(m[2]); if(maybe) day = maybe; }
+        else day = parseInt(m[2],10);
+        if(m[3]) year = parseInt(m[3],10);
+      }
+      // Fallback: next weekday (e.g., Wednesday)
+      if(!month){
+        const wd = s.match(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i)?.[1];
+        if(wd){
+          const idx = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].indexOf(wd.charAt(0).toUpperCase()+wd.slice(1).toLowerCase());
+          const now = new Date();
+          const cur = now.getDay();
+          let add = (idx - cur + 7) % 7; if(add===0) add = 7;
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()+add);
+          month = d.toLocaleString('en-US',{month:'long'});
+          day = d.getDate();
+          year = d.getFullYear();
+        }
+      }
+      if(!month || !day) return null;
+      // Time: e.g., 5 PM, 2:30 PM
+      const timeMatch = s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\b/i);
+      const hour = timeMatch ? parseInt(timeMatch[1],10) : 10;
+      const minute = timeMatch && timeMatch[2] ? parseInt(timeMatch[2],10) : 0;
+      const ap = timeMatch ? timeMatch[3].toUpperCase() : 'AM';
+      const dueDate = new Date(`${month} ${day}, ${year}`);
+      let h24 = hour % 12; if(ap==='PM') h24 += 12;
+      const hh = String(((hour%12)||12)).padStart(2,'0');
+      const mm = String(minute).padStart(2,'0');
+      const dueDateStr = `${String(dueDate.getMonth()+1).padStart(2,'0')}/${String(dueDate.getDate()).padStart(2,'0')}/${dueDate.getFullYear()}`;
+      const dueTimeStr = `${hh}:${mm} ${ap}`;
+      return { dueDate: dueDateStr, dueTime: dueTimeStr };
+    }catch(_){ return null; }
+  }
+
+  function inferTaskTypeFromContext(A){
+    try{
+      const ns = (A && (A.nextSteps || A.next_steps)) || [];
+      const arr = Array.isArray(ns) ? ns.map(x=>String(x).toLowerCase()) : [];
+      if(arr.some(s=>/email|send (an )?email|follow(-|\s)?up email/.test(s))) return 'auto-email';
+      if(arr.some(s=>/call|phone|ring/.test(s))) return 'phone-call';
+      // Heuristic: if timeline mentions a time, prefer call
+      return 'phone-call';
+    }catch(_){ return 'phone-call'; }
+  }
+
+  async function createFollowupTaskFromTimeline(r, A){
+    try {
+      const timelineText = A && (A.timeline || A.nextSteps || A.next_steps);
+      const asText = Array.isArray(timelineText) ? timelineText.join(' ') : String(timelineText||'');
+      const parsed = parseTimelineToTask(asText || (r.transcript||''));
+      if(!parsed) return;
+      const type = inferTaskTypeFromContext(A);
+      const contact = String(r.contactName||'');
+      const account = String(r.company||'');
+      const title = type==='phone-call' ? `Call ${contact||account||'contact'}` : `Email ${contact||account||'contact'}`;
+      const notes = `Auto-created from call timeline for ${contact||account}.`;
+      if (window.createTask) {
+        await window.createTask({ title, type, priority: 'medium', contact, account, dueDate: parsed.dueDate, dueTime: parsed.dueTime, notes });
+      } else if (window.Tasks && typeof window.Tasks.createTask === 'function'){
+        await window.Tasks.createTask({ title, type, priority: 'medium', contact, account, dueDate: parsed.dueDate, dueTime: parsed.dueTime, notes });
+      } else if (window.crm && window.crm.createTask){
+        await window.crm.createTask({ title, type, priority: 'medium', contact, account, dueDate: parsed.dueDate, dueTime: parsed.dueTime, notes });
+      } else if (window.openCreateTaskModal) {
+        // As a fallback, write to local storage directly via tasks module if available
+        try {
+          if (window.dispatchEvent) {
+            const evt = new CustomEvent('pc:auto-task', { detail: { title, type, contact, account, dueDate: parsed.dueDate, dueTime: parsed.dueTime, notes } });
+            window.dispatchEvent(evt);
+          }
+        } catch(_){ }
+      }
+      try { window.ToastManager?.showSaveNotification && window.ToastManager.showSaveNotification('Follow-up task created'); } catch(_){ }
+    } catch(_) {}
+  }
