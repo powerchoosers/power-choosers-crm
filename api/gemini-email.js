@@ -119,6 +119,11 @@ CRITICAL RULES (ZERO TOLERANCE FOR VIOLATIONS):
 - Personalize with known recipient context when appropriate
 - Avoid hallucinations; if unsure, keep it generic
 - Do not include handlebars-like placeholders (e.g., {{first_name}}). Use natural text
+- NEVER end sentences with incomplete phrases like "improving your?" or "discuss your?" - always complete the thought
+- ALWAYS write complete, grammatically correct sentences
+- NEVER use fragments or incomplete thoughts
+- Each paragraph should be 1-2 complete sentences maximum
+- Use proper punctuation and capitalization
 - Before sending, mentally check: "Have I used any phrase or sentence twice?" If yes, rewrite
 
 PERSONAL TOUCH REQUIREMENT:
@@ -291,10 +296,12 @@ export default async function handler(req, res) {
         }
       ],
       generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.9,
-        maxOutputTokens: 2048
+        temperature: 0.6, // Slightly lower for more consistency
+        topK: 32, // Reduced for more focused responses
+        topP: 0.85, // Slightly lower for better quality
+        maxOutputTokens: 2048,
+        candidateCount: 1,
+        stopSequences: ['Subject:', '---', 'END']
       }
     };
 

@@ -392,15 +392,48 @@ class PowerChoosersCRM {
             }, 50);
         }
         
-        // Call Scripts page - initialize the module when navigating to it
-        if (pageName === 'call-scripts' && window.callScriptsModule) {
-            setTimeout(() => {
-                try {
-                    if (typeof window.callScriptsModule.init === 'function') {
-                        window.callScriptsModule.init();
-                    }
-                } catch (_) { /* noop */ }
-            }, 50);
+        // Call Scripts page - store navigation source and initialize the module
+        if (pageName === 'call-scripts') {
+            // Store navigation source for back button functionality
+            const currentPage = this.currentPage;
+            if (currentPage && currentPage !== 'call-scripts') {
+                // Get current page state for restoration
+                let returnState = {};
+                
+                // Try to get state from current page modules
+                if (currentPage === 'people' && window.peopleModule && typeof window.peopleModule.getCurrentState === 'function') {
+                    returnState = window.peopleModule.getCurrentState();
+                } else if (currentPage === 'calls' && window.callsModule && typeof window.callsModule.getCurrentState === 'function') {
+                    returnState = window.callsModule.getCurrentState();
+                } else if (currentPage === 'accounts' && window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
+                    returnState = window.accountsModule.getCurrentState();
+                } else if (currentPage === 'lists' && window.listsModule && typeof window.listsModule.getCurrentState === 'function') {
+                    returnState = window.listsModule.getCurrentState();
+                } else {
+                    // Fallback: store basic state
+                    returnState = {
+                        page: currentPage,
+                        scroll: window.scrollY || 0,
+                        timestamp: Date.now()
+                    };
+                }
+                
+                window._callScriptsNavigationSource = currentPage;
+                window._callScriptsReturn = returnState;
+                
+                console.log('[Main] Stored call scripts navigation source:', currentPage, 'with state:', returnState);
+            }
+            
+            // Initialize the module
+            if (window.callScriptsModule) {
+                setTimeout(() => {
+                    try {
+                        if (typeof window.callScriptsModule.init === 'function') {
+                            window.callScriptsModule.init();
+                        }
+                    } catch (_) { /* noop */ }
+                }, 50);
+            }
         }
 
         // List Detail page - initialize the detail view

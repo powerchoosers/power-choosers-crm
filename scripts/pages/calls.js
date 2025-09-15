@@ -149,7 +149,7 @@
 
 'use strict';
 (function () {
-  const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [] } };
+  const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] } };
   const els = {};
   const chips = [
     { k: 'city', i: 'calls-filter-city', c: 'calls-filter-city-chips', x: 'calls-filter-city-clear', s: 'calls-filter-city-suggest', acc: r => r.contactCity || '' },
@@ -158,9 +158,11 @@
     { k: 'state', i: 'calls-filter-state', c: 'calls-filter-state-chips', x: 'calls-filter-state-clear', s: 'calls-filter-state-suggest', acc: r => r.contactState || '' },
     { k: 'employees', i: 'calls-filter-employees', c: 'calls-filter-employees-chips', x: 'calls-filter-employees-clear', s: 'calls-filter-employees-suggest', acc: r => (r.accountEmployees != null ? r.accountEmployees : r.employees) },
     { k: 'industry', i: 'calls-filter-industry', c: 'calls-filter-industry-chips', x: 'calls-filter-industry-clear', s: 'calls-filter-industry-suggest', acc: r => r.industry || '' },
-    { k: 'visitorDomain', i: 'calls-filter-visitor-domain', c: 'calls-filter-visitor-domain-chips', x: 'calls-filter-visitor-domain-clear', s: 'calls-filter-visitor-domain-suggest', acc: r => r.visitorDomain || '' }
+    { k: 'visitorDomain', i: 'calls-filter-visitor-domain', c: 'calls-filter-visitor-domain-chips', x: 'calls-filter-visitor-domain-clear', s: 'calls-filter-visitor-domain-suggest', acc: r => r.visitorDomain || '' },
+    { k: 'seniority', i: 'calls-filter-seniority', c: 'calls-filter-seniority-chips', x: 'calls-filter-seniority-clear', s: 'calls-filter-seniority-suggest', acc: r => r.contactSeniority || '' },
+    { k: 'department', i: 'calls-filter-department', c: 'calls-filter-department-chips', x: 'calls-filter-department-clear', s: 'calls-filter-department-suggest', acc: r => r.contactDepartment || '' }
   ];
-  const pool = { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [] };
+  const pool = { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] };
   const N = s => (s == null ? '' : String(s)).trim().toLowerCase();
 
   // Small inline SVG icons (inherit currentColor -> white on dark)
@@ -322,12 +324,26 @@
   }
 
   function initDomRefs() {
+    console.log('[Calls Filter Debug] Initializing DOM references...');
     els.page = document.getElementById('calls-page'); if (!els.page) return false;
     els.table = document.getElementById('calls-table'); els.tbody = els.table ? els.table.querySelector('tbody') : null;
     els.container = els.page.querySelector('.table-container');
     els.pag = document.getElementById('calls-pagination'); els.summary = document.getElementById('calls-pagination-summary');
     els.selectAll = document.getElementById('select-all-calls');
     els.toggle = document.getElementById('toggle-calls-filters'); els.panel = document.getElementById('calls-filters'); els.count = document.getElementById('calls-filter-count');
+    
+    console.log('[Calls Filter Debug] els.toggle found:', !!els.toggle);
+    console.log('[Calls Filter Debug] els.panel found:', !!els.panel);
+    if (els.panel) {
+      console.log('[Calls Filter Debug] panel initial classes:', els.panel.className);
+      console.log('[Calls Filter Debug] panel initial hidden attribute:', els.panel.hasAttribute('hidden'));
+      console.log('[Calls Filter Debug] panel initial computed style:', window.getComputedStyle(els.panel).display, window.getComputedStyle(els.panel).opacity, window.getComputedStyle(els.panel).transform);
+    }
+    
+    // Tabs + grid to mirror People page
+    els.tabsRow = els.panel ? els.panel.querySelector('.filter-tabs-row') : null;
+    els.tabs = els.tabsRow ? Array.from(els.tabsRow.querySelectorAll('.filter-tab')) : [];
+    els.grid = els.panel ? els.panel.querySelector('.filter-grid') : null;
     els.btnClear = document.getElementById('clear-calls-filters'); els.btnApply = document.getElementById('apply-calls-filters');
     els.hasEmail = document.getElementById('calls-filter-has-email'); els.hasPhone = document.getElementById('calls-filter-has-phone');
     chips.forEach(d => { d.ie = document.getElementById(d.i); d.ce = document.getElementById(d.c); d.xe = document.getElementById(d.x); d.se = document.getElementById(d.s); });
@@ -335,11 +351,67 @@
   }
 
   function attachEvents() {
-    if (els.toggle && els.panel) els.toggle.addEventListener('click', () => { const h = els.panel.hasAttribute('hidden'); if (h) { els.panel.removeAttribute('hidden'); els.toggle.querySelector('.filter-text').textContent = 'Hide Filters'; } else { els.panel.setAttribute('hidden', ''); els.toggle.querySelector('.filter-text').textContent = 'Show Filters'; } });
+    if (els.toggle && els.panel) els.toggle.addEventListener('click', () => {
+      console.log('[Calls Filter Debug] Toggle clicked');
+      console.log('[Calls Filter Debug] els.toggle:', els.toggle);
+      console.log('[Calls Filter Debug] els.panel:', els.panel);
+      
+      const isHidden = els.panel.hasAttribute('hidden');
+      console.log('[Calls Filter Debug] isHidden:', isHidden);
+      console.log('[Calls Filter Debug] panel classes before:', els.panel.className);
+      console.log('[Calls Filter Debug] panel style before:', els.panel.style.cssText);
+      
+      const textEl = els.toggle.querySelector('.filter-text');
+      console.log('[Calls Filter Debug] textEl:', textEl);
+      
+      if (isHidden) {
+        console.log('[Calls Filter Debug] Opening filter panel...');
+        els.panel.removeAttribute('hidden');
+        console.log('[Calls Filter Debug] Removed hidden attribute');
+        console.log('[Calls Filter Debug] panel classes after removing hidden:', els.panel.className);
+        
+        setTimeout(()=>{ 
+          console.log('[Calls Filter Debug] Adding show class...');
+          els.panel.classList.add('show'); 
+          console.log('[Calls Filter Debug] panel classes after adding show:', els.panel.className);
+          console.log('[Calls Filter Debug] panel computed style after show:', window.getComputedStyle(els.panel).display, window.getComputedStyle(els.panel).opacity, window.getComputedStyle(els.panel).transform);
+          
+          // Force a reflow to ensure the transition starts
+          els.panel.offsetHeight;
+          
+          // Check if transition is working after a short delay
+          setTimeout(() => {
+            console.log('[Calls Filter Debug] panel computed style after transition start:', window.getComputedStyle(els.panel).display, window.getComputedStyle(els.panel).opacity, window.getComputedStyle(els.panel).transform);
+          }, 50);
+        }, 10);
+        if (textEl) textEl.textContent = 'Hide Filters';
+      } else {
+        console.log('[Calls Filter Debug] Closing filter panel...');
+        els.panel.classList.remove('show');
+        console.log('[Calls Filter Debug] Removed show class');
+        setTimeout(()=>{ 
+          console.log('[Calls Filter Debug] Adding hidden attribute...');
+          els.panel.setAttribute('hidden',''); 
+        }, 300);
+        if (textEl) textEl.textContent = 'Show Filters';
+      }
+    });
     if (els.btnClear) els.btnClear.addEventListener('click', () => { clearFilters(); applyFilters(); });
     if (els.btnApply) els.btnApply.addEventListener('click', applyFilters);
     if (els.selectAll) els.selectAll.addEventListener('change', () => { if (els.selectAll.checked) openBulkPopover(); else { state.selected.clear(); render(); closeBulkPopover(); hideBulkBar(); } });
     chips.forEach(d => setupChip(d));
+    // Tab toggle behavior to exactly mirror People
+    if (els.tabs && els.tabs.length && els.grid) {
+      els.tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          els.tabs.forEach(t => t.classList.toggle('active', t === tab));
+          const mode = tab.getAttribute('data-mode') || 'simple';
+          els.grid.setAttribute('data-mode', mode);
+          tab.setAttribute('aria-selected', 'true');
+          els.tabs.filter(t => t !== tab).forEach(t => t.setAttribute('aria-selected','false'));
+        });
+      });
+    }
   }
 
   function setupChip(d) {
@@ -349,10 +421,176 @@
     if (d.xe) d.xe.addEventListener('click', () => { state.tokens[d.k] = []; renderChips(d); applyFilters(); });
   }
   function buildPool(d) { const set = new Set(), arr = []; for (const r of state.data) { const v0 = d.acc(r); const v = v0 == null ? '' : String(v0).trim(); if (!v) continue; const k = N(v); if (!set.has(k)) { set.add(k); arr.push(v); } if (arr.length > 1500) break; } pool[d.k] = arr; }
-  function showSuggest(d, q) { if (!d.se) return; const items = (pool[d.k] || []).filter(v => N(v).includes(N(q))).slice(0, 8); if (!items.length) { hideSuggest(d); return; } d.se.innerHTML = items.map(v => `<div class="suggest-item" data-v="${v.replace(/"/g,'&quot;')}">${v}</div>`).join(''); d.se.removeAttribute('hidden'); d.se.querySelectorAll('.suggest-item').forEach(it => it.addEventListener('mousedown', (e) => { e.preventDefault(); addToken(d.k, it.getAttribute('data-v')); if (d.ie) d.ie.value = ''; hideSuggest(d); applyFilters(); })); }
+  function showSuggest(d, q) {
+    if (!d.se) return;
+    const items = (pool[d.k] || []).filter(v => N(v).includes(N(q))).slice(0, 8);
+    if (!items.length) { hideSuggest(d); return; }
+    // Match People page dropdown item class for identical styling
+    d.se.innerHTML = items.map(v => `<div class="chip-suggest-item" data-v="${v.replace(/"/g,'&quot;')}">${v}</div>`).join('');
+    d.se.removeAttribute('hidden');
+    d.se.querySelectorAll('.chip-suggest-item').forEach(it => it.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      addToken(d.k, it.getAttribute('data-v'));
+      if (d.ie) d.ie.value = '';
+      hideSuggest(d);
+      applyFilters();
+    }));
+  }
   function hideSuggest(d) { if (d.se) { d.se.setAttribute('hidden', ''); d.se.innerHTML = ''; } }
-  function renderChips(d) { if (!d.ce) return; const arr = state.tokens[d.k] || []; d.ce.innerHTML = arr.map((t,i)=>`<span class="chip" data-idx="${i}"><span class="chip-label">${t}</span><button type="button" class="chip-remove" aria-label="Remove">&times;</button></span>`).join(''); d.ce.querySelectorAll('.chip-remove').forEach((b,i)=>b.addEventListener('click',()=>{ arr.splice(i,1); renderChips(d); applyFilters(); })); if (d.xe) { if (arr.length) d.xe.removeAttribute('hidden'); else d.xe.setAttribute('hidden',''); } updateFilterCount(); }
-  function addToken(k, v) { const t = (v==null?'':String(v)).trim(); if (!t) return; const arr = state.tokens[k] || (state.tokens[k]=[]); if (!arr.some(x=>N(x)===N(t))) { arr.push(t); const d = chips.find(x=>x.k===k); if (d) renderChips(d); } }
+  function renderChips(d) { 
+    if (!d.ce) return; 
+    const arr = state.tokens[d.k] || []; 
+    d.ce.innerHTML = arr.map((t,i)=>`<span class="chip" data-idx="${i}"><span class="chip-label">${t}</span><button type="button" class="chip-remove" aria-label="Remove">&times;</button></span>`).join(''); 
+    
+    // Add click handlers with proper animation like people page
+    d.ce.querySelectorAll('.chip-remove').forEach((btn, i) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Disable button to prevent double-clicks
+        btn.disabled = true;
+        
+        // Add removal animation
+        const chip = btn.closest('.chip');
+        if (chip && !chip.classList.contains('chip-removing')) {
+          // If another chip is already removing, ignore to avoid layout churn
+          const existing = d.ce.querySelector('.chip-removing');
+          if (existing && existing !== chip) {
+            return;
+          }
+          // If this chip is already removing, ignore
+          if (chip.classList.contains('chip-removing')) {
+            return;
+          }
+          
+          // Set explicit starting width so width -> 0 is smooth
+          chip.style.width = chip.offsetWidth + 'px';
+          void chip.offsetWidth; // force reflow
+          
+          requestAnimationFrame(() => {
+            chip.classList.add('chip-removing');
+          });
+          
+          // After transition, remove chip from tokens and re-render
+          let handled = false;
+          const onTransitionEnd = (ev) => {
+            // Only handle once, and only for the width transition of this chip
+            if (handled) return;
+            if (ev && ev.target !== chip) return;
+            if (ev && ev.propertyName && ev.propertyName !== 'width') return;
+            handled = true;
+            chip.removeEventListener('transitionend', onTransitionEnd);
+            
+            // Remove from array and re-render
+            arr.splice(i, 1);
+            renderChips(d);
+            applyFilters();
+          };
+          
+          chip.addEventListener('transitionend', onTransitionEnd);
+          // Fallback in case transitionend doesn't fire
+          setTimeout(() => { onTransitionEnd(); }, 300);
+        }
+      });
+    });
+    
+    if (d.xe) { 
+      if (arr.length) d.xe.removeAttribute('hidden'); 
+      else d.xe.setAttribute('hidden',''); 
+    } 
+    updateFilterCount(); 
+  }
+  function addToken(k, v) { 
+    const t = (v==null?'':String(v)).trim(); 
+    if (!t) return; 
+    const arr = state.tokens[k] || (state.tokens[k]=[]); 
+    if (!arr.some(x=>N(x)===N(t))) { 
+      arr.push(t); 
+      const d = chips.find(x=>x.k===k); 
+      if (d) {
+        // Add chip with animation like people page
+        addChipWithAnimation(d, t);
+      }
+    } 
+  }
+  
+  function addChipWithAnimation(d, token) {
+    if (!d.ce) return;
+    
+    const container = d.ce;
+    const inputField = d.ie;
+    const tokens = state.tokens[d.k] || [];
+    
+    // Create chip HTML with chip-new class for animation
+    const chipHTML = `
+      <span class="chip chip-new" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${tokens.length}">
+        <span class="chip-label">${token}</span>
+        <button type="button" class="chip-remove" aria-label="Remove ${token}" data-idx="${tokens.length}">&#215;</button>
+      </span>
+    `;
+    container.insertAdjacentHTML('beforeend', chipHTML);
+    
+    // Add click handler to the new chip
+    const newChip = container.lastElementChild;
+    const removeBtn = newChip.querySelector('.chip-remove');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!removeBtn.disabled) {
+          // Disable button to prevent double-clicks
+          removeBtn.disabled = true;
+          
+          const chip = removeBtn.closest('.chip');
+          if (chip && !chip.classList.contains('chip-removing')) {
+            // Set explicit starting width so width -> 0 is smooth
+            chip.style.width = chip.offsetWidth + 'px';
+            void chip.offsetWidth; // force reflow
+            
+            requestAnimationFrame(() => { 
+              chip.classList.add('chip-removing'); 
+            });
+            
+            let handled = false;
+            const onTransitionEnd = (ev) => {
+              if (handled) return;
+              if (ev && ev.target !== chip) return;
+              if (ev && ev.propertyName && ev.propertyName !== 'width') return;
+              handled = true;
+              chip.removeEventListener('transitionend', onTransitionEnd);
+              
+              // Remove from array and re-render
+              const index = tokens.indexOf(token);
+              if (index > -1) {
+                tokens.splice(index, 1);
+                renderChips(d);
+                applyFilters();
+              }
+            };
+            
+            chip.addEventListener('transitionend', onTransitionEnd);
+            // Fallback in case transitionend doesn't fire
+            setTimeout(() => { onTransitionEnd(); }, 300);
+          }
+        }
+      });
+    }
+    
+    // Remove the animation class after animation completes
+    setTimeout(() => {
+      newChip.classList.remove('chip-new');
+      newChip.classList.add('chip-existing');
+    }, 300);
+    
+    // Update clear button visibility
+    if (d.xe) {
+      if (tokens.length) d.xe.removeAttribute('hidden');
+      else d.xe.setAttribute('hidden','');
+    }
+    updateFilterCount();
+  }
 
   async function loadData() {
     // Enable debugging for contact ID resolution
@@ -536,6 +774,8 @@
             let contactEmail = '';
             let contactCity = '';
             let contactState = '';
+            let contactSeniority = '';
+            let contactDepartment = '';
             let industry = '';
             let accountEmployees = null;
             let visitorDomain = '';
@@ -547,6 +787,8 @@
                 contactEmail = existingContact.email || '';
                 contactCity = existingContact.city || '';
                 contactState = existingContact.state || '';
+                contactSeniority = existingContact.seniority || '';
+                contactDepartment = existingContact.department || '';
                 industry = existingContact.industry || '';
                 accountEmployees = existingContact.accountEmployees || null;
                 visitorDomain = existingContact.visitorDomain || '';
@@ -570,6 +812,8 @@
                 contactEmail = foundContact.email || '';
                 contactCity = foundContact.city || '';
                 contactState = foundContact.state || '';
+                contactSeniority = foundContact.seniority || '';
+                contactDepartment = foundContact.department || '';
                 industry = foundContact.industry || '';
                 accountEmployees = foundContact.accountEmployees || null;
                 visitorDomain = foundContact.visitorDomain || '';
@@ -585,6 +829,8 @@
               if (account) {
                 contactCity = account.city || '';
                 contactState = account.state || '';
+                contactSeniority = account.seniority || '';
+                contactDepartment = account.department || '';
                 industry = account.industry || '';
                 accountEmployees = account.employees || account.employeeCount || account.numEmployees || null;
                 visitorDomain = account.domain || account.website || '';
@@ -601,6 +847,8 @@
               contactPhone,
               contactCity,
               contactState,
+              contactSeniority,
+              contactDepartment,
               accountEmployees,
               industry,
               visitorDomain,
@@ -683,6 +931,8 @@
         contactPhone:Math.random()>0.5?`512-555-${(1000+i).toString().slice(-4)}`:'', 
         contactCity:cities[j], 
         contactState:states[j], 
+        contactSeniority:['Senior', 'Manager', 'Director', 'VP', 'C-Level'][j], 
+        contactDepartment:['Sales', 'Marketing', 'Engineering', 'Operations', 'Finance'][j], 
         accountEmployees:[10,50,120,400,900][j], 
         industry:industries[j], 
         visitorDomain:'', 
@@ -823,6 +1073,8 @@
                   title: callRow.contactTitle || '',
                   city: callRow.contactCity || '',
                   state: callRow.contactState || '',
+                  seniority: callRow.contactSeniority || '',
+                  department: callRow.contactDepartment || '',
                   industry: callRow.industry || ''
                 } : null;
 
@@ -1836,12 +2088,29 @@
     return null;
   }
 
+  function getCurrentState(){
+    return {
+      page: 'calls',
+      scroll: window.scrollY || 0,
+      currentPage: state.currentPage || 1,
+      filters: {
+        // Add any call-specific filters here
+      },
+      searchTerm: els.quickSearch?.value || '',
+      selectedItems: getSelectedCalls().map(c => c.id || c.callId || c._id),
+      sortColumn: state.sortColumn || '',
+      sortDirection: state.sortDirection || 'asc',
+      timestamp: Date.now()
+    };
+  }
+
   // Expose loadData and controls for external use
   window.callsModule = { 
     loadData, 
     startAutoRefresh, 
     stopAutoRefresh,
     getCallContactById,
+    getCurrentState,
     // Debug functions
     testApiEndpoint: async function() {
       const base = 'https://power-choosers-crm.vercel.app';

@@ -387,7 +387,14 @@
                         <div class="page-container">
                             <div class="page-header">
                                 <div class="page-title-section">
-                                    <h2 class="page-title">Call Scripts</h2>
+                                    <div class="page-title-row">
+                                        <button class="back-btn back-btn--icon" id="call-scripts-back-to-previous" aria-label="Back to previous page" title="Back to previous page">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                                            </svg>
+                                        </button>
+                                        <h2 class="page-title">Call Scripts</h2>
+                                    </div>
                                     <div class="page-actions"></div>
                                 </div>
                                 <div class="people-toolbar" id="call-scripts-toolbar">
@@ -458,7 +465,7 @@
                                             <label for="calls-filter-city">City</label>
                                             <div class="chip-input" id="calls-filter-city-chip">
                                                 <div class="chip-list" id="calls-filter-city-chips"></div>
-                                                <input type="text" id="calls-filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" />
+                                                <input type="text" id="calls-filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="calls-filter-city-clear" aria-label="Clear city filters">&#215;</button>
                                                 <div class="chip-suggest" id="calls-filter-city-suggest" hidden></div>
                                             </div>
@@ -467,7 +474,7 @@
                                             <label for="calls-filter-title">Job title</label>
                                             <div class="chip-input" id="calls-filter-title-chip">
                                                 <div class="chip-list" id="calls-filter-title-chips"></div>
-                                                <input type="text" id="calls-filter-title" class="chip-input-field" placeholder="e.g., manager, director" />
+                                                <input type="text" id="calls-filter-title" class="chip-input-field" placeholder="e.g., manager, director" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="calls-filter-title-clear" aria-label="Clear title filters">&#215;</button>
                                                 <div class="chip-suggest" id="calls-filter-title-suggest" hidden></div>
                                             </div>
@@ -476,7 +483,7 @@
                                             <label for="calls-filter-company">Company</label>
                                             <div class="chip-input" id="calls-filter-company-chip">
                                                 <div class="chip-list" id="calls-filter-company-chips"></div>
-                                                <input type="text" id="calls-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
+                                                <input type="text" id="calls-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="calls-filter-company-clear" aria-label="Clear company filters">&#215;</button>
                                                 <div class="chip-suggest" id="calls-filter-company-suggest" hidden></div>
                                             </div>
@@ -485,7 +492,7 @@
                                             <label for="calls-filter-state">State</label>
                                             <div class="chip-input" id="calls-filter-state-chip">
                                                 <div class="chip-list" id="calls-filter-state-chips"></div>
-                                                <input type="text" id="calls-filter-state" class="chip-input-field" placeholder="e.g., TX, CA" />
+                                                <input type="text" id="calls-filter-state" class="chip-input-field" placeholder="e.g., TX, CA" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="calls-filter-state-clear" aria-label="Clear state filters">&#215;</button>
                                                 <div class="chip-suggest" id="calls-filter-state-suggest" hidden></div>
                                             </div>
@@ -494,7 +501,7 @@
                                             <label for="calls-filter-employees">Employees</label>
                                             <div class="chip-input" id="calls-filter-employees-chip">
                                                 <div class="chip-list" id="calls-filter-employees-chips"></div>
-                                                <input type="text" id="calls-filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" />
+                                                <input type="text" id="calls-filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="calls-filter-employees-clear" aria-label="Clear employees filters">&#215;</button>
                                                 <div class="chip-suggest" id="calls-filter-employees-suggest" hidden></div>
                                             </div>
@@ -503,7 +510,7 @@
                                             <label for="calls-filter-industry">Industry</label>
                                             <div class="chip-input" id="calls-filter-industry-chip">
                                                 <div class="chip-list" id="calls-filter-industry-chips"></div>
-                                                <input type="text" id="calls-filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
+                                                <input type="text" id="calls-filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="calls-filter-industry-clear" aria-label="Clear industry filters">&#215;</button>
                                                 <div class="chip-suggest" id="calls-filter-industry-suggest" hidden></div>
                                             </div>
@@ -512,9 +519,27 @@
                                             <label for="calls-filter-visitor-domain">Website visitors (domain)</label>
                                             <div class="chip-input" id="calls-filter-visitor-domain-chip">
                                                 <div class="chip-list" id="calls-filter-visitor-domain-chips"></div>
-                                                <input type="text" id="calls-filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" />
+                                                <input type="text" id="calls-filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="calls-filter-visitor-domain-clear" aria-label="Clear website visitor domains">&#215;</button>
                                                 <div class="chip-suggest" id="calls-filter-visitor-domain-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="calls-filter-seniority">Seniority</label>
+                                            <div class="chip-input" id="calls-filter-seniority-chip">
+                                                <div class="chip-list" id="calls-filter-seniority-chips"></div>
+                                                <input type="text" id="calls-filter-seniority" class="chip-input-field" placeholder="e.g., Senior, Manager, Director" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
+                                                <button type="button" class="chip-clear" id="calls-filter-seniority-clear" aria-label="Clear seniority filters">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-seniority-suggest" hidden></div>
+                                            </div>
+                                        </div>
+                                        <div class="filter-field">
+                                            <label for="calls-filter-department">Department</label>
+                                            <div class="chip-input" id="calls-filter-department-chip">
+                                                <div class="chip-list" id="calls-filter-department-chips"></div>
+                                                <input type="text" id="calls-filter-department" class="chip-input-field" placeholder="e.g., Sales, Marketing, Engineering" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
+                                                <button type="button" class="chip-clear" id="calls-filter-department-clear" aria-label="Clear department filters">&#215;</button>
+                                                <div class="chip-suggest" id="calls-filter-department-suggest" hidden></div>
                                             </div>
                                         </div>
                                         <div class="filter-field checkbox">
@@ -861,7 +886,7 @@
                                             <label for="filter-city">City</label>
                                             <div class="chip-input" id="filter-city-chip">
                                                 <div class="chip-list" id="filter-city-chips"></div>
-                                                <input type="text" id="filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" />
+                                                <input type="text" id="filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-city-clear" aria-label="Clear city filters">&#215;</button>
                                                 <div class="chip-suggest" id="filter-city-suggest" hidden></div>
                                             </div>
@@ -870,7 +895,7 @@
                                             <label for="filter-title">Job title</label>
                                             <div class="chip-input" id="filter-title-chip">
                                                 <div class="chip-list" id="filter-title-chips"></div>
-                                                <input type="text" id="filter-title" class="chip-input-field" placeholder="e.g., manager, director" />
+                                                <input type="text" id="filter-title" class="chip-input-field" placeholder="e.g., manager, director" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-title-clear" aria-label="Clear title filters">&#215;</button>
                                                 <div class="chip-suggest" id="filter-title-suggest" hidden></div>
                                             </div>
@@ -879,7 +904,7 @@
                                             <label for="filter-company">Company</label>
                                             <div class="chip-input" id="filter-company-chip">
                                                 <div class="chip-list" id="filter-company-chips"></div>
-                                                <input type="text" id="filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
+                                                <input type="text" id="filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-company-clear" aria-label="Clear company filters">&#215;</button>
                                                 <div class="chip-suggest" id="filter-company-suggest" hidden></div>
                                             </div>
@@ -888,7 +913,7 @@
                                             <label for="filter-state">State</label>
                                             <div class="chip-input" id="filter-state-chip">
                                                 <div class="chip-list" id="filter-state-chips"></div>
-                                                <input type="text" id="filter-state" class="chip-input-field" placeholder="e.g., TX, CA" />
+                                                <input type="text" id="filter-state" class="chip-input-field" placeholder="e.g., TX, CA" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-state-clear" aria-label="Clear state filters">&#215;</button>
                                                 <div class="chip-suggest" id="filter-state-suggest" hidden></div>
                                             </div>
@@ -897,7 +922,7 @@
                                             <label for="filter-employees">Employees</label>
                                             <div class="chip-input" id="filter-employees-chip">
                                                 <div class="chip-list" id="filter-employees-chips"></div>
-                                                <input type="text" id="filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" />
+                                                <input type="text" id="filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-employees-clear" aria-label="Clear employees filters">&#215;</button>
                                                 <div class="chip-suggest" id="filter-employees-suggest" hidden></div>
                                             </div>
@@ -906,7 +931,7 @@
                                             <label for="filter-industry">Industry</label>
                                             <div class="chip-input" id="filter-industry-chip">
                                                 <div class="chip-list" id="filter-industry-chips"></div>
-                                                <input type="text" id="filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
+                                                <input type="text" id="filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-industry-clear" aria-label="Clear industry filters">&#215;</button>
                                                 <div class="chip-suggest" id="filter-industry-suggest" hidden></div>
                                             </div>
@@ -915,7 +940,7 @@
                                             <label for="filter-visitor-domain">Website visitors (domain)</label>
                                             <div class="chip-input" id="filter-visitor-domain-chip">
                                                 <div class="chip-list" id="filter-visitor-domain-chips"></div>
-                                                <input type="text" id="filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" />
+                                                <input type="text" id="filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-visitor-domain-clear" aria-label="Clear website visitor domains">&#215;</button>
                                                 <div class="chip-suggest" id="filter-visitor-domain-suggest" hidden></div>
                                             </div>
@@ -924,7 +949,7 @@
                                             <label for="filter-seniority">Seniority</label>
                                             <div class="chip-input" id="filter-seniority-chip">
                                                 <div class="chip-list" id="filter-seniority-chips"></div>
-                                                <input type="text" id="filter-seniority" class="chip-input-field" placeholder="e.g., Senior, Manager, Director" />
+                                                <input type="text" id="filter-seniority" class="chip-input-field" placeholder="e.g., Senior, Manager, Director" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-seniority-clear" aria-label="Clear seniority filters">&#215;</button>
                                                 <div class="chip-suggest" id="filter-seniority-suggest" hidden></div>
                                             </div>
@@ -933,7 +958,7 @@
                                             <label for="filter-department">Department</label>
                                             <div class="chip-input" id="filter-department-chip">
                                                 <div class="chip-list" id="filter-department-chips"></div>
-                                                <input type="text" id="filter-department" class="chip-input-field" placeholder="e.g., Sales, Marketing, Engineering" />
+                                                <input type="text" id="filter-department" class="chip-input-field" placeholder="e.g., Sales, Marketing, Engineering" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" />
                                                 <button type="button" class="chip-clear" id="filter-department-clear" aria-label="Clear department filters">&#215;</button>
                                                 <div class="chip-suggest" id="filter-department-suggest" hidden></div>
                                             </div>
@@ -1166,7 +1191,7 @@
                                                 <label for="list-detail-filter-city">City</label>
                                                 <div class="chip-input" id="list-detail-filter-city-chip">
                                                     <div class="chip-list" id="list-detail-filter-city-chips"></div>
-                                                    <input type="text" id="list-detail-filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" />
+                                                    <input type="text" id="list-detail-filter-city" class="chip-input-field" placeholder="e.g., Austin, Dallas" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-city-clear" aria-label="Clear city filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-city-suggest" hidden></div>
                                                 </div>
@@ -1175,14 +1200,14 @@
                                                 <label for="list-detail-filter-title">Job title</label>
                                                 <div class="chip-input" id="list-detail-filter-title-chip">
                                                     <div class="chip-list" id="list-detail-filter-title-chips"></div>
-                                                    <input type="text" id="list-detail-filter-title" class="chip-input-field" placeholder="e.g., manager, director" />
+                                                    <input type="text" id="list-detail-filter-title" class="chip-input-field" placeholder="e.g., manager, director" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-title-clear" aria-label="Clear title filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-title-suggest" hidden></div>
                                                 </div>
                                                 <label for="list-detail-filter-seniority">Seniority</label>
                                                 <div class="chip-input" id="list-detail-filter-seniority-chip">
                                                     <div class="chip-list" id="list-detail-filter-seniority-chips"></div>
-                                                    <input type="text" id="list-detail-filter-seniority" class="chip-input-field" placeholder="e.g., Senior, Manager, Director" />
+                                                    <input type="text" id="list-detail-filter-seniority" class="chip-input-field" placeholder="e.g., Senior, Manager, Director" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-seniority-clear" aria-label="Clear seniority filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-seniority-suggest" hidden></div>
                                                 </div>
@@ -1191,14 +1216,14 @@
                                                 <label for="list-detail-filter-company">Company</label>
                                                 <div class="chip-input" id="list-detail-filter-company-chip">
                                                     <div class="chip-list" id="list-detail-filter-company-chips"></div>
-                                                    <input type="text" id="list-detail-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" />
+                                                    <input type="text" id="list-detail-filter-company" class="chip-input-field" placeholder="e.g., Acme Corp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-company-clear" aria-label="Clear company filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-company-suggest" hidden></div>
                                                 </div>
                                                 <label for="list-detail-filter-department">Department</label>
                                                 <div class="chip-input" id="list-detail-filter-department-chip">
                                                     <div class="chip-list" id="list-detail-filter-department-chips"></div>
-                                                    <input type="text" id="list-detail-filter-department" class="chip-input-field" placeholder="e.g., Sales, Marketing, Engineering" />
+                                                    <input type="text" id="list-detail-filter-department" class="chip-input-field" placeholder="e.g., Sales, Marketing, Engineering" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-department-clear" aria-label="Clear department filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-department-suggest" hidden></div>
                                                 </div>
@@ -1207,7 +1232,7 @@
                                                 <label for="list-detail-filter-state">State</label>
                                                 <div class="chip-input" id="list-detail-filter-state-chip">
                                                     <div class="chip-list" id="list-detail-filter-state-chips"></div>
-                                                    <input type="text" id="list-detail-filter-state" class="chip-input-field" placeholder="e.g., TX, CA" />
+                                                    <input type="text" id="list-detail-filter-state" class="chip-input-field" placeholder="e.g., TX, CA" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-state-clear" aria-label="Clear state filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-state-suggest" hidden></div>
                                                 </div>
@@ -1216,7 +1241,7 @@
                                                 <label for="list-detail-filter-employees">Employees</label>
                                                 <div class="chip-input" id="list-detail-filter-employees-chip">
                                                     <div class="chip-list" id="list-detail-filter-employees-chips"></div>
-                                                    <input type="text" id="list-detail-filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" />
+                                                    <input type="text" id="list-detail-filter-employees" class="chip-input-field" placeholder="e.g., 1-10, 50, 500+" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-employees-clear" aria-label="Clear employees filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-employees-suggest" hidden></div>
                                                 </div>
@@ -1225,7 +1250,7 @@
                                                 <label for="list-detail-filter-industry">Industry</label>
                                                 <div class="chip-input" id="list-detail-filter-industry-chip">
                                                     <div class="chip-list" id="list-detail-filter-industry-chips"></div>
-                                                    <input type="text" id="list-detail-filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" />
+                                                    <input type="text" id="list-detail-filter-industry" class="chip-input-field" placeholder="e.g., Industrial, Retail" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-industry-clear" aria-label="Clear industry filters">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-industry-suggest" hidden></div>
                                                 </div>
@@ -1234,7 +1259,7 @@
                                                 <label for="list-detail-filter-visitor-domain">Website visitors (domain)</label>
                                                 <div class="chip-input" id="list-detail-filter-visitor-domain-chip">
                                                     <div class="chip-list" id="list-detail-filter-visitor-domain-chips"></div>
-                                                    <input type="text" id="list-detail-filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" />
+                                                    <input type="text" id="list-detail-filter-visitor-domain" class="chip-input-field" placeholder="e.g., powerchoosers.com" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                                                     <button type="button" class="chip-clear" id="list-detail-filter-visitor-domain-clear" aria-label="Clear website visitor domains">&#215;</button>
                                                     <div class="chip-suggest" id="list-detail-filter-visitor-domain-suggest" hidden></div>
                                                 </div>

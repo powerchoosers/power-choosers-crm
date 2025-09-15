@@ -68,6 +68,7 @@ class EmailManager {
                 <div class="ai-row actions">
                     <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
                     <button class="fmt-btn ai-generate" data-mode="html">Generate HTML</button>
+                    <button class="fmt-btn ai-log-all" type="button" title="Log outputs for all suggestions">Log All (6)</button>
                     <div class="ai-status" aria-live="polite"></div>
                 </div>
             </div>
@@ -149,6 +150,25 @@ class EmailManager {
                 await this.generateWithAI(aiBar, mode);
             });
         });
+
+        // Log All (6) button
+        const logAllBtn = aiBar.querySelector('.ai-log-all');
+        if (logAllBtn) {
+            logAllBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    logAllBtn.disabled = true;
+                    logAllBtn.textContent = 'Logging...';
+                    await this.logAllAIPrompts(aiBar);
+                } catch (err) {
+                    console.error('[AI] Log All failed', err);
+                } finally {
+                    logAllBtn.disabled = false;
+                    logAllBtn.textContent = 'Log All (6)';
+                }
+            });
+        }
         
         // Ensure textarea is editable
         const textarea = aiBar.querySelector('.ai-prompt');
@@ -360,7 +380,13 @@ class EmailManager {
                         return;
                     }
                     const output2 = data2?.output || '';
-                    const { subject: subject2, html: html2 } = this.formatGeneratedEmail(output2, recipient, mode);
+                    let { subject: subject2, html: html2 } = this.formatGeneratedEmail(output2, enrichedRecipient, mode);
+                    // Warm intro adjustment
+                    if ((prompt || '').toLowerCase().includes('warm intro')) {
+                        html2 = this.adjustWarmIntroHtml(html2);
+                    }
+                    // Replace variables with actual values before inserting
+                    html2 = this.replaceVariablesInHtml(html2, enrichedRecipient);
                     if (subjectInput) {
                         subjectInput.classList.remove('fade-in');
                         subjectInput.value = subject2 || '';
@@ -373,8 +399,7 @@ class EmailManager {
                     } else {
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
                         editor.innerHTML = html2;
-                        this.normalizeVariablesInEditor(editor);
-                        this.sanitizeGeneratedEditor(editor, recipient);
+                        this.sanitizeGeneratedEditor(editor, enrichedRecipient);
                         if (status) status.textContent = 'Draft inserted (prod).';
                     }
                     editor.classList.remove('fade-in');
@@ -393,7 +418,7 @@ class EmailManager {
             } catch (_) {}
 
             // Build clean subject + body layout
-            const { subject, html } = this.formatGeneratedEmail(output, recipient, mode);
+            let { subject, html } = this.formatGeneratedEmail(output, enrichedRecipient, mode);
             try {
                 console.debug('[AI][generate] formatted subject:', subject);
             } catch (_) {}
@@ -410,15 +435,26 @@ class EmailManager {
             if (mode === 'html') {
                 // Switch to HTML mode and set raw HTML
                 if (!this._isHtmlMode) this.toggleHtmlMode(compose);
+                // Warm intro adjustment
+                if ((prompt || '').toLowerCase().includes('warm intro')) {
+                    html = this.adjustWarmIntroHtml(html);
+                }
+                // Replace variables with actual values before inserting
+                html = this.replaceVariablesInHtml(html, enrichedRecipient);
                 editor.textContent = html; // raw source in HTML mode
                 if (status) status.textContent = 'Inserted HTML into editor.';
             } else {
                 // Insert styled HTML into rich editor
                 if (this._isHtmlMode) this.toggleHtmlMode(compose);
+                // Warm intro adjustment
+                if ((prompt || '').toLowerCase().includes('warm intro')) {
+                    html = this.adjustWarmIntroHtml(html);
+                }
+                // Replace variables with actual values before inserting
+                html = this.replaceVariablesInHtml(html, enrichedRecipient);
                 editor.innerHTML = html;
-                this.normalizeVariablesInEditor(editor);
                 // Extra safety: sanitize DOM for duplicate greetings/closings
-                this.sanitizeGeneratedEditor(editor, recipient);
+                this.sanitizeGeneratedEditor(editor, enrichedRecipient);
                 if (status) status.textContent = 'Draft inserted.';
             }
 
@@ -483,9 +519,10 @@ class EmailManager {
         // Normalize newlines and strip HTML to plain text if needed
         body = (looksLikeHtml ? toPlain(body) : body).replace(/\r\n/g, '\n');
 
-        // Prepare greeting
-        const firstName = (recipient?.name || '').split(' ')[0] || '{{contact.first_name}}';
-        const greeting = `Hi ${firstName},`;
+        // Prepare greeting (no template tokens fallback)
+        const nameSource = (recipient?.fullName || recipient?.name || '').trim();
+        const firstName = (nameSource.split(' ')[0] || '').trim();
+        const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
         // Remove greeting lines anywhere and cut from the first closing onward
         const lines = body.split('\n');
@@ -867,20 +904,483 @@ class EmailManager {
         return { subject, html: contentHtml };
     }
 
+    // Replace any {{contact./account./sender.}} tokens and .var-chip spans with real values
+    replaceVariablesInHtml(html, recipient) {
+        try {
+            const r = recipient || {};
+            const contact = r;
+            const account = r.account || {};
+            const sender = (window.currentUser && window.currentUser.profile) || {};
+
+            const get = (obj, key) => {
+                const k = String(key || '').trim();
+                const map = {
+                    first_name: (obj.firstName || (obj.name||'').split(' ')[0] || ''),
+                    last_name: (obj.lastName || (obj.name||'').split(' ').slice(1).join(' ') || ''),
+                    full_name: (obj.fullName || obj.name || [obj.firstName, obj.lastName].filter(Boolean).join(' ') || ''),
+                    title: (obj.title || obj.job || obj.role || obj.jobTitle || ''),
+                    email: (obj.email || ''),
+                    phone: (obj.phone || obj.mobile || ''),
+                    website: (obj.website || obj.domain || ''),
+                    name: (obj.name || obj.accountName || ''),
+                    industry: (obj.industry || ''),
+                    city: (obj.city || obj.billingCity || obj.locationCity || ''),
+                    state: (obj.state || obj.region || obj.billingState || ''),
+                    country: (obj.country || '')
+                };
+                return map.hasOwnProperty(k) ? (map[k] || '') : (obj[k] || '');
+            };
+
+            // Replace raw tokens first
+            let out = String(html || '')
+                .replace(/\{\{\s*contact\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => this.escapeHtml(get(contact, k)))
+                .replace(/\{\{\s*account\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => this.escapeHtml(get(account, k)))
+                .replace(/\{\{\s*sender\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => this.escapeHtml(get(sender, k)));
+
+            // Replace .var-chip elements if present
+            const tmp = document.createElement('div');
+            tmp.innerHTML = out;
+            tmp.querySelectorAll('.var-chip').forEach(chip => {
+                const dataVar = chip.getAttribute('data-var') || '';
+                const m = dataVar.match(/^([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)$/);
+                if (!m) { chip.replaceWith(document.createTextNode(chip.textContent||'')); return; }
+                const scope = m[1];
+                const key = m[2];
+                let val = '';
+                if (scope === 'contact') val = get(contact, key);
+                else if (scope === 'account') val = get(account, key);
+                else if (scope === 'sender') val = get(sender, key);
+                chip.replaceWith(document.createTextNode(val || ''));
+            });
+            out = tmp.innerHTML;
+            return out;
+        } catch (e) {
+            console.warn('[AI] replaceVariablesInHtml failed', e);
+            return html;
+        }
+    }
+
+    // Ensure warm-intro layout: greeting line, personal line on its own paragraph, then the rest
+    adjustWarmIntroHtml(html) {
+        try {
+            let body = String(html || '');
+            // Normalize to paragraphs for manipulation
+            const toPlain = (h) => String(h).replace(/<\s*br\s*\/?>/gi, '\n').replace(/<\/(p|div)>/gi, '\n\n').replace(/<[^>]+>/g,'');
+            const toHtmlPara = (p) => `<p style="margin: 0 0 16px 0;">${this.escapeHtml(p)}</p>`;
+            const plain = toPlain(body).replace(/\r\n/g,'\n');
+            const lines = plain.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+            if (!lines.length) return html;
+
+            // Find personal line candidates
+            const isPersonal = (t) => /productive week|great start to the week|great friday|wonderful holiday season|great start to the new year|hope you're having|hope you are having/i.test(t);
+            const greetIdx = lines.findIndex(l => /^\s*(hi|hello|hey)\b/i.test(l));
+            let personalIdx = lines.findIndex(isPersonal);
+
+            if (personalIdx === -1) {
+                // Sometimes Gemini puts "As promised..." early; keep it below the personal line if present later
+                // If we detect a sentence starting with "As promised," ensure it is NOT above the personal line
+                // We'll attempt to split first paragraph and move clauses
+            }
+
+            // If "As promised," exists before personal line, move it after personal line
+            const asPromisedIdx = lines.findIndex(l => /^as promised[,\s]/i.test(l));
+            if (asPromisedIdx !== -1) {
+                // Ensure personal line exists; if not, try to synthesize a generic one
+                if (personalIdx === -1) {
+                    const today = new Date();
+                    const day = today.getDay();
+                    const personal = (day === 1) ? "I hope you're having a great start to the week." : (day === 5) ? "I hope you're having a great Friday." : "I hope you're having a productive week.";
+                    lines.splice( (greetIdx !== -1 ? greetIdx + 1 : 0), 0, personal);
+                    personalIdx = (greetIdx !== -1 ? greetIdx + 1 : 0);
+                }
+                if (asPromisedIdx < personalIdx) {
+                    const [moved] = lines.splice(asPromisedIdx, 1);
+                    // Place right after personal line
+                    lines.splice(personalIdx + 1, 0, moved);
+                }
+            }
+
+            // Ensure personal line is its own paragraph directly after greeting if present
+            if (personalIdx !== -1 && greetIdx !== -1 && personalIdx !== greetIdx + 1) {
+                const [p] = lines.splice(personalIdx, 1);
+                lines.splice(greetIdx + 1, 0, p);
+            }
+
+            // Ensure any CTA-like time windows sit below the context lines
+            try {
+                // Detect scheduling CTA lines (Tuesday/Thursday windows etc.)
+                const isTimeCta = (t) => /(mon|tue|wed|thu|fri|monday|tuesday|wednesday|thursday|friday|\b\d{1,2}\s*(am|pm)\b|\b\d{1,2}\s*[–-]\s*\d{1,2}\b|work for you\?)/i.test(String(t||''));
+                const ctaIdx = lines.findIndex(isTimeCta);
+                // If we have both an "As promised" line and a CTA, ensure order: greeting → personal → As promised → CTA
+                const asPromisedIdx2 = lines.findIndex(l => /^as promised[, \s]/i.test(l));
+                if (ctaIdx !== -1 && asPromisedIdx2 !== -1) {
+                    // Determine insertion anchor (after personal if present, else after greeting)
+                    const anchor = (personalIdx !== -1) ? personalIdx : greetIdx;
+                    if (asPromisedIdx2 > anchor && ctaIdx < asPromisedIdx2) {
+                        const [cta] = lines.splice(ctaIdx, 1);
+                        // Recompute personal index if it moved earlier
+                        const insertPos = (personalIdx !== -1 ? personalIdx + 1 : (greetIdx !== -1 ? greetIdx + 1 : 0)) + 1; // after As promised
+                        // Ensure As promised is just after personal/greeting
+                        if (asPromisedIdx2 !== (personalIdx !== -1 ? personalIdx + 1 : (greetIdx !== -1 ? greetIdx + 1 : 0))) {
+                            const [ap] = lines.splice(asPromisedIdx2, 1);
+                            lines.splice((personalIdx !== -1 ? personalIdx + 1 : (greetIdx !== -1 ? greetIdx + 1 : 0)), 0, ap);
+                        }
+                        // Place CTA after As promised
+                        const newApIdx = lines.findIndex(l => /^as promised[, \s]/i.test(l));
+                        lines.splice(newApIdx + 1, 0, cta);
+                    }
+                }
+            } catch (_) { /* noop */ }
+
+            // Rebuild
+            const rebuilt = lines.map(toHtmlPara).join('');
+            return rebuilt;
+        } catch (e) {
+            console.warn('[AI] adjustWarmIntroHtml failed', e);
+            return html;
+        }
+    }
+
+    // Fetch and log all six predefined prompts for debugging
+    async logAllAIPrompts(aiBar) {
+        try {
+            const compose = document.getElementById('compose-window');
+            const toInput = compose?.querySelector('#compose-to');
+            const recipient = this._selectedRecipient || null;
+            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+            const genUrl = `${base}/api/gemini-email`;
+            const prompts = [
+                'Warm intro after a call',
+                'Follow-up with tailored value props',
+                'Schedule an Energy Health Check',
+                'Proposal delivery with next steps',
+                'Cold email to a lead I could not reach by phone',
+                'Standard Invoice Request'
+            ];
+            const mode = 'standard';
+
+            // Enrich recipient same as generate path
+            let enrichedRecipient = recipient ? JSON.parse(JSON.stringify(recipient)) : null;
+            try {
+                if (enrichedRecipient && (enrichedRecipient.company || enrichedRecipient.email)) {
+                    const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+                    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
+                    const comp = norm(enrichedRecipient.company || '');
+                    const domain = (enrichedRecipient.email || '').split('@')[1]?.toLowerCase() || '';
+                    let acct = null;
+                    if (comp) {
+                        acct = accounts.find(a => {
+                            const an = norm(a.accountName || a.name || a.companyName || '');
+                            return an === comp || an.includes(comp) || comp.includes(an);
+                        }) || null;
+                    }
+                    if (!acct && domain) {
+                        acct = accounts.find(a => {
+                            const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
+                            return d && domain.endsWith(d);
+                        }) || null;
+                    }
+                    if (acct) {
+                        const acctEnergy = {
+                            supplier: acct.electricitySupplier || acct.supplier || '',
+                            currentRate: acct.currentRate || acct.rate || '',
+                            usage: acct.annual_kwh || acct.kwh || '',
+                            contractEnd: acct.contractEndDate || acct.contractEnd || acct.contract_end_date || ''
+                        };
+                        enrichedRecipient.account = enrichedRecipient.account || {
+                            id: acct.id,
+                            name: acct.accountName || acct.name || acct.companyName || '',
+                            industry: acct.industry || '',
+                            domain: acct.domain || acct.website || ''
+                        };
+                        const rE = enrichedRecipient.energy || {};
+                        const merged = {
+                            supplier: rE.supplier || acctEnergy.supplier || '',
+                            currentRate: rE.currentRate || acctEnergy.currentRate || '',
+                            usage: rE.usage || acctEnergy.usage || '',
+                            contractEnd: rE.contractEnd || acctEnergy.contractEnd || ''
+                        };
+                        if (/^\.\d+$/.test(String(merged.currentRate))) merged.currentRate = '0' + merged.currentRate;
+                        enrichedRecipient.energy = merged;
+                    }
+                }
+            } catch (e) { console.warn('[AI] Could not enrich recipient energy from accounts (logAll)', e); }
+
+            console.group('[AI][LogAll] Starting batch');
+            for (const p of prompts) {
+                const payload = { prompt: p, mode, recipient: enrichedRecipient, to: toInput?.value || '' };
+                try {
+                    const res = await fetch(genUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const data = await res.json().catch(() => null);
+                    const output = data?.output || '';
+                    const formatted = this.formatGeneratedEmail(output, recipient, mode);
+                    let html = formatted.html;
+                    if (p.toLowerCase().includes('warm intro')) {
+                        html = this.adjustWarmIntroHtml(html);
+                    }
+                    html = this.replaceVariablesInHtml(html, enrichedRecipient);
+                    console.groupCollapsed(`[AI][LogAll] ${p}`);
+                    console.log('Subject:', formatted.subject);
+                    console.log('Raw output (first 600):', String(output).slice(0,600));
+                    console.log('HTML after adjustments:', html);
+                    console.groupEnd();
+                } catch (err) {
+                    console.warn('[AI][LogAll] Failed for prompt:', p, err);
+                }
+            }
+            console.groupEnd();
+        } catch (e) {
+            console.error('[AI][LogAll] Unexpected error', e);
+        }
+    }
+
     escapeHtml(s) {
         return String(s || '')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+            .replace(/'/g, '&apos;');
+    }
+
+    // Clean up incomplete sentences and HTML entities in the editor
+    cleanupIncompleteSentences(editor) {
+        try {
+            if (!editor) return;
+            
+            // Fix HTML entities
+            const htmlContent = editor.innerHTML;
+            const cleaned = htmlContent
+                .replace(/&#39;/g, "'")
+                .replace(/&apos;/g, "'")
+                .replace(/&quot;/g, '"')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>');
+            
+            if (cleaned !== htmlContent) {
+                editor.innerHTML = cleaned;
+            }
+            
+            // Comprehensive sentence completion and quality fixes
+            const paragraphs = editor.querySelectorAll('p');
+            paragraphs.forEach(p => {
+                let text = p.textContent || '';
+                let needsUpdate = false;
+                
+                // Fix incomplete sentences ending with "your?" or similar
+                if (text.trim().endsWith('your?') || text.trim().endsWith('your')) {
+                    if (text.includes('improving your')) {
+                        text = text.replace(/improving your\??$/, 'improving your energy procurement process.');
+                        needsUpdate = true;
+                    } else if (text.includes('discuss your')) {
+                        text = text.replace(/discuss your\??$/, 'discuss your specific energy needs.');
+                        needsUpdate = true;
+                    } else if (text.includes('help with your')) {
+                        text = text.replace(/help with your\??$/, 'help with your energy management.');
+                        needsUpdate = true;
+                    } else if (text.includes('options for your')) {
+                        text = text.replace(/options for your\??$/, 'options for your energy procurement.');
+                        needsUpdate = true;
+                    } else {
+                        text = text.replace(/your\??$/, 'your situation.');
+                        needsUpdate = true;
+                    }
+                }
+                
+                // Fix other common incomplete patterns
+                if (text.trim().endsWith('to') || text.trim().endsWith('for') || text.trim().endsWith('with')) {
+                    text = text.replace(/\s+(to|for|with)\s*$/, '.');
+                    needsUpdate = true;
+                }
+                
+                // Fix sentences ending with incomplete questions
+                if (text.trim().endsWith('?') && text.length < 20) {
+                    // Likely incomplete question, try to complete based on context
+                    if (text.includes('schedule') || text.includes('call')) {
+                        text = text.replace(/\?$/, ' a brief call?');
+                        needsUpdate = true;
+                    } else if (text.includes('discuss') || text.includes('review')) {
+                        text = text.replace(/\?$/, ' your energy needs?');
+                        needsUpdate = true;
+                    }
+                }
+                
+                // Fix missing punctuation
+                if (text.trim() && !text.trim().match(/[.!?]$/)) {
+                    text = text.trim() + '.';
+                    needsUpdate = true;
+                }
+                
+                // Fix double punctuation
+                text = text.replace(/[.!?]{2,}/g, (match) => match[0]);
+                
+                // Fix capitalization issues
+                text = text.replace(/^([a-z])/, (match, letter) => letter.toUpperCase());
+                
+                if (needsUpdate) {
+                    p.textContent = text;
+                }
+            });
+            
+            // Ensure proper email structure
+            this.ensureEmailStructure(editor);
+            
+        } catch (e) {
+            console.warn('[AI] cleanupIncompleteSentences failed', e);
+        }
+    }
+    
+    // Ensure proper email structure with greeting, body, and closing
+    ensureEmailStructure(editor) {
+        try {
+            const paragraphs = Array.from(editor.querySelectorAll('p'));
+            if (paragraphs.length === 0) return;
+            
+            // Check if we have a proper greeting
+            const firstPara = paragraphs[0];
+            const firstText = firstPara.textContent || '';
+            if (!/^(hi|hello|hey)\b/i.test(firstText.trim())) {
+                // Add a greeting if missing
+                const nameMatch = firstText.match(/^([A-Z][a-z]+),?\s*/);
+                const name = nameMatch ? nameMatch[1] : 'there';
+                const greeting = document.createElement('p');
+                greeting.textContent = `Hi ${name},`;
+                greeting.style.margin = '0 0 16px 0;';
+                editor.insertBefore(greeting, firstPara);
+            }
+            
+            // Check if we have a proper closing
+            const lastPara = paragraphs[paragraphs.length - 1];
+            const lastText = lastPara.textContent || '';
+            if (!/best regards/i.test(lastText.toLowerCase())) {
+                // Add closing if missing
+                const closing = document.createElement('p');
+                closing.textContent = 'Best regards,';
+                closing.style.margin = '0 0 16px 0;';
+                editor.appendChild(closing);
+                
+                const signature = document.createElement('p');
+                signature.textContent = 'Power Choosers Team';
+                signature.style.margin = '0 0 16px 0;';
+                editor.appendChild(signature);
+            }
+            
+        } catch (e) {
+            console.warn('[AI] ensureEmailStructure failed', e);
+        }
+    }
+    
+    // Validate email quality and return a score (0-1)
+    validateEmailQuality(editor) {
+        try {
+            if (!editor) return 1.0;
+            
+            const paragraphs = Array.from(editor.querySelectorAll('p'));
+            if (paragraphs.length === 0) return 0.0;
+            
+            let score = 1.0;
+            let issues = [];
+            
+            // Check for proper greeting
+            const firstPara = paragraphs[0];
+            const firstText = firstPara.textContent || '';
+            if (!/^(hi|hello|hey)\b/i.test(firstText.trim())) {
+                score -= 0.2;
+                issues.push('Missing proper greeting');
+            }
+            
+            // Check for proper closing
+            const lastPara = paragraphs[paragraphs.length - 1];
+            const lastText = lastPara.textContent || '';
+            if (!/best regards/i.test(lastText.toLowerCase())) {
+                score -= 0.2;
+                issues.push('Missing proper closing');
+            }
+            
+            // Check for incomplete sentences
+            paragraphs.forEach((p, index) => {
+                const text = p.textContent || '';
+                
+                // Skip greeting and closing paragraphs
+                if (index === 0 || index === paragraphs.length - 1) return;
+                
+                if (text.trim().endsWith('your?') || text.trim().endsWith('your')) {
+                    score -= 0.3;
+                    issues.push('Incomplete sentence detected');
+                }
+                
+                if (text.trim().endsWith('to') || text.trim().endsWith('for') || text.trim().endsWith('with')) {
+                    score -= 0.2;
+                    issues.push('Incomplete sentence ending');
+                }
+                
+                if (text.trim() && !text.trim().match(/[.!?]$/)) {
+                    score -= 0.1;
+                    issues.push('Missing punctuation');
+                }
+                
+                if (text.length < 10) {
+                    score -= 0.1;
+                    issues.push('Very short paragraph');
+                }
+            });
+            
+            // Check for HTML entities
+            const htmlContent = editor.innerHTML;
+            if (/&#39;|&apos;|&quot;|&amp;|&lt;|&gt;/.test(htmlContent)) {
+                score -= 0.1;
+                issues.push('HTML entities detected');
+            }
+            
+            // Check for duplicate content
+            const allText = paragraphs.map(p => p.textContent || '').join(' ').toLowerCase();
+            const words = allText.split(/\s+/);
+            const uniqueWords = new Set(words);
+            if (words.length > 0 && uniqueWords.size / words.length < 0.7) {
+                score -= 0.2;
+                issues.push('High repetition detected');
+            }
+            
+            // Check for proper length (not too short, not too long)
+            const totalLength = allText.length;
+            if (totalLength < 100) {
+                score -= 0.2;
+                issues.push('Email too short');
+            } else if (totalLength > 800) {
+                score -= 0.1;
+                issues.push('Email too long');
+            }
+            
+            if (issues.length > 0) {
+                console.log('[AI] Email quality issues:', issues);
+            }
+            
+            return Math.max(0, Math.min(1, score));
+            
+        } catch (e) {
+            console.warn('[AI] validateEmailQuality failed', e);
+            return 0.5; // Default to medium quality if validation fails
+        }
     }
 
     // Post-insert DOM sanitizer: remove duplicate greetings/closings and placeholders
     sanitizeGeneratedEditor(editor, recipient) {
         try {
             if (!editor) return;
-            const firstName = (recipient?.name || '').split(' ')[0] || '{{contact.first_name}}';
+            const nameSource = (recipient?.fullName || recipient?.name || '').trim();
+            const firstName = (nameSource.split(' ')[0] || '').trim() || 'there';
+            
+            // Clean up incomplete sentences and HTML entities
+            this.cleanupIncompleteSentences(editor);
+            
+            // Validate email quality and potentially retry if poor
+            const qualityScore = this.validateEmailQuality(editor);
+            if (qualityScore < 0.7) {
+                console.warn('[AI] Low quality email detected, score:', qualityScore);
+                // Could implement retry logic here if needed
+            }
+            
             const nameEsc = firstName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const isGreeting = (t) => {
                 const s = String(t || '').trim();

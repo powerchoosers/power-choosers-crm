@@ -137,22 +137,26 @@
       .task-popover .close-btn { appearance:none; background:transparent; border:0; color: var(--text-secondary); font-size: 18px; line-height:1; padding: 2px 6px; border-radius: 6px; }
       .task-popover .close-btn:hover { background: var(--grey-700); color: var(--text-inverse); }
       .task-popover .form-row { display: flex; gap: 12px; margin: 8px 0; flex-wrap: wrap; }
-      .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); flex: 1 1 48%; }
-      .task-popover input.input-dark, .task-popover select.input-dark, .task-popover textarea.input-dark { width: 100%; padding: 8px 10px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); font-size: 13px; font-family: inherit; }
-      .task-popover input.input-dark::placeholder, .task-popover textarea.input-dark::placeholder { color: var(--text-secondary); opacity: 0.8; font-family: inherit; }
+      .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); flex: 1 1 48%; position: relative; }
+      .task-popover label:has(.dropdown-toggle-btn) { z-index: 10; }
+      .task-popover input.input-dark, .task-popover select.input-dark, .task-popover textarea.input-dark { width: 100%; padding: 10px 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; font-size: 0.9rem; font-family: inherit; height: 40px; transition: all 0.3s ease; }
+      .task-popover label:has(.dropdown-toggle-btn) input.input-dark { padding-right: 48px; }
+      .task-popover input.input-dark::placeholder, .task-popover textarea.input-dark::placeholder { color: var(--text-muted); font-family: inherit; font-size: 0.85rem; }
+      .task-popover input.input-dark:hover, .task-popover select.input-dark:hover, .task-popover textarea.input-dark:hover { border-color: var(--grey-500); background: var(--bg-widget); }
+      .task-popover input.input-dark:focus, .task-popover select.input-dark:focus, .task-popover textarea.input-dark:focus { outline: none; border-color: var(--orange-subtle); background: var(--bg-widget); box-shadow: 0 0 0 3px rgba(255,145,0,0.1); transform: translateY(-1px); }
       /* Themed selects and options */
       .task-popover select.input-dark { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%), linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }
       .task-popover select.input-dark option, .task-popover select.input-dark optgroup { background-color: var(--bg-card); color: var(--text-primary); }
       /* Themed date picker icon (WebKit) */
       .task-popover input[type="date"].input-dark::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.85; cursor: pointer; }
       .task-popover input[type="date"].input-dark { color-scheme: dark; }
-      .task-popover textarea.input-dark { min-height: 68px; resize: vertical; }
+      .task-popover textarea.input-dark { min-height: 80px; height: auto; resize: vertical; line-height: 1.4; }
       .task-popover .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
       .task-popover .btn-primary { height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm); background: var(--grey-700); color: var(--text-inverse); border: 1px solid var(--grey-600); font-weight: 600; }
       .task-popover .btn-text { height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border: 1px solid transparent; }
       .task-popover .btn-text:hover { background: var(--grey-700); border-color: var(--border-light); color: var(--text-inverse); }
       .task-popover .arrow { position: absolute; top: -8px; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 8px solid var(--bg-card); filter: drop-shadow(0 -1px 0 var(--border-light)); }
-      .task-popover .tp-footer { border-top: 1px solid var(--border-light); margin-top: 8px; padding-top: 8px; }
+      .task-popover .tp-footer { border-top: 1px solid var(--border-light); margin-top: 0; padding-top: 8px; }
       .task-popover .tp-empty { color: var(--text-secondary); font-size: 12px; }
       .task-popover .tp-subtitle { font-size: 12px; color: var(--text-secondary); margin: 0 0 6px 0; }
       .task-popover .tp-task { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
@@ -161,6 +165,103 @@
       .task-popover .tp-badge.pending { background: var(--bg-subtle); color: var(--text-secondary); }
       .task-popover .tp-badge.completed { background: var(--green-muted); color: var(--text-inverse); border-color: var(--green-subtle); }
       .task-popover .tp-task-due { font-size: 11px; color: var(--text-secondary); margin-left: 6px; }
+      
+      /* Dropdown Toggle Button Styles */
+      .task-popover .dropdown-toggle-btn {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-15%);
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 4px;
+        transition: var(--transition-fast);
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+      }
+      .task-popover .dropdown-toggle-btn:hover {
+        color: var(--text-primary);
+        background: transparent;
+      }
+      .task-popover .dropdown-toggle-btn svg {
+        display: block;
+        width: 20px;
+        height: 20px;
+      }
+      
+      /* Dropdown Toolbar Styles */
+      .task-popover .type-toolbar,
+      .task-popover .priority-toolbar {
+        position: relative;
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        z-index: 1000;
+        overflow: hidden;
+        max-height: 0;
+        opacity: 0;
+        transition: all 0.3s ease;
+        margin-top: 0;
+        padding: 0;
+        width: 100%;
+      }
+      .task-popover .type-toolbar.dropdown-slide-in,
+      .task-popover .priority-toolbar.dropdown-slide-in {
+        max-height: 200px;
+        opacity: 1;
+        margin-top: 8px;
+        padding: 12px;
+      }
+      .task-popover .type-toolbar.dropdown-slide-out,
+      .task-popover .priority-toolbar.dropdown-slide-out {
+        max-height: 0;
+        opacity: 0;
+        margin-top: 0;
+        padding: 0;
+      }
+      
+      /* Dropdown Grid Styles */
+      .task-popover .dropdown-grid {
+        display: grid;
+        gap: 6px;
+      }
+      .task-popover .type-grid {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+      }
+      .task-popover .priority-grid {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: 1fr;
+      }
+      
+      /* Dropdown Option Styles */
+      .task-popover .dropdown-option {
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        border-radius: 6px;
+        color: var(--text-primary);
+        padding: 8px 12px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+      }
+      .task-popover .dropdown-option:hover {
+        background: var(--bg-hover);
+        border-color: var(--grey-500);
+      }
+      .task-popover .dropdown-option.selected {
+        background: var(--orange-subtle);
+        border-color: var(--orange-subtle);
+        color: var(--text-inverse);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -370,6 +471,9 @@
     const company = c.companyName || '';
 
     const nextBiz = getNextBusinessDayISO();
+    console.log('nextBiz ISO string:', nextBiz);
+    const nextBizDate = new Date(nextBiz + 'T00:00:00'); // Add time to avoid timezone issues
+    console.log('nextBiz formatted for input:', `${(nextBizDate.getMonth() + 1).toString().padStart(2, '0')}/${nextBizDate.getDate().toString().padStart(2, '0')}/${nextBizDate.getFullYear()}`);
 
     const currentTasksHtml = renderExistingTasksForContact(c.id, fullName);
 
@@ -384,32 +488,81 @@
           <form id="contact-task-form">
             <div class="form-row">
               <label>Type
-                <select name="type" class="input-dark" required>
-                  <option value="">Select task type</option>
-                  <option value="phone-call">Phone Call</option>
-                  <option value="manual-email">Manual Email</option>
-                  <option value="auto-email">Automatic Email</option>
-                  <option value="follow-up">Follow-up</option>
-                  <option value="demo">Demo</option>
-                  <option value="custom-task">Custom Task</option>
-                </select>
+                <input type="text" name="type" class="input-dark" value="Phone Call" readonly />
+                <button type="button" class="dropdown-toggle-btn" id="type-toggle" aria-label="Open type dropdown">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6,9 12,15 18,9"></polyline>
+                  </svg>
+                </button>
               </label>
               <label>Priority
-                <select name="priority" class="input-dark" required>
-                  <option value="">Select priority</option>
-                  <option value="low">Low</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="high">High</option>
-                </select>
+                <input type="text" name="priority" class="input-dark" value="Medium" readonly />
+                <button type="button" class="dropdown-toggle-btn" id="priority-toggle" aria-label="Open priority dropdown">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6,9 12,15 18,9"></polyline>
+                  </svg>
+                </button>
               </label>
+            </div>
+            <div class="type-toolbar" id="type-toolbar" style="display: none;">
+              <div class="dropdown-grid type-grid">
+                <button type="button" class="dropdown-option" data-value="phone-call">Phone Call</button>
+                <button type="button" class="dropdown-option" data-value="manual-email">Manual Email</button>
+                <button type="button" class="dropdown-option" data-value="auto-email">Auto Email</button>
+                <button type="button" class="dropdown-option" data-value="follow-up">Follow-up</button>
+                <button type="button" class="dropdown-option" data-value="demo">Demo</button>
+                <button type="button" class="dropdown-option" data-value="custom-task">Custom Task</button>
+              </div>
+            </div>
+            <div class="priority-toolbar" id="priority-toolbar" style="display: none;">
+              <div class="dropdown-grid priority-grid">
+                <button type="button" class="dropdown-option" data-value="low">Low</button>
+                <button type="button" class="dropdown-option" data-value="medium">Medium</button>
+                <button type="button" class="dropdown-option" data-value="high">High</button>
+              </div>
             </div>
             <div class="form-row">
               <label>Time
                 <input type="text" name="dueTime" class="input-dark" value="10:30 AM" placeholder="10:30 AM" required />
               </label>
               <label>Due date
-                <input type="date" name="dueDate" class="input-dark" value="${nextBiz}" required />
+                <input type="text" name="dueDate" class="input-dark" value="${(nextBizDate.getMonth() + 1).toString().padStart(2, '0')}/${nextBizDate.getDate().toString().padStart(2, '0')}/${nextBizDate.getFullYear()}" readonly />
+                <button type="button" class="calendar-toggle-btn" id="calendar-toggle" aria-label="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                </button>
               </label>
+            </div>
+            <div class="calendar-toolbar" id="calendar-toolbar" style="display: none;">
+              <div class="calendar-header">
+                <button type="button" class="calendar-nav-btn" id="calendar-prev" aria-label="Previous month">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15,18 9,12 15,6"></polyline>
+                  </svg>
+                </button>
+                <div class="calendar-month-year" id="calendar-month-year">September 2025</div>
+                <button type="button" class="calendar-nav-btn" id="calendar-next" aria-label="Next month">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,18 15,12 9,6"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <div class="calendar-weekdays">
+                <div class="calendar-weekday">S</div>
+                <div class="calendar-weekday">M</div>
+                <div class="calendar-weekday">T</div>
+                <div class="calendar-weekday">W</div>
+                <div class="calendar-weekday">T</div>
+                <div class="calendar-weekday">F</div>
+                <div class="calendar-weekday">S</div>
+              </div>
+              <div class="calendar-days" id="calendar-days">
+                <!-- Calendar days will be populated by JavaScript -->
+              </div>
             </div>
             <div class="form-row">
               <label>Notes
@@ -439,13 +592,20 @@
       pop.style.left = `${clampedLeft}px`;
       const arrow = pop.querySelector('.arrow');
       if (arrow) {
-        // Center the arrow on the popover (which should be centered on the anchor)
-        const popCenter = popRect.width / 2;
-        arrow.style.left = `${popCenter}px`;
+        // Position arrow to point to the center of the anchor button
+        // Calculate where the anchor center is relative to the popover's left edge
+        const anchorCenterRelativeToPopover = anchorCenter - clampedLeft;
+        arrow.style.left = `${anchorCenterRelativeToPopover}px`;
       }
     };
     position();
-    requestAnimationFrame(position);
+    requestAnimationFrame(() => {
+      position();
+      // Show with dropdown animation after a small delay to ensure DOM is ready
+      setTimeout(() => {
+        pop.classList.add('--show');
+      }, 10);
+    });
 
     // Event handling
     const form = pop.querySelector('#contact-task-form');
@@ -461,56 +621,152 @@
         }
       });
       
+      // Track last pressed key to refine formatting behavior (e.g., don't auto-expand on delete)
+      let _timeLastKey = null;
+      
       timeInput.addEventListener('input', (e) => {
-        let value = e.target.value;
+        const rawBefore = e.target.value;
+        let value = rawBefore;
         let cursorPos = e.target.selectionStart;
-        const originalLength = value.length;
         
         // Only allow digits, colon, A, P, M, and spaces
-        value = value.replace(/[^\d:APMapm\s]/g, '');
+        let sanitized = value.replace(/[^\d:APMapm\s]/g, '');
         
-        // Don't auto-format if user is backspacing or deleting
-        if (value.length < originalLength) {
-          e.target.value = value;
-          return;
-        }
+        // Handle common time formats more intelligently
+        let formattedValue = formatTimeInput(sanitized, _timeLastKey);
         
-        // Auto-insert colon after 2 digits if no colon exists
-        if (/^\d{2}$/.test(value) && !value.includes(':')) {
-          value = value + ':';
-          cursorPos = 3; // Position cursor after the colon
-        }
+        // If the formatted value ended up with extra characters after AM/PM, strip them
+        formattedValue = formattedValue.replace(/^(\d{1,2}:\d{2}\s+(?:AM|PM)).*$/i, '$1');
         
-        // Auto-insert colon after 1 digit if user types 3rd digit and no colon
-        if (/^\d{3}$/.test(value) && !value.includes(':')) {
-          value = value.slice(0, 1) + ':' + value.slice(1);
-          cursorPos = 4; // Position cursor after the colon
-        }
+        // Calculate cursor position adjustment
+        let cursorAdjustment = formattedValue.length - sanitized.length;
+        let newCursorPos = Math.max(0, (cursorPos ?? formattedValue.length) + cursorAdjustment);
         
-        // Handle 4 digits without colon (e.g., "1030")
-        if (/^\d{4}$/.test(value)) {
-          value = value.slice(0, 2) + ':' + value.slice(2);
-          cursorPos = 5; // Position cursor after the colon
-        }
+        // Debugging
+        try { console.log('[TimeInput] input', { raw: rawBefore, sanitized, formatted: formattedValue, lastKey: _timeLastKey, cursorBefore: cursorPos, cursorAfter: newCursorPos }); } catch (_) {}
         
-        // Clean up AM/PM formatting
-        value = value.replace(/\s+/g, ' ').trim();
+        // Set the formatted value
+        e.target.value = formattedValue;
         
-        // If user types AM or PM, ensure proper spacing
-        if (/AM|PM/i.test(value)) {
-          value = value.replace(/(\d{1,2}:\d{0,2})\s*(AM|PM)/i, '$1 $2');
-          value = value.replace(/(\d{1,2}:\d{2})\s*(AM|PM)/i, '$1 $2');
-        }
-        
-        e.target.value = value;
-        
-        // Restore cursor position
-        if (cursorPos !== undefined) {
-          setTimeout(() => {
-            e.target.setSelectionRange(cursorPos, cursorPos);
-          }, 0);
-        }
+        // Set cursor position properly
+        setTimeout(() => {
+          if (e.target === document.activeElement) {
+            e.target.setSelectionRange(newCursorPos, newCursorPos);
+          }
+          // Reset last key after applying formatting
+          _timeLastKey = null;
+        }, 0);
       });
+      
+      // Check if user is typing beyond a complete time format
+      timeInput.addEventListener('keydown', (e) => {
+        _timeLastKey = e.key;
+        // Always allow backspace, delete, navigation keys, and space
+        const alwaysAllowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Escape', ' ', 'Space', 'Spacebar'];
+        if (alwaysAllowed.includes(e.key) || e.ctrlKey || e.metaKey) {
+          try { console.log('[TimeInput] keydown allow', { key: e.key, reason: 'alwaysAllowed' }); } catch (_) {}
+          return; // Allow the event to proceed
+        }
+        
+        const value = e.target.value;
+        const cursorPos = e.target.selectionStart ?? value.length;
+        const complete = isCompleteTimeFormat(value);
+        
+        // If the current value is a complete time format and user is trying to add characters at the end
+        if (complete && cursorPos >= value.length) {
+          try { console.log('[TimeInput] keydown block', { key: e.key, value, cursorPos, complete }); } catch (_) {}
+          e.preventDefault();
+          return false;
+        }
+        try { console.log('[TimeInput] keydown pass', { key: e.key, value, cursorPos, complete }); } catch (_) {}
+      });
+      
+      // Helper function to check if time format is complete
+      function isCompleteTimeFormat(value) {
+        // Check if it matches "H:MM AM" or "HH:MM AM" or "H:MM PM" or "HH:MM PM"
+        return /^\d{1,2}:\d{2}\s+(AM|PM)$/.test(value);
+      }
+      
+      // Helper function to format time input
+      function formatTimeInput(input, lastKey) {
+        if (input == null) return '';
+        
+        // Detect if user intentionally typed a trailing space and no AM/PM yet
+        const hadTrailingSpace = /\s$/.test(input);
+        
+        // Normalize spaces (but do not trim end yet)
+        let value = String(input).replace(/\s+/g, ' ');
+        // Trim leading spaces only
+        value = value.replace(/^\s+/, '');
+        
+        // Extract digits and letters
+        const digits = (value.match(/\d+/g) || []).join('');
+        const colonExplicit = /:\s*$/.test(value) || /:\s*[ap]?m?$/i.test(value); // user typed colon at end
+        let ampmRaw = (value.match(/([ap]m?)$/i) || [null, ''])[1] || '';
+        
+        // Build time from digits
+        let hours = '';
+        let minutes = '';
+        if (digits.length >= 4) {
+          hours = digits.slice(0, 2);
+          minutes = digits.slice(2, 4);
+        } else if (digits.length === 3) {
+          hours = digits.slice(0, 1);
+          minutes = digits.slice(1);
+        } else if (digits.length === 2) {
+          hours = digits;
+        } else if (digits.length === 1) {
+          hours = digits;
+        }
+        
+        // Clamp minutes to two digits; ignore extras
+        if (minutes.length > 2) minutes = minutes.slice(0, 2);
+        
+        // Compose base time string
+        let out = '';
+        if (hours) {
+          if (minutes) out = `${hours}:${minutes}`;
+          else if (colonExplicit) out = `${hours}:`;
+          else out = hours;
+        }
+        
+        // Handle various input patterns
+        
+        // Apply AM/PM logic
+        if (ampmRaw) {
+          // If deleting, don't auto-expand 'A' -> 'AM'
+          if (lastKey === 'Backspace' || lastKey === 'Delete') {
+            ampmRaw = ampmRaw.toUpperCase();
+          } else {
+            // Expand single-letter to full AM/PM
+            if (/^a$/i.test(ampmRaw)) ampmRaw = 'AM';
+            else if (/^p$/i.test(ampmRaw)) ampmRaw = 'PM';
+            else ampmRaw = ampmRaw.toUpperCase();
+          }
+          out = out ? `${out} ${ampmRaw}` : ampmRaw;
+        }
+        
+        // Auto-add space before AM/PM if missing (e.g., 10:30p -> 10:30 p)
+        out = out.replace(/(\d)([AP]M?)$/g, '$1 $2');
+        
+        // Capitalize AM/PM
+        value = value.replace(/\b(am|pm|a|p)\b/gi, (match) => {
+          if (match.toLowerCase() === 'a') return 'AM';
+          if (match.toLowerCase() === 'p') return 'PM';
+          return match.toUpperCase();
+        });
+        
+        // Preserve a single trailing space if user typed it and AM/PM not present
+        if (hadTrailingSpace && !/(AM|PM)/i.test(out)) {
+          out = out.replace(/\s+$/,'') + ' ';
+          return out;
+        }
+        
+        // Clean up spaces (trim both ends when no trailing space preservation)
+        out = out.replace(/\s+/g, ' ').trim();
+        
+        return out;
+      }
       
       // Handle paste events
       timeInput.addEventListener('paste', (e) => {
@@ -521,6 +777,344 @@
     }
     
     closeBtn?.addEventListener('click', closeContactTaskPopover);
+    
+    // Calendar functionality
+    const calendarToggle = pop.querySelector('#calendar-toggle');
+    const calendarToolbar = pop.querySelector('#calendar-toolbar');
+    const calendarDays = pop.querySelector('#calendar-days');
+    const calendarMonthYear = pop.querySelector('#calendar-month-year');
+    const calendarPrev = pop.querySelector('#calendar-prev');
+    const calendarNext = pop.querySelector('#calendar-next');
+    const dueDateInput = pop.querySelector('input[name="dueDate"]');
+    
+    // Dropdown functionality
+    const typeToggle = pop.querySelector('#type-toggle');
+    const typeToolbar = pop.querySelector('#type-toolbar');
+    const typeInput = pop.querySelector('input[name="type"]');
+    const priorityToggle = pop.querySelector('#priority-toggle');
+    const priorityToolbar = pop.querySelector('#priority-toolbar');
+    const priorityInput = pop.querySelector('input[name="priority"]');
+    
+    let currentDate = new Date(nextBiz + 'T00:00:00');
+    let selectedDate = new Date(nextBiz + 'T00:00:00');
+    
+    // Format date for display
+    function formatDateForDisplay(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+    
+    // Generate calendar days
+    function generateCalendar() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      
+      // Update month/year display
+      calendarMonthYear.textContent = currentDate.toLocaleDateString('en-US', { 
+        month: 'long', 
+        year: 'numeric' 
+      });
+      
+      // Clear existing days
+      calendarDays.innerHTML = '';
+      
+      // Get first day of month and number of days
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startingDayOfWeek = firstDay.getDay();
+      
+      // Add empty cells for days before the first day of the month
+      for (let i = 0; i < startingDayOfWeek; i++) {
+        const emptyDay = document.createElement('div');
+        emptyDay.className = 'calendar-day calendar-day-empty';
+        calendarDays.appendChild(emptyDay);
+      }
+      
+      // Add days of the month
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayElement = document.createElement('button');
+        dayElement.className = 'calendar-day';
+        dayElement.textContent = day;
+        dayElement.type = 'button';
+        
+        const dayDate = new Date(year, month, day);
+        const isSelected = dayDate.toDateString() === selectedDate.toDateString();
+        const isToday = dayDate.toDateString() === new Date().toDateString();
+        
+        if (isSelected) {
+          dayElement.classList.add('calendar-day-selected');
+        }
+        if (isToday) {
+          dayElement.classList.add('calendar-day-today');
+        }
+        
+        dayElement.addEventListener('click', () => {
+          selectedDate = dayDate;
+          dueDateInput.value = `${(dayDate.getMonth() + 1).toString().padStart(2, '0')}/${dayDate.getDate().toString().padStart(2, '0')}/${dayDate.getFullYear()}`;
+          generateCalendar();
+          closeCalendar();
+        });
+        
+        calendarDays.appendChild(dayElement);
+      }
+    }
+    
+    // Ensure the time/due date row is at the top of the scroll container
+    function scrollTimeDueRowIntoView() {
+      try {
+        const body = pop.querySelector('.tp-body');
+        if (!body) return;
+        const row = calendarToggle?.closest('.form-row');
+        if (!row) return;
+        const bodyRect = body.getBoundingClientRect();
+        const rowRect = row.getBoundingClientRect();
+        const targetTop = body.scrollTop + (rowRect.top - bodyRect.top);
+        body.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      } catch (_) { /* noop */ }
+    }
+
+    // Toggle calendar
+    function toggleCalendar() {
+      if (calendarToolbar.style.display === 'none') {
+        openCalendar();
+      } else {
+        closeCalendar();
+      }
+    }
+    
+    function openCalendar() {
+      generateCalendar();
+      calendarToolbar.style.display = 'block';
+      // Force a reflow to ensure the element is rendered before adding animation class
+      calendarToolbar.offsetHeight;
+      calendarToolbar.classList.add('calendar-slide-in');
+      // Add animation class to task popover to make it flexible
+      pop.classList.add('calendar-expanded');
+      
+      // Scroll to the time/date form row when calendar opens
+      setTimeout(() => {
+        console.log('Attempting to scroll to form row...');
+        const tpBody = pop.querySelector('.tp-body');
+        
+        // Find the Time/Due date form row by looking for the Time label
+        const timeLabel = pop.querySelector('label:has(input[name="dueTime"])');
+        const formRow = timeLabel ? timeLabel.closest('.form-row') : null;
+        
+        console.log('tpBody found:', !!tpBody);
+        console.log('timeLabel found:', !!timeLabel);
+        console.log('formRow found:', !!formRow);
+        
+        if (tpBody && formRow) {
+          console.log('Both elements found, attempting scroll...');
+          console.log('tpBody scrollTop before:', tpBody.scrollTop);
+          console.log('formRow offsetTop:', formRow.offsetTop);
+          
+          // Scroll to align the actual Time label top with the container top
+          const anchorEl = timeLabel || formRow; // prefer the Time label; fallback to row
+          
+          if (anchorEl) {
+            const containerRect = tpBody.getBoundingClientRect();
+            const anchorRect = anchorEl.getBoundingClientRect();
+            const deltaTop = anchorRect.top - containerRect.top; // pixels from visible top
+            const targetScrollTop = Math.max(0, tpBody.scrollTop + deltaTop - 0); // no padding
+            
+            console.log('containerRect.top:', containerRect.top);
+            console.log('anchorRect.top:', anchorRect.top);
+            console.log('deltaTop:', deltaTop);
+            console.log('targetScrollTop:', targetScrollTop);
+            
+            tpBody.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+          } else {
+            console.log('Anchor label not found, scrolling to top');
+            tpBody.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+          
+          console.log('tpBody.scrollTo called');
+        } else {
+          console.log('Missing elements - tpBody:', !!tpBody, 'formRow:', !!formRow);
+        }
+      }, 300); // Increased delay to ensure calendar is fully rendered
+    }
+    
+    function closeCalendar() {
+      if (!calendarToolbar) return;
+      
+      // Start smooth scroll back to top when closing
+      const tpBody = pop.querySelector('.tp-body');
+      if (tpBody) {
+        tpBody.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      
+      // Start toolbar collapse animation
+      calendarToolbar.classList.remove('calendar-slide-in');
+      calendarToolbar.classList.add('calendar-slide-out');
+      calendarToolbar.style.display = 'block'; // keep visible during transition
+
+      // Trigger container shrink (popover) animation
+      // rAF ensures the browser registers the class change for smooth transition
+      requestAnimationFrame(() => {
+        pop.classList.remove('calendar-expanded');
+      });
+
+      // When the toolbar transition ends, hide it and clean up classes
+      const handleEnd = (ev) => {
+        if (ev.target !== calendarToolbar) return;
+        calendarToolbar.removeEventListener('transitionend', handleEnd);
+        calendarToolbar.style.display = 'none';
+        calendarToolbar.classList.remove('calendar-slide-out');
+      };
+      calendarToolbar.addEventListener('transitionend', handleEnd);
+
+      // Fallback cleanup in case transitionend doesn't fire
+      setTimeout(() => {
+        try { calendarToolbar.removeEventListener('transitionend', handleEnd); } catch (_) {}
+        calendarToolbar.style.display = 'none';
+        calendarToolbar.classList.remove('calendar-slide-out');
+      }, 600);
+    }
+    
+    // Dropdown toggle functions
+    function toggleTypeDropdown() {
+      if (typeToolbar.style.display === 'none') {
+        openTypeDropdown();
+      } else {
+        closeTypeDropdown();
+      }
+    }
+    
+    function openTypeDropdown() {
+      typeToolbar.style.display = 'block';
+      typeToolbar.offsetHeight; // Force reflow
+      typeToolbar.classList.add('dropdown-slide-in');
+    }
+    
+    function closeTypeDropdown() {
+      if (!typeToolbar) return;
+      typeToolbar.classList.remove('dropdown-slide-in');
+      typeToolbar.classList.add('dropdown-slide-out');
+      typeToolbar.style.display = 'block';
+      
+      const handleEnd = (ev) => {
+        if (ev.target !== typeToolbar) return;
+        typeToolbar.removeEventListener('transitionend', handleEnd);
+        typeToolbar.style.display = 'none';
+        typeToolbar.classList.remove('dropdown-slide-out');
+      };
+      typeToolbar.addEventListener('transitionend', handleEnd);
+      
+      setTimeout(() => {
+        try { typeToolbar.removeEventListener('transitionend', handleEnd); } catch (_) {}
+        typeToolbar.style.display = 'none';
+        typeToolbar.classList.remove('dropdown-slide-out');
+      }, 600);
+    }
+    
+    function togglePriorityDropdown() {
+      if (priorityToolbar.style.display === 'none') {
+        openPriorityDropdown();
+      } else {
+        closePriorityDropdown();
+      }
+    }
+    
+    function openPriorityDropdown() {
+      priorityToolbar.style.display = 'block';
+      priorityToolbar.offsetHeight; // Force reflow
+      priorityToolbar.classList.add('dropdown-slide-in');
+    }
+    
+    function closePriorityDropdown() {
+      if (!priorityToolbar) return;
+      priorityToolbar.classList.remove('dropdown-slide-in');
+      priorityToolbar.classList.add('dropdown-slide-out');
+      priorityToolbar.style.display = 'block';
+      
+      const handleEnd = (ev) => {
+        if (ev.target !== priorityToolbar) return;
+        priorityToolbar.removeEventListener('transitionend', handleEnd);
+        priorityToolbar.style.display = 'none';
+        priorityToolbar.classList.remove('dropdown-slide-out');
+      };
+      priorityToolbar.addEventListener('transitionend', handleEnd);
+      
+      setTimeout(() => {
+        try { priorityToolbar.removeEventListener('transitionend', handleEnd); } catch (_) {}
+        priorityToolbar.style.display = 'none';
+        priorityToolbar.classList.remove('dropdown-slide-out');
+      }, 600);
+    }
+    
+    // Event listeners
+    // Prevent outside-click from firing when interacting with calendar UI
+    calendarToolbar?.addEventListener('mousedown', (e) => e.stopPropagation());
+    calendarToolbar?.addEventListener('click', (e) => e.stopPropagation());
+    calendarToggle?.addEventListener('mousedown', (e) => e.stopPropagation());
+    calendarToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleCalendar(); });
+    calendarPrev?.addEventListener('click', () => {
+      currentDate.setMonth(currentDate.getMonth() - 1);
+      generateCalendar();
+    });
+    calendarNext?.addEventListener('click', () => {
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      generateCalendar();
+    });
+    
+    // Dropdown event listeners
+    typeToggle?.addEventListener('mousedown', (e) => e.stopPropagation());
+    typeToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleTypeDropdown(); });
+    priorityToggle?.addEventListener('mousedown', (e) => e.stopPropagation());
+    priorityToggle?.addEventListener('click', (e) => { e.stopPropagation(); togglePriorityDropdown(); });
+    
+    // Prevent outside-click from firing when interacting with dropdown UI
+    typeToolbar?.addEventListener('mousedown', (e) => e.stopPropagation());
+    typeToolbar?.addEventListener('click', (e) => e.stopPropagation());
+    priorityToolbar?.addEventListener('mousedown', (e) => e.stopPropagation());
+    priorityToolbar?.addEventListener('click', (e) => e.stopPropagation());
+    
+    // Type option selection
+    typeToolbar?.addEventListener('click', (e) => {
+      const option = e.target.closest('.dropdown-option');
+      if (option) {
+        const value = option.dataset.value;
+        const text = option.textContent;
+        typeInput.value = text;
+        
+        // Update selected state
+        typeToolbar.querySelectorAll('.dropdown-option').forEach(btn => btn.classList.remove('selected'));
+        option.classList.add('selected');
+        
+        closeTypeDropdown();
+      }
+    });
+    
+    // Priority option selection
+    priorityToolbar?.addEventListener('click', (e) => {
+      const option = e.target.closest('.dropdown-option');
+      if (option) {
+        const value = option.dataset.value;
+        const text = option.textContent;
+        priorityInput.value = text;
+        
+        // Update selected state
+        priorityToolbar.querySelectorAll('.dropdown-option').forEach(btn => btn.classList.remove('selected'));
+        option.classList.add('selected');
+        
+        closePriorityDropdown();
+      }
+    });
+    
+    // Set initial selected states
+    const phoneCallOption = typeToolbar?.querySelector('[data-value="phone-call"]');
+    const mediumOption = priorityToolbar?.querySelector('[data-value="medium"]');
+    if (phoneCallOption) phoneCallOption.classList.add('selected');
+    if (mediumOption) mediumOption.classList.add('selected');
+    
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
@@ -579,7 +1173,13 @@
     });
 
     // Close on outside click / escape
-    const outside = (ev) => { if (!pop.contains(ev.target) && ev.target !== anchorEl) { cleanup(); } };
+    // Close on outside click / escape (ignore calendar toolbar/toggle)
+    const outside = (ev) => {
+      const t = ev.target;
+      if (calendarToolbar && (calendarToolbar.contains(t) || t === calendarToolbar)) return;
+      if (calendarToggle && (t === calendarToggle || calendarToggle.contains(t))) return;
+      if (!pop.contains(t) && t !== anchorEl) { cleanup(); }
+    };
     const onEsc = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); cleanup(); } };
     setTimeout(() => {
       document.addEventListener('mousedown', outside);
@@ -594,7 +1194,13 @@
 
   function closeContactTaskPopover(){
     const ex = document.querySelector('.task-popover');
-    if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+    if (ex) {
+      // Remove show class for dropdown animation
+      ex.classList.remove('--show');
+      setTimeout(() => {
+        if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+      }, 400); // Match the 400ms transition duration
+    }
   }
 
   function buildTaskTitle(type, name){
@@ -612,10 +1218,28 @@
 
   function getNextBusinessDayISO(){
     const d = new Date();
-    d.setDate(d.getDate() + 1);
-    // If Saturday, move to Monday; if Sunday, move to Monday
-    if (d.getDay() === 6) d.setDate(d.getDate() + 2);
-    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    
+    console.log('Current date:', d.toDateString(), 'Day of week:', dayOfWeek);
+    
+    // If today is Friday (5), next business day is Monday (+3 days)
+    if (dayOfWeek === 5) {
+      d.setDate(d.getDate() + 3);
+    }
+    // If today is Saturday (6), next business day is Monday (+2 days)
+    else if (dayOfWeek === 6) {
+      d.setDate(d.getDate() + 2);
+    }
+    // If today is Sunday (0), next business day is Monday (+1 day)
+    else if (dayOfWeek === 0) {
+      d.setDate(d.getDate() + 1);
+    }
+    // If today is Monday-Thursday (1-4), next business day is tomorrow (+1 day)
+    else {
+      d.setDate(d.getDate() + 1);
+    }
+    
+    console.log('Next business day:', d.toDateString());
     return d.toISOString().split('T')[0];
   }
 
@@ -1428,14 +2052,30 @@
     // Add-to-List button
     const addToListBtn = document.getElementById('add-contact-to-list');
     if (addToListBtn && !addToListBtn._bound) {
-      addToListBtn.addEventListener('click', (e) => { e.preventDefault(); openContactListsPanel(); });
+      addToListBtn.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        // Toggle behavior: close if already open
+        if (document.getElementById('contact-lists-panel')) {
+          closeContactListsPanel();
+        } else {
+          openContactListsPanel();
+        }
+      });
       addToListBtn._bound = '1';
     }
 
     // Sequences button
     const addToSequencesBtn = document.getElementById('add-contact-to-sequences');
     if (addToSequencesBtn && !addToSequencesBtn._bound) {
-      addToSequencesBtn.addEventListener('click', (e) => { e.preventDefault(); openContactSequencesPanel(); });
+      addToSequencesBtn.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        // Toggle behavior: close if already open
+        if (document.getElementById('contact-sequences-panel')) {
+          closeContactSequencesPanel();
+        } else {
+          openContactSequencesPanel();
+        }
+      });
       addToSequencesBtn._bound = '1';
     }
 
@@ -1445,7 +2085,12 @@
       tasksBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        openContactTaskPopover(tasksBtn);
+        // Toggle behavior: close if already open
+        if (document.querySelector('.task-popover')) {
+          closeContactTaskPopover();
+        } else {
+          openContactTaskPopover(tasksBtn);
+        }
       });
       tasksBtn._bound = '1';
     }
@@ -2767,7 +3412,10 @@ function openContactSequencesPanel() {
   const c = state.currentContact || {};
   const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'this contact';
   panel.innerHTML = `
-    <div class="list-header">Add ${escapeHtml(fullName)} to sequence</div>
+    <div class="list-header">
+      <div class="list-title">Add ${escapeHtml(fullName)} to sequence</div>
+      <button type="button" class="close-btn" id="contact-sequences-close" aria-label="Close">×</button>
+    </div>
     <div class="list-body" id="contact-sequences-body">
       <div class="list-item" tabindex="0" data-action="create">
         <div>
@@ -2776,15 +3424,15 @@ function openContactSequencesPanel() {
         </div>
       </div>
       <div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">Loading sequences…</div><div class="list-meta">Please wait</div></div></div>
-    </div>
-    <div class="list-footer">
-      <button type="button" class="btn" id="contact-sequences-cancel">Cancel</button>
     </div>`;
   document.body.appendChild(panel);
 
-  // Cancel closes
-  const cancelBtn = panel.querySelector('#contact-sequences-cancel');
-  if (cancelBtn) cancelBtn.addEventListener('click', () => closeContactSequencesPanel());
+  // Close button
+  const closeBtn = panel.querySelector('#contact-sequences-close');
+  if (closeBtn) closeBtn.addEventListener('click', () => closeContactSequencesPanel());
+
+  // Focus behavior
+  setTimeout(() => { const first = panel.querySelector('.list-item'); if (first) first.focus(); }, 0);
 
   // Populate data
   const container = panel.querySelector('#contact-sequences-body');
@@ -3071,11 +3719,33 @@ async function createContactSequenceThenAdd(name) {
       #contact-lists-panel, #contact-sequences-panel { position: fixed; z-index: 1200; width: min(560px, 92vw);
         background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light);
         border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
-        transform: translateY(-8px); opacity: 0; transition: transform .16s ease, opacity .16s ease;
+        transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
         /* Avoid clipping the pointer arrow */
         --arrow-size: 10px; }
       #contact-lists-panel.--show, #contact-sequences-panel.--show { transform: translateY(0); opacity: 1; }
-      #contact-lists-panel .list-header, #contact-sequences-panel .list-header { padding: 14px 16px; border-bottom: 1px solid var(--border-light); font-weight: 700; background: var(--bg-card); }
+      #contact-lists-panel .list-header, #contact-sequences-panel .list-header { 
+        display: flex; align-items: center; justify-content: space-between; 
+        padding: 14px 16px; border-bottom: 1px solid var(--border-light); 
+        font-weight: 700; background: var(--bg-card); 
+      }
+      #contact-lists-panel .list-title, #contact-sequences-panel .list-title { 
+        font-weight: 700; color: var(--text-primary); font-size: 1rem; 
+      }
+      #contact-lists-panel .close-btn, #contact-sequences-panel .close-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0;
+        background: var(--bg-item) !important; color: var(--grey-300) !important;
+        border: 1px solid var(--border-light); border-radius: var(--border-radius-sm);
+        line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer;
+        transition: var(--transition-fast); box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent; margin-right: 0;
+      }
+      #contact-lists-panel .close-btn:hover, #contact-sequences-panel .close-btn:hover {
+        background: var(--grey-600) !important; color: var(--text-inverse) !important;
+      }
+      #contact-lists-panel .close-btn:focus-visible, #contact-sequences-panel .close-btn:focus-visible {
+        outline: 2px solid var(--orange-muted); outline-offset: 2px;
+      }
       #contact-lists-panel .list-body, #contact-sequences-panel .list-body { max-height: min(70vh, 720px); overflow: auto; background: var(--bg-card); }
       #contact-lists-panel .list-body::-webkit-scrollbar, #contact-sequences-panel .list-body::-webkit-scrollbar { width: 10px; }
       #contact-lists-panel .list-body::-webkit-scrollbar-thumb, #contact-sequences-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
@@ -3086,10 +3756,6 @@ async function createContactSequenceThenAdd(name) {
       #contact-lists-panel .list-item:focus-visible, #contact-sequences-panel .list-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; }
       #contact-lists-panel .list-name, #contact-sequences-panel .list-name { font-weight: 600; }
       #contact-lists-panel .list-meta, #contact-sequences-panel .list-meta { color: var(--text-muted); font-size: .85rem; }
-      #contact-lists-panel .list-footer, #contact-sequences-panel .list-footer { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top: 1px solid var(--border-light); background: var(--bg-card); }
-      #contact-lists-panel .btn, #contact-sequences-panel .btn { border: 1px solid var(--border-light); background: var(--bg-item); color: var(--text-primary); border-radius: var(--border-radius-sm); padding:6px 10px; }
-      #contact-lists-panel .btn:focus-visible, #contact-sequences-panel .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35); }
-      #contact-lists-panel .btn-primary, #contact-sequences-panel .btn-primary { background: var(--orange-subtle); border-color: var(--orange-subtle); color: #fff; }
 
       /* Pointer arrow (reuse delete-popover pattern) */
       #contact-lists-panel::before,
@@ -3169,7 +3835,10 @@ async function createContactSequenceThenAdd(name) {
     const c = state.currentContact || {};
     const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'this contact';
     panel.innerHTML = `
-      <div class="list-header">Add ${escapeHtml(fullName)} to list</div>
+      <div class="list-header">
+        <div class="list-title">Add ${escapeHtml(fullName)} to list</div>
+        <button type="button" class="close-btn" id="contact-lists-close" aria-label="Close">×</button>
+      </div>
       <div class="list-body" id="contact-lists-body">
         <div class="list-item" tabindex="0" data-action="create">
           <div>
@@ -3177,9 +3846,6 @@ async function createContactSequenceThenAdd(name) {
             <div class="list-meta">Create a people list</div>
           </div>
         </div>
-      </div>
-      <div class="list-footer">
-        <button type="button" class="btn" id="contact-lists-cancel">Cancel</button>
       </div>`;
     document.body.appendChild(panel);
 
@@ -3239,11 +3905,11 @@ async function createContactSequenceThenAdd(name) {
     Promise.resolve(populateContactListsPanel(panel.querySelector('#contact-lists-body')))
       .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch(_) {} });
 
-    // Footer
-    panel.querySelector('#contact-lists-cancel')?.addEventListener('click', () => closeContactListsPanel());
+    // Close button
+    panel.querySelector('#contact-lists-close')?.addEventListener('click', () => closeContactListsPanel());
 
     // Focus behavior
-    setTimeout(() => { const first = panel.querySelector('.list-item, .btn'); if (first) first.focus(); }, 0);
+    setTimeout(() => { const first = panel.querySelector('.list-item'); if (first) first.focus(); }, 0);
     _onContactListsKeydown = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); closeContactListsPanel(); return; }
       if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.classList?.contains('list-item')) {

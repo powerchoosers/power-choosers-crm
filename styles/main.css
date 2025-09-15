@@ -40,6 +40,7 @@
     
     /* Subtle Company Colors */
     --orange-subtle: #ff6b35;
+    --orange-primary: #ff6b35;
     --blue-subtle: #1e3a8a;
     --orange-muted: rgba(255, 107, 53, 0.1);
     --blue-muted: rgba(30, 58, 138, 0.1);
@@ -1078,6 +1079,479 @@
     background: var(--bg-card);
 }
 
+/* === TASK POPOVER (contact detail page) === */
+.task-popover {
+    position: fixed; /* positioned via JS under the tasks button */
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 120; /* above other elements */
+    min-width: 320px;
+    max-width: 400px;
+    max-height: 70vh; /* Increased height to show full calendar */
+    transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
+    display: flex;
+    flex-direction: column;
+    overflow: visible; /* Allow arrow to render outside top edge */
+}
+
+.task-popover.--show {
+    transform: translateY(0); opacity: 1;
+    /* Smooth transitions for size and position, preserving transform/opacity transitions */
+    transition: transform 400ms ease, opacity 400ms ease, left 0.45s ease, top 0.45s ease, width 0.6s ease-out, max-width 0.6s ease-out, max-height 0.5s ease-out;
+    will-change: left, top, width, max-width, max-height;
+}
+
+/* Do not widen when calendar opens; keep base width, still allows smooth transitions */
+.task-popover.calendar-expanded { 
+    max-width: 400px; 
+    min-width: 320px; 
+    max-height: 480px; /* Fixed height to stop at bottom of calendar widget */
+}
+
+.task-popover .arrow {
+    position: absolute;
+    top: -6px;
+    left: 20px; /* default position, overridden by JS */
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid var(--border-light);
+    transform: translateX(-50%);
+    z-index: 200; /* Higher z-index to ensure visibility */
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.task-popover .arrow::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    left: -5px;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 5px solid var(--bg-card);
+    z-index: 201; /* Higher than the arrow itself */
+}
+
+.tp-inner {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Keep header fixed and body scrollable */
+}
+
+.tp-header {
+    display: flex;
+    align-items: flex-start; /* align title and close button to the top edge */
+    justify-content: space-between;
+    /* Increase bottom padding to match spacing above form elements */
+    padding: 0 0 10px;
+    /* Pull header up slightly to reduce top whitespace */
+    margin-top: -5px;
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0; /* Prevent header from shrinking */
+    background: var(--bg-card);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.tp-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1rem;
+    padding-left: 0;
+    line-height: 1.1; /* tighten vertical space to match top padding */
+}
+
+.tp-header .close-btn {
+    /* Match notes widget close button exactly */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    background: var(--bg-item) !important;
+    color: var(--grey-300) !important;
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius-sm);
+    line-height: 1;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    margin-right: 0;
+}
+
+.tp-header .close-btn:hover {
+    background: var(--grey-600) !important;
+    color: var(--text-inverse) !important;
+}
+
+.tp-header .close-btn:focus-visible {
+    outline: 2px solid var(--orange-muted);
+    outline-offset: 2px;
+}
+
+.tp-body {
+    /* Remove extra bottom spacing below the Create Task button and left/right gutters */
+    padding: 0 0 0;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0; /* Allow flex item to shrink below content size */
+}
+
+.tp-body .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-base);
+    margin-bottom: var(--spacing-base);
+    padding: 0;
+}
+
+.tp-body .form-row:last-of-type {
+    grid-template-columns: 1fr;
+}
+
+.tp-body label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.tp-body .input-dark {
+    height: 36px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: 0 10px;
+    font-size: 0.9rem;
+    transition: var(--transition-fast);
+}
+
+.tp-body .input-dark:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
+}
+
+.tp-body textarea.input-dark {
+    height: auto;
+    min-height: 80px;
+    padding: 8px 10px;
+    resize: vertical;
+}
+
+.tp-body select.input-dark {
+    cursor: pointer;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--spacing-base);
+    padding: 0;
+}
+
+.tp-body .btn-primary {
+    /* Set button to orange background */
+    background: var(--orange-primary);
+    color: var(--text-inverse);
+    border: 1px solid var(--orange-primary);
+    border-radius: var(--border-radius);
+    padding: 8px 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.tp-body .btn-primary:hover {
+    filter: brightness(0.95);
+}
+
+.tp-body .btn-primary:focus-visible {
+    outline: 2px solid var(--orange-muted);
+    outline-offset: 2px;
+}
+
+/* Ensure scroll content sits flush with divider lines */
+.tp-body form { margin: 0; padding: 0; }
+.tp-body > *:first-child { margin-top: 0 !important; }
+.tp-body > *:last-child { margin-bottom: 0 !important; }
+.tp-body .form-actions { margin-bottom: 0; }
+
+/* Reduce spacing between header and first form row */
+.tp-body form .form-row:first-child { margin-top: 0 !important; }
+
+/* === CALENDAR TOOLBAR === */
+.calendar-toggle-btn {
+    position: absolute;
+    right: 8px;
+    top: 70%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--border-radius);
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    width: 20px;
+}
+
+.calendar-toggle-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-item);
+}
+
+/* === DROPDOWN TOGGLE BUTTONS === */
+.dropdown-toggle-btn {
+    position: absolute;
+    right: 8px;
+    top: 70%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--border-radius);
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    width: 20px;
+}
+
+.dropdown-toggle-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-item);
+}
+
+.tp-body label {
+    position: relative;
+}
+
+.calendar-toolbar {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: 0; /* closed state: no padding to avoid end-of-animation jump */
+    margin-top: 0; /* avoid snap when closing; spacing applied only when open */
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: max-height 0.5s ease-out, opacity 0.5s ease-out, margin 0.5s ease-out, padding 0.5s ease-out, transform 0.5s ease-out;
+}
+
+.calendar-toolbar.calendar-slide-in {
+    max-height: 400px; /* Increased height to show full calendar */
+    opacity: 1;
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-base); /* open state adds padding smoothly */
+    transform: translateY(0);
+}
+
+.calendar-toolbar.calendar-slide-out {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    padding: 0; /* ensure padding collapses smoothly on close */
+    transform: translateY(-10px);
+}
+
+/* === DROPDOWN TOOLBARS === */
+.type-toolbar,
+.priority-toolbar {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: 0; /* closed state: no padding to avoid end-of-animation jump */
+    margin-top: 0; /* avoid snap when closing; spacing applied only when open */
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: max-height 0.5s ease-out, opacity 0.5s ease-out, margin 0.5s ease-out, padding 0.5s ease-out, transform 0.5s ease-out;
+}
+
+.type-toolbar.dropdown-slide-in,
+.priority-toolbar.dropdown-slide-in {
+    max-height: 200px; /* Adjust based on content */
+    opacity: 1;
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-base); /* open state adds padding smoothly */
+    transform: translateY(0);
+}
+
+.type-toolbar.dropdown-slide-out,
+.priority-toolbar.dropdown-slide-out {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    padding: 0; /* ensure padding collapses smoothly on close */
+    transform: translateY(-10px);
+}
+
+/* === DROPDOWN GRIDS === */
+.dropdown-grid {
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.type-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.priority-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr;
+}
+
+.dropdown-option {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: var(--transition-fast);
+    text-align: center;
+}
+
+.dropdown-option:hover {
+    background: var(--grey-800);
+    border-color: var(--border-medium);
+    color: var(--text-inverse);
+}
+
+.dropdown-option.selected {
+    background: var(--orange-primary);
+    border-color: var(--orange-primary);
+    color: var(--text-inverse);
+}
+
+.calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+}
+
+.calendar-nav-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--border-radius);
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calendar-nav-btn:hover {
+    background: var(--grey-600);
+    border-color: var(--grey-500);
+}
+
+.calendar-month-year {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: var(--spacing-sm);
+}
+
+.calendar-weekday {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding: 4px;
+}
+
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.calendar-day {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 8px 4px;
+    border-radius: var(--border-radius);
+    transition: var(--transition-fast);
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+}
+
+.calendar-day:hover {
+    background: var(--grey-600);
+    border-color: var(--grey-500);
+}
+
+.calendar-day-selected {
+    background: var(--orange-subtle) !important;
+    color: var(--text-inverse) !important;
+    border-color: var(--orange-subtle) !important;
+    font-weight: 600;
+}
+
+.calendar-day-today {
+    border-color: var(--orange-muted);
+    font-weight: 500;
+}
+
+.calendar-day-empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+}
+
+.calendar-day-empty:hover {
+    background: transparent;
+}
+
+/* Task popover expansion animation - removed duplicate transition */
+
 .search-loading {
     display: flex;
     align-items: center;
@@ -1134,12 +1608,12 @@
     to   { opacity: 1; transform: none; }
 }
 @keyframes popIn {
-    from { opacity: 0; transform: translateY(4px) scale(0.98); }
+    from { opacity: 0; transform: translateY(8px) scale(0.95); }
     to   { opacity: 1; transform: none; }
 }
 @keyframes fadeSlideOut {
     from { opacity: 1; transform: none; }
-    to   { opacity: 0; transform: translateY(-2px) scale(0.98); }
+    to   { opacity: 0; transform: translateY(-4px) scale(0.95); }
 }
 @media (prefers-reduced-motion: reduce) {
     .seq-title-actions,
@@ -2469,47 +2943,62 @@ html, body {
 
 .search-input {
     width: 400px;
-    height: 36px;
-    background: var(--grey-700);
-    border: 1px solid var(--grey-600);
-    border-radius: var(--border-radius);
-    padding: 0 40px 0 var(--spacing-md);
-    color: var(--text-inverse);
-    font-size: 0.875rem;
-    transition: var(--transition-fast);
+    height: 40px;
+    background: var(--bg-item);
+    border: 2px solid var(--border-light);
+    border-radius: 8px;
+    padding: 0 40px 0 14px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
 }
 
 .search-input::placeholder {
-    color: var(--grey-400);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.search-input:hover {
+    border-color: var(--grey-500);
+    background: var(--bg-widget);
 }
 
 .search-input:focus {
     outline: none;
     border-color: var(--orange-subtle);
-    background: var(--grey-600);
-    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
+    background: var(--bg-widget);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+    transform: translateY(-1px);
 }
 
 .search-btn {
     position: absolute;
     right: 8px;
-    background: none;
-    border: none;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
     color: var(--grey-400);
     cursor: pointer;
-    padding: 6px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--border-radius-sm);
     transition: var(--transition-fast);
 }
 
 .search-btn:hover {
     color: var(--text-inverse);
-    background: var(--grey-600);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .call-btn {
     background: var(--orange-subtle);
-    border: none;
+    border: 1px solid var(--orange-subtle);
     color: var(--text-inverse);
     width: 40px;
     height: 40px;
@@ -2517,7 +3006,7 @@ html, body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--border-radius); /* keep existing rounded px */
+    border-radius: var(--border-radius);
     cursor: pointer;
     transition: var(--transition-fast);
     line-height: 0; /* remove inline content vertical offset */
@@ -2525,7 +3014,9 @@ html, body {
 
 .call-btn:hover {
     background: #e55a2b;
+    border-color: #d9481f;
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Ensure the phone icon is centered and sized consistently */
@@ -2543,18 +3034,26 @@ html, body {
 
 .icon-btn {
     position: relative;
-    background: none;
-    border: none;
+    background: transparent;
+    border: 1px solid var(--border-light);
     color: var(--grey-400);
     cursor: pointer;
-    padding: 8px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--border-radius);
     transition: var(--transition-fast);
 }
 
 .icon-btn:hover {
     color: var(--text-inverse);
-    background: var(--grey-700);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .notification-badge {
@@ -3128,17 +3627,32 @@ html, body {
 
 .search-input-small {
     width: 200px;
-    height: 32px;
-    background: var(--grey-700);
-    border: 1px solid var(--grey-600);
-    border-radius: var(--border-radius);
-    padding: 0 var(--spacing-sm);
-    color: var(--text-inverse);
-    font-size: 0.875rem;
+    height: 40px;
+    background: var(--bg-item);
+    border: 2px solid var(--border-light);
+    border-radius: 8px;
+    padding: 0 14px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
 }
 
 .search-input-small::placeholder {
-    color: var(--grey-400);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.search-input-small:hover {
+    border-color: var(--grey-500);
+    background: var(--bg-widget);
+}
+
+.search-input-small:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    background: var(--bg-widget);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+    transform: translateY(-1px);
 }
 
 .results-count {
@@ -3152,6 +3666,7 @@ html, body {
     align-items: center;
     gap: var(--spacing-sm);
     margin-top: var(--spacing-sm);
+    position: relative;
 }
 
 .filter-panel {
@@ -3161,6 +3676,71 @@ html, body {
     border-radius: var(--border-radius);
     padding: var(--spacing-md);
     box-shadow: var(--elevation-card);
+    transition: all 0.3s ease;
+    overflow: visible !important;
+}
+
+/* People page filters as dropdown overlay */
+#people-page .page-header {
+    position: relative;
+}
+
+/* Ensure dropdowns are not clipped by parents */
+#people-page .page-header,
+#people-page .people-toolbar,
+#people-filters,
+#people-filters .filter-grid,
+#people-filters .filter-field {
+    overflow: visible !important;
+}
+
+/* Ensure dropdowns are not clipped on Calls page as well */
+#calls-page .page-header,
+#calls-page .people-toolbar,
+#calls-filters,
+#calls-filters .filter-grid,
+#calls-filters .filter-field {
+    overflow: visible !important;
+}
+
+/* Ensure Calls header is positioning context for absolute panel */
+#calls-page .page-header { position: relative; }
+
+#people-filters {
+    position: absolute;
+    top: calc(100% - 17px);
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    transform: translateY(-10px);
+    opacity: 0;
+    visibility: hidden;
+    transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* Mirror filter panel animation/positioning for Calls page */
+#calls-filters {
+    position: absolute;
+    top: calc(100% - 17px);
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    transform: translateY(-10px);
+    opacity: 0;
+    visibility: hidden;
+    transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#people-filters.show {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+#calls-filters.show {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
 }
 
 .filter-tabs-row {
@@ -3181,6 +3761,481 @@ html, body {
 }
 @media (max-width: 600px) {
     .filter-grid { grid-template-columns: 1fr; }
+}
+
+/* Fix filter field layout - keep container but improve styling */
+.filter-field {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Fix filter input fields - make chips appear inside the input field */
+#people-filters .chip-input {
+    /* Make the container look like an input field */
+    background: var(--bg-item) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--border-radius) !important;
+    padding: 8px 12px !important;
+    min-height: 40px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    gap: 4px !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+    z-index: 2 !important; /* base above table rows */
+    line-height: 1.2 !important;
+    /* Keep input field on same line as chips */
+    align-content: flex-start !important;
+    /* Center items vertically so caret/placeholder look centered */
+    align-items: center !important;
+    /* Prevent container from shrinking too much */
+    min-width: 200px !important;
+    width: 100% !important;
+}
+
+/* Duplicate the exact chip-input container styling for Calls filters */
+#calls-filters .chip-input {
+    background: var(--bg-item) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--border-radius) !important;
+    padding: 8px 12px !important;
+    min-height: 40px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    gap: 4px !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+    z-index: 2 !important; /* base above table rows */
+    line-height: 1.2 !important;
+    align-content: flex-start !important;
+    align-items: center !important;
+    min-width: 200px !important;
+    width: 100% !important;
+}
+
+#people-filters .chip-input:hover {
+    background: var(--bg-secondary) !important;
+    border-color: var(--accent-color) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+#calls-filters .chip-input:hover {
+    background: var(--bg-secondary) !important;
+    border-color: var(--accent-color) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+#people-filters .chip-input:focus-within {
+    outline: none !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--orange-subtle) !important; /* match other inputs */
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25) !important; /* match other inputs */
+    z-index: 10002 !important; /* raise above neighbors while focused */
+}
+
+#calls-filters .chip-input:focus-within {
+    outline: none !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--orange-subtle) !important; /* match other inputs */
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25) !important; /* match other inputs */
+    z-index: 10002 !important; /* raise above neighbors while focused */
+}
+
+/* Ensure the input field itself has no focus styling */
+#people-filters .chip-input-field:focus {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#calls-filters .chip-input-field:focus {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#people-filters .chip-input-field {
+    /* Make the input field blend into the container */
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: var(--text-primary) !important;
+    font-size: 0.9rem !important;
+    flex: 1 1 auto !important;
+    min-width: 120px !important;
+    max-width: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    z-index: 2 !important;
+    position: relative !important;
+    line-height: 1.2 !important;
+    height: auto !important;
+    resize: none !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    /* Prevent input from wrapping to new line */
+    flex-shrink: 0 !important;
+    /* Browser autofill disabled via HTML autocomplete="off" attribute */
+    /* Slight downward nudge to visually center caret/placeholder */
+    padding-top: 2px !important;
+}
+
+#calls-filters .chip-input-field {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: var(--text-primary) !important;
+    font-size: 0.9rem !important;
+    flex: 1 1 auto !important;
+    min-width: 120px !important;
+    max-width: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    z-index: 2 !important;
+    position: relative !important;
+    line-height: 1.2 !important;
+    height: auto !important;
+    resize: none !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    padding-top: 2px !important;
+}
+
+#people-filters .chip-input-field::placeholder {
+    color: var(--text-muted) !important;
+}
+
+#calls-filters .chip-input-field::placeholder {
+    color: var(--text-muted) !important;
+}
+
+/* Hide placeholder when chips are present */
+#people-filters .chip-input:has(.chip) .chip-input-field::placeholder {
+    opacity: 0 !important;
+}
+
+#calls-filters .chip-input:has(.chip) .chip-input-field::placeholder {
+    opacity: 0 !important;
+}
+
+/* Ensure input field stays on the same line as chips */
+#people-filters .chip-input-field {
+    flex-basis: auto !important;
+    flex-grow: 1 !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+    max-width: 200px !important;
+    min-width: 80px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#calls-filters .chip-input-field {
+    flex-basis: auto !important;
+    flex-grow: 1 !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+    max-width: 200px !important;
+    min-width: 80px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Collapse the input when not active to remove empty second row */
+#people-filters .chip-input.collapsed .chip-input-field {
+    flex: 0 0 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+}
+
+#calls-filters .chip-input.collapsed .chip-input-field {
+    flex: 0 0 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+}
+
+/* Style chips to appear inside the input field */
+#people-filters .chip-list {
+    /* Flatten wrapper so chips and input share the same flex row */
+    display: contents !important;
+}
+
+#calls-filters .chip-list { display: contents !important; }
+
+/* Ensure layout order: chips → input → clear */
+#people-filters .chip-input .chip { order: 1 !important; }
+#people-filters .chip-input .chip-input-field { order: 2 !important; flex: 1 1 60px !important; min-width: 60px !important; }
+#people-filters .chip-input .chip-clear { order: 3 !important; flex: 0 0 auto !important; }
+
+#calls-filters .chip-input .chip { order: 1 !important; }
+#calls-filters .chip-input .chip-input-field { order: 2 !important; flex: 1 1 60px !important; min-width: 60px !important; }
+#calls-filters .chip-input .chip-clear { order: 3 !important; flex: 0 0 auto !important; }
+
+/* Override general chip styles for people filters */
+#people-filters .chip-input .chip,
+#people-filters .chip-list .chip,
+.chip-input .chip {
+    background: var(--orange-primary) !important;
+    border: 1px solid var(--orange-primary) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 2px 6px !important;
+    font-size: 0.8rem !important;
+    color: var(--text-inverse) !important;
+    height: auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    /* Chip animation styles - only for new chips */
+    transform-origin: left center !important;
+    transition: all 0.2s ease !important;
+    /* Keep chips aligned with input text */
+    vertical-align: baseline !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    overflow: hidden !important; /* allow width transition on remove */
+}
+
+#calls-filters .chip-input .chip,
+#calls-filters .chip-list .chip {
+    background: var(--orange-primary) !important;
+    border: 1px solid var(--orange-primary) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: 2px 6px !important;
+    font-size: 0.8rem !important;
+    color: var(--text-inverse) !important;
+    height: auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    transform-origin: left center !important;
+    transition: all 0.2s ease !important;
+    vertical-align: baseline !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Chip slide-in animation - only for new chips */
+#people-filters .chip-input .chip.chip-new,
+#people-filters .chip-list .chip.chip-new,
+.chip-input .chip.chip-new {
+    animation: chipSlideIn 0.3s ease-out !important;
+}
+
+#calls-filters .chip-input .chip.chip-new,
+#calls-filters .chip-list .chip.chip-new {
+    animation: chipSlideIn 0.3s ease-out !important;
+}
+
+@keyframes chipSlideIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateX(-10px);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.05) translateX(0);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateX(0);
+    }
+}
+
+/* Chip hover animation */
+#people-filters .chip-input .chip:hover,
+#people-filters .chip-list .chip:hover,
+.chip-input .chip:hover {
+    transform: scale(1.05) !important;
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3) !important;
+}
+
+#calls-filters .chip-input .chip:hover,
+#calls-filters .chip-list .chip:hover {
+    transform: scale(1.05) !important;
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3) !important;
+}
+
+/* Chip removal animation: smoothly collapse width so siblings slide over */
+#people-filters .chip-input .chip.chip-removing,
+#people-filters .chip-list .chip.chip-removing,
+.chip-input .chip.chip-removing {
+    animation: none !important;
+    will-change: width, margin, padding, opacity, border-width !important;
+    transition: width 180ms cubic-bezier(0.2, 0, 0, 1), margin 180ms cubic-bezier(0.2, 0, 0, 1), padding 180ms cubic-bezier(0.2, 0, 0, 1), opacity 140ms ease, border-width 180ms cubic-bezier(0.2, 0, 0, 1) !important;
+    width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    opacity: 0 !important;
+    border-width: 0 !important;
+}
+
+#calls-filters .chip-input .chip.chip-removing,
+#calls-filters .chip-list .chip.chip-removing {
+    animation: none !important;
+    will-change: width, margin, padding, opacity, border-width !important;
+    transition: width 180ms cubic-bezier(0.2, 0, 0, 1), margin 180ms cubic-bezier(0.2, 0, 0, 1), padding 180ms cubic-bezier(0.2, 0, 0, 1), opacity 140ms ease, border-width 180ms cubic-bezier(0.2, 0, 0, 1) !important;
+    width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    opacity: 0 !important;
+    border-width: 0 !important;
+}
+
+/* Override general chip-remove styles for people filters */
+#people-filters .chip-input .chip-remove,
+#people-filters .chip-list .chip-remove,
+.chip-input .chip-remove {
+    color: var(--text-inverse) !important;
+    cursor: pointer !important;
+    margin-left: 4px !important;
+    opacity: 0.8 !important;
+    background: none !important;
+    border: none !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+#calls-filters .chip-input .chip-remove,
+#calls-filters .chip-list .chip-remove {
+    color: var(--text-inverse) !important;
+    cursor: pointer !important;
+    margin-left: 4px !important;
+    opacity: 0.8 !important;
+    background: none !important;
+    border: none !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+#people-filters .chip-input .chip-remove:hover,
+#people-filters .chip-list .chip-remove:hover,
+.chip-input .chip-remove:hover {
+    color: var(--text-inverse) !important;
+    opacity: 1 !important;
+}
+
+#calls-filters .chip-input .chip-remove:hover,
+#calls-filters .chip-list .chip-remove:hover {
+    color: var(--text-inverse) !important;
+    opacity: 1 !important;
+}
+
+/* Restore suggestion dropdowns */
+#people-filters .chip-suggest {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    z-index: 10010 !important; /* higher than focused chip-input */
+    max-height: 200px !important;
+    overflow-y: auto !important;
+    margin-top: 4px !important;
+}
+
+#calls-filters .chip-suggest {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    z-index: 10010 !important;
+    max-height: 200px !important;
+    overflow-y: auto !important;
+    margin-top: 4px !important;
+}
+
+#people-filters .chip-suggest-item {
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border-light) !important;
+}
+
+#calls-filters .chip-suggest-item { 
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border-light) !important; 
+}
+
+#people-filters .chip-suggest-item:hover {
+    background: var(--bg-secondary) !important;
+    color: var(--text-inverse) !important;
+}
+
+#calls-filters .chip-suggest-item:hover { 
+    background: var(--bg-secondary) !important; 
+    color: var(--text-inverse) !important; 
+}
+
+#people-filters .chip-suggest-item:last-child {
+    border-bottom: none !important;
+}
+
+#calls-filters .chip-suggest-item:last-child { border-bottom: none !important; }
+
+/* Style clear button to work with new layout */
+#people-filters .chip-clear {
+    background: none !important;
+    border: none !important;
+    color: var(--text-muted) !important;
+    cursor: pointer !important;
+    font-size: 1.2rem !important;
+    padding: 4px !important;
+    border-radius: var(--border-radius-sm) !important;
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
+}
+
+#calls-filters .chip-clear {
+    background: none !important;
+    border: none !important;
+    color: var(--text-muted) !important;
+    cursor: pointer !important;
+    font-size: 1.2rem !important;
+    padding: 4px !important;
+    border-radius: var(--border-radius-sm) !important;
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
+}
+
+#people-filters .chip-clear:hover {
+    background: var(--bg-secondary) !important;
+    color: var(--text-inverse) !important;
+}
+
+#calls-filters .chip-clear:hover { 
+    background: var(--bg-secondary) !important; 
+    color: var(--text-inverse) !important; 
 }
 
 .filter-field label {
@@ -3297,6 +4352,26 @@ html, body {
     color: var(--text-inverse);
 }
 
+/* Force orange chips in people filters (placed after global .chip rules) */
+#people-filters .chip,
+#people-filters .chip-input .chip,
+#people-filters .chip-list .chip {
+    background: var(--orange-primary) !important;
+    background-color: var(--orange-primary) !important;
+    border: 1px solid var(--orange-primary) !important;
+    color: var(--text-inverse) !important;
+}
+
+/* Also scope to page containers in case chips render outside #people-filters */
+#people-page .chip,
+#list-detail-filters .chip,
+#calls-page .chip {
+    background: var(--orange-primary) !important;
+    background-color: var(--orange-primary) !important;
+    border: 1px solid var(--orange-primary) !important;
+    color: var(--text-inverse) !important;
+}
+
 .filter-field.checkbox label {
     display: flex;
     align-items: center;
@@ -3309,6 +4384,15 @@ html, body {
     justify-content: flex-end;
     gap: var(--spacing-sm);
     margin-top: var(--spacing-md);
+}
+
+/* Filter action buttons hover effects */
+.filter-actions-row .btn-secondary:hover,
+.filter-actions-row .btn-primary:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .filter-count-badge {
@@ -3360,6 +4444,17 @@ html, body {
     transform: translateY(-1px);
 }
 
+/* Override for Create Task popover button to ensure orange wins over global */
+.task-popover .btn-primary {
+    background: var(--orange-primary) !important;
+    border-color: var(--orange-primary) !important;
+    color: var(--text-inverse) !important;
+}
+.task-popover .btn-primary:hover {
+    filter: brightness(0.95);
+    transform: none;
+}
+
 .btn-secondary {
     background: var(--grey-600);
     border: 1px solid var(--grey-500);
@@ -3390,6 +4485,9 @@ html, body {
 
 .btn-success:hover {
     background: #218838;
+    border-color: #1e7e34;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .btn-text {
@@ -3404,6 +4502,8 @@ html, body {
 
 .btn-text:hover {
     color: var(--text-inverse);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* === TABLE STYLES === */
@@ -3453,8 +4553,14 @@ html, body {
     justify-content: center;
     border-radius: var(--border-radius-sm);
     cursor: pointer;
+    transition: all 0.2s ease;
 }
-.qa-btn:hover { background: var(--grey-700); }
+.qa-btn:hover { 
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
 .qa-btn svg { display:block; width: 14px; height: 14px; stroke: currentColor; fill: none; }
 
 /* Keep all headers and cells on a single line */
@@ -4247,8 +5353,14 @@ html, body {
   color: var(--text-inverse, #fff);
   border: 1px solid var(--border-light, #50555c);
   border-radius: 6px; cursor: pointer; line-height: 1;
+  transition: all 0.2s ease;
 }
-.qa-btn:hover { background: var(--grey-700, #424850); }
+.qa-btn:hover { 
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
 .qa-btn svg { display: block; }
 
 /* === Lists toolbar: swap Quick Search and Filters toggle positions === */
@@ -4420,9 +5532,10 @@ html, body {
   padding: 0; /* ensure perfect square */
 }
 #call-scripts-page #call-scripts-toolbar .widgets-btn:hover {
-  background: var(--grey-600);
-  border-color: var(--grey-500);
+  background: var(--bg-secondary);
+  border-color: var(--accent-color);
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 #call-scripts-page #call-scripts-toolbar .widgets-btn svg { display: block; }
 
@@ -4448,7 +5561,34 @@ html, body {
   gap: 10px;
   z-index: 20;
   transition: transform 160ms ease, opacity 160ms ease, visibility 0s linear 160ms; /* delay visibility off so it doesn't flicker */
+  --arrow-size: 8px; /* square size before rotation */
 }
+
+/* Pointed triangle pointing right */
+#call-scripts-page #call-scripts-toolbar .widgets-drawer::before,
+#call-scripts-page #call-scripts-toolbar .widgets-drawer::after {
+  content: "";
+  position: absolute;
+  width: var(--arrow-size);
+  height: var(--arrow-size);
+  transform: rotate(45deg);
+  pointer-events: none;
+  right: calc(-1 * var(--arrow-size) / 2 + 1px);
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/* Border layer */
+#call-scripts-page #call-scripts-toolbar .widgets-drawer::before {
+  background: var(--border-light);
+}
+
+/* Fill layer */
+#call-scripts-page #call-scripts-toolbar .widgets-drawer::after {
+  background: var(--bg-card);
+  right: calc(-1 * var(--arrow-size) / 2 + 2px);
+}
+
 #call-scripts-page #call-scripts-toolbar .widgets-wrap.open .widgets-drawer {
   transform: translate(0, -50%);
   opacity: 1;
@@ -4468,8 +5608,14 @@ html, body {
   border: 1px solid var(--border-light);
   color: var(--text-inverse);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
-#call-scripts-page #call-scripts-toolbar .widget-item:hover { background: var(--grey-700); }
+#call-scripts-page #call-scripts-toolbar .widget-item:hover { 
+  background: var(--bg-secondary);
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
 
 #call-scripts-page .script-display {
     background: var(--bg-item);
@@ -5051,21 +6197,22 @@ html, body {
 .pc-modal__body label { display:block; margin-bottom: 6px; }
 .pc-modal__body .help-text { color: var(--text-muted); font-size: 0.8rem; margin-top: 6px; }
 .pc-modal input[type="text"] {
-    background: var(--grey-700);
-    border: 1px solid var(--grey-600);
-    color: var(--text-inverse);
-    border-radius: var(--border-radius);
-    padding: 10px var(--spacing-md);
-    height: 38px;
+    background: var(--bg-item);
+    border: 2px solid var(--border-light);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 10px 14px;
+    height: 40px;
     outline: none;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+    transition: all 0.3s ease;
 }
-.pc-modal input[type="text"]::placeholder { color: var(--grey-400); }
-.pc-modal input[type="text"]:hover { background: var(--grey-680, #545b62); }
+.pc-modal input[type="text"]::placeholder { color: var(--text-muted); font-size: 0.85rem; }
+.pc-modal input[type="text"]:hover { border-color: var(--grey-500); background: var(--bg-widget); }
 .pc-modal input[type="text"]:focus {
     border-color: var(--orange-subtle);
-    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
-    background: var(--grey-650, #5a6168);
+    background: var(--bg-widget);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+    transform: translateY(-1px);
 }
 .pc-modal input[type="checkbox"] {
     accent-color: var(--orange-subtle);
@@ -5178,7 +6325,10 @@ html, body {
 }
 
 .table-pagination .page-btn:hover:not(:disabled) {
-    background: var(--grey-700);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .table-pagination .page-btn.active {
@@ -5219,8 +6369,10 @@ html, body {
 }
 
 .pagination-arrow:hover:not(:disabled) {
-    background: var(--grey-700);
-    border-color: var(--border-medium);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     color: var(--text-primary);
 }
 
@@ -5257,8 +6409,10 @@ html, body {
 }
 
 .pagination-current:hover {
-    background: var(--grey-700);
-    border-color: var(--border-medium);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .pagination-picker {
@@ -5269,6 +6423,39 @@ html, body {
     margin-bottom: 8px;
     display: none;
     z-index: 1000;
+    /* Much larger hover zone for better responsiveness */
+    padding: 20px;
+    margin: -20px -20px 8px -20px;
+}
+
+/* Add invisible bridge to the trigger button for better hover continuity */
+.pagination-picker::before {
+    content: '';
+    position: absolute;
+    bottom: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 12px;
+    background: transparent;
+}
+
+/* Add downward-pointing arrow to connect with the page number */
+.pagination-picker::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--bg-card);
+    /* Add subtle border/shadow to match container border */
+    filter: drop-shadow(0 1px 0 var(--border-light));
+    pointer-events: none;
+    z-index: 2;
 }
 
 .pagination-picker.visible {
@@ -5280,10 +6467,15 @@ html, body {
     border: 1px solid var(--border-light);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    padding: 12px;
-    min-width: 200px;
+    padding: 16px;
+    min-width: 220px;
     max-height: 300px;
     overflow-y: auto;
+    /* Ensure content doesn't interfere with hover zone */
+    position: relative;
+    z-index: 1;
+    /* Add slight delay for smoother interaction */
+    transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .pagination-picker-header {
@@ -5297,13 +6489,14 @@ html, body {
 .pagination-picker-pages {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 4px;
+    gap: 6px;
+    padding: 4px;
 }
 
 .picker-page {
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
     background: var(--bg-item);
     border: 1px solid var(--border-light);
     display: flex;
@@ -5314,11 +6507,16 @@ html, body {
     color: var(--text-secondary);
     font-size: 0.85rem;
     font-weight: 500;
+    /* Add padding for easier clicking */
+    padding: 2px;
+    box-sizing: border-box;
 }
 
 .picker-page:hover {
-    background: var(--grey-700);
-    border-color: var(--border-medium);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     color: var(--text-primary);
 }
 
@@ -5697,8 +6895,10 @@ html, body {
 }
 
 .action-btn:hover {
-    background: var(--grey-600);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* === DASHBOARD WIDGETS === */
@@ -5746,9 +6946,11 @@ html, body {
 }
 
 .pagination-btn:hover:not(:disabled) {
-    background: var(--grey-700);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     color: var(--text-primary);
-    border-color: var(--grey-600);
 }
 
 .pagination-btn:disabled {
@@ -5773,6 +6975,7 @@ html, body {
 .task-item, .news-item, .lead-item, .activity-item {
     padding: var(--spacing-sm);
     background: var(--bg-item);
+    border: 1px solid var(--border-light);
     border-radius: var(--border-radius-sm);
     transition: var(--transition-fast);
 }
@@ -5793,7 +6996,10 @@ html, body {
 }
 
 .task-item:hover, .news-item:hover, .lead-item:hover, .activity-item:hover {
-    background: var(--grey-600);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .task-name, .news-title, .lead-name {
@@ -6479,9 +7685,20 @@ html, body {
     color: var(--text-inverse);
 }
 
-/* Enhanced Input Styling */
+/* === STANDARDIZED INPUT FIELD STYLES === */
+/* Base input styling - applies to all input fields across the site */
+.input-standard,
 .health-form-input,
-.deal-form-input {
+.deal-form-input,
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="password"],
+select,
+textarea {
     height: 40px;
     padding: 10px 14px;
     border-radius: 8px;
@@ -6491,61 +7708,161 @@ html, body {
     font-family: inherit;
     font-size: 0.9rem;
     transition: all 0.3s ease;
+    outline: none;
+    box-sizing: border-box;
+}
+
+/* Textarea specific adjustments */
+textarea.input-standard,
+textarea {
+    height: auto;
+    min-height: 80px;
+    resize: vertical;
+    line-height: 1.4;
+}
+
+/* Select specific adjustments */
+select.input-standard,
+select {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%), 
+                      linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%;
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 40px;
+}
+
+select.input-standard option,
+select option {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+}
+
+/* === STANDARDIZED HOVER AND FOCUS EFFECTS === */
+/* Hover effects for all input fields */
+.input-standard:hover,
+.health-form-input:hover,
+.deal-form-input:hover,
+input[type="text"]:hover,
+input[type="email"]:hover,
+input[type="number"]:hover,
+input[type="search"]:hover,
+input[type="tel"]:hover,
+input[type="url"]:hover,
+input[type="password"]:hover,
+select:hover,
+textarea:hover {
+    border-color: var(--grey-500);
+    background: var(--bg-widget);
+}
+
+/* Focus effects for all input fields */
+.input-standard:focus,
+.health-form-input:focus,
+.deal-form-input:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+input[type="search"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+input[type="password"]:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    background: var(--bg-widget);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+    transform: translateY(-1px);
+}
+
+/* Placeholder styling for all input fields */
+.input-standard::placeholder,
+.health-form-input::placeholder,
+.deal-form-input::placeholder,
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="number"]::placeholder,
+input[type="search"]::placeholder,
+input[type="tel"]::placeholder,
+input[type="url"]::placeholder,
+input[type="password"]::placeholder,
+textarea::placeholder {
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.85rem;
 }
 
 /* Keep dark background when browser autofill or suggestions are applied */
+.input-standard:-webkit-autofill,
+.input-standard:-webkit-autofill:hover,
+.input-standard:-webkit-autofill:focus,
 .health-form-input:-webkit-autofill,
 .health-form-input:-webkit-autofill:hover,
 .health-form-input:-webkit-autofill:focus,
 .deal-form-input:-webkit-autofill,
 .deal-form-input:-webkit-autofill:hover,
-.deal-form-input:-webkit-autofill:focus {
+.deal-form-input:-webkit-autofill:focus,
+input[type="text"]:-webkit-autofill,
+input[type="text"]:-webkit-autofill:hover,
+input[type="text"]:-webkit-autofill:focus,
+input[type="email"]:-webkit-autofill,
+input[type="email"]:-webkit-autofill:hover,
+input[type="email"]:-webkit-autofill:focus,
+input[type="number"]:-webkit-autofill,
+input[type="number"]:-webkit-autofill:hover,
+input[type="number"]:-webkit-autofill:focus,
+input[type="search"]:-webkit-autofill,
+input[type="search"]:-webkit-autofill:hover,
+input[type="search"]:-webkit-autofill:focus,
+input[type="tel"]:-webkit-autofill,
+input[type="tel"]:-webkit-autofill:hover,
+input[type="tel"]:-webkit-autofill:focus,
+input[type="url"]:-webkit-autofill,
+input[type="url"]:-webkit-autofill:hover,
+input[type="url"]:-webkit-autofill:focus,
+input[type="password"]:-webkit-autofill,
+input[type="password"]:-webkit-autofill:hover,
+input[type="password"]:-webkit-autofill:focus {
     -webkit-text-fill-color: var(--text-primary) !important;
     -webkit-box-shadow: 0 0 0px 1000px var(--bg-widget) inset !important;
             box-shadow: 0 0 0px 1000px var(--bg-widget) inset !important;
     border-color: var(--border-light) !important;
 }
 
-/* Firefox */
+/* Firefox autofill */
+.input-standard:-moz-autofill,
 .health-form-input:-moz-autofill,
-.deal-form-input:-moz-autofill {
+.deal-form-input:-moz-autofill,
+input[type="text"]:-moz-autofill,
+input[type="email"]:-moz-autofill,
+input[type="number"]:-moz-autofill,
+input[type="search"]:-moz-autofill,
+input[type="tel"]:-moz-autofill,
+input[type="url"]:-moz-autofill,
+input[type="password"]:-moz-autofill {
     box-shadow: 0 0 0px 1000px var(--bg-widget) inset;
     -moz-text-fill-color: var(--text-primary);
 }
 
-.health-form-input::placeholder,
-.deal-form-input::placeholder { 
-    color: var(--text-muted); 
-    font-family: inherit; 
-    font-size: 0.85rem;
-}
-
-.health-form-input:focus,
-.deal-form-input:focus { 
-    outline: none; 
-    border-color: var(--orange-subtle); 
-    background: var(--bg-widget);
-    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
-    transform: translateY(-1px);
-}
-
-.health-form-input:hover,
-.deal-form-input:hover {
-    border-color: var(--grey-500);
-    background: var(--bg-widget);
-}
-
-/* Remove number spinners */
+/* Remove number spinners for all number inputs */
+.input-standard[type="number"],
 .health-form-input[type="number"],
-.deal-form-input[type="number"] { 
+.deal-form-input[type="number"],
+input[type="number"] { 
     -moz-appearance: textfield; 
     appearance: textfield; 
 }
 
+.input-standard[type="number"]::-webkit-outer-spin-button,
+.input-standard[type="number"]::-webkit-inner-spin-button,
 .health-form-input[type="number"]::-webkit-outer-spin-button,
 .health-form-input[type="number"]::-webkit-inner-spin-button,
 .deal-form-input[type="number"]::-webkit-outer-spin-button,
-.deal-form-input[type="number"]::-webkit-inner-spin-button { 
+.deal-form-input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { 
     -webkit-appearance: none; 
     margin: 0; 
 }
@@ -7282,9 +8599,10 @@ html, body {
 }
 
 .back-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--border-medium);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Icon-only square back button */
@@ -7302,6 +8620,13 @@ html, body {
 .back-btn--icon svg {
     width: 18px;
     height: 18px;
+}
+
+/* Page title row for inline back button and title */
+.page-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
 }
 
 .contact-actions {
@@ -7400,9 +8725,10 @@ margin-bottom: var(--spacing-md);
 }
 
 .quick-action-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--border-medium);
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .contact-details-grid {
@@ -8287,7 +9613,7 @@ th.drag-over::after {
     text-decoration: none;
 }
 
-/* Contact Detail header: square, centered Widgets icon button */
+/* Contact Detail header: square, centered Widgets icon button - match scripts page styling */
 #contact-detail-header #open-widgets {
     display: inline-flex;
     align-items: center;
@@ -8299,6 +9625,11 @@ th.drag-over::after {
     box-sizing: border-box; /* include border in total size */
     border-radius: var(--border-radius);
     vertical-align: middle;
+    background: var(--grey-700);
+    border: 1px solid var(--border-light);
+    color: var(--text-inverse);
+    cursor: pointer;
+    transition: var(--transition-fast);
 }
 #contact-detail-header #open-widgets svg {
     width: 18px;
@@ -8307,9 +9638,12 @@ th.drag-over::after {
     pointer-events: none;
 }
 
-/* Prevent hover translate on this icon-only primary button */
+/* Hover effect matching scripts page */
 #contact-detail-header #open-widgets:hover {
-    transform: none;
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Widgets drawer container and slide-out behavior */
@@ -8317,55 +9651,82 @@ th.drag-over::after {
     position: relative;
     display: inline-flex;
     align-items: center;
-    /* Hover bridge to the left so users can move into the drawer without losing hover */
-    padding-left: 16px;
-    margin-left: -16px; /* neutralize layout shift */
 }
 #contact-detail-header .widgets-drawer {
     position: absolute;
     top: 50%;
-    right: 100%;
-    transform: translateY(-50%) translateX(0); /* flush to button */
+    right: calc(100% + 8px); /* appear to the left of the button */
+    /* Start slightly to the right and fade in so it slides left into place */
+    transform: translate(10px, -50%);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    background: var(--grey-700);
+    background: var(--bg-card);
+    color: var(--text-primary);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     box-shadow: var(--elevation-card);
-    padding: 6px;
+    padding: 8px;
     display: inline-flex;
-    gap: 6px;
-    z-index: 5;
-    transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+    align-items: center;
+    gap: 10px;
+  z-index: 20;
+  transition: transform 160ms ease, opacity 160ms ease, visibility 0s linear 160ms; /* delay visibility off so it doesn't flicker */
+  --arrow-size: 8px; /* square size before rotation */
 }
-#contact-detail-header .widgets-wrap:hover .widgets-drawer,
-#contact-detail-header .widgets-wrap:focus-within .widgets-drawer,
+
+/* Pointed triangle pointing right */
+#contact-detail-header .widgets-drawer::before,
+#contact-detail-header .widgets-drawer::after {
+  content: "";
+  position: absolute;
+  width: var(--arrow-size);
+  height: var(--arrow-size);
+  transform: rotate(45deg);
+  pointer-events: none;
+  right: calc(-1 * var(--arrow-size) / 2 + 1px);
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/* Border layer */
+#contact-detail-header .widgets-drawer::before {
+  background: var(--border-light);
+}
+
+/* Fill layer */
+#contact-detail-header .widgets-drawer::after {
+  background: var(--bg-card);
+  right: calc(-1 * var(--arrow-size) / 2 + 2px);
+}
+
 #contact-detail-header .widgets-wrap.open .widgets-drawer {
+    transform: translate(0, -50%);
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transform: translateY(-50%) translateX(0); /* keep flush while visible */
+    transition: transform 180ms ease, opacity 180ms ease;
 }
 
-/* Widget icon buttons inside drawer */
+/* Widget icon buttons inside drawer - match scripts page styling */
 #contact-detail-header .widgets-drawer .widget-item {
-    width: 36px;
-    height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: none;
-    border: 1px solid var(--border-light);
-    color: var(--grey-300);
+    width: 36px;
+    height: 36px;
     border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-#contact-detail-header .widgets-drawer .widget-item:hover {
-    background: var(--grey-600);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
     color: var(--text-inverse);
-    border-color: var(--grey-500);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+#contact-detail-header .widgets-drawer .widget-item:hover { 
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 #contact-detail-header .widgets-drawer .widget-item:focus-visible {
     outline: 2px solid var(--orange-muted);
@@ -8378,7 +9739,23 @@ th.drag-over::after {
     pointer-events: none;
 }
 
-/* Account Detail header: same styling as contact detail */
+/* Contact Detail header: qa-btn hover effects */
+#contact-detail-header .qa-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Standardized hover effects for primary buttons (Add Contact/Account buttons) */
+.btn-primary:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Account Detail header: same styling as contact detail - match scripts page styling */
 #account-detail-header #open-widgets {
     display: inline-flex;
     align-items: center;
@@ -8390,6 +9767,11 @@ th.drag-over::after {
     box-sizing: border-box; /* include border in total size */
     border-radius: var(--border-radius);
     vertical-align: middle;
+    background: var(--grey-700);
+    border: 1px solid var(--border-light);
+    color: var(--text-inverse);
+    cursor: pointer;
+    transition: var(--transition-fast);
 }
 #account-detail-header #open-widgets svg {
     width: 18px;
@@ -8398,9 +9780,12 @@ th.drag-over::after {
     pointer-events: none;
 }
 
-/* Prevent hover translate on this icon-only primary button */
+/* Hover effect matching scripts page */
 #account-detail-header #open-widgets:hover {
-    transform: none;
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Widgets drawer container and slide-out behavior */
@@ -8408,55 +9793,82 @@ th.drag-over::after {
     position: relative;
     display: inline-flex;
     align-items: center;
-    /* Hover bridge to the left so users can move into the drawer without losing hover */
-    padding-left: 16px;
-    margin-left: -16px; /* neutralize layout shift */
 }
 #account-detail-header .widgets-drawer {
     position: absolute;
     top: 50%;
-    right: 100%;
-    transform: translateY(-50%) translateX(0); /* flush to button */
+    right: calc(100% + 8px); /* appear to the left of the button */
+    /* Start slightly to the right and fade in so it slides left into place */
+    transform: translate(10px, -50%);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    background: var(--grey-700);
+    background: var(--bg-card);
+    color: var(--text-primary);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     box-shadow: var(--elevation-card);
-    padding: 6px;
+    padding: 8px;
     display: inline-flex;
-    gap: 6px;
-    z-index: 5;
-    transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+    align-items: center;
+    gap: 10px;
+  z-index: 20;
+  transition: transform 160ms ease, opacity 160ms ease, visibility 0s linear 160ms; /* delay visibility off so it doesn't flicker */
+  --arrow-size: 8px; /* square size before rotation */
 }
-#account-detail-header .widgets-wrap:hover .widgets-drawer,
-#account-detail-header .widgets-wrap:focus-within .widgets-drawer,
+
+/* Pointed triangle pointing right */
+#account-detail-header .widgets-drawer::before,
+#account-detail-header .widgets-drawer::after {
+  content: "";
+  position: absolute;
+  width: var(--arrow-size);
+  height: var(--arrow-size);
+  transform: rotate(45deg);
+  pointer-events: none;
+  right: calc(-1 * var(--arrow-size) / 2 + 1px);
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/* Border layer */
+#account-detail-header .widgets-drawer::before {
+  background: var(--border-light);
+}
+
+/* Fill layer */
+#account-detail-header .widgets-drawer::after {
+  background: var(--bg-card);
+  right: calc(-1 * var(--arrow-size) / 2 + 2px);
+}
+
 #account-detail-header .widgets-wrap.open .widgets-drawer {
+    transform: translate(0, -50%);
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transform: translateY(-50%) translateX(0); /* keep flush while visible */
+    transition: transform 180ms ease, opacity 180ms ease;
 }
 
-/* Widget icon buttons inside drawer */
+/* Widget icon buttons inside drawer - match scripts page styling */
 #account-detail-header .widgets-drawer .widget-item {
-    width: 36px;
-    height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: none;
-    border: 1px solid var(--border-light);
-    color: var(--grey-300);
+    width: 36px;
+    height: 36px;
     border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-#account-detail-header .widgets-drawer .widget-item:hover {
-    background: var(--grey-600);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
     color: var(--text-inverse);
-    border-color: var(--grey-500);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+#account-detail-header .widgets-drawer .widget-item:hover { 
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 #account-detail-header .widgets-drawer .widget-item:focus-visible {
     outline: 2px solid var(--orange-muted);
@@ -8467,6 +9879,14 @@ th.drag-over::after {
     height: 18px;
     display: block;
     pointer-events: none;
+}
+
+/* Account Detail header: qa-btn hover effects */
+#account-detail-header .qa-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* People table: company favicon + name layout (mirror Accounts table) */

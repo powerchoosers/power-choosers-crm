@@ -597,6 +597,7 @@
       display: document.getElementById('call-scripts-display'),
       responses: document.getElementById('call-scripts-responses'),
       backBtn: document.getElementById('call-scripts-back'),
+      backToPreviousBtn: document.getElementById('call-scripts-back-to-previous'),
       restartBtn: document.getElementById('call-scripts-restart'),
       toolbar: document.getElementById('call-scripts-toolbar')
     };
@@ -789,9 +790,49 @@
     render();
   }
 
+  function handleBackToPrevious(){
+    console.log('[Call Scripts] Back button clicked, checking navigation source...');
+    
+    // Check if we have a stored navigation source
+    const navigationSource = window._callScriptsNavigationSource;
+    const returnState = window._callScriptsReturn;
+    
+    console.log('[Call Scripts] Navigation source:', navigationSource, 'Return state:', returnState);
+    
+    if (navigationSource && returnState) {
+      // Clear the navigation variables first
+      window._callScriptsNavigationSource = null;
+      window._callScriptsReturn = null;
+      
+      // Navigate back to the source page
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage(navigationSource);
+        
+        // Dispatch restore event after a short delay to ensure page is ready
+        setTimeout(() => {
+          const restoreEvent = new CustomEvent(`pc:${navigationSource}-restore`, {
+            detail: returnState
+          });
+          document.dispatchEvent(restoreEvent);
+          console.log(`[Call Scripts] Dispatched pc:${navigationSource}-restore event with state:`, returnState);
+        }, 100);
+      }
+    } else {
+      // Fallback: go to dashboard if no navigation source
+      console.log('[Call Scripts] No navigation source found, going to dashboard');
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage('dashboard');
+      }
+    }
+  }
+
   function bind(){
-    const { backBtn, restartBtn, toolbar } = els();
+    const { backBtn, backToPreviousBtn, restartBtn, toolbar } = els();
     if (backBtn && !backBtn._bound){ backBtn.addEventListener('click', back); backBtn._bound = true; }
+    if (backToPreviousBtn && !backToPreviousBtn._bound){ 
+      backToPreviousBtn.addEventListener('click', handleBackToPrevious); 
+      backToPreviousBtn._bound = true; 
+    }
     if (restartBtn && !restartBtn._bound){ restartBtn.addEventListener('click', restart); restartBtn._bound = true; }
 
     // Ensure the contact search UI exists under the title

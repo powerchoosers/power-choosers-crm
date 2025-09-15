@@ -12,6 +12,60 @@
     errorMsg: ''
   };
 
+  // Listen for restore event from back button navigation
+  if (!document._accountsRestoreBound) {
+    document.addEventListener('pc:accounts-restore', (ev) => {
+      try {
+        const detail = ev && ev.detail ? ev.detail : {};
+        console.log('[Accounts] Restoring state from back button:', detail);
+        
+        // Restore pagination
+        const targetPage = Math.max(1, parseInt(detail.currentPage || detail.page || state.currentPage || 1, 10));
+        if (targetPage !== state.currentPage) {
+          state.currentPage = targetPage;
+        }
+        
+        // Restore search term
+        if (detail.searchTerm && els.quickSearch) {
+          els.quickSearch.value = detail.searchTerm;
+        }
+        
+        // Restore sorting
+        if (detail.sortColumn) state.sortColumn = detail.sortColumn;
+        if (detail.sortDirection) state.sortDirection = detail.sortDirection;
+        
+        // Re-render with restored state
+        render();
+        
+        // Restore scroll position
+        const y = parseInt(detail.scroll || 0, 10);
+        setTimeout(() => {
+          try { window.scrollTo(0, y); } catch (_) {}
+        }, 100);
+        
+        // Restore selected items
+        if (detail.selectedItems && Array.isArray(detail.selectedItems)) {
+          setTimeout(() => {
+            try {
+              detail.selectedItems.forEach(id => {
+                const checkbox = document.querySelector(`input[data-account-id="${id}"]`);
+                if (checkbox && !checkbox.checked) {
+                  checkbox.checked = true;
+                  checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              });
+            } catch (_) {}
+          }, 150);
+        }
+        
+        console.log('[Accounts] State restored successfully');
+      } catch (e) { 
+        console.error('[Accounts] Error restoring state:', e);
+      }
+    });
+    document._accountsRestoreBound = true;
+  }
+
   // Column order for Accounts table headers (draggable)
   // Must match the headers in crm-dashboard.html (#accounts-table thead)
   const DEFAULT_ACCOUNTS_COL_ORDER = [
@@ -1374,6 +1428,22 @@
   window.getAccountsData = function () {
     try { return Array.isArray(state.data) ? state.data : []; } catch (_) { return []; }
   };
+  function getCurrentState(){
+    return {
+      page: 'accounts',
+      scroll: window.scrollY || 0,
+      currentPage: state.currentPage || 1,
+      filters: {
+        // Add any account-specific filters here
+      },
+      searchTerm: els.quickSearch?.value || '',
+      selectedItems: getSelectedAccounts().map(a => a.id || a.accountId || a._id),
+      sortColumn: state.sortColumn || '',
+      sortDirection: state.sortDirection || 'asc',
+      timestamp: Date.now()
+    };
+  }
+
   window.accountsModule = {
     rebindDynamic: function () {
       try {
@@ -1382,7 +1452,8 @@
         attachEvents();
       } catch (e) { /* noop */ }
     },
-    init
+    init,
+    getCurrentState
   };
 
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
