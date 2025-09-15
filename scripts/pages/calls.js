@@ -1429,6 +1429,132 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     } catch(_) { return String(s||''); }
   }
 
+  function isWeekdayWord(s){
+    const w = String(s||'').toLowerCase();
+    return ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].includes(w);
+  }
+
+  function canonicalizeSupplierName(s){
+    if (!s) return '';
+    const raw = normalizeSupplierTokens(s).trim();
+    const key = raw.replace(/[^a-z0-9]/gi,'').toLowerCase();
+    const map = {
+      'txu':'TXU', 'txuenergy':'TXU',
+      'nrg':'NRG',
+      'reliant':'Reliant', 'reliantenergy':'Reliant',
+      'constellation':'Constellation',
+      'directenergy':'Direct Energy',
+      'greenmountain':'Green Mountain', 'greenmountainenergy':'Green Mountain',
+      'cirro':'Cirro',
+      'engie':'Engie',
+      'shellenergy':'Shell Energy',
+      'championenergy':'Champion Energy', 'champion':'Champion Energy',
+      'gexa':'Gexa',
+      'taraenergy':'Tara Energy', 'apg&e':'APG & E', 'apge':'APG & E'
+    };
+    const canon = map[key] || raw;
+    return isWeekdayWord(canon) ? '' : canon;
+  }
+
+  function getKnownSuppliers(){
+    const out = new Set();
+    try {
+      if (Array.isArray(window.SupplierNames)) {
+        window.SupplierNames.forEach(n => { if (n) out.add(String(n).trim()); });
+      }
+    } catch(_) {}
+    try {
+      const data = window.SupplierData || {};
+      Object.keys(data).forEach(n => { if (n) out.add(String(n).trim()); });
+    } catch(_) {}
+    return out;
+  }
+
+  function acceptSupplierName(s){
+    const canon = canonicalizeSupplierName(s);
+    if (!canon) return '';
+    const known = getKnownSuppliers();
+    // Exact match against known set (case-insensitive by normalizing)
+    const has = (() => {
+      const lc = canon.toLowerCase();
+      for (const name of known){ if (String(name).toLowerCase() === lc) return true; }
+      return false;
+    })();
+    return has ? canon : '';
+  }
+
+  function parseBestRate(t){
+    const s = t.replace(/(\d)\s+(\d)/g, '$1$2');
+    const nums = [];
+    const re = /\b\$?\d{1,2}\.\d{2,3}\b/g;
+    let m; while ((m = re.exec(s))){ nums.push(m[0]); }
+    // Prefer numbers in realistic $/kWh range 0.03–0.25, otherwise choose smallest decimal with 3 digits
+    let pick = '';
+    let best = Infinity;
+    for (const v of nums){ const n = parseFloat(v.replace('$','')); if (n>=0.03 && n<=0.25 && n<best){ best=n; pick=v; } }
+    if (!pick){
+      for (const v of nums){ const n = parseFloat(v.replace('$','')); if (n<best){ best=n; pick=v; } }
+    }
+    if (!pick) return '';
+    const p = pick.startsWith('$') ? pick : ('$'+pick);
+    return /kwh|cents|¢/i.test(s) ? p.replace(/\s+/g,'') : (p.replace(/\s+/g,'') + '/kWh');
+  }
+
+  function wordOrdinalToNumber(word){
+    const map = { first:1, second:2, third:3, fourth:4, fifth:5, sixth:6, seventh:7, eighth:8, ninth:9, tenth:10, eleventh:11, twelfth:12, thirteenth:13, fourteenth:14, fifteenth:15, sixteenth:16, seventeenth:17, eighteenth:18, nineteenth:19, twentieth:20, twentyfirst:21, twentysecond:22, twentythird:23, twentyfourth:24, twentyfifth:25, twentysixth:26, twentyseventh:27, twentyeighth:28, twentyninth:29, thirtieth:30, thirtyfirst:31 };
+    const k = String(word||'').toLowerCase().replace(/\s+/g,'');
+    return map[k] || null;
+  }
+
+  function extractContractFromTranscriptText(text){
+    const out = { currentRate: '', rateType: '', supplier: '', contractEnd: '', usageKWh: '', contractLength: '' };
+    if (!text) return out;
+    const t = normalizeSupplierTokens(String(text));
+    // Rate like 0.075 near "rate" or explicit $/kWh
+    try {
+      const val = parseBestRate(t);
+      if (val) out.currentRate = val;
+    } catch(_) {}
+    // Rate type
+    if (/\bfixed\b/i.test(t)) out.rateType = 'fixed';
+    else if (/\bvariable\b/i.test(t)) out.rateType = 'variable';
+    else if (/\bindex(ed)?\b/i.test(t)) out.rateType = 'indexed';
+    // Supplier
+    try {
+      const supCand = t.match(/\b(?:supplier|utility)\b[^\n\r]{0,40}?([A-Za-z &]+)\b/i)?.[1] || '';
+      const accepted = acceptSupplierName(supCand);
+      if (accepted) out.supplier = accepted;
+    } catch(_) {}
+    // Usage
+    try {
+      const u = t.match(/\b([\d,.]{4,})\s*(kwh|kilowatt\s*hours?)\b/i);
+      if (u) {
+        const num = u[1].replace(/[,\s]/g,'');
+        const formatted = Number(num).toLocaleString();
+        out.usageKWh = `${formatted} kWh`;
+      }
+    } catch(_) {}
+    // Contract end date (Month day, year), allow spoken numbers with spaces
+    try {
+      let s = t.replace(/(\d)\s+(\d)/g, '$1$2');
+      let m = s.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+([0-9]{1,2})(?:st|nd|rd|th)?\s*,?\s*(20\d{2})/i);
+      if (!m) {
+        const m2 = s.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+([A-Za-z\s-]{3,15})\s*,?\s*(20\d{2})/i);
+        if (m2) {
+          const day = wordOrdinalToNumber(m2[2]);
+          if (day) m = [m2[0], m2[1], String(day), m2[3]];
+        }
+      }
+      if (m) out.contractEnd = `${m[1]} ${m[2]}, ${m[3]}`;
+    } catch(_) {}
+    // Term
+    try {
+      const cl = t.match(/\b(\d{1,2})\s*(years?|months?)\b/i);
+      if (cl) out.contractLength = `${cl[1]} ${/year/i.test(cl[2]) ? 'years' : 'months'}`;
+    } catch(_) {}
+    return out;
+  }
+
   // Extract normalized contract fields from AI insights
   function extractContractFromAI(ai){
     const A = ai || {};
@@ -1437,12 +1563,25 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     const result = {
       currentRate: get(c, ['currentRate','current_rate','rate'], ''),
       rateType: get(c, ['rateType','rate_type'], ''),
-      supplier: normalizeSupplierTokens(get(c, ['supplier','utility'], '')),
+      supplier: acceptSupplierName(get(c, ['supplier','utility'], '')),
       contractEnd: get(c, ['contractEnd','contract_end','endDate'], ''),
       usageKWh: get(c, ['usageKWh','usage_k_wh','usage'], ''),
       contractLength: get(c, ['contractLength','contract_length'], '')
     };
     return result;
+  }
+
+  function extractContractFromAll(ai, transcript){
+    const primary = extractContractFromAI(ai);
+    const fallback = extractContractFromTranscriptText(transcript || '');
+    return {
+      currentRate: primary.currentRate || fallback.currentRate,
+      rateType: primary.rateType || fallback.rateType,
+      supplier: primary.supplier || fallback.supplier,
+      contractEnd: primary.contractEnd || fallback.contractEnd,
+      usageKWh: primary.usageKWh || fallback.usageKWh,
+      contractLength: primary.contractLength || fallback.contractLength
+    };
   }
 
   // Resolve account ID for a call row using direct id or by company name lookup
@@ -1457,6 +1596,19 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         return acc && acc.id ? acc.id : '';
       }
     } catch(_) {}
+    try {
+      // Fallback: resolve via contact → account
+      const name = String(r && r.contactName || '').trim();
+      const phone = String(r && (r.contactPhone || r.to || r.from) || '').replace(/\D/g,'').slice(-10);
+      if (typeof window.getPeopleData === 'function'){
+        const people = window.getPeopleData() || [];
+        let person = null;
+        if (name) person = people.find(p => (p.name === name) || ((p.firstName||p.first_name||'') + ' ' + (p.lastName||p.last_name||'')).trim() === name);
+        if (!person && phone) person = people.find(p => String(p.mobile||p.mobile_phone||p.workDirectPhone||p.otherPhone||'').replace(/\D/g,'').slice(-10) === phone);
+        const accId = person && (person.accountId || person.account_id || person.companyId);
+        if (accId) return accId;
+      }
+    } catch(_) {}
     return '';
   }
 
@@ -1464,9 +1616,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   async function persistEnergyFromAI(r){
     try {
       if (!r || !r.aiInsights || r._energySaved) return;
-      const contract = extractContractFromAI(r.aiInsights);
+      const contract = extractContractFromAll(r.aiInsights, r.transcript);
       const payload = {};
-      if (contract.supplier && contract.supplier !== 'Unknown') payload.electricitySupplier = contract.supplier;
+      if (contract.supplier && contract.supplier !== 'Unknown' && !isWeekdayWord(contract.supplier)) payload.electricitySupplier = contract.supplier;
       if (contract.currentRate && contract.currentRate !== 'Unknown') payload.currentRate = contract.currentRate;
       if (contract.contractEnd && contract.contractEnd !== 'Not discussed') payload.contractEndDate = contract.contractEnd;
       if (!Object.keys(payload).length) return;
@@ -1585,7 +1737,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     const get = (obj, keys, d='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; };
     const toArr = (v)=> Array.isArray(v)?v:(v? [v]:[]);
 
-    const contract = (()=>{ const mapped = extractContractFromAI(A); console.log('[Insights Debug] Mapped contract:', mapped); return mapped; })();
+    const contract = (()=>{ const mapped = extractContractFromAll(A, r.transcript); console.log('[Insights Debug] Mapped contract:', mapped); return mapped; })();
 
     const sentiment = get(A, ['sentiment'], 'Unknown');
     const disposition = get(A, ['disposition'], '');
@@ -1597,31 +1749,30 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     const entities = toArr(get(A, ['entities'], []));
     const flags = get(A, ['flags'], {});
 
-    // Summary paragraph + bullet points rendering
-    let summarySource = get(A, ['summary'], r.aiSummary || '');
-    let paragraphText = '';
-    let bulletPoints = [];
-    if (summarySource) {
-      const parts = summarySource.split('•').map(s=>s.trim()).filter(Boolean);
-      paragraphText = parts.length ? parts[0] : summarySource;
-      bulletPoints = parts.slice(1);
-    } else {
-      paragraphText = `Call ${disposition ? `(${disposition.toLowerCase()}) ` : ''}about energy services. ${sentiment} sentiment detected.`;
-      if (contract.supplier && contract.supplier !== 'Unknown') bulletPoints.push(`Current supplier: ${contract.supplier}`);
-      if (contract.currentRate && contract.currentRate !== 'Unknown') bulletPoints.push(`Current rate: ${contract.currentRate}`);
-      if (contract.usageKWh && contract.usageKWh !== 'Not provided') bulletPoints.push(`Usage: ${contract.usageKWh}`);
-      if (contract.contractEnd && contract.contractEnd !== 'Not discussed') bulletPoints.push(`Contract expires: ${contract.contractEnd}`);
-      if (keyTopics.length) bulletPoints.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
-      if (nextStepsArr.length) bulletPoints.push(`Next steps: ${nextStepsArr.slice(0,2).join(', ')}`);
-      if (painPointsArr.length) bulletPoints.push(`Pain points: ${painPointsArr.slice(0,2).join(', ')}`);
-      if (budget && budget !== 'Unclear') bulletPoints.push(`Budget: ${budget}`);
-      if (timeline && timeline !== 'Not specified') bulletPoints.push(`Timeline: ${timeline}`);
-    }
+    // Always build UI summary from structured data
+    let paragraphText = `Conversation ${disposition ? `(${disposition.toLowerCase()}) ` : ''}about energy services. ${sentiment} sentiment detected.`;
+    const bulletPoints = [];
+    if (contract.supplier) bulletPoints.push(`Current supplier: ${contract.supplier}`);
+    if (contract.currentRate) bulletPoints.push(`Current rate: ${contract.currentRate}`);
+    if (contract.usageKWh) bulletPoints.push(`Usage: ${contract.usageKWh}`);
+    if (contract.contractEnd) bulletPoints.push(`Contract expires: ${contract.contractEnd}`);
+    if (contract.rateType) bulletPoints.push(`Rate type: ${contract.rateType}`);
+    if (contract.contractLength) bulletPoints.push(`Term: ${contract.contractLength}`);
+    if (keyTopics.length) bulletPoints.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
+    if (nextStepsArr.length) bulletPoints.push(`Next steps: ${nextStepsArr.slice(0,2).join(', ')}`);
+    if (painPointsArr.length) bulletPoints.push(`Pain points: ${painPointsArr.slice(0,2).join(', ')}`);
+    if (budget && budget !== 'Unclear') bulletPoints.push(`Budget: ${budget}`);
+    if (timeline && timeline !== 'Not specified') bulletPoints.push(`Timeline: ${timeline}`);
 
     // Transcript rendering with consistent speaker/timestamp lines across pages
     const toMMSS = (s)=>{ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; };
     function parseSpeakerTranscript(text){
-      const out=[]; if(!text) return out; const lines=String(text).split(/\r?\n/);
+      const out=[]; if(!text) return out;
+      // Insert line breaks before Speaker/Agent/Customer markers if transcript is one big line
+      let pre = String(text).replace(/\s*(Speaker\s+\d*\s*\d?:\d{2}:)/g, '\n$1')
+                            .replace(/\s*(Agent\s+\d?:\d{2}:)/g, '\n$1')
+                            .replace(/\s*(Customer\s+\d?:\d{2}:)/g, '\n$1');
+      const lines = pre.split(/\r?\n/);
       for(const raw of lines){
         const line = raw.trim(); if(!line) continue;
         // Pattern: "Agent 1:23: text" or "Speaker 0:03: text"
@@ -1635,7 +1786,27 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       return out;
     }
     function renderTranscriptHtml(A, raw){
-      const turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
+      let turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
+      // Fallback: build from conversationalIntelligence sentences if available
+      if (!turns.length) {
+        try {
+          const sentences = Array.isArray(r?.conversationalIntelligence?.sentences) ? r.conversationalIntelligence.sentences : [];
+          if (sentences.length) {
+            const grouped = [];
+            let current = null;
+            for (const s of sentences){
+              const ch = (s.channel != null ? String(s.channel) : '');
+              const role = (ch === '1') ? 'agent' : 'customer';
+              const ts = Math.max(0, Math.floor((s.startTime || 0)));
+              const txt = normalizeSupplierTokens(s.text || s.transcript || '');
+              if (current && current.role === role){ current.text += (current.text?' ':'') + txt; current.t = ts; }
+              else { if (current) grouped.push(current); current = { role, t: ts, text: txt }; }
+            }
+            if (current) grouped.push(current);
+            turns = grouped;
+          }
+        } catch(_) {}
+      }
       if(turns.length){
         const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
         const groups = [];
