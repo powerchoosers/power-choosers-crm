@@ -3613,6 +3613,140 @@ class EmailManager {
         console.log('🧹 New property value:', span.style.getPropertyValue(property));
     }
 
+    // Handle image upload functionality
+    handleImageUpload(editor) {
+        try {
+            if (!editor) {
+                console.warn('[ImageUpload] No editor provided');
+                return;
+            }
+
+            // Create file input
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.style.display = 'none';
+            
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    window.crm?.showToast('Please select an image file');
+                    return;
+                }
+
+                // Validate file size (max 10MB)
+                const maxSize = 10 * 1024 * 1024; // 10MB
+                if (file.size > maxSize) {
+                    window.crm?.showToast('Image file is too large. Maximum size is 10MB');
+                    return;
+                }
+
+                // Read file as data URL
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.insertImageAtCursor(editor, e.target.result, file.name);
+                };
+                reader.onerror = () => {
+                    window.crm?.showToast('Error reading image file');
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // Add to DOM temporarily and trigger click
+            document.body.appendChild(fileInput);
+            fileInput.click();
+            document.body.removeChild(fileInput);
+
+        } catch (error) {
+            console.error('[ImageUpload] Error:', error);
+            window.crm?.showToast('Error uploading image');
+        }
+    }
+
+    // Insert image at current cursor position
+    insertImageAtCursor(editor, imageDataUrl, fileName) {
+        try {
+            if (!editor) {
+                console.warn('[ImageInsert] No editor provided');
+                return;
+            }
+
+            // Ensure editor has focus
+            editor.focus();
+
+            // Create image element
+            const img = document.createElement('img');
+            img.src = imageDataUrl;
+            img.alt = fileName || 'Uploaded image';
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
+            img.style.margin = '8px 0';
+            img.style.borderRadius = '4px';
+            img.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+
+            // Insert at cursor position
+            this.insertElementAtCursor(editor, img);
+
+            // Show success message
+            window.crm?.showToast('Image inserted successfully');
+
+        } catch (error) {
+            console.error('[ImageInsert] Error:', error);
+            window.crm?.showToast('Error inserting image');
+        }
+    }
+
+    // Insert element at current cursor position
+    insertElementAtCursor(editor, element) {
+        try {
+            const selection = window.getSelection();
+            
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                
+                // If there's a selection, delete it first
+                if (!range.collapsed) {
+                    range.deleteContents();
+                }
+                
+                // Insert the element
+                range.insertNode(element);
+                
+                // Move cursor after the inserted element
+                range.setStartAfter(element);
+                range.setEndAfter(element);
+                range.collapse(true);
+                
+                // Clear selection and set new range
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+            } else {
+                // No selection, append to end of editor
+                editor.appendChild(element);
+                
+                // Move cursor to end
+                const range = document.createRange();
+                range.selectNodeContents(editor);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+
+            // Ensure editor maintains focus
+            editor.focus();
+
+        } catch (error) {
+            console.error('[InsertElement] Error:', error);
+            // Fallback: append to end of editor
+            editor.appendChild(element);
+        }
+    }
+
     // Toolbar actions for the compose editor (top bar with icons)
     handleToolbarAction(action, btn, editor, formattingBar, linkBar) {
         try {
@@ -3707,7 +3841,7 @@ class EmailManager {
                     break;
                 }
                 case 'image': {
-                    window.crm?.showToast('Image upload coming soon');
+                    this.handleImageUpload(editor);
                     break;
                 }
                 case 'attach': {

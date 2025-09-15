@@ -2880,6 +2880,32 @@
         const from10 = String(c.from||'').replace(/\D/g,'').slice(-10);
         return nums.includes(to10) || nums.includes(from10);
       }).slice(0, 6);
+      // DEBUG: show mapping coverage
+      try {
+        console.log('[Contact Detail][Recent Calls] Contact:', {
+          contactId,
+          name: [state.currentContact?.firstName, state.currentContact?.lastName].filter(Boolean).join(' ') || state.currentContact?.name,
+          phones: nums
+        });
+        console.log('[Contact Detail][Recent Calls] Filtered calls:', filtered.map(c=>({ id:c.id, to:c.to, from:c.from, contactName:c.contactName, accountName:c.accountName })));
+      } catch(_) {}
+      // Enrich each call with direction and pretty counterparty number like the Calls page
+      const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n=>String(n||'').replace(/\D/g,'').slice(-10)).filter(Boolean) : [];
+      const isBiz = (p)=> bizList.includes(p);
+      const norm = (s)=> String(s||'').replace(/\D/g,'').slice(-10);
+      filtered.forEach(c => {
+        const to10 = norm(c.to);
+        const from10 = norm(c.from);
+        let direction = 'unknown';
+        if (String(c.from||'').startsWith('client:') || isBiz(from10)) direction = 'outbound';
+        else if (String(c.to||'').startsWith('client:') || isBiz(to10)) direction = 'inbound';
+        const counter10 = direction === 'outbound' ? to10 : (direction === 'inbound' ? from10 : (to10 || from10));
+        const pretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
+        c.direction = c.direction || direction;
+        c.counterpartyPretty = c.counterpartyPretty || pretty;
+        c.contactPhone = c.contactPhone || pretty;
+        try { if (window.CRM_DEBUG_CALLS) console.log('[Contact Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
+      });
       if (!filtered.length){ list.innerHTML = '<div class="rc-empty">No recent calls</div>'; return; }
       list.innerHTML = filtered.map(call => rcItemHtml(call)).join('');
       // delegate click to handle dynamic rerenders
@@ -2913,12 +2939,14 @@
     const when = new Date(ts).toLocaleString();
     const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
     const durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
-    const phone = escapeHtml(String(c.to||c.from||''));
+    // Prefer normalized counterparty number computed by calls page; fallback to raw
+    const phone = escapeHtml(String(c.counterpartyPretty || c.contactPhone || c.to || c.from || ''));
+    const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
     return `
       <div class="rc-item">
         <div class="rc-meta">
           <div class="rc-title">${name}${company?` • ${company}`:''}</div>
-          <div class="rc-sub">${when} • ${durStr} • ${phone}</div>
+          <div class="rc-sub">${when} • ${durStr} • ${phone}${direction?` • ${direction}`:''}</div>
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>

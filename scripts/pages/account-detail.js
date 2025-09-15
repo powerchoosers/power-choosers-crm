@@ -482,6 +482,23 @@
       });
       
       if (!filtered.length){ list.innerHTML = '<div class="rc-empty">No recent calls</div>'; return; }
+
+      // Enrich for direction/number like Calls page for consistent UI
+      const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n=>String(n||'').replace(/\D/g,'').slice(-10)).filter(Boolean) : [];
+      const isBiz = (p)=> bizList.includes(p);
+      const norm = (s)=> String(s||'').replace(/\D/g,'').slice(-10);
+      filtered.forEach(c => {
+        const to10 = norm(c.to);
+        const from10 = norm(c.from);
+        let direction = 'unknown';
+        if (String(c.from||'').startsWith('client:') || isBiz(from10)) direction = 'outbound';
+        else if (String(c.to||'').startsWith('client:') || isBiz(to10)) direction = 'inbound';
+        const counter10 = direction === 'outbound' ? to10 : (direction === 'inbound' ? from10 : (to10 || from10));
+        const pretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
+        c.direction = c.direction || direction;
+        c.counterpartyPretty = c.counterpartyPretty || pretty;
+        try { console.log('[Account Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
+      });
       list.innerHTML = filtered.map(call => rcItemHtml(call)).join('');
       list.querySelectorAll('.rc-insights').forEach(btn => {
         btn.addEventListener('click', (e) => {
