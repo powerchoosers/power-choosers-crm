@@ -156,6 +156,14 @@ CONTEXT AWARENESS:
 
   const bizContext = `About Power Choosers (for positioning only): ${companyOverview}`;
 
+  const priorityDirectives = `Content PRIORITY order (use what is present, skip what isn't):
+1) TOP PRIORITY: Call transcript insights (summarize, do not quote sensitive specifics)
+2) Energy contract details (supplier, rate, contract end Month YYYY, usage)
+3) Notes content (what was discussed or pain points)
+4) Title/role for relevance
+5) Account city/state (do not use contact's city/state)
+Ensure the opening hook uses the highest available priority data. If transcript exists, derive the hook from it.`;
+
   const subjectGuidelines = `Subject line requirements:
 - The FIRST LINE must begin with "Subject:" followed by the subject text.
 - Keep it tight: aim under ~50 characters; make it specific.
@@ -273,6 +281,7 @@ ${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist
     common,
     recipientContext,
     bizContext,
+    priorityDirectives,
     dateGuidelines,
     brevityGuidelines,
     painPointGuidelines,
