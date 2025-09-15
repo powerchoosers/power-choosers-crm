@@ -1845,12 +1845,13 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       if (turns.length) {
         const hasKnownRoles = turns.some(t => t && (t.role === 'agent' || t.role === 'customer'));
         if (!hasKnownRoles) {
+          const patched = [];
           let next = 'customer';
-          turns = turns.map(t => ({
-            t: Number(t.t) || 0,
-            role: next === 'agent' ? 'agent' : 'customer',
-            text: t.text || ''
-          })).map(u => { next = (next === 'agent' ? 'customer' : 'agent'); return u; });
+          for (const t of turns){
+            patched.push({ t: Number(t.t) || 0, role: next, text: t.text || '' });
+            next = (next === 'agent') ? 'customer' : 'agent';
+          }
+          turns = patched;
         }
       }
       // Helper: heuristic splitter when only one generic "Speaker" or no diarization at all

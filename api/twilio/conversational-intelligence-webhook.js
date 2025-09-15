@@ -248,6 +248,12 @@ export default async function handler(req, res) {
                 if (!Array.isArray(aiInsights.speakerTurns) || !aiInsights.speakerTurns.length) {
                   aiInsights.speakerTurns = buildSpeakerTurnsFromSentences(sentences);
                 }
+                // Also attach CI metadata so the UI can render reliably
+                aiInsights.conversationalIntelligence = {
+                  transcriptSid: TranscriptSid,
+                  status: transcript.status,
+                  sentenceCount: Array.isArray(sentences) ? sentences.length : 0
+                };
             }
             
             // Update the call data in the central store (ensure we use a real Call SID to avoid duplicates)
