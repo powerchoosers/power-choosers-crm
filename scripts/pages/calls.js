@@ -148,6 +148,15 @@
   }
 
 'use strict';
+(function bootstrapDebugFlags(){
+  try {
+    if (window.CRM_DEBUG_CALLS == null) window.CRM_DEBUG_CALLS = true;
+    if (window.CRM_DEBUG_TRANSCRIPTS == null) window.CRM_DEBUG_TRANSCRIPTS = true;
+    if (window.CRM_DEBUG_LIVE == null) window.CRM_DEBUG_LIVE = true;
+  } catch(_) {}
+})();
+
+function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console, arguments); } catch(_) {} }
 (function () {
   const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] } };
   const els = {};
@@ -748,8 +757,33 @@
               if (acct){ company = acct.accountName || acct.name || acct.companyName || ''; debug.companySource = 'accounts.byPhone'; }
             }
 
-            // Pretty print phone
-            const contactPhone = party ? `+1 (${party.slice(0,3)}) ${party.slice(3,6)}-${party.slice(6)}` : '';
+            // Determine direction and counterparty number (for display and columns)
+            const to10 = normPhone(c.to);
+            const from10 = normPhone(c.from);
+            const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(normPhone).filter(Boolean) : [];
+            const isBizNum = (p) => bizList.includes(p);
+            let direction = 'unknown';
+            if (isClientAddr(c.from) || isBizNum(from10)) direction = 'outbound';
+            else if (isClientAddr(c.to) || isBizNum(to10)) direction = 'inbound';
+            const counter10 = direction === 'outbound' ? to10 : (direction === 'inbound' ? from10 : party);
+            const counterPretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
+            // Pretty print phone (backwards-compat field)
+            const contactPhone = counterPretty;
+
+            // DEBUG: per-call enrichment
+            dbgCalls('[Calls][enrich]', {
+              id,
+              to: c.to,
+              from: c.from,
+              to10,
+              from10,
+              direction,
+              counter10,
+              counterPretty,
+              resolvedContactId,
+              contactName,
+              company
+            });
 
             // Fallback: Generate a contact ID if none was found
             if (!resolvedContactId && contactName) {
@@ -845,6 +879,9 @@
               company,
               contactEmail,
               contactPhone,
+              counterparty: counter10,
+              counterpartyPretty: counterPretty,
+              direction,
               contactCity,
               contactState,
               contactSeniority,
@@ -887,6 +924,7 @@
             return row;
           });
           // Always use API data, even if empty
+          dbgCalls('[Calls] Rows mapped count:', rows.length);
           state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
           return;
         } else {
@@ -1020,6 +1058,23 @@
   }
 
   function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
+    // DEBUG: header sanity and row sample
+    try {
+      const header = document.querySelector('#calls-table thead tr');
+      if (window.CRM_DEBUG_CALLS && header) {
+        const cols = Array.from(header.children).map(th => (th.textContent||'').trim());
+        console.log('[Calls][header]', cols);
+      }
+      if (window.CRM_DEBUG_CALLS && rows.length) {
+        console.log('[Calls][render sample]', {
+          id: rows[0].id,
+          name: rows[0].contactName,
+          company: rows[0].company,
+          number: rows[0].counterpartyPretty || rows[0].contactPhone,
+          direction: rows[0].direction
+        });
+      }
+    } catch(_) {}
     // row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
     els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',(e)=>{
@@ -1255,12 +1310,17 @@
       </span>';
     })();
 
+    // New columns: Number and Direction
+    const numberCell = escapeHtml(r.counterpartyPretty || r.contactPhone || String(r.to||r.from||''));
+    const directionCell = escapeHtml((r.direction || '').charAt(0).toUpperCase() + (r.direction || '').slice(1));
     return `
     <tr>
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
       <td class="name-cell" data-contact-id="${r.contactId || ''}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${name}</span></div></td>
       <td>${title}</td>
       <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.replaceWith((window.__pcAccountsIcon && window.__pcAccountsIcon()) || document.createRange().createContextualFragment(\'${safeAccountIcon}\').firstChild)" />` : `${safeAccountIcon}`}<span class="company-name">${company}</span></span></a></td>
+      <td>${numberCell}</td>
+      <td>${directionCell || '—'}</td>
       <td>${callTimeStr}</td>
       <td>${dur}</td>
       <td><span class="outcome-badge outcome-${outcome.toLowerCase().replace(' ', '-')}">${outcome}</span></td>
@@ -1313,6 +1373,13 @@
       .pc-transcript{color:var(--text-secondary);max-height:360px;overflow:auto;border:1px solid var(--border-light);padding:12px;border-radius:8px;background:var(--bg-card);font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:13px;line-height:1.35}
     `; document.head.appendChild(style);
   }
+
+  // Lightweight terminal-visible heartbeat for live insights (polling stub)
+  try {
+    if (window.CRM_DEBUG_LIVE) {
+      console.log('[LiveInsights] Debug enabled');
+    }
+  } catch(_) {}
   function closeInsightsModal(){
     const bd=document.querySelector('.pc-insights-backdrop'); if(bd&&bd.parentNode) bd.parentNode.removeChild(bd);
     const md=document.querySelector('.pc-insights-modal'); if(md&&md.parentNode) md.parentNode.removeChild(md);
@@ -1333,6 +1400,26 @@
     console.log('[Call Insights] AI Summary:', r.aiSummary);
     console.log('[Call Insights] Transcript:', r.transcript);
     console.log('[Call Insights] AI Insights:', r.aiInsights);
+    // DEBUG: verify all insight sections present
+    try {
+      const A = r.aiInsights || {};
+      const completeness = {
+        sentiment: !!A.sentiment,
+        disposition: !!A.disposition,
+        keyTopics: Array.isArray(A.keyTopics) && A.keyTopics.length>0,
+        nextSteps: Array.isArray(A.nextSteps) && A.nextSteps.length>0,
+        painPoints: Array.isArray(A.painPoints) && A.painPoints.length>0,
+        contract: !!A.contract,
+        entities: Array.isArray(A.entities) && A.entities.length>0,
+        flags: !!A.flags
+      };
+      console.log('[Call Insights][completeness]', completeness);
+      if (window.CRM_DEBUG_TRANSCRIPTS) {
+        const turns = Array.isArray(A.speakerTurns) ? A.speakerTurns : [];
+        const sample = turns.slice(0, 6).map(t=>({ role:t.role, t:t.t, text:(t.text||'').slice(0,80) }));
+        console.log('[Call Insights][speakerTurns sample]', sample);
+      }
+    } catch(_) {}
     const bd=document.createElement('div'); bd.className='pc-insights-backdrop'; bd.addEventListener('click', closeInsightsModal);
     const md=document.createElement('div'); md.className='pc-insights-modal';
     md.innerHTML = `
@@ -1917,6 +2004,37 @@
     attachEvents(); 
     injectCallsBulkStyles(); 
     loadData(); 
+
+    // Ensure table header has Number and Direction columns (idempotent)
+    try {
+      const table = document.getElementById('calls-table');
+      const thead = table ? table.querySelector('thead tr') : null;
+      if (thead && !thead._pcNumberDirection) {
+        const headers = Array.from(thead.children).map(th => (th.textContent||'').trim().toLowerCase());
+        const ensureTh = (label, afterLabel) => {
+          if (headers.includes(label.toLowerCase())) return;
+          const th = document.createElement('th');
+          th.textContent = label;
+          // Insert after a specific column if found; otherwise append near time
+          let ref = null;
+          if (afterLabel) {
+            for (const child of thead.children) {
+              if ((child.textContent||'').trim().toLowerCase() === afterLabel.toLowerCase()) { ref = child.nextSibling; break; }
+            }
+          }
+          if (!ref) {
+            for (const child of thead.children) {
+              if ((child.textContent||'').trim().toLowerCase().includes('company')) { ref = child.nextSibling; break; }
+            }
+          }
+          thead.insertBefore(th, ref);
+        };
+        // Add Number right after Company, Direction after Number
+        ensureTh('Number', 'Company');
+        ensureTh('Direction', 'Number');
+        thead._pcNumberDirection = true;
+      }
+    } catch (_) { /* noop */ }
     
     // Listen for restore events from back navigation
     document.addEventListener('pc:calls-restore', (e) => {
