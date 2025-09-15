@@ -1288,6 +1288,22 @@
     return raw; // too short; leave as typed
   }
 
+  // Format phone numbers for display
+  function formatPhoneForDisplay(phone) {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '');
+    // Always display US numbers with +1 prefix
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    }
+    if (cleaned.length === 10) {
+      return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    }
+    // If the input already starts with + and is not US length, leave as-is
+    if (/^\+/.test(String(phone))) return String(phone);
+    return phone; // Fallback: return as-is
+  }
+
   function showContactDetail(contactId, tempContact) {
     if (!initDomRefs()) return;
     
@@ -2904,6 +2920,18 @@
         c.direction = c.direction || direction;
         c.counterpartyPretty = c.counterpartyPretty || pretty;
         c.contactPhone = c.contactPhone || pretty;
+        // Fill missing names from current contact/account context
+        try {
+          if (!c.contactName) {
+            const fullName = [state.currentContact?.firstName, state.currentContact?.lastName].filter(Boolean).join(' ') || state.currentContact?.name;
+            if (fullName) c.contactName = fullName;
+          }
+          if (!c.accountName) {
+            // Try to resolve account from contact
+            const acctName = state.currentContact?.companyName || state.currentContact?.accountName || '';
+            if (acctName) c.accountName = acctName;
+          }
+        } catch(_) {}
         try { if (window.CRM_DEBUG_CALLS) console.log('[Contact Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
       });
       if (!filtered.length){ list.innerHTML = '<div class="rc-empty">No recent calls</div>'; return; }
@@ -3252,6 +3280,12 @@
       if (numericValue) {
         text = escapeHtml(numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ','));
       }
+    }
+    
+    // Format phone numbers for display
+    if ((field === 'phone' || field === 'mobile' || field === 'workDirectPhone' || field === 'otherPhone' || field === 'companyPhone') && value && String(value).trim()) {
+      const formattedPhone = formatPhoneForDisplay(value);
+      text = escapeHtml(formattedPhone);
     }
     
     const span = document.createElement('span');

@@ -80,6 +80,63 @@
 
   function escapeHtml(s){return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
 
+  // Parse a date string in MM/DD/YYYY or YYYY-MM-DD into a Date at local midnight
+  function parseDateStrict(dateStr){
+    if(!dateStr) return null;
+    try{
+      if(dateStr.includes('/')){
+        const parts = dateStr.split('/').map(n=>parseInt(n,10));
+        if(parts.length===3 && !parts.some(isNaN)) return new Date(parts[2], parts[0]-1, parts[1]);
+      } else if(dateStr.includes('-')){
+        const parts = dateStr.split('-').map(n=>parseInt(n,10));
+        if(parts.length===3 && !parts.some(isNaN)) return new Date(parts[0], parts[1]-1, parts[2]);
+      }
+      const d = new Date(dateStr);
+      if(!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }catch(_){ /* noop */ }
+    return null;
+  }
+
+  // Parse a time like "10:30 AM" into minutes since midnight; NaN if invalid/missing
+  function parseTimeToMinutes(timeStr){
+    if(!timeStr || typeof timeStr!=='string') return NaN;
+    const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if(!m) return NaN;
+    let hour = parseInt(m[1],10);
+    const min = parseInt(m[2],10);
+    const ap = m[3].toUpperCase();
+    if(hour===12) hour = 0; // 12AM -> 0, 12PM handled below
+    if(ap==='PM') hour += 12;
+    return hour*60 + min;
+  }
+
+  // Sort tasks chronologically by due date then due time
+  function sortTasksChronologically(arr){
+    return arr.slice().sort((a,b)=>{
+      const da = parseDateStrict(a.dueDate);
+      const db = parseDateStrict(b.dueDate);
+      if(da && db){
+        const dd = da - db;
+        if(dd!==0) return dd;
+      } else if(da && !db){
+        return -1;
+      } else if(!da && db){
+        return 1;
+      }
+      const ta = parseTimeToMinutes(a.dueTime);
+      const tb = parseTimeToMinutes(b.dueTime);
+      const taValid = !isNaN(ta), tbValid = !isNaN(tb);
+      if(taValid && tbValid){
+        const td = ta - tb; if(td!==0) return td;
+      } else if(taValid && !tbValid){
+        return -1;
+      } else if(!taValid && tbValid){
+        return 1;
+      }
+      return (a.createdAt||0) - (b.createdAt||0);
+    });
+  }
+
   function initDomRefs(){
     els.page = document.getElementById('tasks-page'); if(!els.page) return false;
     els.table = document.getElementById('tasks-table');
@@ -127,7 +184,9 @@
     // Merge with user tasks first (top priority), then LinkedIn tasks that aren't duplicates by id
     const nonDupLinkedIn = linkedInTasks.filter(li => !userTasks.some(u => u.id === li.id));
     const rows = [...userTasks, ...nonDupLinkedIn];
-    state.data = rows; state.filtered = rows.slice(); render();
+    state.data = rows;
+    state.filtered = sortTasksChronologically(rows);
+    render();
   }
 
   function getLinkedInTasksFromSequences() {
@@ -196,7 +255,8 @@
     let arr = state.data.slice();
     if(state.filterMode==='pending') arr = arr.filter(r=>r.status==='pending');
     else if(state.filterMode==='completed') arr = arr.filter(r=>r.status==='completed');
-    state.filtered = arr; state.currentPage=1; state.selected.clear();
+    state.filtered = sortTasksChronologically(arr);
+    state.currentPage=1; state.selected.clear();
     render();
   }
 
@@ -204,7 +264,7 @@
 
   function paginate(){ if(!els.pag) return; const total=state.filtered.length; const pages=Math.max(1,Math.ceil(total/state.pageSize)); state.currentPage=Math.min(state.currentPage,pages); if(els.summary){ const st=total===0?0:(state.currentPage-1)*state.pageSize+1; const en=Math.min(state.currentPage*state.pageSize,total); els.summary.textContent=`${st}-${en} of ${total}`; } let html=''; const btn=(l,d,p)=>`<button class="page-btn" ${d?'disabled':''} data-page="${p}">${l}</button>`; html+=btn('Prev',state.currentPage===1,state.currentPage-1); for(let p=1;p<=pages;p++){ html+=`<button class="page-btn ${p===state.currentPage?'active':''}" data-page="${p}">${p}</button>`;} html+=btn('Next',state.currentPage===pages,state.currentPage+1); els.pag.innerHTML=html; els.pag.querySelectorAll('.page-btn').forEach(b=>b.addEventListener('click',()=>{ const n=parseInt(b.getAttribute('data-page')||'1',10); if(!isNaN(n)&&n>=1&&n<=pages){ state.currentPage=n; render(); }})); }
 
-  function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML = rows.map(r=>rowHtml(r)).join('');
+  function render(){ if(!els.tbody) return; state.filtered = sortTasksChronologically(state.filtered); const rows=getPageItems(); els.tbody.innerHTML = rows.map(r=>rowHtml(r)).join('');
     // Row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
     els.tbody.querySelectorAll('button.btn-success').forEach(btn=>btn.addEventListener('click',()=>{ const id = btn.getAttribute('data-id'); const rec = state.data.find(x=>x.id===id); if(rec){ rec.status='completed'; 

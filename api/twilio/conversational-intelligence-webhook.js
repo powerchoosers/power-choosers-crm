@@ -24,78 +24,104 @@ function parseBody(req) {
 function pick(obj, keys, d='') { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return d; }
 function toArr(v){ return Array.isArray(v)?v:(v? [v]:[]); }
 
-export default async function handler(req, res){
-  if (cors(req, res)) return;
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
+// Helpers shared by both Operator and CI paths
+function normalizeSupplierTokens(s){
   try {
-    const body = parseBody(req) || {};
-    // Twilio Operator payloads are flexible; allow nesting under Payload.Result
-    const op = body.Payload?.Result || body.result || body || {};
+    if (!s) return '';
+    let out = String(s);
+    out = out.replace(/\bT\s*X\s*U\b/gi, 'TXU');
+    out = out.replace(/\bN\s*R\s*G\b/gi, 'NRG');
+    out = out.replace(/\bT\s*X\s*you\b/gi, 'TXU');
+    return out;
+  } catch(_) { return String(s||''); }
+}
 
-    // Attempt to identify callSid from multiple places
-    const callSid = pick(body, ['CallSid','callSid','call_sid','customerKey','customer_key','customer_key_sid']) || pick(op, ['CallSid','callSid','call_sid','customerKey']);
-    if (!callSid) {
-      return res.status(400).json({ error: 'Missing callSid' });
-    }
+function canonicalizeSupplierName(s){
+  if (!s) return '';
+  const raw = normalizeSupplierTokens(s).trim();
+  const key = raw.replace(/[^a-z0-9]/gi,'').toLowerCase();
+  const map = {
+    'txu':'TXU', 'txuenergy':'TXU',
+    'nrg':'NRG',
+    'reliant':'Reliant', 'reliantenergy':'Reliant',
+    'constellation':'Constellation',
+    'directenergy':'Direct Energy',
+    'greenmountain':'Green Mountain', 'greenmountainenergy':'Green Mountain',
+    'cirro':'Cirro',
+    'engie':'Engie',
+    'shellenergy':'Shell Energy',
+    'championenergy':'Champion Energy', 'champion':'Champion Energy',
+    'gexa':'Gexa',
+    'taraenergy':'Tara Energy', 'apg&e':'APG & E', 'apge':'APG & E',
+  };
+  return map[key] || raw;
+}
 
-    // Build aiInsights by normalizing snake_case to camelCase
-    const contractIn = op.contract || {};
-    console.log('[Webhook Debug] Original operator contract data:', contractIn);
-    console.log('[Webhook Debug] Full operator data (op):', JSON.stringify(op, null, 2));
-    const contract = {
-      currentRate: pick(contractIn, ['currentRate','current_rate','rate']),
-      rateType: pick(contractIn, ['rateType','rate_type']),
-      supplier: pick(contractIn, ['supplier']),
-      contractEnd: pick(contractIn, ['contractEnd','contract_end']),
-      usageKWh: pick(contractIn, ['usage_k_wh','usageK_wh','usageKWh','usage']),
-      contractLength: pick(contractIn, ['contractLength','contract_length'])
-    };
-
-    // Guard supplier: ignore weekday strings accidentally extracted
+function extractContractFromTranscript(text){
+  const out = { currentRate: '', rateType: '', supplier: '', contractEnd: '', usageKWh: '', contractLength: '' };
+  if (!text) return out;
+  const t = normalizeSupplierTokens(String(text));
+  // Rate: $0.078/kWh or 0.078 near 'rate'
+  try {
+    const rateKw = /(rate|price)[^\n\r]{0,30}?([$]?\s*\d{1,2}(?:\.\d{1,3})?\s*(?:cents|¢|\$?\/?\s*kwh))/i;
+    const m1 = t.match(rateKw);
+    const m2 = t.match(/\b\$?\s*(\d{1,2}\.\d{2,3})\b\s*(?:cents|¢|\/?\s*kwh)/i);
+    const val = (m1 && m1[2]) || (m2 && m2[1] ? `$${m2[1]}/kWh` : '');
+    if (val) out.currentRate = val.replace(/\s+/g,'').replace(/\$/,'$');
+  } catch(_) {}
+  // Rate type
+  if (/\bfixed\b/i.test(t)) out.rateType = 'fixed';
+  else if (/\bvariable\b/i.test(t)) out.rateType = 'variable';
+  else if (/\bindex(ed)?\b/i.test(t)) out.rateType = 'indexed';
+  // Supplier candidates
+  try {
+    const supCand = t.match(/\b(?:supplier|utility)\b[^\n\r]{0,30}?([A-Za-z &]+)\b/)?.[1] || '';
+    const normalized = canonicalizeSupplierName(supCand);
     const WEEKDAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-    console.log('[Webhook Debug] Original supplier:', contract.supplier);
-    if (contract.supplier && WEEKDAYS.includes(String(contract.supplier).toLowerCase())) {
-      console.log('[Webhook Debug] Filtering out weekday supplier:', contract.supplier);
-      contract.supplier = '';
+    if (normalized && !WEEKDAYS.includes(normalized.toLowerCase())) out.supplier = normalized;
+  } catch(_) {}
+  // Usage
+  try {
+    const u = t.match(/\b([\d,.]{3,})\s*(kwh|kilowatt\s*hours?)\b/i);
+    if (u) {
+      const num = u[1].replace(/,/g,'');
+      const formatted = Number(num).toLocaleString();
+      out.usageKWh = `${formatted} kWh`;
     }
-    console.log('[Webhook Debug] Final supplier:', contract.supplier);
+  } catch(_) {}
+  // Contract end: month name + day + year (allow spaces in digits)
+  try {
+    let s = t.replace(/(\d)\s+(\d)/g, '$1$2');
+    const m = s.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+([0-9]{1,2})(?:st|nd|rd|th)?\s*,?\s*(20\d{2})/i);
+    if (m) out.contractEnd = `${m[1]} ${m[2]}, ${m[3]}`;
+  } catch(_) {}
+  // Contract length
+  try {
+    const cl = t.match(/\b(\d{1,2})\s*(?:year|years|month|months)\b/i);
+    if (cl) out.contractLength = `${cl[1]} ${/year/i.test(cl[0]) ? 'years' : 'months'}`;
+  } catch(_) {}
+  return out;
+}
 
-    const aiInsights = {
-      source: 'twilio-operator',
-      sentiment: pick(op, ['sentiment'], 'Unknown'),
-      disposition: pick(op, ['disposition'], ''),
-      keyTopics: toArr(pick(op, ['key_topics','keyTopics'], [])),
-      nextSteps: toArr(pick(op, ['next_steps','nextSteps'], [])),
-      painPoints: toArr(pick(op, ['pain_points','painPoints'], [])),
-      budget: pick(op, ['budget'], ''),
-      timeline: pick(op, ['timeline'], ''),
-      contract,
-      flags: {
-        recordingDisclosure: !!pick(op.flags||{}, ['recording_disclosure','recordingDisclosure'], false),
-        escalationRequest: !!pick(op.flags||{}, ['escalation_request','escalationRequest'], false),
-        doNotContact: !!pick(op.flags||{}, ['do_not_contact','doNotContact'], false),
-        nonEnglish: !!pick(op.flags||{}, ['non_english','nonEnglish'], false),
-        voicemailDetected: !!pick(op.flags||{}, ['voicemail_detected','voicemailDetected'], false),
-        callTransfer: !!pick(op.flags||{}, ['call_transfer','callTransfer'], false)
-      },
-      entities: toArr(op.entities || []),
-      summary: pick(op, ['summary','conversation_summary','Conversation Summary'], '')
-    };
-
-    // Post into central calls store
-    const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
-    await fetch(`${base}/api/calls`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ callSid, aiInsights })
-    }).catch(()=>{});
-
-    return res.status(200).json({ ok: true });
-  } catch (e) {
-    console.error('[Operator Webhook] Error:', e);
-    return res.status(500).json({ error: 'Failed to process operator webhook', details: e?.message });
+function buildSpeakerTurnsFromSentences(sentences){
+  const turns = [];
+  if (!Array.isArray(sentences) || !sentences.length) return turns;
+  let current = null;
+  for (const s of sentences){
+    const ch = (s.channel != null ? String(s.channel) : '');
+    const role = (ch === '1') ? 'agent' : 'customer';
+    const t = Math.max(0, Math.floor((s.startTime || 0))); // seconds
+    const text = s.text || s.transcript || '';
+    if (current && current.role === role) {
+      current.text += (current.text ? ' ' : '') + text;
+      current.t = t;
+    } else {
+      if (current) turns.push(current);
+      current = { role, t, text };
+    }
   }
+  if (current) turns.push(current);
+  return turns;
 }
 
 const twilio = require('twilio');
@@ -207,6 +233,21 @@ export default async function handler(req, res) {
             let aiInsights = null;
             if (transcriptText) {
                 aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, operatorResults);
+                // Add normalized contract fields from transcript if missing or weak
+                const contractFromText = extractContractFromTranscript(transcriptText);
+                aiInsights.contract = {
+                  ...(aiInsights.contract || {}),
+                  currentRate: aiInsights.contract?.currentRate || contractFromText.currentRate || '',
+                  rateType: aiInsights.contract?.rateType || contractFromText.rateType || '',
+                  supplier: canonicalizeSupplierName(aiInsights.contract?.supplier || contractFromText.supplier || ''),
+                  contractEnd: aiInsights.contract?.contractEnd || contractFromText.contractEnd || '',
+                  usageKWh: aiInsights.contract?.usageKWh || contractFromText.usageKWh || '',
+                  contractLength: aiInsights.contract?.contractLength || contractFromText.contractLength || ''
+                };
+                // Derive grouped speaker turns from sentences when diarization is not present
+                if (!Array.isArray(aiInsights.speakerTurns) || !aiInsights.speakerTurns.length) {
+                  aiInsights.speakerTurns = buildSpeakerTurnsFromSentences(sentences);
+                }
             }
             
             // Update the call data in the central store (ensure we use a real Call SID to avoid duplicates)
