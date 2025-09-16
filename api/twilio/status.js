@@ -94,12 +94,17 @@ export default async function handler(req, res) {
                 const ordered = [...pstnList, ...Array.from(candidates)];
                 console.log('[Status] Candidate priority order:', { pstnFirst: pstnList, others: Array.from(candidates) });
 
-                // Try candidates in priority order; skip if dual already exists
-                for (const sid of ordered) {
-                    try {
-                        const existing = await client.calls(sid).recordings.list({ limit: 5 });
-                        const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');
-                        if (hasDual) { console.log('[Status] Dual recording already active on', sid); return; }
+                        // Try candidates in priority order; skip if ANY recording exists to avoid interference
+                        for (const sid of ordered) {
+                            try {
+                                const existing = await client.calls(sid).recordings.list({ limit: 5 });
+                                const hasAnyRecording = existing.some(r => r.status !== 'stopped');
+                                if (hasAnyRecording) { 
+                                    console.log('[Status] Recording already exists on', sid, '- skipping REST API fallback to avoid interference'); 
+                                    return; 
+                                }
+                                const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');
+                                if (hasDual) { console.log('[Status] Dual recording already active on', sid); return; }
 
                         // Safety: stop active mono recording so dual can start
                         const active = existing.find(r => r.status !== 'stopped');

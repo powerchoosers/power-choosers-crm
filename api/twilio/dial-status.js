@@ -50,6 +50,7 @@ export default async function handler(req, res) {
     });
 
     // Start dual-channel recording when answered/in-progress/completed (to catch edge cases)
+    // IMPORTANT: Only start REST API recording if NO TwiML recording exists to avoid interference
     if ((event === 'in-progress' || event === 'answered' || event === 'completed') && targetSid) {
       console.log('[Dial-Status] Event triggered, checking for existing recordings before starting REST fallback...');
       try {
@@ -113,7 +114,7 @@ export default async function handler(req, res) {
           for (let i = 0; i < candList.length; i++) {
             const sid = candList[i];
             try {
-              // Skip if a recording already exists and is dual
+              // Check for ANY existing recording (not just dual) to avoid interference
               const existing = await client.calls(sid).recordings.list({ limit: 5 });
               console.log('[Dial-Status] Existing recordings on', sid, ':', existing.map(r => ({ 
                 sid: r.sid, 
@@ -122,6 +123,17 @@ export default async function handler(req, res) {
                 source: r.source,
                 track: r.track 
               })));
+              
+              // Skip if ANY recording exists (TwiML or REST) to avoid interference
+              const hasAnyRecording = existing.some(r => r.status !== 'stopped');
+              if (hasAnyRecording) { 
+                console.log('[Dial-Status] Recording already exists on', sid, '- skipping REST API fallback to avoid interference'); 
+                started = true; 
+                startedOn = sid; 
+                channelsSeen = 2; 
+                break; 
+              }
+              
               const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');
               if (hasDual) { console.log('[Dial-Status] Dual recording already active on', sid); started = true; startedOn = sid; channelsSeen = 2; break; }
 
