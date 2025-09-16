@@ -42,13 +42,8 @@ export default async function handler(req, res) {
             action: `${base}/api/twilio/dial-complete`,
             statusCallback: `${base}/api/twilio/dial-status`,
             statusCallbackEvent: 'initiated ringing answered completed',
-            statusCallbackMethod: 'POST',
-            // Backup: Enable Dial recording while dial-status provides dual-channel fallback
-            record: 'record-from-answer',
-            recordingStatusCallback: `${base}/api/twilio/recording`,
-            recordingStatusCallbackMethod: 'POST',
-            recordingChannels: 'dual',
-            recordingTrack: 'both'
+            statusCallbackMethod: 'POST'
+            // NO recording - let dial-status handle dual-channel on child leg
         });
         
         // Add the target number with no retry logic

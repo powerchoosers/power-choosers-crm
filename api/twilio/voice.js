@@ -32,8 +32,8 @@ export default async function handler(req, res) {
 
         if (isInboundToBusiness) {
             // INBOUND CALL: Ring the browser client (identity: agent)
-            // Requires client token with incomingAllow: true and a connected browser
-            // Pass original caller number as custom parameter since Twilio client always shows business number as "From"
+            // NOTE: For client calls, we DISABLE Dial recording because it records the wrong leg
+            // We'll use dial-status webhook to record the PSTN child leg when needed
             const dial = twiml.dial({
                 callerId: From || businessNumber, // Use caller's number, fallback to business number
                 timeout: 30,
@@ -44,13 +44,8 @@ export default async function handler(req, res) {
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
-                statusCallbackMethod: 'POST',
-                // Backup: Enable Dial recording while dial-status provides dual-channel fallback
-                record: 'record-from-answer',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST',
-                recordingChannels: 'dual',
-                recordingTrack: 'both'
+                statusCallbackMethod: 'POST'
+                // NO recording attributes - let dial-status handle it on the right leg
             });
             // Small prompt to keep caller informed
             twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
@@ -76,13 +71,8 @@ export default async function handler(req, res) {
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
-                statusCallbackMethod: 'POST',
-                // Backup: Enable Dial recording while dial-status provides dual-channel fallback
-                record: 'record-from-answer',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST',
-                recordingChannels: 'dual',
-                recordingTrack: 'both'
+                statusCallbackMethod: 'POST'
+                // NO recording - let dial-status handle dual-channel on child leg
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -99,13 +89,8 @@ export default async function handler(req, res) {
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
-                statusCallbackMethod: 'POST',
-                // Backup: Enable Dial recording while dial-status provides dual-channel fallback
-                record: 'record-from-answer',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST',
-                recordingChannels: 'dual',
-                recordingTrack: 'both'
+                statusCallbackMethod: 'POST'
+                // NO recording - let dial-status handle dual-channel on child leg
             });
             dial.client('agent');
         }
