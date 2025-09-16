@@ -53,7 +53,7 @@ export default async function handler(req, res) {
             // Return to our handler after dial completes
             action: `${base}/api/twilio/dial-complete`,
             statusCallback: `${base}/api/twilio/dial-status`,
-            statusCallbackEvent: 'answered completed',
+            statusCallbackEvent: 'answered',
             // TwiML recording flags
             record: 'record-from-answer',
             recordingStatusCallback: `${base}/api/twilio/recording`,

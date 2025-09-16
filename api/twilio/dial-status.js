@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     }
     if (!body || typeof body !== 'object') body = {};
 
-    const event = (body.CallStatus || body.DialCallStatus || '').toLowerCase();
+    const event = (body.CallStatus || body.DialCallStatus || body.DialStatus || '').toLowerCase();
     const parentSid = body.CallSid || '';
     const childSid = body.DialCallSid || '';
     console.log('[Dial-Status]', { event, parentSid, childSid, from: body.From, to: body.To });
