@@ -178,7 +178,11 @@ export default async function handler(req, res) {
                 status: 'completed',
                 timestamp: new Date().toISOString(),
                 transcript: null,
-                aiInsights: null
+                aiInsights: null,
+                // Store dual-channel recording metadata
+                recordingChannels: body.RecordingChannels || body.Channels || '1',
+                recordingTrack: body.RecordingTrack || 'inbound',
+                recordingSource: body.RecordingSource || body.Source || 'unknown'
             };
 
             callStore.set(CallSid, callData);

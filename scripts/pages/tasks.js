@@ -176,16 +176,62 @@
     }
   }
 
-  function loadData(){
-    // Build from real sources only: LinkedIn sequence tasks + user tasks from localStorage
+  async function loadData(){
+    // Build from real sources: Firebase tasks + localStorage tasks + LinkedIn sequence tasks
     const linkedInTasks = getLinkedInTasksFromSequences();
     let userTasks = [];
-    try { userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]'); } catch(_) { userTasks = []; }
-    // Merge with user tasks first (top priority), then LinkedIn tasks that aren't duplicates by id
-    const nonDupLinkedIn = linkedInTasks.filter(li => !userTasks.some(u => u.id === li.id));
-    const rows = [...userTasks, ...nonDupLinkedIn];
+    let firebaseTasks = [];
+    
+    // Load from localStorage
+    try { 
+      userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]'); 
+    } catch(_) { 
+      userTasks = []; 
+    }
+    
+    // Load from Firebase
+    try {
+      if (window.firebaseDB) {
+        const snapshot = await window.firebaseDB.collection('tasks')
+          .orderBy('timestamp', 'desc')
+          .limit(100)
+          .get();
+        firebaseTasks = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id, 
+            ...data,
+            // Ensure we have the required fields with proper fallbacks
+            createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+            // Ensure status is set
+            status: data.status || 'pending'
+          };
+        });
+      }
+    } catch (error) {
+      console.warn('Could not load tasks from Firebase:', error);
+    }
+    
+    // Debug logging
+    console.log(`[Tasks] Loaded ${userTasks.length} tasks from localStorage, ${firebaseTasks.length} tasks from Firebase`);
+    
+    // Merge all tasks, prioritizing localStorage over Firebase for duplicates
+    const allTasks = [...userTasks];
+    
+    // Add Firebase tasks that aren't already in localStorage
+    firebaseTasks.forEach(fbTask => {
+      if (!userTasks.some(ut => ut.id === fbTask.id)) {
+        allTasks.push(fbTask);
+      }
+    });
+    
+    // Add LinkedIn tasks that aren't duplicates
+    const nonDupLinkedIn = linkedInTasks.filter(li => !allTasks.some(t => t.id === li.id));
+    const rows = [...allTasks, ...nonDupLinkedIn];
+    
     state.data = rows;
     state.filtered = sortTasksChronologically(rows);
+    console.log(`[Tasks] Total tasks loaded: ${rows.length}`);
     render();
   }
 
@@ -632,13 +678,19 @@
     }));
   }
 
-  function init(){ if(!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); loadData(); bindUpdates(); }
+  async function init(){ if(!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); await loadData(); bindUpdates(); }
 
   // Listen for cross-page task updates and refresh immediately
   function bindUpdates(){
-    window.addEventListener('tasksUpdated', () => {
-      // Rebuild from localStorage + LinkedIn tasks
-      loadData();
+    window.addEventListener('tasksUpdated', async () => {
+      // Rebuild from localStorage + Firebase + LinkedIn tasks
+      await loadData();
+    });
+    
+    // Listen for auto-task events from other pages
+    window.addEventListener('pc:auto-task', async (event) => {
+      const { title, type, contact, account, dueDate, dueTime, notes } = event.detail;
+      await createTask({ title, type, priority: 'medium', contact, account, dueDate, dueTime, notes });
     });
   }
   

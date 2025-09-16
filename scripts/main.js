@@ -367,6 +367,18 @@ class PowerChoosersCRM {
             }, 50);
         }
         
+        // Tasks page - ensure data is loaded from Firebase and localStorage
+        if (pageName === 'tasks') {
+            setTimeout(() => {
+                // Trigger a refresh of tasks data when navigating to tasks page
+                if (window.dispatchEvent) {
+                    window.dispatchEvent(new CustomEvent('tasksUpdated', { 
+                        detail: { source: 'navigation' } 
+                    }));
+                }
+            }, 50);
+        }
+        
         // Lists page - ensure overview is shown by default
         if (pageName === 'lists') {
             // Make sure we show the overview, not any detail view

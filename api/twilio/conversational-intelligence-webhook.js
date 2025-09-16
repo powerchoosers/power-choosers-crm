@@ -237,11 +237,21 @@ export default async function handler(req, res) {
                     confidence: s.confidence,
                     startTime: s.startTime,
                     endTime: s.endTime,
-                    channel: s.channel
+                    channel: s.channel,
+                    // Map channel to speaker role (Channel 1 = Agent, Channel 2 = Customer)
+                    speaker: s.channel === 1 ? 'Agent' : s.channel === 2 ? 'Customer' : `Channel ${s.channel}`
                 }));
                 
                 transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
+                
+                // Create formatted transcript with speaker labels for better display
+                const formattedTranscript = sentences
+                    .filter(s => s.text && s.text.trim())
+                    .map(s => `${s.speaker}: ${s.text.trim()}`)
+                    .join('\n\n');
+                
                 console.log(`[Conversational Intelligence Webhook] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
+                console.log(`[Conversational Intelligence Webhook] Formatted transcript with speaker labels: ${formattedTranscript.length} chars`);
             } catch (error) {
                 console.error('[Conversational Intelligence Webhook] Error fetching sentences:', error);
             }
@@ -308,13 +318,18 @@ export default async function handler(req, res) {
                         body: JSON.stringify({
                             callSid: finalCallSid,
                             transcript: transcriptText,
+                            formattedTranscript: formattedTranscript, // Include formatted transcript with speaker labels
                             aiInsights: aiInsights,
                             conversationalIntelligence: {
                                 transcriptSid: TranscriptSid,
                                 status: transcript.status,
                                 sentences: sentences,
                                 operatorResults: operatorResults,
-                                serviceSid: ServiceSid
+                                serviceSid: ServiceSid,
+                                speakerMapping: {
+                                    channel1: 'Agent',
+                                    channel2: 'Customer'
+                                }
                             }
                         })
                     });
