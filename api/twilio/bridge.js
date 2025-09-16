@@ -26,6 +26,28 @@ export default async function handler(req, res) {
             return;
         }
         
+        // Seed the Calls API with correct phone context for this CallSid
+        try {
+            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+            const twilioBiz = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
+            const businessPhone = twilioBiz;
+            const target10 = norm(target);
+            const payload = {
+                callSid: CallSid,
+                to: target,
+                from: twilioBiz,
+                status: 'in-progress',
+                targetPhone: target10,
+                businessPhone
+            };
+            // Fire-and-forget; don't block TwiML
+            fetch(`${base}/api/calls`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(()=>{});
+        } catch(_) {}
+
         // Create TwiML to bridge the call
         const twiml = new VoiceResponse();
         // Note: We don't start recording on parent leg as it creates mono recordings

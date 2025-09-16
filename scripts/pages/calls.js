@@ -812,7 +812,15 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             let direction = 'unknown';
             if (isClientAddr(c.from) || isBizNum(from10)) direction = 'outbound';
             else if (isClientAddr(c.to) || isBizNum(to10)) direction = 'inbound';
-            const counter10 = direction === 'outbound' ? to10 : (direction === 'inbound' ? from10 : party);
+            // Fallback using server-provided targetPhone (when business list not configured)
+            if (direction === 'unknown') {
+              const tp = normPhone(c.targetPhone);
+              if (tp) {
+                if (tp === to10 && from10) direction = 'outbound';
+                else if (tp === from10 && to10) direction = 'inbound';
+              }
+            }
+            const counter10 = direction === 'outbound' ? (to10 || party) : (direction === 'inbound' ? (from10 || party) : party);
             const counterPretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
             // Pretty print phone (backwards-compat field)
             const contactPhone = counterPretty;
@@ -885,10 +893,16 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               
               console.log('[Calls] Looking for contact by phone:', lookupNum, 'Normalized:', partyNorm, 'People data count:', people.length);
               
-              const foundContact = people.find(p => {
-                const phoneNorms = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone].map(norm);
-                return phoneNorms.includes(partyNorm);
-              });
+              // Only attempt phone matching if we have a full 10-digit counterparty
+              let foundContact = null;
+              if (partyNorm && partyNorm.length === 10) {
+                foundContact = people.find(p => {
+                  const phoneNorms = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone]
+                    .map(norm)
+                    .filter(n => n && n.length === 10);
+                  return phoneNorms.includes(partyNorm);
+                });
+              }
               
               if (foundContact) {
                 if (!contactName) contactName = [foundContact.firstName, foundContact.lastName].filter(Boolean).join(' ') || foundContact.name || '';
