@@ -21,8 +21,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
         // Return recent calls with AI insights
         const calls = Array.from(callStore.values())
-            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-            .slice(0, 50);
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             
         return res.status(200).json({
             ok: true,

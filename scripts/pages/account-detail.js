@@ -481,10 +481,40 @@
       .pc-kv{ display:grid; grid-template-columns:160px 1fr; gap:8px 12px; }
       .pc-kv .k{ color:var(--text-secondary); font-size:12px }
       .pc-kv .v{ color:var(--text-primary); font-size:12px }
-      .pc-transcript { color:var(--text-secondary); max-height:260px; overflow:auto; border:1px solid var(--border-light); padding:10px; border-radius:8px; background:var(--bg-card); font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; line-height:1.35 }
+      /* Modern 2025 Transcript Styling */
+      .pc-transcript-container { background: var(--bg-card); border:1px solid var(--border-light); border-radius: 14px; padding:14px; max-height:320px; overflow:auto; }
+      .transcript-message { display:flex; gap:10px; margin-bottom:12px; align-items:flex-start; }
+      .transcript-message:last-child { margin-bottom:0; }
+      .transcript-avatar { flex-shrink:0; }
+      .transcript-avatar-circle { width: 32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12px; letter-spacing:.5px; }
+      .transcript-avatar-circle.agent-avatar { background: var(--orange-subtle); color:#fff; }
+      .transcript-avatar-circle.contact-avatar { background: var(--orange-subtle); color:#fff; }
+      .transcript-avatar-circle.company-avatar { background: var(--bg-item); padding:2px; }
+      .transcript-avatar-circle.company-avatar img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
+      .transcript-avatar-circle .company-favicon-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); }
+      .transcript-content { flex:1; min-width:0; border:1px solid var(--border-light); border-radius:10px; padding:10px 12px; background: var(--bg-item); }
+      .transcript-message.customer .transcript-content { background: var(--bg-card); }
+      .transcript-header { display:flex; align-items:center; gap:8px; margin-bottom:2px; }
+      .transcript-speaker { font-weight:600; font-size:12px; color:var(--text-primary); }
+      .transcript-time { font-size:11px; color:var(--text-secondary); }
+      .transcript-text { font-size:13px; line-height:1.5; color:var(--text-primary); word-wrap:break-word; }
     `;
     document.head.appendChild(style);
   }
+
+  // Avatar helpers (reuse calls page patterns)
+  function ad_getAgentAvatar(){ return `<div class=\"transcript-avatar-circle agent-avatar\" aria-hidden=\"true\">Y</div>`; }
+  function ad_getContactAvatar(contactName, call){
+    const domain = ad_extractDomainFromAccount(call && (call.accountName || ''));
+    if (domain){
+      const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class=\"company-favicon\" aria-hidden=\"true\" style=\"display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);\"></span>';
+      return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\"><img src=\"https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}\" alt=\"\" referrerpolicy=\"no-referrer\" loading=\"lazy\" onerror=\"this.style.display='none'; var n=this.nextElementSibling; if(n){ n.style.display='flex'; }\">${fb}</div>`;
+    }
+    const initial = (String(contactName||'C').charAt(0) || 'C').toUpperCase();
+    return `<div class=\"transcript-avatar-circle contact-avatar\" aria-hidden=\"true\">${initial}</div>`;
+  }
+  function ad_extractDomainFromAccount(name){ if(!name) return ''; try{ const key=String(name).trim().toLowerCase(); if(typeof window.getAccountsData==='function'){ const accounts=window.getAccountsData()||[]; const hit=accounts.find(a=>String(a.name||a.accountName||'').trim().toLowerCase()===key); const dom=hit&&(hit.domain||hit.website||''); if(dom) return String(dom).replace(/^https?:\/\//,'').replace(/\/$/,''); } }catch(_){} return ''; }
+  function ad_normalizeSupplierTokens(s){ try{ if(!s) return ''; let out=String(s); out=out.replace(/\bT\s*X\s*U\b/gi,'TXU'); out=out.replace(/\bN\s*R\s*G\b/gi,'NRG'); out=out.replace(/\breliant\b/gi,'Reliant'); return out; }catch(_){ return s||''; } }
 
   async function loadRecentCallsForAccount(){
     const list = document.getElementById('account-recent-calls-list');
@@ -658,66 +688,33 @@
   function animateCollapse(el, done){ const h=el.scrollHeight; el.style.height=h+'px'; el.style.opacity='1'; requestAnimationFrame(()=>{ el.classList.add('collapsing'); el.style.transition='height 140ms ease, opacity 140ms ease'; el.style.height='0px'; el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('collapsing'); done&&done(); },160); }); }
   function insightsInlineHtml(r){
     const AI = r.aiInsights || {};
-    // Build comprehensive summary with bullet points
-    let summaryText = r.aiSummary || '';
-    if (!summaryText && AI && Object.keys(AI).length) {
-      const contract = AI.contract || {};
-      const supplier = get(contract, ['supplier'], '');
-      const rate = get(contract, ['current_rate'], '');
-      const usage = get(contract, ['usage_k_wh'], '');
-      const contractEnd = get(contract, ['contract_end'], '');
-      const keyTopics = toArr(AI.keyTopics || []);
-      const nextSteps = toArr(AI.nextSteps || []);
-      const painPoints = toArr(AI.painPoints || []);
-      const budget = AI.budget || '';
-      const timeline = AI.timeline || '';
+    // Build summary: prefer Twilio Operator summary, then fallback to constructed paragraph
+    let paragraph = '';
+    let bulletItems = [];
+    const rawTwilioSummary = (AI && typeof AI.summary === 'string') ? AI.summary.trim() : '';
+    if (rawTwilioSummary) {
+      // Twilio format: "Paragraph. • Bullet 1 • Bullet 2 ..."
+      const parts = rawTwilioSummary.split(' • ').map(s=>s.trim()).filter(Boolean);
+      paragraph = parts.shift() || '';
+      bulletItems = parts;
+    } else if (r.aiSummary && String(r.aiSummary).trim()) {
+      paragraph = String(r.aiSummary).trim();
+    } else if (AI && Object.keys(AI).length) {
       const sentiment = AI.sentiment || 'Unknown';
-      const disposition = AI.disposition || 'Unknown';
-      
-      // Create paragraph summary
-      let paragraph = `Call with ${disposition.toLowerCase()} disposition`;
-      if (supplier && supplier !== 'Unknown') {
-        paragraph += ` regarding energy services with ${supplier}`;
-      } else {
-        paragraph += ` about energy services`;
-      }
-      paragraph += `. ${sentiment} sentiment detected.`;
-      
-      // Create bullet points
-      const bullets = [];
-      if (supplier && supplier !== 'Unknown') {
-        bullets.push(`Current supplier: ${supplier}`);
-      }
-      if (rate && rate !== 'Unknown') {
-        bullets.push(`Current rate: ${rate}`);
-      }
-      if (usage && usage !== 'Not provided') {
-        bullets.push(`Usage: ${usage}`);
-      }
-      if (contractEnd && contractEnd !== 'Not discussed') {
-        bullets.push(`Contract expires: ${contractEnd}`);
-      }
-      if (keyTopics.length > 0) {
-        bullets.push(`Topics discussed: ${keyTopics.slice(0,3).join(', ')}`);
-      }
-      if (nextSteps.length > 0) {
-        bullets.push(`Next steps: ${nextSteps.slice(0,2).join(', ')}`);
-      }
-      if (painPoints.length > 0) {
-        bullets.push(`Pain points: ${painPoints.slice(0,2).join(', ')}`);
-      }
-      if (budget && budget !== 'Unclear' && budget !== '') {
-        bullets.push(`Budget: ${budget}`);
-      }
-      if (timeline && timeline !== 'Not specified' && timeline !== '') {
-        bullets.push(`Timeline: ${timeline}`);
-      }
-      
-      // Combine paragraph and bullets
-      summaryText = paragraph + (bullets.length > 0 ? ' • ' + bullets.join(' • ') : '');
-    } else if (!summaryText) {
-      summaryText = 'No summary available';
+      const disposition = AI.disposition || '';
+      const topics = Array.isArray(AI.keyTopics) ? AI.keyTopics.slice(0,3).join(', ') : '';
+      const who = r.contactName ? `Call with ${r.contactName}` : 'Call';
+      let p = `${who}`;
+      if (disposition) p += ` — ${disposition.toLowerCase()} disposition`;
+      if (topics) p += `. Topics: ${topics}`;
+      if (sentiment) p += `. ${sentiment} sentiment.`;
+      paragraph = p;
+    } else {
+      paragraph = 'No summary available';
     }
+    // Filter bullets to avoid redundancy with right-hand sections (energy, topics, steps, pain, entities, budget, timeline)
+    const redundant = /(current rate|rate type|supplier|utility|contract|usage|term|budget|timeline|topic|next step|pain point|entities?)/i;
+    const filteredBullets = (bulletItems||[]).filter(b => b && !redundant.test(b)).slice(0,6);
     const sentiment = AI.sentiment || 'Unknown';
     const disposition = AI.disposition || '';
     const keyTopics = Array.isArray(AI.keyTopics) ? AI.keyTopics : [];
@@ -736,7 +733,24 @@
     const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
     const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
     const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
-    const transcriptText = r.transcript || (AI && Object.keys(AI).length ? 'Transcript processing...' : 'Transcript not available');
+    function toMMSS(s){ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; }
+    function renderTranscriptHtml(A, raw){
+      let turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
+      if (turns.length && !turns.some(t=>t && (t.role==='agent'||t.role==='customer'))){
+        let next='customer';
+        turns = turns.map(t=>({ t:Number(t.t)||0, role: next = (next==='agent'?'customer':'agent'), text: t.text||'' }));
+      }
+      if (turns.length){
+        const contactFirst = (String(r.contactName||r.accountName||'').trim().split(/\s+/)[0]) || 'Customer';
+        const groups=[]; let current=null;
+        for(const t of turns){ const roleKey=t.role==='agent'?'agent':(t.role==='customer'?'customer':'other'); const text=ad_normalizeSupplierTokens(t.text||''); const ts=Number(t.t)||0; if(current && current.role===roleKey){ current.texts.push(text); current.end=ts; } else { if(current) groups.push(current); current={ role:roleKey, start:ts, texts:[text] }; } }
+        if(current) groups.push(current);
+        return groups.map(g=>{ const label=g.role==='agent'?'You':(g.role==='customer'?contactFirst:'Speaker'); const avatar=g.role==='agent'?ad_getAgentAvatar():ad_getContactAvatar(contactFirst, r); return `<div class=\"transcript-message ${g.role}\"><div class=\"transcript-avatar\">${avatar}</div><div class=\"transcript-content\"><div class=\"transcript-header\"><span class=\"transcript-speaker\">${label}</span><span class=\"transcript-time\">${toMMSS(g.start)}</span></div><div class=\"transcript-text\">${escapeHtml(g.texts.join(' ').trim())}</div></div></div>`; }).join('');
+      }
+      const rawText = String(raw||'').trim();
+      if (rawText) return `<div class=\"transcript-message\"><div class=\"transcript-content\"><div class=\"transcript-text\">${escapeHtml(rawText)}</div></div></div>`;
+      return 'Transcript not available';
+    }
     
     // DEBUG: Log transcript data for debugging
     console.log('[Account Detail] Call transcript debug:', {
@@ -747,7 +761,7 @@
       transcriptPreview: r.transcript ? r.transcript.substring(0, 100) : 'N/A',
       hasAI: !!AI,
       aiKeys: AI ? Object.keys(AI) : [],
-      finalTranscriptText: transcriptText
+      finalTranscriptRenderedPreview: (function(){ try{ return (renderTranscriptHtml(AI, r.transcript) || '').slice(0, 100); }catch(_){ return 'N/A'; } })()
     });
     const rec = r.audioUrl || r.recordingUrl || '';
     let proxied = '';
@@ -783,14 +797,15 @@
               AI Call Summary
             </h4>
             <div class=\"pc-chips\" style=\"margin:6px 0 10px 0;\">${chips}</div>
-            <div style=\"color:var(--text-secondary); line-height:1.5;\">${escapeHtml(summaryText)}</div>
+            <div style=\"color:var(--text-secondary); line-height:1.5; margin-bottom:8px;\">${escapeHtml(paragraph)}</div>
+            ${filteredBullets.length ? `<ul class=\"summary-bullets\" style=\"margin:0; padding-left:18px; color:var(--text-secondary);\">${filteredBullets.map(b=>`<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
           </div>
           <div class=\"ip-card\" style=\"margin-top:12px;\">
             <h4>
               <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>
               Call Transcript
             </h4>
-            <div class=\"pc-transcript\">${escapeHtml(transcriptText)}</div>
+            <div class=\"pc-transcript-container\">${renderTranscriptHtml(AI, r.transcript)}</div>
           </div>
         </div>
         <div>
