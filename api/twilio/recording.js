@@ -219,6 +219,7 @@ export default async function handler(req, res) {
                 const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
 
                 if (finalCallSid) {
+                    // Initial upsert with best-known fields (may be refined later)
                     await fetch(`${baseUrl}/api/calls`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -229,12 +230,49 @@ export default async function handler(req, res) {
                             status: 'completed',
                             duration: parseInt(RecordingDuration) || parseInt(callResource?.duration, 10) || 0,
                             recordingUrl: recordingMp3Url,
+                            // Include recording metadata for UI rendering
+                            recordingChannels: (body.RecordingChannels != null ? String(body.RecordingChannels) : (body.Channels != null ? String(body.Channels) : '')) || undefined,
+                            recordingTrack: body.RecordingTrack || undefined,
+                            recordingSource: body.RecordingSource || body.Source || undefined,
                             source: 'twilio-recording-webhook',
                             targetPhone: targetPhone || undefined,
                             businessPhone: businessPhone || undefined
                         })
                     }).catch(() => {});
                     console.log('[Recording] Posted initial call data to /api/calls for', finalCallSid);
+
+                    // If duration is 0 or metadata looked incomplete, schedule a follow-up refresh
+                    try {
+                        const needsRefresh = !RecordingDuration || String(RecordingDuration) === '0';
+                        if (needsRefresh && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && (effectiveRecordingSid || RecordingSid)) {
+                            setTimeout(async () => {
+                                try {
+                                    const client2 = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                                    const recRes = await client2.recordings((effectiveRecordingSid || RecordingSid)).fetch();
+                                    const finalDuration = parseInt(recRes.duration, 10) || 0;
+                                    const finalChannels = recRes.channels != null ? String(recRes.channels) : undefined;
+                                    const finalTrack = recRes.track || undefined;
+                                    const finalSource = recRes.source || undefined;
+                                    if (finalDuration || finalChannels || finalTrack || finalSource) {
+                                        await fetch(`${baseUrl}/api/calls`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                callSid: finalCallSid,
+                                                duration: finalDuration,
+                                                recordingChannels: finalChannels,
+                                                recordingTrack: finalTrack,
+                                                recordingSource: finalSource
+                                            })
+                                        }).catch(() => {});
+                                        console.log('[Recording] Refreshed call with final duration/metadata:', { finalDuration, finalChannels, finalTrack, finalSource });
+                                    }
+                                } catch (re) {
+                                    console.warn('[Recording] Follow-up Recording fetch failed:', re?.message);
+                                }
+                            }, 6000); // allow processing time
+                        }
+                    } catch(_) {}
                 } else {
                     console.warn('[Recording] Skipping initial /api/calls post due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
                 }
