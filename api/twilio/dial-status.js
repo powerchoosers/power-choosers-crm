@@ -50,9 +50,12 @@ export default async function handler(req, res) {
     });
 
     // Start dual-channel recording when answered/in-progress/completed (to catch edge cases)
-    // IMPORTANT: Only start REST API recording if NO TwiML recording exists to avoid interference
+    // IMPORTANT: Only start REST API recording if NO TwiML DialVerb recording exists to avoid interference
     if ((event === 'in-progress' || event === 'answered' || event === 'completed') && targetSid) {
-      console.log('[Dial-Status] Event triggered, checking for existing recordings before starting REST fallback...');
+      console.log('[Dial-Status] Event triggered, will check for DialVerb recordings after 5-second delay...');
+      
+      // Wait 5 seconds for TwiML recording to appear in REST API, then check for DialVerb recording
+      setTimeout(async () => {
       try {
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
         const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -114,7 +117,7 @@ export default async function handler(req, res) {
           for (let i = 0; i < candList.length; i++) {
             const sid = candList[i];
             try {
-              // Check for ANY existing recording (not just dual) to avoid interference
+              // Check specifically for DialVerb recordings (TwiML dual-channel)
               const existing = await client.calls(sid).recordings.list({ limit: 5 });
               console.log('[Dial-Status] Existing recordings on', sid, ':', existing.map(r => ({ 
                 sid: r.sid, 
@@ -124,10 +127,10 @@ export default async function handler(req, res) {
                 track: r.track 
               })));
               
-              // Skip if ANY recording exists (TwiML or REST) to avoid interference
-              const hasAnyRecording = existing.some(r => r.status !== 'stopped');
-              if (hasAnyRecording) { 
-                console.log('[Dial-Status] Recording already exists on', sid, '- skipping REST API fallback to avoid interference'); 
+              // Skip REST API fallback if DialVerb recording exists (TwiML dual-channel)
+              const hasDialVerbRecording = existing.some(r => r.source === 'DialVerb' && r.status !== 'stopped');
+              if (hasDialVerbRecording) { 
+                console.log('[Dial-Status] DialVerb recording already exists on', sid, '- skipping REST API fallback to avoid interference'); 
                 started = true; 
                 startedOn = sid; 
                 channelsSeen = 2; 
@@ -215,6 +218,7 @@ export default async function handler(req, res) {
       } catch (e) { 
         console.warn('[Dial-Status] Failed to start recording:', e?.message); 
       }
+      }, 5000); // 5-second delay as recommended by Twilio
     } else if (!childSid && event === 'answered') {
       console.warn('[Dial-Status] No DialCallSid available for recording - Dial may not be configured properly');
     }
