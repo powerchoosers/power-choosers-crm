@@ -1,7 +1,7 @@
 const twilio = require('twilio');
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
     // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -52,6 +52,8 @@ export default function handler(req, res) {
             timeLimit: 14400,      // 4 hours max call duration
             // Return to our handler after dial completes
             action: `${base}/api/twilio/dial-complete`,
+            statusCallback: `${base}/api/twilio/dial-status`,
+            statusCallbackEvent: 'answered completed',
             // TwiML recording flags
             record: 'record-from-answer',
             recordingStatusCallback: `${base}/api/twilio/recording`,
