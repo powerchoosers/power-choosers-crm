@@ -71,6 +71,7 @@ export default async function handler(req, res) {
             RecordingUrl: RecordingUrl || '(none)'
         });
         try { console.log('[Recording] Raw body:', JSON.stringify(body).slice(0, 1200)); } catch(_) {}
+        try { if (body && (body.RecordingChannels || body.RecordingTrack)) console.log('[Recording] Channels/Track:', body.RecordingChannels || '(n/a)', body.RecordingTrack || '(n/a)'); } catch(_) {}
         
         // If the recording is completed but RecordingUrl is missing, attempt to fetch it by CallSid
         let effectiveRecordingUrl = RecordingUrl || '';
