@@ -55,7 +55,12 @@ export default async function handler(req, res) {
             statusCallback: `${base}/api/twilio/dial-status`,
             statusCallbackEvent: 'initiated ringing answered completed',
             statusCallbackMethod: 'POST',
-            // Do not record from parent leg; recording will start on child leg via webhook
+            // Record via Dial as primary; webhook will still try child leg if needed
+            record: 'record-from-answer',
+            recordingStatusCallback: `${base}/api/twilio/recording`,
+            recordingStatusCallbackMethod: 'POST',
+            recordingChannels: 'dual',
+            recordingTrack: 'both'
         });
         
         // Add the target number with no retry logic
