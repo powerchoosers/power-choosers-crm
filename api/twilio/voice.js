@@ -58,7 +58,7 @@ export default async function handler(req, res) {
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
-                statusCallbackEvent: 'answered completed',
+                statusCallbackEvent: 'answered',
                 // TwiML recording flags
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
                 timeLimit: 14400,
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
-                statusCallbackEvent: 'answered completed',
+                statusCallbackEvent: 'answered',
                 // TwiML recording flags
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
@@ -109,7 +109,7 @@ export default async function handler(req, res) {
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
-                statusCallbackEvent: 'answered completed',
+                statusCallbackEvent: 'answered',
                 // TwiML recording flags
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
