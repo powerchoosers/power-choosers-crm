@@ -50,14 +50,14 @@ export default function handler(req, res) {
             answerOnBridge: true,  // This ensures proper audio bridging
             hangupOnStar: false,
             timeLimit: 14400,      // 4 hours max call duration
-            // Recording config (dual-channel for diarization)
+            // Return to our handler after dial completes
+            action: `${base}/api/twilio/dial-complete`,
+            // TwiML recording flags
             record: 'record-from-answer',
             recordingStatusCallback: `${base}/api/twilio/recording`,
             recordingStatusCallbackMethod: 'POST',
             recordingChannels: 'dual',
-            recordingTrack: 'both',
-            // Return to our handler after dial completes
-            action: `${base}/api/twilio/dial-complete`
+            recordingTrack: 'both'
         });
         
         // Add the target number with no retry logic
@@ -67,9 +67,11 @@ export default function handler(req, res) {
         
         console.log(`[Bridge] TwiML generated to connect to ${target}`);
         
-        // Send TwiML response
+        // Send TwiML response (log for verification)
+        const xml = twiml.toString();
+        try { console.log('[Bridge TwiML]', xml); } catch(_) {}
         res.setHeader('Content-Type', 'text/xml');
-        res.status(200).send(twiml.toString());
+        res.status(200).send(xml);
         
     } catch (error) {
         console.error('Bridge webhook error:', error);

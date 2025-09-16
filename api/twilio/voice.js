@@ -56,7 +56,13 @@ export default async function handler(req, res) {
                 hangupOnStar: false,
                 timeLimit: 14400,
                 // action must return TwiML; use dial-complete endpoint
-                action: `${base}/api/twilio/dial-complete`
+                action: `${base}/api/twilio/dial-complete`,
+                // TwiML recording flags
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST',
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
             // Small prompt to keep caller informed
             try { twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.'); } catch(_) {}
@@ -79,7 +85,13 @@ export default async function handler(req, res) {
                 answerOnBridge: true,
                 hangupOnStar: false,
                 timeLimit: 14400,
-                action: `${base}/api/twilio/dial-complete`
+                action: `${base}/api/twilio/dial-complete`,
+                // TwiML recording flags
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST',
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -91,14 +103,22 @@ export default async function handler(req, res) {
                 timeout: 30,
                 answerOnBridge: true,
                 // action must return TwiML; use dial-complete endpoint
-                action: `${base}/api/twilio/dial-complete`
+                action: `${base}/api/twilio/dial-complete`,
+                // TwiML recording flags
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST',
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
             dial.client('agent');
         }
         
         // Send TwiML response
+        const xml = twiml.toString();
+        try { console.log('[Voice TwiML]', xml); } catch(_) {}
         res.setHeader('Content-Type', 'text/xml');
-        res.status(200).send(twiml.toString());
+        res.status(200).send(xml);
         
     } catch (error) {
         console.error('Voice webhook error:', error);
