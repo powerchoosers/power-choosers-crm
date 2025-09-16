@@ -2026,17 +2026,52 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           }
         } catch(_) {}
       }
-      // If we have turns but roles are blank/unknown, alternate roles agent/customer
+      // If we have turns but roles are blank/unknown, prefer rebuilding from CI sentences using channelRoleMap
       if (turns.length) {
         const hasKnownRoles = turns.some(t => t && (t.role === 'agent' || t.role === 'customer'));
         if (!hasKnownRoles) {
-          const patched = [];
-          let next = 'customer';
-          for (const t of turns){
-            patched.push({ t: Number(t.t) || 0, role: next, text: t.text || '' });
-            next = (next === 'agent') ? 'customer' : 'agent';
+          try {
+            const sentences = Array.isArray(r?.conversationalIntelligence?.sentences) ? r.conversationalIntelligence.sentences : [];
+            const crm = r?.conversationalIntelligence?.channelRoleMap || {};
+            const agentCh = (crm.agentChannel || '1');
+            const normalizeChannel = (c) => { const s = (c==null?'':String(c)).trim(); if (s==='0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
+            if (sentences.length) {
+              console.log('[Transcript Debug] Rebuilding speaker turns from sentences due to unknown roles.', { agentChannel: agentCh, sentenceCount: sentences.length });
+              const rebuilt = [];
+              for (const s of sentences){
+                const ch = normalizeChannel(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex);
+                const sp = (s.speaker || s.role || '').toString().toLowerCase();
+                let role = '';
+                if (sp.includes('agent') || sp.includes('rep')) role = 'agent';
+                else if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) role = 'customer';
+                else role = (ch === agentCh) ? 'agent' : 'customer';
+                const ts = Math.max(0, Math.floor((s.startTime || 0)));
+                const txt = normalizeSupplierTokens(s.text || s.transcript || '');
+                rebuilt.push({ role, t: ts, text: txt });
+              }
+              if (rebuilt.length) {
+                turns = rebuilt;
+              }
+            } else {
+              // No sentences available → alternate as last resort
+              const patched = [];
+              let next = 'customer';
+              for (const t of turns){
+                patched.push({ t: Number(t.t) || 0, role: next, text: t.text || '' });
+                next = (next === 'agent') ? 'customer' : 'agent';
+              }
+              turns = patched;
+            }
+          } catch(_) {
+            // Safe fallback: alternate
+            const patched = [];
+            let next = 'customer';
+            for (const t of turns){
+              patched.push({ t: Number(t.t) || 0, role: next, text: t.text || '' });
+              next = (next === 'agent') ? 'customer' : 'agent';
+            }
+            turns = patched;
           }
-          turns = patched;
         }
       }
       // Helper: heuristic splitter when only one generic "Speaker" or no diarization at all
