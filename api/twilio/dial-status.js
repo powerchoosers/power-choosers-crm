@@ -49,8 +49,8 @@ export default async function handler(req, res) {
       direction: body.Direction 
     });
 
-    // Start dual-channel recording when answered/in-progress
-    if ((event === 'in-progress' || event === 'answered') && targetSid) {
+    // Start dual-channel recording when answered/in-progress/completed (to catch edge cases)
+    if ((event === 'in-progress' || event === 'answered' || event === 'completed') && targetSid) {
       try {
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
         const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -59,30 +59,52 @@ export default async function handler(req, res) {
         if (accountSid && authToken) {
           const client = twilio(accountSid, authToken);
           
-          // Build a candidate list of call SIDs to try (parent first, then child, then discovered children)
+          // Build a candidate list of call SIDs to try, prioritizing PSTN child legs
           const candidates = new Set();
-          if (parentSid) candidates.add(parentSid);
-          if (childSid) candidates.add(childSid);
+          const pstnCandidates = new Set();
           
-          // Discover children of the parent and include any active PSTN legs
+          // Identify if provided child is PSTN (not client)
+          if (childSid) {
+            const isChildPstn = body.To && body.From && 
+                              !body.To.startsWith('client:') && 
+                              !body.From.startsWith('client:') &&
+                              body.Direction === 'outbound-dial';
+            if (isChildPstn) {
+              pstnCandidates.add(childSid);
+              console.log('[Dial-Status] Identified PSTN child leg:', childSid, 'To:', body.To);
+            } else {
+              candidates.add(childSid);
+            }
+          }
+          if (parentSid) candidates.add(parentSid);
+          
+          // Discover children of the parent and separate PSTN vs client legs
           try {
             if (parentSid) {
               const kids = await client.calls.list({ parentCallSid: parentSid, limit: 10 });
               for (const k of kids) {
-                // Prefer non-client legs first
                 const isClient = (k.from || '').startsWith('client:') || (k.to || '').startsWith('client:');
-                if (!isClient) candidates.add(k.sid);
-                else candidates.add(k.sid);
+                const isPstn = !isClient && k.direction === 'outbound-dial';
+                if (isPstn) {
+                  pstnCandidates.add(k.sid);
+                  console.log('[Dial-Status] Found PSTN child leg:', k.sid, 'To:', k.to, 'Direction:', k.direction);
+                } else {
+                  candidates.add(k.sid);
+                }
               }
-              console.log('[Dial-Status] Discovered child legs:', kids.map(c => ({ sid: c.sid, from: c.from, to: c.to, direction: c.direction })));
+              console.log('[Dial-Status] Discovered child legs:', kids.map(c => ({ sid: c.sid, from: c.from, to: c.to, direction: c.direction, isPstn: !((c.from || '').startsWith('client:') || (c.to || '').startsWith('client:')) && c.direction === 'outbound-dial' })));
             }
           } catch (discErr) {
             console.log('[Dial-Status] Child discovery failed:', discErr?.message);
           }
           
           // Try to start a dual-channel recording on the first candidate that succeeds
+          // Prioritize PSTN child legs first, then other candidates
           let started = false; let startedOn = ''; let channelsSeen = 0;
-          const candList = Array.from(candidates);
+          const pstnList = Array.from(pstnCandidates);
+          const candList = [...pstnList, ...Array.from(candidates)];
+          
+          console.log('[Dial-Status] Candidate priority order:', { pstnFirst: pstnList, others: Array.from(candidates) });
           for (let i = 0; i < candList.length; i++) {
             const sid = candList[i];
             try {
