@@ -711,7 +711,14 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               const acct = findAccountByPhone(party);
               if (acct){
                 const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
-                if (p){
+                // Only use recent contact if they have a phone that matches the counterparty
+                const phoneMatch = (()=>{
+                  try{
+                    if (!p) return false; const nums=[p.workDirectPhone, p.mobile, p.otherPhone, p.phone].map(normPhone).filter(Boolean);
+                    return party && nums.includes(party);
+                  }catch(_){ return false; }
+                })();
+                if (p && phoneMatch){
                   const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
                   if (full) { 
                     contactName = full; 
@@ -721,6 +728,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
                       debug.contactIdSource = 'account.recentContact';
                     }
                   }
+                } else if (p && window.CRM_DEBUG_CALLS) {
+                  console.log('[Calls][accountFallback] Skipping recent contact without phone match:', { party, contactId: p?.id, phones: [p?.workDirectPhone, p?.mobile, p?.otherPhone, p?.phone] });
                 }
               }
             }

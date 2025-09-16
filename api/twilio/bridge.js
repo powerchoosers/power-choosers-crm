@@ -43,8 +43,12 @@ export default async function handler(req, res) {
             statusCallback: `${base}/api/twilio/dial-status`,
             statusCallbackEvent: 'initiated ringing answered completed',
             statusCallbackMethod: 'POST',
-            // Do NOT start Dial-level recording; we start dual on PSTN leg via REST in dial-status/status
-            record: 'do-not-record'
+            // Start dual-channel recording on the PSTN child leg at answer time
+            record: 'record-from-answer',
+            recordingStatusCallback: `${base}/api/twilio/recording`,
+            recordingStatusCallbackMethod: 'POST',
+            recordingChannels: 'dual',
+            recordingTrack: 'both'
         });
         
         // Add the target number with no retry logic
