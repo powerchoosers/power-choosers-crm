@@ -55,20 +55,15 @@ export default async function handler(req, res) {
         if (accountSid && authToken) {
           const client = twilio(accountSid, authToken);
           
-          // Check if recording already exists for this call
-          const existingRecordings = await client.calls(childSid).recordings.list({ limit: 1 });
-          
-          if (existingRecordings.length === 0) {
-            await client.calls(childSid).recordings.create({
-              recordingChannels: 'dual',
-              recordingTrack: 'both',
-              recordingStatusCallback: (process.env.PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}` || 'https://power-choosers-crm.vercel.app') + '/api/twilio/recording',
-              recordingStatusCallbackMethod: 'POST'
-            });
-            console.log('[Dial-Status] Started fallback dual recording for child leg', childSid);
-          } else {
-            console.log('[Dial-Status] Recording already exists for child leg', childSid);
-          }
+          // FORCE dual-channel recording on child leg
+          // We now rely entirely on this webhook since Dial recording is disabled
+          await client.calls(childSid).recordings.create({
+            recordingChannels: 'dual',
+            recordingTrack: 'both',
+            recordingStatusCallback: (process.env.PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}` || 'https://power-choosers-crm.vercel.app') + '/api/twilio/recording',
+            recordingStatusCallbackMethod: 'POST'
+          });
+          console.log('[Dial-Status] ✅ Started DUAL-CHANNEL recording for child leg', childSid);
         } else {
           console.warn('[Dial-Status] Missing Twilio credentials');
         }
