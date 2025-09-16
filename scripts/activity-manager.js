@@ -457,8 +457,8 @@ class ActivityManager {
    */
   async fetchTasks() {
     try {
-      if (window.db) {
-        const snapshot = await window.db.collection('tasks')
+      if (window.firebaseDB) {
+        const snapshot = await window.firebaseDB.collection('tasks')
           .orderBy('timestamp', 'desc')
           .limit(50)
           .get();

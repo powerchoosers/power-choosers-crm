@@ -827,6 +827,7 @@
             </h4>
             <div style=\"color:var(--text-secondary); font-style:italic;\">${audio}</div>
             ${proxied ? '' : '<div style=\"color:var(--text-muted); font-size:12px; margin-top:4px;\">Recording may take 1-2 minutes to process after call completion</div>'}
+            ${proxied && r.recordingChannels ? `<div style=\"color:var(--text-secondary); font-size:12px; margin-top:4px;\">Recording: ${r.recordingChannels === '2' ? 'Dual-Channel (2 Channels)' : 'Single Channel'} • Source: ${r.recordingSource || 'Unknown'}</div>` : ''}
             ${hasAI ? '<div style=\"color:var(--orange-subtle); font-size:12px; margin-top:4px;\">✓ AI analysis completed</div>' : '<div style=\"color:var(--text-muted); font-size:12px; margin-top:4px;\">AI analysis in progress...</div>'}
           </div>
           <div class=\"ip-card\" style=\"margin-top:12px;\">

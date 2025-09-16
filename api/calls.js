@@ -131,9 +131,13 @@ async function upsertCallInFirestore(payload) {
     callTime: payload.callTime || current.callTime || current.timestamp || nowIso,
     outcome: payload.outcome || current.outcome,
     transcript: payload.transcript != null ? payload.transcript : current.transcript,
+    formattedTranscript: payload.formattedTranscript != null ? payload.formattedTranscript : current.formattedTranscript,
     aiInsights: payload.aiInsights != null ? payload.aiInsights : current.aiInsights || null,
     aiSummary: payload.aiSummary != null ? payload.aiSummary : current.aiSummary,
     recordingUrl: payload.recordingUrl != null ? payload.recordingUrl : current.recordingUrl,
+    recordingChannels: payload.recordingChannels != null ? payload.recordingChannels : current.recordingChannels,
+    recordingTrack: payload.recordingTrack != null ? payload.recordingTrack : current.recordingTrack,
+    recordingSource: payload.recordingSource != null ? payload.recordingSource : current.recordingSource,
     conversationalIntelligence: (payload.conversationalIntelligence != null ? payload.conversationalIntelligence : (payload.aiInsights && payload.aiInsights.conversationalIntelligence)) != null ? (payload.conversationalIntelligence || (payload.aiInsights && payload.aiInsights.conversationalIntelligence)) : current.conversationalIntelligence,
 
     // CRM context passthrough
@@ -308,9 +312,13 @@ export default async function handler(req, res) {
         callTime: payload.callTime || existing.callTime || existing.timestamp || nowIso,
         outcome: payload.outcome || existing.outcome,
         transcript: payload.transcript != null ? payload.transcript : existing.transcript,
+        formattedTranscript: payload.formattedTranscript != null ? payload.formattedTranscript : existing.formattedTranscript,
         aiInsights: payload.aiInsights != null ? payload.aiInsights : existing.aiInsights || null,
         aiSummary: payload.aiSummary != null ? payload.aiSummary : existing.aiSummary,
         recordingUrl: payload.recordingUrl != null ? payload.recordingUrl : existing.recordingUrl,
+        recordingChannels: payload.recordingChannels != null ? payload.recordingChannels : existing.recordingChannels,
+        recordingTrack: payload.recordingTrack != null ? payload.recordingTrack : existing.recordingTrack,
+        recordingSource: payload.recordingSource != null ? payload.recordingSource : existing.recordingSource,
         businessPhone: context.businessPhone || existing.businessPhone || '',
         targetPhone: context.targetPhone || existing.targetPhone || '',
         source: payload.source || existing.source || 'unknown'

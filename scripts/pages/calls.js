@@ -959,10 +959,14 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               durationSec: c.durationSec || 0,
               outcome: c.outcome || '',
               transcript: c.transcript || '',
+              formattedTranscript: c.formattedTranscript || '',
               aiSummary: c.aiSummary || '',
               aiInsights: c.aiInsights || null,
               conversationalIntelligence: c.conversationalIntelligence || null,
-              audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : ''
+              audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
+              recordingChannels: c.recordingChannels || '1',
+              recordingTrack: c.recordingTrack || 'inbound',
+              recordingSource: c.recordingSource || 'unknown'
             };
 
             // Enhanced debugging for title issues
@@ -2224,7 +2228,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
       return escapeHtml(fallback);
     }
-    const transcriptHtml = renderTranscriptHtml(A, normalizeSupplierTokens(r.transcript || ''));
+    // Use formatted transcript with speaker labels if available, otherwise fall back to regular transcript
+    const transcriptToUse = r.formattedTranscript || r.transcript || '';
+    const transcriptHtml = renderTranscriptHtml(A, normalizeSupplierTokens(transcriptToUse));
 
     const hasAIInsights = r.aiInsights && Object.keys(r.aiInsights).length > 0;
 
@@ -2272,6 +2278,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             </h4>
             <div style="color:var(--text-secondary); font-style:italic;">${r.audioUrl ? `<audio controls style="width:100%; margin-top:8px;"><source src="${r.audioUrl}" type="audio/mpeg">Your browser does not support audio playback.</audio>` : 'No recording available'}</div>
             ${r.audioUrl ? '' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">Recording may take 1-2 minutes to process after call completion</div>'}
+            ${r.audioUrl && r.recordingChannels ? `<div style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Recording: ${r.recordingChannels === '2' ? 'Dual-Channel (2 Channels)' : 'Single Channel'} • Source: ${r.recordingSource || 'Unknown'}</div>` : ''}
             ${hasAIInsights ? '<div style="color:var(--orange-subtle); font-size:12px; margin-top:4px;">✓ AI analysis completed</div>' : '<div style="color:var(--text-muted); font-size:12px; margin-top:4px;">AI analysis in progress...</div>'}
           </div>
 
