@@ -40,6 +40,72 @@ export default async function handler(req, res) {
         console.log('  Host:', req.headers.host, 'Twilio-Signature:', sig);
         console.log(`  From: ${From} → To: ${To}`);
         console.log('  Raw body:', JSON.stringify(body).slice(0, 800));
+
+        // Fallback: attempt to start a dual-channel recording when the call is answered/in-progress
+        // This complements the /api/twilio/dial-status path and covers cases where Dial callbacks are missed
+        async function startDualIfNeeded() {
+            try {
+                const event = String(CallStatus || '').toLowerCase();
+                if (!(event === 'answered' || event === 'in-progress')) return;
+
+                const accountSid = process.env.TWILIO_ACCOUNT_SID;
+                const authToken = process.env.TWILIO_AUTH_TOKEN;
+                if (!accountSid || !authToken) { console.warn('[Status] Missing Twilio creds; cannot start recording'); return; }
+                const twilio = require('twilio');
+                const client = twilio(accountSid, authToken);
+                const baseUrl = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+
+                // Build candidate list: prefer DialCallSid (child PSTN), then parent CallSid, then discovered children
+                const candidates = new Set();
+                const DialCallSid = body.DialCallSid || body.DialCallSid0 || body.DialSid || '';
+                if (DialCallSid && /^CA[0-9a-f]{32}$/i.test(DialCallSid)) candidates.add(DialCallSid);
+                if (CallSid && /^CA[0-9a-f]{32}$/i.test(CallSid)) candidates.add(CallSid);
+
+                try {
+                    if (CallSid) {
+                        const kids = await client.calls.list({ parentCallSid: CallSid, limit: 10 });
+                        // Prefer non-client legs first
+                        for (const k of kids) {
+                            const isClient = (k.from || '').startsWith('client:') || (k.to || '').startsWith('client:');
+                            if (!isClient) candidates.add(k.sid);
+                        }
+                        // Then add remaining client legs as last resort
+                        for (const k of kids) {
+                            const isClient = (k.from || '').startsWith('client:') || (k.to || '').startsWith('client:');
+                            if (isClient) candidates.add(k.sid);
+                        }
+                        console.log('[Status] Discovered child legs:', kids.map(c => ({ sid: c.sid, from: c.from, to: c.to, direction: c.direction })));
+                    }
+                } catch (discErr) {
+                    console.log('[Status] Child discovery failed:', discErr?.message);
+                }
+
+                // Try candidates in order; skip if dual already exists
+                for (const sid of candidates) {
+                    try {
+                        const existing = await client.calls(sid).recordings.list({ limit: 5 });
+                        const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');
+                        if (hasDual) { console.log('[Status] Dual recording already active on', sid); return; }
+                        const rec = await client.calls(sid).recordings.create({
+                            recordingChannels: 'dual',
+                            recordingTrack: 'both',
+                            recordingStatusCallback: baseUrl + '/api/twilio/recording',
+                            recordingStatusCallbackMethod: 'POST'
+                        });
+                        console.log('[Status] Started recording via REST on', sid, '→', { recordingSid: rec.sid, channels: rec.channels, source: rec.source, track: rec.track });
+                        return; // Stop after first success
+                    } catch (tryErr) {
+                        console.log('[Status] Could not start recording on', sid, ':', tryErr?.message);
+                    }
+                }
+
+                if (!candidates.size) console.log('[Status] No candidate call SIDs to start recording on');
+            } catch (e) {
+                console.log('[Status] startDualIfNeeded error:', e?.message);
+            }
+        }
+        await startDualIfNeeded();
+
         // Log to Firestore (best-effort)
         try {
             const { db } = require('../_firebase');
