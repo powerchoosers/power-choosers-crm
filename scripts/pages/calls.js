@@ -1348,7 +1348,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
       <td class="name-cell" data-contact-id="${r.contactId || ''}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${name}</span></div></td>
       <td>${title}</td>
-      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none'; var fb=this.nextElementSibling; if(fb){ fb.style.display='inline-block'; }" />${safeAccountIcon.replace('display:inline-block','display:none')}` : `${safeAccountIcon}`}<span class="company-name">${company}</span></span></a></td>
+      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />${safeAccountIcon.replace('display:inline-block','display:none')}` : `${safeAccountIcon}`}<span class="company-name">${company}</span></span></a></td>
       <td>${numberCell}</td>
       <td>${directionCell || '—'}</td>
       <td>${callTimeStr}</td>
@@ -1567,6 +1567,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">
           <img src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}" 
                alt="" loading="lazy" referrerpolicy="no-referrer" 
+               onload="this.nextElementSibling.style.display='none';"
                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
           <div class="company-favicon-fallback" style="display:none;">${svgIcon('accounts')}</div>
         </div>`;
@@ -2002,12 +2003,19 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       if (!turns.length) {
         try {
           const sentences = Array.isArray(r?.conversationalIntelligence?.sentences) ? r.conversationalIntelligence.sentences : [];
+          const crm = r?.conversationalIntelligence?.channelRoleMap || {};
+          const agentCh = (crm.agentChannel || '1');
+          const normalizeChannel = (c) => { const s = (c==null?'':String(c)).trim(); if (s==='0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
           if (sentences.length) {
             const grouped = [];
             let current = null;
             for (const s of sentences){
-              const ch = (s.channel != null ? String(s.channel) : '');
-              const role = (ch === '1') ? 'agent' : 'customer';
+              const ch = normalizeChannel(s.channel != null ? s.channel : '');
+              let role = '';
+              const sp = (s.speaker || s.role || '').toString().toLowerCase();
+              if (sp.includes('agent') || sp.includes('rep')) role = 'agent';
+              else if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) role = 'customer';
+              else role = (ch === agentCh) ? 'agent' : 'customer';
               const ts = Math.max(0, Math.floor((s.startTime || 0)));
               const txt = normalizeSupplierTokens(s.text || s.transcript || '');
               if (current && current.role === role){ current.text += (current.text?' ':'') + txt; current.t = ts; }

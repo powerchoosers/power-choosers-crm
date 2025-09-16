@@ -156,26 +156,45 @@
       contactId: null
     };
 
-    // Try to extract context from table row
-    const row = phoneElement.closest('tr');
-    if (row) {
-      // Get contact ID if available
-      const contactId = row.getAttribute('data-contact-id') || 
-                       row.querySelector('[data-contact-id]')?.getAttribute('data-contact-id');
-      if (contactId) context.contactId = contactId;
+    // First, try to extract context directly from the phone element's data attributes
+    const phoneContactId = phoneElement.getAttribute('data-contact-id');
+    const phoneAccountId = phoneElement.getAttribute('data-account-id');
+    const phoneContactName = phoneElement.getAttribute('data-contact-name');
+    const phoneCompanyName = phoneElement.getAttribute('data-company-name');
 
-      // Get account ID if available
-      const accountId = row.getAttribute('data-account-id') || 
-                       row.querySelector('[data-account-id]')?.getAttribute('data-account-id');
-      if (accountId) context.accountId = accountId;
+    if (phoneContactId) context.contactId = phoneContactId;
+    if (phoneAccountId) context.accountId = phoneAccountId;
+    if (phoneContactName) {
+      context.contactName = phoneContactName;
+      context.name = phoneContactName;
+    }
+    if (phoneCompanyName) {
+      context.company = phoneCompanyName;
+      context.accountName = phoneCompanyName;
+    }
 
-      // Get company/account name
-      const companyEl = row.querySelector('.company-link, .account-name, .company-cell');
-      if (companyEl) {
-        const companyName = companyEl.textContent?.trim() || companyEl.getAttribute('data-company');
-        if (companyName && companyName !== 'N/A') {
-          context.company = companyName;
-          context.accountName = companyName;
+    // If we didn't get context from the phone element, try to extract from table row
+    if (!context.contactId || !context.accountId) {
+      const row = phoneElement.closest('tr');
+      if (row) {
+        // Get contact ID if available
+        const contactId = row.getAttribute('data-contact-id') || 
+                         row.querySelector('[data-contact-id]')?.getAttribute('data-contact-id');
+        if (contactId && !context.contactId) context.contactId = contactId;
+
+        // Get account ID if available
+        const accountId = row.getAttribute('data-account-id') || 
+                         row.querySelector('[data-account-id]')?.getAttribute('data-account-id');
+        if (accountId && !context.accountId) context.accountId = accountId;
+
+        // Get company/account name
+        const companyEl = row.querySelector('.company-link, .account-name, .company-cell');
+        if (companyEl && !context.company) {
+          const companyName = companyEl.textContent?.trim() || companyEl.getAttribute('data-company');
+          if (companyName && companyName !== 'N/A') {
+            context.company = companyName;
+            context.accountName = companyName;
+          }
         }
       }
     }
@@ -303,7 +322,9 @@
       '#contact-detail-view .info-row[data-field="mobile"] .info-value-text',
       '#contact-detail-view .info-row[data-field="companyPhone"] .info-value-text',
       // Account detail view phone field
-      '#account-detail-view .info-value-wrap[data-field="phone"] .info-value-text'
+      '#account-detail-view .info-value-wrap[data-field="phone"] .info-value-text',
+      // Recent calls phone numbers
+      '.rc-sub .phone-number'
     ];
     
     specificSelectors.forEach(selector => {

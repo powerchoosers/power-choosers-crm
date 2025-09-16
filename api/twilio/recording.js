@@ -202,6 +202,45 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         
+        // Determine which dual-channel maps to Agent vs Customer
+        let agentChannelStr = '1';
+        try {
+            let callResource = null;
+            try { callResource = await client.calls(callSid).fetch(); } catch(_) {}
+            const fromStr = callResource?.from || '';
+            const toStr = callResource?.to || '';
+            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+            const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+              .split(',').map(norm).filter(Boolean);
+            const from10 = norm(fromStr);
+            const to10 = norm(toStr);
+            const isBiz = (p) => !!p && envBiz.includes(p);
+            const fromIsClient = /^client:/i.test(fromStr);
+            // Heuristic: Agent is the "from" leg when from is Voice SDK client or our business number; otherwise agent is the "to" leg
+            const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
+            agentChannelStr = fromIsAgent ? '1' : '2';
+            console.log(`[Recording] Channel-role mapping: agent on channel ${agentChannelStr} (from=${fromStr}, to=${toStr})`);
+        } catch (e) {
+            console.warn('[Recording] Failed to compute channel-role mapping, defaulting agent to channel 1:', e?.message);
+        }
+        const normalizeChannel = (c) => {
+            const s = (c == null ? '' : String(c)).trim();
+            if (s === '0') return '1';
+            if (/^[Aa]$/.test(s)) return '1';
+            if (/^[Bb]$/.test(s)) return '2';
+            return s;
+        };
+        const resolveRoleFromSentence = (s) => {
+            try {
+                const chStr = normalizeChannel(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex);
+                const sp = (s.speaker || s.role || '').toString().toLowerCase();
+                if (sp.includes('agent') || sp.includes('rep')) return 'agent';
+                if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) return 'customer';
+                if (chStr) return chStr === agentChannelStr ? 'agent' : 'customer';
+            } catch(_) {}
+            return '';
+        };
+        
         // Try Conversational Intelligence first, then fallback to basic transcription
         let transcript = '';
         let aiInsights = null;
@@ -255,10 +294,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         for (const s of sentences) {
                             const txt = pickText(s);
                             if (!txt) continue;
-                            const rawRole = (s.channel || s.speaker || s.role || '').toString().toLowerCase();
-                            let role = '';
-                            if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
-                            else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                            const role = resolveRoleFromSentence(s);
                             const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                             const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
                             turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
@@ -273,7 +309,8 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 status: polled.status,
                                 sentenceCount: sentences.length,
                                 averageConfidence: sentences.length > 0 ?
-                                    sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
+                                    sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0,
+                                channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                             };
                             console.log(`[Recording] CI transcript (existing) completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);
                         }
@@ -296,10 +333,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         for (const s of sentences) {
                             const txt = pickText(s);
                             if (!txt) continue;
-                            const rawRole = (s.channel || s.speaker || s.role || '').toString().toLowerCase();
-                            let role = '';
-                            if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
-                            else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                            const role = resolveRoleFromSentence(s);
                             const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                             const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
                             turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
@@ -314,7 +348,8 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             status: ciTranscript.status,
                             sentenceCount: sentences.length,
                             averageConfidence: sentences.length > 0 ? 
-                                sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
+                                sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0,
+                            channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                         };
                         
                         console.log(`[Recording] Found Conversational Intelligence transcript with ${sentences.length} sentences, transcript length: ${transcript.length}`);
@@ -393,10 +428,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             for (const s of sentences) {
                                 const txt = pickText(s);
                                 if (!txt) continue;
-                                const rawRole = (s.channel || s.speaker || s.role || '').toString().toLowerCase();
-                                let role = '';
-                                if (rawRole.includes('agent') || rawRole.includes('rep')) role = 'agent';
-                                else if (rawRole.includes('customer') || rawRole.includes('caller')) role = 'customer';
+                                const role = resolveRoleFromSentence(s);
                                 const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                                 const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
                                 turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
@@ -411,7 +443,8 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 status: updatedTranscript.status,
                                 sentenceCount: sentences.length,
                                 averageConfidence: sentences.length > 0 ? 
-                                    sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
+                                    sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0,
+                                channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                             };
                             
                             console.log(`[Recording] Conversational Intelligence transcript completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);

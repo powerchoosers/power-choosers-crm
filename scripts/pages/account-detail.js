@@ -183,7 +183,11 @@
               <div class="contact-details">
                 ${title ? `<span class="contact-title">${escapeHtml(title)}</span>` : ''}
                 ${email ? `<span class="contact-email">${escapeHtml(email)}</span>` : ''}
-                ${phone ? `<span class="contact-phone">${escapeHtml(phone)}</span>` : ''}
+                ${phone ? `<span class="contact-phone" 
+                                 data-contact-id="${contact.id}" 
+                                 data-account-id="${state.currentAccount?.id || ''}" 
+                                 data-contact-name="${escapeHtml(fullName)}" 
+                                 data-company-name="${escapeHtml(state.currentAccount?.name || state.currentAccount?.accountName || '')}">${escapeHtml(phone)}</span>` : ''}
               </div>
             </div>
             <div class="contact-actions">
@@ -256,7 +260,7 @@
               </svg>
             </button>
             <div class="contact-header-profile">
-              ${favDomain ? `<img class=\"avatar-favicon\" src=\"https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}\" alt=\"\" referrerpolicy=\"no-referrer\" loading=\"lazy\" onerror=\"this.style.display='none'; const sib=this.nextElementSibling; if(sib) sib.style.display='flex';\" />` : ''}
+              ${favDomain ? `<img class=\"avatar-favicon\" src=\"https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}\" alt=\"\" referrerpolicy=\"no-referrer\" loading=\"lazy\" onload=\"const sib=this.nextElementSibling; if(sib) sib.style.display='none';\" onerror=\"this.style.display='none'; const sib=this.nextElementSibling; if(sib) sib.style.display='flex';\" />` : ''}
               <div class="avatar-circle-small" style="${favDomain ? 'display:none;' : ''}">${escapeHtml(getInitials(name))}</div>
               <div class="contact-header-text">
                 <h2 class="page-title contact-page-title">${escapeHtml(name)}</h2>
@@ -311,7 +315,10 @@
           <h3 class="section-title">Account Information</h3>
           <div class="info-grid">
             <div class="info-row"><div class="info-label">WEBSITE</div><div class="info-value-wrap" data-field="website"><span class="info-value-text">${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener">${escapeHtml(website)}</a>` : '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
-            <div class="info-row"><div class="info-label">COMPANY PHONE</div><div class="info-value-wrap" data-field="phone"><span class="info-value-text">${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
+            <div class="info-row"><div class="info-label">COMPANY PHONE</div><div class="info-value-wrap" data-field="phone"><span class="info-value-text" 
+                                 data-account-id="${a.id || a.accountId || a._id || ''}" 
+                                 data-account-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}" 
+                                 data-company-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}">${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">CITY</div><div class="info-value-wrap" data-field="city"><span class="info-value-text">${escapeHtml(city) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">STATE</div><div class="info-value-wrap" data-field="state"><span class="info-value-text">${escapeHtml(stateVal) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value-wrap" data-field="industry"><span class="info-value-text">${escapeHtml(industry) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
@@ -508,7 +515,7 @@
     const domain = ad_extractDomainFromAccount(call && (call.accountName || ''));
     if (domain){
       const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class=\"company-favicon\" aria-hidden=\"true\" style=\"display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);\"></span>';
-      return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\"><img src=\"https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}\" alt=\"\" referrerpolicy=\"no-referrer\" loading=\"lazy\" onerror=\"this.style.display='none'; var n=this.nextElementSibling; if(n){ n.style.display='flex'; }\">${fb}</div>`;
+      return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\"><img src=\"https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}\" alt=\"\" referrerpolicy=\"no-referrer\" loading=\"lazy\" onload=\"this.nextElementSibling.style.display='none';\" onerror=\"this.style.display='none'; var n=this.nextElementSibling; if(n){ n.style.display='flex'; }\">${fb}</div>`;
     }
     const initial = (String(contactName||'C').charAt(0) || 'C').toUpperCase();
     return `<div class=\"transcript-avatar-circle contact-avatar\" aria-hidden=\"true\">${initial}</div>`;
@@ -645,7 +652,11 @@
       <div class="rc-item">
         <div class="rc-meta">
           <div class="rc-title">${name}${company?` • ${company}`:''}</div>
-          <div class="rc-sub">${when} • ${durStr} • ${phone}</div>
+          <div class="rc-sub">${when} • ${durStr} • <span class="phone-number" 
+                                 data-contact-id="${c.contactId || ''}" 
+                                 data-account-id="${c.accountId || state.currentAccount?.id || ''}" 
+                                 data-contact-name="${escapeHtml(name)}" 
+                                 data-company-name="${escapeHtml(company)}">${phone}</span></div>
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
