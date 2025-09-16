@@ -55,37 +55,63 @@ export default async function handler(req, res) {
                 const client = twilio(accountSid, authToken);
                 const baseUrl = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
 
-                // Build candidate list: prefer DialCallSid (child PSTN), then parent CallSid, then discovered children
+                // Build candidate list with PSTN priority similar to /api/twilio/dial-status
+                // PSTN legs = non-client endpoints with direction outbound-dial
                 const candidates = new Set();
+                const pstnCandidates = new Set();
                 const DialCallSid = body.DialCallSid || body.DialCallSid0 || body.DialSid || '';
-                if (DialCallSid && /^CA[0-9a-f]{32}$/i.test(DialCallSid)) candidates.add(DialCallSid);
-                if (CallSid && /^CA[0-9a-f]{32}$/i.test(CallSid)) candidates.add(CallSid);
+                const looksLikeSid = (sid) => sid && /^CA[0-9a-f]{32}$/i.test(String(sid));
+                const isClient = (v) => typeof v === 'string' && v.startsWith('client:');
+                // Classify provided Dial child if available
+                if (looksLikeSid(DialCallSid)) {
+                    const childLooksPstn = (body.To && body.From && !isClient(body.To) && !isClient(body.From) && String(body.Direction||'').toLowerCase() === 'outbound-dial');
+                    if (childLooksPstn) {
+                        pstnCandidates.add(DialCallSid);
+                        console.log('[Status] Identified PSTN Dial child:', DialCallSid, 'To:', body.To);
+                    } else {
+                        candidates.add(DialCallSid);
+                    }
+                }
+                // Add parent at lower priority
+                if (looksLikeSid(CallSid)) candidates.add(CallSid);
 
                 try {
                     if (CallSid) {
                         const kids = await client.calls.list({ parentCallSid: CallSid, limit: 10 });
-                        // Prefer non-client legs first
+                        // Separate PSTN vs others for priority ordering
                         for (const k of kids) {
-                            const isClient = (k.from || '').startsWith('client:') || (k.to || '').startsWith('client:');
-                            if (!isClient) candidates.add(k.sid);
+                            const kidIsClient = (k.from || '').startsWith('client:') || (k.to || '').startsWith('client:');
+                            const isPstn = !kidIsClient && String(k.direction||'').toLowerCase() === 'outbound-dial';
+                            if (isPstn) pstnCandidates.add(k.sid); else candidates.add(k.sid);
                         }
-                        // Then add remaining client legs as last resort
-                        for (const k of kids) {
-                            const isClient = (k.from || '').startsWith('client:') || (k.to || '').startsWith('client:');
-                            if (isClient) candidates.add(k.sid);
-                        }
-                        console.log('[Status] Discovered child legs:', kids.map(c => ({ sid: c.sid, from: c.from, to: c.to, direction: c.direction })));
+                        console.log('[Status] Discovered child legs:', kids.map(c => ({ sid: c.sid, from: c.from, to: c.to, direction: c.direction, isPstn: !(String(c.from||'').startsWith('client:') || String(c.to||'').startsWith('client:')) && String(c.direction||'').toLowerCase()==='outbound-dial' })));
                     }
                 } catch (discErr) {
                     console.log('[Status] Child discovery failed:', discErr?.message);
                 }
 
-                // Try candidates in order; skip if dual already exists
-                for (const sid of candidates) {
+                const pstnList = Array.from(pstnCandidates);
+                const ordered = [...pstnList, ...Array.from(candidates)];
+                console.log('[Status] Candidate priority order:', { pstnFirst: pstnList, others: Array.from(candidates) });
+
+                // Try candidates in priority order; skip if dual already exists
+                for (const sid of ordered) {
                     try {
                         const existing = await client.calls(sid).recordings.list({ limit: 5 });
                         const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');
                         if (hasDual) { console.log('[Status] Dual recording already active on', sid); return; }
+
+                        // Safety: stop active mono recording so dual can start
+                        const active = existing.find(r => r.status !== 'stopped');
+                        if (active && (Number(active.channels) || 0) === 1) {
+                            try {
+                                await client.calls(sid).recordings('Twilio.CURRENT').update({ status: 'stopped' });
+                                console.log('[Status] ⏹️ Stopped active mono recording on', sid, '->', active.sid);
+                            } catch (stopErr) {
+                                console.log('[Status] Could not stop active recording on', sid, ':', stopErr?.message);
+                            }
+                        }
+
                         const rec = await client.calls(sid).recordings.create({
                             recordingChannels: 'dual',
                             recordingTrack: 'both',
