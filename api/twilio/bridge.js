@@ -28,6 +28,20 @@ export default function handler(req, res) {
         
         // Create TwiML to bridge the call
         const twiml = new VoiceResponse();
+        // Also ensure parent call is recording dual via REST (best-effort)
+        try {
+            const accountSid = process.env.TWILIO_ACCOUNT_SID;
+            const authToken = process.env.TWILIO_AUTH_TOKEN;
+            if (accountSid && authToken && CallSid) {
+                const client = twilio(accountSid, authToken);
+                await client.calls(CallSid).recordings.create({
+                    recordingChannels: 'dual',
+                    recordingTrack: 'both',
+                    recordingStatusCallback: `${base}/api/twilio/recording`,
+                    recordingStatusCallbackMethod: 'POST'
+                }).catch(()=>{});
+            }
+        } catch(_) {}
         
         // Dial the target number immediately without any intro message
         const dial = twiml.dial({
