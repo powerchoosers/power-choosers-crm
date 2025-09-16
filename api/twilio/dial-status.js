@@ -81,31 +81,51 @@ export default async function handler(req, res) {
           }
           
           // Try to start a dual-channel recording on the first candidate that succeeds
-          let started = false; let startedOn = '';
-          for (const sid of candidates) {
+          let started = false; let startedOn = ''; let channelsSeen = 0;
+          const candList = Array.from(candidates);
+          for (let i = 0; i < candList.length; i++) {
+            const sid = candList[i];
             try {
               // Skip if a recording already exists and is dual
               const existing = await client.calls(sid).recordings.list({ limit: 5 });
               const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');
-              if (hasDual) { console.log('[Dial-Status] Dual recording already active on', sid); started = true; startedOn = sid; break; }
+              if (hasDual) { console.log('[Dial-Status] Dual recording already active on', sid); started = true; startedOn = sid; channelsSeen = 2; break; }
+
+              // If some mono recording is active, stop it so we can start dual
+              const active = existing.find(r => r.status !== 'stopped');
+              if (active && (Number(active.channels) || 0) === 1) {
+                try {
+                  await client.calls(sid).recordings('Twilio.CURRENT').update({ status: 'stopped' });
+                  console.log('[Dial-Status] ⏹️ Stopped active mono recording on', sid, '->', active.sid);
+                } catch (stopErr) {
+                  console.log('[Dial-Status] Could not stop active recording on', sid, ':', stopErr?.message);
+                }
+              }
+
               const rec = await client.calls(sid).recordings.create({
                 recordingChannels: 'dual',
                 recordingTrack: 'both',
                 recordingStatusCallback: baseUrl + '/api/twilio/recording',
                 recordingStatusCallbackMethod: 'POST'
               });
-              console.log('[Dial-Status] ➕ start result:', { sid: rec.sid, channels: rec.channels, source: rec.source, track: rec.track });
-              // If Twilio reports channels=2 in the create response, we are good
-              if ((Number(rec.channels) || 0) >= 1) { started = true; startedOn = sid; break; }
+              console.log('[Dial-Status] ➕ start result:', { sid: rec.sid, channels: rec.channels, source: rec.source, track: rec.track, callSid: sid });
+              const ch = Number(rec.channels) || 0;
+              if (ch === 2) { started = true; startedOn = sid; channelsSeen = 2; break; }
+              // If mono came back, try the next candidate after stopping this one
+              channelsSeen = Math.max(channelsSeen, ch);
+              try {
+                await client.calls(sid).recordings(rec.sid).update({ status: 'stopped' });
+                console.log('[Dial-Status] ⏹️ Immediately stopped mono recording', rec.sid, 'on', sid, 'and trying next candidate');
+              } catch(_) {}
             } catch (tryErr) {
               console.log('[Dial-Status] Try start on', sid, 'failed:', tryErr?.message);
             }
           }
           
           if (started) {
-            console.log('[Dial-Status] ✅ Started recording on', startedOn, '(parent preferred, dual expected)');
+            console.log('[Dial-Status] ✅ Started recording on', startedOn, '(dual confirmed)');
           } else {
-            console.warn('[Dial-Status] ❌ Unable to start recording on any candidate leg');
+            console.warn('[Dial-Status] ❌ Unable to start dual recording (last channels seen:', channelsSeen, ')');
           }
         } else {
           console.warn('[Dial-Status] Missing Twilio credentials');
