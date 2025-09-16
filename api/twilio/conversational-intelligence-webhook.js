@@ -238,8 +238,8 @@ export default async function handler(req, res) {
                     startTime: s.startTime,
                     endTime: s.endTime,
                     channel: s.channel,
-                    // Map channel to speaker role (Channel 1 = Agent, Channel 2 = Customer)
-                    speaker: s.channel === 1 ? 'Agent' : s.channel === 2 ? 'Customer' : `Channel ${s.channel}`
+                    // Map channel to speaker role (Channel 1 = Customer/PSTN caller, Channel 2 = Agent/Client)
+                    speaker: s.channel === 1 ? 'Customer' : s.channel === 2 ? 'Agent' : `Channel ${s.channel}`
                 }));
                 
                 transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
@@ -327,8 +327,8 @@ export default async function handler(req, res) {
                                 operatorResults: operatorResults,
                                 serviceSid: ServiceSid,
                                 speakerMapping: {
-                                    channel1: 'Agent',
-                                    channel2: 'Customer'
+                                    channel1: 'Customer',
+                                    channel2: 'Agent'
                                 }
                             }
                         })

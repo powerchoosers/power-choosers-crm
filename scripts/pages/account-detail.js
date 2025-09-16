@@ -772,7 +772,7 @@
       transcriptPreview: r.transcript ? r.transcript.substring(0, 100) : 'N/A',
       hasAI: !!AI,
       aiKeys: AI ? Object.keys(AI) : [],
-      finalTranscriptRenderedPreview: (function(){ try{ return (renderTranscriptHtml(AI, r.transcript) || '').slice(0, 100); }catch(_){ return 'N/A'; } })()
+      finalTranscriptRenderedPreview: (function(){ try{ return (renderTranscriptHtml(AI, r.formattedTranscript || r.transcript) || '').slice(0, 100); }catch(_){ return 'N/A'; } })()
     });
     const rec = r.audioUrl || r.recordingUrl || '';
     let proxied = '';
@@ -816,7 +816,7 @@
               <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>
               Call Transcript
             </h4>
-            <div class=\"pc-transcript-container\">${renderTranscriptHtml(AI, r.transcript)}</div>
+            <div class=\"pc-transcript-container\">${renderTranscriptHtml(AI, r.formattedTranscript || r.transcript)}</div>
           </div>
         </div>
         <div>
