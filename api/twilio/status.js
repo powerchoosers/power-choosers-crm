@@ -94,13 +94,13 @@ export default async function handler(req, res) {
                 const ordered = [...pstnList, ...Array.from(candidates)];
                 console.log('[Status] Candidate priority order:', { pstnFirst: pstnList, others: Array.from(candidates) });
 
-                        // Try candidates in priority order; skip if ANY recording exists to avoid interference
+                        // Try candidates in priority order; skip if DialVerb recording exists to avoid interference
                         for (const sid of ordered) {
                             try {
                                 const existing = await client.calls(sid).recordings.list({ limit: 5 });
-                                const hasAnyRecording = existing.some(r => r.status !== 'stopped');
-                                if (hasAnyRecording) { 
-                                    console.log('[Status] Recording already exists on', sid, '- skipping REST API fallback to avoid interference'); 
+                                const hasDialVerbRecording = existing.some(r => r.source === 'DialVerb' && r.status !== 'stopped');
+                                if (hasDialVerbRecording) { 
+                                    console.log('[Status] DialVerb recording already exists on', sid, '- skipping REST API fallback to avoid interference'); 
                                     return; 
                                 }
                                 const hasDual = existing.some(r => (Number(r.channels) || 0) === 2 && r.status !== 'stopped');

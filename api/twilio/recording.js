@@ -102,6 +102,17 @@ export default async function handler(req, res) {
                 src 
             });
             
+            // Monitor for dual-channel recording failures (alert condition)
+            if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
+                console.warn('[Recording] ⚠️ DUAL-CHANNEL FAILURE: DialVerb recording fell back to mono!', {
+                    CallSid,
+                    RecordingSid,
+                    RecordingChannels: body.RecordingChannels,
+                    RecordingSource: body.RecordingSource,
+                    RecordingDuration: body.RecordingDuration
+                });
+            }
+            
             if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
                 console.log('[Recording] Ignoring mono DialVerb completion (will rely on REST dual):', { RecordingSid, CallSid, RecordingChannels: body.RecordingChannels, RecordingSource: body.RecordingSource });
                 return res.status(200).json({ success: true, ignored: true, reason: 'mono_dialverb' });
