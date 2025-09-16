@@ -1391,6 +1391,132 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       .pc-kv .k{color:var(--text-secondary);font-size:12px}
       .pc-kv .v{color:var(--text-primary);font-size:12px}
 
+      /* Modern 2025 Transcript Styling */
+      .pc-transcript-container {
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: 16px;
+        padding: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+        margin: 16px 0;
+      }
+      
+      .transcript-message {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        align-items: flex-start;
+      }
+      
+      .transcript-message:last-child {
+        margin-bottom: 0;
+      }
+      
+      .transcript-avatar {
+        flex-shrink: 0;
+      }
+      
+      .transcript-avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 14px;
+        letter-spacing: 0.5px;
+      }
+      
+      .transcript-avatar-circle.agent-avatar {
+        background: var(--orange-subtle);
+        color: #fff;
+      }
+      
+      .transcript-avatar-circle.contact-avatar {
+        background: var(--orange-subtle);
+        color: #fff;
+      }
+      
+      .transcript-avatar-circle.company-avatar {
+        background: var(--bg-item);
+        padding: 2px;
+        border-radius: 50%;
+      }
+      
+      .transcript-avatar-circle.company-avatar img {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      
+      .transcript-avatar-circle.company-avatar .company-favicon-fallback {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: var(--bg-item);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+      }
+      
+      .transcript-content {
+        flex: 1;
+        min-width: 0;
+      }
+      
+      .transcript-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      
+      .transcript-speaker {
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-primary);
+      }
+      
+      .transcript-time {
+        font-size: 11px;
+        color: var(--text-secondary);
+        font-weight: 400;
+      }
+      
+      .transcript-text {
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--text-primary);
+        word-wrap: break-word;
+      }
+      
+      .transcript-message.agent .transcript-content {
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-left: 8px;
+      }
+      
+      .transcript-message.customer .transcript-content {
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-right: 8px;
+      }
+      
+      .transcript-message.other .transcript-content {
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 12px 16px;
+      }
+
       /* Chips and badges */
       .pc-chips{display:flex;flex-wrap:wrap;gap:8px}
       .pc-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--border-light);background:var(--bg-card);font-size:12px;color:var(--text-secondary)}
@@ -1416,6 +1542,57 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     document.removeEventListener('keydown', escClose);
   }
   function escClose(e){ if(e.key==='Escape') closeInsightsModal(); }
+  
+  // Avatar helper functions for transcript
+  function getAgentAvatar() {
+    return `<div class="transcript-avatar-circle agent-avatar" aria-hidden="true">Y</div>`;
+  }
+  
+  function getContactAvatar(contactName, callData) {
+    // Try to get contact info from call data or lookup
+    let contact = null;
+    if (callData && callData.contactId) {
+      contact = getContactById(callData.contactId);
+    }
+    
+    if (contact && contact.firstName) {
+      // Known contact - use orange letter glyph
+      const initials = (contact.firstName.charAt(0) + (contact.lastName ? contact.lastName.charAt(0) : '')).toUpperCase();
+      return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initials}</div>`;
+    } else {
+      // Unknown contact - use company favicon
+      const companyName = callData?.companyName || callData?.contactName || contactName;
+      const domain = extractDomainFromCompany(companyName);
+      if (domain) {
+        return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">
+          <img src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}" 
+               alt="" loading="lazy" referrerpolicy="no-referrer" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="company-favicon-fallback" style="display:none;">${svgIcon('accounts')}</div>
+        </div>`;
+      } else {
+        // Fallback to first letter of contact name
+        const initial = (contactName || 'C').charAt(0).toUpperCase();
+        return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initial}</div>`;
+      }
+    }
+  }
+  
+  function extractDomainFromCompany(companyName) {
+    if (!companyName) return null;
+    // Simple domain extraction - could be enhanced
+    const clean = companyName.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const commonDomains = {
+      'google': 'google.com',
+      'microsoft': 'microsoft.com',
+      'apple': 'apple.com',
+      'amazon': 'amazon.com',
+      'facebook': 'facebook.com',
+      'meta': 'meta.com'
+    };
+    return commonDomains[clean] || null;
+  }
+  
   // Normalize supplier tokens in free text (e.g., "T X U" → "TXU", "N R G" → "NRG")
   function normalizeSupplierTokens(s){
     try {
@@ -1897,7 +2074,17 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         if (current) groups.push(current);
         return groups.map(g => {
           const label = g.role === 'agent' ? 'You' : (g.role === 'customer' ? contactFirst : 'Speaker');
-          return `<div class=\"transcript-line ${g.role}\"><span class=\"speaker\">${label} ${toMMSS(g.start)}:</span> <span class=\"text\">${escapeHtml(g.texts.join(' ').trim())}</span></div>`;
+          const avatar = g.role === 'agent' ? getAgentAvatar() : getContactAvatar(contactFirst, r);
+          return `<div class=\"transcript-message ${g.role}\">
+            <div class=\"transcript-avatar\">${avatar}</div>
+            <div class=\"transcript-content\">
+              <div class=\"transcript-header\">
+                <span class=\"transcript-speaker\">${label}</span>
+                <span class=\"transcript-time\">${toMMSS(g.start)}</span>
+              </div>
+              <div class=\"transcript-text\">${escapeHtml(g.texts.join(' ').trim())}</div>
+            </div>
+          </div>`;
         }).join('');
       }
       const parsed = parseSpeakerTranscript(raw||'');
@@ -1906,19 +2093,43 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         // Heuristic diarization when labels are all "Speaker": alternate roles by turn order
         let toggle = 'customer'; // start with customer speaking
         return parsed.map(p=> {
-          if (!p.label) return `<div class=\"transcript-line\"><span class=\"text\">${escapeHtml(p.text||'')}</span></div>`;
+          if (!p.label) return `<div class=\"transcript-message\"><div class=\"transcript-content\"><div class=\"transcript-text\">${escapeHtml(p.text||'')}</div></div></div>`;
           let roleLabel = p.label;
+          let role = 'other';
           if (/^speaker\b/i.test(roleLabel)) {
             roleLabel = (toggle === 'agent') ? 'You' : contactFirst;
+            role = toggle;
             toggle = (toggle === 'agent') ? 'customer' : 'agent';
           }
-          return `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(roleLabel)} ${toMMSS(p.t)}:</span> <span class=\"text\">${escapeHtml(p.text||'')}</span></div>`;
+          const avatar = role === 'agent' ? getAgentAvatar() : getContactAvatar(contactFirst, r);
+          return `<div class=\"transcript-message ${role}\">
+            <div class=\"transcript-avatar\">${avatar}</div>
+            <div class=\"transcript-content\">
+              <div class=\"transcript-header\">
+                <span class=\"transcript-speaker\">${escapeHtml(roleLabel)}</span>
+                <span class=\"transcript-time\">${toMMSS(p.t)}</span>
+              </div>
+              <div class=\"transcript-text\">${escapeHtml(p.text||'')}</div>
+            </div>
+          </div>`;
         }).join('');
       }
       // Final heuristic: split by punctuation and alternate roles
       const heur = heuristicSplitByPunctuation(raw||'');
       if (heur.length){
-        return heur.map(h => `<div class=\"transcript-line\"><span class=\"speaker\">${escapeHtml(h.label)}:</span> <span class=\"text\">${escapeHtml(h.text)}</span></div>`).join('');
+        return heur.map(h => {
+          const role = h.label === 'You' ? 'agent' : 'customer';
+          const avatar = role === 'agent' ? getAgentAvatar() : getContactAvatar(h.label, r);
+          return `<div class=\"transcript-message ${role}\">
+            <div class=\"transcript-avatar\">${avatar}</div>
+            <div class=\"transcript-content\">
+              <div class=\"transcript-header\">
+                <span class=\"transcript-speaker\">${escapeHtml(h.label)}</span>
+              </div>
+              <div class=\"transcript-text\">${escapeHtml(h.text)}</div>
+            </div>
+          </div>`;
+        }).join('');
       }
       const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
       return escapeHtml(fallback);
@@ -1959,7 +2170,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
               Call Transcript
             </h4>
-            <div class=\"pc-transcript\">${transcriptHtml}</div>
+            <div class=\"pc-transcript-container\">${transcriptHtml}</div>
           </div>
         </div>
 
