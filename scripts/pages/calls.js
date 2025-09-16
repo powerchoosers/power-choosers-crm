@@ -645,7 +645,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
           const rows = j.calls.map((c, idx) => {
             const id = c.id || `call_${Date.now()}_${idx}`;
-            const party = pickCounterparty(c);
+            // Prefer server-provided targetPhone for reliable counterparty mapping
+            const target10 = normPhone(c.targetPhone || '');
+            const party = target10 || pickCounterparty(c);
             const debug = { id, to: c.to, from: c.from, party, accountId: c.accountId || null, contactId: c.contactId || null };
 
             // Contact name resolution
@@ -680,8 +682,19 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             }
             else if (c.contactId) {
               const pc = getContactById(c.contactId);
-              const full = pc ? ([pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '') : '';
-              if (full) { contactName = full; debug.contactSource = 'people.byId'; }
+              // Validate contactId by requiring a phone match to the counterparty
+              const phoneMatch = (()=>{
+                try{
+                  if (!pc) return false; const nums=[pc.workDirectPhone, pc.mobile, pc.otherPhone, pc.phone].map(normPhone).filter(Boolean);
+                  return party && nums.includes(party);
+                }catch(_){ return false; }
+              })();
+              if (pc && phoneMatch) {
+                const full = ([pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '');
+                if (full) { contactName = full; debug.contactSource = 'people.byId'; }
+              } else {
+                if (window.CRM_DEBUG_CALLS) console.log('[Calls][contactId] Ignoring provided contactId without phone match:', c.contactId, 'party=', party);
+              }
             }
             if (!contactName) {
               const m = phoneToContact.get(party);
@@ -724,10 +737,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             // Try from contact ID lookup
             if (!contactTitle && c.contactId) {
               const pc = getContactById(c.contactId);
-              if (pc && pc.title) { 
-                contactTitle = pc.title; 
-                debug.titleSource = 'people.byId'; 
-              }
+              // Honor title from contact only if phone matches counterparty
+              const phoneMatch = (()=>{ try{ if(!pc) return false; const nums=[pc.workDirectPhone, pc.mobile, pc.otherPhone, pc.phone].map(normPhone).filter(Boolean); return party && nums.includes(party);}catch(_){return false;} })();
+              if (pc && phoneMatch && pc.title) { contactTitle = pc.title; debug.titleSource = 'people.byId'; }
             }
             
             // Try from phone to contact map
@@ -770,7 +782,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             }
             if (!company && c.contactId) {
               const pc = getContactById(c.contactId);
-              if (pc) { company = pc.companyName || pc.accountName || pc.company || ''; debug.companySource = 'people.companyFromContactId'; }
+              // Only use company from contact if phone matches counterparty to avoid wrong associations
+              const phoneMatch = (()=>{ try{ if(!pc) return false; const nums=[pc.workDirectPhone, pc.mobile, pc.otherPhone, pc.phone].map(normPhone).filter(Boolean); return party && nums.includes(party);}catch(_){return false;} })();
+              if (pc && phoneMatch) { company = pc.companyName || pc.accountName || pc.company || ''; debug.companySource = 'people.companyFromContactId'; }
             }
             if (!company) {
               const m = phoneToContact.get(party);
