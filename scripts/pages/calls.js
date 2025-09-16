@@ -2015,7 +2015,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               const sp = (s.speaker || s.role || '').toString().toLowerCase();
               if (sp.includes('agent') || sp.includes('rep')) role = 'agent';
               else if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) role = 'customer';
-              else role = (ch === agentCh) ? 'agent' : 'customer';
+              else if (ch) role = (ch === agentCh) ? 'agent' : 'customer';
               const ts = Math.max(0, Math.floor((s.startTime || 0)));
               const txt = normalizeSupplierTokens(s.text || s.transcript || '');
               if (current && current.role === role){ current.text += (current.text?' ':'') + txt; current.t = ts; }
@@ -2044,7 +2044,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
                 let role = '';
                 if (sp.includes('agent') || sp.includes('rep')) role = 'agent';
                 else if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) role = 'customer';
-                else role = (ch === agentCh) ? 'agent' : 'customer';
+                else if (ch) role = (ch === agentCh) ? 'agent' : 'customer';
                 const ts = Math.max(0, Math.floor((s.startTime || 0)));
                 const txt = normalizeSupplierTokens(s.text || s.transcript || '');
                 rebuilt.push({ role, t: ts, text: txt });
