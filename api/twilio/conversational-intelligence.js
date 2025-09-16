@@ -155,7 +155,7 @@ export default async function handler(req, res) {
                     endTime: s.endTime,
                     channel: s.channel
                 }));
-
+                
                 // If sentences lack channel/speaker entirely, recreate transcript with participants mapping
                 try {
                     const lacksDiarization = Array.isArray(sentences) && sentences.length > 0 && sentences.every(s => (s.channel == null && !s.speaker && !s.role));
