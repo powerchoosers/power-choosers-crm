@@ -146,8 +146,44 @@ export default async function handler(req, res) {
           
           if (started) {
             console.log('[Dial-Status] ✅ Started recording on', startedOn, '(dual confirmed)');
+            // Telemetry: log success to Firestore (best-effort)
+            try {
+              const { db } = require('../_firebase');
+              if (db) {
+                await db.collection('twilio_webhooks').add({
+                  type: 'dial-status',
+                  ts: new Date().toISOString(),
+                  event,
+                  started: true,
+                  startedOn,
+                  parentSid,
+                  childSid,
+                  pstnCandidates: pstnList,
+                  otherCandidates: Array.from(candidates),
+                  body
+                });
+              }
+            } catch(_) {}
           } else {
             console.warn('[Dial-Status] ❌ Unable to start dual recording (last channels seen:', channelsSeen, ')');
+            // Telemetry: log failure to Firestore (best-effort)
+            try {
+              const { db } = require('../_firebase');
+              if (db) {
+                await db.collection('twilio_webhooks').add({
+                  type: 'dial-status',
+                  ts: new Date().toISOString(),
+                  event,
+                  started: false,
+                  parentSid,
+                  childSid,
+                  pstnCandidates: pstnList,
+                  otherCandidates: Array.from(candidates),
+                  lastChannelsSeen: channelsSeen,
+                  body
+                });
+              }
+            } catch(_) {}
           }
         } else {
           console.warn('[Dial-Status] Missing Twilio credentials');
