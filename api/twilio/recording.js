@@ -73,6 +73,41 @@ export default async function handler(req, res) {
         try { console.log('[Recording] Raw body:', JSON.stringify(body).slice(0, 1200)); } catch(_) {}
         try { if (body && (body.RecordingChannels || body.RecordingTrack)) console.log('[Recording] Channels/Track:', body.RecordingChannels || '(n/a)', body.RecordingTrack || '(n/a)'); } catch(_) {}
         
+        // Log all recording-related fields for debugging
+        try {
+            console.log('[Recording] All recording fields:', {
+                RecordingSource: body.RecordingSource,
+                RecordingChannels: body.RecordingChannels,
+                RecordingTrack: body.RecordingTrack,
+                RecordingStatus: body.RecordingStatus,
+                RecordingDuration: body.RecordingDuration,
+                CallSid: body.CallSid,
+                RecordingSid: body.RecordingSid
+            });
+        } catch(_) {}
+        
+        // Guard: ignore only MONO DialVerb completions; allow dual ("2" or "dual")
+        try {
+            const src = String(body.RecordingSource || body.Source || '').toLowerCase();
+            const chRaw = String(body.RecordingChannels || body.Channels || '').toLowerCase();
+            const chNum = Number(body.RecordingChannels || body.Channels || 0);
+            const isDual = chRaw === '2' || chRaw === 'dual' || chRaw === 'both' || chNum === 2;
+            
+            console.log('[Recording] Channel analysis:', { 
+                RecordingChannels: body.RecordingChannels, 
+                chRaw, 
+                chNum, 
+                isDual, 
+                RecordingSource: body.RecordingSource,
+                src 
+            });
+            
+            if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
+                console.log('[Recording] Ignoring mono DialVerb completion (will rely on REST dual):', { RecordingSid, CallSid, RecordingChannels: body.RecordingChannels, RecordingSource: body.RecordingSource });
+                return res.status(200).json({ success: true, ignored: true, reason: 'mono_dialverb' });
+            }
+        } catch(_) {}
+
         // If the recording is completed but RecordingUrl is missing, attempt to fetch it by CallSid
         let effectiveRecordingUrl = RecordingUrl || '';
         let effectiveRecordingSid = RecordingSid || '';

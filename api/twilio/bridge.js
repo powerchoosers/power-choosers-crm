@@ -13,8 +13,11 @@ export default async function handler(req, res) {
         
         console.log(`[Bridge] Connecting agent call to target: ${target}, CallSid: ${CallSid}`);
         
-        // Ensure absolute base URL for Twilio callbacks (avoid preview domains that require auth)
-        const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
+        // Ensure absolute base URL for Twilio callbacks (prefer headers)
+        const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+        const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+        const envBase = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+        const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm.vercel.app');
         
         if (!target) {
             // No target specified, just say hello
@@ -26,10 +29,31 @@ export default async function handler(req, res) {
             return;
         }
         
+        // Seed the Calls API with correct phone context for this CallSid
+        try {
+            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+            const twilioBiz = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
+            const businessPhone = twilioBiz;
+            const target10 = norm(target);
+            const payload = {
+                callSid: CallSid,
+                to: target,
+                from: twilioBiz,
+                status: 'in-progress',
+                targetPhone: target10,
+                businessPhone
+            };
+            // Fire-and-forget; don't block TwiML
+            fetch(`${base}/api/calls`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(()=>{});
+        } catch(_) {}
+
         // Create TwiML to bridge the call
         const twiml = new VoiceResponse();
-        // Note: We don't start recording on parent leg as it creates mono recordings
-        // Instead, we rely on Dial's built-in recording to capture dual-channel on child leg
+        // Outbound PSTN leg: enable TwiML dual-channel recording on the Dialed number
         
         // Dial the target number immediately without any intro message
         const dial = twiml.dial({
@@ -43,12 +67,10 @@ export default async function handler(req, res) {
             statusCallback: `${base}/api/twilio/dial-status`,
             statusCallbackEvent: 'initiated ringing answered completed',
             statusCallbackMethod: 'POST',
-            // Enable Dial recording as a safety net; child-leg dual channel will still be started by dial-status
-            record: 'record-from-answer',
+            // TwiML dual-channel from answer
+            record: 'record-from-answer-dual',
             recordingStatusCallback: `${base}/api/twilio/recording`,
-            recordingStatusCallbackMethod: 'POST',
-            recordingChannels: 'dual',
-            recordingTrack: 'both'
+            recordingStatusCallbackMethod: 'POST'
         });
         
         // Add the target number with no retry logic
