@@ -101,7 +101,8 @@ export default async function handler(req, res) {
             }
             // Ensure we have a direct mp3 URL for playback
             const rawUrl = effectiveRecordingUrl || RecordingUrl;
-            const recordingMp3Url = rawUrl.endsWith('.mp3') ? rawUrl : `${rawUrl}.mp3`;
+            const baseMp3 = rawUrl.endsWith('.mp3') ? rawUrl : `${rawUrl}.mp3`;
+            const recordingMp3Url = baseMp3.includes('?') ? `${baseMp3}&RequestedChannels=2` : `${baseMp3}?RequestedChannels=2`;
 
             // Store call data in local memory (best-effort)
             const callData = {

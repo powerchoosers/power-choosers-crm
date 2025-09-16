@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const url = (req.query && (req.query.url || req.query.u)) || (req.body && req.body.url);
+    let url = (req.query && (req.query.url || req.query.u)) || (req.body && req.body.url);
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'Missing url parameter' });
     }
@@ -22,6 +22,12 @@ export default async function handler(req, res) {
     if (!accountSid || !authToken) {
       return res.status(500).json({ error: 'Missing Twilio credentials' });
     }
+
+    // Force dual-channel playback if not explicitly requested
+    try {
+      const u = new URL(url);
+      if (!u.searchParams.has('RequestedChannels')) { u.searchParams.set('RequestedChannels', '2'); url = u.toString(); }
+    } catch(_) {}
 
     const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
     const twilioResp = await fetch(url, { headers: { Authorization: authHeader } });
