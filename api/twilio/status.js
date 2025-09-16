@@ -228,19 +228,46 @@ export default async function handler(req, res) {
         try {
             if (CallStatus === 'completed' && !RecordingUrl && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
                 const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-                const recs = await client.recordings.list({ callSid: CallSid, limit: 1 });
-                if (recs && recs.length > 0) {
-                    const recSid = recs[0].sid;
-                    const full = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${recSid}.mp3`;
-                    console.log(`[Status] Found recording for ${CallSid}: ${full}`);
+                let foundUrl = '';
+                let foundRecSid = '';
+                // 1) Try parent CallSid first
+                try {
+                    const recs = await client.recordings.list({ callSid: CallSid, limit: 5 });
+                    const best = (recs || []).find(r => (Number(r.channels)||0) === 2) || (recs || [])[0];
+                    if (best) {
+                        foundRecSid = best.sid;
+                        foundUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${foundRecSid}.mp3`;
+                        console.log(`[Status] Found parent-leg recording for ${CallSid}: ${foundUrl}`);
+                    }
+                } catch(_) {}
+                // 2) If not found on parent, look on child legs (PSTN priority)
+                if (!foundUrl) {
+                    try {
+                        const kids = await client.calls.list({ parentCallSid: CallSid, limit: 10 });
+                        // Prefer dual-channel
+                        for (const k of kids) {
+                            try {
+                                const rs = await client.recordings.list({ callSid: k.sid, limit: 5 });
+                                const best = (rs || []).find(r => (Number(r.channels)||0) === 2) || null;
+                                if (best) {
+                                    foundRecSid = best.sid;
+                                    foundUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${foundRecSid}.mp3`;
+                                    console.log(`[Status] Found child-leg recording for ${CallSid} on ${k.sid}: ${foundUrl}`);
+                                    break;
+                                }
+                            } catch(_) {}
+                        }
+                    } catch(_) {}
+                }
+                if (foundUrl) {
                     const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
                     await fetch(`${base}/api/calls`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callSid: CallSid, recordingUrl: full })
+                        body: JSON.stringify({ callSid: CallSid, recordingUrl: foundUrl })
                     }).catch(() => {});
                 } else {
-                    console.log(`[Status] No recordings found yet for ${CallSid}`);
+                    console.log(`[Status] No recordings found yet for ${CallSid} on parent or children`);
                 }
             }
         } catch (err) {
