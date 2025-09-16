@@ -45,8 +45,12 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
-                // Do NOT start Dial-level recording; we start dual on PSTN leg via REST in dial-status/status
-                record: 'do-not-record'
+                // Enable Dial recording as a safety net; we'll still start child-leg dual via dial-status
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST',
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
             // Small prompt to keep caller informed
             twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
@@ -73,8 +77,12 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
-                // Do NOT start Dial-level recording; we start dual on PSTN leg via REST in dial-status/status
-                record: 'do-not-record'
+                // Enable Dial recording as a safety net; child-leg dual channel will still be started by dial-status
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST',
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -92,8 +100,12 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
-                // Do NOT start Dial-level recording; we start dual on PSTN leg via REST in dial-status/status
-                record: 'do-not-record'
+                // Enable Dial recording as a safety net; child-leg dual channel will still be started by dial-status
+                record: 'record-from-answer',
+                recordingStatusCallback: `${base}/api/twilio/recording`,
+                recordingStatusCallbackMethod: 'POST',
+                recordingChannels: 'dual',
+                recordingTrack: 'both'
             });
             dial.client('agent');
         }

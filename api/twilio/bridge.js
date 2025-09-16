@@ -26,28 +26,6 @@ export default async function handler(req, res) {
             return;
         }
         
-        // Seed the Calls API with correct phone context for this CallSid
-        try {
-            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-            const twilioBiz = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
-            const businessPhone = twilioBiz;
-            const target10 = norm(target);
-            const payload = {
-                callSid: CallSid,
-                to: target,
-                from: twilioBiz,
-                status: 'in-progress',
-                targetPhone: target10,
-                businessPhone
-            };
-            // Fire-and-forget; don't block TwiML
-            fetch(`${base}/api/calls`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).catch(()=>{});
-        } catch(_) {}
-
         // Create TwiML to bridge the call
         const twiml = new VoiceResponse();
         // Note: We don't start recording on parent leg as it creates mono recordings
@@ -65,8 +43,12 @@ export default async function handler(req, res) {
             statusCallback: `${base}/api/twilio/dial-status`,
             statusCallbackEvent: 'initiated ringing answered completed',
             statusCallbackMethod: 'POST',
-            // Do NOT start Dial-level recording; start dual via REST in /api/twilio/dial-status or /api/twilio/status
-            record: 'do-not-record'
+            // Enable Dial recording as a safety net; child-leg dual channel will still be started by dial-status
+            record: 'record-from-answer',
+            recordingStatusCallback: `${base}/api/twilio/recording`,
+            recordingStatusCallbackMethod: 'POST',
+            recordingChannels: 'dual',
+            recordingTrack: 'both'
         });
         
         // Add the target number with no retry logic

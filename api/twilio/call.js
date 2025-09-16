@@ -41,7 +41,6 @@ const handler = async function handler(req, res) {
             method: 'POST',
             statusCallback: `${baseUrl}/api/twilio/status`,
             statusCallbackMethod: 'POST',
-            statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             // Add timeout to prevent hanging calls
             timeout: 30,
             // Ensure proper call handling

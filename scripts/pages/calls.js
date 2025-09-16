@@ -645,9 +645,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
           const rows = j.calls.map((c, idx) => {
             const id = c.id || `call_${Date.now()}_${idx}`;
-            // Prefer server-provided targetPhone for reliable counterparty mapping
-            const target10 = normPhone(c.targetPhone || '');
-            const party = target10 || pickCounterparty(c);
+            const party = pickCounterparty(c);
             const debug = { id, to: c.to, from: c.from, party, accountId: c.accountId || null, contactId: c.contactId || null };
 
             // Contact name resolution
@@ -682,19 +680,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             }
             else if (c.contactId) {
               const pc = getContactById(c.contactId);
-              // Validate contactId by requiring a phone match to the counterparty
-              const phoneMatch = (()=>{
-                try{
-                  if (!pc) return false; const nums=[pc.workDirectPhone, pc.mobile, pc.otherPhone, pc.phone].map(normPhone).filter(Boolean);
-                  return party && nums.includes(party);
-                }catch(_){ return false; }
-              })();
-              if (pc && phoneMatch) {
-                const full = ([pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '');
-                if (full) { contactName = full; debug.contactSource = 'people.byId'; }
-              } else {
-                if (window.CRM_DEBUG_CALLS) console.log('[Calls][contactId] Ignoring provided contactId without phone match:', c.contactId, 'party=', party);
-              }
+              const full = pc ? ([pc.firstName, pc.lastName].filter(Boolean).join(' ') || pc.name || '') : '';
+              if (full) { contactName = full; debug.contactSource = 'people.byId'; }
             }
             if (!contactName) {
               const m = phoneToContact.get(party);
@@ -711,14 +698,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               const acct = findAccountByPhone(party);
               if (acct){
                 const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
-                // Only use recent contact if they have a phone that matches the counterparty
-                const phoneMatch = (()=>{
-                  try{
-                    if (!p) return false; const nums=[p.workDirectPhone, p.mobile, p.otherPhone, p.phone].map(normPhone).filter(Boolean);
-                    return party && nums.includes(party);
-                  }catch(_){ return false; }
-                })();
-                if (p && phoneMatch){
+                if (p){
                   const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
                   if (full) { 
                     contactName = full; 
@@ -728,8 +708,6 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
                       debug.contactIdSource = 'account.recentContact';
                     }
                   }
-                } else if (p && window.CRM_DEBUG_CALLS) {
-                  console.log('[Calls][accountFallback] Skipping recent contact without phone match:', { party, contactId: p?.id, phones: [p?.workDirectPhone, p?.mobile, p?.otherPhone, p?.phone] });
                 }
               }
             }
@@ -746,9 +724,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             // Try from contact ID lookup
             if (!contactTitle && c.contactId) {
               const pc = getContactById(c.contactId);
-              // Honor title from contact only if phone matches counterparty
-              const phoneMatch = (()=>{ try{ if(!pc) return false; const nums=[pc.workDirectPhone, pc.mobile, pc.otherPhone, pc.phone].map(normPhone).filter(Boolean); return party && nums.includes(party);}catch(_){return false;} })();
-              if (pc && phoneMatch && pc.title) { contactTitle = pc.title; debug.titleSource = 'people.byId'; }
+              if (pc && pc.title) { 
+                contactTitle = pc.title; 
+                debug.titleSource = 'people.byId'; 
+              }
             }
             
             // Try from phone to contact map
@@ -791,9 +770,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             }
             if (!company && c.contactId) {
               const pc = getContactById(c.contactId);
-              // Only use company from contact if phone matches counterparty to avoid wrong associations
-              const phoneMatch = (()=>{ try{ if(!pc) return false; const nums=[pc.workDirectPhone, pc.mobile, pc.otherPhone, pc.phone].map(normPhone).filter(Boolean); return party && nums.includes(party);}catch(_){return false;} })();
-              if (pc && phoneMatch) { company = pc.companyName || pc.accountName || pc.company || ''; debug.companySource = 'people.companyFromContactId'; }
+              if (pc) { company = pc.companyName || pc.accountName || pc.company || ''; debug.companySource = 'people.companyFromContactId'; }
             }
             if (!company) {
               const m = phoneToContact.get(party);
@@ -812,15 +789,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             let direction = 'unknown';
             if (isClientAddr(c.from) || isBizNum(from10)) direction = 'outbound';
             else if (isClientAddr(c.to) || isBizNum(to10)) direction = 'inbound';
-            // Fallback using server-provided targetPhone (when business list not configured)
-            if (direction === 'unknown') {
-              const tp = normPhone(c.targetPhone);
-              if (tp) {
-                if (tp === to10 && from10) direction = 'outbound';
-                else if (tp === from10 && to10) direction = 'inbound';
-              }
-            }
-            const counter10 = direction === 'outbound' ? (to10 || party) : (direction === 'inbound' ? (from10 || party) : party);
+            const counter10 = direction === 'outbound' ? to10 : (direction === 'inbound' ? from10 : party);
             const counterPretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
             // Pretty print phone (backwards-compat field)
             const contactPhone = counterPretty;
@@ -893,16 +862,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               
               console.log('[Calls] Looking for contact by phone:', lookupNum, 'Normalized:', partyNorm, 'People data count:', people.length);
               
-              // Only attempt phone matching if we have a full 10-digit counterparty
-              let foundContact = null;
-              if (partyNorm && partyNorm.length === 10) {
-                foundContact = people.find(p => {
-                  const phoneNorms = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone]
-                    .map(norm)
-                    .filter(n => n && n.length === 10);
-                  return phoneNorms.includes(partyNorm);
-                });
-              }
+              const foundContact = people.find(p => {
+                const phoneNorms = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone].map(norm);
+                return phoneNorms.includes(partyNorm);
+              });
               
               if (foundContact) {
                 if (!contactName) contactName = [foundContact.firstName, foundContact.lastName].filter(Boolean).join(' ') || foundContact.name || '';
