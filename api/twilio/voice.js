@@ -45,7 +45,7 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
-                // Record the bridged leg via Dial (primary) and still start child-leg via webhook if needed
+                // Record the bridged child leg via Dial - this ensures dual-channel on PSTN leg
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
                 recordingStatusCallbackMethod: 'POST',
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
                 recordingTrack: 'both'
             });
             // Small prompt to keep caller informed
-            try { twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.'); } catch(_) {}
+            twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
             
             // Pass the original caller's number as a custom parameter
             const client = dial.client('agent');
@@ -77,6 +77,7 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
+                // Record the child leg (PSTN) via Dial to get dual-channel
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
                 recordingStatusCallbackMethod: 'POST',
@@ -92,11 +93,14 @@ export default async function handler(req, res) {
                 callerId: businessNumber,
                 timeout: 30,
                 answerOnBridge: true,
+                hangupOnStar: false,
+                timeLimit: 14400,
                 // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
+                // Record the child leg via Dial for dual-channel
                 record: 'record-from-answer',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
                 recordingStatusCallbackMethod: 'POST',
