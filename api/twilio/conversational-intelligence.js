@@ -78,6 +78,28 @@ export default async function handler(req, res) {
         }
         
         let transcript = null;
+        // Compute channel participants map (Agent vs Customer) based on call legs
+        let agentChannelNum = 1;
+        try {
+            const callSidForMap = (callSid || recording.callSid || null);
+            if (callSidForMap) {
+                const callResource = await client.calls(callSidForMap).fetch();
+                const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+                const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+                  .split(',').map(norm).filter(Boolean);
+                const fromStr = callResource?.from || '';
+                const toStr = callResource?.to || '';
+                const from10 = norm(fromStr);
+                const to10 = norm(toStr);
+                const isBiz = (p) => !!p && envBiz.includes(p);
+                const fromIsClient = /^client:/i.test(fromStr);
+                const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
+                agentChannelNum = fromIsAgent ? 1 : 2;
+                console.log('[CI Manual] Agent mapped to channel', agentChannelNum, { from: fromStr, to: toStr });
+            }
+        } catch (e) {
+            console.warn('[CI Manual] Could not compute channel participants map, defaulting agent=1:', e?.message);
+        }
         
         if (existingTranscript) {
             // Fetch the existing transcript
@@ -91,7 +113,11 @@ export default async function handler(req, res) {
                 channel: {
                     media_properties: {
                         source_sid: recording.sid
-                    }
+                    },
+                    participants: [
+                        { role: 'Agent', channel_participant: agentChannelNum },
+                        { role: 'Customer', channel_participant: agentChannelNum === 1 ? 2 : 1 }
+                    ]
                 },
                 customerKey: callSid || recordingSid // Use callSid as customer key for tracking
             });
