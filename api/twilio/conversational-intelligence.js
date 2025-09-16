@@ -197,7 +197,24 @@ export default async function handler(req, res) {
                     }
                 } catch(_) {}
                 
-                transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
+                // Build speakerTurns from sentences using channel map
+                const normCh = (c)=>{ const s=(c==null?'':String(c)).trim(); if(s==='0') return '1'; if(/^[Aa]$/.test(s)) return '1'; if(/^[Bb]$/.test(s)) return '2'; return s; };
+                let speakerTurns = [];
+                try {
+                    const turns = [];
+                    for (const s of sentences){
+                        const txt = (s.text||'').trim(); if(!txt) continue;
+                        const ch = normCh(s.channel);
+                        const sp = (s.speaker||s.role||'').toString().toLowerCase();
+                        let role = '';
+                        if (sp.includes('agent')||sp.includes('rep')) role='agent'; else if (sp.includes('customer')||sp.includes('caller')||sp.includes('client')) role='customer'; else if (ch) role = (String(agentChannelNum)===normCh(ch)) ? 'agent':'customer';
+                        const start = Number(s.startTime)||0; const t=Math.max(0,Math.round(start));
+                        turns.push({ t, role, text: txt });
+                    }
+                    speakerTurns = turns;
+                } catch(_) {}
+
+                transcriptText = (speakerTurns.length ? speakerTurns.map(x=>x.text).join(' ') : sentences.map(s => s.text || '').filter(text => text.trim()).join(' '));
                 console.log(`[Conversational Intelligence] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
                 console.log(`[Conversational Intelligence] Sample sentences:`, sentences.slice(0, 3).map(s => ({ text: s.text, confidence: s.confidence })));
                 
@@ -219,6 +236,37 @@ export default async function handler(req, res) {
                         console.warn('[Conversational Intelligence] Basic transcription fallback failed:', fallbackError.message);
                     }
                 }
+                // Words fallback when sentences lack diarization
+                try {
+                    const lacksDiarization = Array.isArray(sentences) && sentences.length > 0 && sentences.every(s => (s.channel == null && !s.speaker && !s.role));
+                    const noRoles = !speakerTurns.some(t => t.role==='agent' || t.role==='customer');
+                    if (lacksDiarization || noRoles) {
+                        const words = await client.intelligence.v2.transcripts(transcript.sid).words.list();
+                        if (Array.isArray(words) && words.length){
+                            const normalizeChannelWord = (c)=>{ const s=(c==null?'':String(c)).trim(); if(s==='0') return '1'; if(/^[Aa]$/.test(s)) return '1'; if(/^[Bb]$/.test(s)) return '2'; return s; };
+                            const getText=(w)=> (w && (w.text||w.word||w.value||'')).toString().trim();
+                            const segments=[]; let current=null;
+                            for (const w of words){
+                                const txt=getText(w); if(!txt) continue;
+                                const ch = normalizeChannelWord(w.channel ?? w.channelNumber ?? w.channel_id ?? w.channelIndex);
+                                let role='';
+                                const sp=(w.speaker||w.role||'').toString().toLowerCase();
+                                if (sp.includes('agent')||sp.includes('rep')) role='agent'; else if (sp.includes('customer')||sp.includes('caller')||sp.includes('client')) role='customer'; else role = (String(agentChannelNum)===ch)?'agent':'customer';
+                                const startW = Number(w.startTime || w.start_time || w.start || 0);
+                                const tW = isNaN(startW)?0:startW;
+                                const gapOk = !current || (tW - current._lastStart) <= 1.25;
+                                if (current && current.role===role && gapOk){ current.text += (current.text?' ':'') + txt; current._lastStart=tW; current.t=Math.round(tW); }
+                                else { if (current) segments.push({ t: current.t, role: current.role, text: current.text }); current = { role, t: Math.max(0, Math.round(tW)), text: txt, _lastStart: tW }; }
+                            }
+                            if (current) segments.push({ t: current.t, role: current.role, text: current.text });
+                            if (segments.length){ speakerTurns = segments; transcriptText = segments.map(x=>x.text).join(' '); }
+                        }
+                    }
+                } catch(_) {}
+
+                // Attach turns and channel map to be used by UI
+                try { transcript._pcSpeakerTurns = speakerTurns; } catch(_) {}
+
             } catch (error) {
                 console.error('[Conversational Intelligence] Error fetching sentences:', error);
             }
@@ -247,6 +295,8 @@ export default async function handler(req, res) {
         let aiInsights = null;
         if (transcriptText) {
             aiInsights = await generateAdvancedAIInsights(transcriptText, sentences, operatorResults);
+            // Attach speaker turns if available
+            try { if (Array.isArray(transcript._pcSpeakerTurns) && transcript._pcSpeakerTurns.length) aiInsights.speakerTurns = transcript._pcSpeakerTurns; } catch(_) {}
         }
         
         // Update the call data in the central store
@@ -263,6 +313,7 @@ export default async function handler(req, res) {
                         transcriptSid: transcript.sid,
                         status: transcript.status,
                         sentences: sentences,
+                        channelRoleMap: { agentChannel: String(agentChannelNum), customerChannel: String(agentChannelNum===1?2:1) },
                         operatorResults: operatorResults,
                         serviceSid: serviceSid
                     }
