@@ -67,9 +67,11 @@ function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
   return { businessPhone: biz || '', targetPhone: tgt || '' };
 }
 
-async function getCallsFromFirestore(limit = 50) {
+async function getCallsFromFirestore(limit = 0) {
   if (!db) return null;
-  const snap = await db.collection('calls').orderBy('timestamp', 'desc').limit(limit).get();
+  let q = db.collection('calls').orderBy('timestamp', 'desc');
+  if (limit && Number(limit) > 0) q = q.limit(Number(limit));
+  const snap = await q.get();
   const rows = [];
   snap.forEach((doc) => {
     const data = doc.data() || {};
@@ -175,7 +177,7 @@ export default async function handler(req, res) {
           }
         }
 
-        const calls = await getCallsFromFirestore(50);
+        const calls = await getCallsFromFirestore(0);
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ ok: true, calls }));
@@ -185,7 +187,6 @@ export default async function handler(req, res) {
       // Fallback to memory store
       const calls = Array.from(memoryStore.values())
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-        .slice(0, 50)
         .map(normalizeCallForResponse);
 
       res.statusCode = 200;
