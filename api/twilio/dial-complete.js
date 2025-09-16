@@ -10,13 +10,34 @@ export default function handler(req, res) {
   }
 
   try {
-    const { CallSid, DialCallStatus, DialCallDuration } = req.body;
+    const { CallSid, DialCallStatus, DialCallDuration, DialCallSid } = req.body;
     
     console.log('[DialComplete] Call completed:', {
       callSid: CallSid,
+      childCallSid: DialCallSid,
       status: DialCallStatus,
       duration: DialCallDuration
     });
+
+    // Fallback: Start dual-channel recording on child call if we have the DialCallSid
+    if (DialCallSid && DialCallStatus === 'completed') {
+      try {
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        if (accountSid && authToken) {
+          const client = twilio(accountSid, authToken);
+          await client.calls(DialCallSid).recordings.create({
+            recordingChannels: 'dual',
+            recordingTrack: 'both',
+            recordingStatusCallback: (process.env.PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}` || 'https://power-choosers-crm.vercel.app') + '/api/twilio/recording',
+            recordingStatusCallbackMethod: 'POST'
+          });
+          console.log('[DialComplete] Started dual recording for child leg', DialCallSid);
+        }
+      } catch (e) { 
+        console.warn('[DialComplete] Failed to start recording on child leg:', e?.message); 
+      }
+    }
 
     // Create TwiML response that ENDS the call without retry
     const twiml = new VoiceResponse();
