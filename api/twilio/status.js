@@ -180,12 +180,24 @@ export default async function handler(req, res) {
         // Upsert into central /api/calls so the UI stays in sync
         try {
                 const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+            // Derive targetPhone and businessPhone for better UI mapping
+            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+            const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+              .split(',').map(norm).filter(Boolean);
+            const to10 = norm(To);
+            const from10 = norm(From);
+            const isBiz = (p) => !!p && envBiz.includes(p);
+            const businessPhone = isBiz(to10) ? To : (isBiz(from10) ? From : (envBiz[0] || ''));
+            const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
+
             const body = {
                 callSid: CallSid,
                 to: To,
                 from: From,
                 status: CallStatus,
-                duration: parseInt((Duration || CallDuration || '0'), 10)
+                duration: parseInt((Duration || CallDuration || '0'), 10),
+                targetPhone: targetPhone || undefined,
+                businessPhone: businessPhone || undefined
             };
             if (RecordingUrl) {
                 body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
