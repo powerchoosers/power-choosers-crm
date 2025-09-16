@@ -232,14 +232,15 @@ export default async function handler(req, res) {
                     .transcripts(TranscriptSid)
                     .sentences.list();
                 
+                const agentChNum = Number(channelRoleMap.agentChannel || '1');
                 sentences = sentencesResponse.map(s => ({
                     text: s.text || '',
                     confidence: s.confidence,
                     startTime: s.startTime,
                     endTime: s.endTime,
                     channel: s.channel,
-                    // Map channel to speaker role (Channel 1 = Agent, Channel 2 = Customer)
-                    speaker: s.channel === 1 ? 'Agent' : s.channel === 2 ? 'Customer' : `Channel ${s.channel}`
+                    // Map channel to speaker role using computed per-call mapping
+                    speaker: Number(s.channel) === agentChNum ? 'Agent' : 'Customer'
                 }));
                 
                 transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
@@ -329,6 +330,11 @@ export default async function handler(req, res) {
                                 speakerMapping: {
                                     channel1: 'Agent',
                                     channel2: 'Customer'
+                                },
+                                // Provide numeric agent/customer mapping for UI reconstruction
+                                channelRoleMap: {
+                                    agentChannel: channelRoleMap.agentChannel,
+                                    customerChannel: channelRoleMap.customerChannel
                                 }
                             }
                         })
