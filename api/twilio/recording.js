@@ -301,6 +301,49 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
                             try { sentencesSlim.push({ text: txt, startTime: t, endTime: (s.endTime ?? s.end_time ?? s.end ?? t), channel: s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex, speaker: s.speaker || '', role: s.role || '', confidence: s.confidence }); } catch(_) {}
                         }
+                        // Fallback: if no roles were assigned from sentences, try words with channels
+                        try {
+                            const hasKnownRoles = turns.some(x => x.role === 'agent' || x.role === 'customer');
+                            if (!hasKnownRoles) {
+                                const words = await client.intelligence.v2
+                                  .transcripts(polled.sid)
+                                  .words.list();
+                                const list = Array.isArray(words) ? words : [];
+                                if (list.length) {
+                                    const normWordText = (w) => (w && (w.text || w.word || w.value || '')).toString().trim();
+                                    const normalizeChannelWord = (c) => { const s = (c==null?'':String(c)).trim(); if (s==='0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
+                                    const segments = [];
+                                    let current = null;
+                                    for (const w of list) {
+                                        const txt = normWordText(w);
+                                        if (!txt) continue;
+                                        const ch = normalizeChannelWord(w.channel ?? w.channelNumber ?? w.channel_id ?? w.channelIndex);
+                                        let role = '';
+                                        const sp = (w.speaker || w.role || '').toString().toLowerCase();
+                                        if (sp.includes('agent') || sp.includes('rep')) role = 'agent';
+                                        else if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) role = 'customer';
+                                        else role = (ch === agentChannelStr) ? 'agent' : 'customer';
+                                        const startW = (w.startTime ?? w.start_time ?? w.start ?? 0);
+                                        const tW = typeof startW === 'number' ? startW : (parseFloat(startW) || 0);
+                                        const gapOk = !current || (tW - current._lastStart) <= 1.25;
+                                        if (current && current.role === role && gapOk) {
+                                            current.text += (current.text ? ' ' : '') + txt;
+                                            current._lastStart = tW;
+                                            current.t = Math.round(tW);
+                                        } else {
+                                            if (current) segments.push({ t: current.t, role: current.role, text: current.text });
+                                            current = { role, t: Math.max(0, Math.round(tW)), text: txt, _lastStart: tW };
+                                        }
+                                    }
+                                    if (current) segments.push({ t: current.t, role: current.role, text: current.text });
+                                    if (segments.length) {
+                                        console.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
+                                        speakerTurns = segments;
+                                        transcript = segments.map(x => x.text).join(' ');
+                                    }
+                                }
+                            }
+                        } catch (e) { console.warn('[Recording][CI] Words fallback failed:', e?.message); }
                         if (turns.length) speakerTurns = turns;
                         transcript = turns.map(x => x.text).join(' ');
                         if (!transcript && sentences && sentences.length) {
@@ -343,6 +386,49 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
                             try { sentencesSlim.push({ text: txt, startTime: t, endTime: (s.endTime ?? s.end_time ?? s.end ?? t), channel: s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex, speaker: s.speaker || '', role: s.role || '', confidence: s.confidence }); } catch(_) {}
                         }
+                        // Fallback: if no roles were assigned from sentences, try words with channels
+                        try {
+                            const hasKnownRoles = turns.some(x => x.role === 'agent' || x.role === 'customer');
+                            if (!hasKnownRoles) {
+                                const words = await client.intelligence.v2
+                                  .transcripts(ciTranscript.sid)
+                                  .words.list();
+                                const list = Array.isArray(words) ? words : [];
+                                if (list.length) {
+                                    const normWordText = (w) => (w && (w.text || w.word || w.value || '')).toString().trim();
+                                    const normalizeChannelWord = (c) => { const s = (c==null?'':String(c)).trim(); if (s==='0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
+                                    const segments = [];
+                                    let current = null;
+                                    for (const w of list) {
+                                        const txt = normWordText(w);
+                                        if (!txt) continue;
+                                        const ch = normalizeChannelWord(w.channel ?? w.channelNumber ?? w.channel_id ?? w.channelIndex);
+                                        let role = '';
+                                        const sp = (w.speaker || w.role || '').toString().toLowerCase();
+                                        if (sp.includes('agent') || sp.includes('rep')) role = 'agent';
+                                        else if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) role = 'customer';
+                                        else role = (ch === agentChannelStr) ? 'agent' : 'customer';
+                                        const startW = (w.startTime ?? w.start_time ?? w.start ?? 0);
+                                        const tW = typeof startW === 'number' ? startW : (parseFloat(startW) || 0);
+                                        const gapOk = !current || (tW - current._lastStart) <= 1.25;
+                                        if (current && current.role === role && gapOk) {
+                                            current.text += (current.text ? ' ' : '') + txt;
+                                            current._lastStart = tW;
+                                            current.t = Math.round(tW);
+                                        } else {
+                                            if (current) segments.push({ t: current.t, role: current.role, text: current.text });
+                                            current = { role, t: Math.max(0, Math.round(tW)), text: txt, _lastStart: tW };
+                                        }
+                                    }
+                                    if (current) segments.push({ t: current.t, role: current.role, text: current.text });
+                                    if (segments.length) {
+                                        console.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
+                                        speakerTurns = segments;
+                                        transcript = segments.map(x => x.text).join(' ');
+                                    }
+                                }
+                            }
+                        } catch (e) { console.warn('[Recording][CI] Words fallback failed:', e?.message); }
                         if (turns.length) speakerTurns = turns;
                         transcript = turns.map(x => x.text).join(' ');
                         if (!transcript && sentences && sentences.length) {
@@ -397,12 +483,18 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                 } else {
                     // Create new Conversational Intelligence transcript
                     console.log('[Recording] Creating new Conversational Intelligence transcript...');
+                    const agentChNum = Number(agentChannelStr === '2' ? 2 : 1);
+                    const custChNum = agentChNum === 1 ? 2 : 1;
                     const newTranscript = await client.intelligence.v2.transcripts.create({
                         serviceSid: serviceSid,
                         channel: {
                             media_properties: {
                                 source_sid: recordingSid
-                            }
+                            },
+                            participants: [
+                                { role: 'Agent', channel_participant: agentChNum },
+                                { role: 'Customer', channel_participant: custChNum }
+                            ]
                         },
                         customerKey: callSid
                     });
@@ -441,6 +533,49 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
                                 try { sentencesSlim.push({ text: txt, startTime: t, endTime: (s.endTime ?? s.end_time ?? s.end ?? t), channel: s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex, speaker: s.speaker || '', role: s.role || '', confidence: s.confidence }); } catch(_) {}
                             }
+                            // Fallback: if no roles were assigned from sentences, try words with channels
+                            try {
+                                const hasKnownRoles = turns.some(x => x.role === 'agent' || x.role === 'customer');
+                                if (!hasKnownRoles) {
+                                    const words = await client.intelligence.v2
+                                      .transcripts(updatedTranscript.sid)
+                                      .words.list();
+                                    const list = Array.isArray(words) ? words : [];
+                                    if (list.length) {
+                                        const normWordText = (w) => (w && (w.text || w.word || w.value || '')).toString().trim();
+                                        const normalizeChannelWord = (c) => { const s = (c==null?'':String(c)).trim(); if (s==='0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
+                                        const segments = [];
+                                        let current = null;
+                                        for (const w of list) {
+                                            const txt = normWordText(w);
+                                            if (!txt) continue;
+                                            const ch = normalizeChannelWord(w.channel ?? w.channelNumber ?? w.channel_id ?? w.channelIndex);
+                                            let role = '';
+                                            const sp = (w.speaker || w.role || '').toString().toLowerCase();
+                                            if (sp.includes('agent') || sp.includes('rep')) role = 'agent';
+                                            else if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) role = 'customer';
+                                            else role = (ch === agentChannelStr) ? 'agent' : 'customer';
+                                            const startW = (w.startTime ?? w.start_time ?? w.start ?? 0);
+                                            const tW = typeof startW === 'number' ? startW : (parseFloat(startW) || 0);
+                                            const gapOk = !current || (tW - current._lastStart) <= 1.25;
+                                            if (current && current.role === role && gapOk) {
+                                                current.text += (current.text ? ' ' : '') + txt;
+                                                current._lastStart = tW;
+                                                current.t = Math.round(tW);
+                                            } else {
+                                                if (current) segments.push({ t: current.t, role: current.role, text: current.text });
+                                                current = { role, t: Math.max(0, Math.round(tW)), text: txt, _lastStart: tW };
+                                            }
+                                        }
+                                        if (current) segments.push({ t: current.t, role: current.role, text: current.text });
+                                        if (segments.length) {
+                                            console.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
+                                            speakerTurns = segments;
+                                            transcript = segments.map(x => x.text).join(' ');
+                                        }
+                                    }
+                                }
+                            } catch (e) { console.warn('[Recording][CI] Words fallback failed:', e?.message); }
                             if (turns.length) speakerTurns = turns;
                             transcript = turns.map(x => x.text).join(' ');
                             if (!transcript && sentences && sentences.length) {
