@@ -291,6 +291,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             return '';
                         };
                         const turns = [];
+                        const sentencesSlim = [];
                         for (const s of sentences) {
                             const txt = pickText(s);
                             if (!txt) continue;
@@ -298,6 +299,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                             const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
                             turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
+                            try { sentencesSlim.push({ text: txt, startTime: t, endTime: (s.endTime ?? s.end_time ?? s.end ?? t), channel: s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex, speaker: s.speaker || '', role: s.role || '', confidence: s.confidence }); } catch(_) {}
                         }
                         if (turns.length) speakerTurns = turns;
                         transcript = turns.map(x => x.text).join(' ');
@@ -310,6 +312,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 sentenceCount: sentences.length,
                                 averageConfidence: sentences.length > 0 ?
                                     sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0,
+                                sentences: sentencesSlim,
                                 channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                             };
                             console.log(`[Recording] CI transcript (existing) completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);
@@ -330,6 +333,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             return '';
                         };
                         const turns = [];
+                        const sentencesSlim = [];
                         for (const s of sentences) {
                             const txt = pickText(s);
                             if (!txt) continue;
@@ -337,6 +341,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                             const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
                             turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
+                            try { sentencesSlim.push({ text: txt, startTime: t, endTime: (s.endTime ?? s.end_time ?? s.end ?? t), channel: s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex, speaker: s.speaker || '', role: s.role || '', confidence: s.confidence }); } catch(_) {}
                         }
                         if (turns.length) speakerTurns = turns;
                         transcript = turns.map(x => x.text).join(' ');
@@ -349,6 +354,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             sentenceCount: sentences.length,
                             averageConfidence: sentences.length > 0 ? 
                                 sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0,
+                            sentences: sentencesSlim,
                             channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                         };
                         
@@ -425,6 +431,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 return '';
                             };
                             const turns = [];
+                            const sentencesSlim = [];
                             for (const s of sentences) {
                                 const txt = pickText(s);
                                 if (!txt) continue;
@@ -432,6 +439,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 const start = (s.startTime ?? s.start_time ?? s.start ?? 0);
                                 const t = typeof start === 'number' ? start : (parseFloat(start) || 0);
                                 turns.push({ t: Math.max(0, Math.round(t)), role, text: txt });
+                                try { sentencesSlim.push({ text: txt, startTime: t, endTime: (s.endTime ?? s.end_time ?? s.end ?? t), channel: s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex, speaker: s.speaker || '', role: s.role || '', confidence: s.confidence }); } catch(_) {}
                             }
                             if (turns.length) speakerTurns = turns;
                             transcript = turns.map(x => x.text).join(' ');
@@ -444,6 +452,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 sentenceCount: sentences.length,
                                 averageConfidence: sentences.length > 0 ? 
                                     sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0,
+                                sentences: sentencesSlim,
                                 channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                             };
                             
