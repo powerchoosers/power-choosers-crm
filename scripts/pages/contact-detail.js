@@ -3221,7 +3221,9 @@
     const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
     const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
     const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
-    const transcriptHtml = renderTranscriptHtml(AI, r.transcript);
+    // Use formatted transcript with speaker labels if available, otherwise fall back to regular transcript
+    const transcriptToUse = r.formattedTranscript || r.transcript;
+    const transcriptHtml = renderTranscriptHtml(AI, transcriptToUse);
     const rawRec = r.audioUrl || r.recordingUrl || '';
     let audioSrc = '';
     if (rawRec) {
