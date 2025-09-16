@@ -55,15 +55,35 @@ export default async function handler(req, res) {
         if (accountSid && authToken) {
           const client = twilio(accountSid, authToken);
           
-          // FORCE dual-channel recording on child leg
-          // We now rely entirely on this webhook since Dial recording is disabled
-          await client.calls(childSid).recordings.create({
-            recordingChannels: 'dual',
-            recordingTrack: 'both',
-            recordingStatusCallback: (process.env.PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}` || 'https://power-choosers-crm.vercel.app') + '/api/twilio/recording',
-            recordingStatusCallbackMethod: 'POST'
-          });
-          console.log('[Dial-Status] ✅ Started DUAL-CHANNEL recording for child leg', childSid);
+          // Check if recording already exists, if not start dual-channel recording
+          const existingRecordings = await client.calls(childSid).recordings.list({ limit: 1 });
+          
+          if (existingRecordings.length === 0) {
+            await client.calls(childSid).recordings.create({
+              recordingChannels: 'dual',
+              recordingTrack: 'both',
+              recordingStatusCallback: (process.env.PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}` || 'https://power-choosers-crm.vercel.app') + '/api/twilio/recording',
+              recordingStatusCallbackMethod: 'POST'
+            });
+            console.log('[Dial-Status] ✅ Started DUAL-CHANNEL recording for child leg', childSid);
+          } else {
+            console.log('[Dial-Status] 📝 Recording already exists for child leg', childSid, 'channels:', existingRecordings[0]?.channels || 'unknown');
+            
+            // If existing recording is mono, try to start a dual-channel one
+            if (existingRecordings[0]?.channels === 1) {
+              try {
+                await client.calls(childSid).recordings.create({
+                  recordingChannels: 'dual',
+                  recordingTrack: 'both',
+                  recordingStatusCallback: (process.env.PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}` || 'https://power-choosers-crm.vercel.app') + '/api/twilio/recording',
+                  recordingStatusCallbackMethod: 'POST'
+                });
+                console.log('[Dial-Status] ✅ Started additional DUAL-CHANNEL recording to override mono', childSid);
+              } catch (e) {
+                console.log('[Dial-Status] ⚠️ Could not start additional recording:', e.message);
+              }
+            }
+          }
         } else {
           console.warn('[Dial-Status] Missing Twilio credentials');
         }
