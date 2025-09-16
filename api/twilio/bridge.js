@@ -55,12 +55,7 @@ export default async function handler(req, res) {
             statusCallback: `${base}/api/twilio/dial-status`,
             statusCallbackEvent: 'initiated ringing answered completed',
             statusCallbackMethod: 'POST',
-            // TwiML recording flags
-            record: 'record-from-answer',
-            recordingStatusCallback: `${base}/api/twilio/recording`,
-            recordingStatusCallbackMethod: 'POST',
-            recordingChannels: 'dual',
-            recordingTrack: 'both'
+            // Do not record from parent leg; recording will start on child leg via webhook
         });
         
         // Add the target number with no retry logic
