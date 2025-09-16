@@ -155,6 +155,47 @@ export default async function handler(req, res) {
                     endTime: s.endTime,
                     channel: s.channel
                 }));
+
+                // If sentences lack channel/speaker entirely, recreate transcript with participants mapping
+                try {
+                    const lacksDiarization = Array.isArray(sentences) && sentences.length > 0 && sentences.every(s => (s.channel == null && !s.speaker && !s.role));
+                    if (lacksDiarization) {
+                        console.log('[CI Manual] Sentences missing diarization; recreating with participants mapping...');
+                        try { await client.intelligence.v2.transcripts(transcript.sid).remove(); } catch(_) {}
+                        const agentChannel = agentChannelNum;
+                        const recreated = await client.intelligence.v2.transcripts.create({
+                            channel: {
+                                media_properties: { source_sid: recording.sid },
+                                participants: [
+                                    { role: 'Agent', channel_participant: agentChannel },
+                                    { role: 'Customer', channel_participant: agentChannel === 1 ? 2 : 1 }
+                                ]
+                            },
+                            serviceSid: serviceSid,
+                            customerKey: callSid || recordingSid
+                        });
+                        // Poll until complete
+                        let tries = 0; const maxTries = 10; let status = recreated.status; let tx = recreated;
+                        while (tries < maxTries && ['queued','in-progress'].includes((status||'').toLowerCase())){
+                            await new Promise(r=>setTimeout(r,6000));
+                            tx = await client.intelligence.v2.transcripts(recreated.sid).fetch();
+                            status = tx.status; tries++;
+                        }
+                        if ((status||'').toLowerCase() === 'completed'){
+                            const sentencesResponse2 = await client.intelligence.v2
+                                .transcripts(tx.sid)
+                                .sentences.list();
+                            sentences = sentencesResponse2.map(s => ({
+                                text: s.text || '',
+                                confidence: s.confidence,
+                                startTime: s.startTime,
+                                endTime: s.endTime,
+                                channel: s.channel
+                            }));
+                            transcript = tx;
+                        }
+                    }
+                } catch(_) {}
                 
                 transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
                 console.log(`[Conversational Intelligence] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);

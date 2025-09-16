@@ -2018,6 +2018,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               else if (ch) role = (ch === agentCh) ? 'agent' : 'customer';
               const ts = Math.max(0, Math.floor((s.startTime || 0)));
               const txt = normalizeSupplierTokens(s.text || s.transcript || '');
+              try { console.log('[Transcript Debug][sentence]', { text: (txt||'').slice(0,140), start: s.startTime, end: s.endTime, rawChannel: s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex, normalizedChannel: ch, twilioSpeaker: s.speaker || '', twilioRole: s.role || '', resolvedRole: role }); } catch(_) {}
               if (current && current.role === role){ current.text += (current.text?' ':'') + txt; current.t = ts; }
               else { if (current) grouped.push(current); current = { role, t: ts, text: txt }; }
             }
@@ -2047,6 +2048,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
                 else if (ch) role = (ch === agentCh) ? 'agent' : 'customer';
                 const ts = Math.max(0, Math.floor((s.startTime || 0)));
                 const txt = normalizeSupplierTokens(s.text || s.transcript || '');
+                try { console.log('[Transcript Debug][rebuild]', { text: (txt||'').slice(0,140), start: s.startTime, end: s.endTime, rawChannel: s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex, normalizedChannel: ch, twilioSpeaker: s.speaker || '', twilioRole: s.role || '', resolvedRole: role }); } catch(_) {}
                 rebuilt.push({ role, t: ts, text: txt });
               }
               if (rebuilt.length) {
