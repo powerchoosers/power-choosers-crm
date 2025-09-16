@@ -1799,12 +1799,22 @@
     const text = value ? escapeHtml(String(value)) : '--';
     const hasValue = !!value;
     
+    // Get contact and account IDs for context
+    const contactId = contact.id || contact.contactId || contact._id;
+    const accountId = contact.accountId || contact.account_id;
+    const contactName = contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '';
+    const companyName = contact.companyName || contact.company || contact.account || '';
+    
     return `
       <div class="info-row" data-field="phone" data-phone-type="${type}">
         <div class="info-label">${escapeHtml(type.toUpperCase())}</div>
         <div class="info-value">
           <div class="info-value-wrap" data-field="phone" data-has-value="${hasValue ? '1' : '0'}">
-            <span class="info-value-text">${text}</span>
+            <span class="info-value-text" 
+                  data-contact-id="${contactId || ''}" 
+                  data-account-id="${accountId || ''}" 
+                  data-contact-name="${escapeHtml(contactName)}" 
+                  data-company-name="${escapeHtml(companyName)}">${text}</span>
             <div class="info-actions" aria-hidden="true">
               <button type="button" class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button>
               <button type="button" class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button>
@@ -1863,12 +1873,28 @@
   function renderInfoRow(label, field, value) {
     const text = value ? escapeHtml(String(value)) : '--';
     const hasValue = !!value;
+    
+    // Add context data attributes for company phone
+    let dataAttributes = '';
+    if (field === 'companyPhone' && state.currentContact) {
+      const contact = state.currentContact;
+      const contactId = contact.id || contact.contactId || contact._id;
+      const accountId = contact.accountId || contact.account_id;
+      const contactName = contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '';
+      const companyName = contact.companyName || contact.company || contact.account || '';
+      
+      dataAttributes = `data-contact-id="${contactId || ''}" 
+                       data-account-id="${accountId || ''}" 
+                       data-contact-name="${escapeHtml(contactName)}" 
+                       data-company-name="${escapeHtml(companyName)}"`;
+    }
+    
     return `
       <div class="info-row" data-field="${escapeHtml(field)}">
         <div class="info-label">${escapeHtml(label)}</div>
         <div class="info-value">
           <div class="info-value-wrap" data-field="${escapeHtml(field)}" data-has-value="${hasValue ? '1' : '0'}">
-            <span class="info-value-text">${text}</span>
+            <span class="info-value-text" ${dataAttributes}>${text}</span>
             <div class="info-actions" aria-hidden="true">
               <button type="button" class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button>
               <button type="button" class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button>
@@ -2907,7 +2933,7 @@
     const domain = cd_extractDomainFromAccount(call && (call.accountName || ''));
     if (domain){
       const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class="company-favicon" aria-hidden="true" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);"></span>';
-      return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true"><img src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n){ n.style.display='flex'; }">${fb}</div>`;
+      return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true"><img src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n){ n.style.display='flex'; }">${fb}</div>`;
     }
     const initial = (String(contactName||'C').charAt(0) || 'C').toUpperCase();
     return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initial}</div>`;
@@ -3021,7 +3047,11 @@
       <div class="rc-item">
         <div class="rc-meta">
           <div class="rc-title">${name}${company?` • ${company}`:''}</div>
-          <div class="rc-sub">${when} • ${durStr} • ${phone}${direction?` • ${direction}`:''}</div>
+          <div class="rc-sub">${when} • ${durStr} • <span class="phone-number" 
+                                 data-contact-id="${c.contactId || state.currentContact?.id || ''}" 
+                                 data-account-id="${c.accountId || state.currentContact?.accountId || ''}" 
+                                 data-contact-name="${escapeHtml(name)}" 
+                                 data-company-name="${escapeHtml(company)}">${phone}</span>${direction?` • ${direction}`:''}</div>
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>

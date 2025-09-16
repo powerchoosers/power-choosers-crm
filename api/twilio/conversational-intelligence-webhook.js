@@ -103,13 +103,27 @@ function extractContractFromTranscript(text){
   return out;
 }
 
-function buildSpeakerTurnsFromSentences(sentences){
+function buildSpeakerTurnsFromSentences(sentences, agentChannelStr){
   const turns = [];
   if (!Array.isArray(sentences) || !sentences.length) return turns;
+  const normalizeChannel = (c) => {
+    const s = (c == null ? '' : String(c)).trim();
+    if (s === '0') return '1';
+    if (/^[Aa]$/.test(s)) return '1';
+    if (/^[Bb]$/.test(s)) return '2';
+    return s;
+  };
+  const resolveRole = (s) => {
+    const sp = (s.speaker || s.role || '').toString().toLowerCase();
+    if (sp.includes('agent') || sp.includes('rep')) return 'agent';
+    if (sp.includes('customer') || sp.includes('caller') || sp.includes('client')) return 'customer';
+    const ch = normalizeChannel(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex);
+    if (ch) return ch === (agentChannelStr || '1') ? 'agent' : 'customer';
+    return '';
+  };
   let current = null;
   for (const s of sentences){
-    const ch = (s.channel != null ? String(s.channel) : '');
-    const role = (ch === '1') ? 'agent' : 'customer';
+    const role = resolveRole(s) || 'customer';
     const t = Math.max(0, Math.floor((s.startTime || 0))); // seconds
     const text = s.text || s.transcript || '';
     if (current && current.role === role) {
@@ -188,6 +202,28 @@ export default async function handler(req, res) {
                 sourceSid: transcript.sourceSid
             });
             
+            // Compute channel to role mapping for this call (agent vs customer)
+            let channelRoleMap = { agentChannel: '1', customerChannel: '2' };
+            try {
+                let callResource = null;
+                try { callResource = await client.calls(CallSid).fetch(); } catch(_) {}
+                const fromStr = callResource?.from || '';
+                const toStr = callResource?.to || '';
+                const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+                const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+                  .split(',').map(norm).filter(Boolean);
+                const from10 = norm(fromStr);
+                const to10 = norm(toStr);
+                const isBiz = (p) => !!p && envBiz.includes(p);
+                const fromIsClient = /^client:/i.test(fromStr);
+                const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
+                channelRoleMap.agentChannel = fromIsAgent ? '1' : '2';
+                channelRoleMap.customerChannel = fromIsAgent ? '2' : '1';
+                console.log('[CI Webhook] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr });
+            } catch(e) {
+                console.warn('[CI Webhook] Failed to compute channel-role mapping, defaulting:', e?.message);
+            }
+
             // Get sentences
             let transcriptText = '';
             let sentences = [];
@@ -246,13 +282,14 @@ export default async function handler(req, res) {
                 };
                 // Derive grouped speaker turns from sentences when diarization is not present
                 if (!Array.isArray(aiInsights.speakerTurns) || !aiInsights.speakerTurns.length) {
-                  aiInsights.speakerTurns = buildSpeakerTurnsFromSentences(sentences);
+                  aiInsights.speakerTurns = buildSpeakerTurnsFromSentences(sentences, channelRoleMap.agentChannel);
                 }
                 // Also attach CI metadata so the UI can render reliably
                 aiInsights.conversationalIntelligence = {
                   transcriptSid: TranscriptSid,
                   status: transcript.status,
-                  sentenceCount: Array.isArray(sentences) ? sentences.length : 0
+                  sentenceCount: Array.isArray(sentences) ? sentences.length : 0,
+                  channelRoleMap
                 };
             }
             
