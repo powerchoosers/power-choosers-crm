@@ -73,6 +73,16 @@ export default async function handler(req, res) {
         try { console.log('[Recording] Raw body:', JSON.stringify(body).slice(0, 1200)); } catch(_) {}
         try { if (body && (body.RecordingChannels || body.RecordingTrack)) console.log('[Recording] Channels/Track:', body.RecordingChannels || '(n/a)', body.RecordingTrack || '(n/a)'); } catch(_) {}
         
+        // Guard: ignore mono DialVerb completions (we rely on REST-started dual recordings)
+        try {
+            const src = String(body.RecordingSource || body.Source || '').toLowerCase();
+            const ch = String(body.RecordingChannels || body.Channels || '').toLowerCase();
+            if (RecordingStatus === 'completed' && src === 'dialverb' && ch !== '2') {
+                console.log('[Recording] Ignoring mono DialVerb completion (will rely on REST dual):', { RecordingSid, CallSid, RecordingChannels: body.RecordingChannels, RecordingSource: body.RecordingSource });
+                return res.status(200).json({ success: true, ignored: true, reason: 'mono_dialverb' });
+            }
+        } catch(_) {}
+
         // If the recording is completed but RecordingUrl is missing, attempt to fetch it by CallSid
         let effectiveRecordingUrl = RecordingUrl || '';
         let effectiveRecordingSid = RecordingSid || '';
