@@ -48,7 +48,10 @@ function normalizeCallForResponse(call) {
     aiSummary: (call.aiInsights && call.aiInsights.summary) || call.aiSummary || '',
     aiInsights: call.aiInsights || null,
     audioUrl: call.recordingUrl || call.audioUrl || '',
-    conversationalIntelligence: call.conversationalIntelligence || (call.aiInsights && call.aiInsights.conversationalIntelligence) || null
+    conversationalIntelligence: call.conversationalIntelligence || (call.aiInsights && call.aiInsights.conversationalIntelligence) || null,
+    // Provide phones used by front-end for precise mapping
+    targetPhone: call.targetPhone || '',
+    businessPhone: call.businessPhone || ''
   };
 }
 
