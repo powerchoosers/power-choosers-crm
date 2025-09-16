@@ -262,7 +262,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                 });
                 
                 if (transcripts.length > 0) {
-                    const ciTranscript = await client.intelligence.v2.transcripts(transcripts[0].sid).fetch();
+                    let ciTranscript = await client.intelligence.v2.transcripts(transcripts[0].sid).fetch();
 
                     // If transcript exists but isn't completed yet, poll until completion (up to 2 minutes)
                     if (['queued', 'in-progress'].includes((ciTranscript.status || '').toLowerCase())) {
@@ -362,9 +362,44 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         }
                     } else if ((ciTranscript.status || '').toLowerCase() === 'completed') {
                         // Get sentences from Conversational Intelligence
-                        const sentences = await client.intelligence.v2
+                        let sentences = await client.intelligence.v2
                             .transcripts(ciTranscript.sid)
                             .sentences.list();
+                        // If sentences lack channel/speaker entirely, recreate transcript with participants mapping
+                        try {
+                            const lacksDiarization = Array.isArray(sentences) && sentences.length > 0 && sentences.every(s => (s.channel == null && !s.speaker && !s.role));
+                            if (lacksDiarization) {
+                                console.log('[Recording] Existing CI transcript has no channel/speaker diarization. Recreating with participants mapping...');
+                                try { await client.intelligence.v2.transcripts(ciTranscript.sid).remove(); } catch(_) {}
+                                const agentChNum = Number(agentChannelStr === '2' ? 2 : 1);
+                                const custChNum = agentChNum === 1 ? 2 : 1;
+                                const recreated = await client.intelligence.v2.transcripts.create({
+                                    serviceSid: serviceSid,
+                                    channel: {
+                                        media_properties: { source_sid: recordingSid },
+                                        participants: [
+                                            { role: 'Agent', channel_participant: agentChNum },
+                                            { role: 'Customer', channel_participant: custChNum }
+                                        ]
+                                    },
+                                    customerKey: callSid
+                                });
+                                ciTranscript = recreated;
+                                // Re-fetch sentences after recreation
+                                const attemptsRe = 10; // up to ~60s
+                                let tries = 0, status = recreated.status;
+                                while (tries < attemptsRe && ['queued','in-progress'].includes((status||'').toLowerCase())){
+                                    await new Promise(r=>setTimeout(r,6000));
+                                    const tmp = await client.intelligence.v2.transcripts(recreated.sid).fetch();
+                                    status = tmp.status; tries++;
+                                }
+                                if ((status||'').toLowerCase()==='completed'){
+                                    sentences = await client.intelligence.v2
+                                        .transcripts(recreated.sid)
+                                        .sentences.list();
+                                }
+                            }
+                        } catch(_) {}
                         const pickText = (s) => {
                             if (!s || typeof s !== 'object') return '';
                             const candidates = [s.text, s.sentence, s.body, s.content, s.transcript];
