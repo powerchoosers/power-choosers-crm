@@ -45,13 +45,18 @@ function normalizeCallForResponse(call) {
     durationSec: call.durationSec != null ? call.durationSec : (call.duration || 0),
     outcome: call.outcome || (call.status === 'completed' ? 'Connected' : ''),
     transcript: call.transcript || '',
+    formattedTranscript: call.formattedTranscript || call.formatted_transcript || '',
     aiSummary: (call.aiInsights && call.aiInsights.summary) || call.aiSummary || '',
     aiInsights: call.aiInsights || null,
     audioUrl: call.recordingUrl || call.audioUrl || '',
     conversationalIntelligence: call.conversationalIntelligence || (call.aiInsights && call.aiInsights.conversationalIntelligence) || null,
     // Provide phones used by front-end for precise mapping
     targetPhone: call.targetPhone || '',
-    businessPhone: call.businessPhone || ''
+    businessPhone: call.businessPhone || '',
+    // Recording metadata for dual-channel display
+    recordingChannels: call.recordingChannels != null ? String(call.recordingChannels) : '',
+    recordingTrack: call.recordingTrack || '',
+    recordingSource: call.recordingSource || ''
   };
 }
 
