@@ -2,38 +2,81 @@
 const twilio = require('twilio');
 
 export default async function handler(req, res) {
-  // Twilio posts x-www-form-urlencoded
+  // Twilio posts x-www-form-urlencoded data for dial status callbacks
   try {
     const ct = (req.headers['content-type'] || '').toLowerCase();
     let body = req.body;
+    
+    // Robust body parsing for different content types
     if (typeof body === 'string') {
-      try { if (ct.includes('application/json')) body = JSON.parse(body); } catch(_) {}
+      try { 
+        if (ct.includes('application/json')) {
+          body = JSON.parse(body); 
+        }
+      } catch(_) {}
+      
       if (typeof body === 'string') {
-        try { const p = new URLSearchParams(body); const o={}; for (const [k,v] of p.entries()) o[k]=v; body=o; } catch(_) {}
+        try { 
+          const params = new URLSearchParams(body);
+          const obj = {};
+          for (const [key, value] of params.entries()) {
+            obj[key] = value;
+          }
+          body = obj;
+        } catch(_) {}
       }
     }
-    if (!body || typeof body !== 'object') body = {};
+    
+    if (!body || typeof body !== 'object') {
+      body = req.query || {};
+    }
 
-    const event = (body.CallStatus || body.DialStatus || body.DialCallStatus || body.CallStatusEvent || '').toLowerCase();
+    // Determine the dial status event - prioritize more specific status fields
+    const event = (body.DialCallStatus || body.CallStatus || body.DialStatus || body.CallStatusEvent || '').toLowerCase();
     const parentSid = body.ParentCallSid || body.CallSid || '';
     const childSid = body.DialCallSid || '';
-    console.log('[Dial-Status]', { event, parentSid, childSid, from: body.From, to: body.To });
+    
+    console.log('[Dial-Status]', { 
+      event, 
+      parentSid, 
+      childSid, 
+      from: body.From, 
+      to: body.To,
+      direction: body.Direction 
+    });
 
-    if (event === 'in-progress' || event === 'answered') {
+    // Start dual-channel recording on the child leg when call is answered or in-progress
+    // This is a fallback in case Dial's built-in recording doesn't work
+    if ((event === 'in-progress' || event === 'answered') && childSid) {
       try {
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
         const authToken = process.env.TWILIO_AUTH_TOKEN;
-        if (accountSid && authToken && childSid) {
+        
+        if (accountSid && authToken) {
           const client = twilio(accountSid, authToken);
-          await client.calls(childSid).recordings.create({
-            recordingChannels: 'dual',
-            recordingTrack: 'both',
-            recordingStatusCallback: (process.env.PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}` || 'https://power-choosers-crm.vercel.app') + '/api/twilio/recording',
-            recordingStatusCallbackMethod: 'POST'
-          });
-          console.log('[Dial-Status] Started dual recording for child leg', childSid);
+          
+          // Check if recording already exists for this call
+          const existingRecordings = await client.calls(childSid).recordings.list({ limit: 1 });
+          
+          if (existingRecordings.length === 0) {
+            await client.calls(childSid).recordings.create({
+              recordingChannels: 'dual',
+              recordingTrack: 'both',
+              recordingStatusCallback: (process.env.PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}` || 'https://power-choosers-crm.vercel.app') + '/api/twilio/recording',
+              recordingStatusCallbackMethod: 'POST'
+            });
+            console.log('[Dial-Status] Started fallback dual recording for child leg', childSid);
+          } else {
+            console.log('[Dial-Status] Recording already exists for child leg', childSid);
+          }
+        } else {
+          console.warn('[Dial-Status] Missing Twilio credentials');
         }
-      } catch (e) { console.warn('[Dial-Status] Failed to start recording on child leg:', e?.message); }
+      } catch (e) { 
+        console.warn('[Dial-Status] Failed to start recording on child leg:', e?.message); 
+      }
+    } else if (!childSid && event === 'answered') {
+      console.warn('[Dial-Status] No DialCallSid available for recording - Dial may not be configured properly');
     }
 
     res.status(200).send('OK');

@@ -100,10 +100,28 @@ export default async function handler(req, res) {
                     finalCallSid = await resolveToCallSid({ callSid: CallSid, recordingSid: effectiveRecordingSid || RecordingSid });
                 } catch (_) {}
             }
-            // Ensure we have a direct mp3 URL for playback
+            // Ensure we have a direct mp3 URL for playback with dual-channel support
             const rawUrl = effectiveRecordingUrl || RecordingUrl;
-            const baseMp3 = rawUrl.endsWith('.mp3') ? rawUrl : `${rawUrl}.mp3`;
-            const recordingMp3Url = baseMp3.includes('?') ? `${baseMp3}&RequestedChannels=2` : `${baseMp3}?RequestedChannels=2`;
+            let baseMp3;
+            if (rawUrl.endsWith('.mp3')) {
+                baseMp3 = rawUrl;
+            } else if (rawUrl.includes('/Recordings/') && !rawUrl.includes('.')) {
+                // Twilio Recording resource URL format
+                baseMp3 = `${rawUrl}.mp3`;
+            } else {
+                baseMp3 = rawUrl;
+            }
+            
+            // Always append RequestedChannels=2 for dual-channel playback
+            const recordingMp3Url = baseMp3.includes('?') 
+                ? `${baseMp3}&RequestedChannels=2` 
+                : `${baseMp3}?RequestedChannels=2`;
+            
+            console.log('[Recording] Processed URL for dual-channel:', {
+                original: rawUrl,
+                final: recordingMp3Url,
+                recordingSid: effectiveRecordingSid || RecordingSid
+            });
 
             // Store call data in local memory (best-effort)
             const callData = {

@@ -28,20 +28,8 @@ export default async function handler(req, res) {
         
         // Create TwiML to bridge the call
         const twiml = new VoiceResponse();
-        // Also ensure parent call is recording dual via REST (best-effort)
-        try {
-            const accountSid = process.env.TWILIO_ACCOUNT_SID;
-            const authToken = process.env.TWILIO_AUTH_TOKEN;
-            if (accountSid && authToken && CallSid) {
-                const client = twilio(accountSid, authToken);
-                await client.calls(CallSid).recordings.create({
-                    recordingChannels: 'dual',
-                    recordingTrack: 'both',
-                    recordingStatusCallback: `${base}/api/twilio/recording`,
-                    recordingStatusCallbackMethod: 'POST'
-                }).catch(()=>{});
-            }
-        } catch(_) {}
+        // Note: We don't start recording on parent leg as it creates mono recordings
+        // Instead, we rely on Dial's built-in recording to capture dual-channel on child leg
         
         // Dial the target number immediately without any intro message
         const dial = twiml.dial({
@@ -55,7 +43,7 @@ export default async function handler(req, res) {
             statusCallback: `${base}/api/twilio/dial-status`,
             statusCallbackEvent: 'initiated ringing answered completed',
             statusCallbackMethod: 'POST',
-            // Record via Dial as primary; webhook will still try child leg if needed
+            // Record the child leg (PSTN) via Dial to get dual-channel recording
             record: 'record-from-answer',
             recordingStatusCallback: `${base}/api/twilio/recording`,
             recordingStatusCallbackMethod: 'POST',
