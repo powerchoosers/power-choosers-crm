@@ -30,21 +30,6 @@ export default async function handler(req, res) {
         // Create TwiML response
         const twiml = new VoiceResponse();
 
-        // Try to start dual-channel recording on the parent call via REST API
-        try {
-            const accountSid = process.env.TWILIO_ACCOUNT_SID;
-            const authToken = process.env.TWILIO_AUTH_TOKEN;
-            if (accountSid && authToken && CallSid) {
-                const client = twilio(accountSid, authToken);
-                await client.calls(CallSid).recordings.create({
-                    recordingChannels: 'dual',
-                    recordingTrack: 'both',
-                    recordingStatusCallback: `${base}/api/twilio/recording`,
-                    recordingStatusCallbackMethod: 'POST'
-                }).catch(()=>{});
-            }
-        } catch(_) {}
-
         if (isInboundToBusiness) {
             // INBOUND CALL: Ring the browser client (identity: agent)
             // Requires client token with incomingAllow: true and a connected browser
@@ -60,12 +45,7 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
-                // TwiML recording flags
-                record: 'record-from-answer',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST',
-                recordingChannels: 'dual',
-                recordingTrack: 'both'
+                // Do not record from parent leg; we start recording on the child leg via webhook
             });
             // Small prompt to keep caller informed
             try { twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.'); } catch(_) {}
@@ -92,12 +72,7 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
-                // TwiML recording flags
-                record: 'record-from-answer',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST',
-                recordingChannels: 'dual',
-                recordingTrack: 'both'
+                // Do not record from parent leg; we start recording on the child leg via webhook
             });
             dial.number(To);
             console.log(`[Voice] Generated TwiML to dial number: ${To}`);
@@ -113,12 +88,7 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
                 statusCallbackMethod: 'POST',
-                // TwiML recording flags
-                record: 'record-from-answer',
-                recordingStatusCallback: `${base}/api/twilio/recording`,
-                recordingStatusCallbackMethod: 'POST',
-                recordingChannels: 'dual',
-                recordingTrack: 'both'
+                // Do not record from parent leg; we start recording on the child leg via webhook
             });
             dial.client('agent');
         }
