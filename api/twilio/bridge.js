@@ -36,25 +36,20 @@ export default function handler(req, res) {
             answerOnBridge: true,  // This ensures proper audio bridging
             hangupOnStar: false,
             timeLimit: 14400,      // 4 hours max call duration
-            // Enable Twilio Voice Intelligence for real-time transcription and AI insights
+            // Recording config (dual-channel for diarization)
             record: 'record-from-answer',
             recordingStatusCallback: `${base}/api/twilio/recording`,
             recordingStatusCallbackMethod: 'POST',
-            // Enable Voice Intelligence for real-time transcription
-            voiceIntelligence: true,
-            voiceIntelligenceOptions: {
-                voiceIntelligenceInsights: ['summary', 'sentiment', 'topics'],
-                voiceIntelligenceInsightsCallback: `${base}/api/twilio/voice-intelligence`,
-                voiceIntelligenceInsightsCallbackMethod: 'POST'
-            }
+            recordingChannels: 'dual',
+            recordingTrack: 'both',
+            // Return to our handler after dial completes
+            action: `${base}/api/twilio/dial-complete`
         });
         
         // Add the target number with no retry logic
         dial.number(target);
         
-        // CRITICAL: Set action URL to handle dial completion without retry
-        // When the dial completes (target hangs up), this prevents automatic retry
-        dial.action('/api/twilio/dial-complete');
+        // action already set in Dial options
         
         console.log(`[Bridge] TwiML generated to connect to ${target}`);
         
