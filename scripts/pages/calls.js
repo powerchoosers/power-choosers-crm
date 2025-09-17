@@ -962,7 +962,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               formattedTranscript: c.formattedTranscript || '',
               aiSummary: c.aiSummary || '',
               aiInsights: c.aiInsights || null,
-              conversationalIntelligence: c.conversationalIntelligence || null,
+              // Ensure CI metadata is available even when only nested under aiInsights
+              conversationalIntelligence: c.conversationalIntelligence || (c.aiInsights && c.aiInsights.conversationalIntelligence) || null,
               audioUrl: c.audioUrl ? `${playbackBase}/api/recording?url=${encodeURIComponent(c.audioUrl)}` : '',
               recordingChannels: c.recordingChannels || '1',
               recordingTrack: c.recordingTrack || 'inbound',
@@ -1318,6 +1319,33 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         }
       });
     });
+    // Bind Add Contact CTA
+    els.tbody.querySelectorAll('.add-contact-cta').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const companyName = btn.getAttribute('data-company') || '';
+        try {
+          if (window.crm && typeof window.crm.createAddContactModal === 'function') {
+            // Open modal first
+            window.crm.createAddContactModal();
+            // Prefill company name
+            const modal = document.getElementById('modal-add-contact');
+            if (modal) {
+              const companyInput = modal.querySelector('input[name="companyName"], input[name="company"], input[data-field="companyName"]');
+              if (companyInput && companyName) companyInput.value = companyName;
+            }
+          } else if (typeof window.createAddContactModal === 'function') {
+            window.createAddContactModal();
+            const modal = document.getElementById('modal-add-contact');
+            if (modal) {
+              const companyInput = modal.querySelector('input[name="companyName"], input[name="company"], input[data-field="companyName"]');
+              if (companyInput && companyName) companyInput.value = companyName;
+            }
+          }
+        } catch(_) {}
+      });
+    });
     // header select state
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
@@ -1332,7 +1360,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         return n ? `+1 (${n.slice(0,3)}) ${n.slice(3,6)}-${n.slice(6)}` : '';
       }catch(_){ return ''; }
     })();
-    const displayNameRaw = r.contactName && r.contactName.trim() ? r.contactName : (r.company && r.company.trim() ? r.company : prettyPhone);
+    const hasContact = !!(r.contactName && r.contactName.trim());
+    const displayNameRaw = hasContact ? r.contactName : (r.company && r.company.trim() ? r.company : prettyPhone);
     const name = escapeHtml(displayNameRaw || '');
     const title = escapeHtml(r.contactTitle || '');
     const company = escapeHtml(r.company || '');
@@ -1392,12 +1421,22 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     // New columns: Number and Direction
     const numberCell = escapeHtml(r.counterpartyPretty || r.contactPhone || String(r.to||r.from||''));
     const directionCell = escapeHtml((r.direction || '').charAt(0).toUpperCase() + (r.direction || '').slice(1));
+    // Build contact cell: if no contact, show Add Contact CTA (icon + text)
+    const contactCell = hasContact
+      ? `<div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${name}</span></div>`
+      : `<button type="button" class="add-contact-cta" data-company="${company}" data-phone="${escapeHtml(String(r.to||r.from||''))}">
+           <span class="add-contact-icon" aria-hidden="true">
+             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+           </span>
+           <span class="add-contact-text">Add Contact</span>
+         </button>`;
+
     return `
     <tr>
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
-      <td class="name-cell" data-contact-id="${r.contactId || ''}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${name}</span></div></td>
+      <td class="name-cell" data-contact-id="${r.contactId || ''}">${contactCell}</td>
       <td>${title}</td>
-      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />${safeAccountIcon.replace('display:inline-block','display:none')}` : `${safeAccountIcon}`}<span class="company-name">${company}</span></span></a></td>
+      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />${safeAccountIcon.replace('display:inline-block','display:none')}` : `${safeAccountIcon}`}<span class="company-name">${company || (hasContact ? '' : '—')}</span></span></a></td>
       <td>${numberCell}</td>
       <td>${directionCell || '—'}</td>
       <td>${callTimeStr}</td>
@@ -1430,6 +1469,11 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       .pc-insights-body{padding:18px}
       .pc-insights-close{background:transparent;border:1px solid var(--border-light);border-radius:10px;color:var(--text-secondary);height:32px;padding:0 12px}
       .pc-insights-close:hover{background:var(--bg-item);}
+
+      /* Add Contact CTA styles */
+      .add-contact-cta{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border-light);border-radius:10px;background:var(--bg-item);color:var(--text-primary);cursor:pointer}
+      .add-contact-cta:hover{background:var(--grey-700);color:var(--text-inverse)}
+      .add-contact-icon{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;border-radius:50%;background:transparent}
 
       /* Modern cards and grid */
       .pc-sec-grid{display:grid;grid-template-columns:2fr 1fr;gap:18px}
@@ -1945,9 +1989,15 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     } catch(_) {}
     const bd=document.createElement('div'); bd.className='pc-insights-backdrop'; bd.addEventListener('click', closeInsightsModal);
     const md=document.createElement('div'); md.className='pc-insights-modal';
-    md.innerHTML = `
+      // Prefer contactName, else company, else counterparty number
+      const titleName = (function(){
+        const nm = String(r.contactName||'').trim(); if (nm) return nm;
+        const co = String(r.company||'').trim(); if (co) return co;
+        return String(r.to||'').trim();
+      })();
+      md.innerHTML = `
       <div class="pc-insights-header">
-            <div class="pc-insights-title">Call insights for ${escapeHtml(r.contactName || r.to || '')}</div>
+            <div class="pc-insights-title">Call insights for ${escapeHtml(titleName)}</div>
         <div style="display:flex; gap:8px; align-items:center;">
           <button type="button" class="pc-insights-close" aria-label="Close">Close</button>
           <button type="button" class="pc-insights-close" id="copy-summary" aria-label="Copy summary">Copy</button>
@@ -2228,8 +2278,23 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
       return escapeHtml(fallback);
     }
-    // Use formatted transcript with speaker labels if available, otherwise fall back to regular transcript
-    const transcriptToUse = r.formattedTranscript || r.transcript || '';
+    // Use formatted transcript with speaker labels if available. If missing but we have CI sentences, build from sentences.
+    let transcriptToUse = r.formattedTranscript || '';
+    if (!transcriptToUse && r.conversationalIntelligence && Array.isArray(r.conversationalIntelligence.sentences) && r.conversationalIntelligence.sentences.length){
+      // Build a simple speaker-labeled text for legacy rows so rendering splits
+      const crm = r.conversationalIntelligence.channelRoleMap || {};
+      const agentCh = String(crm.agentChannel || '1');
+      const normalizeChannel = (c)=>{ const s=(c==null?'':String(c)).trim(); if(s==='0') return '1'; if(/^[Aa]$/.test(s)) return '1'; if(/^[Bb]$/.test(s)) return '2'; return s; };
+      transcriptToUse = r.conversationalIntelligence.sentences.map(s=>{
+        const ch = normalizeChannel(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex);
+        const who = (ch===agentCh) ? 'Agent' : 'Customer';
+        const ts = Math.max(0, Math.floor(Number(s.startTime||0)));
+        const mm = Math.floor(ts/60); const ss = String(ts%60).padStart(2,'0');
+        const txt = (s.text || s.transcript || '').trim();
+        return `${who} ${mm}:${ss}: ${txt}`;
+      }).join('\n');
+    }
+    transcriptToUse = transcriptToUse || r.transcript || '';
     const transcriptHtml = renderTranscriptHtml(A, normalizeSupplierTokens(transcriptToUse));
 
     const hasAIInsights = r.aiInsights && Object.keys(r.aiInsights).length > 0;
