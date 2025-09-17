@@ -68,4 +68,38 @@
   } catch (e) {
     console.warn('Firestore init warning:', e);
   }
+  
+  // Centralized optimistic save helpers for immediate UI persistence
+  try {
+    if (!window.PCSaves) {
+      window.PCSaves = {
+        async update(collection, id, changes, options) {
+          const db = window.firebaseDB;
+          const fv = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
+          const serverTs = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : new Date();
+          const optimisticTs = new Date();
+          const payload = Object.assign({}, changes || {}, { updatedAt: serverTs });
+          // Optimistic event before persistence (so UI updates instantly)
+          try {
+            if (options && options.eventName && id) {
+              const ev = new CustomEvent(options.eventName, { detail: { id, changes: Object.assign({}, changes || {}, { updatedAt: optimisticTs }) } });
+              document.dispatchEvent(ev);
+            }
+          } catch (_) {}
+          // Persist to Firestore
+          if (db && collection && id) {
+            try { await db.collection(collection).doc(id).set(payload, { merge: true }); } catch (e) { console.warn('[PCSaves] update failed', { collection, id }, e); }
+          }
+          return true;
+        },
+        async updateAccount(id, changes) {
+          return this.update('accounts', id, changes, { eventName: 'pc:account-updated' });
+        },
+        async updateContact(id, changes) {
+          return this.update('contacts', id, changes, { eventName: 'pc:contact-updated' });
+        }
+      };
+      console.log('[Firebase] PCSaves helper installed');
+    }
+  } catch (_) {}
 })();

@@ -1660,6 +1660,15 @@
         <div class="contact-info-section" id="contact-recent-calls">
           <div class="rc-header">
             <h3 class="section-title">Recent Calls</h3>
+            <div class="rc-pager" id="contact-rc-pager" style="display:none">
+              <button class="rc-page-btn" id="rc-prev" aria-label="Previous page">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
+              </button>
+              <div class="rc-page-info" id="rc-info">1 of 1</div>
+              <button class="rc-page-btn" id="rc-next" aria-label="Next page">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"/></svg>
+              </button>
+            </div>
           </div>
           <div class="rc-list" id="contact-recent-calls-list">
             <div class="rc-empty">Loading recent calls…</div>
@@ -1726,6 +1735,23 @@
       els.mainContent.prepend(bodyEl);
     }
     attachContactDetailEvents();
+    // Delegate insights button clicks to ensure it works across rerenders
+    try {
+      const rcList = document.getElementById('contact-recent-calls-list');
+      if (rcList && !rcList._delegated) {
+        rcList.addEventListener('click', (e) => {
+          const btn = e.target && e.target.closest ? e.target.closest('.rc-insights') : null;
+          if (!btn) return;
+          e.preventDefault(); e.stopPropagation();
+          const id = btn.getAttribute('data-id');
+          const call = (state._rcCalls || []).find(x => String(x.id||x.twilioSid||x.callSid||'') === String(id));
+          if (!call) return;
+          toggleRcDetails(btn, call);
+        });
+        rcList._delegated = '1';
+      }
+    } catch(_) {}
+    startRecentCallsLiveHooks();
     try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
     
     // Load activities
@@ -1791,12 +1817,15 @@
   function svgSave() {
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>';
   }
+  function svgStar() {
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21 12 17.77 5.82 21 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+  }
 
   function renderPhoneRow(contact) {
     // Determine the primary phone and its type based on priority
     const phoneData = getPrimaryPhoneData(contact);
     const { value, type, field } = phoneData;
-    const text = value ? escapeHtml(String(value)) : '--';
+    const text = value ? escapeHtml(formatPhoneForDisplay(value)) : '--';
     const hasValue = !!value;
     
     // Get contact and account IDs for context
@@ -1816,6 +1845,7 @@
                   data-contact-name="${escapeHtml(contactName)}" 
                   data-company-name="${escapeHtml(companyName)}">${text}</span>
             <div class="info-actions" aria-hidden="true">
+              <button type="button" class="icon-btn-sm phone-default-btn" title="Set default number">${svgStar()}</button>
               <button type="button" class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button>
               <button type="button" class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button>
               <button type="button" class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button>
@@ -1871,7 +1901,13 @@
   }
 
   function renderInfoRow(label, field, value) {
-    const text = value ? escapeHtml(String(value)) : '--';
+    let text = value ? escapeHtml(String(value)) : '--';
+    
+    // Format phone numbers for display
+    if (field === 'companyPhone' && value && String(value).trim()) {
+      text = escapeHtml(formatPhoneForDisplay(value));
+    }
+    
     const hasValue = !!value;
     
     // Add context data attributes for company phone
@@ -2228,6 +2264,37 @@
           beginEditField(wrap, field);
           return;
         }
+        // Default star button: cycle default phone type (no editing)
+        const defaultBtn = e.target.closest('.phone-default-btn');
+        if (defaultBtn && field === 'phone') {
+          e.preventDefault();
+          const contact = state.currentContact || {};
+          const order = ['mobile', 'workDirectPhone', 'otherPhone'];
+          // Build list of available types with values
+          const available = order.filter(k => !!contact[k]);
+          if (!available.length) return;
+          // Current is first that matches label
+          const currentField = getPrimaryPhoneData(contact).field;
+          const idx = Math.max(0, available.indexOf(currentField));
+          const next = available[(idx + 1) % available.length];
+          try { await setPreferredPhoneType(next); } catch(_) {}
+          // Update label immediately
+          const labelEl = wrap.closest('.info-row')?.querySelector('.info-label');
+          if (labelEl) {
+            const typeLabels = { mobile: 'MOBILE', workDirectPhone: 'WORK DIRECT', otherPhone: 'OTHER PHONE' };
+            labelEl.textContent = typeLabels[next] || 'PHONE';
+          }
+          // Re-render phone row
+          const phoneRow = wrap.closest('.info-row');
+          if (phoneRow) {
+            const newPhoneRow = renderPhoneRow(state.currentContact);
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = newPhoneRow;
+            const newRow = tempDiv.firstElementChild;
+            phoneRow.parentElement.replaceChild(newRow, phoneRow);
+          }
+          return;
+        }
         // Copy button
         const copyBtn = e.target.closest('.info-copy');
         if (copyBtn) {
@@ -2557,7 +2624,7 @@
         item.style.color = 'white';
       }
       
-      const displayText = option.isAdd ? 'Click to add' : (option.value || 'Click to add');
+      const displayText = option.isAdd ? 'Click to add' : (option.value ? formatPhoneForDisplay(option.value) : 'Click to add');
       const typeText = option.isAdd ? option.type.toUpperCase() : option.type.toUpperCase();
       
       item.innerHTML = `
@@ -2623,6 +2690,19 @@
     input.dataset.selectedType = phoneOptions[0].type;
     input.dataset.selectedField = phoneOptions[0].field;
     input.placeholder = 'Enter phone number';
+    
+    // Add real-time formatting as user types
+    input.addEventListener('input', (e) => {
+      const cursorPos = e.target.selectionStart;
+      const rawValue = e.target.value;
+      const formatted = formatPhoneForDisplay(rawValue);
+      if (formatted !== rawValue) {
+        e.target.value = formatted;
+        // Try to maintain cursor position after formatting
+        const newPos = Math.min(cursorPos + (formatted.length - rawValue.length), formatted.length);
+        setTimeout(() => { e.target.setSelectionRange(newPos, newPos); }, 0);
+      }
+    });
     
     // Create input wrapper
     const inputWrap = document.createElement('div');
@@ -2701,9 +2781,18 @@
     console.log('[Contact Detail] commitPhoneEdit called with:', { value, field, type, normalizedValue });
     
     console.log('[Contact Detail] Calling saveField with:', { field, normalizedValue });
+    // Prevent accidental clearing when selecting an "Add <type>" option without entering a value
+    if (!normalizedValue || !String(normalizedValue).trim()) {
+      try { window.crm?.showToast && window.crm.showToast('Enter a phone number or press Escape to cancel'); } catch(_) {}
+      // Restore previous UI without saving
+      cancelEdit(wrap, 'phone', wrap.querySelector('.info-value-text')?.textContent || '');
+      return;
+    }
     await saveField(field, normalizedValue);
     // Remember the chosen field so the primary row reflects it on re-render
     state.preferredPhoneField = field;
+    // Persist preferred type so it remains default on next load
+    try { await setPreferredPhoneType(field); } catch(_) {}
     
     // Update the contact data
     if (state.currentContact) {
@@ -2724,8 +2813,9 @@
       console.log('[Contact Detail] Updated field label to:', fieldLabel.textContent);
     }
     
-    // Update the field value display
-    updateFieldText(wrap, normalizedValue);
+    // Update the field value display with formatted version
+    const formattedDisplay = formatPhoneForDisplay(normalizedValue);
+    updateFieldText(wrap, formattedDisplay);
     console.log('[Contact Detail] Updated field text to:', normalizedValue);
     
     // Re-render the phone row with new primary phone
@@ -2869,17 +2959,33 @@
     const style = document.createElement('style');
     style.id = 'recent-calls-styles';
     style.textContent = `
-      .rc-header { display:flex; align-items:center; justify-content:space-between; }
-      .rc-list { display:flex; flex-direction:column; gap:8px; }
+      .rc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom: var(--spacing-md); }
+      .rc-pager { display:flex; align-items:center; gap:8px; }
+      .rc-page-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
+      .rc-page-btn:hover { 
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .rc-page-info { min-width: 44px; text-align:center; color: var(--text-secondary); font-size: 12px; }
+      .rc-list { position: relative; display:flex; flex-direction:column; gap:8px; }
       .rc-empty { color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
       .rc-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
+      .rc-item.rc-new { animation: rcNewIn 220ms ease-out both; }
+      @keyframes rcNewIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
       .rc-title { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .rc-sub { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
       .rc-outcome { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); color:var(--text-secondary); }
       .rc-actions { display:flex; align-items:center; gap:8px; }
       .rc-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
-      .rc-icon-btn:hover { background: var(--grey-700); color: var(--text-inverse); }
+      .rc-icon-btn:hover { 
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
       /* Inline details panel that expands under the item */
       .rc-details { overflow:hidden; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-card); margin: 6px 2px 2px 2px; box-shadow: var(--elevation-card); }
       .rc-details-inner { padding: 12px; }
@@ -2953,6 +3059,7 @@
   }
   function cd_normalizeSupplierTokens(s){ try{ if(!s) return ''; let out=String(s); out=out.replace(/\bT\s*X\s*U\b/gi,'TXU'); out=out.replace(/\bN\s*R\s*G\b/gi,'NRG'); out=out.replace(/\breliant\b/gi,'Reliant'); return out; }catch(_){ return s||''; } }
 
+  const RC_PAGE_SIZE = 5;
   async function loadRecentCallsForContact(){
     const list = document.getElementById('contact-recent-calls-list');
     if (!list || !state.currentContact) return;
@@ -2963,12 +3070,24 @@
       const j = await r.json().catch(()=>({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
       const nums = collectContactPhones(state.currentContact).map(n=>n.replace(/\D/g,'').slice(-10)).filter(Boolean);
-      const filtered = calls.filter(c => {
+      // De-duplicate numbers (mobile equals company, etc.)
+      const uniq = Array.from(new Set(nums));
+      // Include calls that match by explicit contactId OR any of the contact/company numbers
+      let filtered = calls.filter(c => {
         if (c.contactId && c.contactId === contactId) return true;
         const to10 = String(c.to||'').replace(/\D/g,'').slice(-10);
         const from10 = String(c.from||'').replace(/\D/g,'').slice(-10);
-        return nums.includes(to10) || nums.includes(from10);
-      }).slice(0, 6);
+        return uniq.includes(to10) || uniq.includes(from10);
+      });
+      // Sort newest first by available timestamp field
+      filtered.sort((a,b)=>{
+        const at = new Date(a.callTime || a.timestamp || 0).getTime();
+        const bt = new Date(b.callTime || b.timestamp || 0).getTime();
+        return bt - at;
+      });
+      // Save to state and initialize pagination
+      try { state._rcCalls = filtered; } catch(_) {}
+      try { if (typeof state._rcPage !== 'number' || !state._rcPage) state._rcPage = 1; } catch(_) {}
       // DEBUG: show mapping coverage
       try {
         console.log('[Contact Detail][Recent Calls] Contact:', {
@@ -2983,6 +3102,7 @@
       const isBiz = (p)=> bizList.includes(p);
       const norm = (s)=> String(s||'').replace(/\D/g,'').slice(-10);
       filtered.forEach(c => {
+        if (!c.id) c.id = c.twilioSid || c.callSid || c.sid || `${c.to||''}_${c.from||''}_${c.timestamp||c.callTime||''}`;
         const to10 = norm(c.to);
         const from10 = norm(c.from);
         let direction = 'unknown';
@@ -3007,23 +3127,138 @@
         } catch(_) {}
         try { if (window.CRM_DEBUG_CALLS) console.log('[Contact Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
       });
-      if (!filtered.length){ list.innerHTML = '<div class="rc-empty">No recent calls</div>'; return; }
-      list.innerHTML = filtered.map(call => rcItemHtml(call)).join('');
-      // delegate click to handle dynamic rerenders
-      list.querySelectorAll('.rc-insights').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          const id = btn.getAttribute('data-id');
-          const call = filtered.find(x=>String(x.id)===String(id));
-          if (!call) return;
-          toggleRcDetails(btn, call);
-        });
-      });
+      renderRecentCallsPage();
+      bindRecentCallsPager();
       try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch(_) {}
     } catch (e) {
       console.warn('[RecentCalls][Contact] load failed', e);
       list.innerHTML = '<div class="rc-empty">Failed to load recent calls</div>';
     }
+  }
+
+  function getRecentCallsPageSlice(){
+    const calls = Array.isArray(state._rcCalls) ? state._rcCalls : [];
+    const page = Math.max(1, parseInt(state._rcPage||1, 10));
+    const start = (page - 1) * RC_PAGE_SIZE;
+    return calls.slice(start, start + RC_PAGE_SIZE);
+  }
+
+  function renderRecentCallsPage(){
+    const list = document.getElementById('contact-recent-calls-list');
+    if (!list) return;
+    const total = Array.isArray(state._rcCalls) ? state._rcCalls.length : 0;
+    if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0,0); return; }
+    const slice = getRecentCallsPageSlice();
+    rcUpdateListAnimated(list, slice.map(call => rcItemHtml(call)).join(''));
+    // delegate click to handle dynamic rerenders
+    list.querySelectorAll('.rc-insights').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const call = (state._rcCalls||[]).find(x=>String(x.id)===String(id));
+        if (!call) return;
+        toggleRcDetails(btn, call);
+      });
+    });
+    const totalPages = Math.max(1, Math.ceil(total / RC_PAGE_SIZE));
+    updateRecentCallsPager(state._rcPage||1, totalPages);
+  }
+
+  function rcSpinnerHtml(){ return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
+  function rcSetLoading(list){
+    try {
+      // Overlay spinner without clearing existing rows to prevent flicker
+      let ov = list.querySelector('.rc-loading-overlay');
+      if (!ov) {
+        ov = document.createElement('div');
+        ov.className = 'rc-loading-overlay';
+        ov.innerHTML = rcSpinnerHtml();
+        ov.style.position = 'absolute';
+        ov.style.inset = '0';
+        ov.style.display = 'flex';
+        ov.style.alignItems = 'center';
+        ov.style.justifyContent = 'center';
+        ov.style.pointerEvents = 'none';
+        list.appendChild(ov);
+      }
+      ov.style.display = 'flex';
+    } catch(_) {}
+  }
+  function rcUpdateListAnimated(list, html){
+    try {
+      const startH = list.offsetHeight;
+      list.style.height = startH + 'px';
+      list.style.overflow = 'hidden';
+      requestAnimationFrame(() => {
+        list.innerHTML = html;
+        // Remove any lingering overlay after content update
+        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
+        const targetH = list.scrollHeight;
+        list.style.transition = 'height 220ms ease, opacity 220ms ease';
+        list.style.opacity = '1';
+        list.style.height = targetH + 'px';
+        setTimeout(() => {
+          list.style.height = '';
+          list.style.transition = '';
+          list.style.overflow = '';
+        }, 260);
+      });
+    } catch(_) { list.innerHTML = html; }
+  }
+
+  function bindRecentCallsPager(){
+    const pager = document.getElementById('contact-rc-pager');
+    const prev = document.getElementById('rc-prev');
+    const next = document.getElementById('rc-next');
+    if (!pager || pager._bound) return;
+    prev?.addEventListener('click', (e)=>{ e.preventDefault(); const total = Math.ceil((state._rcCalls||[]).length/RC_PAGE_SIZE)||1; state._rcPage = Math.max(1, (state._rcPage||1) - 1); renderRecentCallsPage(); updateRecentCallsPager(state._rcPage, total); });
+    next?.addEventListener('click', (e)=>{ e.preventDefault(); const total = Math.ceil((state._rcCalls||[]).length/RC_PAGE_SIZE)||1; state._rcPage = Math.min(total, (state._rcPage||1) + 1); renderRecentCallsPage(); updateRecentCallsPager(state._rcPage, total); });
+    pager._bound = '1';
+  }
+
+  function updateRecentCallsPager(current, total){
+    const pager = document.getElementById('contact-rc-pager');
+    const info = document.getElementById('rc-info');
+    const prev = document.getElementById('rc-prev');
+    const next = document.getElementById('rc-next');
+    if (!pager || !info || !prev || !next) return;
+    const show = total > 1;
+    pager.style.display = show ? 'flex' : 'none';
+    info.textContent = `${Math.max(1, parseInt(current||1,10))} of ${Math.max(1, parseInt(total||1,10))}`;
+    prev.disabled = (current <= 1);
+    next.disabled = (current >= total);
+  }
+
+  // Live refresh: refresh Recent Calls when a call starts or ends
+  let _rcRetryTimer = null;
+  function startRecentCallsLiveHooks(){
+    try {
+      if (document._rcLiveHooksBound) return;
+      document.addEventListener('callStarted', onAnyCallActivity, false);
+      document.addEventListener('callEnded', onAnyCallActivity, false);
+      document.addEventListener('pc:recent-calls-refresh', onAnyCallActivity, false);
+      document._rcLiveHooksBound = true;
+    } catch(_) {}
+  }
+  function onAnyCallActivity(){
+    try {
+      const list = document.getElementById('contact-recent-calls-list');
+      if (list) rcSetLoading(list);
+    } catch(_) {}
+    // Kick an immediate refresh and then retry a few times in case backend write lags
+    safeReloadRecentCallsWithRetries();
+  }
+  function safeReloadRecentCallsWithRetries(){
+    try { if (_rcRetryTimer) { clearTimeout(_rcRetryTimer); _rcRetryTimer = null; } } catch(_) {}
+    let attempts = 0;
+    const run = () => {
+      attempts++;
+      try { loadRecentCallsForContact(); } catch(_) {}
+      if (attempts < 10) { // ~8–10s coverage with 900ms spacing
+        _rcRetryTimer = setTimeout(run, 900);
+      }
+    };
+    run();
   }
 
   function collectContactPhones(c){
@@ -3332,6 +3567,14 @@
     try {
       await db.collection('contacts').doc(id).update(payload);
       state.currentContact[field] = value;
+      // If phone field changed, update derived primary 'phone' and persist preferredPhoneField when chosen
+      if (field === 'mobile' || field === 'workDirectPhone' || field === 'otherPhone') {
+        try {
+          // Maintain compatibility primary phone on contact doc
+          const primary = state.currentContact.workDirectPhone || state.currentContact.mobile || state.currentContact.otherPhone || '';
+          await db.collection('contacts').doc(id).update({ phone: primary, updatedAt: Date.now() });
+        } catch (_) {}
+      }
       // Notify other pages to update their in-memory state
       try {
         const ev = new CustomEvent('pc:contact-updated', { detail: { id, changes: { [field]: value, updatedAt: payload.updatedAt } } });
@@ -3380,6 +3623,28 @@
     }
     wrap.classList.remove('editing');
     wrap.setAttribute('data-has-value', (value && String(value).trim()) ? '1' : '0');
+  }
+
+  // Set preferred phone type and persist immediately
+  async function setPreferredPhoneType(type) {
+    const valid = type === 'workDirectPhone' || type === 'mobile' || type === 'otherPhone';
+    const id = state.currentContact?.id;
+    if (!valid || !id) return;
+    try {
+      // Update state and UI immediately
+      state.preferredPhoneField = type;
+      if (state.currentContact) state.currentContact.preferredPhoneField = type;
+      // Persist and broadcast for People page to re-render primary phone
+      if (window.PCSaves && typeof window.PCSaves.updateContact === 'function') {
+        await window.PCSaves.updateContact(id, { preferredPhoneField: type });
+      } else if (window.firebaseDB) {
+        await window.firebaseDB.collection('contacts').doc(id).set({ preferredPhoneField: type, updatedAt: Date.now() }, { merge: true });
+        try { document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id, changes: { preferredPhoneField: type, updatedAt: Date.now() } } })); } catch(_) {}
+      }
+      try { window.crm?.showToast && window.crm.showToast('Default phone updated'); } catch(_) {}
+    } catch (e) {
+      console.warn('Failed to set preferred phone type', e);
+    }
   }
 
   // ===== Inline delete confirmation popover =====

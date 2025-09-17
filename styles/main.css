@@ -117,6 +117,67 @@
     --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* === GLOBAL BUTTON HOVER EFFECTS === */
+/* Apply consistent hover effects to all interactive buttons and icons */
+button:hover:not(:disabled),
+.btn:hover:not(:disabled),
+.icon-btn:hover:not(:disabled),
+.rc-page-btn:hover:not(:disabled),
+.rc-icon-btn:hover:not(:disabled),
+.quick-action-btn:hover:not(:disabled),
+.contact-quick-action-btn:hover:not(:disabled),
+.qa-btn:hover:not(:disabled),
+.widget-item:hover:not(:disabled),
+.page-btn:hover:not(:disabled),
+.pagination-btn:hover:not(:disabled),
+.pagination-arrow:hover:not(:disabled),
+.activity-pagination-btn:hover:not(:disabled),
+.action-btn:hover:not(:disabled),
+.health-entity-info:hover:not(:disabled),
+.back-btn:hover:not(:disabled),
+.call-btn:hover:not(:disabled),
+.search-btn:hover:not(:disabled),
+.filter-btn:hover:not(:disabled),
+.email-action-btn:hover:not(:disabled),
+.tracking-icon:hover:not(:disabled),
+.gmail-badge:hover:not(:disabled),
+.email-item-star:hover:not(:disabled),
+.chip-clear:hover:not(:disabled),
+.chip-suggest-item:hover:not(:disabled),
+.chip-input:hover:not(:disabled),
+.picker-page:hover:not(:disabled),
+.task-item:hover:not(:disabled),
+.news-item:hover:not(:disabled),
+.lead-item:hover:not(:disabled),
+.activity-item:hover:not(:disabled),
+.contact-item:hover:not(:disabled),
+.email-item:hover:not(:disabled) {
+    background: var(--bg-hover) !important;
+    border-color: var(--accent-color) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Special cases that need different hover colors */
+.btn-primary:hover:not(:disabled),
+.add-contact-cta:hover:not(:disabled) {
+    background: var(--bg-hover) !important;
+    border-color: var(--accent-color) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Orange buttons (call buttons, etc.) */
+.call-btn:hover:not(:disabled) {
+    background: #e55a2b !important;
+    border-color: #d9481f !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease !important;
+}
+
 /* Compose editor paragraph spacing */
 .body-input p {
   margin: 0 0 12px 0;
@@ -4444,6 +4505,36 @@ html, body {
     transform: translateY(-1px);
 }
 
+/* Calls table: Add Contact CTA (global so it loads immediately) */
+.add-contact-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+.add-contact-cta:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.add-contact-icon {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: transparent;
+}
+
 /* Override for Create Task popover button to ensure orange wins over global */
 .task-popover .btn-primary {
     background: var(--orange-primary) !important;
@@ -6941,9 +7032,7 @@ html, body {
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border-light);
+    margin-top: 5px;
 }
 
 .pagination-btn {

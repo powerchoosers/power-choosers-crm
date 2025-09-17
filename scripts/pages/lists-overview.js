@@ -300,6 +300,40 @@
     }
   }
 
+  // Live updates for lists collection so cards refresh immediately
+  let _unsubListsPeople = null;
+  let _unsubListsAccounts = null;
+  function startLiveListsListeners() {
+    try {
+      if (!window.firebaseDB || !window.firebaseDB.collection) return;
+      const col = window.firebaseDB.collection('lists');
+      // People lists
+      if (_unsubListsPeople) { try { _unsubListsPeople(); } catch(_) {} _unsubListsPeople = null; }
+      _unsubListsPeople = col.where ? col.where('kind', '==', 'people').onSnapshot((snap) => {
+        try {
+          const items = [];
+          snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+          state.peopleLists = items;
+          state.loadedPeople = true;
+          if (state.kind === 'people') render();
+        } catch (_) { /* noop */ }
+      }) : null;
+      // Account lists
+      if (_unsubListsAccounts) { try { _unsubListsAccounts(); } catch(_) {} _unsubListsAccounts = null; }
+      _unsubListsAccounts = col.where ? col.where('kind', '==', 'accounts').onSnapshot((snap) => {
+        try {
+          const items = [];
+          snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+          state.accountLists = items;
+          state.loadedAccounts = true;
+          if (state.kind === 'accounts') render();
+        } catch (_) { /* noop */ }
+      }) : null;
+    } catch (e) {
+      console.warn('[ListsOverview] Failed to start live listeners', e);
+    }
+  }
+
   function render() {
     const items = state.kind === 'people' ? state.peopleLists : state.accountLists;
     const hasAny = Array.isArray(items) && items.length > 0;
@@ -730,6 +764,7 @@
   updateSwitchLabel();
   render(); // Show loading state immediately
   ensureLoadedThenRender();
+  startLiveListsListeners();
 })();
 
 // ===== Preloader: cache members for instant detail opening =====
