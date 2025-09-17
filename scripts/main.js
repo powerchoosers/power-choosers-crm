@@ -120,7 +120,7 @@ class PowerChoosersCRM {
             if (!db) throw new Error('Firestore not initialized');
             const now = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now();
 
-            // Normalize phone if provided
+            // Normalize company phone if provided
             if (data.phone) {
               try { data.phone = this.normalizePhone(data.phone); } catch(_) {}
             }
@@ -131,7 +131,7 @@ class PowerChoosersCRM {
               industry: data.industry || '',
               domain: data.domain || '',
               website: data.website || '',
-              phone: data.phone || '',
+              companyPhone: data.phone || '',
               city: data.city || '',
               state: data.state || '',
               squareFootage: data.squareFootage || '',
@@ -265,9 +265,6 @@ class PowerChoosersCRM {
             if (data.workDirectPhone) { try { normalized.workDirectPhone = this.normalizePhone(data.workDirectPhone); } catch(_) { normalized.workDirectPhone = data.workDirectPhone; } }
             if (data.otherPhone) { try { normalized.otherPhone = this.normalizePhone(data.otherPhone); } catch(_) { normalized.otherPhone = data.otherPhone; } }
 
-            // Determine primary phone for legacy 'phone' field
-            const primaryPhone = normalized.workDirectPhone || normalized.mobile || normalized.otherPhone || '';
-
             const doc = {
               // Known contact fields
               firstName: data.firstName || '',
@@ -279,7 +276,6 @@ class PowerChoosersCRM {
               mobile: normalized.mobile || '',
               workDirectPhone: normalized.workDirectPhone || '',
               otherPhone: normalized.otherPhone || '',
-              phone: primaryPhone,
               // Optional extras
               city: data.city || '',
               state: data.state || '',
@@ -1778,7 +1774,7 @@ class PowerChoosersCRM {
                 { value: 'accountName', label: 'Account Name' },
                 { value: 'industry', label: 'Industry' },
                 { value: 'website', label: 'Website' },
-                { value: 'phone', label: 'Phone' },
+                { value: 'companyPhone', label: 'Company Phone' },
                 { value: 'city', label: 'City' },
                 { value: 'state', label: 'State' },
                 { value: 'squareFootage', label: 'SQ FT' },
@@ -2308,8 +2304,8 @@ class PowerChoosersCRM {
                 if (contactDoc.companyState && !existingAccount.data().state) {
                     updateData.state = contactDoc.companyState;
                 }
-                if (contactDoc.companyPhone && !existingAccount.data().phone) {
-                    updateData.phone = contactDoc.companyPhone;
+                if (contactDoc.companyPhone && !existingAccount.data().companyPhone) {
+                    updateData.companyPhone = contactDoc.companyPhone;
                 }
                 if (contactDoc.companyEmployees && !existingAccount.data().employees) {
                     updateData.employees = contactDoc.companyEmployees;
@@ -2346,7 +2342,7 @@ class PowerChoosersCRM {
                 if (contactDoc.companyLinkedin) accountData.linkedin = contactDoc.companyLinkedin;
                 if (contactDoc.companyCity) accountData.city = contactDoc.companyCity;
                 if (contactDoc.companyState) accountData.state = contactDoc.companyState;
-                if (contactDoc.companyPhone) accountData.phone = contactDoc.companyPhone;
+                if (contactDoc.companyPhone) accountData.companyPhone = contactDoc.companyPhone;
                 if (contactDoc.companyEmployees) accountData.employees = contactDoc.companyEmployees;
                 if (contactDoc.companySquareFootage) accountData.squareFootage = contactDoc.companySquareFootage;
                 if (contactDoc.companyOccupancyPct) accountData.occupancyPct = contactDoc.companyOccupancyPct;

@@ -135,7 +135,18 @@
     obj.lastName = obj.lastName || obj.last_name || sp.last;
     obj.fullName = obj.fullName || obj.full_name || nameGuess;
     obj.company = obj.company || obj.companyName || obj.accountName || obj.account_name || '';
-    obj.phone = obj.phone || obj.mobile || obj.mobile_phone || obj.workDirectPhone || obj.otherPhone || '';
+    // Derive a primary phone honoring user's preferredPhoneField when available
+    try {
+      const pref = (obj.preferredPhoneField || '').trim();
+      if (pref && obj[pref]) {
+        obj.phone = obj[pref];
+      } else {
+        // Prefer direct work, then mobile, then other, then any legacy phone
+        obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
+      }
+    } catch(_) {
+      obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
+    }
     obj.mobile = obj.mobile || obj.mobile_phone || '';
     obj.email = obj.email || obj.work_email || obj.personal_email || '';
     obj.title = obj.title || obj.jobTitle || obj.job_title || '';
@@ -158,7 +169,10 @@
     const n10 = normPhone(number);
     const nm = String(name||'').toLowerCase();
     const norm = (p) => String(p||'').toLowerCase().replace(/\s+/g,' ').trim();
-    const byNum = people.find(p=> normPhone(p.phone||p.mobile) === n10);
+    const byNum = people.find(p=> {
+      const candidates = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone];
+      return candidates.some(ph => normPhone(ph) === n10);
+    });
     if (byNum) return byNum;
     if (nm) {
       return people.find(p => norm(`${p.firstName||''} ${p.lastName||''}`) === norm(name) || norm(p.name||p.fullName||'') === norm(name));
@@ -338,7 +352,7 @@
       'contact.first_name': data.contact.firstName || data.contact.first || splitName(data.contact.name).first || splitName(data.ctx.name).first || '',
       'contact.last_name': data.contact.lastName || data.contact.last || splitName(data.contact.name).last || splitName(data.ctx.name).last || '',
       'contact.full_name': data.contact.fullName || data.contact.name || data.ctx.name || '',
-      'contact.phone': data.contact.phone || data.contact.mobile || data.ctx.number || '',
+      'contact.phone': data.contact.workDirectPhone || data.contact.mobile || data.contact.otherPhone || data.contact.phone || data.ctx.number || '',
       'contact.mobile': data.contact.mobile || '',
       'contact.email': data.contact.email || '',
       'contact.title': data.contact.title || data.contact.jobTitle || '',

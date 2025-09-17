@@ -43,7 +43,7 @@
     try{
       if (typeof window.getAccountsData === 'function'){
         const accounts = window.getAccountsData() || [];
-        const hit = accounts.find(a=> normPhone(a.phone||a.primaryPhone||a.mainPhone) === phone10);
+        const hit = accounts.find(a=> normPhone(a.companyPhone||a.phone||a.primaryPhone||a.mainPhone) === phone10);
         if (hit) return hit;
       }
       // Fallback: attempt lightweight Firestore lookup once and cache
@@ -54,7 +54,7 @@
             const snap = await window.firebaseDB.collection('accounts').limit(500).get();
             snap.forEach(doc=>{
               const d = doc.data()||{};
-              const ph = normPhone(d.phone||d.primaryPhone||d.mainPhone);
+              const ph = normPhone(d.companyPhone||d.phone||d.primaryPhone||d.mainPhone);
               if (ph && !findAccountByPhone._cache.map.has(ph)) findAccountByPhone._cache.map.set(ph,{ id:doc.id, ...d });
             });
             findAccountByPhone._cache.ready = true;

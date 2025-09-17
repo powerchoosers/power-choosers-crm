@@ -1590,6 +1590,19 @@
         if (next !== state.currentPage) {
           state.currentPage = next;
           render();
+          // After page change, scroll the actual scrollable container to top
+          try {
+            requestAnimationFrame(() => {
+              const scroller = (els.page && els.page.querySelector) ? els.page.querySelector('.table-scroll') : null;
+              if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'auto' });
+              else if (scroller) scroller.scrollTop = 0;
+              const main = document.getElementById('main-content');
+              if (main && typeof main.scrollTo === 'function') main.scrollTo({ top: 0, behavior: 'auto' });
+              const contentArea = document.querySelector('.content-area');
+              if (contentArea && typeof contentArea.scrollTo === 'function') contentArea.scrollTo({ top: 0, behavior: 'auto' });
+              window.scrollTo(0, 0);
+            });
+          } catch (_) { /* noop */ }
         }
       });
     }
@@ -2464,6 +2477,15 @@
         if (next !== state.currentPage) {
           state.currentPage = next;
           render();
+          // After page change, scroll the actual scrollable container to top
+          try {
+            requestAnimationFrame(() => {
+              const scroller = (els.page && els.page.querySelector) ? els.page.querySelector('.table-scroll') : null;
+              if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'auto' });
+              else if (scroller) scroller.scrollTop = 0;
+              window.scrollTo(0, 0);
+            });
+          } catch (_) { /* noop */ }
         }
       });
       els.pagination.dataset.bound = '1';
@@ -3430,23 +3452,39 @@
     const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
 
-    // Use unified pagination component
+    // Use unified pagination component when available
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(current, totalPages, (page) => {
         state.currentPage = page;
         render();
+        // After page change, scroll to the top of the actual scroll container
+        try {
+          requestAnimationFrame(() => {
+            const scroller = (els.page && els.page.querySelector) ? els.page.querySelector('.table-scroll') : null;
+            if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'auto' });
+            else if (scroller) scroller.scrollTop = 0;
+            const main = document.getElementById('main-content');
+            if (main && typeof main.scrollTo === 'function') main.scrollTo({ top: 0, behavior: 'auto' });
+            const contentArea = document.querySelector('.content-area');
+            if (contentArea && typeof contentArea.scrollTo === 'function') contentArea.scrollTo({ top: 0, behavior: 'auto' });
+            window.scrollTo(0, 0);
+          });
+        } catch (_) { /* noop */ }
       }, els.pagination.id);
     } else {
-      // Fallback to simple pagination if unified component not available
-      els.pagination.innerHTML = `<div class="unified-pagination">
-        <button class="pagination-arrow" ${current <= 1 ? 'disabled' : ''} onclick="if(${current} > 1) { state.currentPage = ${current - 1}; render(); }">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
-        </button>
-        <div class="pagination-current">${current}</div>
-        <button class="pagination-arrow" ${current >= totalPages ? 'disabled' : ''} onclick="if(${current} < ${totalPages}) { state.currentPage = ${current + 1}; render(); }">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
-        </button>
-      </div>`;
+      // Fallback simple pagination
+      els.pagination.innerHTML = `
+        <div class="unified-pagination">
+          <button class="pagination-arrow" ${current <= 1 ? 'disabled' : ''}
+            onclick="if(${current} > 1) { state.currentPage = ${current - 1}; render(); (function(){ var s=document.querySelector('#people-page .table-scroll'); if(s){ s.scrollTop=0; } window.scrollTo(0,0); })(); }">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
+          </button>
+          <div class="pagination-current">${current} / ${totalPages}</div>
+          <button class="pagination-arrow" ${current >= totalPages ? 'disabled' : ''}
+            onclick="if(${current} < ${totalPages}) { state.currentPage = ${current + 1}; render(); (function(){ var s=document.querySelector('#people-page .table-scroll'); if(s){ s.scrollTop=0; } window.scrollTo(0,0); })(); }">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
+          </button>
+        </div>`;
     }
 
     // Update summary text

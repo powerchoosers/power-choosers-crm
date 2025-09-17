@@ -42,13 +42,18 @@
         setTimeout(() => {
           try { window.scrollTo(0, y); } catch (_) {}
         }, 100);
+
+        // Clear restoring hint flag shortly after to avoid onSnapshot flicker resetting page to 1
+        try {
+          setTimeout(() => { try { if (window.__restoringAccounts) window.__restoringAccounts = false; } catch(_){} }, 800);
+        } catch (_) {}
         
         // Restore selected items
         if (detail.selectedItems && Array.isArray(detail.selectedItems)) {
           setTimeout(() => {
             try {
               detail.selectedItems.forEach(id => {
-                const checkbox = document.querySelector(`input[data-account-id="${id}"]`);
+                const checkbox = document.querySelector(`input.row-select[data-id="${id}"]`);
                 if (checkbox && !checkbox.checked) {
                   checkbox.checked = true;
                   checkbox.dispatchEvent(new Event('change', { bubbles: true }));
@@ -73,7 +78,7 @@
     'name',
     'industry',
     'domain',
-    'phone',
+    'companyPhone',
     'contractEnd',
     'sqft',
     'occupancy',
@@ -83,7 +88,7 @@
     'updated'
   ];
   // Bump storage key to reset any previously saved order that included non-existent columns
-  const ACCOUNTS_COL_STORAGE_KEY = 'accounts_column_order_v2';
+  const ACCOUNTS_COL_STORAGE_KEY = 'accounts_column_order_v3';
   let accountsColumnOrder = DEFAULT_ACCOUNTS_COL_ORDER.slice();
   function loadAccountsColumnOrder() {
     try {
@@ -472,6 +477,18 @@
         e.preventDefault();
         const id = link.getAttribute('data-id');
         if (id && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          // Capture return state so Account Detail can restore Accounts on back
+          try {
+            window._accountNavigationSource = 'accounts';
+            window._accountsReturn = {
+              page: state.currentPage,
+              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+              searchTerm: els.quickSearch ? els.quickSearch.value : '',
+              sortColumn: state.sortColumn,
+              sortDirection: state.sortDirection,
+              selectedItems: Array.from(state.selected || [])
+            };
+          } catch (_) { /* noop */ }
           window.AccountDetail.show(id);
         }
       });
@@ -488,7 +505,21 @@
         if (rel === 'prev') next = Math.max(1, state.currentPage - 1);
         else if (rel === 'next') next = Math.min(total, state.currentPage + 1);
         else if (btn.dataset.page) next = Math.min(total, Math.max(1, parseInt(btn.dataset.page, 10)));
-        if (next !== state.currentPage) { state.currentPage = next; render(); }
+        if (next !== state.currentPage) {
+          state.currentPage = next;
+          render();
+          // After page change, scroll to the top of the list
+          try {
+            const scroller = (els.page && els.page.querySelector) ? els.page.querySelector('.table-scroll') : null;
+            if (scroller && typeof scroller.scrollTo === 'function') {
+              scroller.scrollTo({ top: 0, behavior: 'auto' });
+            } else if (scroller) {
+              scroller.scrollTop = 0;
+            }
+            // Also ensure window is at top
+            window.scrollTo(0, 0);
+          } catch (_) { /* noop */ }
+        }
       });
     }
 
@@ -565,14 +596,18 @@
       state.filtered = state.data.slice();
       state.loaded = true;
       state.errorMsg = '';
-      state.currentPage = 1;
+      if (!window.__restoringAccounts) {
+        state.currentPage = 1;
+      }
       render();
     } catch (e) {
       state.data = [];
       state.filtered = [];
       state.loaded = true;
       state.errorMsg = (e && (e.message || e.code)) ? String(e.message || e.code) : 'Unknown error';
-      state.currentPage = 1;
+      if (!window.__restoringAccounts) {
+        state.currentPage = 1;
+      }
       render();
     }
   }
@@ -627,15 +662,17 @@
 
     state.filtered = state.data.filter((a) => {
       const acctName = a.accountName || a.name || a.companyName || '';
-      const hasPhone = !!(a.phone || a.primaryPhone || a.mainPhone);
+      const hasPhone = !!(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone);
       const domain = a.domain || a.website || a.site || '';
 
       return (
-        qMatch(acctName) || qMatch(a.industry) || qMatch(domain) || qMatch(a.phone) || qMatch(a.electricitySupplier) || qMatch(a.benefits) || qMatch(a.painPoints)
+        qMatch(acctName) || qMatch(a.industry) || qMatch(domain) || qMatch(a.companyPhone) || qMatch(a.phone) || qMatch(a.electricitySupplier) || qMatch(a.benefits) || qMatch(a.painPoints)
       ) && nameMatch(acctName) && industryMatch(a.industry) && domainMatch(domain) && (!mustPhone || hasPhone);
     });
 
-    state.currentPage = 1;
+    if (!window.__restoringAccounts) {
+      state.currentPage = 1;
+    }
     render();
   }
 
@@ -696,6 +733,10 @@
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="display:block"><text x="12" y="12" dy="-0.12em" text-anchor="middle" dominant-baseline="central" fill="currentColor" font-size="18" font-weight="800" letter-spacing="0.05" font-family="Inter, system-ui, -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif">AI</text></svg>';
       case 'delete':
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+      case 'linkedin':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5z" transform="translate(4 4)"/><path d="M2 8h4v10H2z" transform="translate(4 4)"/><path d="M9 8h3v1.7c.6-1 1.6-1.7 3.2-1.7 3 0 4.8 2 4.8 5.6V18h-4v-3.7c0-1.4-.5-2.4-1.7-2.4-1 0-1.5.7-1.8 1.4-.1.2-.1.6-.1.9V18H9z" transform="translate(4 4)"/></svg>';
+      case 'link':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20"/></svg>';
       default:
         return '';
     }
@@ -880,7 +921,7 @@
     const name = safe(a.accountName || a.name || a.companyName);
     const industry = safe(a.industry);
     const domain = safe(a.domain || a.website || a.site);
-    const phone = safe(a.phone || a.primaryPhone || a.mainPhone);
+    const phone = safe(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone);
     // Normalize to E.164 for data attributes and actions
     const phoneE164 = (() => {
       try {
@@ -934,7 +975,7 @@
       name: `<td class="name-cell"><a href="#account-details" class="acct-link" data-id="${aid}" title="View account details"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : ''}<span class="name-text account-name">${escapeHtml(name || 'Unknown Account')}</span></span></a></td>`,
       industry: `<td>${escapeHtml(industry)}</td>`,
       domain: `<td>${escapeHtml(domain)}</td>`,
-      phone: `<td data-field="phone" class="phone-cell click-to-call" data-phone="${escapeHtml(phoneE164)}" data-name="${escapeHtml(name)}">${escapeHtml(phone)}</td>`,
+      companyPhone: `<td data-field="companyPhone" class="phone-cell click-to-call" data-phone="${escapeHtml(phoneE164)}" data-name="${escapeHtml(name)}">${escapeHtml(phone)}</td>`,
       contractEnd: `<td>${escapeHtml(contractEnd)}</td>`,
       electricitySupplier: `<td>${escapeHtml(electricitySupplier)}</td>`,
       benefits: `<td>${escapeHtml(benefits)}</td>`,
@@ -1482,15 +1523,28 @@
       window.crm.createPagination(current, totalPages, (page) => {
         state.currentPage = page;
         render();
+        // Scroll to top after page change via unified paginator
+        try {
+          requestAnimationFrame(() => {
+            const scroller = (els.page && els.page.querySelector) ? els.page.querySelector('.table-scroll') : null;
+            if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'auto' });
+            else if (scroller) scroller.scrollTop = 0;
+            const main = document.getElementById('main-content');
+            if (main && typeof main.scrollTo === 'function') main.scrollTo({ top: 0, behavior: 'auto' });
+            const contentArea = document.querySelector('.content-area');
+            if (contentArea && typeof contentArea.scrollTo === 'function') contentArea.scrollTo({ top: 0, behavior: 'auto' });
+            window.scrollTo(0, 0);
+          });
+        } catch (_) { /* noop */ }
       }, els.pagination.id);
     } else {
       // Fallback to simple pagination if unified component not available
       els.pagination.innerHTML = `<div class="unified-pagination">
-        <button class="pagination-arrow" ${current <= 1 ? 'disabled' : ''} onclick="if(${current} > 1) { state.currentPage = ${current - 1}; render(); }">
+        <button class="pagination-arrow" ${current <= 1 ? 'disabled' : ''} onclick="if(${current} > 1) { state.currentPage = ${current - 1}; render(); (function(){ var s=document.querySelector('#accounts-page .table-scroll'); if(s){ s.scrollTop=0; } window.scrollTo(0,0); })(); }">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
         </button>
         <div class="pagination-current">${current}</div>
-        <button class="pagination-arrow" ${current >= totalPages ? 'disabled' : ''} onclick="if(${current} < ${totalPages}) { state.currentPage = ${current + 1}; render(); }">
+        <button class="pagination-arrow" ${current >= totalPages ? 'disabled' : ''} onclick="if(${current} < ${totalPages}) { state.currentPage = ${current + 1}; render(); (function(){ var s=document.querySelector('#accounts-page .table-scroll'); if(s){ s.scrollTop=0; } window.scrollTo(0,0); })(); }">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
         </button>
       </div>`;
