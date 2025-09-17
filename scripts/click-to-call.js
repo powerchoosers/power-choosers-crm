@@ -267,7 +267,7 @@
       rows.forEach(row => {
         if (row.dataset.phoneProcessed) return;
         // Find the phone cell reliably even if columns are reordered
-        let phoneCell = row.querySelector('td[data-field="phone"], td.phone-cell, td.click-to-call');
+        let phoneCell = row.querySelector('td[data-field="companyPhone"], td[data-field="phone"], td.phone-cell, td.click-to-call');
         if (!phoneCell) {
           const cells = row.querySelectorAll('td');
           if (cells.length >= 5) phoneCell = cells[4];
@@ -310,6 +310,7 @@
   function processSpecificPhoneElements() {
     // Only target very specific phone number containers
     const specificSelectors = [
+      'td[data-field="companyPhone"]',
       'td[data-field="phone"]',
       'td[data-field="mobile"]',
       '.phone-cell',
@@ -322,6 +323,7 @@
       '#contact-detail-view .info-row[data-field="mobile"] .info-value-text',
       '#contact-detail-view .info-row[data-field="companyPhone"] .info-value-text',
       // Account detail view phone field
+      '#account-detail-view .info-value-wrap[data-field="companyPhone"] .info-value-text',
       '#account-detail-view .info-value-wrap[data-field="phone"] .info-value-text',
       // Recent calls phone numbers
       '.rc-sub .phone-number'

@@ -1314,7 +1314,7 @@
       console.log('[ContactDetail] Using provided temporary contact:', contact);
       console.log('[ContactDetail] Contact fields:', {
         email: contact.email,
-        phone: contact.phone,
+        phone: contact.workDirectPhone || contact.mobile || contact.otherPhone || contact.phone,
         mobile: contact.mobile,
         companyName: contact.companyName,
         title: contact.title,
@@ -1381,6 +1381,8 @@
     hideToolbar();
     // Enable scrollable content area while in contact detail
     if (els.page) { els.page.classList.add('contact-detail-mode'); }
+    // Seed preferred phone selection from persisted value so the primary phone row reflects it immediately
+    try { state.preferredPhoneField = String(contact.preferredPhoneField || '').trim(); } catch(_) { state.preferredPhoneField = ''; }
     renderContactDetail();
     
     // Setup energy update listener for real-time sync with Health Widget
@@ -1389,6 +1391,19 @@
         window.ContactDetail.setupEnergyUpdateListener();
       }
     } catch (_) {}
+    
+    // Add click handler to persist default phone when star button is clicked
+    const starButton = document.querySelector('.star-button');
+    if (starButton) {
+      starButton.addEventListener('click', () => {
+        const preferredPhoneField = state.preferredPhoneField;
+        if (preferredPhoneField) {
+          try {
+            localStorage.setItem('preferredPhoneField', preferredPhoneField);
+          } catch (_) { /* noop */ }
+        }
+      });
+    }
   }
 
   function hideToolbar() {
@@ -1468,8 +1483,8 @@
     if (!contact) return '';
     
     // First try to get from contact's account data if available
-    if (contact.account && contact.account.phone) {
-      return contact.account.phone;
+    if (contact.account && (contact.account.companyPhone || contact.account.phone)) {
+      return contact.account.companyPhone || contact.account.phone;
     }
     
     // If no direct account data, try to look up the account by company name
@@ -1482,7 +1497,7 @@
           const compName = contact.companyName.toLowerCase().trim();
           return accName === compName || accName.includes(compName) || compName.includes(accName);
         });
-        return account ? (account.phone || '') : '';
+        return account ? (account.companyPhone || account.phone || '') : '';
       } catch (e) {
         console.warn('Failed to lookup company phone:', e);
         return '';
@@ -1519,7 +1534,7 @@
     const company = contact.companyName || '';
     const title = contact.title || '';
     const email = contact.email || '';
-    const phone = contact.phone || contact.mobile || '';
+    const phone = (function(){ try { const d = getPrimaryPhoneData(contact); return d && d.value ? d.value : ''; } catch(_) { return contact.workDirectPhone || contact.mobile || contact.otherPhone || ''; } })();
     const city = contact.city || contact.locationCity || '';
     const stateVal = contact.state || contact.locationState || '';
     const industry = contact.industry || contact.companyIndustry || '';
@@ -1619,7 +1634,7 @@
                 </button>
                 <button type="button" class="widget-item" data-widget="notes" title="Notes" aria-label="Notes">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path d="M4 4h12a2 2 0 0 1 2 2v10l-4 4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+                    <path d="M4 4h12a2 2 0 0 1 2 2v14l-4 4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
                     <path d="M14 20v-4a2 2 0 0 1 2-2h4"/>
                   </svg>
                 </button>
@@ -1863,6 +1878,13 @@
       if (f === 'workDirectPhone' && contact.workDirectPhone) return { value: contact.workDirectPhone, type: 'work direct', field: 'workDirectPhone' };
       if (f === 'otherPhone' && contact.otherPhone) return { value: contact.otherPhone, type: 'other', field: 'otherPhone' };
     }
+    // Otherwise, if a persisted preference exists on the contact, honor it
+    try {
+      const pref = (contact && contact.preferredPhoneField) ? String(contact.preferredPhoneField).trim() : '';
+      if (pref === 'mobile' && contact.mobile) return { value: contact.mobile, type: 'mobile', field: 'mobile' };
+      if (pref === 'workDirectPhone' && contact.workDirectPhone) return { value: contact.workDirectPhone, type: 'work direct', field: 'workDirectPhone' };
+      if (pref === 'otherPhone' && contact.otherPhone) return { value: contact.otherPhone, type: 'other', field: 'otherPhone' };
+    } catch(_) {}
     // Priority: Mobile > Work Direct > Other
     if (contact.mobile) {
       return { value: contact.mobile, type: 'mobile', field: 'mobile' };
@@ -2268,30 +2290,39 @@
         const defaultBtn = e.target.closest('.phone-default-btn');
         if (defaultBtn && field === 'phone') {
           e.preventDefault();
-          const contact = state.currentContact || {};
-          const order = ['mobile', 'workDirectPhone', 'otherPhone'];
-          // Build list of available types with values
-          const available = order.filter(k => !!contact[k]);
-          if (!available.length) return;
-          // Current is first that matches label
-          const currentField = getPrimaryPhoneData(contact).field;
-          const idx = Math.max(0, available.indexOf(currentField));
-          const next = available[(idx + 1) % available.length];
-          try { await setPreferredPhoneType(next); } catch(_) {}
-          // Update label immediately
-          const labelEl = wrap.closest('.info-row')?.querySelector('.info-label');
-          if (labelEl) {
-            const typeLabels = { mobile: 'MOBILE', workDirectPhone: 'WORK DIRECT', otherPhone: 'OTHER PHONE' };
-            labelEl.textContent = typeLabels[next] || 'PHONE';
-          }
-          // Re-render phone row
-          const phoneRow = wrap.closest('.info-row');
-          if (phoneRow) {
-            const newPhoneRow = renderPhoneRow(state.currentContact);
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = newPhoneRow;
-            const newRow = tempDiv.firstElementChild;
-            phoneRow.parentElement.replaceChild(newRow, phoneRow);
+          // Throttle: prevent rapid double-clicks from cycling multiple times
+          if (infoGrid._cycleLock) return;
+          infoGrid._cycleLock = true;
+
+          try {
+            const contact = state.currentContact || {};
+            const order = ['mobile', 'workDirectPhone', 'otherPhone'];
+            // Build list of available types with values
+            const available = order.filter(k => !!contact[k]);
+            if (!available.length) return;
+            // Current is first that matches label
+            const currentField = getPrimaryPhoneData(contact).field;
+            const idx = Math.max(0, available.indexOf(currentField));
+            const next = available[(idx + 1) % available.length];
+            try { await setPreferredPhoneType(next); } catch(_) {}
+            // Update label immediately
+            const labelEl = wrap.closest('.info-row')?.querySelector('.info-label');
+            if (labelEl) {
+              const typeLabels = { mobile: 'MOBILE', workDirectPhone: 'WORK DIRECT', otherPhone: 'OTHER PHONE' };
+              labelEl.textContent = typeLabels[next] || 'PHONE';
+            }
+            // Re-render phone row
+            const phoneRow = wrap.closest('.info-row');
+            if (phoneRow) {
+              const newPhoneRow = renderPhoneRow(state.currentContact);
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = newPhoneRow;
+              const newRow = tempDiv.firstElementChild;
+              phoneRow.parentElement.replaceChild(newRow, phoneRow);
+            }
+          } finally {
+            // Release lock after a brief cooldown
+            setTimeout(() => { infoGrid._cycleLock = false; }, 400);
           }
           return;
         }
@@ -3567,14 +3598,6 @@
     try {
       await db.collection('contacts').doc(id).update(payload);
       state.currentContact[field] = value;
-      // If phone field changed, update derived primary 'phone' and persist preferredPhoneField when chosen
-      if (field === 'mobile' || field === 'workDirectPhone' || field === 'otherPhone') {
-        try {
-          // Maintain compatibility primary phone on contact doc
-          const primary = state.currentContact.workDirectPhone || state.currentContact.mobile || state.currentContact.otherPhone || '';
-          await db.collection('contacts').doc(id).update({ phone: primary, updatedAt: Date.now() });
-        } catch (_) {}
-      }
       // Notify other pages to update their in-memory state
       try {
         const ev = new CustomEvent('pc:contact-updated', { detail: { id, changes: { [field]: value, updatedAt: payload.updatedAt } } });

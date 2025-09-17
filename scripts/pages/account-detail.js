@@ -223,7 +223,7 @@
     const industry = a.industry || '';
     const domain = a.domain || a.website || a.site || '';
     const website = a.website || a.site || (domain ? (domain.startsWith('http') ? domain : ('https://' + domain)) : '');
-    const phone = a.phone || a.primaryPhone || a.mainPhone || '';
+    const phone = a.companyPhone || a.phone || a.primaryPhone || a.mainPhone || '';
     const city = a.city || a.locationCity || '';
     const stateVal = a.state || a.locationState || '';
     const linkedin = a.linkedin || a.linkedinUrl || a.linkedin_url || '';
@@ -315,7 +315,7 @@
           <h3 class="section-title">Account Information</h3>
           <div class="info-grid">
             <div class="info-row"><div class="info-label">WEBSITE</div><div class="info-value-wrap" data-field="website"><span class="info-value-text">${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener">${escapeHtml(website)}</a>` : '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
-            <div class="info-row"><div class="info-label">COMPANY PHONE</div><div class="info-value-wrap" data-field="phone"><span class="info-value-text" 
+            <div class="info-row"><div class="info-label">COMPANY PHONE</div><div class="info-value-wrap" data-field="companyPhone"><span class="info-value-text" 
                                  data-account-id="${a.id || a.accountId || a._id || ''}" 
                                  data-account-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}" 
                                  data-company-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}">${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
@@ -585,7 +585,7 @@
     // Show spinner and animate container while loading
     try { arcSetLoading(list); } catch(_) {}
     const accountId = state.currentAccount.id;
-    const accountPhone10 = String(state.currentAccount.phone || state.currentAccount.primaryPhone || state.currentAccount.mainPhone || '').replace(/\D/g,'').slice(-10);
+    const accountPhone10 = String(state.currentAccount.companyPhone || state.currentAccount.phone || state.currentAccount.primaryPhone || state.currentAccount.mainPhone || '').replace(/\D/g,'').slice(-10);
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
     
     // DEBUG: Log account info
@@ -1038,6 +1038,33 @@
           return;
         }
         
+        // Check if we came from Calls page
+        if (window._accountNavigationSource === 'calls') {
+          try {
+            const restore = window._callsReturn || {};
+            // Clear navigation markers early
+            window._accountNavigationSource = null;
+            window._callsReturn = null;
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('calls');
+              // Restore Calls state
+              setTimeout(() => {
+                try {
+                  const ev = new CustomEvent('pc:calls-restore', { detail: {
+                    page: restore.page,
+                    scroll: restore.scroll,
+                    filters: restore.filters,
+                    selectedItems: restore.selectedItems,
+                    searchTerm: restore.searchTerm
+                  }});
+                  document.dispatchEvent(ev);
+                } catch(_) {}
+              }, 60);
+            }
+          } catch (_) { /* noop */ }
+          return;
+        }
+        
         // Special case: if we arrived here from Contact Detail's company link,
         // return back to that contact detail view.
         if (window._contactNavigationSource === 'contact-detail' && window._contactNavigationContactId) {
@@ -1074,25 +1101,28 @@
                   const ev = new CustomEvent('pc:people-restore', { detail: { page: restore.page, scroll: restore.scroll } });
                   document.dispatchEvent(ev);
                 } catch(_) {}
-              }, 60);
+              }, 40);
             }
           } catch (_) { /* noop */ }
           return;
         }
-        
-        // Check if we came from calls page
-        if (window._accountNavigationSource === 'calls') {
+
+        // Check if we came from Accounts page
+        if (window._accountNavigationSource === 'accounts') {
           try {
-            const restore = window._callsReturn || {};
-            // Clear the navigation markers early to avoid leaking state
+            const restore = window._accountsReturn || {};
+            // Clear early to avoid leaking state
             window._accountNavigationSource = null;
-            window._callsReturn = null;
+            window._accountsReturn = null;
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('calls');
-              // Dispatch an event for Calls page to restore pagination and scroll
+              // Hint Accounts page to avoid forcing page=1 during initial load
+              try { window.__restoringAccounts = true; } catch (_) {}
+              window.crm.navigateToPage('accounts');
+              // Dispatch an event for Accounts page to restore UI state
               setTimeout(() => {
                 try {
-                  const ev = new CustomEvent('pc:calls-restore', { detail: { page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm } });
+                  const ev = new CustomEvent('pc:accounts-restore', { detail: {
+                    page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm } });
                   document.dispatchEvent(ev);
                 } catch(_) {}
               }, 60);
@@ -1413,7 +1443,7 @@
     const a = state.currentAccount;
     switch (action) {
       case 'call': {
-        const phone = a?.phone || a?.primaryPhone || a?.mainPhone;
+        const phone = a?.companyPhone || a?.phone || a?.primaryPhone || a?.mainPhone;
         if (phone) {
           try {
             if (window.Widgets && typeof window.Widgets.callNumber === 'function') {

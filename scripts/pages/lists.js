@@ -530,9 +530,9 @@
 
       let base = state.dataAccounts.filter(a => {
         const acct = a.accountName || a.name || '';
-        const hasPhone = !!a.phone;
+        const hasPhone = !!(a.companyPhone || a.phone);
         return (
-          (qMatch(acct) || qMatch(a.industry) || qMatch(a.domain) || qMatch(a.location)) &&
+          (qMatch(acct) || qMatch(a.industry) || qMatch(a.domain) || qMatch(a.location) || qMatch(a.companyPhone) || qMatch(a.phone)) &&
           nameMatch(acct) && industryMatch(a.industry) && domainMatch(a.domain) && (!mustPhone || hasPhone)
         );
       });
@@ -663,7 +663,7 @@
     const acct = escapeHtml(a.accountName || a.name || '');
     const industry = escapeHtml(a.industry || '');
     const domain = escapeHtml(a.domain || '');
-    const phone = escapeHtml(a.phone || '');
+    const phone = escapeHtml(a.companyPhone || a.phone || '');
     const ced = escapeHtml(formatDateOrNA(a.contractEndDate));
     const sqft = escapeHtml(a.squareFeet || a.sqft || '');
     const occ = escapeHtml(a.occupancyPct || a.occupancy || '');
@@ -704,7 +704,7 @@
         <th>Account</th>
         <th>Industry</th>
         <th>Domain</th>
-        <th>Phone</th>
+        <th>Company Phone</th>
         <th>Contract End Date</th>
         <th>Sq Ft</th>
         <th>Occupancy %</th>

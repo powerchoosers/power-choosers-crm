@@ -1558,7 +1558,7 @@
       full_name: contact.full_name || contact.fullName || ((contact.firstName || contact.first_name || '') + ' ' + (contact.lastName || contact.last_name || '')).trim(),
       title: contact.title || contact.jobTitle,
       email: contact.email,
-      phone: contact.phone || contact.phoneNumber,
+      phone: contact.workDirectPhone || contact.mobile || contact.otherPhone || contact.phone || contact.phoneNumber,
       company: contact.company || contact.companyName || contact.accountName || contact.organization || contact.organisation || contact.employer
     };
     if (key in map && map[key]) return map[key];
