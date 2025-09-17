@@ -2148,6 +2148,10 @@
       const d = coerceDate(arguments[i]);
       if (d) return d.toLocaleDateString();
     }
+    // As a last resort, if no timestamps exist, show 'Just now' for newly created items in-session
+    try {
+      if (arguments.length === 0 || arguments.every(v => !v)) return 'Just now';
+    } catch(_) {}
     return 'N/A';
   }
 
@@ -2197,7 +2201,14 @@
     const title = safe(c.title);
     const company = safe(c.companyName);
     const email = safe(c.email);
-    const phone = safe(c.workDirectPhone || c.mobile || c.otherPhone);
+    // Prefer user-selected default phone if provided
+    const preferredKey = String(c.preferredPhoneField || '').trim();
+    let phoneRaw = '';
+    if (preferredKey && (preferredKey === 'workDirectPhone' || preferredKey === 'mobile' || preferredKey === 'otherPhone')) {
+      phoneRaw = c[preferredKey] || '';
+    }
+    if (!phoneRaw) phoneRaw = c.workDirectPhone || c.mobile || c.otherPhone || '';
+    const phone = safe(phoneRaw);
     const updatedStr = formatDateOrNA(c.updatedAt, c.createdAt);
     const city = safe(c.city || c.locationCity || '');
     const stateVal = safe(c.state || c.locationState || '');
@@ -2328,6 +2339,29 @@
     renderSeniorityChips();
     renderDepartmentChips();
     loadDataOnce();
+    startLivePeopleListener();
+  }
+
+  // Live listener to keep People table in sync without navigation
+  let _unsubscribePeople = null;
+  async function startLivePeopleListener() {
+    try {
+      if (!window.firebaseDB || !window.firebaseDB.collection) return;
+      if (_unsubscribePeople) { try { _unsubscribePeople(); } catch(_) {} _unsubscribePeople = null; }
+      const col = window.firebaseDB.collection('contacts');
+      _unsubscribePeople = col.onSnapshot((snap) => {
+        try {
+          const fresh = [];
+          snap.forEach((doc) => { fresh.push({ id: doc.id, ...doc.data() }); });
+          state.data = fresh;
+          applyFilters();
+        } catch (_) { /* noop */ }
+      }, (err) => {
+        console.warn('[People] onSnapshot error', err);
+      });
+    } catch (e) {
+      console.warn('[People] Failed to start live listener', e);
+    }
   }
 
   // Rebind dynamic listeners after the People page table DOM is restored

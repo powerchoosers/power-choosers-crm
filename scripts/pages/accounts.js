@@ -491,6 +491,61 @@
         if (next !== state.currentPage) { state.currentPage = next; render(); }
       });
     }
+
+    // Listen for account updates from Account Detail and Energy updates
+    if (els.page && !els.page._accountUpdatedHandler) {
+      els.page._accountUpdatedHandler = function (e) {
+        try {
+          const d = e && e.detail ? e.detail : {};
+          const id = d.id;
+          const changes = d.changes || {};
+          if (!id) return;
+          // Update in-memory rows
+          const apply = (arr) => {
+            if (!Array.isArray(arr)) return;
+            for (let i = 0; i < arr.length; i++) {
+              const a = arr[i];
+              if (a && a.id === id) {
+                arr[i] = Object.assign({}, a, changes);
+              }
+            }
+          };
+          apply(state.data);
+          apply(state.filtered);
+          render();
+        } catch (_) { /* noop */ }
+      };
+      document.addEventListener('pc:account-updated', els.page._accountUpdatedHandler);
+    }
+
+    if (els.page && !els.page._energyUpdatedHandler) {
+      els.page._energyUpdatedHandler = function (e) {
+        try {
+          const d = e && e.detail ? e.detail : {};
+          if (d.entity !== 'account') return;
+          const id = d.id;
+          const field = d.field;
+          const value = d.value;
+          if (!id || !field) return;
+          const apply = (arr) => {
+            if (!Array.isArray(arr)) return;
+            for (let i = 0; i < arr.length; i++) {
+              const a = arr[i];
+              if (a && a.id === id) {
+                const cloned = Object.assign({}, a);
+                cloned[field] = value;
+                cloned.updatedAt = new Date();
+                arr[i] = cloned;
+              }
+            }
+          };
+          apply(state.data);
+          apply(state.filtered);
+          render();
+        } catch (_) { /* noop */ }
+      };
+      document.addEventListener('pc:energy-updated', els.page._energyUpdatedHandler);
+    }
   }
 
   function debounce(fn, ms) { let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), ms); }; }
@@ -519,6 +574,28 @@
       state.errorMsg = (e && (e.message || e.code)) ? String(e.message || e.code) : 'Unknown error';
       state.currentPage = 1;
       render();
+    }
+  }
+
+  // Live reconcile via onSnapshot (keeps table in sync without navigation)
+  let _unsubscribeAccounts = null;
+  async function startLiveAccountsListener() {
+    try {
+      if (!window.firebaseDB || !window.firebaseDB.collection) return;
+      if (_unsubscribeAccounts) { try { _unsubscribeAccounts(); } catch(_) {} _unsubscribeAccounts = null; }
+      const col = window.firebaseDB.collection('accounts');
+      _unsubscribeAccounts = col.onSnapshot((snap) => {
+        try {
+          const fresh = [];
+          snap.forEach((doc) => { fresh.push({ id: doc.id, ...doc.data() }); });
+          state.data = fresh;
+          applyFilters();
+        } catch (_) { /* noop */ }
+      }, (err) => {
+        console.warn('[Accounts] onSnapshot error', err);
+      });
+    } catch (e) {
+      console.warn('[Accounts] Failed to start live listener', e);
     }
   }
 
@@ -910,6 +987,7 @@
     // Ensure styles for bulk popover and actions bar match CRM theme
     injectAccountsBulkStyles();
     loadDataOnce();
+    startLiveAccountsListener();
   }
 
   function handleQuickAction(btn) {

@@ -461,6 +461,8 @@
       const results = [];
       console.log('[Global Search] Contacts snapshot size:', snapshot.size);
 
+      const qDigits = String(query || '').replace(/\D/g, '');
+      const isPhoneSearch = qDigits.length >= 7; // handle most common formats/partials
       snapshot.forEach(doc => {
         const person = { id: doc.id, ...doc.data() };
         // Build all possible name/title combos for robust matching
@@ -478,7 +480,15 @@
 
         // Also allow searching by fullName split into first/last
         let match = false;
-        if (searchableText.includes(query)) {
+        let matchedPhone = '';
+        if (isPhoneSearch) {
+          const phones = [person.phone, person.mobile, person.workDirectPhone, person.otherPhone]
+            .map(p => String(p || ''));
+          for (const p of phones) {
+            const pd = p.replace(/\D/g, '');
+            if (pd && pd.includes(qDigits)) { match = true; matchedPhone = p; break; }
+          }
+        } else if (searchableText.includes(query)) {
           match = true;
         } else if (person.fullName) {
           const parts = person.fullName.toLowerCase().split(' ');
@@ -491,7 +501,9 @@
             id: person.id,
             type: 'person',
             title: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unnamed Contact',
-            subtitle: [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • '),
+            subtitle: (isPhoneSearch && matchedPhone)
+              ? `${[person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • ')}${([person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).length ? ' • ' : '')}Phone: ${matchedPhone}`
+              : [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • '),
             data: person
           });
         }
@@ -514,6 +526,8 @@
       const snapshot = await window.firebaseDB.collection('accounts').get();
       const results = [];
 
+      const qDigits = String(query || '').replace(/\D/g, '');
+      const isPhoneSearch = qDigits.length >= 7;
       snapshot.forEach(doc => {
         const account = { id: doc.id, ...doc.data() };
         
@@ -522,8 +536,16 @@
         const isUsageSearch = /^\d+(?:,\d{3})*(?:\.\d+)?$/.test(query);
         
         let matches = false;
+        let matchedPhone = '';
 
-        if (isYearSearch) {
+        if (isPhoneSearch) {
+          const phones = [account.phone, account.primaryPhone, account.mainPhone]
+            .map(p => String(p || ''));
+          for (const p of phones) {
+            const pd = p.replace(/\D/g, '');
+            if (pd && pd.includes(qDigits)) { matches = true; matchedPhone = p; break; }
+          }
+        } else if (isYearSearch) {
           // Search contract end dates
           const contractEnd = account.contractEndDate || account.contractEnd || account.contract_end_date;
           if (contractEnd) {
@@ -556,7 +578,9 @@
 
         if (matches) {
           let subtitle = '';
-          if (isYearSearch) {
+          if (isPhoneSearch && matchedPhone) {
+            subtitle = `Phone: ${matchedPhone}`;
+          } else if (isYearSearch) {
             subtitle = `Contract expires ${query}`;
           } else if (isUsageSearch) {
             const usage = account.annualKilowattUsage || account.annualUsage || account.kilowattUsage;

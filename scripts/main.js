@@ -119,6 +119,12 @@ class PowerChoosersCRM {
             const fv = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
             if (!db) throw new Error('Firestore not initialized');
             const now = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now();
+
+            // Normalize phone if provided
+            if (data.phone) {
+              try { data.phone = this.normalizePhone(data.phone); } catch(_) {}
+            }
+
             const doc = {
               // Known account fields (flexible)
               accountName: data.accountName || data.name || 'New Account',
@@ -145,7 +151,8 @@ class PowerChoosersCRM {
 
             // Notify Accounts page to update its state without reload
             try {
-              document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc } }));
+              const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
+              document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc: uiDoc } }));
             } catch (_) { /* noop */ }
 
             if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Account added!');
@@ -251,6 +258,16 @@ class PowerChoosersCRM {
             const fv = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
             if (!db) throw new Error('Firestore not initialized');
             const now = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now();
+
+            // Normalize contact phone fields
+            const normalized = {};
+            if (data.mobile) { try { normalized.mobile = this.normalizePhone(data.mobile); } catch(_) { normalized.mobile = data.mobile; } }
+            if (data.workDirectPhone) { try { normalized.workDirectPhone = this.normalizePhone(data.workDirectPhone); } catch(_) { normalized.workDirectPhone = data.workDirectPhone; } }
+            if (data.otherPhone) { try { normalized.otherPhone = this.normalizePhone(data.otherPhone); } catch(_) { normalized.otherPhone = data.otherPhone; } }
+
+            // Determine primary phone for legacy 'phone' field
+            const primaryPhone = normalized.workDirectPhone || normalized.mobile || normalized.otherPhone || '';
+
             const doc = {
               // Known contact fields
               firstName: data.firstName || '',
@@ -258,7 +275,18 @@ class PowerChoosersCRM {
               title: data.title || '',
               companyName: data.companyName || '',
               email: data.email || '',
-              phone: data.phone || '',
+              // Phones
+              mobile: normalized.mobile || '',
+              workDirectPhone: normalized.workDirectPhone || '',
+              otherPhone: normalized.otherPhone || '',
+              phone: primaryPhone,
+              // Optional extras
+              city: data.city || '',
+              state: data.state || '',
+              industry: data.industry || '',
+              seniority: data.seniority || '',
+              department: data.department || '',
+              linkedin: data.linkedin || '',
               // Timestamps
               createdAt: now,
               updatedAt: now,
@@ -267,8 +295,13 @@ class PowerChoosersCRM {
             const ref = await db.collection('contacts').add(doc);
 
             // Broadcast for optional listeners (e.g., People page refresh)
+            // Use UI-friendly timestamps so the table doesn't show N/A while serverTimestamp resolves
             try {
-              document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc } }));
+              const uiDoc = Object.assign({}, doc, {
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+              document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: uiDoc } }));
             } catch (_) { /* noop */ }
 
             if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Contact added!');
@@ -2081,16 +2114,15 @@ class PowerChoosersCRM {
                                 // Use intelligent merging
                                 const existingData = existingRecord.data();
                                 updateData = window.ContactMerger.mergeContacts(existingData, doc);
-                            } else {
-                                // Simple update
-                                updateData.updatedAt = now;
-                                updateData.enrichedAt = now;
                             }
+                            // Always stamp updated/enriched times for DB
+                            updateData.updatedAt = now;
+                            updateData.enrichedAt = now;
                             
                             await existingRecord.ref.update(updateData);
                             enriched++;
 
-                            // Live update tables
+                            // Live update tables (use UI-friendly timestamps)
                             try {
                                 if (modal._importType === 'accounts') {
                                     // Accounts module listens to pc:account-created; send merged full doc so row renders correctly
@@ -2099,7 +2131,8 @@ class PowerChoosersCRM {
                                     document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: existingRecord.id, doc: merged } }));
                                 } else {
                                     // People module listens to pc:contact-updated with { changes }
-                                    document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id: existingRecord.id, changes: Object.assign({}, doc) } }));
+                                    const uiChanges = Object.assign({}, doc, { updatedAt: new Date() });
+                                    document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id: existingRecord.id, changes: uiChanges } }));
                                 }
                             } catch (_) { /* noop */ }
                         } else {
@@ -2116,12 +2149,13 @@ class PowerChoosersCRM {
                             const ref = await db.collection(collection).add(doc);
                             imported++;
 
-                            // Live update tables
+                            // Live update tables (use UI-friendly timestamps so lists don't show N/A)
                             try {
                                 if (modal._importType === 'accounts') {
                                     document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc } }));
                                 } else {
-                                    document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc } }));
+                                    const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
+                                    document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: uiDoc } }));
                                 }
                             } catch (_) { /* noop */ }
                         }

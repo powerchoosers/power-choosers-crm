@@ -343,6 +343,15 @@
         <div class="contact-info-section" id="account-recent-calls">
           <div class="rc-header">
             <h3 class="section-title">Recent Calls</h3>
+            <div class="rc-pager" id="account-rc-pager" style="display:none">
+              <button class="rc-page-btn" id="arc-prev" aria-label="Previous page">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
+              </button>
+              <div class="rc-page-info" id="arc-info">1 of 1</div>
+              <button class="rc-page-btn" id="arc-next" aria-label="Next page">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"/></svg>
+              </button>
+            </div>
           </div>
           <div class="rc-list" id="account-recent-calls-list">
             <div class="rc-empty">Loading recent calls…</div>
@@ -423,6 +432,7 @@
     }
 
     attachAccountDetailEvents();
+    startAccountRecentCallsLiveHooks();
     try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
     
     // Load activities
@@ -456,17 +466,33 @@
     const style = document.createElement('style');
     style.id = 'recent-calls-styles';
     style.textContent = `
-      .rc-header { display:flex; align-items:center; justify-content:space-between; }
-      .rc-list { display:flex; flex-direction:column; gap:8px; }
+      .rc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom: var(--spacing-md); }
+      .rc-pager { display:flex; align-items:center; gap:8px; }
+      .rc-page-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
+      .rc-page-btn:hover { 
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .rc-page-info { min-width: 44px; text-align:center; color: var(--text-secondary); font-size: 12px; }
+      .rc-list { transition: height 220ms ease, opacity 220ms ease; position: relative; display:flex; flex-direction:column; gap:8px; }
       .rc-empty { color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
       .rc-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
+      .rc-item.rc-new { animation: rcNewIn 220ms ease-out both; }
+      @keyframes rcNewIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
       .rc-title { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .rc-sub { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
       .rc-outcome { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); color:var(--text-secondary); }
       .rc-actions { display:flex; align-items:center; gap:8px; }
       .rc-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
-      .rc-icon-btn:hover { background: var(--grey-700); color: var(--text-inverse); }
+      .rc-icon-btn:hover { 
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
       /* Inline details under item */
       .rc-details { overflow:hidden; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-card); margin: 6px 2px 2px 2px; box-shadow: var(--elevation-card); }
       .rc-details-inner { padding: 12px; }
@@ -509,6 +535,36 @@
     document.head.appendChild(style);
   }
 
+  // Live refresh: refresh Account Recent Calls on call start/end
+  let _arcRetryTimer = null;
+  function startAccountRecentCallsLiveHooks(){
+    try {
+      if (document._arcLiveHooksBound) return;
+      document.addEventListener('callStarted', onAnyAccountCallActivity, false);
+      document.addEventListener('callEnded', onAnyAccountCallActivity, false);
+      document.addEventListener('pc:recent-calls-refresh', onAnyAccountCallActivity, false);
+      document._arcLiveHooksBound = true;
+    } catch(_) {}
+  }
+  function onAnyAccountCallActivity(){
+    try {
+      const list = document.getElementById('account-recent-calls-list');
+      if (list) arcSetLoading(list);
+    } catch(_) {}
+    // Retry loop to cover backend write lag
+    safeReloadAccountRecentCallsWithRetries();
+  }
+  function safeReloadAccountRecentCallsWithRetries(){
+    try { if (_arcRetryTimer) { clearTimeout(_arcRetryTimer); _arcRetryTimer = null; } } catch(_) {}
+    let attempts = 0;
+    const run = () => {
+      attempts++;
+      try { loadRecentCallsForAccount(); } catch(_) {}
+      if (attempts < 10) { _arcRetryTimer = setTimeout(run, 900); }
+    };
+    run();
+  }
+
   // Avatar helpers (reuse calls page patterns)
   function ad_getAgentAvatar(){ return `<div class=\"transcript-avatar-circle agent-avatar\" aria-hidden=\"true\">Y</div>`; }
   function ad_getContactAvatar(contactName, call){
@@ -526,6 +582,8 @@
   async function loadRecentCallsForAccount(){
     const list = document.getElementById('account-recent-calls-list');
     if (!list || !state.currentAccount) return;
+    // Show spinner and animate container while loading
+    try { arcSetLoading(list); } catch(_) {}
     const accountId = state.currentAccount.id;
     const accountPhone10 = String(state.currentAccount.phone || state.currentAccount.primaryPhone || state.currentAccount.mainPhone || '').replace(/\D/g,'').slice(-10);
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
@@ -556,13 +614,47 @@
         }))
       });
       
-      const filtered = calls.filter(c => {
-        if (c.accountId && c.accountId === accountId) return true;
-        const to10 = String(c.to||'').replace(/\D/g,'').slice(-10);
-        const from10 = String(c.from||'').replace(/\D/g,'').slice(-10);
-        if (accountPhone10 && (to10===accountPhone10 || from10===accountPhone10)) return true;
+      // Build contact set and all known numbers for this account (contacts + company)
+      const norm10 = (s) => String(s||'').replace(/\D/g,'').slice(-10);
+      const contactIds = new Set();
+      const accountNumbers = new Set();
+      if (accountPhone10) accountNumbers.add(accountPhone10);
+      try {
+        if (typeof window.getPeopleData === 'function') {
+          const all = window.getPeopleData() || [];
+          const acc = state.currentAccount || {};
+          const accName = String(acc.accountName || acc.name || acc.companyName || '').toLowerCase().trim();
+          const normalized = (s) => String(s||'').toLowerCase().trim();
+          const related = all.filter(p => (
+            (p.accountId && String(p.accountId) === String(accountId)) ||
+            (normalized(p.companyName || p.accountName) === accName)
+          ));
+          related.forEach(p => {
+            if (p.id) contactIds.add(String(p.id));
+            [p.mobile, p.workDirectPhone, p.otherPhone].forEach(n => { const d = norm10(n); if (d) accountNumbers.add(d); });
+          });
+        }
+      } catch(_) {}
+
+      let filtered = calls.filter(c => {
+        if (c.accountId && String(c.accountId) === String(accountId)) return true;
+        if (c.contactId && contactIds.has(String(c.contactId))) return true;
+        const to10 = norm10(c.to);
+        const from10 = norm10(c.from);
+        if (to10 && accountNumbers.has(to10)) return true;
+        if (from10 && accountNumbers.has(from10)) return true;
+        // Fallback by account name text equality
+        const callAcc = String(c.accountName||'').toLowerCase().trim();
+        const thisAcc = String(state.currentAccount?.accountName || state.currentAccount?.name || '').toLowerCase().trim();
+        if (thisAcc && callAcc && callAcc === thisAcc) return true;
         return false;
-      }).slice(0, 6);
+      });
+      // Sort newest first and paginate later
+      filtered.sort((a,b)=>{
+        const at = new Date(a.callTime || a.timestamp || 0).getTime();
+        const bt = new Date(b.callTime || b.timestamp || 0).getTime();
+        return bt - at;
+      });
       
       // DEBUG: Log filtered calls
       console.log('[Account Detail] Filtered calls for account:', {
@@ -576,13 +668,14 @@
         }))
       });
       
-      if (!filtered.length){ list.innerHTML = '<div class="rc-empty">No recent calls</div>'; return; }
+      if (!filtered.length){ arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); return; }
 
       // Enrich for direction/number like Calls page for consistent UI
       const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n=>String(n||'').replace(/\D/g,'').slice(-10)).filter(Boolean) : [];
       const isBiz = (p)=> bizList.includes(p);
       const norm = (s)=> String(s||'').replace(/\D/g,'').slice(-10);
       filtered.forEach(c => {
+        if (!c.id) c.id = c.twilioSid || c.callSid || c.sid || `${c.to||''}_${c.from||''}_${c.timestamp||c.callTime||''}`;
         const to10 = norm(c.to);
         const from10 = norm(c.from);
         let direction = 'unknown';
@@ -612,22 +705,46 @@
         } catch(_) {}
         try { console.log('[Account Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
       });
-      list.innerHTML = filtered.map(call => rcItemHtml(call)).join('');
-      list.querySelectorAll('.rc-insights').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+      // Save to state and render first page
+      try { state._arcCalls = filtered; } catch(_) {}
+      try { if (typeof state._arcPage !== 'number' || !state._arcPage) state._arcPage = 1; } catch(_) {}
+      arcRenderPage();
+      // Delegate once for reliability across rerenders
+      if (!list._delegated) {
+        list.addEventListener('click', (e) => {
+          const btn = e.target && e.target.closest ? e.target.closest('.rc-insights') : null;
+          if (!btn) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
-          const call = filtered.find(x=>String(x.id)===String(id));
+          const call = (state._arcCalls||[]).find(x=>String(x.id||x.twilioSid||x.callSid||'')===String(id));
           if (!call) return;
           toggleRcDetails(btn, call);
         });
-      });
+        list._delegated = '1';
+      }
+      arcBindPager();
       try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch(_) {}
     } catch (e) {
       console.warn('[RecentCalls][Account] load failed', e);
-      list.innerHTML = '<div class="rc-empty">Failed to load recent calls</div>';
+      arcUpdateListAnimated(list, '<div class="rc-empty">Failed to load recent calls</div>');
     }
   }
+
+  const ARC_PAGE_SIZE = 5;
+  function arcGetSlice(){ const a = Array.isArray(state._arcCalls)?state._arcCalls:[]; const p=Math.max(1, parseInt(state._arcPage||1,10)); const s=(p-1)*ARC_PAGE_SIZE; return a.slice(s, s+ARC_PAGE_SIZE); }
+  function arcRenderPage(){
+    const list = document.getElementById('account-recent-calls-list'); if(!list) return;
+    const total = Array.isArray(state._arcCalls)?state._arcCalls.length:0; if(!total){ arcUpdatePager(0,0); return; }
+    const html = arcGetSlice().map(call=>rcItemHtml(call)).join('');
+    arcUpdateListAnimated(list, html);
+    const totalPages = Math.max(1, Math.ceil(total/ARC_PAGE_SIZE));
+    arcUpdatePager(state._arcPage||1, totalPages);
+  }
+  function arcBindPager(){ const pager=document.getElementById('account-rc-pager'); if(!pager||pager._bound) return; const prev=document.getElementById('arc-prev'); const next=document.getElementById('arc-next'); prev?.addEventListener('click', (e)=>{ e.preventDefault(); const total=Math.ceil((state._arcCalls||[]).length/ARC_PAGE_SIZE)||1; state._arcPage=Math.max(1,(state._arcPage||1)-1); arcRenderPage(); arcUpdatePager(state._arcPage,total); }); next?.addEventListener('click', (e)=>{ e.preventDefault(); const total=Math.ceil((state._arcCalls||[]).length/ARC_PAGE_SIZE)||1; state._arcPage=Math.min(total,(state._arcPage||1)+1); arcRenderPage(); arcUpdatePager(state._arcPage,total); }); pager._bound='1'; }
+  function arcUpdatePager(current, total){ const pager=document.getElementById('account-rc-pager'); const info=document.getElementById('arc-info'); const prev=document.getElementById('arc-prev'); const next=document.getElementById('arc-next'); if(!pager||!info||!prev||!next) return; const show=total>1; pager.style.display=show?'flex':'none'; info.textContent=`${Math.max(1,parseInt(current||1,10))} of ${Math.max(1,parseInt(total||1,10))}`; prev.disabled=(current<=1); next.disabled=(current>=total); }
+  function arcSpinnerHtml(){ return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
+  function arcSetLoading(list){ try { let ov=list.querySelector('.rc-loading-overlay'); if(!ov){ ov=document.createElement('div'); ov.className='rc-loading-overlay'; ov.innerHTML=arcSpinnerHtml(); ov.style.position='absolute'; ov.style.inset='0'; ov.style.display='flex'; ov.style.alignItems='center'; ov.style.justifyContent='center'; ov.style.pointerEvents='none'; list.appendChild(ov);} ov.style.display='flex'; } catch(_) {} }
+  function arcUpdateListAnimated(list, html){ try { const h0=list.offsetHeight; list.style.height=h0+'px'; list.style.overflow='hidden'; requestAnimationFrame(()=>{ list.innerHTML=html; const h1=list.scrollHeight; list.style.transition='height 220ms ease, opacity 220ms ease'; list.style.opacity='1'; list.style.height=h1+'px'; setTimeout(()=>{ list.style.height=''; list.style.transition=''; list.style.overflow=''; }, 260); }); } catch(_) { list.innerHTML = html; } }
 
   function rcItemHtml(c){
     const name = escapeHtml(c.contactName || 'Unknown');
@@ -637,7 +754,8 @@
     const when = new Date(ts).toLocaleString();
     const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
     const durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
-    const phone = escapeHtml(String(c.to||c.from||''));
+    const phone = escapeHtml(String(c.counterpartyPretty || c.to || c.from || ''));
+    const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
     
     // DEBUG: Log call data being rendered
     console.log('[Account Detail] Rendering call item:', {
@@ -656,7 +774,7 @@
                                  data-contact-id="${c.contactId || ''}" 
                                  data-account-id="${c.accountId || state.currentAccount?.id || ''}" 
                                  data-contact-name="${escapeHtml(name)}" 
-                                 data-company-name="${escapeHtml(company)}">${phone}</span></div>
+                                 data-company-name="${escapeHtml(company)}">${phone}</span>${direction?` • ${direction}`:''}</div>
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
@@ -1604,6 +1722,13 @@
     console.log('[Account Detail] Saving to Firebase:', { field, toSave });
     await saveField(field, toSave);
     updateFieldText(wrap, toSave);
+    // Notify other pages (e.g., Accounts list) about immediate account changes
+    try {
+      const id = state.currentAccount?.id;
+      const updatedAt = new Date();
+      const ev = new CustomEvent('pc:account-updated', { detail: { id, changes: { [field]: toSave, updatedAt } } });
+      document.dispatchEvent(ev);
+    } catch (_) { /* noop */ }
     // Notify widgets/pages to refresh energy fields
     try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: state.currentAccount?.id, field, value: toSave } })); } catch(_) {}
     cancelEdit(wrap, field, toSave);
@@ -1758,3 +1883,4 @@
   // Backward-compat global alias used by some modules
   try { window.showAccountDetail = showAccountDetail; } catch (_) {}
 })();
+

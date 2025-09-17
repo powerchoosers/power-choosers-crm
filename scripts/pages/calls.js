@@ -643,6 +643,40 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           console.log('[Calls] Found', j.calls.length, 'real calls from API');
           console.log('[Calls] Sample call data from API:', j.calls[0]);
           const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
+          // Helper: pick the most active contact for an account based on historical calls
+          const callsRaw = Array.isArray(j.calls) ? j.calls : [];
+          function pickMostActiveContactForAccountLocal(accountId){
+            try{
+              if (!accountId || typeof window.getPeopleData !== 'function') return null;
+              const people = window.getPeopleData() || [];
+              const list = people.filter(p=> p && (p.accountId===accountId || p.accountID===accountId));
+              if (!list.length) return null;
+              const norm = (v)=> (v==null?'':String(v)).replace(/\D/g,'').slice(-10);
+              let best = null; let bestScore = -1; let bestRecentTs = -1;
+              const scoreTime = (p)=>{
+                const cand = [p.lastActivityAt, p.lastContactedAt, p.notesUpdatedAt, p.updatedAt, p.createdAt].map(v=>{ try{ if(!v) return 0; if(typeof v.toDate==='function') return v.toDate().getTime(); const d=new Date(v); const t=d.getTime(); return isNaN(t)?0:t; }catch(_){ return 0; } });
+                return Math.max(0, ...cand);
+              };
+              for (const p of list){
+                const phones = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone].map(norm).filter(Boolean);
+                let cnt = 0;
+                for (const k of callsRaw){
+                  try{
+                    if (k.contactId && String(k.contactId) === String(p.id)) { cnt++; continue; }
+                    const to10 = norm(k.to); const from10 = norm(k.from);
+                    if (to10 && phones.includes(to10)) { cnt++; continue; }
+                    if (from10 && phones.includes(from10)) { cnt++; continue; }
+                  }catch(_){ /* noop */ }
+                }
+                const rec = scoreTime(p);
+                const score = cnt * 1000000000 + rec; // weight count primarily, break ties by recency
+                if (score > bestScore){ bestScore = score; best = p; bestRecentTs = rec; }
+                else if (score === bestScore && rec > bestRecentTs){ best = p; bestRecentTs = rec; }
+              }
+              return best || null;
+            }catch(_){ return null; }
+          }
+
           const rows = j.calls.map((c, idx) => {
             const id = c.id || `call_${Date.now()}_${idx}`;
             // Prefer server-provided targetPhone for reliable counterparty mapping
@@ -710,26 +744,18 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             if (!contactName) {
               const acct = findAccountByPhone(party);
               if (acct){
-                const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
-                // Only use recent contact if they have a phone that matches the counterparty
-                const phoneMatch = (()=>{
-                  try{
-                    if (!p) return false; const nums=[p.workDirectPhone, p.mobile, p.otherPhone, p.phone].map(normPhone).filter(Boolean);
-                    return party && nums.includes(party);
-                  }catch(_){ return false; }
-                })();
-                if (p && phoneMatch){
+                // Prefer the most active contact for the account when calling a shared company number
+                const p = pickMostActiveContactForAccountLocal(acct.id || acct.accountId || acct.accountID) || pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
+                if (p){
                   const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
                   if (full) { 
                     contactName = full; 
-                    debug.contactSource = 'account.recentContact';
+                    debug.contactSource = 'account.mostActiveContact';
                     if (!resolvedContactId) {
                       resolvedContactId = p.id;
-                      debug.contactIdSource = 'account.recentContact';
+                      debug.contactIdSource = 'account.mostActiveContact';
                     }
                   }
-                } else if (p && window.CRM_DEBUG_CALLS) {
-                  console.log('[Calls][accountFallback] Skipping recent contact without phone match:', { party, contactId: p?.id, phones: [p?.workDirectPhone, p?.mobile, p?.otherPhone, p?.phone] });
                 }
               }
             }
@@ -764,10 +790,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             if (!contactTitle && party) {
               const acct = findAccountByPhone(party);
               if (acct){
-                const p = pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
+                const p = pickMostActiveContactForAccountLocal(acct.id || acct.accountId || acct.accountID) || pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
                 if (p && p.title) { 
                   contactTitle = p.title; 
-                  debug.titleSource = 'account.recentContact'; 
+                  debug.titleSource = 'account.mostActiveContact'; 
                 }
               }
             }
@@ -2096,13 +2122,13 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }
       return out;
     }
-    function renderTranscriptHtml(A, raw){
+    function renderTranscriptHtml(A, raw, callRecord){
       let turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
       // Fallback: build from conversationalIntelligence sentences if available
       if (!turns.length) {
         try {
-          const sentences = Array.isArray(r?.conversationalIntelligence?.sentences) ? r.conversationalIntelligence.sentences : [];
-          const crm = r?.conversationalIntelligence?.channelRoleMap || {};
+          const sentences = Array.isArray(callRecord?.conversationalIntelligence?.sentences) ? callRecord.conversationalIntelligence.sentences : [];
+          const crm = callRecord?.conversationalIntelligence?.channelRoleMap || {};
           const agentCh = (crm.agentChannel || '1');
           const normalizeChannel = (c) => { const s = (c==null?'':String(c)).trim(); if (s==='0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
           if (sentences.length) {
@@ -2131,8 +2157,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         const hasKnownRoles = turns.some(t => t && (t.role === 'agent' || t.role === 'customer'));
         if (!hasKnownRoles) {
           try {
-            const sentences = Array.isArray(r?.conversationalIntelligence?.sentences) ? r.conversationalIntelligence.sentences : [];
-            const crm = r?.conversationalIntelligence?.channelRoleMap || {};
+            const sentences = Array.isArray(callRecord?.conversationalIntelligence?.sentences) ? callRecord.conversationalIntelligence.sentences : [];
+            const crm = callRecord?.conversationalIntelligence?.channelRoleMap || {};
             const agentCh = (crm.agentChannel || '1');
             const normalizeChannel = (c) => { const s = (c==null?'':String(c)).trim(); if (s==='0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
             if (sentences.length) {
@@ -2177,7 +2203,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }
       // Helper: heuristic splitter when only one generic "Speaker" or no diarization at all
       function heuristicSplitByPunctuation(text){
-        const out=[]; if(!text) return out; const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
+        const out=[]; if(!text) return out; const contactFirst = (String(callRecord?.contactName || callRecord?.to || '').trim().split(/\s+/)[0]) || 'Customer';
         let t = String(text).replace(/\s+/g,' ').trim();
         // Normalize common filler tokens as gentle boundaries
         t = t.replace(/\[(?:hes|noise|crosstalk)\]/gi, '. ');
@@ -2200,7 +2226,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         return out;
       }
       if(turns.length){
-        const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
+        const contactFirst = (String(callRecord?.contactName || callRecord?.to || '').trim().split(/\s+/)[0]) || 'Customer';
         const groups = [];
         let current = null;
         for (const t of turns){
@@ -2218,7 +2244,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         if (current) groups.push(current);
         return groups.map(g => {
           const label = g.role === 'agent' ? 'You' : (g.role === 'customer' ? contactFirst : 'Speaker');
-          const avatar = g.role === 'agent' ? getAgentAvatar() : getContactAvatar(contactFirst, r);
+          const avatar = g.role === 'agent' ? getAgentAvatar() : getContactAvatar(contactFirst, callRecord);
           return `<div class=\"transcript-message ${g.role}\">
             <div class=\"transcript-avatar\">${avatar}</div>
             <div class=\"transcript-content\">
@@ -2233,7 +2259,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }
       const parsed = parseSpeakerTranscript(raw||'');
       if(parsed.some(p=>p.label && p.t!=null)){
-        const contactFirst = (String(r.contactName || r.to || '').trim().split(/\s+/)[0]) || 'Customer';
+        const contactFirst = (String(callRecord?.contactName || callRecord?.to || '').trim().split(/\s+/)[0]) || 'Customer';
         // Heuristic diarization when labels are all "Speaker": alternate roles by turn order
         let toggle = 'customer'; // start with customer speaking
         return parsed.map(p=> {
@@ -2245,7 +2271,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             role = toggle;
             toggle = (toggle === 'agent') ? 'customer' : 'agent';
           }
-          const avatar = role === 'agent' ? getAgentAvatar() : getContactAvatar(contactFirst, r);
+          const avatar = role === 'agent' ? getAgentAvatar() : getContactAvatar(contactFirst, callRecord);
           return `<div class=\"transcript-message ${role}\">
             <div class=\"transcript-avatar\">${avatar}</div>
             <div class=\"transcript-content\">
@@ -2263,7 +2289,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       if (heur.length){
         return heur.map(h => {
           const role = h.label === 'You' ? 'agent' : 'customer';
-          const avatar = role === 'agent' ? getAgentAvatar() : getContactAvatar(h.label, r);
+          const avatar = role === 'agent' ? getAgentAvatar() : getContactAvatar(h.label, callRecord);
           return `<div class=\"transcript-message ${role}\">
             <div class=\"transcript-avatar\">${avatar}</div>
             <div class=\"transcript-content\">
@@ -2275,8 +2301,12 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           </div>`;
         }).join('');
       }
-      const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
-      return escapeHtml(fallback);
+      // Final fallback: if we have raw transcript text but no speaker turns, format it as a single message
+      const rawText = String(raw||'').trim();
+      if (rawText) {
+        return `<div class="transcript-message"><div class="transcript-content"><div class="transcript-text">${escapeHtml(rawText)}</div></div></div>`;
+      }
+      return 'Transcript not available';
     }
     // Use formatted transcript with speaker labels if available. If missing but we have CI sentences, build from sentences.
     let transcriptToUse = r.formattedTranscript || '';
@@ -2295,7 +2325,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }).join('\n');
     }
     transcriptToUse = transcriptToUse || r.transcript || '';
-    const transcriptHtml = renderTranscriptHtml(A, normalizeSupplierTokens(transcriptToUse));
+    const transcriptHtml = renderTranscriptHtml(A, normalizeSupplierTokens(transcriptToUse), r);
 
     const hasAIInsights = r.aiInsights && Object.keys(r.aiInsights).length > 0;
 
