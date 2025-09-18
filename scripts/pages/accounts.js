@@ -1031,6 +1031,30 @@
     startLiveAccountsListener();
   }
 
+  // Helper function to calculate contact activity score (same logic as calls page)
+  function getContactActivityScore(contact) {
+    if (!contact) return 0;
+    try {
+      const scoreTime = (p) => {
+        const cand = [p.lastActivityAt, p.lastContactedAt, p.notesUpdatedAt, p.updatedAt, p.createdAt].map(v => {
+          try {
+            if (!v) return 0;
+            if (typeof v.toDate === 'function') return v.toDate().getTime();
+            const d = new Date(v);
+            const t = d.getTime();
+            return isNaN(t) ? 0 : t;
+          } catch (_) {
+            return 0;
+          }
+        });
+        return Math.max(0, ...cand);
+      };
+      return scoreTime(contact);
+    } catch (_) {
+      return 0;
+    }
+  }
+
   function handleQuickAction(btn) {
     const action = btn.getAttribute('data-action');
     const id = btn.getAttribute('data-id');
@@ -1045,7 +1069,42 @@
             // Provide context so backend and Calls page can attribute correctly
             try {
               if (typeof window.Widgets.setCallContext === 'function') {
-                window.Widgets.setCallContext({ accountId: aid || null, accountName: name || null, company: name || null });
+                // Find the most active contact for this account to provide proper context
+                let contactId = null;
+                let contactName = null;
+                if (aid && typeof window.getPeopleData === 'function') {
+                  const people = window.getPeopleData() || [];
+                  const accountContacts = people.filter(p => p.accountId === aid || p.accountID === aid);
+                  if (accountContacts.length > 0) {
+                    // Find the most active contact (same logic as calls page)
+                    const mostActive = accountContacts.reduce((best, current) => {
+                      const currentScore = getContactActivityScore(current);
+                      const bestScore = getContactActivityScore(best);
+                      return currentScore > bestScore ? current : best;
+                    });
+                    if (mostActive) {
+                      contactId = mostActive.id;
+                      contactName = [mostActive.firstName, mostActive.lastName].filter(Boolean).join(' ') || mostActive.name;
+                    }
+                  }
+                }
+                
+                console.log('[Accounts][DEBUG] Setting call context:', {
+                  accountId: aid,
+                  accountName: name,
+                  contactId: contactId,
+                  contactName: contactName,
+                  phone: phone
+                });
+                
+                window.Widgets.setCallContext({ 
+                  accountId: aid || null, 
+                  accountName: name || null, 
+                  company: name || null,
+                  contactId: contactId,
+                  contactName: contactName,
+                  name: contactName || name
+                });
               }
             } catch (_) {}
             window.Widgets.callNumber(phone, name, false);

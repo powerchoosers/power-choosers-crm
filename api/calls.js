@@ -3,7 +3,7 @@
 
 function corsMiddleware(req, res, next) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -340,6 +340,59 @@ export default async function handler(req, res) {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ ok: true, call: normalizeCallForResponse(merged) }));
+      return;
+    }
+
+    if (req.method === 'PATCH') {
+      const payload = await readJson(req);
+      const { callId, contactName, contactId } = payload;
+
+      if (!callId) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'callId is required' }));
+        return;
+      }
+
+      if (db) {
+        // Update in Firestore
+        try {
+          const callRef = db.collection('calls').doc(callId);
+          const updateData = {};
+          if (contactName) updateData.contactName = contactName;
+          if (contactId) updateData.contactId = contactId;
+          
+          await callRef.update(updateData);
+          
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, updated: true }));
+          return;
+        } catch (error) {
+          console.error('Error updating call in Firestore:', error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Failed to update call' }));
+          return;
+        }
+      }
+
+      // Memory fallback update
+      const existing = memoryStore.get(callId);
+      if (existing) {
+        if (contactName) existing.contactName = contactName;
+        if (contactId) existing.contactId = contactId;
+        memoryStore.set(callId, existing);
+        
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: true, updated: true }));
+        return;
+      }
+
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Call not found' }));
       return;
     }
 

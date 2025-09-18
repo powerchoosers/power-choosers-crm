@@ -902,6 +902,14 @@
       const nameLine = (meta && (meta.name || meta.account)) || (currentCallContext && (currentCallContext.name || currentCallContext.company)) || '';
       const account = (meta && (meta.account || meta.company)) || (currentCallContext && currentCallContext.company) || '';
       const sub = [account, number].filter(Boolean).join(' • ');
+      
+      console.log('[Phone Widget][DEBUG] setContactDisplay called:', {
+        meta: meta,
+        currentCallContext: currentCallContext,
+        nameLine: nameLine,
+        account: account,
+        number: number
+      });
       const favicon = makeFavicon(meta && meta.domain);
       const avatarWrap = box.querySelector('.contact-avatar');
       if (avatarWrap) {
@@ -2023,30 +2031,34 @@
         const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
         const callTo = isIncoming ? biz : phoneNumber;
         
-        await fetch(`${base}/api/calls`, {
+        const payload = {
+          callSid: callSid,
+          to: callTo,
+          from: callFrom,
+          status: status,
+          duration: duration,
+          durationSec: duration,
+          callTime: timestamp,
+          timestamp: timestamp,
+          // include call context
+          accountId: currentCallContext.accountId || null,
+          accountName: currentCallContext.accountName || currentCallContext.company || null,
+          contactId: currentCallContext.contactId || null,
+          contactName: currentCallContext.contactName || currentCallContext.name || null,
+          source: 'phone-widget',
+          targetPhone: String(phoneNumber || '').replace(/\D/g, '').slice(-10),
+          businessPhone: biz
+        };
+
+        try { console.debug('[Phone] POST /api/calls', { base, payload }); } catch(_) {}
+
+        const resp = await fetch(`${base}/api/calls`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            callSid: callSid,
-            to: callTo,
-            from: callFrom,
-            status: status,
-            duration: duration,
-            durationSec: duration,
-            callTime: timestamp,
-            timestamp: timestamp,
-            // include call context
-            accountId: currentCallContext.accountId || null,
-            accountName: currentCallContext.accountName || currentCallContext.company || null,
-            contactId: currentCallContext.contactId || null,
-            contactName: currentCallContext.contactName || currentCallContext.name || null,
-            source: 'phone-widget',
-            targetPhone: String(phoneNumber || '').replace(/\D/g, '').slice(-10),
-            businessPhone: biz
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
+        let respJson = null; try { respJson = await resp.json(); } catch(_) {}
+        try { console.debug('[Phone] /api/calls response', { status: resp.status, ok: resp.ok, body: respJson }); } catch(_) {}
         
         // Refresh calls page if it's open (immediate and delayed to catch webhooks)
         const refreshCalls = (label) => {
@@ -2650,19 +2662,25 @@
     }
     window.lastCallNumberTime = now;
     
-    // Set current call context - clear previous context first
+    // Set current call context - preserve existing context from setCallContext()
     currentCallContext = {
       number: number,
       name: contactName,
-      company: contactCompany || '',
-      accountId: null,
-      accountName: null,
-      contactId: null,
-      contactName: null,
+      company: contactCompany || currentCallContext?.company || '',
+      accountId: currentCallContext?.accountId || null,
+      accountName: currentCallContext?.accountName || null,
+      contactId: currentCallContext?.contactId || null,
+      contactName: currentCallContext?.contactName || null,
       isActive: autoTrigger // Mark as active only if we're auto-triggering
     };
     
     console.debug('[Phone Widget] Call context set in callNumber:', currentCallContext);
+    console.debug('[Phone Widget] Preserved account context:', {
+      accountId: currentCallContext.accountId,
+      accountName: currentCallContext.accountName,
+      contactId: currentCallContext.contactId,
+      contactName: currentCallContext.contactName
+    });
     
     // Open phone widget if not already open
     if (!document.getElementById(WIDGET_ID)) {
@@ -2786,6 +2804,13 @@
       if (ctx.name) currentCallContext.name = ctx.name;
       
       console.debug('[Phone Widget] Call context updated:', currentCallContext);
+      console.log('[Phone Widget][DEBUG] setCallContext called with:', {
+        input: ctx,
+        result: currentCallContext,
+        nameField: currentCallContext.name,
+        contactNameField: currentCallContext.contactName,
+        companyField: currentCallContext.company
+      });
     } catch(_) {}
   };
   window.Widgets.isPhoneOpen = function () { return !!document.getElementById(WIDGET_ID); };
