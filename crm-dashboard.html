@@ -113,7 +113,6 @@
                 </div>
                 <div class="profile-container">
                     <div class="profile-avatar">LP</div>
-                    <button class="btn btn-primary" id="test-email-operation" style="margin-left: 10px; font-size: 12px; padding: 6px 12px;">Test Email Ope</button>
                 </div>
             </div>
         </header>
@@ -1696,59 +1695,6 @@
     <script src="scripts/toast-manager.js"></script>
     <script src="scripts/task-notifications.js"></script>
     <script>
-        // Test the new toast notification system
-        document.addEventListener('DOMContentLoaded', function() {
-            const testBtn = document.getElementById('test-email-operation');
-            if (testBtn) {
-                testBtn.addEventListener('click', function() {
-                    // Test different types of notifications
-                    if (window.ToastManager) {
-                        // Test email notification
-                        window.ToastManager.showEmailNotification({
-                            to: 'john.doe@example.com',
-                            subject: 'Test Email Notification',
-                            type: 'opened'
-                        });
-                        
-                        // Test save notification (no sound)
-                        setTimeout(() => {
-                            window.ToastManager.showSaveNotification('Contact information updated');
-                        }, 1000);
-                        
-                        // Test info notification
-                        setTimeout(() => {
-                            window.ToastManager.showInfoNotification('System Update', 'All systems are running normally');
-                        }, 2000);
-                        
-                        // Test call notification (simulated)
-                        setTimeout(() => {
-                            window.ToastManager.showCallNotification({
-                                callerName: 'Jane Smith',
-                                callerNumber: '+1 (555) 123-4567',
-                                company: 'Acme Corp',
-                                title: 'Sales Manager',
-                                city: 'New York',
-                                state: 'NY'
-                            });
-                        }, 3000);
-                        
-                        // Test task notification
-                        setTimeout(() => {
-                            window.ToastManager.showToast({
-                                type: 'task',
-                                title: 'Task Due in 30 minutes',
-                                message: 'Follow up with John Doe about energy proposal',
-                                details: 'John Doe • Sales Manager • Acme Corp • New York, NY • Type: Call • Priority: High',
-                                icon: 'JD',
-                                duration: 8000
-                            });
-                        }, 4000);
-                    }
-                });
-            }
-        });
-    </script>
-    <script>
       (function(){
         function formatUsdPerKwh(n){
           if (typeof n !== 'number' || !isFinite(n)) return '$—';
@@ -1790,7 +1736,6 @@
 
     <!-- Load List Detail Page Script -->
     <script src="scripts/pages/list-detail.js"></script>
-    <script src="debug-lists.js"></script>
 
     <!-- Gmail-style Compose Window -->
     <div class="compose-window" id="compose-window" style="display: none;">

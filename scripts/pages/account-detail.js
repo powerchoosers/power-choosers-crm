@@ -588,31 +588,14 @@
     const accountPhone10 = String(state.currentAccount.companyPhone || state.currentAccount.phone || state.currentAccount.primaryPhone || state.currentAccount.mainPhone || '').replace(/\D/g,'').slice(-10);
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
     
-    // DEBUG: Log account info
-    console.log('[Account Detail] Loading calls for account:', {
-      accountId: accountId,
-      accountPhone10: accountPhone10,
-      accountName: state.currentAccount.name,
-      apiBase: base
-    });
+    // Loading calls for account
     
     try {
       const r = await fetch(`${base}/api/calls`);
       const j = await r.json().catch(()=>({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
       
-      // DEBUG: Log all calls data
-      console.log('[Account Detail] All calls loaded:', {
-        totalCalls: calls.length,
-        callsWithTranscripts: calls.filter(c => c.transcript && c.transcript.length > 0).length,
-        sampleCalls: calls.slice(0, 3).map(c => ({
-          id: c.id,
-          twilioSid: c.twilioSid,
-          hasTranscript: !!c.transcript,
-          transcriptLength: c.transcript ? c.transcript.length : 0,
-          hasAI: !!c.aiInsights
-        }))
-      });
+      // Raw calls loaded from API
       
       // Build contact set and all known numbers for this account (contacts + company)
       const norm10 = (s) => String(s||'').replace(/\D/g,'').slice(-10);
@@ -636,18 +619,24 @@
         }
       } catch(_) {}
 
+      // Account phone numbers and contact IDs collected for filtering
+
       let filtered = calls.filter(c => {
-        if (c.accountId && String(c.accountId) === String(accountId)) return true;
-        if (c.contactId && contactIds.has(String(c.contactId))) return true;
+        const matchByAccountId = c.accountId && String(c.accountId) === String(accountId);
+        const matchByContactId = c.contactId && contactIds.has(String(c.contactId));
         const to10 = norm10(c.to);
         const from10 = norm10(c.from);
-        if (to10 && accountNumbers.has(to10)) return true;
-        if (from10 && accountNumbers.has(from10)) return true;
-        // Fallback by account name text equality
+        const matchByToPhone = to10 && accountNumbers.has(to10);
+        const matchByFromPhone = from10 && accountNumbers.has(from10);
         const callAcc = String(c.accountName||'').toLowerCase().trim();
         const thisAcc = String(state.currentAccount?.accountName || state.currentAccount?.name || '').toLowerCase().trim();
-        if (thisAcc && callAcc && callAcc === thisAcc) return true;
-        return false;
+        const matchByAccountName = thisAcc && callAcc && callAcc === thisAcc;
+        
+        const shouldInclude = matchByAccountId || matchByContactId || matchByToPhone || matchByFromPhone || matchByAccountName;
+        
+        // Call included in filtered results
+        
+        return shouldInclude;
       });
       // Sort newest first and paginate later
       filtered.sort((a,b)=>{
@@ -656,17 +645,7 @@
         return bt - at;
       });
       
-      // DEBUG: Log filtered calls
-      console.log('[Account Detail] Filtered calls for account:', {
-        filteredCount: filtered.length,
-        filteredCalls: filtered.map(c => ({
-          id: c.id,
-          twilioSid: c.twilioSid,
-          hasTranscript: !!c.transcript,
-          transcriptLength: c.transcript ? c.transcript.length : 0,
-          hasAI: !!c.aiInsights
-        }))
-      });
+      // Final filtered calls ready for display
       
       if (!filtered.length){ arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); return; }
 
@@ -1347,9 +1326,11 @@
   function handleContactQuickAction(action, contact) {
     switch (action) {
       case 'call': {
-        const phone = contact.workDirectPhone || contact.mobile || contact.otherPhone;
+        // Use company phone number instead of contact's personal phone
+        // This allows the contact resolution logic to work properly
+        const account = state.currentAccount || {};
+        const phone = account.companyPhone || account.phone || account.primaryPhone || account.mainPhone || contact.workDirectPhone || contact.mobile || contact.otherPhone;
         if (phone) {
-          const account = state.currentAccount || {};
           const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unknown Contact';
           try {
             if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
@@ -1365,6 +1346,14 @@
                 });
               }
               // Trigger call
+              console.log('[Account Detail][DEBUG] Calling contact with phone:', {
+                phone: phone,
+                contactName: fullName,
+                contactId: contact.id,
+                accountId: account.id,
+                accountName: account.accountName || account.name,
+                companyPhone: account.companyPhone
+              });
               window.Widgets.callNumber(phone, fullName, true, 'account-detail-contact');
             } else {
               // Fallback to tel: link
@@ -1745,8 +1734,8 @@
       toSave = toMDY(value);
       console.log('[Account Detail] Converted to MDY:', { converted: toSave });
     }
-    // Normalize phone number for phone field
-    if (field === 'phone') {
+    // Normalize phone numbers for any recognized phone key
+    if (field === 'phone' || field === 'companyPhone' || field === 'primaryPhone' || field === 'mainPhone') {
       toSave = normalizePhone(value);
     }
     console.log('[Account Detail] Saving to Firebase:', { field, toSave });

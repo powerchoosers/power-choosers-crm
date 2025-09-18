@@ -2865,7 +2865,7 @@
 
   async function commitEdit(wrap, field, value) {
     let outVal = value;
-    if (field === 'phone' || field === 'mobile' || field === 'companyPhone') {
+    if (field === 'phone' || field === 'mobile' || field === 'workDirectPhone' || field === 'otherPhone' || field === 'companyPhone') {
       outVal = normalizePhone(value);
     }
     await saveField(field, outVal);
@@ -3096,19 +3096,34 @@
     if (!list || !state.currentContact) return;
     const contactId = state.currentContact.id;
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+    
+    // Loading recent calls for contact
+    
     try {
       const r = await fetch(`${base}/api/calls`);
       const j = await r.json().catch(()=>({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
+      
+      // Raw calls loaded from API
+      
       const nums = collectContactPhones(state.currentContact).map(n=>n.replace(/\D/g,'').slice(-10)).filter(Boolean);
       // De-duplicate numbers (mobile equals company, etc.)
       const uniq = Array.from(new Set(nums));
+      
+      // Contact phone numbers collected for filtering
+      
       // Include calls that match by explicit contactId OR any of the contact/company numbers
       let filtered = calls.filter(c => {
-        if (c.contactId && c.contactId === contactId) return true;
+        const matchByContactId = c.contactId && c.contactId === contactId;
         const to10 = String(c.to||'').replace(/\D/g,'').slice(-10);
         const from10 = String(c.from||'').replace(/\D/g,'').slice(-10);
-        return uniq.includes(to10) || uniq.includes(from10);
+        const matchByPhone = uniq.includes(to10) || uniq.includes(from10);
+        
+        const shouldInclude = matchByContactId || matchByPhone;
+        
+        // Call included in filtered results
+        
+        return shouldInclude;
       });
       // Sort newest first by available timestamp field
       filtered.sort((a,b)=>{
@@ -3116,6 +3131,9 @@
         const bt = new Date(b.callTime || b.timestamp || 0).getTime();
         return bt - at;
       });
+      
+      // Final filtered calls ready for display
+      
       // Save to state and initialize pagination
       try { state._rcCalls = filtered; } catch(_) {}
       try { if (typeof state._rcPage !== 'number' || !state._rcPage) state._rcPage = 1; } catch(_) {}
@@ -3181,16 +3199,16 @@
     if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0,0); return; }
     const slice = getRecentCallsPageSlice();
     rcUpdateListAnimated(list, slice.map(call => rcItemHtml(call)).join(''));
-    // delegate click to handle dynamic rerenders
-    list.querySelectorAll('.rc-insights').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const id = btn.getAttribute('data-id');
+      // delegate click to handle dynamic rerenders
+      list.querySelectorAll('.rc-insights').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const id = btn.getAttribute('data-id');
         const call = (state._rcCalls||[]).find(x=>String(x.id)===String(id));
-        if (!call) return;
-        toggleRcDetails(btn, call);
+          if (!call) return;
+          toggleRcDetails(btn, call);
+        });
       });
-    });
     const totalPages = Math.max(1, Math.ceil(total / RC_PAGE_SIZE));
     updateRecentCallsPager(state._rcPage||1, totalPages);
   }
@@ -3217,6 +3235,24 @@
   }
   function rcUpdateListAnimated(list, html){
     try {
+      // Preserve expanded insights dropdowns before refresh
+      const expandedInsights = [];
+      list.querySelectorAll('.rc-details').forEach(details => {
+        const item = details.previousElementSibling;
+        if (item && item.classList.contains('rc-item')) {
+          const insightsBtn = item.querySelector('.rc-insights');
+          if (insightsBtn) {
+            const callId = insightsBtn.getAttribute('data-id');
+            if (callId) {
+              expandedInsights.push({
+                callId: callId,
+                content: details.innerHTML
+              });
+            }
+          }
+        }
+      });
+
       const startH = list.offsetHeight;
       list.style.height = startH + 'px';
       list.style.overflow = 'hidden';
@@ -3224,6 +3260,24 @@
         list.innerHTML = html;
         // Remove any lingering overlay after content update
         try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
+        
+        // Restore expanded insights dropdowns
+        expandedInsights.forEach(expanded => {
+          const insightsBtn = list.querySelector(`.rc-insights[data-id="${expanded.callId}"]`);
+          if (insightsBtn) {
+            const item = insightsBtn.closest('.rc-item');
+            if (item) {
+              const panel = document.createElement('div');
+              panel.className = 'rc-details';
+              panel.innerHTML = `<div class="rc-details-inner">${expanded.content}</div>`;
+              item.insertAdjacentElement('afterend', panel);
+              // Don't animate the restore - just show it
+              panel.style.height = 'auto';
+              panel.style.opacity = '1';
+            }
+          }
+        });
+        
         const targetH = list.scrollHeight;
         list.style.transition = 'height 220ms ease, opacity 220ms ease';
         list.style.opacity = '1';

@@ -1,3 +1,22 @@
+// Silence verbose logs from this module unless explicitly enabled via localStorage CRM_DEBUG_CALLS=1
+// This shadowed console only affects this file, not the whole app
+var __CALLS_ORIG_CONSOLE__ = window.console || {};
+function __callsDebugEnabled__(){
+  try {
+    const v = localStorage.getItem('CRM_DEBUG_CALLS');
+    if (v != null) return v === '1' || v === 'true';
+  } catch(_) {}
+  return !!window.CRM_DEBUG_CALLS;
+}
+// eslint-disable-next-line no-redeclare
+var console = {
+  log: function(){ if (__callsDebugEnabled__()) return __CALLS_ORIG_CONSOLE__.log && __CALLS_ORIG_CONSOLE__.log.apply(__CALLS_ORIG_CONSOLE__, arguments); },
+  debug: function(){ if (__callsDebugEnabled__()) return __CALLS_ORIG_CONSOLE__.debug && __CALLS_ORIG_CONSOLE__.debug.apply(__CALLS_ORIG_CONSOLE__, arguments); },
+  info: function(){ if (__callsDebugEnabled__()) return __CALLS_ORIG_CONSOLE__.info && __CALLS_ORIG_CONSOLE__.info.apply(__CALLS_ORIG_CONSOLE__, arguments); },
+  warn: (__CALLS_ORIG_CONSOLE__.warn ? __CALLS_ORIG_CONSOLE__.warn.bind(__CALLS_ORIG_CONSOLE__) : function(){}),
+  error: (__CALLS_ORIG_CONSOLE__.error ? __CALLS_ORIG_CONSOLE__.error.bind(__CALLS_ORIG_CONSOLE__) : function(){})
+};
+
   // Normalize to last 10 digits
   function normPhone(s){ return (s==null?'':String(s)).replace(/\D/g,'').slice(-10); }
   function isClientAddr(s){ return typeof s==='string' && s.startsWith('client:'); }
@@ -44,7 +63,61 @@
       if (typeof window.getAccountsData === 'function'){
         const accounts = window.getAccountsData() || [];
         const hit = accounts.find(a=> normPhone(a.companyPhone||a.phone||a.primaryPhone||a.mainPhone) === phone10);
-        if (hit) return hit;
+        if (hit) {
+          console.log('[Calls][DEBUG] findAccountByPhone: Found account:', {
+            phone: phone10,
+            accountId: hit.id,
+            accountName: hit.accountName || hit.name,
+            accountPhone: hit.companyPhone || hit.phone || hit.primaryPhone || hit.mainPhone
+          });
+          return hit;
+        } else {
+          console.log('[Calls][DEBUG] findAccountByPhone: No account found for phone:', {
+            phone: phone10,
+            totalAccounts: accounts.length,
+            sampleAccountPhones: accounts.slice(0, 3).map(a => ({
+              id: a.id,
+              name: a.accountName || a.name,
+              phone: a.companyPhone || a.phone || a.primaryPhone || a.mainPhone,
+              normalizedPhone: normPhone(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone)
+            })),
+            allAccountPhones: accounts.map(a => ({
+              id: a.id,
+              name: a.accountName || a.name,
+              phone: a.companyPhone || a.phone || a.primaryPhone || a.mainPhone,
+              normalizedPhone: normPhone(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone)
+            })).filter(a => a.normalizedPhone === phone10)
+          });
+          console.log('[Calls][DEBUG] Phone lookup details:', 'Searching for:', phone10, 'Total accounts:', accounts.length);
+          console.log('[Calls][DEBUG] Sample account phones:', accounts.slice(0, 3).map(a => ({
+            name: a.accountName || a.name,
+            companyPhone: a.companyPhone,
+            phone: a.phone,
+            primaryPhone: a.primaryPhone,
+            mainPhone: a.mainPhone,
+            finalPhone: a.companyPhone || a.phone || a.primaryPhone || a.mainPhone,
+            normalized: normPhone(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone)
+          })));
+          
+          // Check specifically for Deepwater Corrosion Services
+          const deepwater = accounts.find(a => 
+            (a.accountName && a.accountName.includes('Deepwater')) || 
+            (a.name && a.name.includes('Deepwater'))
+          );
+          if (deepwater) {
+            console.log('[Calls][DEBUG] Deepwater account found:', {
+              name: deepwater.accountName || deepwater.name,
+              companyPhone: deepwater.companyPhone,
+              phone: deepwater.phone,
+              primaryPhone: deepwater.primaryPhone,
+              mainPhone: deepwater.mainPhone,
+              finalPhone: deepwater.companyPhone || deepwater.phone || deepwater.primaryPhone || deepwater.mainPhone,
+              normalized: normPhone(deepwater.companyPhone || deepwater.phone || deepwater.primaryPhone || deepwater.mainPhone)
+            });
+          } else {
+            console.log('[Calls][DEBUG] Deepwater account NOT found in accounts data');
+          }
+        }
       }
       // Fallback: attempt lightweight Firestore lookup once and cache
       if (phone10 && window.firebaseDB && !findAccountByPhone._cache) {
@@ -86,7 +159,23 @@
             const phones = [c.workDirectPhone, c.mobile, c.otherPhone, c.phone].map(norm).filter(Boolean);
             for (const ph of phones) if (ph && !map.has(ph)) map.set(ph,{ id: c.id, name, title, company });
           }
-          _phoneToContactCache = map; return map;
+          // Filter out numbers that are actually company phones to avoid cross-account misattribution
+          try {
+            const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+            const companyPhones = new Set();
+            const norm10 = (p)=>(p||'').toString().replace(/\D/g,'').slice(-10);
+            accounts.forEach(a => {
+              ['companyPhone','phone','primaryPhone','mainPhone'].forEach(k => {
+                const ph = norm10(a && a[k]);
+                if (ph) companyPhones.add(ph);
+              });
+            });
+            const filtered = new Map();
+            for (const [ph, row] of map.entries()){
+              if (!companyPhones.has(ph)) filtered.set(ph, row);
+            }
+            _phoneToContactCache = filtered; return filtered;
+          } catch(_) { _phoneToContactCache = map; return map; }
         }
       }
       // 2) Fallback to Firestore (limited) to populate essential mappings
@@ -141,7 +230,23 @@
             if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
           });
         }catch(_){ /* ignore */ }
-        _phoneToContactCache = map; return map;
+        // Filter out numbers that are actually company phones to avoid cross-account misattribution
+        try {
+          const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+          const companyPhones = new Set();
+          const norm10 = (p)=>(p||'').toString().replace(/\D/g,'').slice(-10);
+          accounts.forEach(a => {
+            ['companyPhone','phone','primaryPhone','mainPhone'].forEach(k => {
+              const ph = norm10(a && a[k]);
+              if (ph) companyPhones.add(ph);
+            });
+          });
+          const filtered = new Map();
+          for (const [ph, row] of map.entries()){
+            if (!companyPhones.has(ph)) filtered.set(ph, row);
+          }
+          _phoneToContactCache = filtered; return filtered;
+        } catch(_) { _phoneToContactCache = map; return map; }
       }
     }catch(_){ }
     return new Map();
@@ -174,15 +279,16 @@
 'use strict';
 (function bootstrapDebugFlags(){
   try {
-    if (window.CRM_DEBUG_CALLS == null) window.CRM_DEBUG_CALLS = true;
-    if (window.CRM_DEBUG_TRANSCRIPTS == null) window.CRM_DEBUG_TRANSCRIPTS = true;
-    if (window.CRM_DEBUG_LIVE == null) window.CRM_DEBUG_LIVE = true;
+    const readFlag = (k, d)=>{ try{ const v=localStorage.getItem(k); if(v==null) return d; return v==='1'||v==='true'; }catch(_){ return d; } };
+    if (window.CRM_DEBUG_CALLS == null) window.CRM_DEBUG_CALLS = readFlag('CRM_DEBUG_CALLS', false);
+    if (window.CRM_DEBUG_TRANSCRIPTS == null) window.CRM_DEBUG_TRANSCRIPTS = readFlag('CRM_DEBUG_TRANSCRIPTS', false);
+    if (window.CRM_DEBUG_LIVE == null) window.CRM_DEBUG_LIVE = readFlag('CRM_DEBUG_LIVE', false);
   } catch(_) {}
 })();
 
 function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console, arguments); } catch(_) {} }
 (function () {
-  const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] } };
+  const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] }, virtual: { enabled: true, rowHeight: 0, headerH: 0, overscan: 4, first: 0, count: 0, rows: [] } };
   const els = {};
   const chips = [
     { k: 'city', i: 'calls-filter-city', c: 'calls-filter-city-chips', x: 'calls-filter-city-clear', s: 'calls-filter-city-suggest', acc: r => r.contactCity || '' },
@@ -361,6 +467,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     els.page = document.getElementById('calls-page'); if (!els.page) return false;
     els.table = document.getElementById('calls-table'); els.tbody = els.table ? els.table.querySelector('tbody') : null;
     els.container = els.page.querySelector('.table-container');
+    els.scroll = els.page.querySelector('.table-scroll') || els.container;
+    els.colCount = (()=>{ try{ return els.table.querySelectorAll('thead th').length || 10; }catch(_){ return 10; } })();
     els.pag = document.getElementById('calls-pagination'); els.summary = document.getElementById('calls-pagination-summary');
     els.selectAll = document.getElementById('select-all-calls');
     els.toggle = document.getElementById('toggle-calls-filters'); els.panel = document.getElementById('calls-filters'); els.count = document.getElementById('calls-filter-count');
@@ -445,6 +553,174 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         });
       });
     }
+  }
+
+  // Virtualization helpers
+  function ensureVirtualization(rows){
+    if (!state.virtual.enabled || !els.scroll || !els.tbody) return;
+    // Measure header height once
+    if (!state.virtual.headerH){
+      try { const thead = els.table.querySelector('thead'); if (thead) state.virtual.headerH = thead.getBoundingClientRect().height || 0; } catch(_) {}
+    }
+    // Measure a row height if unknown
+    if (!state.virtual.rowHeight){
+      if (rows && rows.length){
+        const sampleHtml = rowHtml(rows[0]);
+        const tmp = document.createElement('tbody');
+        tmp.innerHTML = sampleHtml;
+        els.table.appendChild(tmp);
+        try { state.virtual.rowHeight = Math.max(48, tmp.firstElementChild.getBoundingClientRect().height || 0); } catch(_){ state.virtual.rowHeight = 56; }
+        els.table.removeChild(tmp);
+      } else {
+        state.virtual.rowHeight = 56;
+      }
+    }
+    // Attach scroll handler once
+    if (!ensureVirtualization._bound){
+      let rafPending = false;
+      els.scroll.addEventListener('scroll', () => {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => { rafPending = false; renderVirtualRows(); });
+      });
+      ensureVirtualization._bound = true;
+    }
+    state.virtual.rows = rows || [];
+    renderVirtualRows();
+  }
+
+  function renderVirtualRows(){
+    if (!state.virtual.enabled || !els.scroll || !els.tbody) return;
+    const rows = state.virtual.rows || [];
+    const total = rows.length;
+    if (!total){ els.tbody.innerHTML = ''; return; }
+    const rh = state.virtual.rowHeight || 56;
+    const headerH = state.virtual.headerH || 0;
+    const viewH = els.scroll.clientHeight || 600;
+    const scrollY = Math.max(0, (els.scroll.scrollTop || 0) - headerH);
+    let first = Math.max(0, Math.floor(scrollY / rh) - state.virtual.overscan);
+    const visCount = Math.ceil(viewH / rh) + state.virtual.overscan * 2;
+    // Clamp first so we don't oscillate near the end
+    if (first > Math.max(0, total - visCount)) first = Math.max(0, total - visCount);
+    const end = Math.min(total, first + visCount);
+
+    state.virtual.first = first; state.virtual.count = end - first;
+
+    const topH = first * rh;
+    const bottomH = Math.max(0, (total - end) * rh);
+
+    const slice = rows.slice(first, end);
+    const sliceHtml = slice.map(rowHtml).join('');
+    const spacerTop = `<tr class="v-spacer-top"><td colspan="${els.colCount}" style="padding:0;border:none;height:${topH}px"></td></tr>`;
+    const spacerBot = `<tr class="v-spacer-bot"><td colspan="${els.colCount}" style="padding:0;border:none;height:${bottomH}px"></td></tr>`;
+    els.tbody.innerHTML = spacerTop + sliceHtml + spacerBot;
+
+    // Bind row events only for visible rows
+    bindVisibleRowEvents();
+
+    // header select state
+    if (els.selectAll){
+      const pageIds = new Set(rows.map(r=>r.id));
+      const allSelected = [...pageIds].every(id => state.selected.has(id));
+      els.selectAll.checked = allSelected && rows.length > 0;
+    }
+  }
+
+  function bindVisibleRowEvents(){
+    // row checkbox selection
+    els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
+    // insights button
+    els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',(e)=>{
+      if(btn.disabled) { e.preventDefault(); return; }
+      openInsightsModal(btn.getAttribute('data-id'));
+    }));
+    // name-cell navigation
+    els.tbody.querySelectorAll('.name-cell').forEach(cell => {
+      const contactId = cell.getAttribute('data-contact-id');
+      cell.addEventListener('click', (e) => {
+        e.preventDefault();
+        const cid = cell.getAttribute('data-contact-id');
+        if (cid && cid.trim()) {
+          window._contactNavigationSource = 'calls';
+          window._contactNavigationContactId = cid;
+          if (cid.startsWith('call_contact_')) {
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              requestAnimationFrame(() => {
+                const callRow = (state.virtual.rows||[]).find(r => r.contactId === cid) || (state.filtered||[]).find(r=>r.contactId===cid);
+                const tempContact = callRow ? {
+                  id: cid,
+                  firstName: callRow.contactName?.split(' ')[0] || '',
+                  lastName: callRow.contactName?.split(' ').slice(1).join(' ') || '',
+                  name: callRow.contactName,
+                  email: callRow.contactEmail || '',
+                  phone: callRow.contactPhone || '',
+                  mobile: callRow.contactPhone || '',
+                  companyName: callRow.company || '',
+                  company: callRow.company || '',
+                  title: callRow.contactTitle || '',
+                  city: callRow.contactCity || '',
+                  state: callRow.contactState || '',
+                  seniority: callRow.contactSeniority || '',
+                  department: callRow.contactDepartment || '',
+                  industry: callRow.industry || ''
+                } : null;
+                const start = Date.now();
+                const tryOpen = () => {
+                  if (tempContact && window.ContactDetail && typeof window.ContactDetail.show === 'function') { try { window.ContactDetail.show(cid, tempContact); } catch(_) {} return; }
+                  if (Date.now() - start < 2000) setTimeout(tryOpen, 80);
+                };
+                tryOpen();
+              });
+            }
+          } else if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              requestAnimationFrame(() => { try { window.ContactDetail.show(cid); } catch(_) {} });
+            }
+          }
+        }
+      });
+    });
+    // company link
+    els.tbody.querySelectorAll('.company-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const companyName = link.getAttribute('data-company');
+        if (companyName && companyName.trim()) {
+          window._accountNavigationSource = 'calls';
+          window._callsReturn = { page: state.currentPage, scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0, filters: getCurrentFilters(), selectedItems: getSelectedItems(), sortColumn: getCurrentSort(), searchTerm: getCurrentSearch() };
+          if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+            if (typeof window.getAccountsData === 'function') {
+              const accounts = window.getAccountsData() || [];
+              const account = accounts.find(acc => acc.accountName === companyName || acc.name === companyName);
+              if (account && account.id) { window.AccountDetail.show(account.id); return; }
+            }
+            if (window.crm && typeof window.crm.navigateToPage === 'function') window.crm.navigateToPage('account-details');
+          } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('accounts');
+          }
+        }
+      });
+    });
+    // Add Contact CTA
+    els.tbody.querySelectorAll('.add-contact-cta').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const companyName = btn.getAttribute('data-company') || '';
+        try {
+          if (window.crm && typeof window.crm.createAddContactModal === 'function') {
+            window.crm.createAddContactModal();
+            const modal = document.getElementById('modal-add-contact');
+            if (modal) { const companyInput = modal.querySelector('input[name="companyName"], input[name="company"], input[data-field="companyName"]'); if (companyInput && companyName) companyInput.value = companyName; }
+          } else if (typeof window.createAddContactModal === 'function') {
+            window.createAddContactModal();
+            const modal = document.getElementById('modal-add-contact');
+            if (modal) { const companyInput = modal.querySelector('input[name="companyName"], input[name="company"], input[data-field="companyName"]'); if (companyInput && companyName) companyInput.value = companyName; }
+          }
+        } catch(_) {}
+      });
+    });
   }
 
   function setupChip(d) {
@@ -626,9 +902,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   }
 
   async function loadData() {
-    // Enable debugging for contact ID resolution
-    window.CRM_DEBUG_CALLS = true;
-    console.log('[Calls] Debug mode enabled - will show detailed contact data mapping');
+    // Debug disabled by default for performance; enable by setting localStorage.CRM_DEBUG_CALLS = '1'
     
     // 1) Try to load real calls from backend - use current origin by default
     try {
@@ -647,9 +921,21 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           const callsRaw = Array.isArray(j.calls) ? j.calls : [];
           function pickMostActiveContactForAccountLocal(accountId){
             try{
-              if (!accountId || typeof window.getPeopleData !== 'function') return null;
+              if (!accountId || typeof window.getPeopleData !== 'function') {
+                console.log('[Calls][DEBUG] pickMostActiveContactForAccountLocal: Invalid accountId or getPeopleData not available:', {
+                  accountId,
+                  hasGetPeopleData: typeof window.getPeopleData === 'function'
+                });
+                return null;
+              }
               const people = window.getPeopleData() || [];
               const list = people.filter(p=> p && (p.accountId===accountId || p.accountID===accountId));
+              console.log('[Calls][DEBUG] pickMostActiveContactForAccountLocal: Found contacts for account:', {
+                accountId,
+                totalPeople: people.length,
+                matchingContacts: list.length,
+                contactIds: list.map(p => p.id)
+              });
               if (!list.length) return null;
               const norm = (v)=> (v==null?'':String(v)).replace(/\D/g,'').slice(-10);
               let best = null; let bestScore = -1; let bestRecentTs = -1;
@@ -698,20 +984,46 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             }
             
             if (c.contactName) { 
-              contactName = c.contactName; 
-              debug.contactSource = 'api.contactName';
+              // Check if contactName is the same as company name - if so, treat as no contact name
+              // and let the system find the most active contact for the account
+              const isCompanyName = c.company && c.contactName === c.company;
               
-              // Try to find contact ID by name if not provided
-              if (!resolvedContactId && typeof window.getPeopleData === 'function') {
-                const people = window.getPeopleData() || [];
-                const foundContact = people.find(p => {
-                  const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ');
-                  return fullName === contactName || p.name === contactName;
+              // Debug logging for contact name vs company name
+              if (isCompanyName) {
+                console.log('[Calls][contactId] DETECTED: Contact name same as company name:', {
+                  contactName: c.contactName,
+                  company: c.company,
+                  callId: c.id
                 });
-                if (foundContact) {
-                  resolvedContactId = foundContact.id;
-                  debug.contactIdSource = 'people.byName';
+              }
+              
+              if (!isCompanyName) {
+                contactName = c.contactName; 
+                debug.contactSource = 'api.contactName';
+                
+                // Try to find contact ID by name if not provided
+                if (!resolvedContactId && typeof window.getPeopleData === 'function') {
+                  const people = window.getPeopleData() || [];
+                  const foundContact = people.find(p => {
+                    const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ');
+                    return fullName === contactName || p.name === contactName;
+                  });
+                  if (foundContact) {
+                    resolvedContactId = foundContact.id;
+                    debug.contactIdSource = 'people.byName';
+                  }
                 }
+              } else {
+                // Contact name is same as company name - treat as no contact name
+                if (window.CRM_DEBUG_CALLS) {
+                  console.log('[Calls][contactId] Contact name same as company name, will find most active contact:', {
+                    contactName: c.contactName,
+                    company: c.company
+                  });
+                }
+                // Clear the contact name so the system will find the most active contact
+                contactName = '';
+                console.log('[Calls][contactId] CLEARED contact name, will now find most active contact for account');
               }
             }
             else if (c.contactId) {
@@ -742,8 +1054,21 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               }
             }
             if (!contactName) {
+              console.log('[Calls][DEBUG] Searching for account by phone:', {
+                party: party,
+                normalizedParty: normPhone(party),
+                callId: id
+              });
+              console.log('[Calls][DEBUG] Phone number details:', party, '-> normalized:', normPhone(party));
               const acct = findAccountByPhone(party);
               if (acct){
+                console.log('[Calls][DEBUG] Found account for phone:', {
+                  phone: party,
+                  accountId: acct.id,
+                  accountName: acct.accountName || acct.name,
+                  callId: id
+                });
+                
                 // Prefer the most active contact for the account when calling a shared company number
                 const p = pickMostActiveContactForAccountLocal(acct.id || acct.accountId || acct.accountID) || pickRecentContactForAccount(acct.id || acct.accountId || acct.accountID);
                 if (p){
@@ -755,8 +1080,32 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
                       resolvedContactId = p.id;
                       debug.contactIdSource = 'account.mostActiveContact';
                     }
+                    console.log('[Calls] Selected most active contact for account:', {
+                      accountId: acct.id,
+                      accountName: acct.accountName || acct.name,
+                      selectedContact: {
+                        id: p.id,
+                        name: full,
+                        title: p.title
+                      },
+                      contactName,
+                      resolvedContactId,
+                      callId: id
+                    });
                   }
+                } else {
+                  console.log('[Calls][DEBUG] No most active contact found for account:', {
+                    accountId: acct.id,
+                    accountName: acct.accountName || acct.name,
+                    callId: id,
+                    phone: party
+                  });
                 }
+              } else {
+                console.log('[Calls][DEBUG] No account found for phone:', {
+                  phone: party,
+                  callId: id
+                });
               }
             }
 
@@ -830,6 +1179,36 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               if (acct){ company = acct.accountName || acct.name || acct.companyName || ''; debug.companySource = 'accounts.byPhone'; }
             }
 
+            // Sanitize: if contact name equals company (normalized), clear contact
+            try {
+              const normName = (s)=> String(s||'')
+                .toLowerCase()
+                .replace(/&/g,'and')
+                .replace(/[^a-z0-9\s]/g,' ')
+                .replace(/\b(inc|incorporated|llc|l\.?l\.?c\.?|llp|l\.?l\.?p\.?|ltd|co|corp|corporation|company|limited|the)\b/g,' ')
+                .replace(/\s+/g,' ')
+                .trim();
+              if (contactName && company && normName(contactName) === normName(company)) {
+                contactName = '';
+                resolvedContactId = null;
+                contactTitle = '';
+              }
+            } catch(_) {}
+
+            // Zero-contact guard: if account exists and has 0 contacts, blank contact fields
+            try {
+              const acct = getAccountById(c.accountId) || findAccountByPhone(party);
+              if (acct && typeof window.getPeopleData==='function'){
+                const people = window.getPeopleData() || [];
+                const accName = String(acct.accountName || acct.name || acct.companyName || '').toLowerCase().trim();
+                const cid = String(acct.id || '');
+                const related = people.filter(p => (String(p.accountId||p.accountID||'')===cid) || (String(p.companyName||p.accountName||'').toLowerCase().trim()===accName));
+                if (related.length === 0) {
+                  contactName=''; resolvedContactId=null; contactTitle='';
+                }
+              }
+            } catch(_) {}
+
             // Determine direction and counterparty number (for display and columns)
             const to10 = normPhone(c.to);
             const from10 = normPhone(c.from);
@@ -865,15 +1244,47 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               contactName,
               company
             });
-
-            // Fallback: Generate a contact ID if none was found
-            if (!resolvedContactId && contactName) {
-              // Create a temporary contact ID for calls without existing contacts
-              resolvedContactId = `call_contact_${id}_${Date.now()}`;
-              if (window.CRM_DEBUG_CALLS) {
-                console.log('[Calls][contactId] Generated fallback contact ID:', resolvedContactId);
+            
+            // Debug contact name vs company name
+            if (contactName && company && contactName === company) {
+              console.log('[Calls][DEBUG] WARNING: Contact name equals company name in final data:', {
+                callId: id,
+                contactName,
+                company,
+                resolvedContactId
+              });
+            }
+            
+            // Save resolved contact name to backend if it was resolved from company name
+            if (contactName && company && contactName !== company && resolvedContactId) {
+              // Only save if we resolved a different contact name than the original
+              if (c.contactName !== contactName) {
+                console.log('[Calls][DEBUG] Saving resolved contact name to backend:', {
+                  callId: id,
+                  originalContactName: c.contactName,
+                  resolvedContactName: contactName,
+                  resolvedContactId
+                });
+                // Save to backend asynchronously
+                saveResolvedContactName(id, contactName, resolvedContactId).catch(err => {
+                  console.warn('[Calls] Failed to save resolved contact name:', err);
+                });
               }
             }
+            
+            // Update the original call data with resolved contact name for immediate display
+            if (contactName && c.contactName !== contactName) {
+              const originalContactName = c.contactName;
+              c.contactName = contactName;
+              c.contactId = resolvedContactId;
+              console.log('[Calls][DEBUG] Updated call data with resolved contact name:', {
+                callId: id,
+                originalContactName: originalContactName,
+                resolvedContactName: contactName,
+                resolvedContactId
+              });
+            }
+
             
             // Debug logging for final contact ID
             if (window.CRM_DEBUG_CALLS) {
@@ -917,7 +1328,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
               const lookupNum = counter10 || party;
               const partyNorm = norm(lookupNum);
               
-              console.log('[Calls] Looking for contact by phone:', lookupNum, 'Normalized:', partyNorm, 'People data count:', people.length);
+              // Look for contact by phone number
               
               // Only attempt phone matching if we have a full 10-digit counterparty
               let foundContact = null;
@@ -943,9 +1354,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
                 industry = industry || foundContact.industry || '';
                 accountEmployees = accountEmployees || foundContact.accountEmployees || null;
                 visitorDomain = visitorDomain || foundContact.visitorDomain || '';
-                console.log('[Calls] Found contact by phone in people data:', contactName, 'Phone:', lookupNum, 'Email:', contactEmail, 'City:', contactCity);
+                // Contact found by phone lookup
               } else {
-                console.log('[Calls] No contact found by phone:', lookupNum, 'in people data');
+                // No contact found by phone lookup
               }
             }
             
@@ -1155,8 +1566,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     }
   }
 
-  function render(){ if(!els.tbody) return; const rows=getPageItems(); els.tbody.innerHTML= rows.map(r=>rowHtml(r)).join('');
-    // DEBUG: header sanity and row sample
+  function render(){ if(!els.tbody) return; const rows=getPageItems();
+    // Use virtualization to render only visible rows
+    ensureVirtualization(rows);
+    // DEBUG: header sanity and row sample (silenced unless enabled)
     try {
       const header = document.querySelector('#calls-table thead tr');
       if (window.CRM_DEBUG_CALLS && header) {
@@ -1164,216 +1577,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         console.log('[Calls][header]', cols);
       }
       if (window.CRM_DEBUG_CALLS && rows.length) {
-        console.log('[Calls][render sample]', {
-          id: rows[0].id,
-          name: rows[0].contactName,
-          company: rows[0].company,
-          number: rows[0].counterpartyPretty || rows[0].contactPhone,
-          direction: rows[0].direction
-        });
+        console.log('[Calls][render sample]', { id: rows[0].id, name: rows[0].contactName, company: rows[0].company, number: rows[0].counterpartyPretty || rows[0].contactPhone, direction: rows[0].direction });
       }
     } catch(_) {}
-    // row events
-    els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
-    els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',(e)=>{
-      if(btn.disabled) {
-        e.preventDefault();
-        return;
-      }
-      openInsightsModal(btn.getAttribute('data-id'));
-    }));
-    
-    // Navigation event handlers (following project rules)
-    console.log('[Calls] Attaching event listeners to', els.tbody.querySelectorAll('.name-cell').length, 'name cells');
-    els.tbody.querySelectorAll('.name-cell').forEach(cell => {
-      const contactId = cell.getAttribute('data-contact-id');
-      console.log('[Calls] Found name cell with contactId:', contactId, 'HTML:', cell.outerHTML.substring(0, 100));
-      cell.addEventListener('click', (e) => {
-        e.preventDefault();
-        const contactId = cell.getAttribute('data-contact-id');
-        console.log('[Calls] Contact name clicked, contactId:', contactId);
-        console.log('[Calls] ContactDetail module available:', !!window.ContactDetail);
-        console.log('[Calls] ContactDetail.show function available:', !!(window.ContactDetail && typeof window.ContactDetail.show === 'function'));
-        
-        if (contactId && contactId.trim()) {
-          // Store navigation source before navigating (using same pattern as other pages)
-          window._contactNavigationSource = 'calls';
-          window._contactNavigationContactId = contactId;
-          
-          console.log('[Calls] Navigation source stored for contact:', window._contactNavigationSource, contactId);
-          
-          // Check if this is a generated contact ID (from calls without existing contacts)
-          if (contactId.startsWith('call_contact_')) {
-            console.log('[Calls] Generated contact ID detected, creating contact detail from call data');
-            // For generated contact IDs, we need to create a contact detail from the call data
-            // Navigate to people page first, then create a temporary contact detail
-            if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('people');
-              // Use requestAnimationFrame to ensure the page has started loading
-              requestAnimationFrame(() => {
-                // Create a temporary contact object from the call data
-                const callRow = state.filtered.find(r => r.contactId === contactId);
-                const tempContact = callRow ? {
-                  id: contactId,
-                  firstName: callRow.contactName.split(' ')[0] || '',
-                  lastName: callRow.contactName.split(' ').slice(1).join(' ') || '',
-                  name: callRow.contactName,
-                  email: callRow.contactEmail || '',
-                  phone: callRow.contactPhone || '',
-                  mobile: callRow.contactPhone || '',
-                  companyName: callRow.company || '',
-                  company: callRow.company || '',
-                  title: callRow.contactTitle || '',
-                  city: callRow.contactCity || '',
-                  state: callRow.contactState || '',
-                  seniority: callRow.contactSeniority || '',
-                  department: callRow.contactDepartment || '',
-                  industry: callRow.industry || ''
-                } : null;
-
-                const start = Date.now();
-                const tryOpen = () => {
-                  if (tempContact && window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                    console.log('[Calls] Showing temporary contact detail (generated ID):', contactId);
-                    try { window.ContactDetail.show(contactId, tempContact); } catch (error) { console.error('[Calls] Error showing temporary contact detail:', error); }
-                    return;
-                  }
-                  if (Date.now() - start < 2000) { setTimeout(tryOpen, 80); }
-                };
-                tryOpen();
-              });
-            }
-          } else {
-            // Navigate to contact detail for existing contacts
-            if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-              console.log('[Calls] Navigating to ContactDetail with ID:', contactId);
-              // Navigate to people page first, then show contact detail (same pattern as account-detail.js)
-              if (window.crm && typeof window.crm.navigateToPage === 'function') {
-                window.crm.navigateToPage('people');
-                // Use requestAnimationFrame to ensure the page has started loading
-                requestAnimationFrame(() => {
-                  if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                    console.log('[Calls] Showing contact detail:', contactId);
-                    try {
-                      // Try to get contact data from calls first, then fall back to just ID
-                      const callContact = getCallContactById(contactId);
-                      if (callContact) {
-                        console.log('[Calls] Passing contact data from calls:', callContact);
-                        console.log('[Calls] Contact data fields:', {
-                          email: callContact.email,
-                          phone: callContact.phone,
-                          mobile: callContact.mobile,
-                          companyName: callContact.companyName,
-                          title: callContact.title,
-                          city: callContact.city,
-                          state: callContact.state,
-                          industry: callContact.industry
-                        });
-                        window.ContactDetail.show(contactId, callContact);
-                      } else {
-                        console.log('[Calls] No contact data found for:', contactId);
-                        window.ContactDetail.show(contactId);
-                      }
-                    } catch (error) {
-                      console.error('[Calls] Error showing contact detail:', error);
-                    }
-                  } else {
-                    console.log('[Calls] ContactDetail not available after navigation');
-                  }
-                });
-              }
-            } else {
-              console.log('[Calls] ContactDetail not available, trying fallback navigation');
-              // Fallback: navigate to people page
-              if (window.crm && typeof window.crm.navigateToPage === 'function') {
-                window.crm.navigateToPage('people');
-              }
-            }
-          }
-        } else {
-          console.log('[Calls] No contact ID available for navigation, contactId:', contactId);
-        }
-      });
-    });
-    
-    els.tbody.querySelectorAll('.company-link').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const companyName = link.getAttribute('data-company');
-        console.log('[Calls] Company name clicked, companyName:', companyName);
-        
-        if (companyName && companyName.trim()) {
-          // Store navigation source before navigating (using same pattern as other pages)
-          window._accountNavigationSource = 'calls';
-          window._callsReturn = {
-            page: state.currentPage,
-            scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-            filters: getCurrentFilters(),
-            selectedItems: getSelectedItems(),
-            sortColumn: getCurrentSort(),
-            searchTerm: getCurrentSearch()
-          };
-          
-          console.log('[Calls] Navigation source stored for company:', window._accountNavigationSource, window._callsReturn);
-          
-          // Navigate to account detail
-          if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-            // Try to find account by name first
-            if (typeof window.getAccountsData === 'function') {
-              const accounts = window.getAccountsData() || [];
-              const account = accounts.find(acc => acc.accountName === companyName || acc.name === companyName);
-              if (account && account.id) {
-                console.log('[Calls] Found account, navigating to AccountDetail with ID:', account.id);
-                window.AccountDetail.show(account.id);
-                return;
-              }
-            }
-            console.log('[Calls] Account not found, trying fallback navigation');
-            // Fallback: navigate to account details page
-            if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('account-details');
-            }
-          } else {
-            console.log('[Calls] AccountDetail not available, trying fallback navigation');
-            // Fallback: navigate to accounts page
-            if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              window.crm.navigateToPage('accounts');
-            }
-          }
-        } else {
-          console.log('[Calls] No company name available for navigation');
-        }
-      });
-    });
-    // Bind Add Contact CTA
-    els.tbody.querySelectorAll('.add-contact-cta').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const companyName = btn.getAttribute('data-company') || '';
-        try {
-          if (window.crm && typeof window.crm.createAddContactModal === 'function') {
-            // Open modal first
-            window.crm.createAddContactModal();
-            // Prefill company name
-            const modal = document.getElementById('modal-add-contact');
-            if (modal) {
-              const companyInput = modal.querySelector('input[name="companyName"], input[name="company"], input[data-field="companyName"]');
-              if (companyInput && companyName) companyInput.value = companyName;
-            }
-          } else if (typeof window.createAddContactModal === 'function') {
-            window.createAddContactModal();
-            const modal = document.getElementById('modal-add-contact');
-            if (modal) {
-              const companyInput = modal.querySelector('input[name="companyName"], input[name="company"], input[data-field="companyName"]');
-              if (companyInput && companyName) companyInput.value = companyName;
-            }
-          }
-        } catch(_) {}
-      });
-    });
-    // header select state
-    if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
 
   function rowHtml(r){
@@ -1387,8 +1593,42 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }catch(_){ return ''; }
     })();
     const hasContact = !!(r.contactName && r.contactName.trim());
-    const displayNameRaw = hasContact ? r.contactName : (r.company && r.company.trim() ? r.company : prettyPhone);
+    let displayNameRaw = '';
+    
+    if (hasContact) {
+      displayNameRaw = r.contactName;
+    } else if (r.company && r.company.trim()) {
+      // If no contact name but we have a company, show "Unknown" instead of company name
+      // This indicates we need to find the actual contact for this company
+      displayNameRaw = 'Unknown';
+    } else {
+      displayNameRaw = prettyPhone || 'Unknown';
+    }
+    
     const name = escapeHtml(displayNameRaw || '');
+    
+    // Debug contact name display logic
+    if (window.CRM_DEBUG_CALLS && r.company && r.contactName) {
+      console.log('[Calls] Contact name display logic:', {
+        callId: r.id,
+        contactName: r.contactName,
+        company: r.company,
+        hasContact,
+        displayNameRaw,
+        finalName: name
+      });
+    }
+    
+    // Debug when contact name equals company name
+    if (window.CRM_DEBUG_CALLS && r.contactName && r.company && r.contactName === r.company) {
+      console.log('[Calls][DEBUG] DISPLAY ISSUE: Contact name equals company name in display:', {
+        callId: r.id,
+        contactName: r.contactName,
+        company: r.company,
+        displayNameRaw,
+        finalName: name
+      });
+    }
     const title = escapeHtml(r.contactTitle || '');
     const company = escapeHtml(r.company || '');
     const callTimeStr = new Date(r.callTime).toLocaleString();
@@ -1434,12 +1674,12 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     const timeline = aiInsights.timeline || 'Not specified';
     
     // Safe account favicon helper (fallback icon when shared helper missing)
-    const safeAccountIcon = (() => {
+    const safeAccountIcon = (()=>{
       try {
         if (typeof window.__pcAccountsIcon === 'function') return window.__pcAccountsIcon();
       } catch(_) {}
-      // Minimal white vector icon placeholder inside proper container
-      return '<span class="company-favicon" aria-hidden="true" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);position:relative;overflow:hidden">\
+      // Minimal white vector icon placeholder
+      return '<span class="company-favicon-fallback-icon" aria-hidden="true" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);position:relative;overflow:hidden">\
         <svg viewBox="0 0 24 24" width="14" height="14" style="position:absolute;left:1px;top:1px" fill="none" stroke="#fff" stroke-width="1.5"><rect x="4" y="8" width="6" height="10" rx="1"></rect><rect x="14" y="6" width="6" height="12" rx="1"></rect></svg>\
       </span>';
     })();
@@ -1462,7 +1702,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
       <td class="name-cell" data-contact-id="${r.contactId || ''}">${contactCell}</td>
       <td>${title}</td>
-      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" />${safeAccountIcon.replace('display:inline-block','display:none')}` : `${safeAccountIcon}`}<span class="company-name">${company || (hasContact ? '' : '—')}</span></span></a></td>
+      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<div class="company-favicon-container"><img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onload="this.parentNode.classList.add('favicon-loaded'); var f=this.parentNode.querySelector('.company-favicon-fallback'); if(f){f.style.display='none';}" onerror="this.parentNode.classList.add('favicon-failed'); var f=this.parentNode.querySelector('.company-favicon-fallback'); if(f){f.style.display='block';}" /><span class="company-favicon-fallback" style="display:none">${safeAccountIcon}</span></div>` : `${safeAccountIcon}`}<span class="company-name">${company || (hasContact ? '' : '—')}</span></span></a></td>
       <td>${numberCell}</td>
       <td>${directionCell || '—'}</td>
       <td>${callTimeStr}</td>
@@ -1500,6 +1740,62 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       .add-contact-cta{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border-light);border-radius:10px;background:var(--bg-item);color:var(--text-primary);cursor:pointer}
       .add-contact-cta:hover{background:var(--grey-700);color:var(--text-inverse)}
       .add-contact-icon{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;border-radius:50%;background:transparent}
+
+      /* Company favicon container to prevent flicker - Calls table specific */
+      #calls-table .company-favicon-container {
+        position: relative;
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+      #calls-table .company-favicon-container .company-favicon {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 16px !important;
+        height: 16px !important;
+        border-radius: 50%;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+        z-index: 2;
+      }
+      #calls-table .company-favicon-container .company-favicon-fallback {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: none; /* hidden by default to avoid overlap under transparent favicons */
+        opacity: 1;
+        z-index: 1;
+      }
+      #calls-table .company-favicon-container.favicon-loaded .company-favicon {
+        opacity: 1;
+      }
+      #calls-table .company-favicon-container.favicon-loaded .company-favicon-fallback {
+        display: none;
+        opacity: 0;
+      }
+      #calls-table .company-favicon-container.favicon-failed .company-favicon {
+        display: none;
+      }
+      #calls-table .company-favicon-container.favicon-failed .company-favicon-fallback {
+        display: block; /* show fallback only when load fails */
+        opacity: 1;
+      }
+      
+      /* Ensure company cell layout stability */
+      #calls-table .company-cell__wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 20px;
+      }
+      #calls-table .company-favicon-fallback-icon {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+      }
 
       /* Modern cards and grid */
       .pc-sec-grid{display:grid;grid-template-columns:2fr 1fr;gap:18px}
@@ -1944,6 +2240,33 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }
     } catch(_) {}
     return '';
+  }
+
+  // Save resolved contact name to backend
+  async function saveResolvedContactName(callId, contactName, contactId) {
+    try {
+      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+      const response = await fetch(`${base}/api/calls`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          callId: callId,
+          contactName: contactName,
+          contactId: contactId
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to save contact name: ${response.status}`);
+      }
+      
+      console.log('[Calls] Successfully saved resolved contact name to backend');
+    } catch (error) {
+      console.error('[Calls] Error saving resolved contact name:', error);
+      throw error;
+    }
   }
 
   // Persist extracted contract fields to the linked Account and notify UI
