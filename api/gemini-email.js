@@ -24,8 +24,6 @@ function buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, s
   const linkedin = r.linkedin || '';
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 2000);
-  // NEW: Added next_steps from recipient data
-  const next_steps = (r.next_steps || r.account?.next_steps || '').toString().slice(0, 800);
   const usage = energy.usage || '';
   const supplier = energy.supplier || '';
   const contractEnd = energy.contractEnd || '';
@@ -116,20 +114,33 @@ CRITICAL RULES (ZERO TOLERANCE FOR VIOLATIONS):
 - NEVER repeat the same information in different words
 - NEVER use the same phrase twice anywhere in the email
 - Each sentence must add unique value to the email
-- Include exactly ONE clear call-to-action, which MUST be a question and end with a question mark (?).
+- Include exactly ONE clear call-to-action
 - End with "Best regards," followed immediately by the sender name on the next line with no blank line between them
 - Keep tone professional and helpful
 - Personalize with known recipient context when appropriate
 - Avoid hallucinations; if unsure, keep it generic
 - Do not include handlebars-like placeholders (e.g., {{first_name}}). Use natural text
 - NEVER end sentences with incomplete phrases like "improving your?" or "discuss your?" - always complete the thought
-- Before sending, mentally check: "Have I used any phrase or sentence twice?" If yes, rewrite`;
+- Before sending, mentally check: "Have I used any phrase or sentence twice?" If yes, rewrite
 
-  const personalTouch = `PERSONAL TOUCH REQUIREMENT:
-- After "Hi [Name]," always include a personal paragraph about the current time/season.
-- Be aware of the current day of the week and upcoming/recent holidays.
+PERSONAL TOUCH REQUIREMENT:
+- After "Hi [Name]," always include a personal paragraph about the current time/season
+- Be aware of the current day of the week and upcoming/recent holidays
 - Examples: "I hope you're having a great start to the week" (Monday), "I hope you're having a productive week" (Tuesday-Thursday), "I hope you're having a great Friday" (Friday), "I hope you're having a wonderful holiday season" (near Christmas), "I hope you're having a great start to the new year" (January), etc.
-- Keep it natural and warm, not generic.`;
+- Keep it natural and warm, not generic
+
+CONTEXT AWARENESS:
+- For "warm intro after a call": Reference the previous conversation naturally, don't repeat the same phrase twice
+- For "follow-up with tailored value props": Focus on specific benefits relevant to their industry/company size
+- For "schedule an energy health check":
+    • Never reference speaking with a colleague; do not include that phrasing in this email type.
+    • Use notes to infer relationship stage:
+      – If notes indicate we already spoke (e.g., "spoke with", "talked to", "met", "called"), write as a warm follow‑up.
+      – Otherwise treat as a cold intro and briefly explain what an Energy Health Check is and why companies need one.
+    • Briefly outline what the health check covers: current bill/supplier/rate review, contract end month/year (Month YYYY only), quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating insight, and recommended next steps.
+    • Offer two specific time windows and include exactly one short question CTA.
+- For "proposal delivery with next steps": Reference the proposal and outline clear next steps
+- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person`;
 
   const recipientContext = `Recipient/context signals (use selectively; do not reveal sensitive specifics):
 - Name: ${name || 'Unknown'} (${firstName || 'Unknown'})
@@ -141,25 +152,17 @@ CRITICAL RULES (ZERO TOLERANCE FOR VIOLATIONS):
 - LinkedIn: ${linkedin || 'n/a'}
 - Notes (free text, optional): ${notes || 'n/a'}
 - Colleague contact: ${colleagueInfo?.found ? colleagueInfo.name : 'none found'}
-- Next Steps (from CRM): ${next_steps || 'n/a'}
 - Transcript (top priority; summarize and use insights, do not quote sensitive specifics): ${transcript ? (transcript.slice(0, 600) + (transcript.length > 600 ? '…' : '')) : 'n/a'}`;
 
   const bizContext = `About Power Choosers (for positioning only): ${companyOverview}`;
-  
-  // NEW: Guidelines for using transcript and next_steps
-  const transcriptAndNextStepsGuidelines = `TRANSCRIPT & NEXT STEPS GUIDELINES (ABSOLUTE TOP PRIORITY):
-- If a call transcript or a 'Next Steps' field exists, you MUST treat them as the source of truth.
-- The email's opening and call-to-action MUST directly reflect the topics, agreements, or action items from the transcript/next steps.
-- Example: If transcript says "client will send the invoice tomorrow afternoon", the email MUST reference this: "Following up on our call, will you still be able to send over that invoice this afternoon?"
-- Synthesize insights from both fields if they exist. Do NOT quote them directly.`;
 
   const priorityDirectives = `Content PRIORITY order (use what is present, skip what isn't):
-1) ABSOLUTE TOP PRIORITY: Synthesized insights from Call Transcript and Next Steps.
+1) TOP PRIORITY: Call transcript insights (summarize, do not quote sensitive specifics)
 2) Energy contract details (supplier, rate, contract end Month YYYY, usage)
 3) Notes content (what was discussed or pain points)
 4) Title/role for relevance
 5) Account city/state (do not use contact's city/state)
-Ensure the opening hook uses the highest available priority data. If transcript or next steps exist, derive the hook from them.`;
+Ensure the opening hook uses the highest available priority data. If transcript exists, derive the hook from it.`;
 
   const subjectGuidelines = `Subject line requirements:
 - The FIRST LINE must begin with "Subject:" followed by the subject text.
@@ -190,7 +193,7 @@ Ensure the opening hook uses the highest available priority data. If transcript 
 - Structure: 2 very short paragraphs (1–2 sentences each) + a single-line CTA.
 - NEVER duplicate any sentence, phrase, or information within the email
 - Each sentence must add unique value - no repetition
-- Include exactly ONE call-to-action, which MUST be a question and end with a question mark (?).
+- Include exactly ONE call-to-action
 - Reflect the recipient's title/company/industry when helpful.
 - You may allude to scale (e.g., multi-site or large facility) but do NOT state exact square footage.
 - Mention one or two of our offerings most relevant to this contact (procurement, renewals/contracting, bill management, or efficiency) without overloading the email.
@@ -209,27 +212,18 @@ Ensure the opening hook uses the highest available priority data. If transcript 
 - Avoid repeating the same opening or subject phrasing across runs.
 - If transcript provided, derive the HOOK from the transcript first (top priority), then supplement with notes and energy fields.`;
 
-  // UPDATED: Refined specific prompt handling based on user feedback
   const specificHandling = `SPECIFIC PROMPT HANDLING:
-  - "Warm intro after a call": Reference the call once (what we discussed), then propose specific next steps. The CTA must be a question suggesting two time windows for a follow-up and MUST end with a question mark (?).
+  - "Warm intro after a call": Reference the call once (what we discussed), then propose specific next steps and suggest two time windows for a follow-up. Keep it concise.
   - "Follow-up with tailored value props": Assume a few days/weeks have passed. Recap in one line, then highlight 1–2 tailored benefits tied to their industry/facility scale or known data. Optionally include one brief proof point. End with a light CTA to keep the lead warm.
   - "Schedule an energy health check":
-    • Never include any mention of speaking with a colleague.
+    • Never include any mention of speaking with a colleague (that belongs only to the cold-call-not-reached template).
     • Structure STRICTLY:
-      – Paragraph 1: One concise sentence that explains what an Energy Health Check is and why it matters. If transcript/next steps indicate warm context, reference the prior call. If cold, tie to a single relevant pain point.
-      – Paragraph 2: One concise sentence listing what the review covers: bill/supplier/rate review, contract end Month YYYY, usage estimate, Energy Health Score, projected costs, supplier BBB rating, and next steps.
-      – CTA line: Exactly one short question offering two specific time windows (e.g., "Does Tue 10–12 or Thu 2–4 work for that?").
+      – Paragraph 1: One concise sentence that explains what an Energy Health Check is and why it matters for this recipient. If notes indicate warm context, reference the prior call in a few words; if cold, tie to a single relevant pain point.
+      – Paragraph 2: One concise sentence listing what the review covers: current bill/supplier/rate review, contract end Month YYYY, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, and recommended next steps.
+      – CTA line: Exactly one short question offering two specific time windows (e.g., "Does Tue 10–12 or Thu 2–4 work?").
   - "Proposal delivery with next steps": Provide a crisp summary of the options (supplier/term/rate/est. annual cost/notable terms), selection guidance, and 2–3 clear next steps. CTA: short call to review/confirm.
-  - "Cold email to a lead I could not reach by phone": COLD email. Structure: 1) Pattern‑interrupt hook using one concrete pain point. 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect..." + value prop. 3) ONE call‑to‑action. NEVER say "following up on our call".
-  - "Standard Invoice Request":
-    • This is a polite follow-up to get an invoice.
-    • If a transcript or 'next_steps' field mentions the invoice, you MUST reference that conversation (e.g., "Following up on our call..."). Otherwise, use a simple reminder ("Sending a quick reminder..."). Do NOT use "As promised".
-    • STRUCTURE (MUST BE FOLLOWED EXACTLY):
-      1. Personal greeting ("Hi [Name], I hope you're having a productive week.").
-      2. Polite reminder sentence. If energy details are known, include them naturally here (e.g., "...reminder about the invoice for your ${company} account with ${supplier || 'your supplier'}.").
-      3. Bullet point explanation (MUST be this exact text): "We use your invoice to:".
-      4. The following 3 bullets, exactly: "• Verify your ESID(s)", "• Confirm your Contract End Date (Month YYYY)", "• Validate your Service Address".
-      5. CTA line: A single, time-bound question asking for the invoice. It MUST end with a question mark (?). Example: "Will you be able to send a copy of your latest invoice by end of day today?".`;
+  - "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Pattern‑interrupt hook using one concrete pain point or timely risk for their industry (no generic claims), 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + tightly aligned value prop, 3) ONE call‑to‑action. If energy data is known (supplier/currentRate/contractEnd), include a single short clause referencing it naturally in paragraph 1 or paragraph 2 (e.g., "with ${supplier || 'your supplier'} at ${currentRate || '$/kWh'}, contract ends ${contractEndLabel || 'Month YYYY'}"). NEVER say "following up on our call" with this person.
+  - "Standard Invoice Request": Warm follow‑up after they agreed to send their invoice. If energy contract details exist, you MUST briefly include them in paragraph 1 in a single, natural clause (e.g., "with ${supplier || 'your supplier'}, ~${usage || 'your annual'} kWh, at ${currentRate || '$/kWh'} and a contract ending ${contractEndLabel || 'Month YYYY'}"). Do NOT list numbers aggressively; keep it one short clause. If unknown, tie to one relevant pain point instead. Structure: Paragraph 1 (one sentence): polite reminder + why sending the invoice helps us start immediately (mention we'll review for discrepancies/extra charges and run a free Energy Health Check). Paragraph 2 (bullet list): "We use your invoice to:" with exactly 3 bullets — ESID(s), Contract End Date (Month YYYY only), Service Address. CTA line: one short, time‑bounded ask to send the bill today or by EOD (e.g., "Could you send the latest invoice today or by EOD so my team can get started right away?"). Keep it helpful, not salesy.`;
 
   const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
 - Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
@@ -254,23 +248,38 @@ Ensure the opening hook uses the highest available priority data. If transcript 
 2) Then one blank line, then the BODY as plain text (no code fences).`;
 
   const baseChecklist = `FINAL CHECKLIST (MANDATORY VERIFICATION):
-- Complete all sentences - no incomplete thoughts.
-- NO duplicate content anywhere in the email - check every sentence.
-- NO repeated phrases or similar wording.
-- Exactly one call-to-action, ending with a question mark (?).
-- Proper signature formatting.
-- Each sentence adds unique value.
-- Personal touch included after greeting.`;
+- Complete all sentences - no incomplete thoughts
+- NO duplicate content anywhere in the email - check every sentence
+- NO repeated phrases or similar wording
+- Exactly one call-to-action
+- Proper signature formatting with no blank line before sender name
+- Each sentence adds unique value to the email
+- Personal touch included after greeting (day/season awareness)`;
+
+  const coldChecklist = `
+- Cold email specifics:
+  • Do NOT reference any prior conversation with this person.
+  • In paragraph 1, use a concrete pain point or timely risk as a pattern‑interrupt hook (avoid generic claims).
+  • In paragraph 2, include: "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + a tightly aligned value prop.
+  • Subject may reference the colleague or a specific risk/pain point.
+  • Include exactly ONE call-to-action, no duplicates.`;
+
+  const ehcChecklist = `
+- Energy Health Check specifics:
+  • Paragraph 1 must explain what an Energy Health Check is and why it matters to this recipient (tie to one relevant pain point if cold, or lightly reference prior call if warm).
+  • Paragraph 2 must list what the review covers in one concise sentence: current bill/supplier/rate, contract end Month YYYY, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, recommended next steps.
+  • CTA line must be a single short question offering two specific time windows (e.g., Tue 10–12 or Thu 2–4).`;
 
   const invoiceChecklist = `
 - Standard Invoice Request specifics:
-  • The structure MUST match the prompt exactly: Greeting -> Reminder -> "We use your invoice to:" -> 3 bullets -> Time-bound CTA question.
-  • The reminder MUST reference a transcript/next_step if available.
-  • The CTA MUST be a time-bound question ending in a question mark.`;
+  • Paragraph 1: one-sentence warm reminder referencing the prior agreement to share the invoice and why it helps us start immediately. If supplier/current rate/usage/contract end are known, include them in a single short clause (Month YYYY for contract end only).
+  • Paragraph 2: include a short bullet list under "We use your invoice to:" with exactly these items: ESID(s), Contract End Date (Month YYYY), Service Address.
+  • CTA line: one short, time-bounded ask to send the invoice today or by EOD so the team can begin immediately (polite urgency, not salesy).
+  • No duplicate "We use your invoice to:" lines anywhere.`;
 
   const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}
 
-${baseChecklist}${isInvoicePrompt ? invoiceChecklist : ''}
+${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist : ''}${isInvoicePrompt ? invoiceChecklist : ''}
 
 - Read the entire email once more to catch any duplication`;
 
@@ -278,7 +287,7 @@ ${baseChecklist}${isInvoicePrompt ? invoiceChecklist : ''}
     common,
     recipientContext,
     bizContext,
-    transcriptAndNextStepsGuidelines, // NEW: Added explicit guidelines for transcript/next_steps
+    subjectVariety,
     priorityDirectives,
     dateGuidelines,
     brevityGuidelines,
@@ -286,21 +295,17 @@ ${baseChecklist}${isInvoicePrompt ? invoiceChecklist : ''}
     energyGuidelines,
     notesGuidelines,
     subjectGuidelines,
-    subjectVariety,
     bodyGuidelines,
     variationDirectives,
     specificHandling,
-    personalTouch, // Moved to be just before the final instructions
     outputStyle,
     instructions
   ].join('\n\n');
 }
 
-
 export default async function handler(req, res) {
   if (cors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
   try {
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) return res.status(400).json({ error: 'Missing GEMINI_API_KEY' });
@@ -308,66 +313,37 @@ export default async function handler(req, res) {
     const { prompt, mode = 'standard', recipient = null, to = '', style = 'auto', subjectStyle = 'auto', subjectSeed = '' } = req.body || {};
     const sys = buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed });
 
-    // Using gemini-1.5-pro-latest
+    // Google Generative Language API (Gemini 1.5 Pro)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
-
-    const apiRequestBody = {
-      contents: [{ role: 'user', parts: [{ text: sys }] }],
+    const body = {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: sys }]
+        }
+      ],
       generationConfig: {
-        // NEW: Enforcing JSON output for reliability
-        response_mime_type: "application/json",
         temperature: 0.7,
         topK: 40,
         topP: 0.9,
         maxOutputTokens: 2048
-      },
-      // NEW: Defining the JSON schema the model MUST follow
-      tools: [{
-        function_declarations: [{
-          name: "email_formatter",
-          description: "Formats the email into a structured JSON object with a subject and a body.",
-          parameters: {
-            type: "OBJECT",
-            properties: {
-              subject: { type: "STRING", description: "The email subject line, 4-8 words long." },
-              body: { type: "STRING", description: "The full email body, adhering to all content and formatting rules." }
-            },
-            required: ["subject", "body"]
-          }
-        }]
-      }],
-      tool_config: {
-        function_calling_config: { mode: "ANY" } // Force the model to use the specified tool
       }
     };
 
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(apiRequestBody)
+      body: JSON.stringify(body)
     });
 
     const data = await resp.json();
-
     if (!resp.ok) {
       const msg = data?.error?.message || 'Gemini API error';
-      console.error('Gemini API Error:', data);
-      return res.status(resp.status).json({ error: msg, details: data });
+      return res.status(resp.status).json({ error: msg });
     }
 
-    // Extract the function call response from the new JSON format
-    const functionCall = data?.candidates?.[0]?.content?.parts?.[0]?.functionCall;
-    if (functionCall && functionCall.name === 'email_formatter') {
-      const { subject, body } = functionCall.args;
-      // Reconstruct the simple text output for the frontend to parse
-      const textOutput = `Subject: ${subject || ''}\n\n${body || ''}`;
-      return res.status(200).json({ ok: true, output: textOutput, json: functionCall.args }); // Send both for compatibility
-    }
-    
-    // Fallback to old text extraction if JSON/function call fails
     const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
     return res.status(200).json({ ok: true, output: text });
-
   } catch (e) {
     console.error('Gemini handler error', e);
     return res.status(500).json({ error: 'Failed to generate email', message: e.message });

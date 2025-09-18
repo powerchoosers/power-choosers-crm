@@ -33,9 +33,11 @@ async function readJson(req) {
 }
 
 function normalizeCallForResponse(call) {
-  // Normalize to the shape expected by scripts/pages/calls.js mapping
+  // Normalize to the shape expected by front-end pages while preserving IDs for mapping
   return {
     id: call.id || call.callSid || call.twilioSid || '',
+    callSid: call.callSid || call.twilioSid || call.id || '',
+    twilioSid: call.twilioSid || call.callSid || call.id || '',
     to: call.to || '',
     from: call.from || '',
     status: call.status || '',
@@ -56,7 +58,12 @@ function normalizeCallForResponse(call) {
     // Recording metadata for dual-channel display
     recordingChannels: call.recordingChannels != null ? String(call.recordingChannels) : '',
     recordingTrack: call.recordingTrack || '',
-    recordingSource: call.recordingSource || ''
+    recordingSource: call.recordingSource || '',
+    // CRM linkage for detail pages
+    accountId: call.accountId || '',
+    accountName: call.accountName || '',
+    contactId: call.contactId || '',
+    contactName: call.contactName || ''
   };
 }
 

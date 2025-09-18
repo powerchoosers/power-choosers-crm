@@ -448,7 +448,8 @@
                 const callStartTime = Date.now();
                 const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
                 if (typeof updateCallStatus === 'function') {
-                  updateCallStatus(number, 'connected', callStartTime, 0, callId, number, 'incoming');
+                  // Use Twilio CallSid if available so backend persists immediately
+                  updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
                 } else {
                   console.warn('[TwilioRTC] updateCallStatus not available - skipping status update');
                 }
@@ -459,9 +460,9 @@
                   const duration = Math.floor((callEndTime - callStartTime) / 1000);
                   // Notify widgets that the call ended
                   try {
-                    document.dispatchEvent(new CustomEvent('callEnded', { detail: { callSid: twilioCallSid || callId, duration } }));
+                    document.dispatchEvent(new CustomEvent('callEnded', { detail: { callSid: incomingCallSid || callId, duration } }));
                     const el = document.getElementById(WIDGET_ID);
-                    if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'idle', callSid: twilioCallSid || callId } }));
+                    if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'idle', callSid: incomingCallSid || callId } }));
                   } catch(_) {}
                   
                   // IMMEDIATELY set cooldown and clear context to prevent auto-redial
@@ -477,7 +478,7 @@
                   
                   // Update call with final status and duration using Twilio CallSid if available
                   console.debug('[Phone] Posting final status with context before clearing it');
-                  updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
+                  updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
                   currentCall = null;
                   // Notify detail pages to refresh recent calls immediately after hangup
                   try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
@@ -580,7 +581,7 @@
                   autoTriggerBlockUntil = Date.now() + 10000;
                   // Guard: updateCallStatus may not be defined yet if widget hasn't been created
                   if (typeof updateCallStatus === 'function') {
-                    updateCallStatus(number, 'error', callStartTime, 0, callId, number, 'incoming');
+                    updateCallStatus(number, 'error', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
                   } else {
                     console.warn('[TwilioRTC] updateCallStatus not available - skipping status update');
                   }
