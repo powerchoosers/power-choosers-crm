@@ -1108,13 +1108,14 @@
                   phone: phone
                 });
                 
+                // If no specific contact selected, clear previous contact context to avoid misattribution
                 window.Widgets.setCallContext({ 
                   accountId: aid || null, 
                   accountName: name || null, 
                   company: name || null,
-                  contactId: contactId,
-                  contactName: contactName,
-                  name: contactName || name
+                  contactId: contactId || null,
+                  contactName: contactName || null,
+                  name: (contactName || name) || null
                 });
               }
             } catch (_) {}

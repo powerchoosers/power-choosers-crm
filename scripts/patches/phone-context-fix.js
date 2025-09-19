@@ -84,7 +84,14 @@
     // Track latest explicit context provided by the app
     const originalSet = window.Widgets.setCallContext;
     window.Widgets.setCallContext = function(ctx){
-      try { window.__pcLatestContext = Object.assign({}, ctx || {}); } catch(_) {}
+      try {
+        ctx = ctx || {};
+        // If no contactId/name provided, explicitly clear previous contact context
+        if (!ctx.contactId && !ctx.contactName) {
+          try { delete window.__pcLatestContext?.contactId; delete window.__pcLatestContext?.contactName; } catch(_) {}
+        }
+        window.__pcLatestContext = Object.assign({}, window.__pcLatestContext || {}, ctx);
+      } catch(_) {}
       try { return originalSet && originalSet.apply(this, arguments); } catch(e) { return undefined; }
     };
 
