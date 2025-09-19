@@ -301,11 +301,15 @@
     if (entityType === 'account') {
       try {
         const a = window.AccountDetail?.state?.currentAccount || {};
+        console.log('[Lusha] Account state:', a);
         const name = a.name || a.accountName || a.companyName || '';
         const d = a.domain || a.website || a.site || '';
+        console.log('[Lusha] Account data:', { name, d, hasAccountDetail: !!window.AccountDetail });
         if (!companyName && name) companyName = name;
         if (!domain && d) domain = deriveDomain(d);
-      } catch(_) {}
+      } catch(e) {
+        console.log('[Lusha] Account error:', e);
+      }
     } else {
       try {
         const c = window.ContactDetail?.state?.currentContact || {};
@@ -589,13 +593,15 @@
   }
 
   function openLushaForAccount(accountId) {
+    console.log('[Lusha] openLushaForAccount called with:', accountId);
     currentAccountId = accountId;
     currentEntityType = 'account';
     removeExistingWidget();
     makeCard(accountId, 'account');
     // Ensure prefill runs after widget is created
     setTimeout(() => {
-      try { prefillInputs('account'); } catch(_) {}
+      console.log('[Lusha] Running prefill for account...');
+      try { prefillInputs('account'); } catch(e) { console.log('[Lusha] Prefill error:', e); }
     }, 100);
     try { window.crm?.showToast && window.crm.showToast('Lusha Contact Search opened'); } catch (_) {}
   }
