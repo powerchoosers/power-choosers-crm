@@ -1938,10 +1938,13 @@
           try {
             if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
               if (typeof window.Widgets.setCallContext === 'function') {
+                // Explicitly clear any previous contact context to avoid misattribution
                 window.Widgets.setCallContext({
                   accountId: a?.id || null,
                   accountName: a?.accountName || a?.name || a?.companyName || null,
-                  company: a?.accountName || a?.name || a?.companyName || null
+                  company: a?.accountName || a?.name || a?.companyName || null,
+                  contactId: null,
+                  contactName: null
                 });
               }
               const name = a?.accountName || a?.name || a?.companyName || 'Account';

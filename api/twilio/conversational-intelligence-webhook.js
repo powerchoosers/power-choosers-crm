@@ -139,6 +139,7 @@ function buildSpeakerTurnsFromSentences(sentences, agentChannelStr){
 }
 
 const twilio = require('twilio');
+const { db } = require('../_firebase.js');
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -220,6 +221,35 @@ export default async function handler(req, res) {
         
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+        // Gate processing when CI auto-processing is disabled: only handle transcripts we explicitly requested
+        try {
+            const auto = String(process.env.CI_AUTO_PROCESS || '').toLowerCase();
+            const autoEnabled = auto === '1' || auto === 'true' || auto === 'yes';
+            if (!autoEnabled) {
+                let allowed = false;
+                let callSidFromCustomerKey = '';
+                try {
+                    const t = await client.intelligence.v2.transcripts(TranscriptSid).fetch();
+                    callSidFromCustomerKey = t?.customerKey || '';
+                } catch(_) {}
+                if (db && callSidFromCustomerKey) {
+                    try {
+                        const snap = await db.collection('calls').doc(callSidFromCustomerKey).get();
+                        if (snap.exists) {
+                            const data = snap.data() || {};
+                            if (data.ciRequested || String(data.ciTranscriptSid || '') === String(TranscriptSid)) {
+                                allowed = true;
+                            }
+                        }
+                    } catch(_) {}
+                }
+                if (!allowed) {
+                    console.log('[CI Webhook] CI auto-process disabled; ignoring transcript not explicitly requested', { TranscriptSid, callSidFromCustomerKey });
+                    return res.status(202).json({ success: true, gated: true });
+                }
+            }
+        } catch(_) {}
         
         try {
             // Get the transcript details and validate CI analysis status
