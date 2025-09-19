@@ -57,29 +57,50 @@ module.exports = async (req, res) => {
   cors(req, res);
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
   try {
-    const { companyId, companyName, domain, kind, page, size } = req.body || {};
-    // Lusha requires size >= 10, max 40
-    const pages = { page: Math.max(0, parseInt(page ?? 0, 10) || 0), size: Math.min(40, Math.max(10, parseInt(size ?? 10, 10) || 10)) };
+    const requestBody = req.body || {};
     
-    // Use correct Lusha API format
-    const body = {
-      pages,
-      filters: {
-        companies: {
-          include: {}
-        }
+    // Check if request already has the correct Lusha API structure
+    if (requestBody.pages && requestBody.filters && requestBody.filters.companies) {
+      // Request is already in correct format, use it directly
+      const body = requestBody;
+      
+      // Validate that we have at least one company identifier
+      const hasCompanyId = body.filters.companies.include?.ids?.length > 0;
+      const hasDomain = body.filters.companies.include?.domains?.length > 0;
+      const hasCompanyName = body.filters.companies.include?.names?.length > 0;
+      
+      if (!hasCompanyId && !hasDomain && !hasCompanyName) {
+        return res.status(400).json({ error: 'Missing company identifier in filters.companies.include' });
       }
-    };
-    
-    // Add company filter using correct structure
-    if (companyId) {
-      body.filters.companies.include.ids = [companyId];
-    } else if (domain) {
-      body.filters.companies.include.domains = [normalizeDomain(domain)];
-    } else if (companyName) {
-      body.filters.companies.include.names = [companyName];
+      
+      // Normalize domains if present
+      if (hasDomain) {
+        body.filters.companies.include.domains = body.filters.companies.include.domains.map(normalizeDomain);
+      }
     } else {
-      return res.status(400).json({ error: 'Missing company identifier (domain, companyId, or companyName)' });
+      // Legacy format - convert to correct structure
+      const { companyId, companyName, domain, kind, page, size } = requestBody;
+      const pages = { page: Math.max(0, parseInt(page ?? 0, 10) || 0), size: Math.min(40, Math.max(10, parseInt(size ?? 10, 10) || 10)) };
+      
+      const body = {
+        pages,
+        filters: {
+          companies: {
+            include: {}
+          }
+        }
+      };
+      
+      // Add company filter using correct structure
+      if (companyId) {
+        body.filters.companies.include.ids = [companyId];
+      } else if (domain) {
+        body.filters.companies.include.domains = [normalizeDomain(domain)];
+      } else if (companyName) {
+        body.filters.companies.include.names = [companyName];
+      } else {
+        return res.status(400).json({ error: 'Missing company identifier (domain, companyId, or companyName)' });
+      }
     }
 
     // Debug: log the request body
@@ -106,7 +127,7 @@ module.exports = async (req, res) => {
           lastName: c?.name?.last || '',
           jobTitle: c?.jobTitle || '',
           companyId: c?.companyId || null,
-          companyName: c?.companyName || companyName || '',
+          companyName: c?.companyName || '',
           fqdn: c?.fqdn || '',
           hasEmails: !!c?.hasEmails,
           hasPhones: !!c?.hasPhones
@@ -115,7 +136,7 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({ 
       contacts, 
-      page: data?.currentPage ?? pages.page, 
+      page: data?.currentPage ?? body.pages?.page ?? 0, 
       total: data?.totalResults ?? contacts.length,
       requestId: data?.requestId // Include requestId for enrich step
     });
