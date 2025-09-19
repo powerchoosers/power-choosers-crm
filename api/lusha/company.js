@@ -28,6 +28,7 @@ function cors(req, res) {
   
   return false;
 }
+
 const LUSHA_BASE_URL = 'https://api.lusha.com';
 
 async function fetchWithRetry(url, options, retries = 5) {
@@ -55,34 +56,49 @@ function normalizeDomain(raw) {
 
 module.exports = async (req, res) => {
   cors(req, res);
-  if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
+  if (req.method !== 'GET') { return res.status(405).json({ error: 'Method not allowed' }); }
+  
   try {
-    const { domain, companyName, companyId } = req.body || {};
-    if (!domain && !companyName && !companyId) return res.status(400).json({ error: 'domain, companyName, or companyId required' });
+    const { domain, company, companyId } = req.query || {};
+    
+    if (!domain && !company && !companyId) {
+      return res.status(400).json({ error: 'Missing required parameter: domain, company, or companyId' });
+    }
 
-    const qs = new URLSearchParams();
-    if (domain) qs.append('domain', normalizeDomain(domain));
-    if (companyName) qs.append('company', companyName);
-    if (companyId) qs.append('companyId', companyId);
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (domain) params.append('domain', normalizeDomain(domain));
+    if (company) params.append('company', company);
+    if (companyId) params.append('companyId', companyId);
 
-    const resp = await fetchWithRetry(`${LUSHA_BASE_URL}/v2/company?${qs.toString()}`, {
+    const url = `${LUSHA_BASE_URL}/v2/company?${params.toString()}`;
+    
+    const resp = await fetchWithRetry(url, {
       method: 'GET',
       headers: { 'api_key': LUSHA_API_KEY }
     });
+
     if (!resp.ok) {
       const text = await resp.text();
       return res.status(resp.status).json({ error: 'Lusha company error', details: text });
     }
+
     const data = await resp.json();
-    const rawDomain = data?.data?.domain || data?.data?.fqdn || domain || '';
-    const out = {
-      id: data?.data?.companyId || data?.data?.id || null,
-      name: data?.data?.name || companyName || '',
-      domain: normalizeDomain(rawDomain),
-      fqdn: data?.data?.fqdn || rawDomain || '',
-      raw: data
+    
+    // Map the response to a consistent format
+    const companyData = {
+      id: data?.data?.id || null,
+      name: data?.data?.name || '',
+      domain: data?.data?.domain || '',
+      website: data?.data?.website || '',
+      description: data?.data?.description || '',
+      employees: data?.data?.employees || '',
+      industry: data?.data?.mainIndustry || '',
+      location: data?.data?.location?.fullLocation || '',
+      logoUrl: data?.data?.logoUrl || null
     };
-    return res.status(200).json(out);
+
+    return res.status(200).json(companyData);
   } catch (e) {
     return res.status(500).json({ error: 'Server error', details: e.message });
   }
