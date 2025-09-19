@@ -489,11 +489,11 @@
               const now = Date.now();
               const timeSinceLastRefresh = now - lastRefreshTime;
               
-              if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && timeSinceLastRefresh >= 5000) {
+              if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && timeSinceLastRefresh >= 60000) {
                 lastRefreshTime = now;
                 loadRecentCallsForAccount();
               }
-            }, 5000); // Check every 5 seconds
+            }, 60000); // Check every 60 seconds
           };
     
     // Start periodic refresh

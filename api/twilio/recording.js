@@ -307,6 +307,31 @@ export default async function handler(req, res) {
 async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, baseUrl) {
     try {
         console.log('[Recording] Starting Twilio AI processing for:', callSid);
+
+        // Hard gate: On-demand CI only. When disabled, do not auto-transcribe or create CI.
+        try {
+            const auto = String(process.env.CI_AUTO_PROCESS || '').toLowerCase();
+            const shouldAuto = auto === '1' || auto === 'true' || auto === 'yes';
+            if (!shouldAuto) {
+                console.log('[Recording] CI auto-processing disabled; skipping transcription/AI until eye button request.');
+                // Persist minimal metadata so UI knows recording is ready but not processed
+                try {
+                    const base = baseUrl || process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') || 'https://power-choosers-crm.vercel.app';
+                    await fetch(`${base}/api/calls`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            callSid,
+                            recordingSid,
+                            recordingUrl,
+                            aiInsights: null,
+                            conversationalIntelligence: { status: 'not-requested' }
+                        })
+                    }).catch(() => {});
+                } catch (_) {}
+                return; // Do not continue with any transcription/CI work
+            }
+        } catch (_) {}
         
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -625,32 +650,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         }
                     }
                 } else {
-                    // On-demand CI mode: only create CI transcript when explicitly requested
-                    const autoProcess = String(process.env.CI_AUTO_PROCESS || '').toLowerCase();
-                    const shouldAutoProcess = autoProcess === '1' || autoProcess === 'true' || autoProcess === 'yes';
-                    if (!shouldAutoProcess) {
-                        console.log('[Recording] CI auto-processing is disabled (CI_AUTO_PROCESS not enabled). Skipping transcript creation.');
-                        // Persist minimal CI metadata so UI knows recording is ready but not processed
-                        try {
-                            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
-                            await fetch(`${base}/api/calls`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    callSid,
-                                    recordingSid,
-                                    recordingUrl,
-                                    recordingChannels: recordingChannels,
-                                    recordingTrack: recordingTrack,
-                                    recordingSource: recordingSource,
-                                    aiInsights: null,
-                                    conversationalIntelligence: { status: 'not-requested' }
-                                })
-                            }).catch(()=>{});
-                        } catch(_) {}
-                        // Exit early from CI auto-processing path; no transcript is created when disabled
-                        return res.status(200).json({ ok: true, note: 'CI auto-processing disabled', callSid, recordingSid, recordingUrl: recordingMp3Url });
-                    }
+                    // Auto-process is enabled at this point; create new CI transcript
                     // Create new Conversational Intelligence transcript
                     console.log('[Recording] Creating new Conversational Intelligence transcript...');
                     const agentChNum = Number(agentChannelStr === '2' ? 2 : 1);

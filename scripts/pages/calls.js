@@ -1750,7 +1750,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
       <td class="name-cell" data-contact-id="${r.contactId || ''}">${contactCell}</td>
       <td>${title}</td>
-      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<div class="company-favicon-container"><img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onload="this.parentNode.classList.add('favicon-loaded'); var f=this.parentNode.querySelector('.company-favicon-fallback'); if(f){f.style.display='none';}" onerror="this.parentNode.classList.add('favicon-failed'); var f=this.parentNode.querySelector('.company-favicon-fallback'); if(f){f.style.display='block';}" /><span class="company-favicon-fallback" style="display:none">${safeAccountIcon}</span></div>` : `${safeAccountIcon}`}<span class="company-name">${company || (hasContact ? '' : '—')}</span></span></a></td>
+      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : safeAccountIcon) : safeAccountIcon}<span class="company-name">${company || (hasContact ? '' : '—')}</span></span></a></td>
       <td>${numberCell}</td>
       <td>${directionCell || '—'}</td>
       <td>${callTimeStr}</td>

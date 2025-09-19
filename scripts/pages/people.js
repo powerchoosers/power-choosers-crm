@@ -2291,7 +2291,7 @@
       select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(c.id)}" aria-label="Select contact"${checked}></td>`,
       name: `<td class="name-cell" data-contact-id="${escapeHtml(c.id)}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${escapeHtml(fullName)}</span></div></td>`,
       title: `<td>${escapeHtml(title)}</td>`,
-      company: `<td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : ''}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`,
+      company: `<td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : '') : ''}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`,
       email: `<td>${escapeHtml(email)}</td>`,
       phone: `<td class="phone-cell" data-phone="${escapeHtml(phone)}">${phone ? `<span class="phone-link">${escapeHtml(phone)}</span>` : ''}</td>`,
       location: `<td>${location}</td>`,

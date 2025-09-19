@@ -2784,6 +2784,89 @@ window.__pcAccountsIcon = () => {
     </span>`;
 };
 
+// Enhanced favicon system with multiple fallback sources
+window.__pcFaviconHelper = {
+    // Generate favicon HTML with multiple fallback sources
+    generateFaviconHTML: function(domain, size = 64) {
+        if (!domain) {
+            return window.__pcAccountsIcon();
+        }
+
+        const cleanDomain = domain.replace(/^www\./i, '');
+        const fallbackIcon = window.__pcAccountsIcon();
+        
+        // Multiple favicon sources to try
+        const faviconSources = [
+            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(cleanDomain)}`,
+            `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`,
+            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`,
+            `https://${cleanDomain}/favicon.ico`
+        ];
+
+        // Create a unique ID for this favicon container
+        const containerId = `favicon-${cleanDomain.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
+        
+        return `
+            <div class="company-favicon-container" id="${containerId}">
+                <img class="company-favicon" 
+                     src="${faviconSources[0]}" 
+                     alt="" 
+                     referrerpolicy="no-referrer" 
+                     loading="lazy"
+                     onload="window.__pcFaviconHelper.onFaviconLoad('${containerId}')"
+                     onerror="window.__pcFaviconHelper.onFaviconError('${containerId}', '${cleanDomain}', ${size})" />
+                <span class="company-favicon-fallback" style="display:none">${fallbackIcon}</span>
+            </div>
+        `;
+    },
+
+    // Handle successful favicon load
+    onFaviconLoad: function(containerId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.classList.add('favicon-loaded');
+            const fallback = container.querySelector('.company-favicon-fallback');
+            if (fallback) {
+                fallback.style.display = 'none';
+            }
+        }
+    },
+
+    // Handle favicon load error and try next source
+    onFaviconError: function(containerId, domain, size) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const img = container.querySelector('.company-favicon');
+        const fallback = container.querySelector('.company-favicon-fallback');
+        
+        if (!img || !fallback) return;
+
+        // Get current source index from data attribute
+        let currentIndex = parseInt(img.dataset.sourceIndex || '0');
+        currentIndex++;
+
+        // Try next favicon source
+        const faviconSources = [
+            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`,
+            `https://favicons.githubusercontent.com/${encodeURIComponent(domain)}`,
+            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`,
+            `https://${domain}/favicon.ico`
+        ];
+
+        if (currentIndex < faviconSources.length) {
+            // Try next source
+            img.dataset.sourceIndex = currentIndex.toString();
+            img.src = faviconSources[currentIndex];
+        } else {
+            // All sources failed, show fallback
+            container.classList.add('favicon-failed');
+            fallback.style.display = 'block';
+            img.style.display = 'none';
+        }
+    }
+};
+
 // Initialize CRM when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.crm = new PowerChoosersCRM();
