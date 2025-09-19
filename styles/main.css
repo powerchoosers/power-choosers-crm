@@ -3114,7 +3114,39 @@ html, body {
     background: var(--bg-secondary);
     border-color: var(--accent-color);
     transform: translateY(-1px);
+}
+
+/* Greyed out state for unprocessed calls - still clickable with hover effects */
+.rc-icon-btn.not-processed {
+    color: var(--grey-500);
+    background: var(--bg-item);
+    border-color: var(--border-light);
+    opacity: 0.6;
+}
+
+.rc-icon-btn.not-processed:hover {
+    color: var(--text-inverse);
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+    opacity: 1;
+    transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Processing state for CI requests */
+.rc-icon-btn.processing {
+    color: var(--orange-primary);
+    background: var(--bg-item);
+    border-color: var(--orange-primary);
+    cursor: not-allowed;
+}
+
+.rc-icon-btn.processing:hover {
+    color: var(--orange-primary);
+    background: var(--bg-item);
+    border-color: var(--orange-primary);
+    transform: none;
+    box-shadow: none;
 }
 
 .notification-badge {
@@ -8116,6 +8148,274 @@ input[type="number"]::-webkit-inner-spin-button {
 .deal-form-section:first-child { margin-top: 0; }
 .health-form-section:last-child,
 .deal-form-section:last-child { margin-bottom: 0; }
+
+/* === LUSHA WIDGET === */
+.lusha-card {
+    /* Use standard widget card padding */
+    padding: var(--spacing-md) var(--spacing-base) var(--spacing-base) var(--spacing-base);
+}
+
+.lusha-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: var(--spacing-md);
+    line-height: 1.4;
+}
+
+.lusha-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.lusha-search-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.lusha-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.lusha-input-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.lusha-form-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    background: var(--bg-item);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: var(--transition-fast);
+    box-sizing: border-box;
+}
+
+.lusha-form-input:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
+}
+
+.lusha-form-input::placeholder {
+    color: var(--text-muted);
+}
+
+.lusha-button-group {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.lusha-search-btn {
+    flex: 1;
+    padding: 12px 20px;
+    background: var(--orange-subtle);
+    color: var(--text-inverse);
+    border: 1px solid var(--orange-subtle);
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.lusha-search-btn:hover:not(:disabled) {
+    background: #e55a2b;
+    border-color: #d9481f;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.lusha-search-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.lusha-reset-btn {
+    padding: 12px 20px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.lusha-reset-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Loading state */
+.lusha-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.lusha-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border-light);
+    border-top: 2px solid var(--orange-subtle);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.lusha-loading-text {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Results section */
+.lusha-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.lusha-results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.lusha-results-header h4 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.lusha-results-count {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.lusha-contacts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.lusha-contact-item {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    transition: var(--transition-fast);
+}
+
+.lusha-contact-item:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.lusha-contact-header {
+    margin-bottom: var(--spacing-sm);
+}
+
+.lusha-contact-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.lusha-contact-title {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.lusha-contact-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: var(--spacing-sm);
+}
+
+.lusha-contact-detail {
+    display: flex;
+    gap: 8px;
+    font-size: 0.9rem;
+}
+
+.lusha-detail-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    min-width: 60px;
+}
+
+.lusha-detail-value {
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.lusha-contact-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.lusha-action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.lusha-action-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.lusha-no-results {
+    text-align: center;
+    padding: var(--spacing-lg);
+    color: var(--text-secondary);
+}
+
+.lusha-no-results p {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: 0.9rem;
+}
+
+.lusha-no-results p:last-child {
+    margin-bottom: 0;
+}
+
+/* Animation helper */
+.lusha-anim {
+    will-change: height, opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lusha-anim { will-change: auto; }
+}
 
 .health-form-section.active,
 .deal-form-section.active {
