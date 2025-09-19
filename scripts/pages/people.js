@@ -14,6 +14,7 @@
     companyTokens: [],
     cityTokens: [],
     stateTokens: [],
+    statusTokens: [],
     employeesTokens: [],
     industryTokens: [],
     visitorDomainTokens: [],
@@ -59,7 +60,13 @@
     document.addEventListener('pc:people-restore', (ev) => {
       try {
         const detail = ev && ev.detail ? ev.detail : {};
-        console.log('[People] Restoring state from back button:', detail);
+        console.log('[People] RESTORE EVENT RECEIVED from back button:', detail);
+        console.log('[People] Current state before restore:', {
+          currentPage: state.currentPage,
+          searchTerm: els.quickSearch?.value || '',
+          sortColumn: state.sortColumn,
+          sortDirection: state.sortDirection
+        });
         
         // Restore pagination
         const targetPage = Math.max(1, parseInt(detail.currentPage || detail.page || state.currentPage || 1, 10));
@@ -74,6 +81,7 @@
           if (filters.companyTokens) state.companyTokens = [...filters.companyTokens];
           if (filters.cityTokens) state.cityTokens = [...filters.cityTokens];
           if (filters.stateTokens) state.stateTokens = [...filters.stateTokens];
+          if (filters.statusTokens) state.statusTokens = [...filters.statusTokens];
           if (filters.employeesTokens) state.employeesTokens = [...filters.employeesTokens];
           if (filters.industryTokens) state.industryTokens = [...filters.industryTokens];
           if (filters.visitorDomainTokens) state.visitorDomainTokens = [...filters.visitorDomainTokens];
@@ -675,7 +683,18 @@
     style.id = 'people-bulk-styles';
     style.textContent = `
       /* Ensure absolute children anchor to the table container */
-      #people-page .table-container { position: relative; overflow: visible; }
+#people-page .table-container { position: relative; overflow: visible; }
+
+/* Scroll smoothness improvements */
+#people-page .table-scroll {
+  scrollbar-gutter: stable both-edges;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: paint layout;
+}
 
       /* Backdrop used by the bulk select popover */
       .bulk-select-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 800; }
@@ -1551,6 +1570,20 @@
         if (nameCell) {
           const contactId = nameCell.getAttribute('data-contact-id');
           if (contactId && window.ContactDetail) {
+            // Store navigation source for back button
+            window._contactNavigationSource = 'people';
+            window._peopleReturn = {
+              page: state.currentPage,
+              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+              searchTerm: els.quickSearch?.value || '',
+              sortColumn: state.sortColumn || '',
+              sortDirection: state.sortDirection || 'asc',
+              filters: {
+                titleTokens: [...state.titleTokens],
+                companyTokens: [...state.companyTokens],
+                statusTokens: [...state.statusTokens]
+              }
+            };
             window.ContactDetail.show(contactId);
           }
           return;
@@ -2451,6 +2484,20 @@
         if (nameCell) {
           const contactId = nameCell.getAttribute('data-contact-id');
           if (contactId && window.ContactDetail) {
+            // Store navigation source for back button
+            window._contactNavigationSource = 'people';
+            window._peopleReturn = {
+              page: state.currentPage,
+              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+              searchTerm: els.quickSearch?.value || '',
+              sortColumn: state.sortColumn || '',
+              sortDirection: state.sortDirection || 'asc',
+              filters: {
+                titleTokens: [...state.titleTokens],
+                companyTokens: [...state.companyTokens],
+                statusTokens: [...state.statusTokens]
+              }
+            };
             window.ContactDetail.show(contactId);
           }
           return;

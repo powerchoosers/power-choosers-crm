@@ -428,7 +428,7 @@
                 } catch(_) {}
                 currentCallContext = { number: number, name: meta?.name || '', isActive: true };
                 // Start live timer banner
-                startLiveCallTimer(document.getElementById(WIDGET_ID));
+                startLiveCallTimer(document.getElementById(WIDGET_ID), incomingCallSid);
                 const card = document.getElementById(WIDGET_ID);
                 if (card) {
                   const btn = card.querySelector('.call-btn-start');
@@ -1074,6 +1074,8 @@
   // Live call duration timer helpers
   let callTimerHandle = null;
   let callTimerStartedAt = 0;
+  let currentCallSid = null; // Track current call SID for live updates
+  
   function formatDuration(ms) {
     const total = Math.floor(ms / 1000);
     const h = Math.floor(total / 3600);
@@ -1081,6 +1083,14 @@
     const s = total % 60;
     const pad = (n) => String(n).padStart(2, '0');
     return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+  }
+  
+  // Format duration for recent calls display (e.g., "2m 15s")
+  function formatDurationForRecentCalls(ms) {
+    const total = Math.floor(ms / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}m ${s}s`;
   }
   function setMicBanner(card, className, text) {
     const micStatus = card.querySelector('.mic-status');
@@ -1090,17 +1100,31 @@
     if (className) micStatus.classList.add(className);
     micText.textContent = text;
   }
-  function startLiveCallTimer(card) {
+  function startLiveCallTimer(card, callSid = null) {
     if (!card) card = document.getElementById(WIDGET_ID);
     if (!card) return;
     // switch banner style to active and start ticking
     callTimerStartedAt = Date.now();
+    currentCallSid = callSid; // Store current call SID
     setMicBanner(card, 'active', '0:00');
     if (callTimerHandle) clearInterval(callTimerHandle);
     callTimerHandle = setInterval(() => {
       const elapsed = Date.now() - callTimerStartedAt;
       const micText = card.querySelector('.mic-text');
       if (micText) micText.textContent = formatDuration(elapsed);
+      
+            // Broadcast live duration to recent calls sections (throttled to reduce overhead)
+            if (currentCallSid && elapsed % 2000 < 1000) { // Only dispatch every 2 seconds
+              try {
+                document.dispatchEvent(new CustomEvent('pc:live-call-duration', { 
+                  detail: { 
+                    callSid: currentCallSid, 
+                    duration: Math.floor(elapsed / 1000),
+                    durationFormatted: formatDurationForRecentCalls(elapsed)
+                  } 
+                }));
+              } catch(_) {}
+            }
     }, 1000);
   }
   function stopLiveCallTimer(card) {
@@ -1108,6 +1132,7 @@
       clearInterval(callTimerHandle);
       callTimerHandle = null;
     }
+    currentCallSid = null; // Clear current call SID
     if (!card) card = document.getElementById(WIDGET_ID);
     if (!card) return;
     const now = Date.now();
@@ -1708,7 +1733,7 @@
           } catch(_) {}
           // Show live timer in banner
           const card = document.getElementById(WIDGET_ID);
-          startLiveCallTimer(card);
+          startLiveCallTimer(card, twilioCallSid || callId);
           // Populate in-call contact display (keep header title simple)
           try {
             const meta = await resolvePhoneMeta(number).catch(() => ({}));
@@ -2067,9 +2092,11 @@
             console.debug(`[Phone] Refreshed calls page data (${label})`);
           }
         };
-        setTimeout(() => refreshCalls('t+1s'), 1000);
-        setTimeout(() => refreshCalls('t+15s'), 15000);
-        setTimeout(() => refreshCalls('t+30s'), 30000);
+        // Consolidate refresh timers to reduce overhead
+        const refreshTimes = [1000, 15000, 30000];
+        refreshTimes.forEach((delay, index) => {
+          setTimeout(() => refreshCalls(`t+${delay/1000}s`), delay);
+        });
         
       } catch (error) {
         console.error('[Phone] Failed to update call status:', error);
