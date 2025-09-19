@@ -238,7 +238,8 @@ export default async function handler(req, res) {
                         const snap = await db.collection('calls').doc(callSidFromCustomerKey).get();
                         if (snap.exists) {
                             const data = snap.data() || {};
-                            if (data.ciRequested || String(data.ciTranscriptSid || '') === String(TranscriptSid)) {
+                            // Only allow if this call explicitly requested CI
+                            if (data.ciRequested === true) {
                                 allowed = true;
                             }
                         }
