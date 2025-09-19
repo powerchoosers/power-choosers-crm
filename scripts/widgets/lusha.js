@@ -410,15 +410,37 @@
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       console.log('[Lusha] Raw contacts response:', data);
-      const contacts = data.contacts || [];
+      const contacts = Array.isArray(data.contacts) ? data.contacts : [];
       console.log('[Lusha] Parsed contacts array:', contacts);
+
+      // Ensure results container shows
+      try {
+        const resultsWrap = document.getElementById('lusha-results');
+        if (resultsWrap) resultsWrap.style.display = 'block';
+        const countEl = document.getElementById('lusha-results-count');
+        if (countEl) countEl.textContent = `${contacts.length} contacts found`;
+      } catch(_) {}
+
       const panel = document.getElementById(kind === 'all' ? 'lusha-panel-all' : 'lusha-panel-popular');
       if (panel){
         panel.innerHTML = '';
-        const list = document.createElement('div');
-        list.className = 'lusha-contacts-list';
-        contacts.forEach((c,i)=> list.appendChild(createContactElement(mapProspectingContact(c),i)));
-        panel.appendChild(list);
+        if (contacts.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'lusha-no-results';
+          empty.textContent = 'No results found.';
+          panel.appendChild(empty);
+        } else {
+          const list = document.createElement('div');
+          list.className = 'lusha-contacts-list';
+          contacts.forEach((c,i)=> list.appendChild(createContactElement(mapProspectingContact(c),i)));
+          panel.appendChild(list);
+        }
+      }
+
+      // If popular returned none, try the full list as a fallback
+      if (kind === 'popular' && contacts.length === 0) {
+        console.log('[Lusha] Popular empty, loading all employees as fallback');
+        await loadEmployees('all', company);
       }
     }catch(e){ console.error('Employees load failed', e); }
   }
@@ -447,7 +469,7 @@
     el.innerHTML = `
       <div class="company-summary">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          ${domain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${domain}" alt="" referrerpolicy="no-referrer">` : ''}
+          ${domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : '') : ''}
           <div>
             <div style=\"font-weight:600;color:var(--text-primary)\">${name}</div>
             ${website ? `<a href="${website}" target="_blank" rel="noopener" class="interactive-text">${website}</a>` : ''}
