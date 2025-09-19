@@ -1,6 +1,33 @@
-const cors = require('../_cors');
+const LUSHA_API_KEY = process.env.LUSHA_API_KEY || '1e97bb11-eac3-4b20-8491-02f9b7d783b7';
 
-const LUSHA_API_KEY = '1e97bb11-eac3-4b20-8491-02f9b7d783b7';
+function cors(req, res) {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000', 
+    'https://powerchoosers.com',
+    'https://www.powerchoosers.com',
+    'https://power-choosers-crm.vercel.app'
+  ];
+  
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Vary', 'Origin');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return true;
+  }
+  
+  return false;
+}
 const LUSHA_BASE_URL = 'https://api.lusha.com';
 
 async function fetchWithRetry(url, options, retries = 5) {
