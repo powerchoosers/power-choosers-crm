@@ -236,6 +236,17 @@ export default async function handler(req, res) {
             
             // Double-check that CI analysis is actually completed (per Twilio guidance)
             if (transcript.analysisStatus && transcript.analysisStatus !== 'completed') {
+                if (transcript.analysisStatus === 'failed') {
+                    console.error('[Conversational Intelligence Webhook] CI analysis failed:', {
+                        transcriptStatus: transcript.status,
+                        analysisStatus: transcript.analysisStatus,
+                        ciStatus: transcript.ciStatus,
+                        processingStatus: transcript.processingStatus,
+                        message: 'CI analysis failed - manual review needed'
+                    });
+                    return res.status(200).json({ success: true, message: 'CI analysis failed' });
+                }
+                
                 console.log('[Conversational Intelligence Webhook] CI analysis not completed yet:', {
                     transcriptStatus: transcript.status,
                     analysisStatus: transcript.analysisStatus,
@@ -289,26 +300,70 @@ export default async function handler(req, res) {
                     fullResponse: sentencesResponse.slice(0, 3)
                 });
                 
-                // Validate we have proper sentence segmentation
+                // Validate we have proper sentence segmentation (per Twilio guidance)
                 if (sentencesResponse.length === 0) {
                     console.warn('[Conversational Intelligence Webhook] No sentences returned - CI analysis may not be complete');
                     return res.status(200).json({ success: true, message: 'No sentences available yet' });
                 }
                 
+                // Check for segmentation failure indicators (per Twilio guidance: 5-20+ sentences expected for 1-2 min calls)
+                if (sentencesResponse.length <= 2) {
+                    console.warn('[Conversational Intelligence Webhook] Very few sentences detected - possible segmentation failure:', {
+                        sentenceCount: sentencesResponse.length,
+                        callLength: 'unknown', // We could calculate this from call duration if available
+                        message: 'Expected 5-20+ sentences for typical 1-2 minute calls'
+                    });
+                }
+                
                 if (sentencesResponse.length === 1 && sentencesResponse[0].text && sentencesResponse[0].text.length > 500) {
-                    console.warn('[Conversational Intelligence Webhook] Single long sentence detected - CI segmentation may have failed');
+                    console.warn('[Conversational Intelligence Webhook] Single long sentence detected - CI segmentation likely failed:', {
+                        sentenceLength: sentencesResponse[0].text.length,
+                        message: 'Single sentence over 500 chars suggests segmentation failure'
+                    });
                 }
                 
                 const agentChNum = Number(channelRoleMap.agentChannel || '1');
-                sentences = sentencesResponse.map(s => ({
-                    text: s.text || '',
-                    confidence: s.confidence,
-                    startTime: s.startTime,
-                    endTime: s.endTime,
-                    channel: s.channel,
-                    // Map channel to speaker role using computed per-call mapping
-                    speaker: Number(s.channel) === agentChNum ? 'Agent' : 'Customer'
-                }));
+                sentences = sentencesResponse.map(s => {
+                    // Handle edge cases for channel values (per Twilio guidance)
+                    let channel = s.channel;
+                    let channelNum = null;
+                    
+                    // Normalize channel values defensively
+                    if (channel === null || channel === undefined) {
+                        console.warn('[Conversational Intelligence Webhook] Null/undefined channel detected:', {
+                            sentence: s.text?.substring(0, 50) + '...',
+                            originalChannel: channel
+                        });
+                        channelNum = 1; // Default fallback
+                    } else if (typeof channel === 'string') {
+                        // Handle 'A'/'B' or other string representations
+                        if (channel.toLowerCase() === 'a') channelNum = 1;
+                        else if (channel.toLowerCase() === 'b') channelNum = 2;
+                        else channelNum = Number(channel) || 1;
+                    } else {
+                        channelNum = Number(channel) || 1;
+                    }
+                    
+                    // Log unexpected channel values for investigation
+                    if (channelNum !== 1 && channelNum !== 2) {
+                        console.warn('[Conversational Intelligence Webhook] Unexpected channel value:', {
+                            originalChannel: channel,
+                            normalizedChannel: channelNum,
+                            sentence: s.text?.substring(0, 50) + '...'
+                        });
+                    }
+                    
+                    return {
+                        text: s.text || '',
+                        confidence: s.confidence,
+                        startTime: s.startTime,
+                        endTime: s.endTime,
+                        channel: channel,
+                        channelNum: channelNum,
+                        // Map channel to speaker role using computed per-call mapping
+                        speaker: channelNum === agentChNum ? 'Agent' : 'Customer'
+                    };
+                });
                 
                 transcriptText = sentences.map(s => s.text || '').filter(text => text.trim()).join(' ');
                 
@@ -321,9 +376,11 @@ export default async function handler(req, res) {
                 console.log(`[Conversational Intelligence Webhook] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
                 console.log(`[Conversational Intelligence Webhook] Formatted transcript with speaker labels: ${formattedTranscript.length} chars`);
                 console.log(`[Conversational Intelligence Webhook] Channel distribution:`, {
-                    channel1: sentences.filter(s => s.channel === 1 || s.channel === '1').length,
-                    channel2: sentences.filter(s => s.channel === 2 || s.channel === '2').length,
-                    other: sentences.filter(s => s.channel !== 1 && s.channel !== '1' && s.channel !== 2 && s.channel !== '2').length
+                    channel1: sentences.filter(s => s.channelNum === 1).length,
+                    channel2: sentences.filter(s => s.channelNum === 2).length,
+                    other: sentences.filter(s => s.channelNum !== 1 && s.channelNum !== 2).length,
+                    totalSentences: sentences.length,
+                    segmentationQuality: sentences.length >= 5 ? 'Good' : sentences.length >= 2 ? 'Poor' : 'Failed'
                 });
             } catch (error) {
                 console.error('[Conversational Intelligence Webhook] Error fetching sentences:', error);
