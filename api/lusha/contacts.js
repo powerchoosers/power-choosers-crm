@@ -60,18 +60,30 @@ module.exports = async (req, res) => {
     const { companyId, companyName, domain, kind, page, size } = req.body || {};
     const pages = { page: Math.max(0, parseInt(page ?? 0, 10) || 0), size: Math.min(40, Math.max(1, parseInt(size ?? 10, 10) || 10)) };
     
-    // Try minimal structure - just pages and company filter at root
-    const body = { pages };
+    // Use correct Lusha API format
+    const body = {
+      pages,
+      filters: {
+        companies: {
+          include: {}
+        }
+      }
+    };
     
-    // Add company filter directly at root level
+    // Add company filter using correct structure
     if (companyId) {
-      body.companyId = companyId;
+      body.filters.companies.include.ids = [companyId];
     } else if (domain) {
-      body.companyDomain = normalizeDomain(domain);
+      body.filters.companies.include.domains = [normalizeDomain(domain)];
     } else if (companyName) {
-      body.companyName = companyName;
+      body.filters.companies.include.names = [companyName];
+    } else {
+      return res.status(400).json({ error: 'Missing company identifier (domain, companyId, or companyName)' });
     }
 
+    // Debug: log the request body
+    console.log('Lusha contacts request body:', JSON.stringify(body, null, 2));
+    
     const resp = await fetchWithRetry(`${LUSHA_BASE_URL}/prospecting/contact/search`, {
       method: 'POST',
       headers: { 'api_key': LUSHA_API_KEY, 'Content-Type': 'application/json' },

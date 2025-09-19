@@ -593,6 +593,10 @@
     currentEntityType = 'account';
     removeExistingWidget();
     makeCard(accountId, 'account');
+    // Ensure prefill runs after widget is created
+    setTimeout(() => {
+      try { prefillInputs('account'); } catch(_) {}
+    }, 100);
     try { window.crm?.showToast && window.crm.showToast('Lusha Contact Search opened'); } catch (_) {}
   }
 
