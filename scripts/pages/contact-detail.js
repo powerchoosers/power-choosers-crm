@@ -1846,11 +1846,17 @@
       if (rcList && !rcList._delegated) {
         rcList.addEventListener('click', (e) => {
           const btn = e.target && e.target.closest ? e.target.closest('.rc-insights') : null;
-          if (!btn || btn.disabled) return;
+          if (!btn) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
           const call = (state._rcCalls || []).find(x => String(x.id||x.twilioSid||x.callSid||'') === String(id));
           if (!call) return;
+          if (btn.classList.contains('not-processed')) {
+            const callSid = call.id || call.twilioSid || call.callSid;
+            const recordingSid = call.recordingSid || call.recording_id;
+            triggerContactCI(callSid, recordingSid, btn);
+            return;
+          }
           toggleRcDetails(btn, call);
         });
         rcList._delegated = '1';
@@ -1869,11 +1875,11 @@
         const now = Date.now();
         const timeSinceLastRefresh = now - lastRefreshTime;
         
-        if (!state._rcReloadInFlight && !state._rcIsScrolling && !hasOpenInsights && timeSinceLastRefresh >= 5000) {
+        if (!state._rcReloadInFlight && !state._rcIsScrolling && !hasOpenInsights && timeSinceLastRefresh >= 60000) {
           lastRefreshTime = now;
           loadRecentCallsForContact();
         }
-      }, 5000); // Check every 5 seconds
+      }, 60000); // Check every 60 seconds
     };
     
     // Start periodic refresh
@@ -3416,11 +3422,16 @@
       // delegate click to handle dynamic rerenders
       list.querySelectorAll('.rc-insights').forEach(btn => {
         btn.addEventListener('click', (e) => {
-          if (btn.disabled) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
-        const call = (state._rcCalls||[]).find(x=>String(x.id)===String(id));
+          const call = (state._rcCalls||[]).find(x=>String(x.id)===String(id));
           if (!call) return;
+          if (btn.classList.contains('not-processed')) {
+            const callSid = call.id || call.twilioSid || call.callSid;
+            const recordingSid = call.recordingSid || call.recording_id;
+            triggerContactCI(callSid, recordingSid, btn);
+            return;
+          }
           toggleRcDetails(btn, call);
         });
       });
@@ -3588,9 +3599,45 @@
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
-          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'disabled' : ''}" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Insights processing...' : 'View AI insights'}" ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'disabled' : ''}>${svgEye()}</button>
+          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
         </div>
       </div>`;
+  }
+
+  // Trigger on-demand CI processing for a call (Contact Detail)
+  async function triggerContactCI(callSid, recordingSid, btn) {
+    if (!callSid) {
+      try { console.warn('[ContactDetail] Missing callSid for CI processing:', { callSid, recordingSid }); } catch(_) {}
+      return;
+    }
+    try {
+      // Show loading spinner on the button
+      try { btn.innerHTML = '<div class="loading-spinner" aria-hidden="true"></div>'; btn.classList.add('processing'); btn.disabled = true; } catch(_) {}
+      // Toast
+      try { if (window.ToastManager) { window.ToastManager.showToast('Processing call insights...', 'info'); } } catch(_) {}
+      const response = await fetch('/api/twilio/ci-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callSid: callSid, recordingSid: recordingSid })
+      });
+      if (response.status === 404) {
+        try { if (window.ToastManager) { window.ToastManager.showToast('Recording not ready yet. Please try again in ~5–10 seconds.', 'warning'); } } catch(_) {}
+        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`CI request failed: ${response.status} ${response.statusText}`);
+      }
+      const result = await response.json().catch(()=>({}));
+      try { console.log('[ContactDetail] CI processing initiated:', result); } catch(_) {}
+      // Keep spinner; backend/webhook will update UI when analysis completes
+      try { btn.title = 'Processing call insights...'; btn.classList.remove('not-processed'); btn.classList.add('processing'); } catch(_) {}
+    } catch (error) {
+      try { console.error('[ContactDetail] Failed to trigger CI processing:', error); } catch(_) {}
+      // Reset button state on error
+      try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.disabled = false; } catch(_) {}
+      try { if (window.ToastManager) { window.ToastManager.showToast('Failed to start call processing', 'error'); } } catch(_) {}
+    }
   }
 
   // Inline expanding details under an rc-item
