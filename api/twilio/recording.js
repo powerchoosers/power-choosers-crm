@@ -230,6 +230,7 @@ export default async function handler(req, res) {
                             status: 'completed',
                             duration: parseInt(RecordingDuration) || parseInt(callResource?.duration, 10) || 0,
                             recordingUrl: recordingMp3Url,
+                            recordingSid: effectiveRecordingSid || RecordingSid,
                             // Include recording metadata for UI rendering
                             recordingChannels: (body.RecordingChannels != null ? String(body.RecordingChannels) : (body.Channels != null ? String(body.Channels) : '')) || undefined,
                             recordingTrack: body.RecordingTrack || undefined,
@@ -647,7 +648,8 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 })
                             }).catch(()=>{});
                         } catch(_) {}
-                        break; // Exit CI branch
+                        // Exit early from CI auto-processing path; no transcript is created when disabled
+                        return res.status(200).json({ ok: true, note: 'CI auto-processing disabled', callSid, recordingSid, recordingUrl: recordingMp3Url });
                     }
                     // Create new Conversational Intelligence transcript
                     console.log('[Recording] Creating new Conversational Intelligence transcript...');

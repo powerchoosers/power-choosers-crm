@@ -473,26 +473,30 @@
     attachAccountDetailEvents();
     startAccountRecentCallsLiveHooks();
     
-          // Add periodic refresh to ensure eye icons update when recordings are ready
+          // Replace 5s periodic refresh with a lightweight 60s heartbeat
           let refreshInterval = null;
-          let lastRefreshTime = 0;
-          const startPeriodicRefresh = () => {
+          let lastUpdateTs = Date.now(); // updated when we receive events or render
+          const markUpdated = ()=>{ try{ lastUpdateTs = Date.now(); }catch(_){} };
+          // Mark update on key events
+          document.addEventListener('pc:call-created', markUpdated, false);
+          document.addEventListener('pc:call-updated', markUpdated, false);
+          document.addEventListener('pc:recent-calls-refresh', markUpdated, false);
+          const startLightweightHeartbeat = () => {
             if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(() => {
-              // Only refresh if we're not already refreshing, not scrolling, no insights are open, and enough time has passed
               const hasOpenInsights = state._arcOpenIds && state._arcOpenIds.size > 0;
               const now = Date.now();
-              const timeSinceLastRefresh = now - lastRefreshTime;
-              
-              if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && timeSinceLastRefresh >= 5000) {
-                lastRefreshTime = now;
+              const since = now - lastUpdateTs;
+              // Only refresh if no updates for 60s, not scrolling, and no panels open
+              if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && since >= 60000) {
                 loadRecentCallsForAccount();
+                lastUpdateTs = now;
               }
-            }, 5000); // Check every 5 seconds
+            }, 60000);
           };
     
-    // Start periodic refresh
-    startPeriodicRefresh();
+    // Start lightweight heartbeat
+    startLightweightHeartbeat();
     
     // Cleanup interval when page is unloaded
     window.addEventListener('beforeunload', () => {
@@ -507,7 +511,7 @@
     // Load activities
     loadAccountActivities();
     // Load account recent calls and styles
-    try { injectRecentCallsStyles(); loadRecentCallsForAccount(); } catch (_) { /* noop */ }
+    try { injectRecentCallsStyles(); loadRecentCallsForAccount(); markUpdated(); } catch (_) { /* noop */ }
     
     // DEBUG: Add test function to manually trigger Conversational Intelligence
     window.testConversationalIntelligence = async function(callSid) {
@@ -1076,8 +1080,8 @@
   }
   // Trigger on-demand CI processing for a call
   async function triggerAccountCI(callSid, recordingSid, btn) {
-    if (!callSid || !recordingSid) {
-      console.warn('[AccountDetail] Missing callSid or recordingSid for CI processing:', { callSid, recordingSid });
+    if (!callSid) {
+      console.warn('[AccountDetail] Missing callSid for CI processing:', { callSid, recordingSid });
       return;
     }
 
