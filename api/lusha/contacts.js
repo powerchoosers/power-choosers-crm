@@ -60,16 +60,16 @@ module.exports = async (req, res) => {
     const { companyId, companyName, domain, kind, page, size } = req.body || {};
     const pages = { page: Math.max(0, parseInt(page ?? 0, 10) || 0), size: Math.min(40, Math.max(1, parseInt(size ?? 10, 10) || 10)) };
     
-    // Build request body based on Lusha API requirements
+    // Build request body - try minimal structure first
     const body = { pages };
     
-    // Add company filter directly to body (not nested in filters)
+    // Add company filter at top level (based on error messages)
     if (companyId) {
-      body.companyId = companyId;
+      body.company = { id: companyId };
     } else if (domain) {
-      body.domain = normalizeDomain(domain);
+      body.company = { domain: normalizeDomain(domain) };
     } else if (companyName) {
-      body.companyName = companyName;
+      body.company = { name: companyName };
     }
 
     const resp = await fetchWithRetry(`${LUSHA_BASE_URL}/prospecting/contact/search`, {
