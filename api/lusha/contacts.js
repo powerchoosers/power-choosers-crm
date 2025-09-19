@@ -58,7 +58,8 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
   try {
     const { companyId, companyName, domain, kind, page, size } = req.body || {};
-    const pages = { page: Math.max(0, parseInt(page ?? 0, 10) || 0), size: Math.min(40, Math.max(1, parseInt(size ?? 10, 10) || 10)) };
+    // Lusha requires size >= 10, max 40
+    const pages = { page: Math.max(0, parseInt(page ?? 0, 10) || 0), size: Math.min(40, Math.max(10, parseInt(size ?? 10, 10) || 10)) };
     
     // Use correct Lusha API format
     const body = {

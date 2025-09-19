@@ -259,9 +259,17 @@
     if (searchBtn) { searchBtn.disabled = true; searchBtn.textContent = 'Searching...'; }
 
     try {
-      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      const url = `${base}/api/lusha/company`;
-      const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName, domain }) });
+      // Prefer production base when local points to localhost to avoid 404s
+      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
+        base = 'https://power-choosers-crm.vercel.app';
+      }
+      // Company endpoint is GET with query params
+      const params = new URLSearchParams();
+      if (domain) params.append('domain', domain);
+      if (companyName) params.append('company', companyName);
+      const url = `${base}/api/lusha/company?${params.toString()}`;
+      const resp = await fetch(url, { method: 'GET' });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const company = await resp.json();
       renderCompanyPanel(company);
@@ -348,8 +356,9 @@
     }
 
     // Set all values
-    if (companyEl && companyName) companyEl.value = companyName;
-    if (domainEl && domain) domainEl.value = domain;
+    // Always set fields when we have values; avoid overwriting non-empty existing
+    if (companyEl && companyName && (!companyEl.value || currentEntityType === 'account')) companyEl.value = companyName;
+    if (domainEl && domain && (!domainEl.value || currentEntityType === 'account')) domainEl.value = domain;
     if (contactNameEl && contactName) contactNameEl.value = contactName;
     if (contactEmailEl && contactEmail) contactEmailEl.value = contactEmail;
 
@@ -359,7 +368,8 @@
   async function loadEmployees(kind, company){
     try{
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ companyId: company?.id, companyName: company?.name, domain: company?.domain, kind, page: 0, size: kind==='all' ? 40 : 10 }) });
+    // Ensure size >= 10 to satisfy API minimum
+    const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ companyId: company?.id, companyName: company?.name, domain: company?.domain, kind, page: 0, size: kind==='all' ? 40 : 10 }) });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       const contacts = data.contacts || [];
