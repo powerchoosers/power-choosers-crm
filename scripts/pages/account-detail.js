@@ -1108,6 +1108,19 @@
         })
       });
 
+      // If recording is not yet available, show friendly message and reset button
+      if (response.status === 404) {
+        try { if (window.ToastManager) { window.ToastManager.showToast('Recording not ready yet. Please try again in ~5–10 seconds.', 'warning'); } } catch(_) {}
+        try {
+          btn.innerHTML = svgEye();
+          btn.classList.remove('processing');
+          btn.classList.add('not-processed');
+          btn.disabled = false;
+          btn.title = 'Process Call';
+        } catch(_) {}
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`CI request failed: ${response.status} ${response.statusText}`);
       }
