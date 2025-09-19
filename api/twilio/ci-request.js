@@ -83,12 +83,19 @@ export default async function handler(req, res){
               if (!statusOk) { others.push(rec); continue; }
               let channels = rec.channels;
               if (channels == null){
-                try { const fetched = await client.recordings(rec.sid).fetch(); channels = fetched?.channels; } catch(_){ }
+                try { const fetched = await client.recordings(rec.sid).fetch(); channels = fetched?.channels; rec.source = rec.source || fetched?.source; } catch(_){ }
               }
-              if (String(channels||'') === '2'){ dual.push(rec); } else { others.push(rec); }
+              const isDual = String(channels||'') === '2';
+              if (isDual){ dual.push(rec); } else { others.push(rec); }
             }
             const sortByDateDesc = (a,b)=> new Date(b.dateCreated||b.startTime||0) - new Date(a.dateCreated||a.startTime||0);
-            if (dual.length){ dual.sort(sortByDateDesc); return dual[0].sid; }
+            if (dual.length){
+              // Prefer source=Dial, then most recent
+              const dial = dual.filter(r=> String(r.source||'').toLowerCase()==='dial').sort(sortByDateDesc);
+              if (dial.length) return dial[0].sid;
+              dual.sort(sortByDateDesc);
+              return dual[0].sid;
+            }
             // Fallback: any completed, most recent
             const completed = items.filter(r=> !r.status || String(r.status).toLowerCase()==='completed').sort(sortByDateDesc);
             if (completed.length){ return completed[0].sid; }

@@ -473,30 +473,26 @@
     attachAccountDetailEvents();
     startAccountRecentCallsLiveHooks();
     
-          // Replace 5s periodic refresh with a lightweight 60s heartbeat
+          // Add periodic refresh to ensure eye icons update when recordings are ready
           let refreshInterval = null;
-          let lastUpdateTs = Date.now(); // updated when we receive events or render
-          const markUpdated = ()=>{ try{ lastUpdateTs = Date.now(); }catch(_){} };
-          // Mark update on key events
-          document.addEventListener('pc:call-created', markUpdated, false);
-          document.addEventListener('pc:call-updated', markUpdated, false);
-          document.addEventListener('pc:recent-calls-refresh', markUpdated, false);
-          const startLightweightHeartbeat = () => {
+          let lastRefreshTime = 0;
+          const startPeriodicRefresh = () => {
             if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(() => {
+              // Only refresh if we're not already refreshing, not scrolling, no insights are open, and enough time has passed
               const hasOpenInsights = state._arcOpenIds && state._arcOpenIds.size > 0;
               const now = Date.now();
-              const since = now - lastUpdateTs;
-              // Only refresh if no updates for 60s, not scrolling, and no panels open
-              if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && since >= 60000) {
+              const timeSinceLastRefresh = now - lastRefreshTime;
+              
+              if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && timeSinceLastRefresh >= 5000) {
+                lastRefreshTime = now;
                 loadRecentCallsForAccount();
-                lastUpdateTs = now;
               }
-            }, 60000);
+            }, 5000); // Check every 5 seconds
           };
     
-    // Start lightweight heartbeat
-    startLightweightHeartbeat();
+    // Start periodic refresh
+    startPeriodicRefresh();
     
     // Cleanup interval when page is unloaded
     window.addEventListener('beforeunload', () => {
@@ -511,7 +507,7 @@
     // Load activities
     loadAccountActivities();
     // Load account recent calls and styles
-    try { injectRecentCallsStyles(); loadRecentCallsForAccount(); markUpdated(); } catch (_) { /* noop */ }
+    try { injectRecentCallsStyles(); loadRecentCallsForAccount(); } catch (_) { /* noop */ }
     
     // DEBUG: Add test function to manually trigger Conversational Intelligence
     window.testConversationalIntelligence = async function(callSid) {
@@ -878,46 +874,6 @@
           }
         } catch(_) {}
         try { console.log('[Account Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
-        
-        // Persist inferred account linkage for this call when missing, so it survives reloads
-        try {
-          const currentAcc = state.currentAccount || {};
-          const accId = currentAcc.id;
-          const accName = currentAcc.accountName || currentAcc.name || currentAcc.companyName || '';
-          if (accId && !c.accountId) {
-            // Recompute quick match conditions used earlier
-            const norm10 = (s) => String(s||'').replace(/\D/g,'').slice(-10);
-            const to10 = norm10(c.to);
-            const from10 = norm10(c.from);
-            const thisAccName = String(accName||'').toLowerCase().trim();
-            const callAccName = String(c.accountName||'').toLowerCase().trim();
-            const matchedByName = thisAccName && callAccName && (thisAccName === callAccName);
-            const matchedByPhone = (()=>{ try{ const numbers = new Set();
-              const add = (v)=>{ const d=norm10(v); if(d) numbers.add(d); };
-              add(currentAcc.companyPhone); add(currentAcc.phone); add(currentAcc.primaryPhone); add(currentAcc.mainPhone);
-              if (typeof window.getPeopleData === 'function') {
-                const people = window.getPeopleData() || [];
-                const list = people.filter(p=> p && (p.accountId===accId || p.accountID===accId));
-                list.forEach(p=>{ add(p.mobile); add(p.workDirectPhone); add(p.otherPhone); add(p.phone); });
-              }
-              return (to10 && numbers.has(to10)) || (from10 && numbers.has(from10));
-            } catch(_) { return false; } })();
-            if (matchedByPhone || matchedByName) {
-              const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-              const callSid = c.callSid || c.twilioSid || c.id || '';
-              if (callSid) {
-                // Best-effort save; ignore failures
-                fetch(`${base}/api/calls`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ callSid, accountId: accId, accountName: accName })
-                }).catch(()=>{});
-                // Update local object so it renders immediately
-                c.accountId = accId; c.accountName = accName;
-              }
-            }
-          }
-        } catch(_) {}
       });
       // Save to state and render first page
       try { state._arcCalls = filtered; } catch(_) {}
@@ -1080,8 +1036,8 @@
   }
   // Trigger on-demand CI processing for a call
   async function triggerAccountCI(callSid, recordingSid, btn) {
-    if (!callSid) {
-      console.warn('[AccountDetail] Missing callSid for CI processing:', { callSid, recordingSid });
+    if (!callSid || !recordingSid) {
+      console.warn('[AccountDetail] Missing callSid or recordingSid for CI processing:', { callSid, recordingSid });
       return;
     }
 
@@ -1107,19 +1063,6 @@
           recordingSid: recordingSid
         })
       });
-
-      // If recording is not yet available, show friendly message and reset button
-      if (response.status === 404) {
-        try { if (window.ToastManager) { window.ToastManager.showToast('Recording not ready yet. Please try again in ~5–10 seconds.', 'warning'); } } catch(_) {}
-        try {
-          btn.innerHTML = svgEye();
-          btn.classList.remove('processing');
-          btn.classList.add('not-processed');
-          btn.disabled = false;
-          btn.title = 'Process Call';
-        } catch(_) {}
-        return;
-      }
 
       if (!response.ok) {
         throw new Error(`CI request failed: ${response.status} ${response.statusText}`);
