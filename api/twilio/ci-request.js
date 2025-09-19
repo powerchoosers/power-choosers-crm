@@ -94,7 +94,9 @@ export default async function handler(req, res){
             if (completed.length){ return completed[0].sid; }
           }
         }catch(_){ }
-        const delay = backoffs[attempt] || 0;
+        const baseDelay = backoffs[attempt] || 0;
+        const jitter = baseDelay ? Math.floor(Math.random() * 1000) : 0; // add up to 1s jitter to avoid thundering herd
+        const delay = baseDelay + jitter;
         if (delay) await new Promise(r => setTimeout(r, delay));
       }
       return '';
