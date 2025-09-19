@@ -625,6 +625,28 @@
       document.addEventListener('callEnded', onAnyAccountCallActivity, false);
       document.addEventListener('pc:recent-calls-refresh', onAnyAccountCallActivity, false);
       document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
+      
+      // Listen for call updates to refresh recent calls
+      document.addEventListener('pc:call-updated', (event) => {
+        const callData = event.detail;
+        if (callData && callData.accountId === state.currentAccount?.id) {
+          // Refresh recent calls when a call for this account is updated
+          setTimeout(() => {
+            loadRecentCallsForAccount();
+          }, 1000); // Small delay to ensure data is saved
+        }
+      });
+      
+      // Listen for new calls
+      document.addEventListener('pc:call-created', (event) => {
+        const callData = event.detail;
+        if (callData && callData.accountId === state.currentAccount?.id) {
+          // Refresh recent calls when a new call is created for this account
+          setTimeout(() => {
+            loadRecentCallsForAccount();
+          }, 1000); // Small delay to ensure data is saved
+        }
+      });
       // Track scrolling state to avoid animations/jank during scroll
       try {
         if (els.mainContent && !els.mainContent._scrollBound) {
@@ -852,6 +874,46 @@
           }
         } catch(_) {}
         try { console.log('[Account Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
+        
+        // Persist inferred account linkage for this call when missing, so it survives reloads
+        try {
+          const currentAcc = state.currentAccount || {};
+          const accId = currentAcc.id;
+          const accName = currentAcc.accountName || currentAcc.name || currentAcc.companyName || '';
+          if (accId && !c.accountId) {
+            // Recompute quick match conditions used earlier
+            const norm10 = (s) => String(s||'').replace(/\D/g,'').slice(-10);
+            const to10 = norm10(c.to);
+            const from10 = norm10(c.from);
+            const thisAccName = String(accName||'').toLowerCase().trim();
+            const callAccName = String(c.accountName||'').toLowerCase().trim();
+            const matchedByName = thisAccName && callAccName && (thisAccName === callAccName);
+            const matchedByPhone = (()=>{ try{ const numbers = new Set();
+              const add = (v)=>{ const d=norm10(v); if(d) numbers.add(d); };
+              add(currentAcc.companyPhone); add(currentAcc.phone); add(currentAcc.primaryPhone); add(currentAcc.mainPhone);
+              if (typeof window.getPeopleData === 'function') {
+                const people = window.getPeopleData() || [];
+                const list = people.filter(p=> p && (p.accountId===accId || p.accountID===accId));
+                list.forEach(p=>{ add(p.mobile); add(p.workDirectPhone); add(p.otherPhone); add(p.phone); });
+              }
+              return (to10 && numbers.has(to10)) || (from10 && numbers.has(from10));
+            } catch(_) { return false; } })();
+            if (matchedByPhone || matchedByName) {
+              const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+              const callSid = c.callSid || c.twilioSid || c.id || '';
+              if (callSid) {
+                // Best-effort save; ignore failures
+                fetch(`${base}/api/calls`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ callSid, accountId: accId, accountName: accName })
+                }).catch(()=>{});
+                // Update local object so it renders immediately
+                c.accountId = accId; c.accountName = accName;
+              }
+            }
+          }
+        } catch(_) {}
       });
       // Save to state and render first page
       try { state._arcCalls = filtered; } catch(_) {}
@@ -863,11 +925,23 @@
       if (!list._delegated) {
         list.addEventListener('click', (e) => {
           const btn = e.target && e.target.closest ? e.target.closest('.rc-insights') : null;
-          if (!btn || btn.disabled) return;
+          if (!btn) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
           const call = (state._arcCalls||[]).find(x=>String(x.id||x.twilioSid||x.callSid||'')===String(id));
           if (!call) return;
+          
+          // Check if this is a not-processed call that needs CI processing
+          if (btn.classList.contains('not-processed')) {
+            // Use the correct property names from the call object
+            const callSid = call.id || call.twilioSid || call.callSid;
+            const recordingSid = call.recordingSid || call.recording_id;
+            console.log('[AccountDetail] Triggering CI processing for call:', callSid, 'recording:', recordingSid);
+            triggerAccountCI(callSid, recordingSid, btn);
+            return;
+          }
+          
+          // Otherwise, toggle the details as usual
           toggleRcDetails(btn, call);
         });
         list._delegated = '1';
@@ -896,11 +970,22 @@
     list.querySelectorAll('.rc-insights').forEach(btn => {
       if (!btn._insightsListenerBound) {
         btn.addEventListener('click', (e) => {
-          if (btn.disabled) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
           const call = (state._arcCalls||[]).find(x=>String(x.id||x.twilioSid||x.callSid||'')===String(id));
           if (!call) return;
+          
+          // Check if this is a not-processed call that needs CI processing
+          if (btn.classList.contains('not-processed')) {
+            // Use the correct property names from the call object
+            const callSid = call.id || call.twilioSid || call.callSid;
+            const recordingSid = call.recordingSid || call.recording_id;
+            console.log('[AccountDetail] Direct button - Triggering CI processing for call:', callSid, 'recording:', recordingSid);
+            triggerAccountCI(callSid, recordingSid, btn);
+            return;
+          }
+          
+          // Otherwise, toggle the details as usual
           toggleRcDetails(btn, call);
         });
         btn._insightsListenerBound = true;
@@ -985,10 +1070,68 @@
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
-          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'disabled' : ''}" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Insights processing...' : 'View AI insights'}" ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'disabled' : ''}>${svgEye()}</button>
+          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
         </div>
       </div>`;
   }
+  // Trigger on-demand CI processing for a call
+  async function triggerAccountCI(callSid, recordingSid, btn) {
+    if (!callSid || !recordingSid) {
+      console.warn('[AccountDetail] Missing callSid or recordingSid for CI processing:', { callSid, recordingSid });
+      return;
+    }
+
+    try {
+      // Show loading spinner on the button
+      btn.innerHTML = '<div class="loading-spinner" aria-hidden="true"></div>';
+      btn.classList.add('processing');
+      btn.disabled = true;
+
+      // Show toast notification
+      if (window.ToastManager) {
+        window.ToastManager.showToast('Processing call insights...', 'info');
+      }
+
+      // Call the CI request endpoint
+      const response = await fetch('/api/twilio/ci-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          callSid: callSid,
+          recordingSid: recordingSid
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`CI request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('[AccountDetail] CI processing initiated:', result);
+
+      // Update the button to show processing state
+      btn.innerHTML = '<div class="loading-spinner" aria-hidden="true"></div>';
+      btn.title = 'Processing call insights...';
+      btn.classList.remove('not-processed');
+      btn.classList.add('processing');
+
+    } catch (error) {
+      console.error('[AccountDetail] Failed to trigger CI processing:', error);
+      
+      // Reset button state on error
+      btn.innerHTML = svgEye();
+      btn.classList.remove('processing');
+      btn.disabled = false;
+      
+      // Show error toast
+      if (window.ToastManager) {
+        window.ToastManager.showToast('Failed to start call processing', 'error');
+      }
+    }
+  }
+
   // Inline expanding details
   function toggleRcDetails(btn, call){
     const item = btn.closest('.rc-item');
