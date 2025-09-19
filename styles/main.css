@@ -2508,6 +2508,7 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
   .widget-card .notes-close,
   .widget-card .health-close,
   .widget-card .deal-close,
+  .widget-card .lusha-close,
   .pc-modal__close,
   .close-btn {
     display: inline-flex;
@@ -2533,6 +2534,7 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
   .widget-card .notes-close:hover,
   .widget-card .health-close:hover,
   .widget-card .deal-close:hover,
+  .widget-card .lusha-close:hover,
   .pc-modal__close:hover,
   .close-btn:hover {
     background: var(--grey-600);
@@ -2541,6 +2543,7 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
   .widget-card .notes-close:focus-visible,
   .widget-card .health-close:focus-visible,
   .widget-card .deal-close:focus-visible,
+  .widget-card .lusha-close:focus-visible,
   .pc-modal__close:focus-visible,
   .close-btn:focus-visible {
     outline: 2px solid var(--orange-muted);

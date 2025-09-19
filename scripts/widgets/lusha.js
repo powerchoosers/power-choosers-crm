@@ -77,6 +77,13 @@
           const contact = window.ContactDetail.state.currentContact;
           accountName = contact.companyName || contact.company || contact.account || '';
         }
+        // Fallback: try to get from DOM
+        if (!accountName) {
+          const companyLink = document.querySelector('#contact-company-link');
+          if (companyLink) {
+            accountName = companyLink.textContent?.trim() || '';
+          }
+        }
       } catch (_) {}
     } else {
       // Try to get account name from account data
@@ -84,6 +91,13 @@
         if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
           const account = window.AccountDetail.state.currentAccount;
           accountName = account.name || account.accountName || '';
+        }
+        // Fallback: try to get from DOM
+        if (!accountName) {
+          const accountTitle = document.querySelector('#account-detail-header .contact-header-profile .contact-name');
+          if (accountTitle) {
+            accountName = accountTitle.textContent?.trim() || '';
+          }
         }
       } catch (_) {}
     }

@@ -29,15 +29,32 @@ module.exports = async (req, res) => {
     if (lastName) searchParams.lastName = lastName;
     if (email) searchParams.email = email;
 
-    // Make request to Lusha API
-    const response = await fetch(`${LUSHA_BASE_URL}/v2/person`, {
-      method: 'GET',
+    // Use prospecting endpoint for searching contacts by company
+    const searchBody = {
+      filters: {
+        company: {
+          name: companyName
+        }
+      },
+      limit: 10 // Limit results to 10 contacts
+    };
+
+    // Add contact filters if provided
+    if (firstName || lastName || email) {
+      searchBody.filters.contact = {};
+      if (firstName) searchBody.filters.contact.firstName = firstName;
+      if (lastName) searchBody.filters.contact.lastName = lastName;
+      if (email) searchBody.filters.contact.email = email;
+    }
+
+    // Make request to Lusha Prospecting API
+    const response = await fetch(`${LUSHA_BASE_URL}/prospecting/contact/search`, {
+      method: 'POST',
       headers: {
         'api_key': LUSHA_API_KEY,
         'Content-Type': 'application/json'
       },
-      // Convert params to URL search params for GET request
-      // Note: Lusha API expects GET with query parameters
+      body: JSON.stringify(searchBody)
     });
 
     if (!response.ok) {
@@ -63,24 +80,39 @@ module.exports = async (req, res) => {
 
     const data = await response.json();
     
-    // Transform Lusha response to our format
+    // Transform Lusha prospecting response to our format
     const contacts = [];
     
-    if (data && data.data) {
+    if (data && data.data && Array.isArray(data.data)) {
+      // Handle multiple contacts response from prospecting API
+      data.data.forEach(contact => {
+        if (contact.firstName || contact.lastName) {
+          contacts.push({
+            firstName: contact.firstName || '',
+            lastName: contact.lastName || '',
+            fullName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+            email: contact.email || '',
+            phone: contact.phone || contact.phoneNumber || '',
+            title: contact.title || contact.jobTitle || '',
+            company: contact.company || contact.companyName || companyName,
+            location: contact.location || contact.city || '',
+            linkedin: contact.linkedin || ''
+          });
+        }
+      });
+    } else if (data && data.data && (data.data.firstName || data.data.lastName)) {
       // Handle single contact response
-      if (data.data.firstName || data.data.lastName) {
-        contacts.push({
-          firstName: data.data.firstName || '',
-          lastName: data.data.lastName || '',
-          fullName: `${data.data.firstName || ''} ${data.data.lastName || ''}`.trim(),
-          email: data.data.email || '',
-          phone: data.data.phone || data.data.phoneNumber || '',
-          title: data.data.title || data.data.jobTitle || '',
-          company: data.data.company || data.data.companyName || companyName,
-          location: data.data.location || data.data.city || '',
-          linkedin: data.data.linkedin || ''
-        });
-      }
+      contacts.push({
+        firstName: data.data.firstName || '',
+        lastName: data.data.lastName || '',
+        fullName: `${data.data.firstName || ''} ${data.data.lastName || ''}`.trim(),
+        email: data.data.email || '',
+        phone: data.data.phone || data.data.phoneNumber || '',
+        title: data.data.title || data.data.jobTitle || '',
+        company: data.data.company || data.data.companyName || companyName,
+        location: data.data.location || data.data.city || '',
+        linkedin: data.data.linkedin || ''
+      });
     }
 
     // Return standardized response
