@@ -68,6 +68,13 @@
     card.id = WIDGET_ID;
     card.className = 'widget-card lusha-card';
     
+    // Store current entity info for later use
+    currentEntityType = entityType;
+    currentContactId = entityId;
+    if (entityType === 'account') {
+      currentAccountId = entityId;
+    }
+    
     // Get account name for search
     let accountName = '';
     if (entityType === 'contact') {
@@ -283,9 +290,13 @@
   function prefillInputs(entityType){
     const companyEl = document.getElementById('lusha-company-search');
     const domainEl = document.getElementById('lusha-company-domain');
+    const contactNameEl = document.getElementById('lusha-contact-name');
+    const contactEmailEl = document.getElementById('lusha-contact-email');
 
     let companyName = companyEl?.value || '';
     let domain = '';
+    let contactName = '';
+    let contactEmail = '';
 
     if (entityType === 'account') {
       try {
@@ -299,6 +310,11 @@
       try {
         const c = window.ContactDetail?.state?.currentContact || {};
         const linkedId = window.ContactDetail?.state?._linkedAccountId;
+        
+        // Get contact info
+        contactName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+        contactEmail = c.email || '';
+        
         if (!companyName) companyName = c.companyName || c.company || c.account || '';
         if (linkedId && typeof window.getAccountsData === 'function') {
           const acc = (window.getAccountsData()||[]).find(x => (x.id||x.accountId||x._id) === linkedId);
@@ -327,10 +343,13 @@
       } catch(_) {}
     }
 
+    // Set all values
     if (companyEl && companyName) companyEl.value = companyName;
     if (domainEl && domain) domainEl.value = domain;
+    if (contactNameEl && contactName) contactNameEl.value = contactName;
+    if (contactEmailEl && contactEmail) contactEmailEl.value = contactEmail;
 
-    try { console.log('[Lusha] Prefilled', { page: entityType, companyName, domain }); } catch(_) {}
+    try { console.log('[Lusha] Prefilled', { page: entityType, companyName, domain, contactName, contactEmail }); } catch(_) {}
   }
 
   async function loadEmployees(kind, company){
@@ -535,11 +554,18 @@
   function resetLushaForm() {
     const companyInput = document.getElementById('lusha-company-search');
     const domainInput = document.getElementById('lusha-company-domain');
+    const contactNameInput = document.getElementById('lusha-contact-name');
+    const contactEmailInput = document.getElementById('lusha-contact-email');
     const resultsEl = document.getElementById('lusha-results');
 
-    if (companyInput) companyInput.value = currentAccountName || '';
+    // Clear all fields first
+    if (companyInput) companyInput.value = '';
     if (domainInput) domainInput.value = '';
+    if (contactNameInput) contactNameInput.value = '';
+    if (contactEmailInput) contactEmailInput.value = '';
     if (resultsEl) resultsEl.style.display = 'none';
+    
+    // Then repopulate with current data
     try { prefillInputs(currentEntityType); } catch(_) {}
   }
 
