@@ -1106,6 +1106,38 @@
     const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
     const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
     function toMMSS(s){ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; }
+  // Expose CI trigger for the eye button (Account Details)
+  if (!window.__triggerAccountCI){
+    window.__triggerAccountCI = async function(callSid, recordingSid){
+      try{
+        const btn = document.querySelector('button.rc-icon-btn[data-ci-btn="1"]');
+        if (btn){ btn.classList.add('is-loading'); btn.disabled = true; }
+        // Show spinner by swapping inner SVG to a small loader
+        if (btn){ btn.innerHTML = '<span class="loader" style="display:inline-block;width:16px;height:16px;border:2px solid var(--orange-subtle);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>'; }
+        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/,'');
+        const url = `${base}/api/twilio/ci-request`;
+        const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ callSid, recordingSid }) });
+        const data = await resp.json().catch(()=>({}));
+        if (data && data.transcriptSid){
+          if (window.ToastManager){
+            window.ToastManager.showToast({ type:'save', title:'Processing started', message:`We are processing your call insights now.` });
+          }
+        } else {
+          if (window.ToastManager){ window.ToastManager.showToast({ type:'warn', title:'Could not start', message:'Unable to queue call insights. Try again shortly.' }); }
+        }
+      }catch(e){
+        if (window.ToastManager){ window.ToastManager.showToast({ type:'danger', title:'Error', message:e?.message||'Failed to start insights' }); }
+      }
+    };
+    // Loader keyframes (once)
+    const styleId = '__ci_loader_style__';
+    if (!document.getElementById(styleId)){
+      const st = document.createElement('style');
+      st.id = styleId;
+      st.textContent = '@keyframes spin {from{transform:rotate(0)} to{transform:rotate(360deg)}}';
+      document.head.appendChild(st);
+    }
+  }
     function renderTranscriptHtml(A, raw){
       let turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
       if (turns.length && !turns.some(t=>t && (t.role==='agent'||t.role==='customer'))){
@@ -1242,7 +1274,7 @@
           <div class=\"ip-card\" style=\"margin-top:12px;\"><h4><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polyline points=\"9 18 15 12 9 6\"></polyline></svg> Next Steps</h4><div style=\"color:var(--text-secondary); font-size:12px;\">${nextHtml}</div></div>
           <div class=\"ip-card\" style=\"margin-top:12px;\"><h4><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z\"></path><line x1=\"12\" y1=\"9\" x2=\"12\" y2=\"13\"></line><line x1=\"12\" y1=\"17\" x2=\"12.01\" y2=\"17\"></line></svg> Pain Points</h4><div style=\"color:var(--text-secondary); font-size:12px;\">${painHtml}</div></div>
           <div class=\"ip-card\" style=\"margin-top:12px;\"><h4><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle></svg> Entities</h4><div class=\"pc-chips\">${entitiesHtml}</div></div>
-          <div class=\"ip-card\" style=\"margin-top:12px; text-align:right;\"><button class=\"rc-icon-btn\" onclick=\"(function(){ try{ openInsightsModal && openInsightsModal('${String(r.id||'')}'); }catch(_){}})()\" aria-label=\"Open full modal\" title=\"Open full modal\">${svgEye()}</button></div>
+          <div class=\"ip-card\" style=\"margin-top:12px; text-align:right;\"><button class=\"rc-icon-btn\" data-ci-btn=\"1\" onclick=\"(function(){ try{ (window.__triggerAccountCI||function(){})('${String(r.callSid||r.id||'')}','${String(r.recordingSid||'')}'); }catch(_){}})()\" aria-label=\"Process call insights\" title=\"Process call insights\">${svgEye()}</button></div>
         </div>
       </div>`;
   }

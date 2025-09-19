@@ -101,6 +101,14 @@ export default async function handler(req, res) {
             console.warn('[CI Manual] Could not compute channel participants map, defaulting agent=1:', e?.message);
         }
         
+        // Respect on-demand CI: if CI_AUTO_PROCESS is not enabled and no manual trigger param is provided, do not auto-create
+        const autoProcess = String(process.env.CI_AUTO_PROCESS || '').toLowerCase();
+        const shouldAutoProcess = autoProcess === '1' || autoProcess === 'true' || autoProcess === 'yes';
+        if (!shouldAutoProcess && !req.query?.trigger && !req.body?.trigger) {
+            console.log('[CI Manual] CI auto-processing disabled and no trigger flag provided; skipping transcript creation');
+            return res.status(202).json({ ok: true, pending: true, reason: 'CI not requested' });
+        }
+
         if (existingTranscript) {
             // Fetch the existing transcript
             transcript = await client.intelligence.v2.transcripts(existingTranscript.sid).fetch();
