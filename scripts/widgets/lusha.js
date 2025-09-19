@@ -109,13 +109,17 @@
         <h3 class="widget-title">Lusha Contact Search</h3>
         <button class="lusha-close" type="button" title="Close Lusha Search" aria-label="Close">×</button>
       </div>
-      <div class="lusha-subtitle">Search for contact information using Lusha API</div>
+      <div class="lusha-subtitle">Search for company and contacts using Lusha API</div>
       
       <div class="lusha-body">
         <div class="lusha-search-section">
           <div class="lusha-input-group">
             <label for="lusha-company-search" class="lusha-input-label">Company Name</label>
             <input type="text" id="lusha-company-search" class="lusha-form-input" placeholder="Enter company name" value="${escapeHtml(accountName)}">
+          </div>
+          <div class="lusha-input-group">
+            <label for="lusha-company-domain" class="lusha-input-label">Website / Domain (preferred)</label>
+            <input type="text" id="lusha-company-domain" class="lusha-form-input" placeholder="e.g., powerchoosers.com">
           </div>
           
           <div class="lusha-input-group">
@@ -129,7 +133,7 @@
           </div>
           
           <div class="lusha-button-group">
-            <button id="lusha-search-btn" class="lusha-search-btn">Search Contacts</button>
+            <button id="lusha-search-btn" class="lusha-search-btn">Search</button>
             <button id="lusha-reset-btn" class="lusha-reset-btn">Reset</button>
           </div>
         </div>
@@ -231,78 +235,72 @@
 
   async function performLushaSearch() {
     const companyInput = document.getElementById('lusha-company-search');
-    const nameInput = document.getElementById('lusha-contact-name');
-    const emailInput = document.getElementById('lusha-contact-email');
+    const domainInput = document.getElementById('lusha-company-domain');
     const loadingEl = document.getElementById('lusha-loading');
-    const resultsEl = document.getElementById('lusha-results');
     const searchBtn = document.getElementById('lusha-search-btn');
 
     const companyName = companyInput?.value?.trim();
-    const contactName = nameInput?.value?.trim();
-    const contactEmail = emailInput?.value?.trim();
+    const domain = domainInput?.value?.trim();
 
-    if (!companyName) {
-      try { window.crm?.showToast && window.crm.showToast('Please enter a company name'); } catch (_) {}
+    if (!companyName && !domain) {
+      try { window.crm?.showToast && window.crm.showToast('Enter company or domain'); } catch(_) {}
       return;
     }
 
-    // Show loading state
     if (loadingEl) loadingEl.style.display = 'block';
-    if (resultsEl) resultsEl.style.display = 'none';
-    if (searchBtn) {
-      searchBtn.disabled = true;
-      searchBtn.textContent = 'Searching...';
-    }
+    if (searchBtn) { searchBtn.disabled = true; searchBtn.textContent = 'Searching...'; }
 
     try {
-      // Prepare search parameters
-      const searchParams = {
-        companyName: companyName
-      };
-
-      if (contactName) {
-        const nameParts = contactName.split(' ');
-        if (nameParts.length >= 2) {
-          searchParams.firstName = nameParts[0];
-          searchParams.lastName = nameParts.slice(1).join(' ');
-        } else {
-          searchParams.firstName = contactName;
-        }
-      }
-
-      if (contactEmail) {
-        searchParams.email = contactEmail;
-      }
-
-      // Call backend API
-      const response = await fetch('/api/lusha/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(searchParams)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      // Display results
-      displayLushaResults(data);
-
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      const url = `${base}/api/lusha/company`;
+      const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName, domain }) });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const company = await resp.json();
+      renderCompanyPanel(company);
+      await loadEmployees('popular', company);
     } catch (error) {
       console.error('Lusha search error:', error);
       try { window.crm?.showToast && window.crm.showToast('Search failed: ' + error.message); } catch (_) {}
     } finally {
-      // Hide loading state
       if (loadingEl) loadingEl.style.display = 'none';
-      if (searchBtn) {
-        searchBtn.disabled = false;
-        searchBtn.textContent = 'Search Contacts';
-      }
+      if (searchBtn) { searchBtn.disabled = false; searchBtn.textContent = 'Search'; }
     }
+  }
+
+  async function loadEmployees(kind, company){
+    try{
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ companyId: company?.id, companyName: company?.name, domain: company?.domain, kind }) });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const contacts = data.contacts || [];
+      const panel = document.getElementById(kind === 'all' ? 'lusha-panel-all' : 'lusha-panel-popular');
+      if (panel){
+        panel.innerHTML = '';
+        const list = document.createElement('div');
+        list.className = 'lusha-contacts-list';
+        contacts.forEach((c,i)=> list.appendChild(createContactElement(c,i)));
+        panel.appendChild(list);
+      }
+    }catch(e){ console.error('Employees load failed', e); }
+  }
+
+  function renderCompanyPanel(company){
+    const el = document.getElementById('lusha-panel-company');
+    if (!el) return;
+    const name = escapeHtml(company?.name || '');
+    const domain = escapeHtml(company?.domain || '');
+    const website = domain ? `https://${domain}` : '';
+    el.innerHTML = `
+      <div class="company-summary">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          ${domain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=64&domain=${domain}" alt="" referrerpolicy="no-referrer">` : ''}
+          <div>
+            <div style=\"font-weight:600;color:var(--text-primary)\">${name}</div>
+            ${website ? `<a href="${website}" target="_blank" rel="noopener" class="interactive-text">${website}</a>` : ''}
+          </div>
+        </div>
+      </div>`;
   }
 
   function displayLushaResults(data) {
