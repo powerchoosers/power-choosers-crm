@@ -2039,6 +2039,21 @@ class PowerChoosersCRM {
                                 doc[crmField] = this.normalizeForField(crmField, value);
                             }
                         });
+
+                        // Derive domain from website fields post-mapping (accounts import)
+                        try {
+                            if (modal._importType === 'accounts') {
+                                if (doc.website && !doc.domain) {
+                                    const src = String(doc.website).trim();
+                                    try {
+                                        const u = new URL(src.startsWith('http') ? src : `https://${src}`);
+                                        doc.domain = (u.hostname || '').replace(/^www\./i, '');
+                                    } catch (_) {
+                                        doc.domain = src.replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+                                    }
+                                }
+                            }
+                        } catch (_) { /* noop */ }
                         
                         // Skip if no data
                         if (Object.keys(doc).length === 0) return;
@@ -2264,6 +2279,14 @@ class PowerChoosersCRM {
             // Examples: phone, primaryPhone, mainPhone, workDirectPhone, mobile, otherPhone, companyPhone
             if (f.includes('phone') || f === 'mobile') {
                 return this.normalizePhone(value);
+            }
+            // Normalize website-looking fields (trim, unwrap common CSV wrappers)
+            if (f === 'website' || f === 'companywebsite') {
+                let v = String(value == null ? '' : value).trim();
+                if (!v) return '';
+                // Remove Excel formula-style wrappers
+                v = v.replace(/^=\s*["']?(.+?)["']?$/u, '$1').trim();
+                return v;
             }
             return value;
         } catch (_) {

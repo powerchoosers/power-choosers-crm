@@ -8156,6 +8156,8 @@ input[type="number"]::-webkit-inner-spin-button {
 .lusha-card {
     /* Use standard widget card padding */
     padding: var(--spacing-md) var(--spacing-base) var(--spacing-base) var(--spacing-base);
+    display: flex;
+    flex-direction: column;
 }
 
 .lusha-subtitle {
@@ -8169,6 +8171,8 @@ input[type="number"]::-webkit-inner-spin-button {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+    flex: 1;
+    min-height: 0; /* allow children to define scroll */
 }
 
 .lusha-search-section {
@@ -8419,6 +8423,29 @@ input[type="number"]::-webkit-inner-spin-button {
 @media (prefers-reduced-motion: reduce) {
     .lusha-anim { will-change: auto; }
 }
+
+/* Lusha tabs */
+.lusha-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 8px;
+}
+.lusha-tab {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+.lusha-tab:hover { background: var(--bg-hover); border-color: var(--accent-color); }
+.lusha-tab.active { background: var(--grey-700); color: var(--text-inverse); border-color: var(--grey-600); }
+
+.lusha-panels { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.lusha-panel { flex: 1; min-height: 0; overflow: auto; display: none; }
+.lusha-panel.active { display: block; }
 
 .health-form-section.active,
 .deal-form-section.active {

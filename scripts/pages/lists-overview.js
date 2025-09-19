@@ -238,7 +238,7 @@
   async function loadLists(kind) {
     // Try to load from Firestore if available, otherwise keep empty
     try {
-      console.time(`[ListsOverview] loadLists ${kind}`);
+      if (console.time) console.time(`[ListsOverview] loadLists ${kind}`);
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         // Primary query: filter by kind on server if available
         let query = window.firebaseDB.collection('lists');
@@ -293,7 +293,7 @@
         // No Firestore: remain empty but mark as loaded
         if (kind === 'people') state.loadedPeople = true; else state.loadedAccounts = true;
       }
-      console.timeEnd(`[ListsOverview] loadLists ${kind}`);
+      if (console.timeEnd) console.timeEnd(`[ListsOverview] loadLists ${kind}`);
     } catch (err) {
       console.warn('Failed to load lists for kind', kind, err);
       if (kind === 'people') state.loadedPeople = true; else state.loadedAccounts = true;
@@ -742,11 +742,11 @@
 
   async function refreshCounts() {
     // Reload list data and refresh counts
-    console.time('[ListsOverview] refreshCounts');
+    if (console.time) console.time('[ListsOverview] refreshCounts');
     state.loadedPeople = false;
     state.loadedAccounts = false;
     await ensureLoadedThenRender();
-    console.timeEnd('[ListsOverview] refreshCounts');
+    if (console.timeEnd) console.timeEnd('[ListsOverview] refreshCounts');
   }
 
   // Expose API for other modules
@@ -773,7 +773,7 @@
 
   async function fetchMembersForList(listId) {
     const out = { people: new Set(), accounts: new Set(), loaded: false };
-    console.time(`[ListsOverview] preload fetch ${listId}`);
+    if (console.time) console.time(`[ListsOverview] preload fetch ${listId}`);
     if (!listId || !window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return out;
     let gotAny = false;
     // Prefer subcollection lists/{id}/members
@@ -806,12 +806,12 @@
       } catch (_) {}
     }
     out.loaded = true;
-    console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
+    if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
     return out;
   }
 
   async function preloadMembersForLists(items) {
-    console.time('[ListsOverview] preloadMembersForLists');
+    if (console.time) console.time('[ListsOverview] preloadMembersForLists');
     try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
     const tasks = [];
     for (const it of (items || [])) {
@@ -829,7 +829,7 @@
       try { await Promise.all(tasks); } catch (_) {}
       console.debug('[ListsOverview] preload done', { cached: Object.keys(window.listMembersCache || {}).length });
     }
-    console.timeEnd('[ListsOverview] preloadMembersForLists');
+    if (console.timeEnd) console.timeEnd('[ListsOverview] preloadMembersForLists');
   }
 
   // Expose for debugging/tests

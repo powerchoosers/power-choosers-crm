@@ -2266,6 +2266,43 @@
     if (field === 'phone' || field === 'companyPhone' || field === 'primaryPhone' || field === 'mainPhone') {
       toSave = normalizePhone(value);
     }
+    // If website updated, also compute and persist domain, then refresh header favicon
+    if (field === 'website') {
+      try {
+        const src = String(value || '').trim();
+        let nextDomain = '';
+        if (src) {
+          try {
+            const u = new URL(/^https?:\/\//i.test(src) ? src : `https://${src}`);
+            nextDomain = (u.hostname || '').replace(/^www\./i, '');
+          } catch (_) {
+            nextDomain = src.replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+          }
+        }
+        if (nextDomain) {
+          // Save both website and derived domain
+          await saveField('domain', nextDomain);
+          // Dispatch account-updated so tables/people can refresh favicons
+          try {
+            const id = state.currentAccount?.id;
+            const ev = new CustomEvent('pc:account-updated', { detail: { id, changes: { domain: nextDomain, website: toSave, updatedAt: new Date() } } });
+            document.dispatchEvent(ev);
+          } catch (_) { /* noop */ }
+          // Refresh header favicon (cache-bust)
+          try {
+            const header = document.getElementById('account-detail-header');
+            const img = header && header.querySelector('img.avatar-favicon');
+            if (img) {
+              const ts = Date.now();
+              img.src = `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(nextDomain)}&ts=${ts}`;
+              img.style.display = '';
+              const initials = header.querySelector('.avatar-circle-small');
+              if (initials) initials.style.display = 'none';
+            }
+          } catch (_) { /* noop */ }
+        }
+      } catch (_) { /* noop */ }
+    }
     console.log('[Account Detail] Saving to Firebase:', { field, toSave });
     await saveField(field, toSave);
     updateFieldText(wrap, toSave);
