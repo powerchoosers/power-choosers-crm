@@ -27,10 +27,6 @@ const PORT = process.env.PORT || 3000;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm.vercel.app';
 // Email sending now handled by Gmail API via frontend
-console.log('[Server] Email sending configured to use Gmail API via frontend authentication');
-
-console.log(`[Server] Starting in ${LOCAL_DEV_MODE ? 'development' : 'production'} mode`);
-console.log(`[Server] API Base URL: ${API_BASE_URL}`);
 
 // ---------------- Gemini API endpoints now proxied to Vercel ----------------
 
@@ -429,6 +425,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/token' ||
     pathname === '/api/twilio/call' ||
     pathname === '/api/twilio/voice' ||
+    pathname === '/api/twilio/caller-lookup' ||
     pathname === '/api/calls' ||
     pathname === '/api/twilio/language-webhook' ||
     pathname === '/api/twilio/conversational-intelligence' ||
@@ -459,6 +456,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/twilio/voice') {
     return handleApiTwilioVoice(req, res, parsedUrl);
+  }
+  if (pathname === '/api/twilio/caller-lookup') {
+    return handleApiTwilioCallerLookup(req, res);
   }
   if (pathname === '/api/twilio/language-webhook') {
     return handleApiTwilioLanguageWebhook(req, res);
@@ -632,9 +632,6 @@ const server = http.createServer(async (req, res) => {
 // Start the server
 server.listen(PORT, () => {
   console.log(`[Server] Power Choosers CRM server running at http://localhost:${PORT}`);
-  console.log(`[Server] Environment: ${LOCAL_DEV_MODE ? 'Development' : 'Production'}`);
-  console.log(`[Server] Twilio API proxying to: ${API_BASE_URL}`);
-  console.log(`[Server] Gemini API proxying to: ${API_BASE_URL}`);
 });
 
 // Handle server errors
@@ -665,6 +662,37 @@ async function handleApiSearch(req, res, parsedUrl) {
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
+// Twilio Caller ID lookup: proxy to production; accepts POST { phoneNumber }
+async function handleApiTwilioCallerLookup(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    await new Promise((resolve) => req.on('end', resolve));
+    let payload = {};
+    try { payload = body ? JSON.parse(body) : {}; } catch (_) { payload = {}; }
+
+    const proxyUrl = `${API_BASE_URL}/api/twilio/caller-lookup`;
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json().catch(() => ({ success: false }));
+    res.writeHead(response.status || 200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Proxy error', message: error.message }));
   }
 }
 
@@ -761,15 +789,12 @@ async function handleApiSendEmail(req, res) {
     };
 
     // Save to Firebase (simulated for now - in production, you'd use Firebase Admin SDK)
-    console.log('[Email] Storing email record:', emailRecord);
-    
     // In a real implementation, you would use Firebase Admin SDK here:
     // const admin = require('firebase-admin');
     // await admin.firestore().collection('emails').doc(trackingId).set(emailRecord);
 
     // Email sending is now handled by the frontend using Gmail API
     // This endpoint just stores the email record for tracking purposes
-    console.log('[Email] Storing email record for tracking:', { to, subject, trackingId });
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
@@ -796,8 +821,6 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
     const trackingId = parsedUrl.pathname.split('/').pop();
     const userAgent = req.headers['user-agent'] || '';
     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
-    
-    console.log('[Email] Tracking pixel hit:', { trackingId, userAgent, ip });
 
     // Update database with open event
     const openEvent = {
@@ -806,8 +829,6 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
       userAgent,
       ip
     };
-
-    console.log('[Email] Open event:', openEvent);
     
     // Since we're using client-side Firebase, we'll trigger a client-side update
     // The tracking pixel will be loaded by the email client, which will then
@@ -862,7 +883,6 @@ async function handleApiEmailUpdateTracking(req, res) {
       return;
     }
 
-    console.log('[Email] Update tracking request:', { trackingId, type, data });
 
     // Store the tracking event in a simple in-memory store
     // In production, this would be stored in a database
@@ -928,24 +948,20 @@ async function handleApiEmailWebhook(req, res) {
     const body = await readJsonBody(req);
     const { event, trackingId, data } = body;
 
-    console.log('[Email] Webhook received:', { event, trackingId, data });
-
     // Handle different webhook events
     switch (event) {
       case 'email_opened':
         // TODO: Update database with open event
-        console.log('[Email] Email opened:', trackingId);
         break;
       case 'email_replied':
         // TODO: Update database with reply event
-        console.log('[Email] Email replied:', trackingId);
         break;
       case 'email_bounced':
         // TODO: Update database with bounce event
-        console.log('[Email] Email bounced:', trackingId);
         break;
       default:
-        console.log('[Email] Unknown webhook event:', event);
+        // Unknown webhook event
+        break;
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
