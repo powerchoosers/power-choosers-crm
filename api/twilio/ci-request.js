@@ -122,7 +122,10 @@ export default async function handler(req, res){
 
     if (!ciTranscriptSid){
       const createArgs = serviceSid ? { serviceSid, channel: { media_properties: { source_sid: recordingSid } }, customerKey: callSid } : { channel: { media_properties: { source_sid: recordingSid } }, customerKey: callSid };
-      const created = await client.intelligence.v2.transcripts.create(createArgs);
+      const idemKey = (callSid && recordingSid) ? `${callSid}-${recordingSid}` : undefined;
+      const created = idemKey
+        ? await client.intelligence.v2.transcripts.create(createArgs, { idempotencyKey: idemKey })
+        : await client.intelligence.v2.transcripts.create(createArgs);
       ciTranscriptSid = created.sid;
     }
 
@@ -146,8 +149,15 @@ export default async function handler(req, res){
     res.end(JSON.stringify({ ok: true, transcriptSid: ciTranscriptSid, recordingSid }));
   }catch(e){
     console.error('[ci-request] Error:', e);
-    res.statusCode = 500; res.setHeader('Content-Type','application/json');
-    res.end(JSON.stringify({ error: 'Failed to request CI', details: e?.message }));
+    const twilioCode = e && (e.code || e.status || e.statusCode);
+    let friendly = 'Failed to request CI';
+    if (twilioCode === 31000) friendly = 'Recording not found or not ready';
+    else if (twilioCode === 31001) friendly = 'Recording is not dual-channel';
+    else if (twilioCode === 31002) friendly = 'Recording is too short or empty';
+    else if (twilioCode === 31003) friendly = 'Service temporarily unavailable';
+    res.statusCode = (twilioCode && Number(twilioCode) >= 400 && Number(twilioCode) < 600) ? 400 : 500;
+    res.setHeader('Content-Type','application/json');
+    res.end(JSON.stringify({ error: friendly, details: e?.message, code: twilioCode }));
   }
 }
 

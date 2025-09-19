@@ -3626,7 +3626,15 @@
         return;
       }
       if (!response.ok) {
-        throw new Error(`CI request failed: ${response.status} ${response.statusText}`);
+        try {
+          const err = await response.json().catch(()=>({}));
+          const msg = (err && (err.error || err.details)) ? String(err.error || err.details) : `CI request failed: ${response.status} ${response.statusText}`;
+          if (window.ToastManager) { window.ToastManager.showToast(msg, 'error'); }
+        } catch(_) {
+          try { if (window.ToastManager) { window.ToastManager.showToast('Failed to start call processing', 'error'); } } catch(__) {}
+        }
+        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+        return;
       }
       const result = await response.json().catch(()=>({}));
       try { console.log('[ContactDetail] CI processing initiated:', result); } catch(_) {}
@@ -3806,9 +3814,37 @@
     const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
     const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
     const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
-    // Use formatted transcript with speaker labels if available, otherwise fall back to regular transcript
-    const transcriptToUse = r.formattedTranscript || r.transcript;
-    const transcriptHtml = renderTranscriptHtml(AI, transcriptToUse);
+    // Prefer CI sentences + channelRoleMap for dual-channel mapping; fallback to formatted/plain transcript
+    let transcriptHtml = '';
+    try {
+      const ci = r.conversationalIntelligence || {};
+      const sentences = Array.isArray(ci.sentences) ? ci.sentences : [];
+      const channelMap = ci.channelRoleMap || {};
+      const normalizeChannel = (c)=>{ const s=(c==null?'':String(c)).trim(); if(s==='0') return '1'; if(/^[Aa]$/.test(s)) return '1'; if(/^[Bb]$/.test(s)) return '2'; return s; };
+      const resolveRole = (ch)=>{
+        const n = normalizeChannel(ch);
+        const mapped = channelMap[n];
+        if (mapped === 'agent' || mapped === 'customer') return mapped;
+        const agentCh = String(ci.agentChannel || channelMap.agentChannel || '');
+        if (agentCh && n === agentCh) return 'agent';
+        if (agentCh) return 'customer';
+        return '';
+      };
+      if (sentences.length && (Object.keys(channelMap).length || ci.agentChannel!=null || channelMap.agentChannel!=null)){
+        const turns = sentences.map(s=>{
+          const role = resolveRole(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex) || 'other';
+          const t = Math.max(0, Number(s.startTime||0));
+          const text = (s.text || s.transcript || '').trim();
+          return { t, role, text };
+        });
+        transcriptHtml = renderTranscriptHtml({ speakerTurns: turns }, '');
+      } else {
+        const transcriptToUse = r.formattedTranscript || r.transcript;
+        transcriptHtml = renderTranscriptHtml(AI, transcriptToUse);
+      }
+    } catch (_){
+      try { const transcriptToUse = r.formattedTranscript || r.transcript; transcriptHtml = renderTranscriptHtml(AI, transcriptToUse); } catch(__){ transcriptHtml = 'Transcript not available'; }
+    }
     const rawRec = r.audioUrl || r.recordingUrl || '';
     let audioSrc = '';
     if (rawRec) {
