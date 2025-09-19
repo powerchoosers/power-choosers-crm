@@ -1,5 +1,6 @@
 // Vercel API endpoint for email tracking (sending handled by Gmail API)
 import { cors } from '../_cors';
+import { admin, db } from '../_firebase';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
     const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
     const emailContent = content + trackingPixel;
 
-    // Store email record in database (you'll need to implement this with your database)
+    // Store email record in database
     const emailRecord = {
       id: trackingId,
       to: Array.isArray(to) ? to : [to],
@@ -46,11 +47,19 @@ export default async function handler(req, res) {
       updatedAt: new Date().toISOString()
     };
 
-    // TODO: Save to Firebase or your database
-    console.log('[Email] Storing email record:', emailRecord);
+    // Save to Firebase
+    if (db) {
+      try {
+        await db.collection('emails').doc(trackingId).set(emailRecord);
+        console.log('[Email] Successfully stored email record in Firebase');
+      } catch (firebaseError) {
+        console.error('[Email] Firebase save error:', firebaseError);
+        // Continue even if Firebase fails
+      }
+    } else {
+      console.warn('[Email] Firebase not available, email record not saved');
+    }
 
-    // Email sending is now handled by Gmail API in the frontend
-    // This endpoint is kept for compatibility with email tracking
     console.log('[Email] Email record stored for tracking:', { to, subject, trackingId });
     
     return res.status(200).json({ 

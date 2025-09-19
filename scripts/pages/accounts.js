@@ -983,7 +983,7 @@
 
     const cells = {
       select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${aid}" aria-label="Select account"${checked}></td>`,
-      name: `<td class="name-cell"><a href="#account-details" class="acct-link" data-id="${aid}" title="View account details"><span class="company-cell__wrap">${favDomain ? `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" />` : ''}<span class="name-text account-name">${escapeHtml(name || 'Unknown Account')}</span></span></a></td>`,
+      name: `<td class="name-cell"><a href="#account-details" class="acct-link" data-id="${aid}" title="View account details"><span class="company-cell__wrap">${favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : '') : ''}<span class="name-text account-name">${escapeHtml(name || 'Unknown Account')}</span></span></a></td>`,
       industry: `<td>${escapeHtml(industry)}</td>`,
       domain: `<td>${escapeHtml(domain)}</td>`,
       companyPhone: `<td data-field="companyPhone" class="phone-cell click-to-call" data-phone="${escapeHtml(phoneE164)}" data-name="${escapeHtml(name)}">${escapeHtml(phone)}</td>`,

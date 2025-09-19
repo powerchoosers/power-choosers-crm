@@ -297,7 +297,7 @@
               </svg>
             </button>
             <div class="contact-header-profile">
-              ${favDomain ? `<img class=\"avatar-favicon\" src=\"https://www.google.com/s2/favicons?sz=64&domain=${escapeHtml(favDomain)}\" alt=\"\" referrerpolicy=\"no-referrer\" loading=\"lazy\" onload=\"const sib=this.nextElementSibling; if(sib) sib.style.display='none';\" onerror=\"this.style.display='none'; const sib=this.nextElementSibling; if(sib) sib.style.display='flex';\" />` : ''}
+              ${favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : ''}
               <div class="avatar-circle-small" style="${favDomain ? 'display:none;' : ''}">${escapeHtml(getInitials(name))}</div>
               <div class="contact-header-text">
                 <h2 class="page-title contact-page-title">${escapeHtml(name)}</h2>
@@ -762,7 +762,7 @@
     const domain = ad_extractDomainFromAccount(call && (call.accountName || ''));
     if (domain){
       const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class=\"company-favicon\" aria-hidden=\"true\" style=\"display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);\"></span>';
-      return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\"><img src=\"https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}\" alt=\"\" referrerpolicy=\"no-referrer\" loading=\"lazy\" onload=\"this.nextElementSibling.style.display='none';\" onerror=\"this.style.display='none'; var n=this.nextElementSibling; if(n){ n.style.display='flex'; }\">${fb}</div>`;
+      return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\">${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : fb}</div>`;
     }
     const initial = (String(contactName||'C').charAt(0) || 'C').toUpperCase();
     return `<div class=\"transcript-avatar-circle contact-avatar\" aria-hidden=\"true\">${initial}</div>`;
@@ -2294,7 +2294,18 @@
             const img = header && header.querySelector('img.avatar-favicon');
             if (img) {
               const ts = Date.now();
-              img.src = `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(nextDomain)}&ts=${ts}`;
+              // Update favicon using the new helper system
+              if (window.__pcFaviconHelper) {
+                const faviconHTML = window.__pcFaviconHelper.generateFaviconHTML(nextDomain, 64);
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = faviconHTML;
+                const newImg = tempDiv.querySelector('.company-favicon');
+                if (newImg) {
+                  img.src = newImg.src;
+                }
+              } else {
+                img.src = `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(nextDomain)}&ts=${ts}`;
+              }
               img.style.display = '';
               const initials = header.querySelector('.avatar-circle-small');
               if (initials) initials.style.display = 'none';
