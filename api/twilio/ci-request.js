@@ -57,7 +57,7 @@ export default async function handler(req, res){
             try{
               const m = String(data.recordingUrl).match(/Recordings\/([A-Z0-9]+)\.mp3/i);
               if (m && m[1]) existingRecordingSid = m[1];
-            }catch(_){}
+            }catch(_){ }
           }
         }
       }
@@ -66,14 +66,43 @@ export default async function handler(req, res){
     // Prefer provided recordingSid, then existing one from Firestore
     if (!recordingSid && existingRecordingSid) recordingSid = existingRecordingSid;
 
-    // If still missing, try to resolve via Twilio by Call SID
+    // Helper: select preferred recording (dual-channel + completed, most recent)
+    async function selectPreferredRecordingByCall(callSid, maxAttempts = 5){
+      const backoffs = [2000, 4000, 8000, 16000, 0]; // ~30s total
+      for (let attempt = 0; attempt < Math.min(maxAttempts, backoffs.length); attempt++){
+        try{
+          const list = await client.recordings.list({ callSid, limit: 20 });
+          const items = Array.isArray(list) ? list : [];
+          if (items.length){
+            // Try to find dual-channel first, then latest completed
+            // Some SDKs expose channels on the list item; if not, we can fetch details lazily
+            let dual = [];
+            const others = [];
+            for (const rec of items){
+              const statusOk = !rec.status || String(rec.status).toLowerCase() === 'completed';
+              if (!statusOk) { others.push(rec); continue; }
+              let channels = rec.channels;
+              if (channels == null){
+                try { const fetched = await client.recordings(rec.sid).fetch(); channels = fetched?.channels; } catch(_){ }
+              }
+              if (String(channels||'') === '2'){ dual.push(rec); } else { others.push(rec); }
+            }
+            const sortByDateDesc = (a,b)=> new Date(b.dateCreated||b.startTime||0) - new Date(a.dateCreated||a.startTime||0);
+            if (dual.length){ dual.sort(sortByDateDesc); return dual[0].sid; }
+            // Fallback: any completed, most recent
+            const completed = items.filter(r=> !r.status || String(r.status).toLowerCase()==='completed').sort(sortByDateDesc);
+            if (completed.length){ return completed[0].sid; }
+          }
+        }catch(_){ }
+        const delay = backoffs[attempt] || 0;
+        if (delay) await new Promise(r => setTimeout(r, delay));
+      }
+      return '';
+    }
+
+    // If still missing, try to resolve via Twilio by Call SID with backoff
     if (!recordingSid && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN){
-      try{
-        const recs = await client.recordings.list({ callSid, limit: 1 });
-        if (Array.isArray(recs) && recs.length){
-          recordingSid = recs[0].sid;
-        }
-      }catch(_){ }
+      recordingSid = await selectPreferredRecordingByCall(callSid, 5);
     }
 
     if (!recordingSid){
@@ -83,7 +112,7 @@ export default async function handler(req, res){
     }
 
     if (!ciTranscriptSid){
-      const createArgs = serviceSid ? { serviceSid, channel: { media_properties: { source_sid: recordingSid } } } : { channel: { media_properties: { source_sid: recordingSid } } };
+      const createArgs = serviceSid ? { serviceSid, channel: { media_properties: { source_sid: recordingSid } }, customerKey: callSid } : { channel: { media_properties: { source_sid: recordingSid } }, customerKey: callSid };
       const created = await client.intelligence.v2.transcripts.create(createArgs);
       ciTranscriptSid = created.sid;
     }
