@@ -122,6 +122,74 @@
     }
   }
 
+  // Recent Calls (Contact) keyed patching & styles
+  function injectRecentCallsStyles(){
+    if (document.getElementById('contact-recent-calls-styles')) return;
+    const style=document.createElement('style');
+    style.id='contact-recent-calls-styles';
+    style.textContent=`
+      /* Base list + rows */
+      #contact-recent-calls .rc-list { position: relative; display:flex; flex-direction:column; gap:8px; transition: height 220ms ease, opacity 220ms ease; }
+      #contact-recent-calls .rc-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
+      #contact-recent-calls .rc-item.rc-new { animation: rcNewIn 220ms ease-out both; }
+      @keyframes rcNewIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      #contact-recent-calls .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
+      #contact-recent-calls .rc-title { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      #contact-recent-calls .rc-sub { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
+      #contact-recent-calls .rc-empty { color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
+      /* Pager (shared with Account) */
+      .rc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom: var(--spacing-md); }
+      .rc-pager { display:flex; align-items:center; gap:8px; }
+      .rc-page-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
+      .rc-page-btn:hover { background: var(--bg-hover); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+      .rc-page-info { min-width: 44px; text-align:center; color: var(--text-secondary); font-size: 12px; }
+      /* Actions */
+      #contact-recent-calls .rc-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
+      #contact-recent-calls .rc-icon-btn:hover { background: var(--bg-hover); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+      #contact-recent-calls .rc-icon-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+      #contact-recent-calls .rc-icon-btn.disabled:hover { background: var(--bg-card); border-color: var(--border-light); transform: none; box-shadow: none; }
+      #contact-recent-calls .rc-actions { display:flex; align-items:center; gap:8px; }
+      #contact-recent-calls .rc-outcome { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); color:var(--text-secondary); }
+      /* Inline details under item */
+      #contact-recent-calls .rc-details { overflow:hidden; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-card); margin: 6px 2px 2px 2px; box-shadow: var(--elevation-card); }
+      #contact-recent-calls .rc-details-inner { padding: 12px; }
+      /* Live call duration indicator */
+      #contact-recent-calls .rc-item.live-call .rc-duration { color: var(--text-secondary); font-weight: 400; }
+      /* Shared insights styles (mirrors account/calls page so it always looks correct) */
+      .insights-grid { display:grid; grid-template-columns: 2fr 1fr; gap:14px; }
+      @media (max-width: 960px){ .insights-grid{ grid-template-columns:1fr; } }
+      .ip-card { background: var(--bg-item); border:1px solid var(--border-light); border-radius: 10px; padding: 12px; }
+      .ip-card h4 { margin:0 0 8px 0; font-size:13px; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:8px; }
+      .pc-chips { display:flex; flex-wrap:wrap; gap:8px; }
+      .pc-chip { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); font-size:12px; color:var(--text-secondary); }
+      .pc-chip.ok{ background:rgba(16,185,129,.15); border-color:rgba(16,185,129,.25); color:#16c088 }
+      .pc-chip.warn{ background:rgba(234,179,8,.15); border-color:rgba(234,179,8,.25); color:#eab308 }
+      .pc-chip.danger{ background:rgba(239,68,68,.15); border-color:rgba(239,68,68,.25); color:#ef4444 }
+      .pc-chip.info{ background:rgba(59,130,246,.13); border-color:rgba(59,130,246,.25); color:#60a5fa }
+      .pc-kv{ display:grid; grid-template-columns:160px 1fr; gap:8px 12px; }
+      .pc-kv .k{ color:var(--text-secondary); font-size:12px }
+      .pc-kv .v{ color:var(--text-primary); font-size:12px }
+      /* Modern transcript styling */
+      .pc-transcript-container { background: var(--bg-card); border:1px solid var(--border-light); border-radius: 14px; padding:14px; max-height:320px; overflow:auto; }
+      .transcript-message { display:flex; gap:10px; margin-bottom:12px; align-items:flex-start; }
+      .transcript-message:last-child { margin-bottom:0; }
+      .transcript-avatar { flex-shrink:0; }
+      .transcript-avatar-circle { width: 32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12px; letter-spacing:.5px; }
+      .transcript-avatar-circle.agent-avatar { background: var(--orange-subtle); color:#fff; }
+      .transcript-avatar-circle.contact-avatar { background: var(--orange-subtle); color:#fff; }
+      .transcript-avatar-circle.company-avatar { background: var(--bg-item); padding:2px; }
+      .transcript-avatar-circle.company-avatar img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
+      .transcript-avatar-circle .company-favicon-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); }
+      .transcript-content { flex:1; min-width:0; border:1px solid var(--border-light); border-radius:10px; padding:10px 12px; background: var(--bg-item); }
+      .transcript-message.customer .transcript-content { background: var(--bg-card); }
+      .transcript-header { display:flex; align-items:center; gap:8px; margin-bottom:2px; }
+      .transcript-speaker { font-weight:600; font-size:12px; color:var(--text-primary); }
+      .transcript-time { font-size:11px; color:var(--text-secondary); }
+      .transcript-text { font-size:13px; line-height:1.5; color:var(--text-primary); word-wrap:break-word; }
+    `;
+    document.head.appendChild(style);
+  }
+
   function injectTaskPopoverStyles(){
     const id = 'contact-task-popover-styles';
     if (document.getElementById(id)) return;
@@ -1368,6 +1436,9 @@
     }
 
     state.currentContact = contact;
+    // Ensure per-contact event handlers are rebound on each view
+    // This avoids stale guards after navigating to other pages (e.g., account details)
+    state._contactDetailEventsAttached = false;
     // Preload notes content early for smooth Notes widget open
     try { preloadNotesForContact(contact.id); } catch (_) { /* noop */ }
     // Non-destructive: hide the existing table/list instead of replacing all HTML
@@ -1526,6 +1597,23 @@
     } catch (_) { return null; }
   }
 
+  function promotePageContent(){
+    // Apply performance CSS to contact page-content
+    if (document.getElementById('contact-page-perf-styles')) return;
+    const style=document.createElement('style');
+    style.id='contact-page-perf-styles';
+    style.textContent=`
+      #people-page .page-content {
+        will-change: transform;
+        transform: translateZ(0);
+        backface-visibility: hidden;
+        contain: paint layout;
+        overflow-anchor: none;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function renderContactDetail() {
     if (!state.currentContact || !els.mainContent) return;
 
@@ -1552,6 +1640,8 @@
     // Ensure header styles (divider, layout) are present
     injectContactHeaderStyles();
     injectTaskPopoverStyles();
+    // Ensure recent calls styles are present
+    injectRecentCallsStyles();
 
     // Header (styled same as page header)
     const headerHtml = `
@@ -1756,7 +1846,7 @@
       if (rcList && !rcList._delegated) {
         rcList.addEventListener('click', (e) => {
           const btn = e.target && e.target.closest ? e.target.closest('.rc-insights') : null;
-          if (!btn) return;
+          if (!btn || btn.disabled) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
           const call = (state._rcCalls || []).find(x => String(x.id||x.twilioSid||x.callSid||'') === String(id));
@@ -1767,12 +1857,43 @@
       }
     } catch(_) {}
     startRecentCallsLiveHooks();
+    
+    // Add periodic refresh to ensure eye icons update when recordings are ready
+    let refreshInterval = null;
+    let lastRefreshTime = 0;
+    const startPeriodicRefresh = () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(() => {
+        // Only refresh if we're not already refreshing, not scrolling, no insights are open, and enough time has passed
+        const hasOpenInsights = state._rcOpenIds && state._rcOpenIds.size > 0;
+        const now = Date.now();
+        const timeSinceLastRefresh = now - lastRefreshTime;
+        
+        if (!state._rcReloadInFlight && !state._rcIsScrolling && !hasOpenInsights && timeSinceLastRefresh >= 5000) {
+          lastRefreshTime = now;
+          loadRecentCallsForContact();
+        }
+      }, 5000); // Check every 5 seconds
+    };
+    
+    // Start periodic refresh
+    startPeriodicRefresh();
+    
+    // Cleanup interval when page is unloaded
+    window.addEventListener('beforeunload', () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+      }
+    });
+    
     try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
     
     // Load activities
     loadContactActivities();
-    // Load recent calls and styles
-    try { injectRecentCallsStyles(); loadRecentCallsForContact(); } catch (_) { /* noop */ }
+    // Load recent calls
+        try { loadRecentCallsForContact(); } catch (_) { /* noop */ }
+        try { promotePageContent(); } catch(_) {}
   }
 
   function svgPencil() {
@@ -1788,6 +1909,115 @@
     // Setup pagination
     setupContactActivityPagination(contactId);
   }
+
+  // ===== Recent Calls (Contact) =====
+  let _rcRetryTimer = null;
+  function startRecentCallsLiveHooks(){
+    try{
+      if (document._rcLiveHooksBound) return;
+      document.addEventListener('callStarted', onAnyContactCallActivity, false);
+      document.addEventListener('callEnded', onAnyContactCallActivity, false);
+      document.addEventListener('pc:recent-calls-refresh', onAnyContactCallActivity, false);
+      document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
+      // Track scroll state to defer refresh
+      try{
+        if (els.mainContent && !els.mainContent._rcScrollBound){
+          const sc = els.mainContent;
+          let scrollRafId = null;
+          sc.addEventListener('scroll', ()=>{
+            state._rcIsScrolling = true;
+            if (scrollRafId) cancelAnimationFrame(scrollRafId);
+            scrollRafId = requestAnimationFrame(() => {
+              clearTimeout(state._rcScrollTimer);
+              state._rcScrollTimer = setTimeout(()=>{
+                state._rcIsScrolling = false;
+                if (state._rcPendingRefresh){ state._rcPendingRefresh = false; safeReloadContactRecentCallsWithRetries(); }
+              }, 180);
+            });
+          }, { passive:true });
+          els.mainContent._rcScrollBound = '1';
+        }
+      }catch(_){ }
+      document._rcLiveHooksBound = true;
+    }catch(_){ }
+  }
+  function onAnyContactCallActivity(){
+    // Optimized cleanup: only clean up if we have many entries to reduce overhead
+    try {
+      if (state._liveCallDurations && state._liveCallDurations.size > 10) {
+        const now = Date.now();
+        const toDelete = [];
+        for (const [callSid, data] of state._liveCallDurations.entries()) {
+          if (now - data.timestamp > 30000) {
+            toDelete.push(callSid);
+          }
+        }
+        // Batch delete to reduce Map operations
+        toDelete.forEach(sid => state._liveCallDurations.delete(sid));
+      }
+    } catch(_) {}
+    
+    try{ const list = document.getElementById('contact-recent-calls-list'); const hasOpen = (state._rcOpenIds && state._rcOpenIds.size>0); if(list && !hasOpen) { /* could show spinner */ } }catch(_){ }
+    // Add a small delay to allow webhooks to update call data before first refresh
+    setTimeout(() => {
+      safeReloadContactRecentCallsWithRetries();
+    }, 1000); // 1 second delay to allow webhooks to process
+  }
+  
+  function onLiveCallDurationUpdate(e) {
+    try {
+      const { callSid, duration, durationFormatted } = e.detail || {};
+      if (!callSid || !durationFormatted) return;
+      
+      // Store the live duration for this call to prevent overwriting
+      if (!state._liveCallDurations) state._liveCallDurations = new Map();
+      state._liveCallDurations.set(callSid, { duration, durationFormatted, timestamp: Date.now() });
+      
+      // Cache the list element to avoid repeated DOM queries
+      if (!state._cachedRecentCallsList) {
+        state._cachedRecentCallsList = document.getElementById('contact-recent-calls-list');
+      }
+      const list = state._cachedRecentCallsList;
+      if (!list) return;
+      
+      // Look for a call row that matches this call SID
+      const callRows = list.querySelectorAll('.rc-item');
+      for (const row of callRows) {
+        const insightsBtn = row.querySelector('.rc-insights');
+        if (insightsBtn) {
+          const rowCallId = insightsBtn.getAttribute('data-id');
+          if (rowCallId === callSid) {
+            // Update the duration display in this row
+            const durationSpan = row.querySelector('.rc-duration');
+            if (durationSpan) {
+              durationSpan.textContent = durationFormatted;
+              // Add a visual indicator that this is a live call
+              row.classList.add('live-call');
+            }
+            break;
+          }
+        }
+      }
+    } catch(_) {}
+  }
+  function safeReloadContactRecentCallsWithRetries(){
+    try{ if (_rcRetryTimer){ clearTimeout(_rcRetryTimer); _rcRetryTimer=null; } }catch(_){ }
+    // Skip auto-reload while insights are open to prevent UI thrash/shrink
+    if (state._rcOpenIds && state._rcOpenIds.size > 0) return;
+    if (state._rcReloadInFlight) return;
+    state._rcReloadInFlight = true;
+    let attempts=0;
+    const run=()=>{
+      // If user opened insights mid-sequence, stop further retries
+      if (state._rcOpenIds && state._rcOpenIds.size > 0) { state._rcReloadInFlight=false; return; }
+      attempts++;
+      try{ loadRecentCallsForContact(); }catch(_){ }
+      if (attempts<10) { _rcRetryTimer = setTimeout(run, 900); }
+      else { state._rcReloadInFlight=false; }
+    };
+    run();
+  }
+
 
   function setupContactActivityPagination(contactId) {
     const paginationEl = document.getElementById('contact-activity-pagination');
@@ -1964,6 +2194,12 @@
   }
 
   function attachContactDetailEvents() {
+    // Prevent multiple calls to this function for the same contact
+    if (state._contactDetailEventsAttached) {
+      return;
+    }
+    state._contactDetailEventsAttached = true;
+
     // Listen for activity refresh events
     document.addEventListener('pc:activities-refresh', (e) => {
       const { entityType, entityId } = e.detail || {};
@@ -1976,9 +2212,13 @@
       }
     });
 
-    const backBtn = document.getElementById('back-to-people');
-    if (backBtn) {
-      backBtn.addEventListener('click', () => {
+    // Back button: use a single delegated listener so it binds once and works across rerenders
+    if (!document._pcBackButtonDelegated) {
+      const onBackClick = (evt) => {
+        const target = evt.target && evt.target.closest ? evt.target.closest('#back-to-people') : null;
+        if (!target) return;
+        evt.preventDefault();
+
         // Check if we came from health widget (call scripts page)
         const healthReturnPage = sessionStorage.getItem('health-widget-return-page');
         if (healthReturnPage) {
@@ -1991,7 +2231,6 @@
         
         // Check if we came from account details page
         if (window._contactNavigationSource === 'account-details' && window._contactNavigationAccountId) {
-          console.log('Returning to account details page:', window._contactNavigationAccountId);
           // Navigate back to account details page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('account-details');
@@ -2010,7 +2249,6 @@
         
         // Check if we came from list detail page
         if (window._contactNavigationSource === 'list-detail' && window._contactNavigationListId) {
-          console.log('Returning to list detail page:', window._contactNavigationListId);
           // Navigate back to list detail page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             // Provide context up-front so navigateToPage's internal init uses it immediately
@@ -2032,18 +2270,64 @@
         
         // Check if we came from calls page
         if (window._contactNavigationSource === 'calls') {
-          console.log('Returning to calls page from contact detail');
-          // Clear the navigation source first
-          window._contactNavigationSource = null;
-          window._contactNavigationContactId = null;
           // Navigate back to calls page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('calls');
           }
+          // Clear the navigation source after successful navigation
+          window._contactNavigationSource = null;
+          window._contactNavigationContactId = null;
+          return;
+        }
+        
+        // Check if we came from people page
+        if (window._contactNavigationSource === 'people') {
+          try {
+            const restore = window._peopleReturn || {};
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('people');
+              // Dispatch an event for People page to restore UI state
+              setTimeout(() => {
+                try {
+                  const ev = new CustomEvent('pc:people-restore', { detail: {
+                    page: restore.page, scroll: restore.scroll, filters: restore.filters, searchTerm: restore.searchTerm, sortColumn: restore.sortColumn, sortDirection: restore.sortDirection } });
+                  document.dispatchEvent(ev);
+                  
+                  // Clear navigation markers AFTER successful navigation and restore
+                  window._contactNavigationSource = null;
+                  window._peopleReturn = null;
+                } catch(_) {}
+              }, 60);
+            }
+            // Also cleanup the contact detail overlay and restore people view immediately (overlay mode)
+            try {
+              showToolbar();
+              if (els.page) { els.page.classList.remove('contact-detail-mode'); }
+              const view = document.getElementById('contact-detail-view');
+              if (view && view.parentElement) view.parentElement.removeChild(view);
+              const header = document.getElementById('contact-detail-header');
+              if (header && header.parentElement) header.parentElement.removeChild(header);
+              if (els.mainContent) {
+                const tableContainer = els.mainContent.querySelector('.table-container');
+                if (tableContainer) {
+                  tableContainer.classList.remove('hidden');
+                } else if (typeof state.prevPeopleContent === 'string' && state.prevPeopleContent) {
+                  els.mainContent.innerHTML = state.prevPeopleContent;
+                  state.prevPeopleContent = '';
+                }
+              }
+              if (window.peopleModule && typeof window.peopleModule.rebindDynamic === 'function') {
+                try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
+              } else if (window.peopleModule && typeof window.peopleModule.init === 'function') {
+                try { window.peopleModule.init(); } catch (e) { /* noop */ }
+              }
+            } catch (_) { /* noop */ }
+          } catch (_) { /* noop */ }
           return;
         }
         
         // Default behavior: return to people page
+        
         // Show the People toolbar/header again
         showToolbar();
         // Disable contact detail scroll mode
@@ -2070,7 +2354,9 @@
         } else if (window.peopleModule && typeof window.peopleModule.init === 'function') {
           try { window.peopleModule.init(); } catch (e) { /* noop */ }
         }
-      });
+      };
+      document.addEventListener('click', onBackClick, true);
+      document._pcBackButtonDelegated = true;
     }
 
     const widgetsBtn = document.getElementById('open-widgets');
@@ -2373,7 +2659,6 @@
       });
       infoGrid._bound = '1';
     }
-
   }
 
   function beginEditField(wrap, field) {
@@ -2985,79 +3270,6 @@
   }
 
   // ===== Recent Calls (Contact) =====
-  function injectRecentCallsStyles(){
-    if (document.getElementById('recent-calls-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'recent-calls-styles';
-    style.textContent = `
-      .rc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom: var(--spacing-md); }
-      .rc-pager { display:flex; align-items:center; gap:8px; }
-      .rc-page-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
-      .rc-page-btn:hover { 
-        background: var(--bg-hover);
-        border-color: var(--accent-color);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-      .rc-page-info { min-width: 44px; text-align:center; color: var(--text-secondary); font-size: 12px; }
-      .rc-list { position: relative; display:flex; flex-direction:column; gap:8px; }
-      .rc-empty { color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
-      .rc-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
-      .rc-item.rc-new { animation: rcNewIn 220ms ease-out both; }
-      @keyframes rcNewIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-      .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
-      .rc-title { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .rc-sub { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
-      .rc-outcome { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); color:var(--text-secondary); }
-      .rc-actions { display:flex; align-items:center; gap:8px; }
-      .rc-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
-      .rc-icon-btn:hover { 
-        background: var(--bg-hover);
-        border-color: var(--accent-color);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-      /* Inline details panel that expands under the item */
-      .rc-details { overflow:hidden; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-card); margin: 6px 2px 2px 2px; box-shadow: var(--elevation-card); }
-      .rc-details-inner { padding: 12px; }
-      .rc-details.collapsing, .rc-details.expanding { will-change: height, opacity; }
-      .rc-details.expanding { animation: rcExpand 180ms ease-out forwards; }
-      .rc-details.collapsing { animation: rcCollapse 140ms ease-in forwards; }
-      @keyframes rcExpand { from { opacity: .0; } to { opacity: 1; } }
-      @keyframes rcCollapse { from { opacity: 1; } to { opacity: .0; } }
-      .insights-grid { display:grid; grid-template-columns: 2fr 1fr; gap:14px; }
-      @media (max-width: 960px){ .insights-grid{ grid-template-columns:1fr; } }
-      .ip-card { background: var(--bg-item); border:1px solid var(--border-light); border-radius: 10px; padding: 12px; }
-      .ip-card h4 { margin:0 0 8px 0; font-size:13px; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:8px; }
-      .pc-chips { display:flex; flex-wrap:wrap; gap:8px; }
-      .pc-chip { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; border-radius:999px; border:1px solid var(--border-light); background:var(--bg-card); font-size:12px; color:var(--text-secondary); }
-      .pc-chip.ok{ background:rgba(16,185,129,.15); border-color:rgba(16,185,129,.25); color:#16c088 }
-      .pc-chip.warn{ background:rgba(234,179,8,.15); border-color:rgba(234,179,8,.25); color:#eab308 }
-      .pc-chip.danger{ background:rgba(239,68,68,.15); border-color:rgba(239,68,68,.25); color:#ef4444 }
-      .pc-chip.info{ background:rgba(59,130,246,.13); border-color:rgba(59,130,246,.25); color:#60a5fa }
-      .pc-kv{ display:grid; grid-template-columns:160px 1fr; gap:8px 12px; }
-      .pc-kv .k{ color:var(--text-secondary); font-size:12px }
-      .pc-kv .v{ color:var(--text-primary); font-size:12px }
-      /* Modern 2025 Transcript Styling */
-      .pc-transcript-container { background: var(--bg-card); border:1px solid var(--border-light); border-radius: 14px; padding:14px; max-height:320px; overflow:auto; }
-      .transcript-message { display:flex; gap:10px; margin-bottom:12px; align-items:flex-start; }
-      .transcript-message:last-child { margin-bottom:0; }
-      .transcript-avatar { flex-shrink:0; }
-      .transcript-avatar-circle { width: 32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12px; letter-spacing:.5px; }
-      .transcript-avatar-circle.agent-avatar { background: var(--orange-subtle); color:#fff; }
-      .transcript-avatar-circle.contact-avatar { background: var(--orange-subtle); color:#fff; }
-      .transcript-avatar-circle.company-avatar { background: var(--bg-item); padding:2px; }
-      .transcript-avatar-circle.company-avatar img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
-      .transcript-avatar-circle .company-favicon-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); }
-      .transcript-content { flex:1; min-width:0; border:1px solid var(--border-light); border-radius:10px; padding:10px 12px; background: var(--bg-item); }
-      .transcript-message.customer .transcript-content { background: var(--bg-card); }
-      .transcript-header { display:flex; align-items:center; gap:8px; margin-bottom:2px; }
-      .transcript-speaker { font-weight:600; font-size:12px; color:var(--text-primary); }
-      .transcript-time { font-size:11px; color:var(--text-secondary); }
-      .transcript-text { font-size:13px; line-height:1.5; color:var(--text-primary); word-wrap:break-word; }
-    `;
-    document.head.appendChild(style);
-  }
 
   // Avatar + helper utilities for transcript rendering
   function cd_getAgentAvatar(){ return `<div class="transcript-avatar-circle agent-avatar" aria-hidden="true">Y</div>`; }
@@ -3090,7 +3302,6 @@
   }
   function cd_normalizeSupplierTokens(s){ try{ if(!s) return ''; let out=String(s); out=out.replace(/\bT\s*X\s*U\b/gi,'TXU'); out=out.replace(/\bN\s*R\s*G\b/gi,'NRG'); out=out.replace(/\breliant\b/gi,'Reliant'); return out; }catch(_){ return s||''; } }
 
-  const RC_PAGE_SIZE = 5;
   async function loadRecentCallsForContact(){
     const list = document.getElementById('contact-recent-calls-list');
     if (!list || !state.currentContact) return;
@@ -3179,12 +3390,15 @@
       renderRecentCallsPage();
       bindRecentCallsPager();
       try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch(_) {}
+      // Clear the reload flag after successful load
+      try { state._rcReloadInFlight = false; } catch(_) {}
     } catch (e) {
       console.warn('[RecentCalls][Contact] load failed', e);
       list.innerHTML = '<div class="rc-empty">Failed to load recent calls</div>';
     }
   }
 
+  const RC_PAGE_SIZE = 5;
   function getRecentCallsPageSlice(){
     const calls = Array.isArray(state._rcCalls) ? state._rcCalls : [];
     const page = Math.max(1, parseInt(state._rcPage||1, 10));
@@ -3202,6 +3416,7 @@
       // delegate click to handle dynamic rerenders
       list.querySelectorAll('.rc-insights').forEach(btn => {
         btn.addEventListener('click', (e) => {
+          if (btn.disabled) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
         const call = (state._rcCalls||[]).find(x=>String(x.id)===String(id));
@@ -3261,7 +3476,7 @@
         // Remove any lingering overlay after content update
         try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
         
-        // Restore expanded insights dropdowns
+        // Restore expanded insights dropdowns (avoid nesting rc-details-inner repeatedly)
         expandedInsights.forEach(expanded => {
           const insightsBtn = list.querySelector(`.rc-insights[data-id="${expanded.callId}"]`);
           if (insightsBtn) {
@@ -3269,7 +3484,8 @@
             if (item) {
               const panel = document.createElement('div');
               panel.className = 'rc-details';
-              panel.innerHTML = `<div class="rc-details-inner">${expanded.content}</div>`;
+              // expanded.content already contains rc-details-inner wrapper
+              panel.innerHTML = expanded.content;
               item.insertAdjacentElement('afterend', panel);
               // Don't animate the restore - just show it
               panel.style.height = 'auto';
@@ -3314,25 +3530,6 @@
     next.disabled = (current >= total);
   }
 
-  // Live refresh: refresh Recent Calls when a call starts or ends
-  let _rcRetryTimer = null;
-  function startRecentCallsLiveHooks(){
-    try {
-      if (document._rcLiveHooksBound) return;
-      document.addEventListener('callStarted', onAnyCallActivity, false);
-      document.addEventListener('callEnded', onAnyCallActivity, false);
-      document.addEventListener('pc:recent-calls-refresh', onAnyCallActivity, false);
-      document._rcLiveHooksBound = true;
-    } catch(_) {}
-  }
-  function onAnyCallActivity(){
-    try {
-      const list = document.getElementById('contact-recent-calls-list');
-      if (list) rcSetLoading(list);
-    } catch(_) {}
-    // Kick an immediate refresh and then retry a few times in case backend write lags
-    safeReloadRecentCallsWithRetries();
-  }
   function safeReloadRecentCallsWithRetries(){
     try { if (_rcRetryTimer) { clearTimeout(_rcRetryTimer); _rcRetryTimer = null; } } catch(_) {}
     let attempts = 0;
@@ -3358,8 +3555,24 @@
     const outcome = escapeHtml(c.outcome || c.status || '');
     const ts = c.callTime || c.timestamp || new Date().toISOString();
     const when = new Date(ts).toLocaleString();
-    const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
-    const durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
+    const idAttr = escapeHtml(String(c.id||c.twilioSid||c.callSid||''));
+    
+    // Check for live duration first, fallback to database duration
+    let durStr = '';
+    if (state._liveCallDurations && state._liveCallDurations.has(idAttr)) {
+      const liveData = state._liveCallDurations.get(idAttr);
+      // Only use live duration if it's recent (within last 10 seconds)
+      if (Date.now() - liveData.timestamp < 10000) {
+        durStr = liveData.durationFormatted;
+      }
+    }
+    
+    // Fallback to database duration if no live duration
+    if (!durStr) {
+      const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
+      durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
+    }
+    
     // Prefer normalized counterparty number computed by calls page; fallback to raw
     const phone = escapeHtml(String(c.counterpartyPretty || c.contactPhone || c.to || c.from || ''));
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
@@ -3367,7 +3580,7 @@
       <div class="rc-item">
         <div class="rc-meta">
           <div class="rc-title">${name}${company?` • ${company}`:''}</div>
-          <div class="rc-sub">${when} • ${durStr} • <span class="phone-number" 
+          <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 
                                  data-contact-id="${c.contactId || state.currentContact?.id || ''}" 
                                  data-account-id="${c.accountId || state.currentContact?.accountId || ''}" 
                                  data-contact-name="${escapeHtml(name)}" 
@@ -3375,7 +3588,7 @@
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
-          <button type="button" class="rc-icon-btn rc-insights" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="View insights">${svgEye()}</button>
+          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'disabled' : ''}" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Insights processing...' : 'View AI insights'}" ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'disabled' : ''}>${svgEye()}</button>
         </div>
       </div>`;
   }
@@ -3385,11 +3598,16 @@
     const item = btn.closest('.rc-item');
     if (!item) return;
     const existing = item.nextElementSibling && item.nextElementSibling.classList && item.nextElementSibling.classList.contains('rc-details') ? item.nextElementSibling : null;
+    const idStr = String(call.id || call.twilioSid || call.callSid || '');
     if (existing) {
+      // Track explicit close so periodic refresh pauses correctly
+      try { if (state._rcOpenIds && state._rcOpenIds instanceof Set) state._rcOpenIds.delete(idStr); } catch(_) {}
       // collapse then remove
       animateCollapse(existing, () => existing.remove());
       return;
     }
+    // Ensure open tracker exists and add current id
+    try { if (!state._rcOpenIds || !(state._rcOpenIds instanceof Set)) state._rcOpenIds = new Set(); state._rcOpenIds.add(idStr); } catch(_) {}
     const panel = document.createElement('div');
     panel.className = 'rc-details';
     panel.innerHTML = `<div class="rc-details-inner">${insightsInlineHtml(call)}</div>`;

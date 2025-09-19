@@ -168,7 +168,9 @@ export default async function handler(req, res) {
             ServiceSid, 
             Status, 
             CallSid,
-            RecordingSid 
+            RecordingSid,
+            EventType,
+            AnalysisStatus
         } = req.body;
         
         if (!TranscriptSid || !ServiceSid) {
@@ -176,31 +178,54 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
         
-        console.log('[Conversational Intelligence Webhook] Processing transcript:', {
+        console.log('[Conversational Intelligence Webhook] Processing webhook:', {
             TranscriptSid,
             ServiceSid,
             Status,
             CallSid,
-            RecordingSid
+            RecordingSid,
+            EventType,
+            AnalysisStatus
         });
         
-        // Only process completed transcripts
-        if (Status !== 'completed') {
-            console.log('[Conversational Intelligence Webhook] Transcript not completed yet, status:', Status);
-            return res.status(200).json({ success: true, message: 'Transcript not ready' });
+        // Only process analysis completed events (not just transcript completed)
+        const isAnalysisComplete = EventType === 'analysis_completed' || 
+                                 EventType === 'ci.analysis.completed' ||
+                                 AnalysisStatus === 'completed' ||
+                                 (Status === 'completed' && EventType === 'transcript.completed');
+        
+        if (!isAnalysisComplete) {
+            console.log('[Conversational Intelligence Webhook] Analysis not completed yet:', {
+                Status,
+                EventType,
+                AnalysisStatus,
+                message: 'Waiting for analysis_completed event'
+            });
+            return res.status(200).json({ success: true, message: 'Analysis not ready' });
         }
         
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         
         try {
-            // Get the transcript details
+            // Get the transcript details and validate CI analysis status
             const transcript = await client.intelligence.v2.transcripts(TranscriptSid).fetch();
             console.log('[Conversational Intelligence Webhook] Transcript details:', {
                 sid: transcript.sid,
                 status: transcript.status,
-                sourceSid: transcript.sourceSid
+                sourceSid: transcript.sourceSid,
+                analysisStatus: transcript.analysisStatus || 'unknown'
             });
+            
+            // Double-check that CI analysis is actually completed
+            if (transcript.analysisStatus && transcript.analysisStatus !== 'completed') {
+                console.log('[Conversational Intelligence Webhook] CI analysis not completed yet:', {
+                    transcriptStatus: transcript.status,
+                    analysisStatus: transcript.analysisStatus,
+                    message: 'Waiting for CI analysis to complete'
+                });
+                return res.status(200).json({ success: true, message: 'CI analysis in progress' });
+            }
             
             // Compute channel to role mapping for this call (agent vs customer)
             let channelRoleMap = { agentChannel: '1', customerChannel: '2' };
@@ -224,13 +249,33 @@ export default async function handler(req, res) {
                 console.warn('[CI Webhook] Failed to compute channel-role mapping, defaulting:', e?.message);
             }
 
-            // Get sentences
+            // Get sentences with validation
             let transcriptText = '';
             let sentences = [];
             try {
                 const sentencesResponse = await client.intelligence.v2
                     .transcripts(TranscriptSid)
                     .sentences.list();
+                
+                console.log(`[Conversational Intelligence Webhook] Raw sentences response:`, {
+                    count: sentencesResponse.length,
+                    sample: sentencesResponse.slice(0, 2).map(s => ({
+                        text: s.text?.substring(0, 50) + '...',
+                        channel: s.channel,
+                        startTime: s.startTime,
+                        endTime: s.endTime
+                    }))
+                });
+                
+                // Validate we have proper sentence segmentation
+                if (sentencesResponse.length === 0) {
+                    console.warn('[Conversational Intelligence Webhook] No sentences returned - CI analysis may not be complete');
+                    return res.status(200).json({ success: true, message: 'No sentences available yet' });
+                }
+                
+                if (sentencesResponse.length === 1 && sentencesResponse[0].text && sentencesResponse[0].text.length > 500) {
+                    console.warn('[Conversational Intelligence Webhook] Single long sentence detected - CI segmentation may have failed');
+                }
                 
                 const agentChNum = Number(channelRoleMap.agentChannel || '1');
                 sentences = sentencesResponse.map(s => ({
@@ -253,6 +298,11 @@ export default async function handler(req, res) {
                 
                 console.log(`[Conversational Intelligence Webhook] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
                 console.log(`[Conversational Intelligence Webhook] Formatted transcript with speaker labels: ${formattedTranscript.length} chars`);
+                console.log(`[Conversational Intelligence Webhook] Channel distribution:`, {
+                    channel1: sentences.filter(s => s.channel === 1 || s.channel === '1').length,
+                    channel2: sentences.filter(s => s.channel === 2 || s.channel === '2').length,
+                    other: sentences.filter(s => s.channel !== 1 && s.channel !== '1' && s.channel !== 2 && s.channel !== '2').length
+                });
             } catch (error) {
                 console.error('[Conversational Intelligence Webhook] Error fetching sentences:', error);
             }

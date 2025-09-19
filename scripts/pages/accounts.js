@@ -816,7 +816,18 @@
       .bulk-select-popover .btn-primary:hover { background: var(--grey-600); border-color: var(--grey-500); }
 
       /* Ensure container is a positioning context and not clipping */
-      #accounts-page .table-container { position: relative; overflow: visible; }
+#accounts-page .table-container { position: relative; overflow: visible; }
+
+/* Scroll smoothness improvements */
+#accounts-page .table-scroll {
+  scrollbar-gutter: stable both-edges;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: paint layout;
+}
 
       /* Bulk actions bar inside table container, centered above header */
       #accounts-bulk-actions.bulk-actions-modal {

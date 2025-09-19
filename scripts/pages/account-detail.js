@@ -212,6 +212,40 @@
     }
   }
 
+  function findMostRelevantContactForAccount(accountId) {
+    if (!accountId || typeof window.getPeopleData !== 'function') return null;
+    
+    try {
+      const people = window.getPeopleData() || [];
+      const accountContacts = people.filter(p => 
+        p.accountId === accountId || 
+        p.account_id === accountId || 
+        p.companyId === accountId ||
+        p.company_id === accountId
+      );
+      
+      if (accountContacts.length === 0) return null;
+      
+      // Sort by most recent activity (if available) or by name
+      accountContacts.sort((a, b) => {
+        // Prefer contacts with recent activity
+        const aActivity = a.lastActivity || a.updatedAt || a.createdAt || 0;
+        const bActivity = b.lastActivity || b.updatedAt || b.createdAt || 0;
+        if (aActivity !== bActivity) return bActivity - aActivity;
+        
+        // Fallback to alphabetical by name
+        const aName = [a.firstName, a.lastName].filter(Boolean).join(' ') || a.name || '';
+        const bName = [b.firstName, b.lastName].filter(Boolean).join(' ') || b.name || '';
+        return aName.localeCompare(bName);
+      });
+      
+      return accountContacts[0];
+    } catch (error) {
+      console.warn('[Account Detail] Error finding most relevant contact:', error);
+      return null;
+    }
+  }
+
   function renderAccountDetail() {
     if (!state.currentAccount || !els.mainContent) return;
     
@@ -219,6 +253,9 @@
     injectSectionHeaderStyles();
 
     const a = state.currentAccount;
+    
+    // Find the most relevant contact for this account (for company phone context)
+    const mostRelevantContact = findMostRelevantContactForAccount(a.id || a.accountId || a._id);
     const name = a.accountName || a.name || a.companyName || 'Unknown Account';
     const industry = a.industry || '';
     const domain = a.domain || a.website || a.site || '';
@@ -318,7 +355,9 @@
             <div class="info-row"><div class="info-label">COMPANY PHONE</div><div class="info-value-wrap" data-field="companyPhone"><span class="info-value-text" 
                                  data-account-id="${a.id || a.accountId || a._id || ''}" 
                                  data-account-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}" 
-                                 data-company-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}">${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
+                                 data-company-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}"
+                                 ${mostRelevantContact ? `data-contact-id="${mostRelevantContact.id || mostRelevantContact._id || ''}"` : ''}
+                                 ${mostRelevantContact ? `data-contact-name="${escapeHtml([mostRelevantContact.firstName, mostRelevantContact.lastName].filter(Boolean).join(' ') || mostRelevantContact.name || '')}"` : ''}>${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">CITY</div><div class="info-value-wrap" data-field="city"><span class="info-value-text">${escapeHtml(city) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">STATE</div><div class="info-value-wrap" data-field="state"><span class="info-value-text">${escapeHtml(stateVal) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value-wrap" data-field="industry"><span class="info-value-text">${escapeHtml(industry) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
@@ -433,6 +472,36 @@
 
     attachAccountDetailEvents();
     startAccountRecentCallsLiveHooks();
+    
+          // Add periodic refresh to ensure eye icons update when recordings are ready
+          let refreshInterval = null;
+          let lastRefreshTime = 0;
+          const startPeriodicRefresh = () => {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(() => {
+              // Only refresh if we're not already refreshing, not scrolling, no insights are open, and enough time has passed
+              const hasOpenInsights = state._arcOpenIds && state._arcOpenIds.size > 0;
+              const now = Date.now();
+              const timeSinceLastRefresh = now - lastRefreshTime;
+              
+              if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && timeSinceLastRefresh >= 5000) {
+                lastRefreshTime = now;
+                loadRecentCallsForAccount();
+              }
+            }, 5000); // Check every 5 seconds
+          };
+    
+    // Start periodic refresh
+    startPeriodicRefresh();
+    
+    // Cleanup interval when page is unloaded
+    window.addEventListener('beforeunload', () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+      }
+    });
+    
     try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
     
     // Load activities
@@ -466,6 +535,14 @@
     const style = document.createElement('style');
     style.id = 'recent-calls-styles';
     style.textContent = `
+      /* Performance: promote and isolate page-content to reduce jank during live updates */
+      #account-details-page .page-content {
+        will-change: transform;
+        transform: translateZ(0);
+        backface-visibility: hidden;
+        contain: paint layout;
+        overflow-anchor: none;
+      }
       .rc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom: var(--spacing-md); }
       .rc-pager { display:flex; align-items:center; gap:8px; }
       .rc-page-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); }
@@ -493,6 +570,10 @@
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
+      .rc-icon-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+      .rc-icon-btn.disabled:hover { background: var(--bg-card); border-color: var(--border-light); transform: none; box-shadow: none; }
+      /* Live call duration indicator */
+      .rc-item.live-call .rc-duration { color: var(--text-secondary); font-weight: 400; }
       /* Inline details under item */
       .rc-details { overflow:hidden; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-card); margin: 6px 2px 2px 2px; box-shadow: var(--elevation-card); }
       .rc-details-inner { padding: 12px; }
@@ -543,24 +624,107 @@
       document.addEventListener('callStarted', onAnyAccountCallActivity, false);
       document.addEventListener('callEnded', onAnyAccountCallActivity, false);
       document.addEventListener('pc:recent-calls-refresh', onAnyAccountCallActivity, false);
+      document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
+      // Track scrolling state to avoid animations/jank during scroll
+      try {
+        if (els.mainContent && !els.mainContent._scrollBound) {
+          const sc = els.mainContent;
+          let scrollRafId = null;
+          sc.addEventListener('scroll', () => {
+            state._isScrolling = true;
+            if (scrollRafId) cancelAnimationFrame(scrollRafId);
+            scrollRafId = requestAnimationFrame(() => {
+              clearTimeout(state._scrollTimer);
+              state._scrollTimer = setTimeout(() => {
+                state._isScrolling = false;
+                if (state._arcPendingRefresh) {
+                  state._arcPendingRefresh = false;
+                  // Run a single deferred refresh
+                  try { safeReloadAccountRecentCallsWithRetries(); } catch(_) {}
+                }
+              }, 180);
+            });
+          }, { passive: true });
+          els.mainContent._scrollBound = '1';
+        }
+      } catch(_) {}
       document._arcLiveHooksBound = true;
     } catch(_) {}
   }
   function onAnyAccountCallActivity(){
+    // Optimized cleanup: only clean up if we have many entries to reduce overhead
+    try {
+      if (state._liveCallDurations && state._liveCallDurations.size > 10) {
+        const now = Date.now();
+        const toDelete = [];
+        for (const [callSid, data] of state._liveCallDurations.entries()) {
+          if (now - data.timestamp > 30000) {
+            toDelete.push(callSid);
+          }
+        }
+        // Batch delete to reduce Map operations
+        toDelete.forEach(sid => state._liveCallDurations.delete(sid));
+      }
+    } catch(_) {}
+    
+    // If user is viewing any details panels, avoid showing loading overlay; refresh silently
     try {
       const list = document.getElementById('account-recent-calls-list');
-      if (list) arcSetLoading(list);
+      const hasOpen = (state._arcOpenIds && state._arcOpenIds.size > 0);
+      if (list && !hasOpen) arcSetLoading(list);
     } catch(_) {}
-    // Retry loop to cover backend write lag
-    safeReloadAccountRecentCallsWithRetries();
+    // Add a small delay to allow webhooks to update call data before first refresh
+    setTimeout(() => {
+      safeReloadAccountRecentCallsWithRetries();
+    }, 1000); // 1 second delay to allow webhooks to process
+  }
+  
+  function onLiveCallDurationUpdate(e) {
+    try {
+      const { callSid, duration, durationFormatted } = e.detail || {};
+      if (!callSid || !durationFormatted) return;
+      
+      // Store the live duration for this call to prevent overwriting
+      if (!state._liveCallDurations) state._liveCallDurations = new Map();
+      state._liveCallDurations.set(callSid, { duration, durationFormatted, timestamp: Date.now() });
+      
+      // Cache the list element to avoid repeated DOM queries
+      if (!state._cachedRecentCallsList) {
+        state._cachedRecentCallsList = document.getElementById('account-recent-calls-list');
+      }
+      const list = state._cachedRecentCallsList;
+      if (!list) return;
+      
+      // Look for a call row that matches this call SID
+      const callRows = list.querySelectorAll('.rc-item');
+      for (const row of callRows) {
+        const insightsBtn = row.querySelector('.rc-insights');
+        if (insightsBtn) {
+          const rowCallId = insightsBtn.getAttribute('data-id');
+          if (rowCallId === callSid) {
+            // Update the duration display in this row
+            const durationSpan = row.querySelector('.rc-duration');
+            if (durationSpan) {
+              durationSpan.textContent = durationFormatted;
+              // Add a visual indicator that this is a live call
+              row.classList.add('live-call');
+            }
+            break;
+          }
+        }
+      }
+    } catch(_) {}
   }
   function safeReloadAccountRecentCallsWithRetries(){
     try { if (_arcRetryTimer) { clearTimeout(_arcRetryTimer); _arcRetryTimer = null; } } catch(_) {}
+    if (state._arcReloadInFlight) { return; }
+    state._arcReloadInFlight = true;
     let attempts = 0;
     const run = () => {
       attempts++;
       try { loadRecentCallsForAccount(); } catch(_) {}
       if (attempts < 10) { _arcRetryTimer = setTimeout(run, 900); }
+      else { state._arcReloadInFlight = false; }
     };
     run();
   }
@@ -589,6 +753,11 @@
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
     
     // Loading calls for account
+    // If user is actively scrolling, defer refresh to avoid jank
+    if (state._isScrolling) {
+      try { state._arcPendingRefresh = true; } catch(_) {}
+      return;
+    }
     
     try {
       const r = await fetch(`${base}/api/calls`);
@@ -688,11 +857,13 @@
       try { state._arcCalls = filtered; } catch(_) {}
       try { if (typeof state._arcPage !== 'number' || !state._arcPage) state._arcPage = 1; } catch(_) {}
       arcRenderPage();
+      // Clear the reload flag after successful load
+      try { state._arcReloadInFlight = false; } catch(_) {}
       // Delegate once for reliability across rerenders
       if (!list._delegated) {
         list.addEventListener('click', (e) => {
           const btn = e.target && e.target.closest ? e.target.closest('.rc-insights') : null;
-          if (!btn) return;
+          if (!btn || btn.disabled) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
           const call = (state._arcCalls||[]).find(x=>String(x.id||x.twilioSid||x.callSid||'')===String(id));
@@ -713,9 +884,28 @@
   function arcGetSlice(){ const a = Array.isArray(state._arcCalls)?state._arcCalls:[]; const p=Math.max(1, parseInt(state._arcPage||1,10)); const s=(p-1)*ARC_PAGE_SIZE; return a.slice(s, s+ARC_PAGE_SIZE); }
   function arcRenderPage(){
     const list = document.getElementById('account-recent-calls-list'); if(!list) return;
-    const total = Array.isArray(state._arcCalls)?state._arcCalls.length:0; if(!total){ arcUpdatePager(0,0); return; }
-    const html = arcGetSlice().map(call=>rcItemHtml(call)).join('');
-    arcUpdateListAnimated(list, html);
+    const total = Array.isArray(state._arcCalls)?state._arcCalls.length:0; 
+    if(!total){ 
+      arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); 
+      arcUpdatePager(0,0); 
+      return; 
+    }
+    const slice = arcGetSlice();
+    arcUpdateListAnimated(list, slice.map(call => rcItemHtml(call)).join(''));
+    // delegate click to handle dynamic rerenders (prevent duplicate listeners)
+    list.querySelectorAll('.rc-insights').forEach(btn => {
+      if (!btn._insightsListenerBound) {
+        btn.addEventListener('click', (e) => {
+          if (btn.disabled) return;
+          e.preventDefault(); e.stopPropagation();
+          const id = btn.getAttribute('data-id');
+          const call = (state._arcCalls||[]).find(x=>String(x.id||x.twilioSid||x.callSid||'')===String(id));
+          if (!call) return;
+          toggleRcDetails(btn, call);
+        });
+        btn._insightsListenerBound = true;
+      }
+    });
     const totalPages = Math.max(1, Math.ceil(total/ARC_PAGE_SIZE));
     arcUpdatePager(state._arcPage||1, totalPages);
   }
@@ -723,7 +913,37 @@
   function arcUpdatePager(current, total){ const pager=document.getElementById('account-rc-pager'); const info=document.getElementById('arc-info'); const prev=document.getElementById('arc-prev'); const next=document.getElementById('arc-next'); if(!pager||!info||!prev||!next) return; const show=total>1; pager.style.display=show?'flex':'none'; info.textContent=`${Math.max(1,parseInt(current||1,10))} of ${Math.max(1,parseInt(total||1,10))}`; prev.disabled=(current<=1); next.disabled=(current>=total); }
   function arcSpinnerHtml(){ return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
   function arcSetLoading(list){ try { let ov=list.querySelector('.rc-loading-overlay'); if(!ov){ ov=document.createElement('div'); ov.className='rc-loading-overlay'; ov.innerHTML=arcSpinnerHtml(); ov.style.position='absolute'; ov.style.inset='0'; ov.style.display='flex'; ov.style.alignItems='center'; ov.style.justifyContent='center'; ov.style.pointerEvents='none'; list.appendChild(ov);} ov.style.display='flex'; } catch(_) {} }
-  function arcUpdateListAnimated(list, html){ try { const h0=list.offsetHeight; list.style.height=h0+'px'; list.style.overflow='hidden'; requestAnimationFrame(()=>{ list.innerHTML=html; const h1=list.scrollHeight; list.style.transition='height 220ms ease, opacity 220ms ease'; list.style.opacity='1'; list.style.height=h1+'px'; setTimeout(()=>{ list.style.height=''; list.style.transition=''; list.style.overflow=''; }, 260); }); } catch(_) { list.innerHTML = html; } }
+  function arcUpdateListAnimated(list, html){
+    try {
+      const avoidAnim = !!(state._isScrolling || (state._arcOpenIds && state._arcOpenIds.size > 0));
+      if (avoidAnim) { 
+        list.innerHTML = html; 
+        // Remove any lingering loading overlay after content update
+        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
+        return; 
+      }
+      const h0 = list.offsetHeight;
+      list.style.height = h0 + 'px';
+      list.style.overflow = 'hidden';
+      requestAnimationFrame(() => {
+        list.innerHTML = html;
+        // Remove any lingering loading overlay after content update
+        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
+        const h1 = list.scrollHeight;
+        list.style.transition = 'height 220ms ease, opacity 220ms ease';
+        list.style.opacity = '1';
+        list.style.height = h1 + 'px';
+        // Use requestAnimationFrame for smoother animation cleanup
+        requestAnimationFrame(() => {
+          setTimeout(() => { list.style.height = ''; list.style.transition = ''; list.style.overflow = ''; }, 260);
+        });
+      });
+    } catch(_) { 
+      list.innerHTML = html; 
+      // Remove any lingering loading overlay after content update
+      try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
+    }
+  }
 
   function rcItemHtml(c){
     const name = escapeHtml(c.contactName || 'Unknown');
@@ -731,25 +951,33 @@
     const outcome = escapeHtml(c.outcome || c.status || '');
     const ts = c.callTime || c.timestamp || new Date().toISOString();
     const when = new Date(ts).toLocaleString();
-    const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
-    const durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
+    const idAttr = escapeHtml(String(c.id||c.twilioSid||c.callSid||''));
+    
+    // Check for live duration first, fallback to database duration
+    let durStr = '';
+    if (state._liveCallDurations && state._liveCallDurations.has(idAttr)) {
+      const liveData = state._liveCallDurations.get(idAttr);
+      // Only use live duration if it's recent (within last 10 seconds)
+      if (Date.now() - liveData.timestamp < 10000) {
+        durStr = liveData.durationFormatted;
+      }
+    }
+    
+    // Fallback to database duration if no live duration
+    if (!durStr) {
+      const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
+      durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
+    }
+    
     const phone = escapeHtml(String(c.counterpartyPretty || c.to || c.from || ''));
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
+    const sig = `${idAttr}|${c.status||c.outcome||''}|${c.durationSec||c.duration||0}|${c.transcript?1:0}|${c.aiInsights?1:0}`;
     
-    // DEBUG: Log call data being rendered
-    console.log('[Account Detail] Rendering call item:', {
-      callId: c.id,
-      twilioSid: c.twilioSid,
-      hasTranscript: !!c.transcript,
-      transcriptLength: c.transcript ? c.transcript.length : 0,
-      hasAI: !!c.aiInsights,
-      aiKeys: c.aiInsights ? Object.keys(c.aiInsights) : []
-    });
     return `
-      <div class="rc-item">
+      <div class=\"rc-item\" data-id=\"${idAttr}\" data-sig=\"${sig}\">
         <div class="rc-meta">
           <div class="rc-title">${name}${company?` • ${company}`:''}</div>
-          <div class="rc-sub">${when} • ${durStr} • <span class="phone-number" 
+          <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 
                                  data-contact-id="${c.contactId || ''}" 
                                  data-account-id="${c.accountId || state.currentAccount?.id || ''}" 
                                  data-contact-name="${escapeHtml(name)}" 
@@ -757,7 +985,7 @@
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
-          <button type="button" class="rc-icon-btn rc-insights" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="View insights">${svgEye()}</button>
+          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'disabled' : ''}" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Insights processing...' : 'View AI insights'}" ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'disabled' : ''}>${svgEye()}</button>
         </div>
       </div>`;
   }
@@ -766,7 +994,15 @@
     const item = btn.closest('.rc-item');
     if (!item) return;
     const existing = item.nextElementSibling && item.nextElementSibling.classList && item.nextElementSibling.classList.contains('rc-details') ? item.nextElementSibling : null;
-    if (existing) { animateCollapse(existing, () => existing.remove()); return; }
+    const idStr = String(call.id || call.twilioSid || call.callSid || '');
+    if (existing) {
+      // User explicitly closed - remove from open tracker
+      try { if (state._arcOpenIds && state._arcOpenIds instanceof Set) state._arcOpenIds.delete(idStr); } catch(_) {}
+      animateCollapse(existing, () => existing.remove());
+      return;
+    }
+    // Ensure open tracker exists and add current id
+    try { if (!state._arcOpenIds || !(state._arcOpenIds instanceof Set)) state._arcOpenIds = new Set(); state._arcOpenIds.add(idStr); } catch(_) {}
     const panel = document.createElement('div');
     panel.className = 'rc-details';
     panel.innerHTML = `<div class="rc-details-inner">${insightsInlineHtml(call)}</div>`;
@@ -792,8 +1028,36 @@
       }
     } catch(_) {}
   }
-  function animateExpand(el){ el.style.height='0px'; el.style.opacity='0'; const h=el.scrollHeight; requestAnimationFrame(()=>{ el.classList.add('expanding'); el.style.transition='height 180ms ease, opacity 180ms ease'; el.style.height=h+'px'; el.style.opacity='1'; setTimeout(()=>{ el.style.height=''; el.style.transition=''; el.classList.remove('expanding'); },200); }); }
-  function animateCollapse(el, done){ const h=el.scrollHeight; el.style.height=h+'px'; el.style.opacity='1'; requestAnimationFrame(()=>{ el.classList.add('collapsing'); el.style.transition='height 140ms ease, opacity 140ms ease'; el.style.height='0px'; el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('collapsing'); done&&done(); },160); }); }
+  function animateExpand(el){ 
+    el.style.height='0px'; 
+    el.style.opacity='0'; 
+    const h=el.scrollHeight; 
+    requestAnimationFrame(()=>{ 
+      el.classList.add('expanding'); 
+      el.style.transition='height 180ms ease, opacity 180ms ease'; 
+      el.style.height=h+'px'; 
+      el.style.opacity='1'; 
+      // Use requestAnimationFrame for smoother cleanup
+      requestAnimationFrame(() => {
+        setTimeout(()=>{ el.style.height=''; el.style.transition=''; el.classList.remove('expanding'); },200); 
+      });
+    }); 
+  }
+  function animateCollapse(el, done){ 
+    const h=el.scrollHeight; 
+    el.style.height=h+'px'; 
+    el.style.opacity='1'; 
+    requestAnimationFrame(()=>{ 
+      el.classList.add('collapsing'); 
+      el.style.transition='height 140ms ease, opacity 140ms ease'; 
+      el.style.height='0px'; 
+      el.style.opacity='0'; 
+      // Use requestAnimationFrame for smoother cleanup
+      requestAnimationFrame(() => {
+        setTimeout(()=>{ el.classList.remove('collapsing'); done&&done(); },160); 
+      });
+    }); 
+  }
   function insightsInlineHtml(r){
     const AI = r.aiInsights || {};
     // Build summary: prefer Twilio Operator summary, then fallback to constructed paragraph
@@ -859,6 +1123,37 @@
       if (rawText) return `<div class=\"transcript-message\"><div class=\"transcript-content\"><div class=\"transcript-text\">${escapeHtml(rawText)}</div></div></div>`;
       return 'Transcript not available';
     }
+
+    // Prefer CI sentences + channelRoleMap for dual-channel mapping (per Twilio guidance)
+    let transcriptHtml = '';
+    try {
+      const ci = r.conversationalIntelligence || {};
+      const sentences = Array.isArray(ci.sentences) ? ci.sentences : [];
+      const channelMap = ci.channelRoleMap || {};
+      const normalizeChannel = (c)=>{ const s=(c==null?'':String(c)).trim(); if(s==='0') return '1'; if(/^[Aa]$/.test(s)) return '1'; if(/^[Bb]$/.test(s)) return '2'; return s; };
+      const resolveRole = (ch)=>{
+        const n = normalizeChannel(ch);
+        const mapped = channelMap[n];
+        if (mapped === 'agent' || mapped === 'customer') return mapped;
+        const agentCh = String(ci.agentChannel || channelMap.agentChannel || '');
+        if (agentCh && n === agentCh) return 'agent';
+        if (agentCh) return 'customer';
+        return '';
+      };
+      if (sentences.length && (Object.keys(channelMap).length || ci.agentChannel!=null || channelMap.agentChannel!=null)){
+        const turns = sentences.map(s=>{
+          const role = resolveRole(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex) || 'other';
+          const t = Math.max(0, Number(s.startTime||0));
+          const text = (s.text || s.transcript || '').trim();
+          return { t, role, text };
+        });
+        transcriptHtml = renderTranscriptHtml({ speakerTurns: turns }, '');
+      } else {
+        transcriptHtml = renderTranscriptHtml(AI, r.formattedTranscript || r.transcript);
+      }
+    } catch(_){
+      try { transcriptHtml = renderTranscriptHtml(AI, r.formattedTranscript || r.transcript); } catch(__){ transcriptHtml = 'Transcript not available'; }
+    }
     
     // DEBUG: Log transcript data for debugging
     console.log('[Account Detail] Call transcript debug:', {
@@ -869,7 +1164,7 @@
       transcriptPreview: r.transcript ? r.transcript.substring(0, 100) : 'N/A',
       hasAI: !!AI,
       aiKeys: AI ? Object.keys(AI) : [],
-      finalTranscriptRenderedPreview: (function(){ try{ return (renderTranscriptHtml(AI, r.formattedTranscript || r.transcript) || '').slice(0, 100); }catch(_){ return 'N/A'; } })()
+      finalTranscriptRenderedPreview: (function(){ try{ return (transcriptHtml || '').slice(0, 100); }catch(_){ return 'N/A'; } })()
     });
     const rec = r.audioUrl || r.recordingUrl || '';
     let proxied = '';
@@ -913,7 +1208,7 @@
               <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>
               Call Transcript
             </h4>
-            <div class=\"pc-transcript-container\">${renderTranscriptHtml(AI, r.formattedTranscript || r.transcript)}</div>
+            <div class=\"pc-transcript-container\">${transcriptHtml}</div>
           </div>
         </div>
         <div>
@@ -950,6 +1245,67 @@
           <div class=\"ip-card\" style=\"margin-top:12px; text-align:right;\"><button class=\"rc-icon-btn\" onclick=\"(function(){ try{ openInsightsModal && openInsightsModal('${String(r.id||'')}'); }catch(_){}})()\" aria-label=\"Open full modal\" title=\"Open full modal\">${svgEye()}</button></div>
         </div>
       </div>`;
+  }
+
+  function arcPatchList(list, slice){
+    // Build map of existing rows by id
+    const rows = Array.from(list.querySelectorAll('.rc-item'));
+    const byId = new Map();
+    rows.forEach(r => { const id = r.getAttribute('data-id'); if (id) byId.set(id, r); });
+    // Desired order
+    let anchor = null;
+    slice.forEach(call => {
+      const id = String(call.id || call.twilioSid || call.callSid || '');
+      let row = byId.get(id);
+      const newSig = `${id}|${call.status||call.outcome||''}|${call.durationSec||call.duration||0}|${call.transcript?1:0}|${call.aiInsights?1:0}`;
+      if (row){
+        // Move row to correct order if needed (keep rc-details sibling with it)
+        const needMove = !anchor ? (list.firstElementChild !== row) : (anchor.nextSibling !== row);
+        if (needMove){
+          const details = (row.nextElementSibling && row.nextElementSibling.classList.contains('rc-details')) ? row.nextElementSibling : null;
+          if (!anchor) list.insertBefore(row, list.firstChild);
+          else list.insertBefore(row, anchor.nextSibling);
+          if (details) list.insertBefore(details, row.nextSibling);
+        }
+        // Update content only if signature changed
+        const oldSig = row.getAttribute('data-sig') || '';
+        if (oldSig !== newSig){
+          row.setAttribute('data-sig', newSig);
+          // Replace inner of row meta/actions only, keep row element and potential details sibling intact
+          const html = rcItemHtml(call);
+          const tmp = document.createElement('div');
+          tmp.innerHTML = html.trim();
+          const fresh = tmp.firstElementChild;
+          if (fresh){
+            // Swap inner structure of row (children) without replacing row node
+            row.innerHTML = fresh.innerHTML;
+          }
+        }
+      } else {
+        // Create new row and insert
+        const html = rcItemHtml(call);
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html.trim();
+        row = tmp.firstElementChild;
+        if (!anchor) list.insertBefore(row, list.firstChild);
+        else list.insertBefore(row, anchor.nextSibling);
+        // Auto-open if this id was previously open
+        try {
+          if (state._arcOpenIds && state._arcOpenIds.has(id)){
+            const btn = row.querySelector('.rc-icon-btn.rc-insights');
+            if (btn) toggleRcDetails(btn, call);
+          }
+        } catch(_) {}
+      }
+      anchor = row;
+      byId.delete(id);
+    });
+    // Remove any extra rows not in slice (and their details), but keep details for open ids on other pages
+    byId.forEach((row, id) => {
+      const details = (row.nextElementSibling && row.nextElementSibling.classList.contains('rc-details')) ? row.nextElementSibling : null;
+      if (details) details.remove();
+      row.remove();
+    });
   }
 
   function svgEye(){
@@ -1021,9 +1377,6 @@
         if (window._accountNavigationSource === 'calls') {
           try {
             const restore = window._callsReturn || {};
-            // Clear navigation markers early
-            window._accountNavigationSource = null;
-            window._callsReturn = null;
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('calls');
               // Restore Calls state
@@ -1040,6 +1393,9 @@
                 } catch(_) {}
               }, 60);
             }
+            // Clear navigation markers after successful navigation
+            window._accountNavigationSource = null;
+            window._callsReturn = null;
           } catch (_) { /* noop */ }
           return;
         }
@@ -1069,9 +1425,6 @@
         if (window._accountNavigationSource === 'people') {
           try {
             const restore = window._peopleReturn || {};
-            // Clear the navigation markers early to avoid leaking state
-            window._accountNavigationSource = null;
-            window._peopleReturn = null;
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('people');
               // Dispatch an event for People page to restore pagination and scroll
@@ -1082,6 +1435,9 @@
                 } catch(_) {}
               }, 40);
             }
+            // Clear navigation markers after successful navigation
+            window._accountNavigationSource = null;
+            window._peopleReturn = null;
           } catch (_) { /* noop */ }
           return;
         }
@@ -1090,9 +1446,7 @@
         if (window._accountNavigationSource === 'accounts') {
           try {
             const restore = window._accountsReturn || {};
-            // Clear early to avoid leaking state
-            window._accountNavigationSource = null;
-            window._accountsReturn = null;
+            console.log('[Account Detail] Back button: Returning to accounts page with restore data:', restore);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               // Hint Accounts page to avoid forcing page=1 during initial load
               try { window.__restoringAccounts = true; } catch (_) {}
@@ -1103,9 +1457,13 @@
                   const ev = new CustomEvent('pc:accounts-restore', { detail: {
                     page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm } });
                   document.dispatchEvent(ev);
+                  console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event');
                 } catch(_) {}
               }, 60);
             }
+            // Clear navigation markers after successful navigation
+            window._accountNavigationSource = null;
+            window._accountsReturn = null;
           } catch (_) { /* noop */ }
           return;
         }

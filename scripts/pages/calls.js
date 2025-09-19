@@ -384,6 +384,17 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       /* Ensure positioning context and avoid clipping */
       #calls-page .table-container { position: relative; overflow: visible; }
 
+      /* Stabilize scrollbars to avoid flicker during virtualization */
+      #calls-page .table-scroll { 
+        scrollbar-gutter: stable both-edges; 
+        overscroll-behavior: contain; 
+        overflow-anchor: none; 
+        will-change: transform; 
+        transform: translateZ(0); 
+        backface-visibility: hidden; 
+        contain: paint layout; 
+      }
+
       /* Disabled insights button styles */
       .qa-btn.insights-btn.disabled {
         opacity: 0.5;
@@ -449,6 +460,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         border-color: var(--red-subtle);
       }
       .btn-danger:hover { background: var(--red-600); border-color: var(--red-500); }
+      
+      /* Live call duration indicator */
+      tr.live-call .call-duration { color: var(--text-primary); font-weight: 400; }
     `;
     document.head.appendChild(style);
   }
@@ -562,15 +576,22 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     if (!state.virtual.headerH){
       try { const thead = els.table.querySelector('thead'); if (thead) state.virtual.headerH = thead.getBoundingClientRect().height || 0; } catch(_) {}
     }
-    // Measure a row height if unknown
+    // Measure a row height if unknown (off-DOM to avoid layout impact)
     if (!state.virtual.rowHeight){
       if (rows && rows.length){
         const sampleHtml = rowHtml(rows[0]);
-        const tmp = document.createElement('tbody');
-        tmp.innerHTML = sampleHtml;
-        els.table.appendChild(tmp);
-        try { state.virtual.rowHeight = Math.max(48, tmp.firstElementChild.getBoundingClientRect().height || 0); } catch(_){ state.virtual.rowHeight = 56; }
-        els.table.removeChild(tmp);
+        const tmpTable = document.createElement('table');
+        tmpTable.style.position = 'absolute';
+        tmpTable.style.visibility = 'hidden';
+        tmpTable.style.pointerEvents = 'none';
+        tmpTable.style.left = '-9999px';
+        tmpTable.innerHTML = `<tbody>${sampleHtml}</tbody>`;
+        document.body.appendChild(tmpTable);
+        try {
+          const h = (tmpTable.querySelector('tr')?.getBoundingClientRect().height) || 56;
+          state.virtual.rowHeight = Math.max(48, Math.round(h));
+        } catch(_){ state.virtual.rowHeight = 56; }
+        if (tmpTable.parentNode) tmpTable.parentNode.removeChild(tmpTable);
       } else {
         state.virtual.rowHeight = 56;
       }
@@ -582,7 +603,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         if (rafPending) return;
         rafPending = true;
         requestAnimationFrame(() => { rafPending = false; renderVirtualRows(); });
-      });
+      }, { passive: true });
       ensureVirtualization._bound = true;
     }
     state.virtual.rows = rows || [];
@@ -606,13 +627,13 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
 
     state.virtual.first = first; state.virtual.count = end - first;
 
-    const topH = first * rh;
-    const bottomH = Math.max(0, (total - end) * rh);
+    const topH = Math.max(0, Math.round(first * rh));
+    const bottomH = Math.max(0, Math.round((total - end) * rh));
 
     const slice = rows.slice(first, end);
     const sliceHtml = slice.map(rowHtml).join('');
-    const spacerTop = `<tr class="v-spacer-top"><td colspan="${els.colCount}" style="padding:0;border:none;height:${topH}px"></td></tr>`;
-    const spacerBot = `<tr class="v-spacer-bot"><td colspan="${els.colCount}" style="padding:0;border:none;height:${bottomH}px"></td></tr>`;
+    const spacerTop = `<tr class=\"v-spacer-top\"><td colspan=\"${els.colCount}\" style=\"padding:0;border:none;height:${topH}px\"></td></tr>`;
+    const spacerBot = `<tr class=\"v-spacer-bot\"><td colspan=\"${els.colCount}\" style=\"padding:0;border:none;height:${bottomH}px\"></td></tr>`;
     els.tbody.innerHTML = spacerTop + sliceHtml + spacerBot;
 
     // Bind row events only for visible rows
@@ -627,17 +648,28 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   }
 
   function bindVisibleRowEvents(){
-    // row checkbox selection
-    els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
-    // insights button
-    els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>btn.addEventListener('click',(e)=>{
-      if(btn.disabled) { e.preventDefault(); return; }
-      openInsightsModal(btn.getAttribute('data-id'));
-    }));
-    // name-cell navigation
+    // row checkbox selection (prevent duplicate listeners)
+    els.tbody.querySelectorAll('input.row-select').forEach(cb=>{
+      if (!cb._rowSelectListenerBound) {
+        cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); });
+        cb._rowSelectListenerBound = true;
+      }
+    });
+    // insights button (prevent duplicate listeners)
+    els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>{
+      if (!btn._insightsListenerBound) {
+        btn.addEventListener('click',(e)=>{
+          if(btn.disabled) { e.preventDefault(); return; }
+          openInsightsModal(btn.getAttribute('data-id'));
+        });
+        btn._insightsListenerBound = true;
+      }
+    });
+    // name-cell navigation (prevent duplicate listeners)
     els.tbody.querySelectorAll('.name-cell').forEach(cell => {
-      const contactId = cell.getAttribute('data-contact-id');
-      cell.addEventListener('click', (e) => {
+      if (!cell._nameCellListenerBound) {
+        const contactId = cell.getAttribute('data-contact-id');
+        cell.addEventListener('click', (e) => {
         e.preventDefault();
         const cid = cell.getAttribute('data-contact-id');
         if (cid && cid.trim()) {
@@ -680,7 +712,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             }
           }
         }
-      });
+        });
+        cell._nameCellListenerBound = true;
+      }
     });
     // company link
     els.tbody.querySelectorAll('.company-link').forEach(link => {
@@ -1583,8 +1617,22 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     paginate(); updateBulkBar(); }
 
   function rowHtml(r){
-    const dur = `${Math.floor(r.durationSec/60)}m ${r.durationSec%60}s`;
     const id = escapeHtml(r.id);
+    
+    // Check for live duration first, fallback to database duration
+    let dur = '';
+    if (state._liveCallDurations && state._liveCallDurations.has(id)) {
+      const liveData = state._liveCallDurations.get(id);
+      // Only use live duration if it's recent (within last 10 seconds)
+      if (Date.now() - liveData.timestamp < 10000) {
+        dur = liveData.durationFormatted;
+      }
+    }
+    
+    // Fallback to database duration if no live duration
+    if (!dur) {
+      dur = `${Math.floor(r.durationSec/60)}m ${r.durationSec%60}s`;
+    }
     // Compute a robust display name: contactName → company → pretty phone
     const prettyPhone = (()=>{
       try{
@@ -1706,7 +1754,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       <td>${numberCell}</td>
       <td>${directionCell || '—'}</td>
       <td>${callTimeStr}</td>
-      <td>${dur}</td>
+      <td><span class="call-duration">${dur}</span></td>
       <td><span class="outcome-badge outcome-${outcome.toLowerCase().replace(' ', '-')}">${outcome}</span></td>
       <td class="qa-cell"><div class="qa-actions">
         <button type="button" class="qa-btn insights-btn ${(!r.transcript || !r.aiInsights || Object.keys(r.aiInsights).length === 0) ? 'disabled' : ''}" data-id="${id}" aria-label="View insights" title="${(!r.transcript || !r.aiInsights || Object.keys(r.aiInsights).length === 0) ? 'Insights processing...' : 'View AI insights'}" ${(!r.transcript || !r.aiInsights || Object.keys(r.aiInsights).length === 0) ? 'disabled' : ''}>${svgIcon('insights')}</button>
@@ -3072,7 +3120,64 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     if(!initDomRefs()) return; 
     attachEvents(); 
     injectCallsBulkStyles(); 
-    loadData(); 
+    loadData();
+    
+    // Listen for live call duration updates
+    document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
+    
+    // Optimized cleanup: only clean up if we have many entries to reduce overhead
+    setInterval(() => {
+      try {
+        if (state._liveCallDurations && state._liveCallDurations.size > 10) {
+          const now = Date.now();
+          const toDelete = [];
+          for (const [callSid, data] of state._liveCallDurations.entries()) {
+            if (now - data.timestamp > 30000) {
+              toDelete.push(callSid);
+            }
+          }
+          // Batch delete to reduce Map operations
+          toDelete.forEach(sid => state._liveCallDurations.delete(sid));
+        }
+      } catch(_) {}
+    }, 15000); // Clean up every 15 seconds (less frequent)
+    
+    function onLiveCallDurationUpdate(e) {
+      try {
+        const { callSid, duration, durationFormatted } = e.detail || {};
+        if (!callSid || !durationFormatted) return;
+        
+        // Store the live duration for this call to prevent overwriting
+        if (!state._liveCallDurations) state._liveCallDurations = new Map();
+        state._liveCallDurations.set(callSid, { duration, durationFormatted, timestamp: Date.now() });
+        
+        // Cache the tbody element to avoid repeated DOM queries
+        if (!state._cachedCallsTableBody) {
+          state._cachedCallsTableBody = document.getElementById('calls-table')?.querySelector('tbody');
+        }
+        const tbody = state._cachedCallsTableBody;
+        if (!tbody) return;
+        
+        // Look for a call row that matches this call SID
+        const rows = tbody.querySelectorAll('tr');
+        for (const row of rows) {
+          const insightsBtn = row.querySelector('.insights-btn');
+          if (insightsBtn) {
+            const rowCallId = insightsBtn.getAttribute('data-id');
+            if (rowCallId === callSid) {
+              // Update the duration display in this row
+              const durationSpan = row.querySelector('.call-duration');
+              if (durationSpan) {
+                durationSpan.textContent = durationFormatted;
+                // Add a visual indicator that this is a live call
+                row.classList.add('live-call');
+              }
+              break;
+            }
+          }
+        }
+      } catch(_) {}
+    } 
 
     // Ensure table header has Number and Direction columns (idempotent)
     try {
