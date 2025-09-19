@@ -323,6 +323,11 @@
                 </svg>
               </button>
               <div id="widgets-drawer" class="widgets-drawer" role="menu" aria-label="Account widgets">
+                <button type="button" class="widget-item" data-widget="lusha" title="Lusha Contact Search" aria-label="Lusha Contact Search">
+                  <svg width="16" height="16" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
+                    <path d="M46.117,23.081l-0.995-0.04H45.12C34.243,22.613,25.387,13.757,24.959,2.88l-0.04-0.996	C24.9,1.39,24.494,1,24,1s-0.9,0.39-0.919,0.883l-0.04,0.996c-0.429,10.877-9.285,19.733-20.163,20.162l-0.995,0.04	C1.39,23.1,1,23.506,1,24s0.39,0.9,0.884,0.919l0.995,0.039c10.877,0.43,19.733,9.286,20.162,20.163l0.04,0.996	C23.1,46.61,23.506,47,24,47s0.9-0.39,0.919-0.883l0.04-0.996c0.429-10.877,9.285-19.733,20.162-20.163l0.995-0.039	C46.61,24.9,47,24.494,47,24S46.61,23.1,46.117,23.081z"/>
+                  </svg>
+                </button>
                 <button type="button" class="widget-item" data-widget="health" title="Energy Health Check" aria-label="Energy Health Check">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -2030,6 +2035,25 @@
         }
         console.log('Widget: Deal Calculator for account', accountId);
         try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) {}
+        break;
+      }
+      case 'lusha': {
+        // Toggle Lusha Search: if open, close; else open for this account
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen()) {
+              if (typeof api.closeLusha === 'function') { api.closeLusha(); return; }
+            } else if (typeof api.openLushaForAccount === 'function') {
+              api.openLushaForAccount(accountId); return;
+            } else if (typeof api.openLusha === 'function') {
+              // Fallback to contact version with account prefix
+              api.openLusha('account-' + accountId); return;
+            }
+          } catch (_) { /* noop */ }
+        }
+        console.log('Widget: Lusha Contact Search for account', accountId);
+        try { window.crm?.showToast && window.crm.showToast('Open Lusha Contact Search'); } catch (_) {}
         break;
       }
       default:
