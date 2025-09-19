@@ -83,17 +83,33 @@ export default async function handler(req, res){
               if (!statusOk) { others.push(rec); continue; }
               let channels = rec.channels;
               if (channels == null){
-                try { const fetched = await client.recordings(rec.sid).fetch(); channels = fetched?.channels; rec.source = rec.source || fetched?.source; } catch(_){ }
+                try {
+                  const fetched = await client.recordings(rec.sid).fetch();
+                  channels = fetched?.channels;
+                  rec.source = rec.source || fetched?.source;
+                  // Capture duration when available for better ranking
+                  if (rec.duration == null && fetched && (fetched.duration != null || fetched.durationSec != null)) {
+                    rec.duration = fetched.duration != null ? Number(fetched.duration) : Number(fetched.durationSec);
+                  }
+                } catch(_){ }
               }
               const isDual = String(channels||'') === '2';
               if (isDual){ dual.push(rec); } else { others.push(rec); }
             }
+            const sortByDurDescThenDate = (a,b)=>{
+              const da = (a.duration != null ? Number(a.duration) : -1);
+              const db = (b.duration != null ? Number(b.duration) : -1);
+              if (db !== da) return db - da;
+              const tb = new Date(b.dateCreated||b.startTime||0).getTime();
+              const ta = new Date(a.dateCreated||a.startTime||0).getTime();
+              return tb - ta;
+            };
             const sortByDateDesc = (a,b)=> new Date(b.dateCreated||b.startTime||0) - new Date(a.dateCreated||a.startTime||0);
             if (dual.length){
               // Prefer source=Dial, then most recent
-              const dial = dual.filter(r=> String(r.source||'').toLowerCase()==='dial').sort(sortByDateDesc);
+              const dial = dual.filter(r=> String(r.source||'').toLowerCase()==='dial').sort(sortByDurDescThenDate);
               if (dial.length) return dial[0].sid;
-              dual.sort(sortByDateDesc);
+              dual.sort(sortByDurDescThenDate);
               return dual[0].sid;
             }
             // Fallback: any completed, most recent
