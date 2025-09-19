@@ -1065,7 +1065,15 @@
       });
 
       if (!response.ok) {
-        throw new Error(`CI request failed: ${response.status} ${response.statusText}`);
+        try {
+          const err = await response.json().catch(()=>({}));
+          const msg = (err && (err.error || err.details)) ? String(err.error || err.details) : `CI request failed: ${response.status} ${response.statusText}`;
+          if (window.ToastManager) { window.ToastManager.showToast(msg, 'error'); }
+        } catch(_) {
+          try { if (window.ToastManager) { window.ToastManager.showToast('Failed to start call processing', 'error'); } } catch(__) {}
+        }
+        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+        return;
       }
 
       const result = await response.json();
