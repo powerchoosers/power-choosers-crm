@@ -99,9 +99,11 @@
           const account = window.AccountDetail.state.currentAccount;
           accountName = account.name || account.accountName || '';
         }
-        // Fallback: try to get from DOM
+        // Fallback: try to get from DOM (use page title, not contact name)
         if (!accountName) {
-          const accountTitle = document.querySelector('#account-detail-header .contact-header-profile .contact-name');
+          const accountTitle = document.querySelector('#account-detail-header .page-title') ||
+                               document.querySelector('.contact-page-title') ||
+                               document.querySelector('#account-details-page .page-title');
           if (accountTitle) {
             accountName = accountTitle.textContent?.trim() || '';
           }
@@ -310,8 +312,25 @@
       try {
         const a = window.AccountDetail?.state?.currentAccount || {};
         console.log('[Lusha] Account state:', a);
-        const name = a.name || a.accountName || a.companyName || '';
-        const d = a.domain || a.website || a.site || '';
+        
+        // Enhanced fallback chain for account name
+        const name = a.name || a.accountName || a.companyName || 
+                    document.querySelector('#account-detail-header .page-title')?.textContent?.trim() || 
+                    document.querySelector('#account-details-page .page-title')?.textContent?.trim() || 
+                    document.querySelector('.contact-page-title')?.textContent?.trim() || '';
+        
+        // Enhanced fallback chain for domain/website
+        let d = a.domain || a.website || a.site || a.companyWebsite || a.websiteUrl || '';
+        
+        // Try to get domain from website link in the page
+        if (!d) {
+          const websiteLink = document.querySelector('#account-detail-header [data-field="website"] a') ||
+                              document.querySelector('#account-details-page [data-field="website"] a');
+          if (websiteLink && websiteLink.href) {
+            d = websiteLink.href;
+          }
+        }
+        
         console.log('[Lusha] Account data:', { name, d, hasAccountDetail: !!window.AccountDetail });
         if (!companyName && name) companyName = name;
         if (!domain && d) domain = deriveDomain(d);
@@ -372,10 +391,27 @@
         base = 'https://power-choosers-crm.vercel.app';
       }
       // Ensure size >= 10 to satisfy API minimum
-      const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ companyId: company?.id, companyName: company?.name, domain: company?.domain, kind, page: 0, size: kind==='all' ? 40 : 10 }) });
+      const requestBody = { 
+        page: 0, 
+        size: kind==='all' ? 40 : 10 
+      };
+      
+      // Add company identifier - prioritize domain, then companyId, then companyName
+      if (company?.domain) {
+        requestBody.domain = company.domain;
+      } else if (company?.id) {
+        requestBody.companyId = company.id;
+      } else if (company?.name) {
+        requestBody.companyName = company.name;
+      }
+      
+      console.log('[Lusha] Contacts request body:', requestBody);
+      const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(requestBody) });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      console.log('[Lusha] Raw contacts response:', data);
       const contacts = data.contacts || [];
+      console.log('[Lusha] Parsed contacts array:', contacts);
       const panel = document.getElementById(kind === 'all' ? 'lusha-panel-all' : 'lusha-panel-popular');
       if (panel){
         panel.innerHTML = '';
