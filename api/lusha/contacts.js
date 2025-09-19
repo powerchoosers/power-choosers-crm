@@ -58,11 +58,12 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
   try {
     const requestBody = req.body || {};
+    let body;
     
     // Check if request already has the correct Lusha API structure
     if (requestBody.pages && requestBody.filters && requestBody.filters.companies) {
       // Request is already in correct format, use it directly
-      const body = requestBody;
+      body = requestBody;
       
       // Validate that we have at least one company identifier
       const hasCompanyId = body.filters.companies.include?.ids?.length > 0;
@@ -82,7 +83,7 @@ module.exports = async (req, res) => {
       const { companyId, companyName, domain, kind, page, size } = requestBody;
       const pages = { page: Math.max(0, parseInt(page ?? 0, 10) || 0), size: Math.min(40, Math.max(10, parseInt(size ?? 10, 10) || 10)) };
       
-      const body = {
+      body = {
         pages,
         filters: {
           companies: {
