@@ -10343,6 +10343,38 @@ th.drag-over::after {
     display: inline-block;
 }
 
+/* Enhanced favicon container styling */
+.company-favicon-container {
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-item);
+    overflow: hidden;
+}
+
+.company-favicon-container .company-favicon {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    transition: opacity 0.2s ease;
+}
+
+.company-favicon-container .company-favicon-fallback {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-item);
+    border-radius: 50%;
+}
+
 /* Fallback favicon styling */
 .company-favicon.company-favicon--fallback {
     padding: 0; /* Remove padding for SVG icon */
@@ -10357,6 +10389,19 @@ th.drag-over::after {
     width: 20px; /* Adjust SVG size within the 28px circle */
     height: 20px;
     display: block;
+}
+
+/* Favicon container states */
+.company-favicon-container.favicon-loaded .company-favicon-fallback {
+    display: none;
+}
+
+.company-favicon-container.favicon-failed .company-favicon {
+    display: none;
+}
+
+.company-favicon-container.favicon-failed .company-favicon-fallback {
+    display: flex;
 }
 
 /* === VARIABLES MODAL === */

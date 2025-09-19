@@ -95,10 +95,12 @@ module.exports = async (req, res) => {
       return res.status(resp.status).json({ error: 'Lusha contacts error', details: text });
     }
     const data = await resp.json();
+    console.log('Raw Lusha API response:', JSON.stringify(data, null, 2));
 
     // Map minimal fields the widget needs from prospecting search
     const contacts = Array.isArray(data?.contacts)
       ? data.contacts.map(c => ({
+          contactId: c.contactId, // Keep original contactId for enrich step
           id: c.contactId,
           firstName: c?.name?.first || '',
           lastName: c?.name?.last || '',
@@ -111,7 +113,12 @@ module.exports = async (req, res) => {
         }))
       : [];
 
-    return res.status(200).json({ contacts, page: data?.currentPage ?? pages.page, total: data?.totalResults ?? contacts.length });
+    return res.status(200).json({ 
+      contacts, 
+      page: data?.currentPage ?? pages.page, 
+      total: data?.totalResults ?? contacts.length,
+      requestId: data?.requestId // Include requestId for enrich step
+    });
   } catch (e) {
     return res.status(500).json({ error: 'Server error', details: e.message });
   }

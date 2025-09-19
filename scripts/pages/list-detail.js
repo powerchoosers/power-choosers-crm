@@ -1511,6 +1511,144 @@
     }
   }
 
+  // Drag and Drop functionality for table headers
+  let dragSrcTh = null;
+  let dragOverTh = null;
+
+  function initHeaderDragAndDrop() {
+    // Re-resolve header row each time to avoid stale references
+    const page = document.getElementById('list-detail-page');
+    els.theadRow = page ? page.querySelector('#list-detail-table thead tr') : els.theadRow;
+    if (!els || !els.theadRow) {
+      console.warn('[ListDetail] No theadRow found for drag and drop');
+      return;
+    }
+    
+    // Clean up existing event listeners by cloning the row to remove all listeners
+    const newTheadRow = els.theadRow.cloneNode(true);
+    els.theadRow.parentNode.replaceChild(newTheadRow, els.theadRow);
+    els.theadRow = newTheadRow;
+    
+    const ths = els.theadRow.querySelectorAll('th[draggable="true"]');
+    console.log('[ListDetail] Found', ths.length, 'draggable headers');
+    console.log('[ListDetail] Headers found:', Array.from(ths).map(th => th.textContent.trim()));
+    
+    // Define event handlers
+    const handleDragStart = (e) => {
+      console.log('[ListDetail] Drag start triggered on:', e.target.textContent.trim());
+      dragSrcTh = e.target;
+      e.target.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', e.target.outerHTML);
+    };
+
+    const handleDragEnd = (e) => {
+      e.target.classList.remove('dragging');
+      dragSrcTh = null;
+      dragOverTh = null;
+    };
+
+    const handleDragOver = (e) => {
+      if (e.preventDefault) {
+        e.preventDefault();
+      }
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    };
+
+    const handleDragEnter = (e) => {
+      e.target.classList.add('drag-over');
+      dragOverTh = e.target;
+    };
+
+    const handleDragLeave = (e) => {
+      e.target.classList.remove('drag-over');
+    };
+
+    const handleDrop = (e) => {
+      if (e.stopPropagation) {
+        e.stopPropagation();
+      }
+
+      if (dragSrcTh !== dragOverTh) {
+        console.log('[ListDetail] Dropping', dragSrcTh.textContent.trim(), 'onto', dragOverTh.textContent.trim());
+        commitHeaderMove(dragSrcTh, dragOverTh);
+      }
+
+      return false;
+    };
+
+    // Attach event listeners to each draggable header
+    ths.forEach(th => {
+      th.addEventListener('dragstart', handleDragStart, false);
+      th.addEventListener('dragend', handleDragEnd, false);
+      th.addEventListener('dragover', handleDragOver, false);
+      th.addEventListener('dragenter', handleDragEnter, false);
+      th.addEventListener('dragleave', handleDragLeave, false);
+      th.addEventListener('drop', handleDrop, false);
+    });
+
+    console.log('[ListDetail] Drag and drop initialized for', ths.length, 'headers');
+  }
+
+  function commitHeaderMove(dragSrcTh, dragOverTh) {
+    if (!dragSrcTh || !dragOverTh || dragSrcTh === dragOverTh) return;
+    
+    console.log('[ListDetail] Committing header move from', dragSrcTh.textContent.trim(), 'to', dragOverTh.textContent.trim());
+    
+    // Get the current order from DOM
+    const currentOrder = getHeaderOrderFromDom();
+    console.log('[ListDetail] Current order:', currentOrder);
+    
+    // Find the source and target column names
+    const srcCol = dragSrcTh.getAttribute('data-col');
+    const targetCol = dragOverTh.getAttribute('data-col');
+    
+    if (!srcCol || !targetCol) {
+      console.warn('[ListDetail] Missing data-col attributes');
+      return;
+    }
+    
+    // Create new order array
+    const newOrder = [...currentOrder];
+    const srcIndex = newOrder.indexOf(srcCol);
+    const targetIndex = newOrder.indexOf(targetCol);
+    
+    if (srcIndex === -1 || targetIndex === -1) {
+      console.warn('[ListDetail] Could not find column indices');
+      return;
+    }
+    
+    // Remove source from its current position
+    newOrder.splice(srcIndex, 1);
+    // Insert source at target position
+    newOrder.splice(targetIndex, 0, srcCol);
+    
+    console.log('[ListDetail] New order:', newOrder);
+    
+    // Save the new order
+    const storageKey = state.view === 'people' ? PEOPLE_COL_STORAGE_KEY : ACCOUNTS_COL_STORAGE_KEY;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(newOrder));
+    } catch (e) {
+      console.warn('Failed to save column order:', e);
+    }
+    
+    // Re-render the table with new column order
+    renderTableHead();
+    applyFilters();
+    
+    // Update the DOM order
+    dragOverTh.parentNode.insertBefore(dragSrcTh, dragOverTh);
+  }
+
+  function getHeaderOrderFromDom() {
+    if (!els.theadRow) return [];
+    
+    const ths = els.theadRow.querySelectorAll('th[data-col]');
+    return Array.from(ths).map(th => th.getAttribute('data-col')).filter(Boolean);
+  }
+
   window.ListDetail = {
     init: init,
     refreshListMembership: refreshListMembership,
@@ -1987,182 +2125,4 @@ async function removeSelectedFromList() {
     console.warn('Remove from list failed', e);
     window.crm?.showToast && window.crm.showToast('Failed to remove from list');
   }
-}
-
-// Drag and Drop functionality for table headers
-let dragSrcTh = null;
-let dragOverTh = null;
-
-function initHeaderDragAndDrop() {
-  // Re-resolve header row each time to avoid stale references
-  const page = document.getElementById('list-detail-page');
-  els.theadRow = page ? page.querySelector('#list-detail-table thead tr') : els.theadRow;
-  if (!els || !els.theadRow) {
-    console.warn('[ListDetail] No theadRow found for drag and drop');
-    return;
-  }
-  
-  // Clean up existing event listeners by cloning the row to remove all listeners
-  const newTheadRow = els.theadRow.cloneNode(true);
-  els.theadRow.parentNode.replaceChild(newTheadRow, els.theadRow);
-  els.theadRow = newTheadRow;
-  
-  const ths = els.theadRow.querySelectorAll('th[draggable="true"]');
-  console.log('[ListDetail] Found', ths.length, 'draggable headers');
-  console.log('[ListDetail] Headers found:', Array.from(ths).map(th => th.textContent.trim()));
-  
-  // Define event handlers
-  const handleDragStart = (e) => {
-    console.log('[ListDetail] Drag start triggered on:', e.target.textContent.trim());
-    dragSrcTh = e.target;
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.target.outerHTML);
-  };
-  
-  const handleDragEnd = () => {
-    if (dragSrcTh) {
-      dragSrcTh.classList.remove('dragging');
-    }
-    if (dragOverTh) {
-      dragOverTh.classList.remove('drag-over');
-      dragOverTh = null;
-    }
-    dragSrcTh = null;
-  };
-  
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    
-    if (!dragSrcTh) return;
-    
-    // Find the target column based on mouse position
-    let targetTh = null;
-    const elements = document.elementsFromPoint(e.clientX, e.clientY);
-    
-    for (const el of elements) {
-      if (el.tagName === 'TH' && el !== dragSrcTh && el.hasAttribute('draggable')) {
-        targetTh = el;
-        break;
-      }
-    }
-    
-    // Method 2: Check if mouse is over any draggable th
-    if (!targetTh) {
-      const rects = Array.from(ths).map(th => ({ th, rect: th.getBoundingClientRect() }));
-      for (const { th, rect } of rects) {
-        if (th !== dragSrcTh && e.clientX >= rect.left && e.clientX <= rect.right && 
-            e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          targetTh = th;
-          break;
-        }
-      }
-    }
-    
-    // Method 3: Use mouse X position to find closest column
-    if (!targetTh) {
-      const mouseX = e.clientX;
-      let closestTh = null;
-      let closestDistance = Infinity;
-      
-      ths.forEach(th => {
-        if (th === dragSrcTh) return;
-        const rect = th.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const distance = Math.abs(mouseX - centerX);
-        
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestTh = th;
-        }
-      });
-      
-      if (closestTh) {
-        targetTh = closestTh;
-      }
-    }
-    
-    // Method 4: Edge case handling for adjacent columns
-    if (!targetTh) {
-      const draggedIndex = Array.from(els.theadRow.children).indexOf(dragSrcTh);
-      const nextSibling = dragSrcTh.nextElementSibling;
-      const prevSibling = dragSrcTh.previousElementSibling;
-      
-      if (nextSibling && nextSibling.tagName === 'TH') {
-        const nextRect = nextSibling.getBoundingClientRect();
-        if (e.clientX >= nextRect.left - 30 && e.clientX <= nextRect.right + 30) {
-          targetTh = nextSibling;
-        }
-      } else if (prevSibling && prevSibling.tagName === 'TH') {
-        const prevRect = prevSibling.getBoundingClientRect();
-        if (e.clientX >= prevRect.left - 30 && e.clientX <= prevRect.right + 30) {
-          targetTh = prevSibling;
-        }
-      }
-    }
-    
-    // Update highlight if we found a new target
-    if (targetTh && targetTh !== dragOverTh) {
-      // Remove previous highlight
-      if (dragOverTh) {
-        dragOverTh.classList.remove('drag-over');
-      }
-      
-      // Add new highlight
-      dragOverTh = targetTh;
-      targetTh.classList.add('drag-over');
-    }
-  };
-  
-  const handleDrop = (e) => {
-    e.preventDefault();
-    
-    if (!dragSrcTh || !dragOverTh) return;
-    
-    // Remove highlight
-    dragOverTh.classList.remove('drag-over');
-    
-    // Commit the move - this will insert the dragged column before the highlighted target
-    commitHeaderMove(dragSrcTh, dragOverTh);
-    
-    // Update the column order and persist
-    const newOrder = getHeaderOrderFromDom();
-    if (newOrder.length > 0) {
-      if (state.view === 'people') {
-        peopleColumnOrder = newOrder;
-      } else {
-        accountsColumnOrder = newOrder;
-      }
-      persistColumnOrder();
-      // Re-render to reflect new column order
-      render();
-    }
-    
-    dragOverTh = null;
-  };
-  
-  ths.forEach(th => {
-    th.addEventListener('dragstart', handleDragStart);
-    th.addEventListener('dragend', handleDragEnd);
-    console.log('[ListDetail] Added drag listeners to:', th.textContent.trim());
-  });
-  
-  els.theadRow.addEventListener('dragover', handleDragOver);
-  els.theadRow.addEventListener('drop', handleDrop);
-  console.log('[ListDetail] Drag and drop initialized successfully');
-}
-
-function commitHeaderMove(dragSrcTh, dragOverTh) {
-  if (!dragSrcTh || !dragOverTh || dragSrcTh === dragOverTh) return;
-  
-  // Insert the dragged element before the target
-  dragOverTh.parentNode.insertBefore(dragSrcTh, dragOverTh);
-}
-
-function getHeaderOrderFromDom() {
-  if (!els.theadRow) return [];
-  
-  const ths = els.theadRow.querySelectorAll('th[data-col]');
-  return Array.from(ths).map(th => th.getAttribute('data-col')).filter(Boolean);
 }
