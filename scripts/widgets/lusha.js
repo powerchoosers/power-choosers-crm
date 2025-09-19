@@ -367,9 +367,12 @@
 
   async function loadEmployees(kind, company){
     try{
-      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-    // Ensure size >= 10 to satisfy API minimum
-    const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ companyId: company?.id, companyName: company?.name, domain: company?.domain, kind, page: 0, size: kind==='all' ? 40 : 10 }) });
+      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
+        base = 'https://power-choosers-crm.vercel.app';
+      }
+      // Ensure size >= 10 to satisfy API minimum
+      const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ companyId: company?.id, companyName: company?.name, domain: company?.domain, kind, page: 0, size: kind==='all' ? 40 : 10 }) });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       const contacts = data.contacts || [];
