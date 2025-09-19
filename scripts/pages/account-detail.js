@@ -356,8 +356,8 @@
                                  data-account-id="${a.id || a.accountId || a._id || ''}" 
                                  data-account-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}" 
                                  data-company-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}"
-                                 ${mostRelevantContact ? `data-contact-id="${mostRelevantContact.id || mostRelevantContact._id || ''}"` : ''}
-                                 ${mostRelevantContact ? `data-contact-name="${escapeHtml([mostRelevantContact.firstName, mostRelevantContact.lastName].filter(Boolean).join(' ') || mostRelevantContact.name || '')}"` : ''}>${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
+                                 data-contact-id=""
+                                 data-contact-name="">${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">CITY</div><div class="info-value-wrap" data-field="city"><span class="info-value-text">${escapeHtml(city) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">STATE</div><div class="info-value-wrap" data-field="state"><span class="info-value-text">${escapeHtml(stateVal) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value-wrap" data-field="industry"><span class="info-value-text">${escapeHtml(industry) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
@@ -1023,9 +1023,9 @@
         <div class="rc-meta">
           <div class="rc-title">${name}${company?` • ${company}`:''}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 
-                                 data-contact-id="${c.contactId || ''}" 
+                                 data-contact-id="" 
                                  data-account-id="${c.accountId || state.currentAccount?.id || ''}" 
-                                 data-contact-name="${escapeHtml(name)}" 
+                                 data-contact-name="" 
                                  data-company-name="${escapeHtml(company)}">${phone}</span>${direction?` • ${direction}`:''}</div>
         </div>
         <div class="rc-actions">
