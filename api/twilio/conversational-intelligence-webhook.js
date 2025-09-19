@@ -170,13 +170,18 @@ export default async function handler(req, res) {
             CallSid,
             RecordingSid,
             EventType,
-            AnalysisStatus
+            analysisStatus,
+            AccountSid,
+            timestamp
         } = req.body;
         
         if (!TranscriptSid || !ServiceSid) {
             console.log('[Conversational Intelligence Webhook] Missing required fields');
             return res.status(400).json({ error: 'Missing required fields' });
         }
+        
+        // Log full webhook payload for debugging
+        console.log('[Conversational Intelligence Webhook] Full webhook payload:', JSON.stringify(req.body, null, 2));
         
         console.log('[Conversational Intelligence Webhook] Processing webhook:', {
             TranscriptSid,
@@ -185,23 +190,32 @@ export default async function handler(req, res) {
             CallSid,
             RecordingSid,
             EventType,
-            AnalysisStatus
+            analysisStatus,
+            AccountSid,
+            timestamp
         });
         
-        // Only process analysis completed events (not just transcript completed)
+        // Only process analysis completed events (per Twilio guidance)
         const isAnalysisComplete = EventType === 'analysis_completed' || 
-                                 EventType === 'ci.analysis.completed' ||
-                                 AnalysisStatus === 'completed' ||
-                                 (Status === 'completed' && EventType === 'transcript.completed');
+                                 EventType === 'ci.analysis.completed';
         
         if (!isAnalysisComplete) {
-            console.log('[Conversational Intelligence Webhook] Analysis not completed yet:', {
-                Status,
+            console.log('[Conversational Intelligence Webhook] Not an analysis completion event:', {
                 EventType,
-                AnalysisStatus,
+                analysisStatus,
                 message: 'Waiting for analysis_completed event'
             });
-            return res.status(200).json({ success: true, message: 'Analysis not ready' });
+            return res.status(200).json({ success: true, message: 'Not analysis completion event' });
+        }
+        
+        // Validate analysis status
+        if (analysisStatus && analysisStatus !== 'completed') {
+            console.log('[Conversational Intelligence Webhook] Analysis not completed yet:', {
+                EventType,
+                analysisStatus,
+                message: 'Analysis still in progress'
+            });
+            return res.status(200).json({ success: true, message: 'Analysis in progress' });
         }
         
         // Initialize Twilio client
@@ -214,14 +228,19 @@ export default async function handler(req, res) {
                 sid: transcript.sid,
                 status: transcript.status,
                 sourceSid: transcript.sourceSid,
-                analysisStatus: transcript.analysisStatus || 'unknown'
+                analysisStatus: transcript.analysisStatus || 'unknown',
+                // Log additional CI fields for debugging
+                ciStatus: transcript.ciStatus || 'unknown',
+                processingStatus: transcript.processingStatus || 'unknown'
             });
             
-            // Double-check that CI analysis is actually completed
+            // Double-check that CI analysis is actually completed (per Twilio guidance)
             if (transcript.analysisStatus && transcript.analysisStatus !== 'completed') {
                 console.log('[Conversational Intelligence Webhook] CI analysis not completed yet:', {
                     transcriptStatus: transcript.status,
                     analysisStatus: transcript.analysisStatus,
+                    ciStatus: transcript.ciStatus,
+                    processingStatus: transcript.processingStatus,
                     message: 'Waiting for CI analysis to complete'
                 });
                 return res.status(200).json({ success: true, message: 'CI analysis in progress' });
@@ -263,8 +282,11 @@ export default async function handler(req, res) {
                         text: s.text?.substring(0, 50) + '...',
                         channel: s.channel,
                         startTime: s.startTime,
-                        endTime: s.endTime
-                    }))
+                        endTime: s.endTime,
+                        confidence: s.confidence
+                    })),
+                    // Log full sentences response for debugging (first 3 sentences)
+                    fullResponse: sentencesResponse.slice(0, 3)
                 });
                 
                 // Validate we have proper sentence segmentation
