@@ -314,9 +314,20 @@ export default async function handler(req, res) {
             let transcriptText = '';
             let sentences = [];
             try {
-                const sentencesResponse = await client.intelligence.v2
-                    .transcripts(TranscriptSid)
-                    .sentences.list();
+                // Retry fetching sentences for short propagation lag (2–5s up to 30s)
+                let sentencesResponse = [];
+                const maxMs = 30000; const stepMs = 2500; let waited = 0;
+                while (waited <= maxMs) {
+                    const resp = await client.intelligence.v2
+                        .transcripts(TranscriptSid)
+                        .sentences.list();
+                    const count = Array.isArray(resp) ? resp.length : 0;
+                    console.log(`[Conversational Intelligence Webhook] Sentences fetch: count=${count}, waitedMs=${waited}`);
+                    if (count > 0) { sentencesResponse = resp; break; }
+                    if (waited >= maxMs) break;
+                    await new Promise(r => setTimeout(r, stepMs));
+                    waited += stepMs;
+                }
                 
                 console.log(`[Conversational Intelligence Webhook] Raw sentences response:`, {
                     count: sentencesResponse.length,
