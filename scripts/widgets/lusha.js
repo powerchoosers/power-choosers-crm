@@ -390,19 +390,27 @@
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
         base = 'https://power-choosers-crm.vercel.app';
       }
-      // Ensure size >= 10 to satisfy API minimum
+      
+      // Build request body with correct Lusha API structure
       const requestBody = { 
-        page: 0, 
-        size: kind==='all' ? 40 : 10 
+        pages: { page: 0, size: kind==='all' ? 40 : 10 },
+        filters: {
+          companies: {
+            include: {}
+          }
+        }
       };
       
       // Add company identifier - prioritize domain, then companyId, then companyName
       if (company?.domain) {
-        requestBody.domain = company.domain;
+        requestBody.filters.companies.include.domains = [company.domain];
       } else if (company?.id) {
-        requestBody.companyId = company.id;
+        requestBody.filters.companies.include.ids = [company.id];
       } else if (company?.name) {
-        requestBody.companyName = company.name;
+        requestBody.filters.companies.include.names = [company.name];
+      } else {
+        console.warn('[Lusha] No company identifier available for search');
+        return;
       }
       
       console.log('[Lusha] Contacts request body:', requestBody);
