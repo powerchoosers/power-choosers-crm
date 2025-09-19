@@ -330,6 +330,11 @@ class TaskNotificationManager {
     makeFavicon(domain) {
         if (!domain) return '';
         const d = domain.replace(/^https?:\/\//, '');
+        // Use the new favicon helper system if available
+        if (window.__pcFaviconHelper) {
+            return window.__pcFaviconHelper.generateFaviconHTML(d, 64);
+        }
+        // Fallback to old system
         return `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent('https://' + d)}`;
     }
 

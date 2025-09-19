@@ -2028,11 +2028,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       const domain = extractDomainFromCompany(companyName);
       if (domain) {
         return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">
-          <img src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}" 
-               alt="" loading="lazy" referrerpolicy="no-referrer" 
-               onload="this.nextElementSibling.style.display='none';"
-               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-          <div class="company-favicon-fallback" style="display:none;">${svgIcon('accounts')}</div>
+          ${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : `<div class="company-favicon-fallback">${svgIcon('accounts')}</div>`}
         </div>`;
       } else {
         // Fallback to first letter of contact name

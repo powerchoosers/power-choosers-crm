@@ -4198,14 +4198,15 @@ class EmailManager {
             // Generate unique tracking ID for this email
             const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            // Create tracking pixel URL
-            const trackingPixelUrl = `${window.location.protocol}//${window.location.host}/api/email/track/${trackingId}`;
+            // Create tracking pixel URL using configured API base (prod -> Vercel)
+            const baseUrl = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+            const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
             
             // Inject tracking pixel into email content
             const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
             const contentWithTracking = content + trackingPixel;
             
-            // Create email message in Gmail format
+            // Create email message in Gmail format with spam prevention headers
             const recipients = Array.isArray(to) ? to.join(', ') : to;
             const emailLines = [
                 `To: ${recipients}`,
@@ -4213,6 +4214,14 @@ class EmailManager {
                 `Subject: ${subject}`,
                 'MIME-Version: 1.0',
                 'Content-Type: text/html; charset=utf-8',
+                'X-Mailer: Power Choosers CRM',
+                'X-Priority: 3',
+                'X-MSMail-Priority: Normal',
+                'Importance: Normal',
+                'List-Unsubscribe: <mailto:unsubscribe@powerchoosers.com>',
+                'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
+                'X-Auto-Response-Suppress: All',
+                'Precedence: bulk',
                 '',
                 contentWithTracking
             ];

@@ -412,6 +412,36 @@
       console.log('[Lusha] Raw contacts response:', data);
       const contacts = Array.isArray(data.contacts) ? data.contacts : [];
       console.log('[Lusha] Parsed contacts array:', contacts);
+      
+      // If we have contactIds but no details, we need to enrich them
+      if (contacts.length > 0 && data.requestId) {
+        console.log('[Lusha] Found contacts, enriching for full details...');
+        const contactIds = contacts.map(c => c.contactId).filter(Boolean);
+        
+        if (contactIds.length > 0) {
+          try {
+            const enrichResp = await fetch(`${base}/api/lusha/enrich`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                requestId: data.requestId,
+                contactIds: contactIds
+              })
+            });
+            
+            if (enrichResp.ok) {
+              const enrichData = await enrichResp.json();
+              console.log('[Lusha] Enriched contacts:', enrichData);
+              // Use enriched contacts instead of search contacts
+              contacts.splice(0, contacts.length, ...(enrichData.contacts || []));
+            } else {
+              console.warn('[Lusha] Enrich failed:', await enrichResp.text());
+            }
+          } catch (enrichError) {
+            console.error('[Lusha] Enrich error:', enrichError);
+          }
+        }
+      }
 
       // Ensure results container shows
       try {
@@ -446,16 +476,24 @@
   }
 
   function mapProspectingContact(c){
+    // Handle both search results (with hasEmails/hasPhones) and enriched results (with actual emails/phones)
+    const isEnriched = Array.isArray(c.emails) || Array.isArray(c.phones);
+    
     return {
       firstName: c.firstName || c.name?.first || '',
       lastName: c.lastName || c.name?.last || '',
       jobTitle: c.jobTitle || '',
       company: c.companyName || '',
-      email: '',
-      phone: '',
+      email: isEnriched && c.emails && c.emails.length > 0 ? c.emails[0].address : '',
+      phone: isEnriched && c.phones && c.phones.length > 0 ? c.phones[0].number : '',
       fqdn: c.fqdn || '',
       companyId: c.companyId || null,
-      id: c.id || c.contactId
+      id: c.id || c.contactId,
+      hasEmails: isEnriched ? (c.emails && c.emails.length > 0) : !!c?.hasEmails,
+      hasPhones: isEnriched ? (c.phones && c.phones.length > 0) : !!c?.hasPhones,
+      emails: c.emails || [],
+      phones: c.phones || [],
+      isSuccess: c.isSuccess !== false // Default to true for search results
     };
   }
 

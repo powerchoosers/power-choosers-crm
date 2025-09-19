@@ -3309,7 +3309,7 @@
     const domain = cd_extractDomainFromAccount(call && (call.accountName || ''));
     if (domain){
       const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class="company-favicon" aria-hidden="true" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);"></span>';
-      return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true"><img src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n){ n.style.display='flex'; }">${fb}</div>`;
+      return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : fb}</div>`;
     }
     const initial = (String(contactName||'C').charAt(0) || 'C').toUpperCase();
     return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initial}</div>`;

@@ -830,10 +830,19 @@
   }
 
   function makeFavicon(domain) {
-    if (!domain) return '';
-    const d = domain.replace(/^https?:\/\//, '');
-    const src = `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent('https://' + d)}`;
-    return src;
+  if (!domain) return '';
+  const d = domain.replace(/^https?:\/\//, '');
+  // Use the new favicon helper system if available
+  if (window.__pcFaviconHelper) {
+    const faviconHTML = window.__pcFaviconHelper.generateFaviconHTML(d, 64);
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = faviconHTML;
+    const img = tempDiv.querySelector('.company-favicon');
+    return img ? img.src : '';
+  }
+  // Fallback to old system
+  const src = `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent('https://' + d)}`;
+  return src;
   }
 
   // Inject minimal styles for the in-call contact display that replaces the input

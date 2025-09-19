@@ -1,5 +1,6 @@
 // Vercel API endpoint for email tracking pixels
 import { cors } from '../../_cors';
+import { admin, db } from '../../_firebase';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -25,15 +26,24 @@ export default async function handler(req, res) {
 
     console.log('[Email] Open event:', openEvent);
     
-    // TODO: Update Firebase database here
-    // const admin = require('firebase-admin');
-    // const emailRef = admin.firestore().collection('emails').doc(trackingId);
-    // await emailRef.update({
-    //   opens: admin.firestore.FieldValue.arrayUnion(openEvent),
-    //   openCount: admin.firestore.FieldValue.increment(1),
-    //   lastOpened: openEvent.openedAt,
-    //   updatedAt: new Date().toISOString()
-    // });
+    // Update Firebase database with tracking event
+    if (db) {
+      try {
+        const emailRef = db.collection('emails').doc(trackingId);
+        await emailRef.update({
+          opens: admin.firestore.FieldValue.arrayUnion(openEvent),
+          openCount: admin.firestore.FieldValue.increment(1),
+          lastOpened: openEvent.openedAt,
+          updatedAt: new Date().toISOString()
+        });
+        console.log('[Email] Successfully updated Firebase with open event');
+      } catch (firebaseError) {
+        console.error('[Email] Firebase update error:', firebaseError);
+        // Continue to return pixel even if Firebase fails
+      }
+    } else {
+      console.warn('[Email] Firebase not available, tracking event not saved');
+    }
 
     // Return a 1x1 transparent pixel
     const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
