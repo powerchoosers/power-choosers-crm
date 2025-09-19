@@ -738,7 +738,7 @@
     } catch (_) {}
     
     try {
-      console.time('[ListDetail] loadDataOnce');
+      if (console.time) console.time('[ListDetail] loadDataOnce');
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         // Load people
         if (!state.loadedPeople) {
@@ -764,7 +764,7 @@
       state.loadedAccounts = true;
     }
     
-    console.timeEnd('[ListDetail] loadDataOnce');
+    if (console.timeEnd) console.timeEnd('[ListDetail] loadDataOnce');
     renderTableHead();
     buildSuggestionPools();
     applyFilters();
@@ -777,7 +777,7 @@
     
     // 1) Try preloaded cache for instant availability
     try {
-      console.time(`[ListDetail] fetchMembers ${listId}`);
+      if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
       let cacheHit = false; let cacheLoaded = false;
       const cache = (window.listMembersCache && window.listMembersCache[listId]) || null;
       if (cache && (cache.loaded || cache.people || cache.accounts)) {
@@ -790,7 +790,7 @@
         cacheHit = true; cacheLoaded = !!cache.loaded;
         console.debug('[ListDetail] fetchMembers: cache', { listId, cacheLoaded, people: state.membersPeople.size, accounts: state.membersAccounts.size });
         if (cache.loaded) {
-          console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
+          if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
           return; // Use cached result immediately
         }
       }
@@ -848,7 +848,7 @@
         };
         console.debug('[ListDetail] fetchMembers: cache updated', { listId, people: state.membersPeople.size, accounts: state.membersAccounts.size });
       } catch (_) {}
-      console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
+      if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
       
       // Debug: Log the actual member IDs
       console.log('[ListDetail] fetchMembers result:', {
@@ -1391,7 +1391,7 @@
 
   async function init(context) {
     console.log('[ListDetail] Initializing with context:', context);
-    console.time('[ListDetail] init');
+    if (console.time) console.time('[ListDetail] init');
     
     if (!initDomRefs()) {
       console.error('[ListDetail] Failed to initialize DOM refs');
@@ -1492,7 +1492,7 @@
       console.log('[ListDetail] Initializing drag and drop after data load');
       initHeaderDragAndDrop();
     }, 100);
-    console.timeEnd('[ListDetail] init');
+    if (console.timeEnd) console.timeEnd('[ListDetail] init');
   }
 
   // Expose API

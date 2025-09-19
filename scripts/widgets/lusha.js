@@ -200,6 +200,7 @@
     } catch (_) { /* noop */ }
 
     attachEventListeners();
+    try { prefillInputs(entityType); } catch(_) {}
     return card;
   }
 
@@ -267,10 +268,75 @@
     }
   }
 
+  function deriveDomain(raw) {
+    if (!raw) return '';
+    try {
+      let s = String(raw).trim();
+      if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+      const u = new URL(s);
+      return (u.hostname || '').replace(/^www\./i, '');
+    } catch (_) {
+      return String(raw).replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
+    }
+  }
+
+  function prefillInputs(entityType){
+    const companyEl = document.getElementById('lusha-company-search');
+    const domainEl = document.getElementById('lusha-company-domain');
+
+    let companyName = companyEl?.value || '';
+    let domain = '';
+
+    if (entityType === 'account') {
+      try {
+        const a = window.AccountDetail?.state?.currentAccount || {};
+        const name = a.name || a.accountName || a.companyName || '';
+        const d = a.domain || a.website || a.site || '';
+        if (!companyName && name) companyName = name;
+        if (!domain && d) domain = deriveDomain(d);
+      } catch(_) {}
+    } else {
+      try {
+        const c = window.ContactDetail?.state?.currentContact || {};
+        const linkedId = window.ContactDetail?.state?._linkedAccountId;
+        if (!companyName) companyName = c.companyName || c.company || c.account || '';
+        if (linkedId && typeof window.getAccountsData === 'function') {
+          const acc = (window.getAccountsData()||[]).find(x => (x.id||x.accountId||x._id) === linkedId);
+          if (acc) {
+            const d = acc.domain || acc.website || acc.site || '';
+            if (d) domain = deriveDomain(d);
+            if (!companyName) companyName = acc.name || acc.accountName || '';
+          }
+        }
+        if (!domain) {
+          const alt = c.companyWebsite || c.website || '';
+          if (alt) domain = deriveDomain(alt);
+        }
+      } catch(_) {}
+    }
+
+    // Fallback by name match in accounts cache
+    if (!domain && companyName && typeof window.getAccountsData === 'function') {
+      try {
+        const key = String(companyName).trim().toLowerCase();
+        const hit = (window.getAccountsData()||[]).find(a => String(a.name||a.accountName||'').trim().toLowerCase() === key);
+        if (hit) {
+          const d = hit.domain || hit.website || hit.site || '';
+          if (d) domain = deriveDomain(d);
+        }
+      } catch(_) {}
+    }
+
+    if (companyEl && companyName) companyEl.value = companyName;
+    if (domainEl && domain) domainEl.value = domain;
+
+    try { console.log('[Lusha] Prefilled', { page: entityType, companyName, domain }); } catch(_) {}
+  }
+
   async function loadEmployees(kind, company){
     try{
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ companyId: company?.id, companyName: company?.name, domain: company?.domain, kind }) });
+      const resp = await fetch(`${base}/api/lusha/contacts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ companyId: company?.id, companyName: company?.name, domain: company?.domain, kind, page: 0, size: kind==='all' ? 40 : 10 }) });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       const contacts = data.contacts || [];
@@ -279,17 +345,32 @@
         panel.innerHTML = '';
         const list = document.createElement('div');
         list.className = 'lusha-contacts-list';
-        contacts.forEach((c,i)=> list.appendChild(createContactElement(c,i)));
+        contacts.forEach((c,i)=> list.appendChild(createContactElement(mapProspectingContact(c),i)));
         panel.appendChild(list);
       }
     }catch(e){ console.error('Employees load failed', e); }
+  }
+
+  function mapProspectingContact(c){
+    return {
+      firstName: c.firstName || c.name?.first || '',
+      lastName: c.lastName || c.name?.last || '',
+      jobTitle: c.jobTitle || '',
+      company: c.companyName || '',
+      email: '',
+      phone: '',
+      fqdn: c.fqdn || '',
+      companyId: c.companyId || null,
+      id: c.id || c.contactId
+    };
   }
 
   function renderCompanyPanel(company){
     const el = document.getElementById('lusha-panel-company');
     if (!el) return;
     const name = escapeHtml(company?.name || '');
-    const domain = escapeHtml(company?.domain || '');
+    const domainRaw = (company?.domain || company?.fqdn || '') || '';
+    const domain = escapeHtml(String(domainRaw).replace(/^www\./i,''));
     const website = domain ? `https://${domain}` : '';
     el.innerHTML = `
       <div class="company-summary">
@@ -347,8 +428,8 @@
       : contact.fullName || 'Unknown Name';
     
     const title = contact.title || contact.jobTitle || 'No title';
-    const email = contact.email || 'No email';
-    const phone = contact.phone || contact.phoneNumber || 'No phone';
+    const email = contact.email || '—';
+    const phone = contact.phone || contact.phoneNumber || '—';
     const company = contact.company || contact.companyName || 'No company';
     const location = contact.location || contact.city || 'No location';
 
@@ -453,14 +534,13 @@
 
   function resetLushaForm() {
     const companyInput = document.getElementById('lusha-company-search');
-    const nameInput = document.getElementById('lusha-contact-name');
-    const emailInput = document.getElementById('lusha-contact-email');
+    const domainInput = document.getElementById('lusha-company-domain');
     const resultsEl = document.getElementById('lusha-results');
 
     if (companyInput) companyInput.value = currentAccountName || '';
-    if (nameInput) nameInput.value = '';
-    if (emailInput) emailInput.value = '';
+    if (domainInput) domainInput.value = '';
     if (resultsEl) resultsEl.style.display = 'none';
+    try { prefillInputs(currentEntityType); } catch(_) {}
   }
 
   function escapeHtml(str) {
