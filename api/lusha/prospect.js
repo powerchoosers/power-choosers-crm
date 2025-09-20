@@ -1,6 +1,5 @@
 const cors = require('../_cors');
 
-// Lusha API configuration
 const LUSHA_API_KEY = process.env.LUSHA_API_KEY;
 const LUSHA_BASE_URL = 'https://api.lusha.com';
 
@@ -23,8 +22,10 @@ async function callLushaApi(endpoint, body) {
   return response.json();
 }
 
-module.exports = async (req, res) => {
-  cors(req, res);
+const handler = async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (!LUSHA_API_KEY) {
     return res.status(500).json({ error: 'Lusha API key is not configured.' });
@@ -93,3 +94,5 @@ module.exports = async (req, res) => {
     });
   }
 };
+
+module.exports = cors(handler);
