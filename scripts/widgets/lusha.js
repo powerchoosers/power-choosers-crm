@@ -11,6 +11,11 @@
   let currentEntityType = 'contact'; // 'contact' or 'account'
   let currentAccountName = null;
   let lastCompanyResult = null;
+  
+  // Pagination state
+  let allContacts = []; // Store all contacts for pagination
+  let currentPage = 1;
+  const contactsPerPage = 5;
 
   function getPanelContentEl() {
     const panel = document.getElementById('widget-panel');
@@ -120,7 +125,7 @@
       <div class="widget-card-header">
         <h3 class="widget-title">Lusha Contact Search</h3>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="lusha-refresh-top" id="lusha-refresh-btn" type="button" title="Refresh">⟳</button>
+          <button class="lusha-refresh-top" id="lusha-refresh-btn" type="button" title="Force Live Search (1 credit)">⟳</button>
           <button class="lusha-close" type="button" title="Close Lusha Search" aria-label="Close">×</button>
         </div>
       </div>
@@ -128,18 +133,33 @@
       <div class="lusha-body">
         <!-- Company Summary -->
         <div id="lusha-panel-company"></div>
+        
+        <!-- Loading indicator -->
+        <div id="lusha-loading" style="display:none;">
           <div class="lusha-spinner"></div>
           <div class="lusha-loading-text">Searching Lusha database...</div>
         </div>
-
-        <!-- Company Summary -->
-        <div id="lusha-panel-company"></div>
 
         <!-- Results Section -->
         <div class="lusha-results" id="lusha-results" style="display: none;">
           <div class="lusha-results-header">
             <h4>Search Results</h4>
             <div class="lusha-results-count" id="lusha-results-count">0 contacts found</div>
+            <div class="lusha-pagination" id="lusha-pagination" style="display: none;">
+              <button class="lusha-pagination-arrow" id="lusha-prev-btn" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15,18 9,12 15,6"/>
+                </svg>
+              </button>
+              <div class="lusha-pagination-current-container">
+                <div class="lusha-pagination-current" id="lusha-pagination-current">1</div>
+              </div>
+              <button class="lusha-pagination-arrow" id="lusha-next-btn" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9,18 15,12 9,6"/>
+                </svg>
+              </button>
+            </div>
           </div>
           
           <div class="lusha-contacts-list" id="lusha-contacts-list">
@@ -234,12 +254,52 @@
         }
       });
     });
+    
+    // Pagination buttons
+    const prevBtn = document.getElementById('lusha-prev-btn');
+    const nextBtn = document.getElementById('lusha-next-btn');
+    
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          displayCurrentPage();
+        }
+      });
+    }
+    
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil(allContacts.length / contactsPerPage);
+        if (currentPage < totalPages) {
+          currentPage++;
+          displayCurrentPage();
+        }
+      });
+    }
   }
 
   async function performLushaSearch(options = {}) {
     lushaLog('Starting Lusha search with options:', options);
+    
+    // Reset pagination state
+    allContacts = [];
+    currentPage = 1;
+    
     const loadingEl = document.getElementById('lusha-loading');
-    if (loadingEl) loadingEl.style.display = 'block';
+    const resultsWrap = document.getElementById('lusha-results');
+    // Show loading with fade-in; hide results until ready
+    if (loadingEl) {
+      loadingEl.style.display = 'block';
+      try { loadingEl.classList.remove('is-hidden'); loadingEl.classList.add('is-shown'); } catch(_) {}
+    }
+    if (resultsWrap) {
+      try {
+        resultsWrap.style.display = 'block';
+        resultsWrap.classList.remove('is-shown');
+        resultsWrap.classList.add('is-hidden');
+      } catch(_) {}
+    }
 
     // derive company + domain from page context (no input fields)
     const ctx = getContextDefaults(currentEntityType);
@@ -257,13 +317,43 @@
         lushaLog('Checking cache for:', { domain, companyName });
         const cached = await tryLoadCache({ domain, companyName });
         if (cached && cached.contacts && cached.contacts.length) {
-          lushaLog('Using cached contacts:', cached);
-          lastCompanyResult = { name: cached.companyName || companyName || '', domain: cached.domain || domain, website: cached.website || '' };
+          lushaLog('Using cached contacts (saving credits):', cached);
+          
+          // Use complete cached company data
+          lastCompanyResult = {
+            name: cached.companyName || companyName || '',
+            domain: cached.domain || domain,
+            website: cached.website || '',
+            // Include all cached company fields
+            id: cached.companyId,
+            logoUrl: cached.logoUrl,
+            description: cached.description,
+            industry: cached.industry,
+            employees: cached.employees,
+            revenue: cached.revenue,
+            location: cached.location,
+            city: cached.city,
+            state: cached.state,
+            country: cached.country,
+            phone: cached.phone,
+            email: cached.email,
+            linkedin: cached.linkedin,
+            twitter: cached.twitter,
+            facebook: cached.facebook,
+            // Include full company object if available
+            ...(cached.company || {})
+          };
+          
           renderCompanyPanel(lastCompanyResult);
           updateResults(cached.contacts);
+          // Crossfade from loading to results
+          try { crossfadeToResults(); } catch(_) {}
+          
+          // Show cache indicator
+          window.crm?.showToast && window.crm.showToast('Using cached results (0 credits)');
           return;
         } else {
-          lushaLog('No cache found, proceeding with live search');
+          lushaLog('No cache found, proceeding with live search (1 credit)');
         }
       }
 
@@ -306,17 +396,54 @@
         lushaLog('Parsed contacts:', contacts);
         collected.push(...contacts);
         total = data.total || contacts.length;
+        
+        // Store requestId for reveal functionality (only on first page)
+        if (page === 0 && data.requestId) {
+          window.__lushaLastRequestId = data.requestId;
+          lushaLog('Stored requestId for reveals:', data.requestId);
+        }
+        
         page += 1;
       } while (collected.length < total && page < 5); // safety max pages
 
       lushaLog('Final collected contacts:', collected);
+      
+      // Save to cache to avoid future credit usage
+      if (collected.length > 0) {
+        try {
+          await saveCache({ 
+            company: lastCompanyResult, 
+            contacts: collected 
+          });
+          lushaLog('Results saved to cache for future searches');
+          window.crm?.showToast && window.crm.showToast('Results cached for future searches');
+        } catch (e) {
+          lushaLog('Failed to save cache:', e);
+        }
+      }
+      
       updateResults(collected);
+      try { crossfadeToResults(); } catch(_) {}
     } catch (error) {
       lushaLog('Search error:', error);
       console.error('Lusha search error:', error);
       try { window.crm?.showToast && window.crm.showToast('Search failed: ' + error.message); } catch (_) {}
     } finally {
-      if (loadingEl) loadingEl.style.display = 'none';
+      // Ensure loading is hidden
+      const loadingElement = document.getElementById('lusha-loading');
+      if (loadingElement) {
+        // If crossfade already hid it, do nothing; otherwise hide now
+        if (!loadingElement.classList.contains('is-hidden')) loadingElement.style.display = 'none';
+        lushaLog('Loading element hidden');
+      }
+      
+      // Also hide any standalone spinner elements
+      const spinnerElements = document.querySelectorAll('.lusha-spinner, .lusha-loading-text');
+      spinnerElements.forEach(el => {
+        if (el.parentElement && el.parentElement.id !== 'lusha-loading') {
+          el.style.display = 'none';
+        }
+      });
     }
   }
 
@@ -471,7 +598,11 @@
       // Update results UI (search-only; emails/phones hidden until reveal)
       updateResults(contacts);
       // Hide spinner if visible
-      try { const loadingEl = document.getElementById('lusha-loading'); if (loadingEl) loadingEl.style.display = 'none'; } catch(_){}
+      const loadingEl = document.getElementById('lusha-loading');
+      if (loadingEl) {
+        loadingEl.style.display = 'none';
+        lushaLog('Loading element hidden in loadEmployees');
+      }
 
       // If popular returned none, try the full list as a fallback
       if (kind === 'popular' && contacts.length === 0) {
@@ -519,7 +650,10 @@
       phoneMapping: phoneMapping,
       emails: c.emails || [],
       phones: c.phones || [],
-      isSuccess: c.isSuccess !== false // Default to true for search results
+      isSuccess: c.isSuccess !== false, // Default to true for search results
+      // Carry through additional helpful fields
+      location: c.location || c.city || '',
+      linkedin: c.linkedin || c.linkedinUrl || (c.social && c.social.linkedin) || ''
     };
     
     lushaLog('Mapping contact:', { original: c, mapped: mapped });
@@ -535,6 +669,7 @@
     const website = domain ? `https://${domain}` : '';
     const logo = company?.logoUrl ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : '');
     const desc = company?.description ? `<div class="company-desc" style="color:var(--text-muted);max-width:640px;line-height:1.35;margin-top:6px;">${escapeHtml(company.description)}</div>` : '';
+    const linkedinUrl = company?.linkedin || '';
 
     // Style overrides for link behavior
     ensureLushaStyles();
@@ -544,17 +679,28 @@
     const enrBtn = `<button class="lusha-action-btn" id="lusha-enrich-account" style="display:none;">Enrich Account</button>`;
 
     el.innerHTML = `
-      <div class="company-summary" style="padding:8px 0 10px 0;">
+      <div class="company-summary fade-in-block" style="padding:8px 0 10px 0;">
         <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:6px;">
           <div>${logo || ''}</div>
           <div>
             <div style="font-weight:600;color:var(--text-primary)">${name}</div>
             ${website ? `<a href="${website}" target="_blank" rel="noopener" class="lusha-weblink">${website}</a>` : ''}
+            ${linkedinUrl ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="Company LinkedIn" style="margin-left:8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              </svg>
+            </a>` : ''}
             ${desc}
             <div style="margin-top:8px;display:flex;gap:8px;">${accBtn}${enrBtn}</div>
           </div>
         </div>
       </div>`;
+
+    // Animate in the company summary smoothly
+    try {
+      const wrap = el.querySelector('.company-summary.fade-in-block');
+      if (wrap) requestAnimationFrame(() => { try { wrap.classList.add('in'); } catch(_){} });
+    } catch(_) {}
 
     // Hook up account Add/Enrich
     try {
@@ -627,7 +773,7 @@
 
   function createContactElement(contact, index) {
     const div = document.createElement('div');
-    div.className = 'lusha-contact-item';
+    div.className = 'lusha-contact-item item-pre';
     div.setAttribute('data-id', contact.id || contact.contactId || '');
     
     let name = contact.firstName && contact.lastName 
@@ -654,17 +800,30 @@
 
     const emailsArr = Array.isArray(contact.emails) ? contact.emails.map(e => e.address).filter(Boolean) : [];
     const phonesArr = Array.isArray(contact.phones) ? contact.phones.map(p => p.number).filter(Boolean) : [];
-    const location = contact.location || contact.city || '';
+    // Format location as City, State if possible
+    let location = contact.location || contact.city || '';
 
     const emailList = emailsArr.length ? emailsArr : (contact.email ? [contact.email] : []);
     const phoneList = phonesArr.length ? phonesArr : (contact.phone ? [contact.phone] : []);
 
     const renderList = (arr, attr) => arr.map(v => `<div class="lusha-value-item">${escapeHtml(v)}</div>`).join('') || `<div class="lusha-value-item">—</div>`;
 
+    // Get LinkedIn URL for the contact
+    const linkedinUrl = contact.linkedin || contact.linkedinUrl || '';
+
     div.innerHTML = `
       <div class="lusha-contact-header">
-        <div class="lusha-contact-name">${escapeHtml(name)}</div>
-        <div class="lusha-contact-title">${escapeHtml(title)}</div>
+        <div class="lusha-contact-info">
+          <div class="lusha-contact-name">${escapeHtml(name)}</div>
+          <div class="lusha-contact-title">${escapeHtml(title)}</div>
+        </div>
+        <div class="lusha-contact-actions-header">
+          ${linkedinUrl ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="View LinkedIn Profile">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+            </svg>
+          </a>` : ''}
+        </div>
       </div>
       <div class="lusha-contact-details">
         <div class="lusha-fields">
@@ -699,6 +858,11 @@
         <button class="lusha-action-btn" data-action="copy-info" data-contact='${escapeHtml(JSON.stringify(contact))}'>
           Copy Info
         </button>
+        ${contact.linkedin ? `<a href="${escapeHtml(contact.linkedin)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="View LinkedIn Profile" style="margin-left:4px;display:inline-flex;align-items:center;">
+          <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\">
+            <path d=\"M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z\"/>
+          </svg>
+        </a>` : ''}
       </div>
     `;
 
@@ -747,6 +911,35 @@
         } catch(_){}
       }
       
+      // Get current account information for linking
+      let accountId = null;
+      let accountName = '';
+      
+      if (currentEntityType === 'account' && currentAccountId) {
+        accountId = currentAccountId;
+        // Get account name from current account state
+        try {
+          if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+            accountName = window.AccountDetail.state.currentAccount.name || window.AccountDetail.state.currentAccount.accountName || '';
+          }
+        } catch(_) {}
+      } else if (currentEntityType === 'contact') {
+        // Try to get account from contact context
+        try {
+          if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state._linkedAccountId) {
+            accountId = window.ContactDetail.state._linkedAccountId;
+            // Get account name from accounts data
+            if (typeof window.getAccountsData === 'function') {
+              const accounts = window.getAccountsData() || [];
+              const account = accounts.find(a => (a.id || a.accountId || a._id) === accountId);
+              if (account) {
+                accountName = account.name || account.accountName || '';
+              }
+            }
+          }
+        } catch(_) {}
+      }
+      
       // Prepare payload
       const payload = {
         firstName: contact.firstName || '',
@@ -754,13 +947,17 @@
         name: (contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}`.trim() : (contact.fullName || ''),
         email,
         phone: contact.phone || contact.phoneNumber || (Array.isArray(contact.phones) && contact.phones[0] && contact.phones[0].number) || '',
-        companyName,
+        companyName: accountName || companyName, // Use account name if available
         title: contact.title || contact.jobTitle || '',
         location: contact.location || contact.city || '',
+        linkedin: contact.linkedin || contact.linkedinUrl || '',
         // map phone numbers to workDirectPhone/mobile/otherPhone
         workDirectPhone: selectPhone(contact, 'direct') || selectPhone(contact, 'work') || '',
         mobile: selectPhone(contact, 'mobile') || '',
         otherPhone: selectPhone(contact, 'other') || '',
+        // Link to current account
+        accountId: accountId,
+        accountName: accountName,
         source: 'lusha',
         updatedAt: new Date(),
         createdAt: new Date()
@@ -818,6 +1015,7 @@
         employees: (lastCompanyResult && lastCompanyResult.employees) || '',
         shortDescription: (lastCompanyResult && lastCompanyResult.description) || '',
         logoUrl: (lastCompanyResult && lastCompanyResult.logoUrl) || '',
+        linkedin: (lastCompanyResult && lastCompanyResult.linkedin) || '',
         source: 'lusha',
         updatedAt: new Date(),
         createdAt: new Date()
@@ -890,33 +1088,69 @@
 
   async function revealForContact(contact, which, container){
     try {
+      lushaLog('Revealing', which, 'for contact:', contact);
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
       const requestId = window.__lushaLastRequestId;
       const id = contact.id || contact.contactId;
-      if (!requestId || !id) return;
+      
+      if (!requestId) {
+        lushaLog('No requestId available for reveal');
+        window.crm?.showToast && window.crm.showToast('No search session found. Please search again.');
+        return;
+      }
+      if (!id) {
+        lushaLog('No contact ID available for reveal');
+        window.crm?.showToast && window.crm.showToast('Contact ID missing.');
+        return;
+      }
+      
+      lushaLog('Making enrich request with requestId:', requestId, 'contactId:', id);
       const resp = await fetch(`${base}/api/lusha/enrich`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, contactIds: [id] })
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      lushaLog('Enrich response:', data);
       const enriched = (data.contacts && data.contacts[0]) || null;
-      if (!enriched) return;
+      if (!enriched) {
+        lushaLog('No enriched data returned');
+        window.crm?.showToast && window.crm.showToast('No data available to reveal.');
+        return;
+      }
 
-      // Update UI lists
+      // Update UI lists and contact object
       if (which === 'email') {
         const wrap = container.querySelector('[data-email-list]');
         if (wrap) {
           const emails = Array.isArray(enriched.emails) ? enriched.emails.map(e => e.address).filter(Boolean) : [];
           wrap.innerHTML = emails.length ? emails.map(v => `<div class="lusha-value-item">${escapeHtml(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          
+          // Update contact object with revealed emails
+          contact.emails = enriched.emails || [];
+          if (emails.length > 0) {
+            contact.email = emails[0]; // Set primary email
+          }
         }
       } else if (which === 'phones') {
         const wrap = container.querySelector('[data-phones-list]');
         if (wrap) {
           const phones = Array.isArray(enriched.phones) ? enriched.phones.map(p => p.number).filter(Boolean) : [];
           wrap.innerHTML = phones.length ? phones.map(v => `<div class="lusha-value-item">${escapeHtml(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          
+          // Update contact object with revealed phones
+          contact.phones = enriched.phones || [];
+          if (phones.length > 0) {
+            contact.phone = phones[0]; // Set primary phone
+          }
         }
+      }
+      
+      // Update the contact data in the Add Contact button
+      const addContactBtn = container.querySelector('[data-action="add-contact"]');
+      if (addContactBtn) {
+        addContactBtn.setAttribute('data-contact', JSON.stringify(contact));
       }
 
       // Persist into cache (merge contact by id) AND update CRM if contact exists
@@ -1068,31 +1302,108 @@
   function updateResults(contacts){
     try {
       lushaLog('Updating results with contacts:', contacts);
+      
+      // Store all contacts for pagination
+      allContacts = contacts;
+      currentPage = 1; // Reset to first page
+      
       const resultsWrap = document.getElementById('lusha-results');
       const countEl = document.getElementById('lusha-results-count');
       const listEl = document.getElementById('lusha-contacts-list');
+      const paginationEl = document.getElementById('lusha-pagination');
+      
       if (resultsWrap) resultsWrap.style.display = 'block';
       if (countEl) countEl.textContent = `${contacts.length} contact${contacts.length===1?'':'s'} found`;
-      if (listEl) {
-        listEl.innerHTML = '';
-        if (contacts.length === 0) {
-          lushaLog('No contacts to display');
-          const empty = document.createElement('div');
-          empty.className = 'lusha-no-results';
-          empty.textContent = 'No results found.';
-          listEl.appendChild(empty);
+      
+      // Show/hide pagination based on contact count
+      if (paginationEl) {
+        if (contacts.length > contactsPerPage) {
+          paginationEl.style.display = 'flex';
+          updatePaginationControls();
         } else {
-          lushaLog('Creating contact elements for', contacts.length, 'contacts');
-          contacts.forEach((c,i) => {
-            const mapped = mapProspectingContact(c);
-            lushaLog(`Creating element ${i}:`, mapped);
-            listEl.appendChild(createContactElement(mapped, i));
-          });
+          paginationEl.style.display = 'none';
         }
       }
+      
+      // Display current page of contacts
+      displayCurrentPage();
+      // Stagger in the items for a smoother appearance
+      try { animateResultItemsIn(); } catch(_) {}
+      
     } catch (e) { 
       lushaLog('Update results failed:', e);
       console.error('Update results failed', e); 
+    }
+  }
+  
+  function displayCurrentPage() {
+    try {
+      const listEl = document.getElementById('lusha-contacts-list');
+      if (!listEl) return;
+      
+      listEl.innerHTML = '';
+      
+      if (allContacts.length === 0) {
+        lushaLog('No contacts to display');
+        const empty = document.createElement('div');
+        empty.className = 'lusha-no-results';
+        empty.textContent = 'No results found.';
+        listEl.appendChild(empty);
+        return;
+      }
+      
+      // Calculate pagination
+      const startIndex = (currentPage - 1) * contactsPerPage;
+      const endIndex = startIndex + contactsPerPage;
+      const pageContacts = allContacts.slice(startIndex, endIndex);
+      
+      lushaLog(`Displaying page ${currentPage}: contacts ${startIndex + 1}-${Math.min(endIndex, allContacts.length)} of ${allContacts.length}`);
+      
+      // Create contact elements for current page
+      pageContacts.forEach((c, i) => {
+        const mapped = mapProspectingContact(c);
+        const globalIndex = startIndex + i;
+        lushaLog(`Creating element ${globalIndex}:`, mapped);
+        listEl.appendChild(createContactElement(mapped, globalIndex));
+      });
+      
+      // Update pagination controls
+      updatePaginationControls();
+
+      // Re-run stagger animation on page change
+      try { animateResultItemsIn(); } catch(_) {}
+      
+    } catch (e) {
+      lushaLog('Display current page failed:', e);
+      console.error('Display current page failed', e);
+    }
+  }
+  
+  function updatePaginationControls() {
+    try {
+      const paginationEl = document.getElementById('lusha-pagination');
+      const prevBtn = document.getElementById('lusha-prev-btn');
+      const nextBtn = document.getElementById('lusha-next-btn');
+      const currentEl = document.getElementById('lusha-pagination-current');
+      
+      if (!paginationEl || !prevBtn || !nextBtn || !currentEl) return;
+      
+      const totalPages = Math.ceil(allContacts.length / contactsPerPage);
+      const startContact = (currentPage - 1) * contactsPerPage + 1;
+      const endContact = Math.min(currentPage * contactsPerPage, allContacts.length);
+      
+      // Update current page number
+      currentEl.textContent = currentPage;
+      
+      // Update button states
+      prevBtn.disabled = currentPage <= 1;
+      nextBtn.disabled = currentPage >= totalPages;
+      
+      lushaLog(`Pagination: page ${currentPage}/${totalPages}, contacts ${startContact}-${endContact} of ${allContacts.length}`);
+      
+    } catch (e) {
+      lushaLog('Update pagination controls failed:', e);
+      console.error('Update pagination controls failed', e);
     }
   }
 
@@ -1165,6 +1476,24 @@
         companyName: companyName || '',
         website: company && company.website || (domain ? ('https://' + domain) : ''),
         companyId: company && (company.id || null),
+        // Cache complete company data
+        company: company || {},
+        // Cache all company fields from Lusha
+        logoUrl: company && company.logoUrl || '',
+        description: company && company.description || company && company.companyDescription || '',
+        industry: company && company.industry || '',
+        employees: company && company.employees || '',
+        revenue: company && company.revenue || '',
+        location: company && company.location || '',
+        city: company && company.city || '',
+        state: company && company.state || '',
+        country: company && company.country || '',
+        phone: company && company.phone || '',
+        email: company && company.email || '',
+        linkedin: company && company.linkedin || '',
+        twitter: company && company.twitter || '',
+        facebook: company && company.facebook || '',
+        // Cache contacts
         contacts: (contacts || []).map(mapProspectingContact),
         updatedAt: new Date()
       };
@@ -1188,7 +1517,28 @@
       const mapped = mapProspectingContact(enriched);
       if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], mapped);
       else arr.push(mapped);
-      await ref.set({ contacts: arr, updatedAt: new Date() }, { merge: true });
+      // Preserve all existing company data when updating contacts
+      const updateData = { 
+        contacts: arr, 
+        updatedAt: new Date(),
+        // Preserve existing company data
+        ...(existing.company && { company: existing.company }),
+        ...(existing.logoUrl && { logoUrl: existing.logoUrl }),
+        ...(existing.description && { description: existing.description }),
+        ...(existing.industry && { industry: existing.industry }),
+        ...(existing.employees && { employees: existing.employees }),
+        ...(existing.revenue && { revenue: existing.revenue }),
+        ...(existing.location && { location: existing.location }),
+        ...(existing.city && { city: existing.city }),
+        ...(existing.state && { state: existing.state }),
+        ...(existing.country && { country: existing.country }),
+        ...(existing.phone && { phone: existing.phone }),
+        ...(existing.email && { email: existing.email }),
+        ...(existing.linkedin && { linkedin: existing.linkedin }),
+        ...(existing.twitter && { twitter: existing.twitter }),
+        ...(existing.facebook && { facebook: existing.facebook })
+      };
+      await ref.set(updateData, { merge: true });
       console.log('[Lusha] Cache upserted contact', mapped.id);
     } catch (e) { console.warn('[Lusha] Cache upsert failed', e); }
   }
@@ -1205,6 +1555,20 @@
     const style = document.createElement('style');
     style.id = 'lusha-styles';
     style.textContent = `
+      /* Crossfade helpers */
+      #lusha-widget .is-hidden { opacity: 0; transform: translateY(2px); pointer-events: none; }
+      #lusha-widget .is-shown { opacity: 1; transform: translateY(0); }
+      #lusha-widget #lusha-loading, #lusha-widget #lusha-results {
+        transition: opacity 280ms ease, transform 280ms ease;
+      }
+
+      /* Item stagger animation */
+      #lusha-widget .lusha-contact-item { opacity: 0; transform: translateY(6px); transition: opacity 320ms ease, transform 320ms ease; }
+      #lusha-widget .lusha-contact-item.item-in { opacity: 1; transform: translateY(0); }
+
+      /* Company summary fade-in */
+      #lusha-widget .fade-in-block { opacity: 0; transform: translateY(4px); transition: opacity 280ms ease, transform 280ms ease; }
+      #lusha-widget .fade-in-block.in { opacity: 1; transform: translateY(0); }
       /* Lusha Widget Layout - Left-to-Right with Proper Field Alignment */
       #lusha-widget .lusha-weblink { 
         color: var(--text-primary); 
@@ -1232,6 +1596,31 @@
         margin-bottom: 12px;
         padding-bottom: 8px;
         border-bottom: 1px solid var(--border-light);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      #lusha-widget .lusha-contact-info {
+        flex: 1;
+      }
+      #lusha-widget .lusha-contact-actions-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 12px;
+      }
+      #lusha-widget .lusha-linkedin-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: var(--transition-fast);
+        display: inline-flex;
+        align-items: center;
+        padding: 2px;
+        border-radius: 4px;
+      }
+      #lusha-widget .lusha-linkedin-link:hover {
+        color: #0077b5;
+        text-decoration: none;
       }
       #lusha-widget .lusha-contact-name {
         font-weight: 600;
@@ -1375,6 +1764,87 @@
         color: var(--text-muted);
         font-style: italic;
       }
+      
+      /* Results Header */
+      #lusha-widget .lusha-results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border-light);
+      }
+      
+      #lusha-widget .lusha-results-header h4 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      
+      #lusha-widget .lusha-results-count {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-left: 12px;
+      }
+      
+      /* Pagination - Match accounts page styling */
+      #lusha-widget .lusha-pagination {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+      }
+      
+      #lusha-widget .lusha-pagination-arrow {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: var(--text-secondary);
+      }
+      
+      #lusha-widget .lusha-pagination-arrow:hover:not(:disabled) {
+        background: var(--grey-700);
+        border-color: var(--border-medium);
+        color: var(--text-primary);
+      }
+      
+      #lusha-widget .lusha-pagination-arrow:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      
+      #lusha-widget .lusha-pagination-arrow svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+      }
+      
+      #lusha-widget .lusha-pagination-current-container {
+        position: relative;
+      }
+      
+      #lusha-widget .lusha-pagination-current {
+        width: 40px;
+        height: 32px;
+        border-radius: 6px;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -1432,3 +1902,34 @@
   window.Widgets.isLushaOpen = isLushaOpen;
 
 })();
+
+// Helpers for smoother transitions (kept outside IIFE scope for simplicity)
+function crossfadeToResults(){
+  try {
+    const loadingEl = document.getElementById('lusha-loading');
+    const resultsEl = document.getElementById('lusha-results');
+    if (!loadingEl || !resultsEl) return;
+    // Hide loading
+    loadingEl.classList.remove('is-shown');
+    loadingEl.classList.add('is-hidden');
+    // Show results
+    resultsEl.style.display = 'block';
+    resultsEl.classList.remove('is-hidden');
+    resultsEl.classList.add('is-shown');
+    // After transition, set display to none for loading to avoid layout shifts
+    setTimeout(()=>{ try { loadingEl.style.display='none'; } catch(_){} }, 320);
+  } catch(_) {}
+}
+
+function animateResultItemsIn(){
+  try {
+    const list = document.getElementById('lusha-contacts-list');
+    if (!list) return;
+    const items = Array.from(list.querySelectorAll('.lusha-contact-item'));
+    items.forEach((el, i) => {
+      el.classList.remove('item-in');
+      const delay = Math.min(40 * i, 400);
+      setTimeout(()=>{ try { el.classList.add('item-in'); } catch(_){} }, delay);
+    });
+  } catch(_) {}
+}
