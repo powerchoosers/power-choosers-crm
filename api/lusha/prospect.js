@@ -2,33 +2,6 @@
 const LUSHA_API_KEY = process.env.LUSHA_API_KEY;
 const LUSHA_BASE_URL = 'https://api.lusha.com';
 
-const allowCors = fn => async (req, res) => {
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'https://powerchoosers.com',
-        'https://www.powerchoosers.com',
-        'https://power-choosers-crm.vercel.app'
-    ];
-
-    if (allowedOrigins.includes(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-    } else if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', 'https://powerchoosers.com');
-    }
-
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    
-    if (req.method === 'OPTIONS') {
-        res.status(204).end();
-        return;
-    }
-    return await fn(req, res);
-};
-
 async function callLushaApi(endpoint, body) {
   const response = await fetch(`${LUSHA_BASE_URL}${endpoint}`, {
     method: 'POST',
@@ -49,6 +22,8 @@ async function callLushaApi(endpoint, body) {
 }
 
 const handler = async (req, res) => {
+  // CORS is handled by vercel.json, no OPTIONS check needed here.
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -114,4 +89,4 @@ const handler = async (req, res) => {
   }
 };
 
-module.exports = allowCors(handler);
+module.exports = handler;
