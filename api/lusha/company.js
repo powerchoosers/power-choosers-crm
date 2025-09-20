@@ -33,6 +33,13 @@ module.exports = async (req, res) => {
 
     const derivedDomain = raw?.data?.domain || raw?.data?.fqdn || normalizeDomain(raw?.data?.website || '');
     const website = raw?.data?.website || (derivedDomain ? `https://${derivedDomain}` : '');
+    const linkedin =
+      raw?.data?.linkedinUrl ||
+      raw?.data?.links?.linkedin ||
+      raw?.data?.social?.linkedin ||
+      raw?.data?.socialNetworks?.linkedinUrl ||
+      raw?.data?.linkedin?.url ||
+      '';
 
     // Map the response to a consistent format
     const companyData = {
@@ -44,7 +51,8 @@ module.exports = async (req, res) => {
       employees: raw?.data?.employees || '',
       industry: raw?.data?.mainIndustry || '',
       location: raw?.data?.location?.fullLocation || '',
-      logoUrl: raw?.data?.logoUrl || null
+      logoUrl: raw?.data?.logoUrl || null,
+      linkedin
     };
 
     return res.status(200).json(companyData);

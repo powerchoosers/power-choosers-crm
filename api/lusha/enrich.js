@@ -27,6 +27,13 @@ module.exports = async (req, res) => {
 
     if (!resp.ok) {
       const text = await resp.text();
+      if (resp.status === 403) {
+        return res.status(403).json({
+          error: 'Access forbidden',
+          message: 'Your current Lusha plan may not allow individual data point reveals (emails/phones).',
+          details: text
+        });
+      }
       return res.status(resp.status).json({ error: 'Lusha enrich error', details: text });
     }
 
@@ -39,11 +46,15 @@ module.exports = async (req, res) => {
           const emailsRaw = contact.data?.emailAddresses || [];
           const phonesRaw = contact.data?.phoneNumbers || [];
           const emails = Array.isArray(emailsRaw)
-            ? emailsRaw.map(e => ({ address: e.address || e.email || e.value || '' , type: e.type || e.kind || '' })).filter(x => x.address)
+            ? emailsRaw.map(e => ({ address: e.address || e.email || e.value || '', type: e.type || e.kind || '' })).filter(x => x.address)
             : [];
           const phones = Array.isArray(phonesRaw)
             ? phonesRaw.map(p => ({ number: p.number || p.phone || p.value || '', type: p.type || p.kind || '' })).filter(x => x.number)
             : [];
+          const city = contact.data?.location?.city || contact.data?.location?.cityName || '';
+          const state = contact.data?.location?.state || contact.data?.location?.stateCode || contact.data?.location?.region || '';
+          const location = (city || state) ? `${city}${city && state ? ', ' : ''}${state}` : (contact.data?.location?.fullLocation || '');
+          const linkedin = contact.data?.linkedinUrl || contact.data?.linkedin || contact.data?.social?.linkedin || contact.data?.links?.linkedin || '';
           return ({
             id: contact.id,
             firstName: contact.data?.name?.first || '',
@@ -54,6 +65,8 @@ module.exports = async (req, res) => {
             fqdn: contact.data?.fqdn || '',
             emails,
             phones,
+            location,
+            linkedin,
             isSuccess: contact.isSuccess || false
           });
         })

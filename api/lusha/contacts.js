@@ -141,7 +141,13 @@ module.exports = async (req, res) => {
           companyName: c?.companyName || c?.company || '',
           fqdn: c?.fqdn || c?.domain || '',
           hasEmails: !!c?.hasEmails,
-          hasPhones: !!c?.hasPhones
+          hasPhones: !!c?.hasPhones,
+          // additional helpful flags and fields
+          hasMobilePhone: !!c?.hasMobilePhone,
+          hasDirectPhone: !!c?.hasDirectPhone,
+          hasSocialLink: !!c?.hasSocialLink,
+          location: c?.location || c?.city || '',
+          linkedin: c?.linkedinUrl || c?.linkedin || c?.social?.linkedin || ''
         };
 
         // Debug log for first few contacts
@@ -172,7 +178,12 @@ module.exports = async (req, res) => {
           companyName: x.companyName || x.company || '',
           fqdn: x.fqdn || x.domain || '',
           hasEmails: !!x.hasEmails,
-          hasPhones: !!x.hasPhones
+          hasPhones: !!x.hasPhones,
+          hasMobilePhone: !!x.hasMobilePhone,
+          hasDirectPhone: !!x.hasDirectPhone,
+          hasSocialLink: !!x.hasSocialLink,
+          location: x.location || x.city || '',
+          linkedin: x.linkedinUrl || x.linkedin || x.social?.linkedin || ''
         };
         
         // Debug log for first few contacts
@@ -202,7 +213,7 @@ module.exports = async (req, res) => {
           const full = (typeof x.name === 'string') ? x.name : (x?.name?.full || '');
           const [first, ...rest] = String(full || '').trim().split(/\s+/);
           const last = rest.join(' ');
-          return {
+        return {
             contactId: x.contactId || x.id,
             id: x.contactId || x.id,
             firstName: x.firstName || first || '',
@@ -212,8 +223,13 @@ module.exports = async (req, res) => {
             companyId: x.companyId || null,
             companyName: x.companyName || '',
             fqdn: x.fqdn || '',
-            hasEmails: !!x.hasEmails,
-            hasPhones: !!x.hasPhones
+          hasEmails: !!x.hasEmails,
+          hasPhones: !!x.hasPhones,
+          hasMobilePhone: !!x.hasMobilePhone,
+          hasDirectPhone: !!x.hasDirectPhone,
+          hasSocialLink: !!x.hasSocialLink,
+          location: x.location || x.city || '',
+          linkedin: x.linkedinUrl || x.linkedin || x.social?.linkedin || ''
           };
         });
         contactIds = contacts.map(c => c.contactId).filter(Boolean);
