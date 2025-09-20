@@ -10,6 +10,7 @@
   let currentAccountId = null;
   let currentEntityType = 'contact'; // 'contact' or 'account'
   let currentAccountName = null;
+  let lastCompanyResult = null;
 
   function getPanelContentEl() {
     const panel = document.getElementById('widget-panel');
@@ -153,6 +154,9 @@
           <div class="lusha-loading-text">Searching Lusha database...</div>
         </div>
 
+        <!-- Company Summary -->
+        <div id="lusha-panel-company"></div>
+
         <!-- Results Section -->
         <div class="lusha-results" id="lusha-results" style="display: none;">
           <div class="lusha-results-header">
@@ -250,7 +254,8 @@
     const searchBtn = document.getElementById('lusha-search-btn');
 
     const companyName = companyInput?.value?.trim();
-    const domain = domainInput?.value?.trim();
+    const domainRaw = domainInput?.value?.trim();
+    const domain = deriveDomain(domainRaw);
 
     if (!companyName && !domain) {
       try { window.crm?.showToast && window.crm.showToast('Enter company or domain'); } catch(_) {}
@@ -261,7 +266,18 @@
     if (searchBtn) { searchBtn.disabled = true; searchBtn.textContent = 'Searching...'; }
 
     try {
-      // Prefer production base when local points to localhost to avoid 404s
+      // 1) Try cache first to avoid credits
+      const cached = await tryLoadCache({ domain, companyName });
+      if (cached && cached.contacts && cached.contacts.length) {
+        console.log('[Lusha] Using cached contacts', cached);
+        // Render company summary (from cache or rebuild minimal)
+        lastCompanyResult = { name: cached.companyName || companyName || '', domain: cached.domain || domain, website: cached.website || '' };
+        renderCompanyPanel(lastCompanyResult);
+        updateResults(cached.contacts);
+        return;
+      }
+
+      // 2) Fallback to live API
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
         base = 'https://power-choosers-crm.vercel.app';
@@ -274,6 +290,7 @@
       const resp = await fetch(url, { method: 'GET' });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const company = await resp.json();
+      lastCompanyResult = company;
       renderCompanyPanel(company);
       await loadEmployees('popular', company);
     } catch (error) {
@@ -393,7 +410,7 @@
       
       // Build request body with correct Lusha API structure
       const requestBody = { 
-        pages: { page: 0, size: kind==='all' ? 40 : 10 },
+        pages: { page: 0, size: kind==='all' ? 40 : 20 },
         filters: {
           companies: {
             include: {}
@@ -446,6 +463,8 @@
               console.log('[Lusha] Enriched contacts:', enrichData);
               // Use enriched contacts (replace current list)
               contacts.splice(0, contacts.length, ...(enrichData.contacts || []));
+              // Save cache to Firestore (optional)
+              try { await saveCache({ company, contacts }); } catch(_){}
             } else {
               console.warn('[Lusha] Enrich failed:', await enrichResp.text());
             }
@@ -457,29 +476,8 @@
         }
       }
 
-      // Ensure results container shows
-      try {
-        const resultsWrap = document.getElementById('lusha-results');
-        if (resultsWrap) resultsWrap.style.display = 'block';
-        const countEl = document.getElementById('lusha-results-count');
-        if (countEl) countEl.textContent = `${contacts.length} contacts found`;
-      } catch(_) {}
-
-      const panel = document.getElementById(kind === 'all' ? 'lusha-panel-all' : 'lusha-panel-popular');
-      if (panel){
-        panel.innerHTML = '';
-        if (contacts.length === 0) {
-          const empty = document.createElement('div');
-          empty.className = 'lusha-no-results';
-          empty.textContent = 'No results found.';
-          panel.appendChild(empty);
-        } else {
-          const list = document.createElement('div');
-          list.className = 'lusha-contacts-list';
-          contacts.forEach((c,i)=> list.appendChild(createContactElement(mapProspectingContact(c),i)));
-          panel.appendChild(list);
-        }
-      }
+      // Update results UI
+      updateResults(contacts);
 
       // If popular returned none, try the full list as a fallback
       if (kind === 'popular' && contacts.length === 0) {
@@ -488,9 +486,6 @@
       }
     }catch(e){ console.error('Employees load failed', e); }
   }
-
-  function mapProspectingContact(c){
-    // Handle both search results (with hasEmails/hasPhones) and enriched results (with actual emails/phones)
     const isEnriched = Array.isArray(c.emails) || Array.isArray(c.phones);
     
     return {
@@ -603,8 +598,11 @@
         </div>
       </div>
       <div class="lusha-contact-actions">
+        <button class="lusha-action-btn" data-action="add-account" data-contact='${escapeHtml(JSON.stringify(contact))}'>
+          Add Account
+        </button>
         <button class="lusha-action-btn" data-action="add-contact" data-contact='${escapeHtml(JSON.stringify(contact))}'>
-          Add to CRM
+          Add Contact
         </button>
         <button class="lusha-action-btn" data-action="copy-info" data-contact='${escapeHtml(JSON.stringify(contact))}'>
           Copy Info
@@ -613,52 +611,141 @@
     `;
 
     // Add event listeners for action buttons
-    const addBtn = div.querySelector('[data-action="add-contact"]');
+    const addContactBtn = div.querySelector('[data-action="add-contact"]');
+    const addAccountBtn = div.querySelector('[data-action="add-account"]');
     const copyBtn = div.querySelector('[data-action="copy-info"]');
 
-    if (addBtn) {
-      addBtn.addEventListener('click', () => addContactToCRM(contact));
+    if (addContactBtn) {
+      addContactBtn.addEventListener('click', () => addContactToCRM(contact));
     }
-
+    if (addAccountBtn) {
+      addAccountBtn.addEventListener('click', () => addAccountToCRM(contact));
+    }
     if (copyBtn) {
       copyBtn.addEventListener('click', () => copyContactInfo(contact));
     }
+
+    // Update button labels depending on existence
+    updateActionButtons(div, contact).catch(()=>{});
 
     return div;
   }
 
   async function addContactToCRM(contact) {
     try {
-      // Prepare contact data for CRM
-      const contactData = {
+      const db = window.firebaseDB;
+      if (!db) throw new Error('Firestore not initialized');
+      // Check if contact exists (by email)
+      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+      const companyName = contact.company || contact.companyName || '';
+      let existingId = null;
+      if (email) {
+        try {
+          const snap = await db.collection('contacts').where('email','==',email).limit(1).get();
+          if (snap && snap.docs && snap.docs[0]) existingId = snap.docs[0].id;
+        } catch(_){}
+      }
+      // Prepare payload
+      const payload = {
         firstName: contact.firstName || '',
         lastName: contact.lastName || '',
-        email: contact.email || '',
-        phone: contact.phone || contact.phoneNumber || '',
-        company: contact.company || contact.companyName || '',
+        name: (contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}`.trim() : (contact.fullName || ''),
+        email,
+        phone: contact.phone || contact.phoneNumber || (Array.isArray(contact.phones) && contact.phones[0] && contact.phones[0].number) || '',
+        companyName,
         title: contact.title || contact.jobTitle || '',
-        location: contact.location || contact.city || ''
+        location: contact.location || contact.city || '',
+        source: 'lusha',
+        updatedAt: new Date(),
+        createdAt: new Date()
       };
-
-      // Call backend to add contact
-      const response = await fetch('/api/contacts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(contactData)
-      });
-
-      if (response.ok) {
-        try { window.crm?.showToast && window.crm.showToast('Contact added to CRM successfully'); } catch (_) {}
+      if (existingId) {
+        await window.PCSaves.updateContact(existingId, payload);
+        window.crm?.showToast && window.crm.showToast('Enriched existing contact');
       } else {
-        throw new Error('Failed to add contact');
+        const ref = await db.collection('contacts').add(payload);
+        window.crm?.showToast && window.crm.showToast('Contact added to CRM');
+        // Emit create event for People page to prepend
+        try { document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: payload } })); } catch(_){}
       }
-
     } catch (error) {
       console.error('Error adding contact:', error);
-      try { window.crm?.showToast && window.crm.showToast('Failed to add contact: ' + error.message); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Failed to add/enrich contact: ' + error.message); } catch (_) {}
     }
+  }
+
+  async function addAccountToCRM(contact){
+    try {
+      const db = window.firebaseDB;
+      if (!db) throw new Error('Firestore not initialized');
+      const domain = contact.fqdn || (contact.companyDomain) || (lastCompanyResult && lastCompanyResult.domain) || '';
+      const companyName = contact.company || contact.companyName || (lastCompanyResult && (lastCompanyResult.name || lastCompanyResult.companyName)) || '';
+      // Check by domain then name
+      let existingId = null;
+      try {
+        if (domain) {
+          const s1 = await db.collection('accounts').where('domain','==',domain).limit(1).get();
+          if (s1 && s1.docs && s1.docs[0]) existingId = s1.docs[0].id;
+        }
+        if (!existingId && companyName) {
+          const s2 = await db.collection('accounts').where('accountName','==',companyName).limit(1).get();
+          if (s2 && s2.docs && s2.docs[0]) existingId = s2.docs[0].id;
+        }
+      } catch(_){}
+      const payload = {
+        accountName: companyName,
+        name: companyName,
+        domain: domain || (lastCompanyResult && lastCompanyResult.domain) || '',
+        website: (lastCompanyResult && lastCompanyResult.website) || (domain ? `https://${domain}` : ''),
+        industry: (lastCompanyResult && lastCompanyResult.industry) || '',
+        employees: (lastCompanyResult && lastCompanyResult.employees) || '',
+        shortDescription: (lastCompanyResult && lastCompanyResult.description) || '',
+        logoUrl: (lastCompanyResult && lastCompanyResult.logoUrl) || '',
+        source: 'lusha',
+        updatedAt: new Date(),
+        createdAt: new Date()
+      };
+      if (existingId) {
+        await window.PCSaves.updateAccount(existingId, payload);
+        window.crm?.showToast && window.crm.showToast('Enriched existing account');
+      } else {
+        await db.collection('accounts').add(payload);
+        window.crm?.showToast && window.crm.showToast('Account added to CRM');
+      }
+    } catch (e) {
+      console.error('Add account failed', e);
+      window.crm?.showToast && window.crm.showToast('Failed to add/enrich account: ' + (e && e.message ? e.message : ''));
+    }
+  }
+
+  async function updateActionButtons(containerEl, contact){
+    try {
+      const db = window.firebaseDB;
+      if (!db) return;
+      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+      const companyName = contact.company || contact.companyName || '';
+      const domain = contact.fqdn || '';
+      let contactExists = false;
+      let accountExists = false;
+      try {
+        if (email) {
+          const s = await db.collection('contacts').where('email','==',email).limit(1).get();
+          contactExists = !!(s && s.docs && s.docs[0]);
+        }
+        if (domain) {
+          const s1 = await db.collection('accounts').where('domain','==',domain).limit(1).get();
+          accountExists = !!(s1 && s1.docs && s1.docs[0]);
+        }
+        if (!accountExists && companyName) {
+          const s2 = await db.collection('accounts').where('accountName','==',companyName).limit(1).get();
+          accountExists = !!(s2 && s2.docs && s2.docs[0]);
+        }
+      } catch(_){}
+      const contactBtn = containerEl.querySelector('[data-action="add-contact"]');
+      const accountBtn = containerEl.querySelector('[data-action="add-account"]');
+      if (contactBtn) contactBtn.textContent = contactExists ? 'Enrich Contact' : 'Add Contact';
+      if (accountBtn) accountBtn.textContent = accountExists ? 'Enrich Account' : 'Add Account';
+    } catch(_){}
   }
 
   function copyContactInfo(contact) {
@@ -678,6 +765,27 @@
     });
   }
 
+  function updateResults(contacts){
+    try {
+      const resultsWrap = document.getElementById('lusha-results');
+      const countEl = document.getElementById('lusha-results-count');
+      const listEl = document.getElementById('lusha-contacts-list');
+      if (resultsWrap) resultsWrap.style.display = 'block';
+      if (countEl) countEl.textContent = `${contacts.length} contact${contacts.length===1?'':'s'} found`;
+      if (listEl) {
+        listEl.innerHTML = '';
+        if (contacts.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'lusha-no-results';
+          empty.textContent = 'No results found.';
+          listEl.appendChild(empty);
+        } else {
+          contacts.forEach((c,i) => listEl.appendChild(createContactElement(mapProspectingContact(c), i)));
+        }
+      }
+    } catch (e) { console.error('Update results failed', e); }
+  }
+
   function resetLushaForm() {
     const companyInput = document.getElementById('lusha-company-search');
     const domainInput = document.getElementById('lusha-company-domain');
@@ -694,6 +802,65 @@
     
     // Then repopulate with current data
     try { prefillInputs(currentEntityType); } catch(_) {}
+  }
+
+  // Cache helpers (optional separate Firebase project)
+  async function getLushaCacheDB(){
+    try {
+      if (!window.firebase) return null;
+      if (window.__LUSHA_CACHE_CONFIG && typeof window.firebase.initializeApp === 'function') {
+        // Use a named secondary app
+        const name = '__lusha_cache__';
+        let app = null;
+        try { app = window.firebase.app(name); } catch(_) {}
+        if (!app) {
+          try { app = window.firebase.initializeApp(window.__LUSHA_CACHE_CONFIG, name); } catch(e){ console.warn('Cache app init failed', e); }
+        }
+        if (app && app.firestore) return app.firestore();
+      }
+      // Fallback to primary DB
+      return window.firebaseDB || null;
+    } catch (_) { return null; }
+  }
+  async function tryLoadCache(key){
+    try {
+      const db = await getLushaCacheDB();
+      if (!db) return null;
+      const domain = (key && key.domain) || '';
+      const companyName = (key && key.companyName) || '';
+      let doc = null;
+      if (domain) {
+        const snap = await db.collection('lusha_cache').doc(domain.toLowerCase()).get();
+        if (snap && snap.exists) doc = { id: snap.id, ...snap.data() };
+      }
+      if (!doc && companyName) {
+        // simple name-keyed cache
+        const id = ('name_' + companyName.toLowerCase());
+        const snap = await db.collection('lusha_cache').doc(id).get();
+        if (snap && snap.exists) doc = { id: snap.id, ...snap.data() };
+      }
+      if (doc && doc.contacts && doc.contacts.length) return doc;
+      return null;
+    } catch (_) { return null; }
+  }
+  async function saveCache({ company, contacts }){
+    try {
+      const db = await getLushaCacheDB();
+      if (!db) return;
+      const domain = (company && (company.domain || company.fqdn)) || '';
+      const companyName = company && (company.name || company.companyName) || '';
+      const docId = (domain ? domain.toLowerCase() : ('name_' + (companyName || 'unknown').toLowerCase()));
+      const payload = {
+        domain: domain || '',
+        companyName: companyName || '',
+        website: company && company.website || (domain ? ('https://' + domain) : ''),
+        companyId: company && (company.id || null),
+        contacts: (contacts || []).map(mapProspectingContact),
+        updatedAt: new Date()
+      };
+      await db.collection('lusha_cache').doc(docId).set(payload, { merge: true });
+      console.log('[Lusha] Cache saved', docId, payload);
+    } catch (e) { console.warn('[Lusha] Cache save failed', e); }
   }
 
   function escapeHtml(str) {
