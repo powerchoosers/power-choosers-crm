@@ -120,7 +120,7 @@
 
     try {
       const base = (window.API_BASE_URL || '').replace(/\/$/, '') || 'https://power-choosers-crm.vercel.app';
-      const url = `${base}/api/lusha/prospect`;
+      const url = `${base}/api/lusha`;
       
       const response = await fetch(url, {
         method: 'POST',
@@ -162,7 +162,7 @@
     listEl.innerHTML = '';
 
     if (contacts.length === 0) {
-      listEl.innerHTML = `<div class="lusha-no-results"><p>No contacts found for "${escapeHtml(document.getElementById('lusha-company-search')?.value)}".</p></div>`;
+      listEl.innerHTML = `<div class="lusha-no-results"><p>No contacts found for \"${escapeHtml(document.getElementById('lusha-company-search')?.value)}\".</p></div>`;
     } else {
       contacts.forEach(contact => {
         listEl.appendChild(createContactElement(contact));
@@ -208,7 +208,7 @@
             try {
                 // Here you would call your backend to add the contact
                 console.log("Adding contact to CRM:", contactData);
-                window.crm?.showToast?.(`Contact "${name}" added.`);
+                window.crm?.showToast?.(`Contact \"${name}\" added.`);
             } catch (error) {
                 console.error("Failed to add contact:", error);
                 window.crm?.showToast?.(`Error adding contact: ${error.message}`, 'error');
