@@ -1,7 +1,33 @@
-const cors = require('../_cors');
 
 const LUSHA_API_KEY = process.env.LUSHA_API_KEY;
 const LUSHA_BASE_URL = 'https://api.lusha.com';
+
+const allowCors = fn => async (req, res) => {
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://powerchoosers.com',
+        'https://www.powerchoosers.com',
+        'https://power-choosers-crm.vercel.app'
+    ];
+
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', 'https://powerchoosers.com');
+    }
+
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+        res.status(204).end();
+        return;
+    }
+    return await fn(req, res);
+};
 
 async function callLushaApi(endpoint, body) {
   const response = await fetch(`${LUSHA_BASE_URL}${endpoint}`, {
@@ -23,16 +49,12 @@ async function callLushaApi(endpoint, body) {
 }
 
 const handler = async (req, res) => {
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   if (!LUSHA_API_KEY) {
     return res.status(500).json({ error: 'Lusha API key is not configured.' });
-  }
-  
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
@@ -42,7 +64,6 @@ const handler = async (req, res) => {
       return res.status(400).json({ error: 'Company name is required' });
     }
 
-    // Step 1: Search for the company to get its ID
     const companySearchBody = {
       "filters": {
         "companyName": {
@@ -58,14 +79,13 @@ const handler = async (req, res) => {
     }
     const companyId = companySearchData.companies[0].id;
 
-    // Step 2: Search for contacts at that company
     const contactSearchBody = {
       "filters": {
         "companyId": {
           "values": [companyId]
         }
       },
-      "limit": 25 // You can adjust this limit
+      "limit": 25
     };
     const contactSearchData = await callLushaApi('/prospecting/contact/search', contactSearchBody);
     
@@ -73,7 +93,6 @@ const handler = async (req, res) => {
       return res.status(404).json({ error: 'No contacts found for this company' });
     }
 
-    // Step 3: Enrich the found contacts to get their details
     const contactIdsToEnrich = contactSearchData.contacts.map(c => c.id);
     const enrichBody = {
       "contactIds": contactIdsToEnrich
@@ -95,4 +114,4 @@ const handler = async (req, res) => {
   }
 };
 
-module.exports = cors(handler);
+module.exports = allowCors(handler);
