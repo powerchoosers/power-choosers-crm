@@ -68,7 +68,7 @@ module.exports = async (req, res) => {
     console.log('Raw Lusha API response:', JSON.stringify(data, null, 2));
 
     // Map minimal fields the widget needs from prospecting search
-    const contacts = Array.isArray(data?.contacts)
+    let contacts = Array.isArray(data?.contacts)
       ? data.contacts.map(c => ({
           contactId: c.contactId, // Keep original contactId for enrich step
           id: c.contactId,
@@ -83,12 +83,43 @@ module.exports = async (req, res) => {
         }))
       : [];
 
-    return res.status(200).json({ 
-      contacts, 
-      page: data?.currentPage ?? body.pages?.page ?? 0, 
-      total: data?.totalResults ?? contacts.length,
-      requestId: data?.requestId // Include requestId for enrich step
-    });
+    // Fallbacks: if contacts array is empty, try to infer contactIds from alternative shapes
+    let contactIds = [];
+    if (contacts.length > 0) {
+      contactIds = contacts.map(c => c.contactId).filter(Boolean);
+    } else {
+      // If data.contacts is an object keyed by id
+      if (data && typeof data.contacts === 'object' && !Array.isArray(data.contacts)) {
+        contactIds = Object.keys(data.contacts);
+        contacts = contactIds.map(id => ({ contactId: id, id }));
+      }
+      // If data.results or data.items contain contactId
+      const buckets = [data?.results, data?.items, data?.data, data?.contactsList];
+      for (const b of buckets) {
+        if (Array.isArray(b)) {
+          const ids = b.map(x => x.contactId || x.id).filter(Boolean);
+          if (ids.length > 0) { contactIds = ids; break; }
+        }
+      }
+      if (contacts.length === 0 && contactIds.length > 0) {
+        contacts = contactIds.map(id => ({ contactId: id, id }));
+      }
+    }
+
+    const payload = {
+      contacts,
+      contactIds, // surfaced to allow frontend to enrich even when only IDs are available
+      page: data?.currentPage ?? body.pages?.page ?? 0,
+      total: data?.totalResults ?? data?.total ?? contacts.length,
+      requestId: data?.requestId
+    };
+
+    // Debug passthrough when ?debug=1
+    if ((req.query && (req.query.debug === '1' || req.query.debug === 1))) {
+      payload.raw = data;
+    }
+
+    return res.status(200).json(payload);
   } catch (e) {
     return res.status(500).json({ error: 'Server error', details: e.message });
   }

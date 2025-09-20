@@ -419,28 +419,32 @@
       const data = await resp.json();
       console.log('[Lusha] Raw contacts response:', data);
       const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+      const contactIdsFromPayload = Array.isArray(data.contactIds) ? data.contactIds.filter(Boolean) : [];
       console.log('[Lusha] Parsed contacts array:', contacts);
-      
-      // If we have contactIds but no details, we need to enrich them
-      if (contacts.length > 0 && data.requestId) {
-        console.log('[Lusha] Found contacts, enriching for full details...');
-        const contactIds = contacts.map(c => c.contactId).filter(Boolean);
-        
-        if (contactIds.length > 0) {
+
+      // If we have a requestId and either contacts or explicit contactIds, enrich them
+      const shouldEnrich = !!data.requestId && (contacts.length > 0 || contactIdsFromPayload.length > 0);
+      if (shouldEnrich) {
+        console.log('[Lusha] Proceeding to enrich contacts for full details...');
+        const mergedIds = [...new Set([
+          ...contacts.map(c => c.contactId).filter(Boolean),
+          ...contactIdsFromPayload
+        ])].slice(0, 40);
+        if (mergedIds.length > 0) {
           try {
             const enrichResp = await fetch(`${base}/api/lusha/enrich`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 requestId: data.requestId,
-                contactIds: contactIds
+                contactIds: mergedIds
               })
             });
-            
+
             if (enrichResp.ok) {
               const enrichData = await enrichResp.json();
               console.log('[Lusha] Enriched contacts:', enrichData);
-              // Use enriched contacts instead of search contacts
+              // Use enriched contacts (replace current list)
               contacts.splice(0, contacts.length, ...(enrichData.contacts || []));
             } else {
               console.warn('[Lusha] Enrich failed:', await enrichResp.text());
@@ -448,6 +452,8 @@
           } catch (enrichError) {
             console.error('[Lusha] Enrich error:', enrichError);
           }
+        } else {
+          console.warn('[Lusha] No contact IDs available to enrich');
         }
       }
 
