@@ -1,58 +1,4 @@
-const LUSHA_API_KEY = process.env.LUSHA_API_KEY || '1e97bb11-eac3-4b20-8491-02f9b7d783b7';
-
-function cors(req, res) {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000', 
-    'https://powerchoosers.com',
-    'https://www.powerchoosers.com',
-    'https://power-choosers-crm.vercel.app'
-  ];
-  
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Vary', 'Origin');
-
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return true;
-  }
-  
-  return false;
-}
-
-const LUSHA_BASE_URL = 'https://api.lusha.com';
-
-async function fetchWithRetry(url, options, retries = 5) {
-  let attempt = 0;
-  while (true) {
-    const resp = await fetch(url, options);
-    if (resp.status !== 429 && resp.status < 500) return resp;
-    attempt += 1;
-    if (attempt > retries) return resp;
-    const jitter = Math.random() * 200;
-    const delay = Math.min(30000, Math.pow(2, attempt) * 1000) + jitter;
-    await new Promise(r => setTimeout(r, delay));
-  }
-}
-
-function normalizeDomain(raw) {
-  if (!raw) return '';
-  try {
-    let s = String(raw).trim();
-    s = s.replace(/^https?:\/\//i, '');
-    s = s.replace(/^www\./i, '');
-    return s.split('/')[0];
-  } catch (_) { return String(raw); }
-}
+const { cors, fetchWithRetry, normalizeDomain, getApiKey, LUSHA_BASE_URL } = require('./_utils');
 
 module.exports = async (req, res) => {
   cors(req, res);
@@ -72,7 +18,7 @@ module.exports = async (req, res) => {
     if (companyId) params.append('companyId', companyId);
 
     const url = `${LUSHA_BASE_URL}/v2/company?${params.toString()}`;
-    
+    const LUSHA_API_KEY = getApiKey();
     const resp = await fetchWithRetry(url, {
       method: 'GET',
       headers: { 'api_key': LUSHA_API_KEY }
@@ -83,19 +29,22 @@ module.exports = async (req, res) => {
       return res.status(resp.status).json({ error: 'Lusha company error', details: text });
     }
 
-    const data = await resp.json();
-    
+    const raw = await resp.json();
+
+    const derivedDomain = raw?.data?.domain || raw?.data?.fqdn || normalizeDomain(raw?.data?.website || '');
+    const website = raw?.data?.website || (derivedDomain ? `https://${derivedDomain}` : '');
+
     // Map the response to a consistent format
     const companyData = {
-      id: data?.data?.id || null,
-      name: data?.data?.name || '',
-      domain: data?.data?.domain || '',
-      website: data?.data?.website || '',
-      description: data?.data?.description || '',
-      employees: data?.data?.employees || '',
-      industry: data?.data?.mainIndustry || '',
-      location: data?.data?.location?.fullLocation || '',
-      logoUrl: data?.data?.logoUrl || null
+      id: raw?.data?.id || null,
+      name: raw?.data?.name || '',
+      domain: derivedDomain || '',
+      website: website || '',
+      description: raw?.data?.description || '',
+      employees: raw?.data?.employees || '',
+      industry: raw?.data?.mainIndustry || '',
+      location: raw?.data?.location?.fullLocation || '',
+      logoUrl: raw?.data?.logoUrl || null
     };
 
     return res.status(200).json(companyData);
