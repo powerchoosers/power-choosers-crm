@@ -35,18 +35,28 @@ module.exports = async (req, res) => {
     
     // Map the enriched contact data
     const enrichedContacts = Array.isArray(data.contacts)
-      ? data.contacts.map(contact => ({
-          id: contact.id,
-          firstName: contact.data?.name?.first || '',
-          lastName: contact.data?.name?.last || '',
-          jobTitle: contact.data?.jobTitle || '',
-          companyId: contact.data?.companyId || null,
-          companyName: contact.data?.companyName || '',
-          fqdn: contact.data?.fqdn || '',
-          emails: contact.data?.emailAddresses || [],
-          phones: contact.data?.phoneNumbers || [],
-          isSuccess: contact.isSuccess || false
-        }))
+      ? data.contacts.map(contact => {
+          const emailsRaw = contact.data?.emailAddresses || [];
+          const phonesRaw = contact.data?.phoneNumbers || [];
+          const emails = Array.isArray(emailsRaw)
+            ? emailsRaw.map(e => ({ address: e.address || e.email || e.value || '' , type: e.type || e.kind || '' })).filter(x => x.address)
+            : [];
+          const phones = Array.isArray(phonesRaw)
+            ? phonesRaw.map(p => ({ number: p.number || p.phone || p.value || '', type: p.type || p.kind || '' })).filter(x => x.number)
+            : [];
+          return ({
+            id: contact.id,
+            firstName: contact.data?.name?.first || '',
+            lastName: contact.data?.name?.last || '',
+            jobTitle: contact.data?.jobTitle || '',
+            companyId: contact.data?.companyId || null,
+            companyName: contact.data?.companyName || '',
+            fqdn: contact.data?.fqdn || '',
+            emails,
+            phones,
+            isSuccess: contact.isSuccess || false
+          });
+        })
       : [];
 
     return res.status(200).json({ 
