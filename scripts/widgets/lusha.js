@@ -1312,7 +1312,12 @@
       const listEl = document.getElementById('lusha-contacts-list');
       const paginationEl = document.getElementById('lusha-pagination');
       
-      if (resultsWrap) resultsWrap.style.display = 'block';
+      if (resultsWrap) {
+        // Ensure results container is shown before animating (for consistent measuring)
+        resultsWrap.style.display = 'block';
+        resultsWrap.classList.add('is-shown');
+        resultsWrap.classList.remove('is-hidden');
+      }
       if (countEl) countEl.textContent = `${contacts.length} contact${contacts.length===1?'':'s'} found`;
       
       // Show/hide pagination based on contact count
@@ -1340,25 +1345,45 @@
     try {
       const listEl = document.getElementById('lusha-contacts-list');
       if (!listEl) return;
-      
+
+      // Smooth height transition between pages / first render
+      const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const prevHeight = listEl.offsetHeight;
+      if (!prefersReduce) {
+        try {
+          listEl.style.height = prevHeight + 'px';
+          listEl.style.overflow = 'hidden';
+        } catch(_) {}
+      }
+
       listEl.innerHTML = '';
-      
+
       if (allContacts.length === 0) {
         lushaLog('No contacts to display');
         const empty = document.createElement('div');
         empty.className = 'lusha-no-results';
         empty.textContent = 'No results found.';
         listEl.appendChild(empty);
+        // Collapse to empty smoothly
+        if (!prefersReduce) {
+          requestAnimationFrame(() => {
+            const nextHeight = listEl.scrollHeight;
+            listEl.style.transition = 'height 360ms ease';
+            listEl.style.height = nextHeight + 'px';
+            const onEnd = () => { try { listEl.style.height = 'auto'; listEl.style.overflow = 'visible'; listEl.removeEventListener('transitionend', onEnd); } catch(_){} };
+            listEl.addEventListener('transitionend', onEnd);
+          });
+        }
         return;
       }
-      
+
       // Calculate pagination
       const startIndex = (currentPage - 1) * contactsPerPage;
       const endIndex = startIndex + contactsPerPage;
       const pageContacts = allContacts.slice(startIndex, endIndex);
-      
+
       lushaLog(`Displaying page ${currentPage}: contacts ${startIndex + 1}-${Math.min(endIndex, allContacts.length)} of ${allContacts.length}`);
-      
+
       // Create contact elements for current page
       pageContacts.forEach((c, i) => {
         const mapped = mapProspectingContact(c);
@@ -1366,7 +1391,18 @@
         lushaLog(`Creating element ${globalIndex}:`, mapped);
         listEl.appendChild(createContactElement(mapped, globalIndex));
       });
-      
+
+      // Animate height to fit new content
+      if (!prefersReduce) {
+        requestAnimationFrame(() => {
+          const nextHeight = listEl.scrollHeight;
+          listEl.style.transition = 'height 360ms ease';
+          listEl.style.height = nextHeight + 'px';
+          const onEnd = () => { try { listEl.style.height = 'auto'; listEl.style.overflow = 'visible'; listEl.removeEventListener('transitionend', onEnd); } catch(_){} };
+          listEl.addEventListener('transitionend', onEnd);
+        });
+      }
+
       // Update pagination controls
       updatePaginationControls();
 
@@ -1563,7 +1599,7 @@
       }
 
       /* Item stagger animation */
-      #lusha-widget .lusha-contact-item { opacity: 0; transform: translateY(6px); transition: opacity 320ms ease, transform 320ms ease; }
+      #lusha-widget .lusha-contact-item { opacity: 0; transform: translateY(6px); transition: opacity 320ms ease, transform 320ms ease; will-change: opacity, transform; }
       #lusha-widget .lusha-contact-item.item-in { opacity: 1; transform: translateY(0); }
 
       /* Company summary fade-in */
