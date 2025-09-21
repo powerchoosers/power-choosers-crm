@@ -1121,10 +1121,10 @@
       copyBtn.addEventListener('click', () => copyContactInfo(contact));
     }
     if (revealEmailBtn) {
-      revealEmailBtn.addEventListener('click', () => revealForContact(contact, 'email', div));
+      revealEmailBtn.addEventListener('click', () => { revealForContact(contact, 'email', div).then(() => { try { renderUsageBar(); } catch(_) {} }); });
     }
     if (revealPhonesBtn) {
-      revealPhonesBtn.addEventListener('click', () => revealForContact(contact, 'phones', div));
+      revealPhonesBtn.addEventListener('click', () => { revealForContact(contact, 'phones', div).then(() => { try { renderUsageBar(); } catch(_) {} }); });
     }
 
     // Update button labels and show Enrich if exists
@@ -2342,6 +2342,32 @@
         color: var(--text-primary);
         font-weight: 500;
       }
+
+      /* Usage bar */
+      #lusha-widget .lusha-usage-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 10px 0 0 0;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+      #lusha-widget .lusha-usage-bar {
+        position: relative;
+        height: 8px;
+        border-radius: 6px;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        flex: 1;
+        overflow: hidden;
+      }
+      #lusha-widget .lusha-usage-fill {
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 0%;
+        background: var(--orange-subtle);
+        transition: width .3s ease;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -2382,6 +2408,9 @@
       `;
       
       listEl.appendChild(chip);
+
+      // Also render a live usage bar beneath the chip
+      try { renderUsageBar(); } catch(_) {}
       
       // Animate in the chip
       const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2460,5 +2489,54 @@ function crossfadeToResults(){
     try { 
       loadingEl.classList.remove('is-shown', 'is-hidden');
     } catch(_){} 
+  } catch(_) {}
+}
+
+// Fetch and render live Lusha usage bar (rate-limited server endpoint)
+async function renderUsageBar(){
+  try {
+    // Throttle to avoid exceeding Lusha's ~5/minute usage endpoint limit
+    const now = Date.now();
+    try {
+      if (!window.__lushaUsageLastFetch) window.__lushaUsageLastFetch = 0;
+      // 15s min interval
+      if (now - window.__lushaUsageLastFetch < 15000) return;
+      window.__lushaUsageLastFetch = now;
+    } catch(_) {}
+
+    let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+    if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+    const resp = await fetch(`${base}/api/lusha/usage`, { method: 'GET' });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const usage = data && data.usage ? data.usage : {};
+    const headers = data && data.headers ? data.headers : {};
+
+    // Prefer payload fields; fallback to headers
+    const dailyLimit = Number(usage.dailyLimit || headers.dailyLimit || 0) || 0;
+    const dailyUsed = Number(usage.dailyUsage || headers.dailyUsage || 0) || 0;
+    const dailyRemaining = Number(usage.dailyRemaining || headers.dailyRemaining || (dailyLimit ? (dailyLimit - dailyUsed) : 0)) || 0;
+    const limit = dailyLimit > 0 ? dailyLimit : (dailyUsed + dailyRemaining);
+    const used = dailyUsed;
+    const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
+
+    const listEl = document.getElementById('lusha-contacts-list');
+    if (!listEl) return;
+    let wrap = document.getElementById('lusha-usage-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'lusha-usage-wrap';
+      wrap.className = 'lusha-usage-wrap';
+      wrap.innerHTML = `
+        <div style="min-width:90px;">Credits</div>
+        <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
+        <div id="lusha-usage-text">–</div>
+      `;
+      listEl.appendChild(wrap);
+    }
+    const fill = document.getElementById('lusha-usage-fill');
+    const txt = document.getElementById('lusha-usage-text');
+    if (fill) fill.style.width = pct + '%';
+    if (txt) txt.textContent = limit ? `${used}/${limit} (${pct}%)` : `${used} used`;
   } catch(_) {}
 }
