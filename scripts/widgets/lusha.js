@@ -2512,12 +2512,45 @@ async function renderUsageBar(){
     const usage = data && data.usage ? data.usage : {};
     const headers = data && data.headers ? data.headers : {};
 
-    // Prefer payload fields; fallback to headers
-    const dailyLimit = Number(usage.dailyLimit || headers.dailyLimit || 0) || 0;
-    const dailyUsed = Number(usage.dailyUsage || headers.dailyUsage || 0) || 0;
-    const dailyRemaining = Number(usage.dailyRemaining || headers.dailyRemaining || (dailyLimit ? (dailyLimit - dailyUsed) : 0)) || 0;
-    const limit = dailyLimit > 0 ? dailyLimit : (dailyUsed + dailyRemaining);
-    const used = dailyUsed;
+    const toNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // Prefer true credits if present in payload
+    const totalCreditCandidates = [
+      usage.totalCredits,
+      usage.total,
+      usage?.credits?.total,
+      usage?.plan?.totalCredits,
+      usage?.account?.credits?.total
+    ];
+    const usedCreditCandidates = [
+      usage.usedCredits,
+      usage.used,
+      usage?.credits?.used,
+      usage?.account?.credits?.used
+    ];
+    let creditsTotal = totalCreditCandidates.find(toNum);
+    let creditsUsed = usedCreditCandidates.find(toNum);
+
+    let label = 'Credits';
+    let limit;
+    let used;
+
+    if (creditsTotal != null && creditsUsed != null && creditsTotal >= creditsUsed) {
+      limit = creditsTotal;
+      used = creditsUsed;
+    } else {
+      // Fallback: show requests today (rate-limit headers)
+      const dailyLimit = toNum(usage.dailyLimit) ?? toNum(headers.dailyLimit) ?? 0;
+      const dailyUsed = toNum(usage.dailyUsage) ?? toNum(headers.dailyUsage) ?? 0;
+      const dailyRemaining = toNum(usage.dailyRemaining) ?? toNum(headers.dailyRemaining) ?? (dailyLimit ? (dailyLimit - dailyUsed) : 0);
+      limit = dailyLimit > 0 ? dailyLimit : (dailyUsed + dailyRemaining);
+      used = dailyUsed;
+      label = 'Requests today';
+    }
+
     const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
 
     const listEl = document.getElementById('lusha-contacts-list');
@@ -2528,7 +2561,7 @@ async function renderUsageBar(){
       wrap.id = 'lusha-usage-wrap';
       wrap.className = 'lusha-usage-wrap';
       wrap.innerHTML = `
-        <div style="min-width:90px;">Credits</div>
+        <div id="lusha-usage-label" style="min-width:120px;">${label}</div>
         <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
         <div id="lusha-usage-text">–</div>
       `;
@@ -2536,7 +2569,9 @@ async function renderUsageBar(){
     }
     const fill = document.getElementById('lusha-usage-fill');
     const txt = document.getElementById('lusha-usage-text');
+    const lab = document.getElementById('lusha-usage-label');
     if (fill) fill.style.width = pct + '%';
     if (txt) txt.textContent = limit ? `${used}/${limit} (${pct}%)` : `${used} used`;
+    if (lab) lab.textContent = label;
   } catch(_) {}
 }
