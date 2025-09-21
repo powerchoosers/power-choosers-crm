@@ -335,6 +335,16 @@
 
     try {
       if (!companyName && !domain) {
+        if (options.cachedOnly) {
+          lushaLog('No company context found in cached-only mode; showing empty state');
+          // Show empty results gracefully without hitting live endpoints
+          try { renderCompanyPanel({ name: '', domain: '' }, false); } catch(_) {}
+          updateResults([]);
+          try { crossfadeToResults(); } catch(_) {}
+          try { showCreditsUsed(0, 'cached'); } catch(_) {}
+          try { renderUsageBar(); } catch(_) {}
+          return;
+        }
         throw new Error('No company context found');
       }
 
@@ -393,6 +403,7 @@
           // Show cache indicator in results
           showCreditsUsed(0, 'cached');
           return;
+
         } else if (options.cachedOnly) {
           // No cache found and cachedOnly requested → run a minimal, unbilled prospecting search (page=0,size=1)
           try {
@@ -553,8 +564,9 @@
         }
       } catch(_) {}
       
-      // Show credits used for live search
-      showCreditsUsed(1, 'live');
+      // Prospecting search is unbilled; indicate live but 0 credits
+      showCreditsUsed(0, 'live');
+      try { renderUsageBar(); } catch(_) {}
     } catch (error) {
       lushaLog('Search error:', error);
       console.error('Lusha search error:', error);
