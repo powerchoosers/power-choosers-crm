@@ -393,13 +393,50 @@
           // Show cache indicator in results
           showCreditsUsed(0, 'cached');
           return;
-        } else if (!options.cachedOnly) {
-          lushaLog('No cache found, proceeding with live search (1 credit)');
+        } else if (options.cachedOnly) {
+          // No cache found and cachedOnly requested → run a minimal, unbilled prospecting search (page=0,size=1)
+          try {
+            let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+            if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+
+            // Build minimal request body using company context without calling company endpoint
+            const requestBody = { 
+              pages: { page: 0, size: 1 },
+              filters: { companies: { include: {} } }
+            };
+            if (domain) requestBody.filters.companies.include.domains = [domain];
+            else if (companyName) requestBody.filters.companies.include.names = [companyName];
+
+            const r = await fetch(`${base}/api/lusha/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = await r.json();
+            const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+
+            // Store requestId for reveals
+            if (data.requestId) {
+              window.__lushaLastRequestId = data.requestId;
+              lushaLog('Stored requestId from minimal search:', data.requestId);
+            }
+
+            // Minimal company context (avoid company GET)
+            lastCompanyResult = { name: companyName || '', domain: domain || '' };
+            renderCompanyPanel(lastCompanyResult, false);
+            updateResults(contacts);
+            try { crossfadeToResults(); } catch(_) {}
+            showCreditsUsed(0, 'cached');
+            try { renderUsageBar(); } catch(_) {}
+            return;
+          } catch (minErr) {
+            lushaLog('Minimal search failed in cached-only mode', minErr);
+            // Fall through to error handling below
+          }
+        } else {
+          lushaLog('No cache found, proceeding with live search');
         }
       }
 
+      // If cachedOnly and minimal search failed above, we'll continue to throw below
       if (options.cachedOnly) {
-        // In cached-only mode we don't hit live endpoints
         throw new Error('cache_only_no_live');
       }
 
