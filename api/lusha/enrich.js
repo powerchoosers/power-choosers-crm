@@ -5,7 +5,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
   
   try {
-    const { requestId, contactIds, company, name, title } = req.body || {};
+    const { requestId, contactIds, company, name, title, revealEmails, revealPhones } = req.body || {};
     
     // Helper to extract contacts array from search response
     const extractContacts = (data) => {
@@ -29,22 +29,47 @@ module.exports = async (req, res) => {
         if (!Object.keys(include).length) {
           return res.status(400).json({ error: 'Missing requestId and insufficient company context for search' });
         }
-        const searchBody = {
-          pages: { page: 0, size: 40 },
-          filters: { companies: { include } }
-        };
-        const searchResp = await fetchWithRetry(`${LUSHA_BASE_URL}/prospecting/contact/search`, {
-          method: 'POST',
-          headers: { 'api_key': LUSHA_API_KEY, 'Content-Type': 'application/json' },
-          body: JSON.stringify(searchBody)
-        });
-        if (!searchResp.ok) {
-          const text = await searchResp.text();
-          return res.status(searchResp.status).json({ error: 'Search before enrich failed', details: text });
+        // Minimal, progressive pre-search to obtain requestId while limiting search requests
+        const attemptSizes = [1, 10, 40];
+        for (const size of attemptSizes) {
+          const searchBody = {
+            pages: { page: 0, size },
+            filters: { companies: { include } }
+          };
+          const searchResp = await fetchWithRetry(`${LUSHA_BASE_URL}/prospecting/contact/search`, {
+            method: 'POST',
+            headers: { 'api_key': LUSHA_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify(searchBody)
+          });
+          if (!searchResp.ok) {
+            const text = await searchResp.text();
+            // If the first attempt fails hard, bubble up; otherwise try next size
+            if (size === attemptSizes[0]) return res.status(searchResp.status).json({ error: 'Search before enrich failed', details: text });
+            continue;
+          }
+          const searchData = await searchResp.json();
+          effectiveRequestId = searchData.requestId;
+          searchContacts = extractContacts(searchData);
+
+          // Try to resolve the id from current batch
+          const targetName = (name || '').toString().trim().toLowerCase();
+          const targetTitle = (title || '').toString().trim().toLowerCase();
+          const candidates = searchContacts.map(c => ({
+            id: c.contactId || c.id,
+            name: (c.fullName || c.name?.full || c.name || `${c.firstName || c.name?.first || ''} ${c.lastName || c.name?.last || ''}`).toString().trim().toLowerCase(),
+            title: (c.jobTitle || c.title || '').toString().trim().toLowerCase()
+          })).filter(x => x.id);
+          let match = null;
+          if (targetName) {
+            match = candidates.find(x => x.name === targetName && (!targetTitle || x.title === targetTitle))
+              || candidates.find(x => x.name === targetName)
+              || null;
+          }
+          if (match || candidates.length > 0) {
+            // Good enough — stop escalating size
+            break;
+          }
         }
-        const searchData = await searchResp.json();
-        effectiveRequestId = searchData.requestId;
-        searchContacts = extractContacts(searchData);
       } catch (e) {
         return res.status(500).json({ error: 'Failed to initiate search before enrich', details: e.message });
       }
@@ -79,6 +104,8 @@ module.exports = async (req, res) => {
       requestId: effectiveRequestId,
       contactIds: idsToEnrich
     };
+    if (typeof revealEmails === 'boolean') requestBody.revealEmails = !!revealEmails;
+    if (typeof revealPhones === 'boolean') requestBody.revealPhones = !!revealPhones;
 
     console.log('Lusha enrich request body:', JSON.stringify(requestBody, null, 2));
 
