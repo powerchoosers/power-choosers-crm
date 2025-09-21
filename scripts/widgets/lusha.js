@@ -773,7 +773,7 @@
 
   function createContactElement(contact, index) {
     const div = document.createElement('div');
-    div.className = 'lusha-contact-item item-pre';
+    div.className = 'lusha-contact-item';
     div.setAttribute('data-id', contact.id || contact.contactId || '');
     
     let name = contact.firstName && contact.lastName 
@@ -1346,16 +1346,6 @@
       const listEl = document.getElementById('lusha-contacts-list');
       if (!listEl) return;
 
-      // Smooth height transition between pages / first render
-      const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const prevHeight = listEl.offsetHeight;
-      if (!prefersReduce) {
-        try {
-          listEl.style.height = prevHeight + 'px';
-          listEl.style.overflow = 'hidden';
-        } catch(_) {}
-      }
-
       listEl.innerHTML = '';
 
       if (allContacts.length === 0) {
@@ -1364,16 +1354,6 @@
         empty.className = 'lusha-no-results';
         empty.textContent = 'No results found.';
         listEl.appendChild(empty);
-        // Collapse to empty smoothly
-        if (!prefersReduce) {
-          requestAnimationFrame(() => {
-            const nextHeight = listEl.scrollHeight;
-            listEl.style.transition = 'height 360ms ease';
-            listEl.style.height = nextHeight + 'px';
-            const onEnd = () => { try { listEl.style.height = 'auto'; listEl.style.overflow = 'visible'; listEl.removeEventListener('transitionend', onEnd); } catch(_){} };
-            listEl.addEventListener('transitionend', onEnd);
-          });
-        }
         return;
       }
 
@@ -1392,23 +1372,28 @@
         listEl.appendChild(createContactElement(mapped, globalIndex));
       });
 
-      // Animate height to fit new content
-      if (!prefersReduce) {
-        requestAnimationFrame(() => {
-          const nextHeight = listEl.scrollHeight;
-          listEl.style.transition = 'height 360ms ease';
-          listEl.style.height = nextHeight + 'px';
-          const onEnd = () => { try { listEl.style.height = 'auto'; listEl.style.overflow = 'visible'; listEl.removeEventListener('transitionend', onEnd); } catch(_){} };
-          listEl.addEventListener('transitionend', onEnd);
-        });
-      }
-
       // Update pagination controls
       updatePaginationControls();
 
-      // Re-run stagger animation on page change
-      try { animateResultItemsIn(); } catch(_) {}
-      
+      // Simple fade-in for all items at once
+      try { 
+        const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!prefersReduce) {
+          requestAnimationFrame(() => {
+            const items = listEl.querySelectorAll('.lusha-contact-item');
+            items.forEach((item, i) => {
+              item.style.opacity = '0';
+              item.style.transform = 'translateY(8px)';
+              setTimeout(() => {
+                item.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                item.style.opacity = '1';
+                item.style.transform = 'translateY(0)';
+              }, i * 50);
+            });
+          });
+        }
+      } catch(_) {}
+
     } catch (e) {
       lushaLog('Display current page failed:', e);
       console.error('Display current page failed', e);
@@ -1591,20 +1576,16 @@
     const style = document.createElement('style');
     style.id = 'lusha-styles';
     style.textContent = `
-      /* Crossfade helpers */
-      #lusha-widget .is-hidden { opacity: 0; transform: translateY(2px); pointer-events: none; }
-      #lusha-widget .is-shown { opacity: 1; transform: translateY(0); }
+      /* Simple crossfade helpers */
+      #lusha-widget .is-hidden { opacity: 0; pointer-events: none; }
+      #lusha-widget .is-shown { opacity: 1; }
       #lusha-widget #lusha-loading, #lusha-widget #lusha-results {
-        transition: opacity 280ms ease, transform 280ms ease;
+        transition: opacity 300ms ease;
       }
 
-      /* Item stagger animation */
-      #lusha-widget .lusha-contact-item { opacity: 0; transform: translateY(6px); transition: opacity 320ms ease, transform 320ms ease; will-change: opacity, transform; }
-      #lusha-widget .lusha-contact-item.item-in { opacity: 1; transform: translateY(0); }
-
       /* Company summary fade-in */
-      #lusha-widget .fade-in-block { opacity: 0; transform: translateY(4px); transition: opacity 280ms ease, transform 280ms ease; }
-      #lusha-widget .fade-in-block.in { opacity: 1; transform: translateY(0); }
+      #lusha-widget .fade-in-block { opacity: 0; transition: opacity 300ms ease; }
+      #lusha-widget .fade-in-block.in { opacity: 1; }
       /* Lusha Widget Layout - Left-to-Right with Proper Field Alignment */
       #lusha-widget .lusha-weblink { 
         color: var(--text-primary); 
@@ -1939,33 +1920,28 @@
 
 })();
 
-// Helpers for smoother transitions (kept outside IIFE scope for simplicity)
+// Simple crossfade helper
 function crossfadeToResults(){
   try {
     const loadingEl = document.getElementById('lusha-loading');
     const resultsEl = document.getElementById('lusha-results');
     if (!loadingEl || !resultsEl) return;
+    
     // Hide loading
     loadingEl.classList.remove('is-shown');
     loadingEl.classList.add('is-hidden');
+    
     // Show results
     resultsEl.style.display = 'block';
     resultsEl.classList.remove('is-hidden');
     resultsEl.classList.add('is-shown');
-    // After transition, set display to none for loading to avoid layout shifts
-    setTimeout(()=>{ try { loadingEl.style.display='none'; } catch(_){} }, 320);
-  } catch(_) {}
-}
-
-function animateResultItemsIn(){
-  try {
-    const list = document.getElementById('lusha-contacts-list');
-    if (!list) return;
-    const items = Array.from(list.querySelectorAll('.lusha-contact-item'));
-    items.forEach((el, i) => {
-      el.classList.remove('item-in');
-      const delay = Math.min(40 * i, 400);
-      setTimeout(()=>{ try { el.classList.add('item-in'); } catch(_){} }, delay);
-    });
+    
+    // Clean up loading after transition
+    setTimeout(()=>{ 
+      try { 
+        loadingEl.style.display='none'; 
+        loadingEl.classList.remove('is-hidden');
+      } catch(_){} 
+    }, 350);
   } catch(_) {}
 }
