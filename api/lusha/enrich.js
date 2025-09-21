@@ -7,8 +7,18 @@ module.exports = async (req, res) => {
   try {
     const { requestId, contactIds, company, name, title } = req.body || {};
     
+    // Helper to extract contacts array from search response
+    const extractContacts = (data) => {
+      if (!data) return [];
+      if (Array.isArray(data.contacts)) return data.contacts;
+      if (Array.isArray(data.data)) return data.data;
+      if (Array.isArray(data.results)) return data.results;
+      return [];
+    };
+    
     // If requestId is missing, perform a search to obtain one (direct enrich path)
     let effectiveRequestId = requestId;
+    let searchContacts = [];
     if (!effectiveRequestId) {
       try {
         const LUSHA_API_KEY = getApiKey();
@@ -20,10 +30,8 @@ module.exports = async (req, res) => {
           return res.status(400).json({ error: 'Missing requestId and insufficient company context for search' });
         }
         const searchBody = {
-          pages: { page: 0, size: 1 },
-          filters: { companies: { include } },
-          // Optionally pass person filters for better matching when provided
-          person: name ? { name, title: title || undefined } : undefined
+          pages: { page: 0, size: 40 },
+          filters: { companies: { include } }
         };
         const searchResp = await fetchWithRetry(`${LUSHA_BASE_URL}/prospecting/contact/search`, {
           method: 'POST',
@@ -36,18 +44,40 @@ module.exports = async (req, res) => {
         }
         const searchData = await searchResp.json();
         effectiveRequestId = searchData.requestId;
+        searchContacts = extractContacts(searchData);
       } catch (e) {
         return res.status(500).json({ error: 'Failed to initiate search before enrich', details: e.message });
       }
     }
     
-    if (!effectiveRequestId || !contactIds || !Array.isArray(contactIds)) {
-      return res.status(400).json({ error: 'Missing required fields: requestId/contactIds' });
+    // Determine IDs to enrich
+    let idsToEnrich = Array.isArray(contactIds) ? contactIds.filter(Boolean) : [];
+    if (idsToEnrich.length === 0) {
+      // Try to resolve from search contacts using name/title
+      const targetName = (name || '').toString().trim().toLowerCase();
+      const targetTitle = (title || '').toString().trim().toLowerCase();
+      const candidates = searchContacts.map(c => ({
+        id: c.contactId || c.id,
+        name: (c.fullName || c.name?.full || c.name || `${c.firstName || c.name?.first || ''} ${c.lastName || c.name?.last || ''}`).toString().trim().toLowerCase(),
+        title: (c.jobTitle || c.title || '').toString().trim().toLowerCase()
+      })).filter(x => x.id);
+      let match = null;
+      if (targetName) {
+        match = candidates.find(x => x.name === targetName && (!targetTitle || x.title === targetTitle))
+          || candidates.find(x => x.name === targetName)
+          || null;
+      }
+      if (!match && candidates.length > 0) match = candidates[0];
+      if (match) idsToEnrich = [match.id];
+    }
+    
+    if (!effectiveRequestId || idsToEnrich.length === 0) {
+      return res.status(400).json({ error: 'Missing requestId or unable to resolve contactId for enrich' });
     }
 
     const requestBody = {
       requestId: effectiveRequestId,
-      contactIds: contactIds
+      contactIds: idsToEnrich
     };
 
     console.log('Lusha enrich request body:', JSON.stringify(requestBody, null, 2));
