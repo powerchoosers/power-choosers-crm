@@ -80,8 +80,7 @@
     if (entityType === 'account') {
       currentAccountId = entityId;
     }
-    // Reset last company context to avoid leaking across pages
-    lastCompanyResult = null;
+    // Preserve lastCompanyResult so we can pre-render company summary on reopen
     
     // Get account name for search
     let accountName = '';
@@ -136,16 +135,14 @@
         
         <!-- Loading indicator -->
         <div id="lusha-loading" style="display:none;">
-          <div class="lusha-spinner"></div>
-          <div class="lusha-loading-text">Searching Lusha database...</div>
         </div>
 
         <!-- Results Section -->
-        <div class="lusha-results" id="lusha-results" style="display: none;">
-          <div class="lusha-results-header">
+        <div class="lusha-results is-hidden" id="lusha-results" style="display: block;">
+          <div class="lusha-results-header" style="opacity:0;transform:translateY(8px);">
             <h4>Search Results</h4>
             <div class="lusha-results-count" id="lusha-results-count">0 contacts found</div>
-            <div class="lusha-pagination" id="lusha-pagination" style="display: none;">
+            <div class="lusha-pagination" id="lusha-pagination" style="display:flex; visibility: hidden;">
               <button class="lusha-pagination-arrow" id="lusha-prev-btn" disabled>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="15,18 9,12 15,6"/>
@@ -169,52 +166,84 @@
       </div>
     `;
 
-    // Smooth expand-in animation
+    // Smooth expand-in animation - slide down from top
     const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!prefersReduce) {
       try { card.classList.add('lusha-anim'); } catch (_) {}
+      // Start hidden and positioned above viewport
       card.style.opacity = '0';
-      card.style.transform = 'translateY(-6px)';
+      card.style.transform = 'translateY(-100%)';
+      card.style.willChange = 'opacity, transform';
     }
 
     const content = getPanelContentEl();
+
+    // Reserve space for the widget to prevent layout jumps
+    if (!prefersReduce) {
+        card.style.height = '0px';
+        card.style.overflow = 'hidden';
+    }
+    
     if (content.firstChild) content.insertBefore(card, content.firstChild);
     else content.appendChild(card);
 
+    // Reserve space for company summary to avoid container jumps while it loads/animates
+    try {
+      const compPanel = card.querySelector('#lusha-panel-company');
+      if (compPanel) compPanel.style.minHeight = '80px';
+    } catch(_) {}
+
     if (!prefersReduce) {
-      // Measure natural height and animate to it
-      requestAnimationFrame(() => {
-        const targetHeight = card.scrollHeight;
-        card.style.height = '0px';
-        card.style.overflow = 'hidden';
-        
+      // Slide down from top animation with height expansion
         requestAnimationFrame(() => {
-          card.style.transition = 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease, transform 0.35s ease';
-          card.style.height = targetHeight + 'px';
+        requestAnimationFrame(() => {
+          const targetHeight = card.scrollHeight;
+          card.style.transition = 'opacity 400ms ease, transform 400ms ease, height 400ms ease';
           card.style.opacity = '1';
           card.style.transform = 'translateY(0)';
+          card.style.height = targetHeight + 'px';
           
           const onEnd = () => {
+            try { 
+              card.style.willChange = ''; 
             card.style.height = 'auto';
             card.style.overflow = 'visible';
             card.removeEventListener('transitionend', onEnd);
+            } catch(_){} 
           };
           card.addEventListener('transitionend', onEnd);
         });
       });
+    } else {
+      // For reduced motion, just show immediately
+      card.style.height = 'auto';
+      card.style.overflow = 'visible';
     }
 
-    // Bring panel into view
+    // Bring panel into view without jumping during transition
     try {
       const panel = document.getElementById('widget-panel');
-      if (panel) panel.scrollTop = 0;
+      if (panel) {
+        requestAnimationFrame(() => { try { panel.scrollTop = 0; } catch(_){} });
+      }
     } catch (_) { /* noop */ }
 
     attachEventListeners();
     try { prefillInputs(entityType); } catch(_) {}
 
-    // Auto-run search after prefill to skip the input step
-    setTimeout(() => { try { performLushaSearch({ forceLive: false }); } catch(_){} }, 120);
+    // Don't render company panel initially - let it animate when search completes
+
+    // Defer search until after the open animation settles to avoid jank
+    const scheduleSearch = () => { try { performLushaSearch({ forceLive: false }); } catch(_){} };
+    if (!prefersReduce) {
+      let started = false;
+      const onOpened = () => { if (started) return; started = true; try { card.removeEventListener('transitionend', onOpened); } catch(_){} scheduleSearch(); };
+      try { card.addEventListener('transitionend', onOpened, { once: true }); } catch(_) {}
+      // Safety fallback if transitionend doesn’t fire
+      setTimeout(() => { if (!started) scheduleSearch(); }, 360);
+    } else {
+      scheduleSearch();
+    }
     return card;
   }
 
@@ -290,7 +319,7 @@
     const resultsWrap = document.getElementById('lusha-results');
     // Show loading with fade-in; hide results until ready
     if (loadingEl) {
-      loadingEl.style.display = 'block';
+      loadingEl.style.display = 'none'; // Keep hidden since it's empty
       try { loadingEl.classList.remove('is-hidden'); loadingEl.classList.add('is-shown'); } catch(_) {}
     }
     if (resultsWrap) {
@@ -344,13 +373,13 @@
             ...(cached.company || {})
           };
           
-          renderCompanyPanel(lastCompanyResult);
+          renderCompanyPanel(lastCompanyResult, false); // Allow animation for cached results
           updateResults(cached.contacts);
           // Crossfade from loading to results
           try { crossfadeToResults(); } catch(_) {}
           
-          // Show cache indicator
-          window.crm?.showToast && window.crm.showToast('Using cached results (0 credits)');
+          // Show cache indicator in results
+          showCreditsUsed(0, 'cached');
           return;
         } else {
           lushaLog('No cache found, proceeding with live search (1 credit)');
@@ -371,7 +400,7 @@
       const company = await resp.json();
       lushaLog('Company data received:', company);
       lastCompanyResult = company;
-      renderCompanyPanel(company);
+      renderCompanyPanel(company, false); // Allow animation for live search results
 
       // Pull all pages (search only, no enrichment)
       const collected = [];
@@ -408,15 +437,29 @@
 
       lushaLog('Final collected contacts:', collected);
       
+      // Build/refresh name map so Unknown Name backfills correctly after refresh
+      try {
+        const nameMap = new Map();
+        collected.forEach(c => {
+          const id = c.contactId || c.id;
+          const f = c.firstName || c.name?.first || '';
+          const l = c.lastName || c.name?.last || '';
+          const full = (c.name && (c.name.full || c.name)) || `${f} ${l}`.trim();
+          if (id) nameMap.set(id, { f, l, full });
+        });
+        window.__lushaNameMap = nameMap;
+        lushaLog('Name map refreshed for backfill. size=', nameMap.size);
+      } catch(_) {}
+      
       // Save to cache to avoid future credit usage
       if (collected.length > 0) {
         try {
+          // For refresh (forceLive), ensure we overwrite existing cache completely
           await saveCache({ 
             company: lastCompanyResult, 
             contacts: collected 
           });
-          lushaLog('Results saved to cache for future searches');
-          window.crm?.showToast && window.crm.showToast('Results cached for future searches');
+          lushaLog('Results saved to cache for future searches (refresh overwrite)');
         } catch (e) {
           lushaLog('Failed to save cache:', e);
         }
@@ -424,6 +467,9 @@
       
       updateResults(collected);
       try { crossfadeToResults(); } catch(_) {}
+      
+      // Show credits used for live search
+      showCreditsUsed(1, 'live');
     } catch (error) {
       lushaLog('Search error:', error);
       console.error('Lusha search error:', error);
@@ -660,16 +706,47 @@
     return mapped;
   }
 
-  function renderCompanyPanel(company){
+  function renderCompanyPanel(company, skipAnimation = false){
     const el = document.getElementById('lusha-panel-company');
     if (!el) return;
+    
+    // Check if company summary already exists and is visible
+    const existingSummary = el.querySelector('.company-summary');
+    const shouldAnimate = !skipAnimation;
+    
     const name = escapeHtml(company?.name || '');
     const domainRaw = (company?.domain || company?.fqdn || '') || '';
     const domain = String(domainRaw).replace(/^www\./i,'');
     const website = domain ? `https://${domain}` : '';
     const logo = company?.logoUrl ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : '');
-    const desc = company?.description ? `<div class="company-desc" style="color:var(--text-muted);max-width:640px;line-height:1.35;margin-top:6px;">${escapeHtml(company.description)}</div>` : '';
     const linkedinUrl = company?.linkedin || '';
+    const fullDescription = company?.description || '';
+    
+    // Create collapsible description
+    let descHtml = '';
+    if (fullDescription) {
+      const lines = fullDescription.split('\n');
+      const hasMoreThan5Lines = lines.length > 5;
+      const previewLines = hasMoreThan5Lines ? lines.slice(0, 5) : lines;
+      const remainingLines = hasMoreThan5Lines ? lines.slice(5) : [];
+      
+      descHtml = `
+        <div class="company-desc-container" style="margin-top:6px;width:100%;">
+          <div class="company-desc-preview" style="color:var(--text-muted);line-height:1.35;width:100%;">
+            ${previewLines.map(line => escapeHtml(line)).join('<br>')}
+            ${hasMoreThan5Lines ? '<br><span class="desc-ellipsis" style="color:var(--text-muted);font-style:italic;">...</span>' : ''}
+          </div>
+          ${hasMoreThan5Lines ? `
+            <div class="company-desc-more" style="color:var(--text-muted);line-height:1.35;display:none;width:100%;overflow:hidden;">
+              ${remainingLines.map(line => escapeHtml(line)).join('<br>')}
+            </div>
+            <button class="lusha-desc-toggle" style="background:none;border:none;color:var(--text-primary);cursor:pointer;font-size:12px;margin-top:4px;padding:0;text-decoration:underline;">
+              Show more
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }
 
     // Style overrides for link behavior
     ensureLushaStyles();
@@ -678,11 +755,14 @@
     const accBtn = `<button class="lusha-action-btn" id="lusha-add-account">Add Account</button>`;
     const enrBtn = `<button class="lusha-action-btn" id="lusha-enrich-account" style="display:none;">Enrich Account</button>`;
 
+    // Ensure placeholder space remains during animation; cleared on animation end
+    if (!el.style.minHeight) el.style.minHeight = '80px';
+
     el.innerHTML = `
       <div class="company-summary fade-in-block" style="padding:8px 0 10px 0;">
         <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:6px;">
           <div>${logo || ''}</div>
-          <div>
+          <div style="flex:1;">
             <div style="font-weight:600;color:var(--text-primary)">${name}</div>
             ${website ? `<a href="${website}" target="_blank" rel="noopener" class="lusha-weblink">${website}</a>` : ''}
             ${linkedinUrl ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="Company LinkedIn" style="margin-left:8px;">
@@ -690,16 +770,100 @@
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
               </svg>
             </a>` : ''}
-            ${desc}
-            <div style="margin-top:8px;display:flex;gap:8px;">${accBtn}${enrBtn}</div>
           </div>
         </div>
+        ${descHtml}
+        <div style="margin-top:8px;display:flex;gap:8px;width:100%;">${accBtn}${enrBtn}</div>
       </div>`;
 
-    // Animate in the company summary smoothly
+    // Animate in the company summary smoothly using slide-down (max-height) - only if it's new
     try {
       const wrap = el.querySelector('.company-summary.fade-in-block');
-      if (wrap) requestAnimationFrame(() => { try { wrap.classList.add('in'); } catch(_){} });
+      if (wrap && shouldAnimate) {
+        wrap.classList.add('animated');
+        wrap.style.overflow = 'hidden';
+        wrap.style.maxHeight = '0px';
+        wrap.style.opacity = '0';
+        requestAnimationFrame(() => {
+          const target = wrap.scrollHeight;
+          wrap.style.transition = 'max-height 500ms ease, opacity 400ms ease';
+          wrap.style.maxHeight = target + 'px';
+          wrap.style.opacity = '1';
+          const onEnd = () => { try { wrap.style.maxHeight = 'none'; wrap.style.overflow = 'visible'; el.style.minHeight = ''; wrap.removeEventListener('transitionend', onEnd); } catch(_){} };
+          wrap.addEventListener('transitionend', onEnd);
+        });
+      } else if (wrap && !shouldAnimate) {
+        // If not animating, ensure it's visible immediately
+        wrap.style.opacity = '1';
+        wrap.style.maxHeight = 'none';
+        wrap.style.overflow = 'visible';
+        try { el.style.minHeight = ''; } catch(_) {}
+      }
+    } catch(_) {}
+
+    // Hook up description toggle
+    try {
+      const toggleBtn = el.querySelector('.lusha-desc-toggle');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          const preview = el.querySelector('.company-desc-preview');
+          const more = el.querySelector('.company-desc-more');
+          const ellipsis = el.querySelector('.desc-ellipsis');
+          
+          if (preview && more) {
+            const isExpanded = more.style.display !== 'none';
+            
+            if (isExpanded) {
+              // Collapse with animation
+              const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+              if (!prefersReduce) {
+                // Show ellipsis immediately so layout doesn't jump at the end
+                if (ellipsis) ellipsis.style.display = 'inline';
+                toggleBtn.textContent = 'Show more';
+                
+                more.style.overflow = 'hidden';
+                more.style.maxHeight = more.scrollHeight + 'px';
+                requestAnimationFrame(() => {
+                  more.style.transition = 'max-height 300ms ease, opacity 200ms ease';
+                  more.style.maxHeight = '0px';
+                  more.style.opacity = '0';
+                  setTimeout(() => {
+                    more.style.display = 'none';
+                    more.style.maxHeight = 'none';
+                    more.style.opacity = '1';
+                    more.style.overflow = 'visible';
+                  }, 300);
+                });
+              } else {
+                more.style.display = 'none';
+                if (ellipsis) ellipsis.style.display = 'inline';
+                toggleBtn.textContent = 'Show more';
+              }
+            } else {
+              // Expand with animation
+              more.style.display = 'block';
+              if (ellipsis) ellipsis.style.display = 'none';
+              toggleBtn.textContent = 'Show less';
+              
+              const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+              if (!prefersReduce) {
+                more.style.overflow = 'hidden';
+                more.style.maxHeight = '0px';
+                more.style.opacity = '0';
+                requestAnimationFrame(() => {
+                  more.style.transition = 'max-height 300ms ease, opacity 200ms ease';
+                  more.style.maxHeight = more.scrollHeight + 'px';
+                  more.style.opacity = '1';
+                  setTimeout(() => {
+                    more.style.maxHeight = 'none';
+                    more.style.overflow = 'visible';
+                  }, 300);
+                });
+              }
+            }
+          }
+        });
+      }
     } catch(_) {}
 
     // Hook up account Add/Enrich
@@ -1094,29 +1258,67 @@
       const requestId = window.__lushaLastRequestId;
       const id = contact.id || contact.contactId;
       
+      let enriched = null;
+      
       if (!requestId) {
-        lushaLog('No requestId available for reveal');
-        window.crm?.showToast && window.crm.showToast('No search session found. Please search again.');
-        return;
+        lushaLog('No requestId available for reveal - making direct enrich call');
+        // Make a direct enrich call without requestId (this will cost credits but work)
+        try {
+          const enrichResp = await fetch(`${base}/api/lusha/enrich`, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              contactIds: [id],
+              // Include company context for direct enrich
+              company: lastCompanyResult ? {
+                domain: lastCompanyResult.domain,
+                name: lastCompanyResult.name
+              } : null
+            })
+          });
+          
+          if (!enrichResp.ok) {
+            if (enrichResp.status === 403) {
+              window.crm?.showToast && window.crm.showToast('Plan restriction: Individual data reveals not available. Please refresh to get full data.');
+              return;
+            }
+            throw new Error(`HTTP ${enrichResp.status}`);
+          }
+          
+          const enrichData = await enrichResp.json();
+          enriched = (enrichData.contacts && enrichData.contacts[0]) || null;
+          
+          if (!enriched) {
+            window.crm?.showToast && window.crm.showToast('No data available to reveal.');
+            return;
+          }
+          
+          lushaLog('Direct enrich successful:', enriched);
+        } catch (directError) {
+          lushaLog('Direct enrich failed:', directError);
+          window.crm?.showToast && window.crm.showToast('Reveal failed. Please click refresh to get live data.');
+          return;
+        }
+      } else {
+        // Original logic with requestId
+        lushaLog('Making enrich request with requestId:', requestId, 'contactId:', id);
+        const resp = await fetch(`${base}/api/lusha/enrich`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId, contactIds: [id] })
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        lushaLog('Enrich response:', data);
+        enriched = (data.contacts && data.contacts[0]) || null;
+        if (!enriched) {
+          lushaLog('No enriched data returned');
+          window.crm?.showToast && window.crm.showToast('No data available to reveal.');
+          return;
+        }
       }
       if (!id) {
         lushaLog('No contact ID available for reveal');
         window.crm?.showToast && window.crm.showToast('Contact ID missing.');
-        return;
-      }
-      
-      lushaLog('Making enrich request with requestId:', requestId, 'contactId:', id);
-      const resp = await fetch(`${base}/api/lusha/enrich`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, contactIds: [id] })
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      lushaLog('Enrich response:', data);
-      const enriched = (data.contacts && data.contacts[0]) || null;
-      if (!enriched) {
-        lushaLog('No enriched data returned');
-        window.crm?.showToast && window.crm.showToast('No data available to reveal.');
         return;
       }
 
@@ -1146,6 +1348,38 @@
           }
         }
       }
+
+      // Persist enriched fields in session so paging keeps them
+      try {
+        const id = contact.id || contact.contactId;
+        const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
+        if (idx >= 0) {
+          const merged = Object.assign({}, allContacts[idx], enriched);
+          if (Array.isArray(enriched.emails)) {
+            merged.emails = enriched.emails;
+            merged.hasEmails = enriched.emails.length > 0;
+            if (enriched.emails[0] && enriched.emails[0].address) merged.email = enriched.emails[0].address;
+          }
+          if (Array.isArray(enriched.phones)) {
+            merged.phones = enriched.phones;
+            merged.hasPhones = enriched.phones.length > 0;
+            if (enriched.phones[0] && enriched.phones[0].number) merged.phone = enriched.phones[0].number;
+          }
+          if (enriched.firstName || enriched.lastName || (enriched.name && (enriched.name.first || enriched.name.last || enriched.name.full))) {
+            merged.firstName = enriched.firstName || enriched.name?.first || merged.firstName;
+            merged.lastName = enriched.lastName || enriched.name?.last || merged.lastName;
+            const full = (enriched.name && (enriched.name.full || enriched.name)) || `${merged.firstName||''} ${merged.lastName||''}`.trim();
+            if (full) merged.fullName = full;
+            // update name map as well
+            try {
+              if (!window.__lushaNameMap) window.__lushaNameMap = new Map();
+              window.__lushaNameMap.set(id, { f: merged.firstName||'', l: merged.lastName||'', full: merged.fullName||full||'' });
+            } catch(_){}
+          }
+          allContacts[idx] = merged;
+          lushaLog('Persisted enriched fields to session for', id);
+        }
+      } catch(persistErr) { lushaLog('Persist session merge failed', persistErr); }
       
       // Update the contact data in the Add Contact button
       const addContactBtn = container.querySelector('[data-action="add-contact"]');
@@ -1155,8 +1389,13 @@
 
       // Persist into cache (merge contact by id) AND update CRM if contact exists
       try { 
-        await upsertCacheContact({ company: lastCompanyResult }, enriched);
-        console.log('[Lusha] Revealed data saved to cache');
+        // Use the merged contact data (with enriched fields) for cache update
+        const id = contact.id || contact.contactId;
+        const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
+        const contactToCache = idx >= 0 ? allContacts[idx] : Object.assign({}, contact, enriched);
+        
+        await upsertCacheContact({ company: lastCompanyResult }, contactToCache);
+        console.log('[Lusha] Revealed data saved to cache with merged contact data');
         
         // Also update CRM contact if it exists (by email match)
         const email = enriched.emails && enriched.emails[0] && enriched.emails[0].address;
@@ -1324,9 +1563,11 @@
       if (paginationEl) {
         if (contacts.length > contactsPerPage) {
           paginationEl.style.display = 'flex';
+          paginationEl.style.visibility = 'visible';
           updatePaginationControls();
         } else {
-          paginationEl.style.display = 'none';
+          paginationEl.style.visibility = 'hidden';
+          paginationEl.style.display = 'flex';
         }
       }
       
@@ -1334,6 +1575,23 @@
       displayCurrentPage();
       // Stagger in the items for a smoother appearance
       try { animateResultItemsIn(); } catch(_) {}
+
+      // Fade-in the results header (title, count, pagination) to avoid jump
+      try {
+        const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!prefersReduce) {
+          const headerEl = resultsWrap?.querySelector('.lusha-results-header');
+          if (headerEl) {
+            headerEl.style.opacity = '0';
+            headerEl.style.transform = 'translateY(8px)';
+            requestAnimationFrame(() => {
+              headerEl.style.transition = 'opacity 400ms ease, transform 400ms ease';
+              headerEl.style.opacity = '1';
+              headerEl.style.transform = 'translateY(0)';
+            });
+          }
+        }
+      } catch(_) {}
       
     } catch (e) { 
       lushaLog('Update results failed:', e);
@@ -1345,9 +1603,9 @@
     try {
       const listEl = document.getElementById('lusha-contacts-list');
       if (!listEl) return;
-
+      
       listEl.innerHTML = '';
-
+      
       if (allContacts.length === 0) {
         lushaLog('No contacts to display');
         const empty = document.createElement('div');
@@ -1356,14 +1614,14 @@
         listEl.appendChild(empty);
         return;
       }
-
+      
       // Calculate pagination
       const startIndex = (currentPage - 1) * contactsPerPage;
       const endIndex = startIndex + contactsPerPage;
       const pageContacts = allContacts.slice(startIndex, endIndex);
-
+      
       lushaLog(`Displaying page ${currentPage}: contacts ${startIndex + 1}-${Math.min(endIndex, allContacts.length)} of ${allContacts.length}`);
-
+      
       // Create contact elements for current page
       pageContacts.forEach((c, i) => {
         const mapped = mapProspectingContact(c);
@@ -1371,28 +1629,28 @@
         lushaLog(`Creating element ${globalIndex}:`, mapped);
         listEl.appendChild(createContactElement(mapped, globalIndex));
       });
-
+      
       // Update pagination controls
       updatePaginationControls();
-
-      // Simple fade-in for all items at once
-      try { 
-        const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (!prefersReduce) {
-          requestAnimationFrame(() => {
-            const items = listEl.querySelectorAll('.lusha-contact-item');
-            items.forEach((item, i) => {
-              item.style.opacity = '0';
-              item.style.transform = 'translateY(8px)';
-              setTimeout(() => {
-                item.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-                item.style.opacity = '1';
-                item.style.transform = 'translateY(0)';
-              }, i * 50);
-            });
-          });
-        }
-      } catch(_) {}
+      
+       // Simple fade-in for all items at once
+       try { 
+         const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+         if (!prefersReduce) {
+           requestAnimationFrame(() => {
+             const items = listEl.querySelectorAll('.lusha-contact-item');
+             items.forEach((item, i) => {
+               item.style.opacity = '0';
+               item.style.transform = 'translateY(8px)';
+               setTimeout(() => {
+                 item.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                 item.style.opacity = '1';
+                 item.style.transform = 'translateY(0)';
+               }, i * 80);
+             });
+           });
+         }
+       } catch(_) {}
 
     } catch (e) {
       lushaLog('Display current page failed:', e);
@@ -1518,8 +1776,9 @@
         contacts: (contacts || []).map(mapProspectingContact),
         updatedAt: new Date()
       };
-      await db.collection('lusha_cache').doc(docId).set(payload, { merge: true });
-      console.log('[Lusha] Cache saved', docId, payload);
+      // Use set() without merge to completely overwrite cache data
+      await db.collection('lusha_cache').doc(docId).set(payload);
+      console.log('[Lusha] Cache saved (overwrite)', docId, payload);
     } catch (e) { console.warn('[Lusha] Cache save failed', e); }
   }
 
@@ -1576,17 +1835,18 @@
     const style = document.createElement('style');
     style.id = 'lusha-styles';
     style.textContent = `
-      /* Simple crossfade helpers */
-      #lusha-widget .is-hidden { opacity: 0; pointer-events: none; }
-      #lusha-widget .is-shown { opacity: 1; }
-      #lusha-widget #lusha-loading, #lusha-widget #lusha-results {
-        transition: opacity 300ms ease;
-      }
+       /* Simple crossfade helpers */
+       #lusha-widget .is-hidden { opacity: 0; pointer-events: none; }
+       #lusha-widget .is-shown { opacity: 1; }
+       #lusha-widget #lusha-loading, #lusha-widget #lusha-results {
+         transition: opacity 500ms ease;
+       }
 
       /* Company summary fade-in */
       #lusha-widget .fade-in-block { opacity: 0; transition: opacity 300ms ease; }
       #lusha-widget .fade-in-block.in { opacity: 1; }
       /* Lusha Widget Layout - Left-to-Right with Proper Field Alignment */
+      #lusha-widget.lusha-anim { will-change: opacity, transform; }
       #lusha-widget .lusha-weblink { 
         color: var(--text-primary); 
         text-decoration: none; 
@@ -1876,13 +2136,54 @@
       .replace(/'/g, '&#039;');
   }
 
+  function showCreditsUsed(credits, type) {
+    try {
+      const listEl = document.getElementById('lusha-contacts-list');
+      if (!listEl) return;
+      
+      // Remove existing credits chip
+      const existingChip = listEl.querySelector('.lusha-credits-chip');
+      if (existingChip) existingChip.remove();
+      
+      const text = type === 'cached' ? '0 credits used' : `${credits} credit${credits !== 1 ? 's' : ''} used`;
+      
+      const chip = document.createElement('div');
+      chip.className = 'lusha-credits-chip';
+      chip.style.display = 'block';
+      chip.style.textAlign = 'center';
+      chip.style.marginTop = '0px';
+      chip.innerHTML = `
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--orange-subtle);border:1px solid var(--orange-primary);border-radius:16px;font-size:12px;color:#ffffff;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          ${escapeHtml(text)}
+        </div>
+      `;
+      
+      listEl.appendChild(chip);
+      
+      // Animate in the chip
+      const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!prefersReduce) {
+        chip.style.opacity = '0';
+        chip.style.transform = 'translateY(8px)';
+        requestAnimationFrame(() => {
+          chip.style.transition = 'opacity 300ms ease, transform 300ms ease';
+          chip.style.opacity = '1';
+          chip.style.transform = 'translateY(0)';
+        });
+      }
+    } catch(_) {}
+  }
+
   // Public API
   function openLusha(contactId) {
     currentContactId = contactId;
     currentEntityType = 'contact';
     removeExistingWidget();
     makeCard(contactId, 'contact');
-    try { window.crm?.showToast && window.crm.showToast('Lusha Contact Search opened'); } catch (_) {}
+    // Removed toast notification
   }
 
   function openLushaForAccount(accountId) {
@@ -1901,7 +2202,7 @@
         console.log('[Lusha] Prefill error:', e); 
       }
     }, 100);
-    try { window.crm?.showToast && window.crm.showToast('Lusha Contact Search opened'); } catch (_) {}
+    // Removed toast notification
   }
 
   function closeLusha() {
@@ -1926,22 +2227,18 @@ function crossfadeToResults(){
     const loadingEl = document.getElementById('lusha-loading');
     const resultsEl = document.getElementById('lusha-results');
     if (!loadingEl || !resultsEl) return;
-    
-    // Hide loading
-    loadingEl.classList.remove('is-shown');
-    loadingEl.classList.add('is-hidden');
-    
-    // Show results
+      
+    // Ensure layout is stable before transition
+    void resultsEl.offsetHeight; // force reflow
+
+    // Loading is already hidden, just show results immediately
     resultsEl.style.display = 'block';
     resultsEl.classList.remove('is-hidden');
     resultsEl.classList.add('is-shown');
     
-    // Clean up loading after transition
-    setTimeout(()=>{ 
-      try { 
-        loadingEl.style.display='none'; 
-        loadingEl.classList.remove('is-hidden');
-      } catch(_){} 
-    }, 350);
+    // Clean up loading classes
+    try { 
+      loadingEl.classList.remove('is-shown', 'is-hidden');
+    } catch(_){} 
   } catch(_) {}
 }
