@@ -884,17 +884,31 @@
     
     // Check if company summary already exists and is visible
     const existingSummary = el.querySelector('.company-summary');
-    // Avoid first-open flicker: skip animation the very first time we render company summary
-    let shouldAnimate = !skipAnimation;
-    try { if (!window.__lushaCompanyRenderedOnce) { shouldAnimate = false; } } catch(_) {}
     
+    // Create content hash to detect if content has actually changed
     const name = escapeHtml(company?.name || '');
     const domainRaw = (company?.domain || company?.fqdn || '') || '';
     const domain = String(domainRaw).replace(/^www\./i,'');
-    const website = domain ? `https://${domain}` : '';
-    const logo = company?.logoUrl ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : '');
     const linkedinUrl = company?.linkedin || '';
     const fullDescription = company?.description || '';
+    const contentHash = `${name}|${domain}|${linkedinUrl}|${fullDescription}`;
+    
+    // Check if content is the same as what's already rendered
+    const existingContentHash = el.getAttribute('data-content-hash');
+    const contentUnchanged = existingContentHash === contentHash;
+    
+    // Avoid first-open flicker: skip animation the very first time we render company summary
+    // Also skip animation if content hasn't changed or if explicitly requested
+    let shouldAnimate = !skipAnimation && !contentUnchanged;
+    try { if (!window.__lushaCompanyRenderedOnce) { shouldAnimate = false; } } catch(_) {}
+    
+    // If content is unchanged and summary already exists, don't re-render
+    if (contentUnchanged && existingSummary) {
+      return;
+    }
+    
+    const website = domain ? `https://${domain}` : '';
+    const logo = company?.logoUrl ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : '');
     
     // Create collapsible description
     let descHtml = '';
@@ -1048,6 +1062,9 @@
       }
     } catch(_) {}
 
+    // Store content hash to detect changes in future renders
+    try { el.setAttribute('data-content-hash', contentHash); } catch(_) {}
+    
     // Mark that we've rendered the company summary at least once (enables smooth animation on next renders)
     try { window.__lushaCompanyRenderedOnce = true; } catch(_) {}
 

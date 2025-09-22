@@ -608,9 +608,9 @@
       .transcript-avatar-circle { width: 32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12px; letter-spacing:.5px; }
       .transcript-avatar-circle.agent-avatar { background: var(--orange-subtle); color:#fff; }
       .transcript-avatar-circle.contact-avatar { background: var(--orange-subtle); color:#fff; }
-      .transcript-avatar-circle.company-avatar { background: var(--bg-item); padding:2px; }
-      .transcript-avatar-circle.company-avatar img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
-      .transcript-avatar-circle .company-favicon-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); }
+      .transcript-avatar-circle.company-avatar { background: transparent; padding:0; }
+      .transcript-avatar-circle.company-avatar img { width:100%; height:100%; object-fit:cover; }
+      .transcript-avatar-circle .company-favicon-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); background: transparent; }
       .transcript-content { flex:1; min-width:0; border:1px solid var(--border-light); border-radius:10px; padding:10px 12px; background: var(--bg-item); }
       .transcript-message.customer .transcript-content { background: var(--bg-card); }
       .transcript-header { display:flex; align-items:center; gap:8px; margin-bottom:2px; }
@@ -761,7 +761,7 @@
   function ad_getContactAvatar(contactName, call){
     const domain = ad_extractDomainFromAccount(call && (call.accountName || ''));
     if (domain){
-      const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class=\"company-favicon\" aria-hidden=\"true\" style=\"display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);\"></span>';
+      const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class=\"company-favicon\" aria-hidden=\"true\" style=\"display:inline-block;width:16px;height:16px;\"></span>';
       return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\">${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : fb}</div>`;
     }
     const initial = (String(contactName||'C').charAt(0) || 'C').toUpperCase();
@@ -1856,7 +1856,11 @@
                   company: account.accountName || account.name || account.companyName || null,
                   contactId: contact.id || null,
                   contactName: fullName || null,
-                  name: fullName || null
+                  name: fullName || null,
+                  city: account.city || account.locationCity || '',
+                  state: account.state || account.locationState || '',
+                  domain: account.domain || account.website || '',
+                  isCompanyPhone: false // This is calling a contact, not company phone
                 });
               }
               // Trigger call
@@ -1957,7 +1961,11 @@
                   accountName: a?.accountName || a?.name || a?.companyName || null,
                   company: a?.accountName || a?.name || a?.companyName || null,
                   contactId: null,
-                  contactName: null
+                  contactName: null,
+                  city: a?.city || a?.locationCity || '',
+                  state: a?.state || a?.locationState || '',
+                  domain: a?.domain || a?.website || '',
+                  isCompanyPhone: true
                 });
               }
               const name = a?.accountName || a?.name || a?.companyName || 'Account';

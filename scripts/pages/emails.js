@@ -4325,10 +4325,14 @@ class EmailManager {
                 sendButton.textContent = 'Sending...';
             }
 
+            // Get email signature and append to body
+            const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+            const contentWithSignature = body + signature;
+
             const emailData = {
                 to: to.split(',').map(email => email.trim()),
                 subject,
-                content: body
+                content: contentWithSignature
             };
 
             // Try Gmail API first, fallback to email tracking manager

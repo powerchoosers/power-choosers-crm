@@ -873,7 +873,7 @@
       .phone-contact .contact-text { display: flex; flex-direction: column; }
       .phone-contact .contact-name { font-weight: 700; color: var(--text-primary, #fff); }
       .phone-contact .contact-sub { color: var(--text-secondary, #b5b5b5); font-size: 12px; }
-      .phone-contact .company-favicon { width: 20px; height: 20px; border-radius: 50%; background: var(--bg-card, #383f46); padding: 2px; box-sizing: border-box; object-fit: cover; }
+      .phone-contact .company-favicon { width: 20px; height: 20px; object-fit: cover; }
       .phone-contact .avatar-initials { width: 28px; height: 28px; border-radius: 50%; background: var(--primary-700, #ff6b35); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 12px; font-weight: 700; }
     `;
     document.head.appendChild(style);
@@ -910,7 +910,19 @@
       // Populate
       const nameLine = (meta && (meta.name || meta.account)) || (currentCallContext && (currentCallContext.name || currentCallContext.company)) || '';
       const account = (meta && (meta.account || meta.company)) || (currentCallContext && currentCallContext.company) || '';
-      const sub = [account, number].filter(Boolean).join(' • ');
+      
+      // Determine if this is a company phone call vs individual contact call
+      const isCompanyPhone = currentCallContext && currentCallContext.isCompanyPhone;
+      const city = (meta && meta.city) || (currentCallContext && currentCallContext.city) || '';
+      const state = (meta && meta.state) || (currentCallContext && currentCallContext.state) || '';
+      
+      // Build subtitle: for company calls show location, for individual calls show company + number
+      let sub;
+      if (isCompanyPhone && (city || state)) {
+        sub = [city, state].filter(Boolean).join(', ');
+      } else {
+        sub = [account, number].filter(Boolean).join(' • ');
+      }
       
       console.log('[Phone Widget][DEBUG] setContactDisplay called:', {
         meta: meta,
@@ -922,9 +934,14 @@
       const favicon = makeFavicon(meta && meta.domain);
       const avatarWrap = box.querySelector('.contact-avatar');
       if (avatarWrap) {
-        if (favicon) {
+        // For company phone calls, always try to show company favicon
+        if (isCompanyPhone && favicon) {
+          avatarWrap.innerHTML = `<img class="company-favicon" src="${favicon}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
+        } else if (favicon) {
+          // For individual contacts, show favicon if available
           avatarWrap.innerHTML = `<img class="company-favicon" src="${favicon}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
         } else {
+          // Fallback to initials
           const initials = (nameLine || account || number || '')
             .split(/\s+/)
             .map(s => s.trim()[0])
@@ -1595,7 +1612,7 @@
       });
     });
     
-    // Helper: lookup contact by phone and update widget title
+    // Helper: lookup contact by phone and update widget display
     function enrichTitleFromPhone(rawNumber) {
       try {
         const norm = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
@@ -1603,18 +1620,46 @@
         if (!needle || typeof window.getPeopleData !== 'function') return;
         const people = window.getPeopleData() || [];
         const hit = people.find((c) => {
-          const a = norm(c.phone);
-          const b = norm(c.mobile);
-          return (a && a === needle) || (b && b === needle);
+          const phone = norm(c.phone);
+          const mobile = norm(c.mobile);
+          const workDirect = norm(c.workDirectPhone);
+          const other = norm(c.otherPhone);
+          const companyPhone = norm(c.companyPhone);
+          return (phone && phone === needle) || 
+                 (mobile && mobile === needle) || 
+                 (workDirect && workDirect === needle) || 
+                 (other && other === needle) ||
+                 (companyPhone && companyPhone === needle);
         });
         if (hit) {
           const fullName = [hit.firstName, hit.lastName].filter(Boolean).join(' ') || (hit.name || '');
           if (fullName) {
-            // Do not modify header title anymore. Optionally store in context for later in-call display
+            // Store in context for later in-call display
             const comp = hit.companyName || hit.accountName || hit.company || '';
             currentCallContext.name = fullName;
             currentCallContext.company = comp;
+            currentCallContext.city = hit.city || hit.locationCity || '';
+            currentCallContext.state = hit.state || hit.locationState || '';
+            currentCallContext.domain = hit.domain || '';
+            
+            // Check if this is a company phone call by comparing with company phone
+            const companyPhone = hit.companyPhone || '';
+            const normalizedCompanyPhone = norm(companyPhone);
+            currentCallContext.isCompanyPhone = normalizedCompanyPhone && normalizedCompanyPhone === needle;
+            
+            // Update the visual display immediately
+            const meta = {
+              name: fullName,
+              account: comp,
+              domain: hit.domain || '',
+              city: hit.city || hit.locationCity || '',
+              state: hit.state || hit.locationState || ''
+            };
+            setContactDisplay(meta, rawNumber);
           }
+        } else {
+          // Clear contact display if no match found
+          try { clearContactDisplay(); } catch(_) {}
         }
       } catch (_) { /* noop */ }
     }
@@ -1623,8 +1668,27 @@
     if (input) {
       input.addEventListener('input', trackUserInput);
       input.addEventListener('keydown', trackUserInput);
+      
+      // Debounced contact lookup to avoid too many calls
+      let lookupTimeout = null;
       input.addEventListener('input', () => {
-        enrichTitleFromPhone(input.value || '');
+        const value = input.value || '';
+        
+        // Clear any existing timeout
+        if (lookupTimeout) {
+          clearTimeout(lookupTimeout);
+        }
+        
+        // If input is empty, clear contact display
+        if (!value.trim()) {
+          try { clearContactDisplay(); } catch(_) {}
+          return;
+        }
+        
+        // Debounce the lookup by 500ms
+        lookupTimeout = setTimeout(() => {
+          enrichTitleFromPhone(value);
+        }, 500);
       });
     }
 
@@ -2295,7 +2359,14 @@
       enrichTitleFromPhone(normalized.value);
       // Immediately reveal early contact display with whatever metadata we have
       try {
-        const earlyMeta = { name: (currentCallContext && currentCallContext.name) || '', account: (currentCallContext && currentCallContext.company) || '', domain: '' };
+        const earlyMeta = { 
+          name: (currentCallContext && currentCallContext.name) || '', 
+          account: (currentCallContext && currentCallContext.company) || '', 
+          domain: (currentCallContext && currentCallContext.domain) || '',
+          city: (currentCallContext && currentCallContext.city) || '',
+          state: (currentCallContext && currentCallContext.state) || '',
+          isCompanyPhone: !!(currentCallContext && currentCallContext.isCompanyPhone)
+        };
         setContactDisplay(earlyMeta, normalized.value);
       } catch(_) {}
       // Immediately switch button to Hang Up and mark call-in-progress so user can cancel immediately
@@ -2846,6 +2917,10 @@
       currentCallContext.contactName = null;
       currentCallContext.company = '';
       currentCallContext.name = '';
+      currentCallContext.city = '';
+      currentCallContext.state = '';
+      currentCallContext.domain = '';
+      currentCallContext.isCompanyPhone = false;
       
       // Set new context
       currentCallContext.accountId = ctx.accountId || null;
@@ -2854,6 +2929,10 @@
       currentCallContext.contactName = ctx.contactName || null;
       if (ctx.company) currentCallContext.company = ctx.company;
       if (ctx.name) currentCallContext.name = ctx.name;
+      if (ctx.city) currentCallContext.city = ctx.city;
+      if (ctx.state) currentCallContext.state = ctx.state;
+      if (ctx.domain) currentCallContext.domain = ctx.domain;
+      if (ctx.isCompanyPhone) currentCallContext.isCompanyPhone = ctx.isCompanyPhone;
       
       console.debug('[Phone Widget] Call context updated:', currentCallContext);
       console.log('[Phone Widget][DEBUG] setCallContext called with:', {

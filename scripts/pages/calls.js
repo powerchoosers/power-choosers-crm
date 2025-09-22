@@ -1727,7 +1727,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         if (typeof window.__pcAccountsIcon === 'function') return window.__pcAccountsIcon();
       } catch(_) {}
       // Minimal white vector icon placeholder
-      return '<span class="company-favicon-fallback-icon" aria-hidden="true" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--bg-item);position:relative;overflow:hidden">\
+      return '<span class="company-favicon-fallback-icon" aria-hidden="true" style="display:inline-block;width:16px;height:16px;position:relative;overflow:hidden">\
         <svg viewBox="0 0 24 24" width="14" height="14" style="position:absolute;left:1px;top:1px" fill="none" stroke="#fff" stroke-width="1.5"><rect x="4" y="8" width="6" height="10" rx="1"></rect><rect x="14" y="6" width="6" height="12" rx="1"></rect></svg>\
       </span>';
     })();
@@ -1789,46 +1789,19 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       .add-contact-cta:hover{background:var(--grey-700);color:var(--text-inverse)}
       .add-contact-icon{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;border-radius:50%;background:transparent}
 
-      /* Company favicon container to prevent flicker - Calls table specific */
-      #calls-table .company-favicon-container {
-        position: relative;
-        display: inline-block;
-        width: 16px;
-        height: 16px;
-        flex-shrink: 0;
-      }
-      #calls-table .company-favicon-container .company-favicon {
-        position: absolute;
-        top: 0;
-        left: 0;
+      /* Company favicon styling - Calls table specific */
+      #calls-table .company-favicon {
         width: 16px !important;
         height: 16px !important;
-        border-radius: 50%;
+        flex-shrink: 0;
         opacity: 0;
         transition: opacity 0.2s ease-in-out;
-        z-index: 2;
       }
-      #calls-table .company-favicon-container .company-favicon-fallback {
-        position: absolute;
-        top: 0;
-        left: 0;
-        display: none; /* hidden by default to avoid overlap under transparent favicons */
-        opacity: 1;
-        z-index: 1;
-      }
-      #calls-table .company-favicon-container.favicon-loaded .company-favicon {
+      #calls-table .company-favicon.favicon-loaded {
         opacity: 1;
       }
-      #calls-table .company-favicon-container.favicon-loaded .company-favicon-fallback {
+      #calls-table .company-favicon.favicon-failed {
         display: none;
-        opacity: 0;
-      }
-      #calls-table .company-favicon-container.favicon-failed .company-favicon {
-        display: none;
-      }
-      #calls-table .company-favicon-container.favicon-failed .company-favicon-fallback {
-        display: block; /* show fallback only when load fails */
-        opacity: 1;
       }
       
       /* Ensure company cell layout stability */
@@ -1842,7 +1815,6 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         display: inline-block;
         width: 16px;
         height: 16px;
-        border-radius: 50%;
       }
 
       /* Modern cards and grid */
@@ -1903,23 +1875,20 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }
       
       .transcript-avatar-circle.company-avatar {
-        background: var(--bg-item);
-        padding: 2px;
-        border-radius: 50%;
+        background: transparent;
+        padding: 0;
       }
       
       .transcript-avatar-circle.company-avatar img {
         width: 100%;
         height: 100%;
-        border-radius: 50%;
         object-fit: cover;
       }
       
       .transcript-avatar-circle.company-avatar .company-favicon-fallback {
         width: 100%;
         height: 100%;
-        border-radius: 50%;
-        background: var(--bg-item);
+        background: transparent;
         display: flex;
         align-items: center;
         justify-content: center;

@@ -127,14 +127,19 @@ export default async function handler(req, res){
 
     // If still missing, try to resolve via Twilio by Call SID with backoff
     if (!recordingSid && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN){
+      console.log(`[CI Request] Looking up recording for call: ${callSid}`);
       recordingSid = await selectPreferredRecordingByCall(callSid, 5);
+      console.log(`[CI Request] Found recording: ${recordingSid}`);
     }
 
     if (!recordingSid){
+      console.error(`[CI Request] No recording found for call: ${callSid}`);
       res.statusCode = 404; res.setHeader('Content-Type','application/json');
       res.end(JSON.stringify({ error: 'Recording not found for call', callSid }));
       return;
     }
+
+    console.log(`[CI Request] Using recording: ${recordingSid} for call: ${callSid}`);
 
     if (!ciTranscriptSid){
       // Determine channel mapping for proper speaker separation
@@ -250,15 +255,32 @@ export default async function handler(req, res){
     }));
   }catch(e){
     console.error('[ci-request] Error:', e);
+    console.error('[ci-request] Error details:', {
+      message: e?.message,
+      code: e?.code,
+      status: e?.status,
+      statusCode: e?.statusCode,
+      moreInfo: e?.moreInfo,
+      details: e?.details
+    });
     const twilioCode = e && (e.code || e.status || e.statusCode);
     let friendly = 'Failed to request CI';
     if (twilioCode === 31000) friendly = 'Recording not found or not ready';
     else if (twilioCode === 31001) friendly = 'Recording is not dual-channel';
     else if (twilioCode === 31002) friendly = 'Recording is too short or empty';
     else if (twilioCode === 31003) friendly = 'Service temporarily unavailable';
+    else if (twilioCode === 20003) friendly = 'Authentication failed - check Twilio credentials';
+    else if (twilioCode === 20404) friendly = 'Resource not found';
+    else if (twilioCode === 21211) friendly = 'Invalid phone number format';
     res.statusCode = (twilioCode && Number(twilioCode) >= 400 && Number(twilioCode) < 600) ? 400 : 500;
     res.setHeader('Content-Type','application/json');
-    res.end(JSON.stringify({ error: friendly, details: e?.message, code: twilioCode }));
+    res.end(JSON.stringify({ 
+      error: friendly, 
+      details: e?.message, 
+      code: twilioCode,
+      moreInfo: e?.moreInfo,
+      fullError: e?.toString()
+    }));
   }
 }
 
