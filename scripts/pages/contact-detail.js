@@ -3687,8 +3687,29 @@
       }
       const result = await response.json().catch(()=>({}));
       try { console.log('[ContactDetail] CI processing initiated:', result); } catch(_) {}
+      
       // Keep spinner; backend/webhook will update UI when analysis completes
-      try { btn.title = 'Processing call insights...'; btn.classList.remove('not-processed'); btn.classList.add('processing'); } catch(_) {}
+      try { 
+        btn.title = 'Processing call insights...'; 
+        btn.classList.remove('not-processed'); 
+        btn.classList.add('processing'); 
+        
+        // Store transcript SID for status checking
+        if (result.transcriptSid) {
+          btn.setAttribute('data-transcript-sid', result.transcriptSid);
+        }
+      } catch(_) {}
+      
+      // Show success toast with transcript SID for debugging
+      try { 
+        if (window.ToastManager && result.transcriptSid) { 
+          window.ToastManager.showToast({
+            type: 'success',
+            title: 'Processing Started',
+            message: `Transcript ID: ${result.transcriptSid.substring(0, 8)}...`
+          }); 
+        } 
+      } catch(_) {}
     } catch (error) {
       try { console.error('[ContactDetail] Failed to trigger CI processing:', error); } catch(_) {}
       // Reset button state on error

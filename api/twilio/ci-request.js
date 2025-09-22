@@ -193,6 +193,35 @@ export default async function handler(req, res){
         ? await client.intelligence.v2.transcripts.create(createArgs, { idempotencyKey: idemKey })
         : await client.intelligence.v2.transcripts.create(createArgs);
       ciTranscriptSid = created.sid;
+      
+      console.log(`[CI Request] Created transcript: ${ciTranscriptSid}, status: ${created.status}`);
+      
+      // Poll transcript status to ensure it's processing
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          const transcript = await client.intelligence.v2.transcripts(ciTranscriptSid).fetch();
+          console.log(`[CI Request] Transcript ${ciTranscriptSid} status: ${transcript.status}`);
+          
+          if (transcript.status === 'completed') {
+            console.log(`[CI Request] Transcript completed immediately: ${ciTranscriptSid}`);
+            break;
+          } else if (transcript.status === 'failed') {
+            console.error(`[CI Request] Transcript failed: ${ciTranscriptSid}`, transcript);
+            throw new Error(`Transcript processing failed: ${transcript.status}`);
+          } else if (['queued', 'in-progress'].includes(transcript.status)) {
+            console.log(`[CI Request] Transcript processing: ${transcript.status}`);
+            break;
+          }
+        } catch (e) {
+          console.warn(`[CI Request] Error checking transcript status (attempt ${attempts + 1}):`, e.message);
+        }
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        }
+      }
     }
 
     // Persist request flags so webhook only processes allowed transcripts
@@ -212,7 +241,13 @@ export default async function handler(req, res){
     }catch(_){ }
 
     res.statusCode = 202; res.setHeader('Content-Type','application/json');
-    res.end(JSON.stringify({ ok: true, transcriptSid: ciTranscriptSid, recordingSid }));
+    res.end(JSON.stringify({ 
+      ok: true, 
+      transcriptSid: ciTranscriptSid, 
+      recordingSid,
+      message: 'Transcript processing started. Check status via webhook or polling.',
+      webhookUrl: `${base}/api/twilio/conversational-intelligence-webhook`
+    }));
   }catch(e){
     console.error('[ci-request] Error:', e);
     const twilioCode = e && (e.code || e.status || e.statusCode);
