@@ -17,7 +17,20 @@ module.exports = async (req, res) => {
       return res.status(resp.status).json({ error: 'Lusha usage error', details: text });
     }
 
-    const data = await resp.json();
+    const raw = await resp.json();
+
+    // Flatten response: handle both { usage: { used,total,remaining } } and { used,total,remaining }
+    const toNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    let usage = raw && typeof raw === 'object' ? (raw.usage || raw) : {};
+    if (usage && typeof usage === 'object') {
+      // Coerce fields to numbers when possible
+      if (usage.used != null) usage.used = toNum(usage.used);
+      if (usage.total != null) usage.total = toNum(usage.total);
+      if (usage.remaining != null) usage.remaining = toNum(usage.remaining);
+    }
 
     // Also surface common rate/usage headers when present
     const headers = {
@@ -32,7 +45,7 @@ module.exports = async (req, res) => {
       minuteUsage: resp.headers.get('x-minute-usage') || null
     };
 
-    return res.status(200).json({ usage: data || {}, headers });
+    return res.status(200).json({ usage: usage || {}, headers });
   } catch (e) {
     return res.status(500).json({ error: 'Server error', details: e.message });
   }

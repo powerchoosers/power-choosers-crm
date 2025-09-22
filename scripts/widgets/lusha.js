@@ -122,7 +122,7 @@
 
     card.innerHTML = `
       <div class="widget-card-header">
-        <h3 class="widget-title">Lusha Contact Search</h3>
+        <h3 class="widget-title">Prospect</h3>
         <div style="display:flex;gap:8px;align-items:center;">
           <button class="lusha-close" type="button" title="Close Lusha Search" aria-label="Close">×</button>
         </div>
@@ -158,11 +158,13 @@
             </div>
           </div>
           
-          <div class="lusha-contacts-list" id="lusha-contacts-list">
-            <!-- Results will be populated here -->
-          </div>
-        </div>
+      <div class="lusha-contacts-list" id="lusha-contacts-list">
+        <!-- Results will be populated here -->
       </div>
+      <!-- Persistent footer so pagination re-renders don't remove the usage bar -->
+      <div class="lusha-usage-footer" id="lusha-usage-footer"></div>
+    </div>
+  </div>
     `;
 
     // Smooth expand-in animation - slide down from top
@@ -244,6 +246,10 @@
     } else {
       scheduleSearch();
     }
+
+    // Always attempt to render the usage bar on open (throttled internally)
+    try { renderUsageBar(); } catch(_) {}
+
     return card;
   }
 
@@ -417,7 +423,7 @@
             if (includeAttempts.length === 0) includeAttempts.push({});
 
             let best = null;
-            const sizes = [1, 10, 40];
+            const sizes = [10, 40];
             outer: for (const size of sizes) {
               for (const inc of includeAttempts) {
                 const requestBody = { 
@@ -447,6 +453,8 @@
             lastCompanyResult = { name: companyName || '', domain: domain || '' };
             renderCompanyPanel(lastCompanyResult, false);
             updateResults(contacts);
+            // Persist minimal results to lusha_cache immediately so reopen shows them
+            try { await saveCache({ company: lastCompanyResult, contacts }); } catch(_) {}
             try { crossfadeToResults(); } catch(_) {}
             showCreditsUsed(0, 'cached');
             try { renderUsageBar(); } catch(_) {}
@@ -531,7 +539,7 @@
 
       // Pull all pages (search only, no enrichment)
       const collected = [];
-      const pageSize = options.pageSize || 1; // minimal by default; can be expanded on explicit action
+      const pageSize = Math.max(10, options.pageSize || 10); // enforce minimum page size of 10
       let page = 0;
       let total = 0;
       do {
@@ -876,7 +884,9 @@
     
     // Check if company summary already exists and is visible
     const existingSummary = el.querySelector('.company-summary');
-    const shouldAnimate = !skipAnimation;
+    // Avoid first-open flicker: skip animation the very first time we render company summary
+    let shouldAnimate = !skipAnimation;
+    try { if (!window.__lushaCompanyRenderedOnce) { shouldAnimate = false; } } catch(_) {}
     
     const name = escapeHtml(company?.name || '');
     const domainRaw = (company?.domain || company?.fqdn || '') || '';
@@ -926,14 +936,18 @@
       <div class="company-summary fade-in-block" style="padding:8px 0 10px 0;">
         <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:6px;">
           <div>${logo || ''}</div>
-          <div style="flex:1;">
-            <div style="font-weight:600;color:var(--text-primary)">${name}</div>
-            ${website ? `<a href="${website}" target="_blank" rel="noopener" class="lusha-weblink">${website}</a>` : ''}
-            ${linkedinUrl ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="Company LinkedIn" style="margin-left:8px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-              </svg>
-            </a>` : ''}
+          <div style="flex:1;min-width:0;">
+            <div class="lusha-company-top">
+              <div class="lusha-company-name">${name}</div>
+              ${linkedinUrl ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener" class="lusha-linkedin-link" title="Company LinkedIn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+              </a>` : ''}
+            </div>
+            <div class="lusha-company-meta">
+              ${website ? `<a href="${website}" target="_blank" rel="noopener" class="lusha-weblink">${website}</a>` : ''}
+            </div>
           </div>
         </div>
         ${descHtml}
@@ -1034,6 +1048,9 @@
       }
     } catch(_) {}
 
+    // Mark that we've rendered the company summary at least once (enables smooth animation on next renders)
+    try { window.__lushaCompanyRenderedOnce = true; } catch(_) {}
+
     // Hook up account Add/Enrich — avoid flicker on refresh by skipping async existence check
     try {
       const addBtn = document.getElementById('lusha-add-account');
@@ -1069,7 +1086,8 @@
               enrichBtn.onclick = async () => { try { await addAccountToCRM({ company: company.name, companyName: company.name, fqdn: company.domain }); } catch(_){} };
           }
           if (liveBtn) {
-            liveBtn.onclick = () => performLushaSearch({ forceLive: true, pageSize: 1, maxPages: 1 });
+            // Use a minimum page size of 10 to satisfy Lusha API constraints
+            liveBtn.onclick = () => performLushaSearch({ forceLive: true, pageSize: 10, maxPages: 1 });
           }
         })();
       }
@@ -1182,7 +1200,7 @@
           </div>
           <div class="lusha-field">
             <div class="lusha-field-header">
-              <div class="lusha-label">Phone Numbers</div>
+              <div class=\"lusha-label\">Phone</div>
               <button class="lusha-mini-btn" data-reveal="phones">${hasAnyPhones ? 'Enrich' : 'Reveal'}</button>
             </div>
             <div class="lusha-field-body" data-phones-list>
@@ -2014,6 +2032,28 @@
       return null;
     } catch (_) { return null; }
   }
+  // Helper: write to Firestore later if DB not yet available
+  function __lushaScheduleCacheWrite(docId, payload, merge){
+    try {
+      if (!docId || !payload) return;
+      let attempts = 0;
+      const tryOnce = async () => {
+        attempts++;
+        try {
+          const db = await getLushaCacheDB();
+          if (db) {
+            const ref = db.collection('lusha_cache').doc(docId);
+            if (merge) await ref.set(payload, { merge: true });
+            else await ref.set(payload);
+            return; // success
+          }
+        } catch(_) {}
+        if (attempts < 8) setTimeout(tryOnce, Math.min(1000 * Math.pow(2, attempts-1), 8000));
+      };
+      setTimeout(tryOnce, 250);
+    } catch(_) {}
+  }
+
   async function saveCache({ company, contacts }){
     try {
       const db = await getLushaCacheDB();
@@ -2098,6 +2138,9 @@
       };
       if (ref) {
         await ref.set(payload); // overwrite with merged payload
+      } else {
+        // Schedule a Firestore write when DB becomes available
+        __lushaScheduleCacheWrite(docId, payload, false);
       }
       // Always persist to localStorage as a fallback cache
       try { localStorage.setItem(`lusha_cache_${docId}`, JSON.stringify(payload)); } catch(_) {}
@@ -2150,6 +2193,7 @@
         ...(existing.facebook && { facebook: existing.facebook })
       };
       if (ref) await ref.set(updateData, { merge: true });
+      else __lushaScheduleCacheWrite(docId, updateData, true);
       try { localStorage.setItem(`lusha_cache_${docId}`, JSON.stringify(Object.assign({}, existing, updateData))); } catch(_) {}
       console.log('[Lusha] Cache upserted contact', mapped.id);
     } catch (e) { console.warn('[Lusha] Cache upsert failed', e); }
@@ -2222,6 +2266,12 @@
 
       /* Company summary fade-in */
       #lusha-widget .fade-in-block { opacity: 0; transition: opacity 300ms ease; }
+      
+      /* Company header rows */
+      #lusha-widget .lusha-company-top { display:flex; align-items:center; gap:8px; }
+      #lusha-widget .lusha-company-name { font-weight:600; color:var(--text-primary); flex:1 1 auto; min-width:0; }
+      #lusha-widget .lusha-company-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+      #lusha-widget .lusha-company-top .lusha-linkedin-link { margin-left:auto; }
       #lusha-widget .fade-in-block.in { opacity: 1; }
       /* Lusha Widget Layout - Left-to-Right with Proper Field Alignment */
       #lusha-widget.lusha-anim { will-change: opacity, transform; }
@@ -2307,16 +2357,22 @@
       #lusha-widget .lusha-field-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-start; /* place button right after label */
+        gap: 6px; /* tight spacing between label and button */
         margin-bottom: 4px;
+        width: 100%;
+        flex-wrap: nowrap;
       }
       
       #lusha-widget .lusha-label {
         font-weight: 500;
         font-size: 13px;
         color: var(--text-primary);
-        min-width: 80px;
+        min-width: 0; /* don't force extra width */
+        flex: 0 0 auto; /* keep label natural width */
+        white-space: nowrap; /* keep on one line with the button */
       }
+      #lusha-widget .lusha-field-header .lusha-mini-btn { flex-shrink: 0; margin-left: 0; }
       
       #lusha-widget .lusha-field-body {
         display: flex;
@@ -2526,6 +2582,11 @@
         background: var(--orange-subtle);
         transition: width .3s ease;
       }
+
+      /* Layout to keep usage footer stuck to bottom of results */
+      #lusha-widget .lusha-results { display: flex; flex-direction: column; }
+      #lusha-widget #lusha-contacts-list { flex: 1 1 auto; }
+      #lusha-widget .lusha-usage-footer { margin-top: 10px; }
     `;
     document.head.appendChild(style);
   }
@@ -2675,30 +2736,48 @@ async function renderUsageBar(){
       return Number.isFinite(n) ? n : null;
     };
 
+    // Allow manual override if your plan credits are known (e.g., 600)
+    const configuredTotal = (function(){
+      const fromWindow = toNum(window.LUSHA_CREDITS_TOTAL);
+      if (fromWindow != null) return fromWindow;
+      try { const ls = toNum(localStorage.getItem('LUSHA_CREDITS_TOTAL')); if (ls != null) return ls; } catch(_) {}
+      return null;
+    })();
+
+    // Deterministic pick helper (accepts 0 as valid)
+    const pick = (...vals) => {
+      for (const v of vals) { const n = toNum(v); if (n != null) return n; }
+      return null;
+    };
+
     // Prefer true credits if present in payload
-    const totalCreditCandidates = [
-      usage.totalCredits,
+    const creditsTotal = pick(
+      configuredTotal,
       usage.total,
+      usage.totalCredits,
       usage?.credits?.total,
+      usage?.credits?.limit,
       usage?.plan?.totalCredits,
-      usage?.account?.credits?.total
-    ];
-    const usedCreditCandidates = [
-      usage.usedCredits,
+      usage?.plan?.limit,
+      usage?.account?.credits?.total,
+      usage?.account?.credits?.limit
+    );
+    const creditsUsed = pick(
       usage.used,
+      usage.usedCredits,
       usage?.credits?.used,
       usage?.account?.credits?.used
-    ];
-    let creditsTotal = totalCreditCandidates.find(toNum);
-    let creditsUsed = usedCreditCandidates.find(toNum);
+    );
 
     let label = 'Credits';
     let limit;
     let used;
 
-    if (creditsTotal != null && creditsUsed != null && creditsTotal >= creditsUsed) {
+    if (creditsTotal != null) {
+      // If total is known but used is missing, assume 0 rather than falling back to daily headers
       limit = creditsTotal;
-      used = creditsUsed;
+      used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
+      label = 'Credits';
     } else {
       // Fallback: show requests today (rate-limit headers)
       const dailyLimit = toNum(usage.dailyLimit) ?? toNum(headers.dailyLimit) ?? 0;
@@ -2711,8 +2790,17 @@ async function renderUsageBar(){
 
     const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
 
-    const listEl = document.getElementById('lusha-contacts-list');
-    if (!listEl) return;
+    // Anchor usage bar in persistent footer (not wiped by pagination)
+    const resultsEl = document.getElementById('lusha-results');
+    if (!resultsEl) return;
+    let footer = document.getElementById('lusha-usage-footer');
+    if (!footer) {
+      footer = document.createElement('div');
+      footer.id = 'lusha-usage-footer';
+      footer.className = 'lusha-usage-footer';
+      resultsEl.appendChild(footer);
+    }
+
     let wrap = document.getElementById('lusha-usage-wrap');
     if (!wrap) {
       wrap = document.createElement('div');
@@ -2723,8 +2811,12 @@ async function renderUsageBar(){
         <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
         <div id="lusha-usage-text">–</div>
       `;
-      listEl.appendChild(wrap);
+      footer.appendChild(wrap);
+    } else if (wrap.parentElement !== footer) {
+      // If it exists somewhere else, move it to footer
+      footer.appendChild(wrap);
     }
+
     const fill = document.getElementById('lusha-usage-fill');
     const txt = document.getElementById('lusha-usage-text');
     const lab = document.getElementById('lusha-usage-label');
