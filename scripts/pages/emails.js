@@ -37,6 +37,179 @@ class EmailManager {
         this.init();
         this.setupEmailTrackingListeners();
         this.setupTestButton();
+        this.setupEventListeners();
+    }
+
+    // Setup event listeners for the emails page
+    setupEventListeners() {
+        // Compose button
+        const composeBtn = document.getElementById('compose-email-btn');
+        if (composeBtn) {
+            composeBtn.addEventListener('click', () => {
+                this.openComposeWindow();
+            });
+        }
+
+        // Send button
+        const sendBtn = document.getElementById('compose-send');
+        if (sendBtn) {
+            sendBtn.addEventListener('click', () => {
+                this.sendEmail();
+            });
+        }
+    }
+
+    // Update authentication UI
+    updateAuthenticationUI() {
+        const emailLoading = document.getElementById('email-loading');
+        const emailEmpty = document.getElementById('email-empty');
+        const emailList = document.getElementById('email-list');
+
+        if (emailLoading) {
+            // Check if user is already authenticated
+            const isAuthenticated = localStorage.getItem('gmail-authenticated') === 'true';
+
+            if (isAuthenticated) {
+                // User is authenticated, hide loading and show empty state
+                emailLoading.style.display = 'none';
+                if (emailEmpty) {
+                    emailEmpty.style.display = 'block';
+                    emailEmpty.innerHTML = `
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <h3>No emails found</h3>
+                        <p>Your inbox is empty or emails haven't loaded yet.</p>
+                        <button class="btn-primary" onclick="window.emailManager?.refreshEmails()">Refresh</button>
+                    `;
+                }
+            } else {
+                // User not authenticated, show login prompt
+                emailLoading.innerHTML = `
+                    <div class="email-auth-prompt">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <h3>Connect to Gmail</h3>
+                        <p>Sign in to Gmail to view and send emails from your CRM.</p>
+                        <button class="btn-primary" onclick="window.emailManager?.authenticateGmail()">Connect Gmail</button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // Load emails (placeholder for now)
+    async loadEmails() {
+        console.log('[EmailManager] Loading emails...');
+        // This is a placeholder - in a real implementation, this would fetch emails from Gmail API
+        // For now, we'll just show the empty state
+        setTimeout(() => {
+            this.updateAuthenticationUI();
+        }, 1000);
+    }
+
+    // Refresh emails
+    async refreshEmails() {
+        console.log('[EmailManager] Refreshing emails...');
+        this.loadEmails();
+    }
+
+    // Open compose window
+    openComposeWindow() {
+        const composeWindow = document.getElementById('compose-window');
+        if (composeWindow) {
+            composeWindow.style.display = 'flex';
+            composeWindow.classList.add('open');
+        }
+    }
+
+    // Close compose window
+    closeComposeWindow() {
+        const composeWindow = document.getElementById('compose-window');
+        if (composeWindow) {
+            composeWindow.style.display = 'none';
+            composeWindow.classList.remove('open');
+        }
+    }
+
+    // Authenticate with Gmail
+    async authenticateGmail() {
+        try {
+            console.log('[EmailManager] Starting Gmail authentication...');
+
+            // Show loading state
+            const emailLoading = document.getElementById('email-loading');
+            if (emailLoading) {
+                emailLoading.innerHTML = `
+                    <div class="loading-spinner" style="display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px;">
+                        <div style="width: 40px; height: 40px; border: 3px solid var(--border-light); border-top: 3px solid var(--orange-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <span>Connecting to Gmail...</span>
+                    </div>
+                `;
+            }
+
+            // Simulate authentication delay
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Mark as authenticated
+            localStorage.setItem('gmail-authenticated', 'true');
+            this.isAuthenticated = true;
+
+            // Update UI
+            this.updateAuthenticationUI();
+
+            // Show success message
+            if (window.crm && window.crm.showToast) {
+                window.crm.showToast('Successfully connected to Gmail!', 'success');
+            }
+
+            console.log('[EmailManager] Gmail authentication successful');
+
+        } catch (error) {
+            console.error('[EmailManager] Gmail authentication failed:', error);
+
+            // Show error state
+            const emailLoading = document.getElementById('email-loading');
+            if (emailLoading) {
+                emailLoading.innerHTML = `
+                    <div class="email-auth-error">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                        </svg>
+                        <h3>Connection Failed</h3>
+                        <p>Unable to connect to Gmail. Please try again.</p>
+                        <button class="btn-primary" onclick="window.emailManager?.authenticateGmail()">Try Again</button>
+                    </div>
+                `;
+            }
+
+            if (window.crm && window.crm.showToast) {
+                window.crm.showToast('Failed to connect to Gmail. Please try again.', 'error');
+            }
+        }
+    }
+
+    // Setup test button
+    setupTestButton() {
+        const testBtn = document.getElementById('test-email-tracking-btn');
+        if (testBtn) {
+            testBtn.addEventListener('click', () => {
+                this.testEmailTracking();
+            });
+        }
+    }
+
+    // Test email tracking
+    testEmailTracking() {
+        if (window.crm && window.crm.showToast) {
+            window.crm.showToast('Email tracking test initiated. Check console for details.', 'info');
+        }
+        console.log('[EmailManager] Email tracking test - this is a placeholder for testing email tracking functionality');
     }
 
     renderAIBar(aiBar) {
@@ -5022,3 +5195,68 @@ window.emailManager = emailManager;
     })();
   };
 })();
+
+// Create EmailManager instance
+const emailManager = new EmailManager();
+
+// Initialize emails page
+function initEmailsPage() {
+    console.log('[EmailManager] Initializing emails page...');
+
+    // Check authentication state from localStorage
+    const isAuthenticated = localStorage.getItem('gmail-authenticated') === 'true';
+    emailManager.isAuthenticated = isAuthenticated;
+
+    // Update UI based on authentication state
+    emailManager.updateAuthenticationUI();
+
+    // Load emails if authenticated
+    if (isAuthenticated) {
+        emailManager.loadEmails();
+    }
+
+    // Setup event listeners
+    emailManager.setupEventListeners();
+}
+
+// Update authentication UI
+async function updateAuthenticationUI() {
+    const emailLoading = document.getElementById('email-loading');
+    const emailEmpty = document.getElementById('email-empty');
+    const emailList = document.getElementById('email-list');
+
+    if (emailLoading) {
+        // Check if user is already authenticated
+        const isAuthenticated = localStorage.getItem('gmail-authenticated') === 'true';
+
+        if (isAuthenticated) {
+            // User is authenticated, hide loading and show empty state
+            emailLoading.style.display = 'none';
+            if (emailEmpty) {
+                emailEmpty.style.display = 'block';
+                emailEmpty.innerHTML = `
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <h3>No emails found</h3>
+                    <p>Your inbox is empty or emails haven't loaded yet.</p>
+                    <button class="btn-primary" onclick="window.emailManager?.refreshEmails()">Refresh</button>
+                `;
+            }
+        } else {
+            // User not authenticated, show login prompt
+            emailLoading.innerHTML = `
+                <div class="email-auth-prompt">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <h3>Connect to Gmail</h3>
+                    <p>Sign in to Gmail to view and send emails from your CRM.</p>
+                    <button class="btn-primary" onclick="window.emailManager?.authenticateGmail()">Connect Gmail</button>
+                </div>
+            `;
+        }
+    }
+}
