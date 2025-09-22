@@ -898,13 +898,20 @@
     const contentUnchanged = existingContentHash === contentHash;
     
     // Avoid first-open flicker: skip animation the very first time we render company summary
-    // Also skip animation if content hasn't changed or if explicitly requested
-    let shouldAnimate = !skipAnimation && !contentUnchanged;
+    let shouldAnimate = !skipAnimation;
     try { if (!window.__lushaCompanyRenderedOnce) { shouldAnimate = false; } } catch(_) {}
     
-    // If content is unchanged and summary already exists, don't re-render
-    if (contentUnchanged && existingSummary) {
+    // For uncached live searches, always allow animation (new data from API)
+    const isUncachedLiveSearch = !window.__lushaOpenedFromCache && !skipAnimation;
+    
+    // If content is unchanged and summary already exists, and it's not an uncached live search, don't re-render
+    if (contentUnchanged && existingSummary && !isUncachedLiveSearch) {
       return;
+    }
+    
+    // For uncached live searches, always animate even if content is similar
+    if (isUncachedLiveSearch) {
+      shouldAnimate = true;
     }
     
     const website = domain ? `https://${domain}` : '';
@@ -2578,7 +2585,7 @@
       #lusha-widget .lusha-usage-wrap {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 6px;
         margin: 10px 0 0 0;
         color: var(--text-muted);
         font-size: 12px;
@@ -2758,7 +2765,8 @@ async function renderUsageBar(){
       const fromWindow = toNum(window.LUSHA_CREDITS_TOTAL);
       if (fromWindow != null) return fromWindow;
       try { const ls = toNum(localStorage.getItem('LUSHA_CREDITS_TOTAL')); if (ls != null) return ls; } catch(_) {}
-      return null;
+      // Default to 600 credits if not configured
+      return 600;
     })();
 
     // Deterministic pick helper (accepts 0 as valid)
@@ -2838,7 +2846,7 @@ async function renderUsageBar(){
     const txt = document.getElementById('lusha-usage-text');
     const lab = document.getElementById('lusha-usage-label');
     if (fill) fill.style.width = pct + '%';
-    if (txt) txt.textContent = limit ? `${used}/${limit} (${pct}%)` : `${used} used`;
+    if (txt) txt.textContent = limit ? `${used}/${limit}` : `${used} used`;
     if (lab) lab.textContent = label;
   } catch(_) {}
 }

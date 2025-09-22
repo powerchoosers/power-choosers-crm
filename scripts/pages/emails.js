@@ -4325,9 +4325,10 @@ class EmailManager {
                 sendButton.textContent = 'Sending...';
             }
 
-            // Get email signature and append to body
+            // Check if signature is already in the body (prevent duplication)
             const signature = window.getEmailSignature ? window.getEmailSignature() : '';
-            const contentWithSignature = body + signature;
+            const hasSignature = body.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
+            const contentWithSignature = hasSignature ? body : body + signature;
 
             const emailData = {
                 to: to.split(',').map(email => email.trim()),

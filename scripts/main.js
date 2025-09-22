@@ -2916,9 +2916,92 @@ window.getEmailSignatureText = function() {
     return '';
 };
 
+// Email compose signature injection
+function injectEmailSignature() {
+    const bodyInput = document.querySelector('.body-input');
+    if (!bodyInput) return;
+    
+    // Check if signature is already in the body (prevent duplication)
+    const currentContent = bodyInput.innerHTML;
+    if (currentContent.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;')) {
+        return; // Signature already present
+    }
+    
+    // Get signature and add to body if it exists
+    const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+    if (signature) {
+        // If body is empty, just add signature
+        if (!currentContent.trim()) {
+            bodyInput.innerHTML = '<p><br></p>' + signature;
+        } else {
+            // Add signature to end of existing content
+            bodyInput.innerHTML = currentContent + signature;
+        }
+        
+        // Move cursor to before the signature
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(bodyInput);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+}
+
+// Function to add signature to AI-generated content (not HTML AI)
+function addSignatureToAIContent(content, isHtmlMode = false) {
+    // Don't add signature to HTML AI emails (they have custom signatures)
+    if (isHtmlMode) {
+        return content;
+    }
+    
+    // Check if signature is already present
+    if (content.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;')) {
+        return content;
+    }
+    
+    // Add signature to AI-generated content
+    const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+    return content + signature;
+}
+
 // Initialize CRM when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.crm = new PowerChoosersCRM();
+    
+    // Add compose button listener for signature injection
+    const composeBtn = document.getElementById('compose-email-btn');
+    if (composeBtn) {
+        composeBtn.addEventListener('click', () => {
+            // Wait for compose window to open, then inject signature
+            setTimeout(() => {
+                injectEmailSignature();
+            }, 100);
+        });
+    }
+    
+    // Watch for compose window visibility changes
+    const composeWindow = document.getElementById('compose-window');
+    if (composeWindow) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                    const isVisible = !composeWindow.style.display || composeWindow.style.display !== 'none';
+                    if (isVisible) {
+                        // Compose window is now visible, inject signature
+                        setTimeout(() => {
+                            injectEmailSignature();
+                        }, 50);
+                    }
+                }
+            });
+        });
+        
+        observer.observe(composeWindow, {
+            attributes: true,
+            attributeFilter: ['style']
+        });
+    }
     if (typeof initGlobalSearch === 'function') {
         initGlobalSearch();
     } else if (window.initGlobalSearch) {
