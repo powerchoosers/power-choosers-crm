@@ -137,7 +137,50 @@ export default async function handler(req, res){
     }
 
     if (!ciTranscriptSid){
-      const createArgs = serviceSid ? { serviceSid, channel: { media_properties: { source_sid: recordingSid } }, customerKey: callSid } : { channel: { media_properties: { source_sid: recordingSid } }, customerKey: callSid };
+      // Determine channel mapping for proper speaker separation
+      let agentChannelNum = 1; // Default to channel 1 for agent
+      try {
+        let callResource = null;
+        try { callResource = await client.calls(callSid).fetch(); } catch(_) {}
+        const fromStr = callResource?.from || '';
+        const toStr = callResource?.to || '';
+        const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+        const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+          .split(',').map(norm).filter(Boolean);
+        const from10 = norm(fromStr);
+        const to10 = norm(toStr);
+        const isBiz = (p) => !!p && envBiz.includes(p);
+        const fromIsClient = /^client:/i.test(fromStr);
+        // Heuristic: Agent is the "from" leg when from is Voice SDK client or our business number; otherwise agent is the "to" leg
+        const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
+        agentChannelNum = fromIsAgent ? 1 : 2;
+        console.log(`[CI Request] Channel-role mapping: agent on channel ${agentChannelNum} (from=${fromStr}, to=${toStr})`);
+      } catch (e) {
+        console.warn('[CI Request] Failed to compute channel-role mapping, defaulting agent to channel 1:', e?.message);
+      }
+
+      // Create CI transcript with proper channel participants for speaker separation
+      const createArgs = serviceSid ? { 
+        serviceSid, 
+        channel: { 
+          media_properties: { source_sid: recordingSid },
+          participants: [
+            { role: 'Agent', channel_participant: agentChannelNum },
+            { role: 'Customer', channel_participant: agentChannelNum === 1 ? 2 : 1 }
+          ]
+        }, 
+        customerKey: callSid 
+      } : { 
+        channel: { 
+          media_properties: { source_sid: recordingSid },
+          participants: [
+            { role: 'Agent', channel_participant: agentChannelNum },
+            { role: 'Customer', channel_participant: agentChannelNum === 1 ? 2 : 1 }
+          ]
+        }, 
+        customerKey: callSid 
+      };
+      
       const idemKey = (callSid && recordingSid) ? `${callSid}-${recordingSid}` : undefined;
       const created = idemKey
         ? await client.intelligence.v2.transcripts.create(createArgs, { idempotencyKey: idemKey })

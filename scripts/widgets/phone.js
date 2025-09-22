@@ -470,7 +470,7 @@
                   lastCallCompleted = disconnectTime;
                   lastCalledNumber = number;
                   isCallInProgress = false;
-                  autoTriggerBlockUntil = Date.now() + 15000; // Increased to 15s hard block
+                  autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3s for better UX
                   
                   // Clear ALL Twilio state to prevent ghost connections
                   TwilioRTC.state.connection = null;
@@ -1768,7 +1768,7 @@
           lastCallCompleted = disconnectTime;
           lastCalledNumber = number;
           isCallInProgress = false;
-          autoTriggerBlockUntil = Date.now() + 15000; // Increased to 15s hard block
+          autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3s for better UX
           
           // Clear ALL Twilio state to prevent ghost connections
           TwilioRTC.state.connection = null;
@@ -2050,10 +2050,26 @@
       }
     }
     
+    // Debounce call status updates to prevent UI stuttering
+    let statusUpdateTimeout = null;
+    const debouncedStatusUpdates = new Map();
+    
     async function updateCallStatus(phoneNumber, status, startTime, duration = 0, callId = null, fromNumber = null, callType = 'outgoing') {
       try {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         if (!base) return;
+        
+        // Debounce rapid status updates for the same call
+        const callKey = `${phoneNumber}_${callId || startTime}`;
+        const now = Date.now();
+        const lastUpdate = debouncedStatusUpdates.get(callKey) || 0;
+        
+        // Skip updates that are too frequent (less than 500ms apart)
+        if (now - lastUpdate < 500 && status !== 'completed' && status !== 'failed') {
+          return;
+        }
+        
+        debouncedStatusUpdates.set(callKey, now);
         
         const callSid = callId || `call_${startTime}_${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = new Date(startTime).toISOString();
@@ -2855,13 +2871,14 @@
   // Expose for console diagnostics
   try { window.TwilioRTC = TwilioRTC; } catch(_) {}
 
-  // Background: register Twilio Device quietly so inbound calls can reach the browser
+  // Background: register Twilio Device only when needed (not in a loop)
+  // This prevents the 800ms loop that was causing browser stuttering
   try {
     if (window.API_BASE_URL) {
-      // Defer a moment to avoid blocking initial page work
+      // Only initialize device once on page load, not continuously
       setTimeout(() => {
         TwilioRTC.ensureDevice().catch(e => console.warn('[Phone] Background device init failed:', e?.message || e));
-      }, 800);
+      }, 2000); // Increased delay to avoid blocking initial page load
     }
   } catch (_) {}
 

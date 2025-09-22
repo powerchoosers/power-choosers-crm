@@ -1054,7 +1054,11 @@
 
       // Show toast notification
       if (window.ToastManager) {
-        window.ToastManager.showToast('Processing call insights...', 'info');
+        window.ToastManager.showToast({
+          type: 'info',
+          title: 'Processing Call',
+          message: 'Starting conversational intelligence analysis...'
+        });
       }
 
       // Call the CI request endpoint
@@ -1100,7 +1104,11 @@
       
       // Show error toast
       if (window.ToastManager) {
-        window.ToastManager.showToast('Failed to start call processing', 'error');
+        window.ToastManager.showToast({
+          type: 'error',
+          title: 'Processing Failed',
+          message: 'Unable to start call analysis. Please try again.'
+        });
       }
     }
   }
