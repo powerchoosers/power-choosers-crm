@@ -3635,14 +3635,30 @@
       // Show loading spinner on the button
       try { btn.innerHTML = '<div class="loading-spinner" aria-hidden="true"></div>'; btn.classList.add('processing'); btn.disabled = true; } catch(_) {}
       // Toast
-      try { if (window.ToastManager) { window.ToastManager.showToast('Processing call insights...', 'info'); } } catch(_) {}
+      try { 
+        if (window.ToastManager) { 
+          window.ToastManager.showToast({
+            type: 'info',
+            title: 'Processing Call',
+            message: 'Starting conversational intelligence analysis...'
+          }); 
+        } 
+      } catch(_) {}
       const response = await fetch('/api/twilio/ci-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ callSid: callSid, recordingSid: recordingSid })
       });
       if (response.status === 404) {
-        try { if (window.ToastManager) { window.ToastManager.showToast('Recording not ready yet. Please try again in ~5–10 seconds.', 'warning'); } } catch(_) {}
+        try { 
+          if (window.ToastManager) { 
+            window.ToastManager.showToast({
+              type: 'warning',
+              title: 'Recording Not Ready',
+              message: 'Please wait 5-10 seconds for the recording to be processed, then try again.'
+            }); 
+          } 
+        } catch(_) {}
         try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
         return;
       }
@@ -3652,7 +3668,15 @@
           const msg = (err && (err.error || err.details)) ? String(err.error || err.details) : `CI request failed: ${response.status} ${response.statusText}`;
           if (window.ToastManager) { window.ToastManager.showToast(msg, 'error'); }
         } catch(_) {
-          try { if (window.ToastManager) { window.ToastManager.showToast('Failed to start call processing', 'error'); } } catch(__) {}
+          try { 
+            if (window.ToastManager) { 
+              window.ToastManager.showToast({
+                type: 'error',
+                title: 'Processing Failed',
+                message: 'Unable to start call analysis. Please try again.'
+              }); 
+            } 
+          } catch(__) {}
         }
         try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
         return;
@@ -3665,7 +3689,15 @@
       try { console.error('[ContactDetail] Failed to trigger CI processing:', error); } catch(_) {}
       // Reset button state on error
       try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.disabled = false; } catch(_) {}
-      try { if (window.ToastManager) { window.ToastManager.showToast('Failed to start call processing', 'error'); } } catch(_) {}
+      try { 
+        if (window.ToastManager) { 
+          window.ToastManager.showToast({
+            type: 'error',
+            title: 'Processing Failed',
+            message: 'Unable to start call analysis. Please try again.'
+          }); 
+        } 
+      } catch(_) {}
     }
   }
 
