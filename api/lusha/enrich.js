@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
           return res.status(400).json({ error: 'Missing requestId and insufficient company context for search' });
         }
         // Minimal, progressive pre-search to obtain requestId while limiting search requests
-        const attemptSizes = [1, 10, 40];
+        const attemptSizes = [10, 40];
         for (const size of attemptSizes) {
           const searchBody = {
             pages: { page: 0, size },
