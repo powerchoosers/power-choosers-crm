@@ -233,8 +233,8 @@
     // Don't render company panel initially - let it animate when search completes
 
     // Defer search until after the open animation settles to avoid jank
-    // Default to cached-only on open; user can trigger live search explicitly later
-    const scheduleSearch = () => { try { performLushaSearch({ forceLive: false, cachedOnly: true }); } catch(_){} };
+    // On open: if cached, use cache; if uncached, perform a small live search (1 credit) to get requestId and summary
+    const scheduleSearch = () => { try { performLushaSearch({ openLiveIfUncached: true }); } catch(_){} };
     if (!prefersReduce) {
       let started = false;
       const onOpened = () => { if (started) return; started = true; try { card.removeEventListener('transitionend', onOpened); } catch(_){} scheduleSearch(); };
@@ -349,7 +349,7 @@
       }
 
     // 1) Try cache first (unless forcing live) or when cachedOnly is requested
-      if (!options.forceLive || options.cachedOnly) {
+      if (!options.forceLive || options.cachedOnly || options.openLiveIfUncached) {
         lushaLog('Checking cache for:', { domain, companyName });
         const cached = await tryLoadCache({ domain, companyName });
         if (cached && cached.contacts && cached.contacts.length) {
@@ -405,26 +405,40 @@
           return;
 
         } else if (options.cachedOnly) {
-          // No cache found and cachedOnly requested → run a minimal, unbilled prospecting search (page=0,size=1)
+          // No cache found and cachedOnly requested → run a minimal, unbilled prospecting search (try small sizes)
           try {
             let base = (window.API_BASE_URL || '').replace(/\/$/, '');
             if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
 
-            // Build minimal request body using company context without calling company endpoint
-            const requestBody = { 
-              pages: { page: 0, size: 1 },
-              filters: { companies: { include: {} } }
-            };
-            if (domain) requestBody.filters.companies.include.domains = [domain];
-            else if (companyName) requestBody.filters.companies.include.names = [companyName];
+            // Try both domain and name includes to improve match rate (still unbilled)
+            const includeAttempts = [];
+            if (domain) includeAttempts.push({ domains: [domain] });
+            if (companyName) includeAttempts.push({ names: [companyName] });
+            if (includeAttempts.length === 0) includeAttempts.push({});
 
-            const r = await fetch(`${base}/api/lusha/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            const data = await r.json();
-            const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+            let best = null;
+            const sizes = [1, 10, 40];
+            outer: for (const size of sizes) {
+              for (const inc of includeAttempts) {
+                const requestBody = { 
+                  pages: { page: 0, size },
+                  filters: { companies: { include: { ...inc } } }
+                };
+                const r = await fetch(`${base}/api/lusha/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+                if (!r.ok) continue;
+                const data = await r.json();
+                const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+                best = { data, contacts };
+                // Prefer any contacts; otherwise keep the best with requestId
+                if (contacts.length > 0 || data.requestId) break outer;
+              }
+            }
 
-            // Store requestId for reveals
-            if (data.requestId) {
+            const data = best ? best.data : { requestId: null };
+            const contacts = best ? best.contacts : [];
+
+            // Store requestId for reveals when present
+            if (data && data.requestId) {
               window.__lushaLastRequestId = data.requestId;
               lushaLog('Stored requestId from minimal search:', data.requestId);
             }
@@ -441,6 +455,49 @@
             lushaLog('Minimal search failed in cached-only mode', minErr);
             // Fall through to error handling below
           }
+        } else if (options.openLiveIfUncached) {
+          // Open-time flow: run a small live company + contacts search (1 credit) for summary + requestId + 1-page contacts
+          let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+          if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+
+          // Company summary first (this may bill under "API Company Enrichment" per plan)
+          const params = new URLSearchParams();
+          if (domain) params.append('domain', domain);
+          if (companyName) params.append('company', companyName);
+          const url = `${base}/api/lusha/company?${params.toString()}`;
+          lushaLog('Open-live: fetching company summary from:', url);
+          const resp = await fetch(url, { method: 'GET' });
+          if (resp.ok) {
+            const company = await resp.json();
+            lastCompanyResult = company;
+            try { requestAnimationFrame(() => renderCompanyPanel(company, false)); } catch(_) { renderCompanyPanel(company, false); }
+          }
+
+          // Minimal contacts page (pageSize=40 limited to maxPages=1 for rich preview)
+          const requestBody = {
+            pages: { page: 0, size: 40 },
+            filters: { companies: { include: {} } }
+          };
+          if (domain) requestBody.filters.companies.include.domains = [domain];
+          else if (companyName) requestBody.filters.companies.include.names = [companyName];
+
+          const r = await fetch(`${base}/api/lusha/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const data = await r.json();
+          const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+          if (data.requestId) {
+            window.__lushaLastRequestId = data.requestId;
+            lushaLog('Open-live stored requestId:', data.requestId);
+          }
+
+          // Save to cache immediately for future free opens
+          try { await saveCache({ company: lastCompanyResult || { name: companyName, domain }, contacts }); } catch(_) {}
+
+          updateResults(contacts, true);
+          try { crossfadeToResults(); } catch(_) {}
+          showCreditsUsed(1, 'live');
+          try { renderUsageBar(); } catch(_) {}
+          return;
         } else {
           lushaLog('No cache found, proceeding with live search');
         }
@@ -1908,7 +1965,24 @@
   async function tryLoadCache(key){
     try {
       const db = await getLushaCacheDB();
-      if (!db) return null;
+      if (!db) {
+        // LocalStorage fallback
+        try {
+          const domain = (key && key.domain) || '';
+          const companyName = (key && key.companyName) || '';
+          const ids = [];
+          if (domain) ids.push(`lusha_cache_${domain.toLowerCase()}`);
+          if (companyName) ids.push(`lusha_cache_name_${companyName.toLowerCase()}`);
+          for (const id of ids) {
+            const raw = localStorage.getItem(id);
+            if (raw) {
+              const doc = JSON.parse(raw);
+              if (doc && Array.isArray(doc.contacts) && doc.contacts.length) return doc;
+            }
+          }
+        } catch(_) {}
+        return null;
+      }
       const domain = (key && key.domain) || '';
       const companyName = (key && key.companyName) || '';
       let doc = null;
@@ -1923,19 +1997,41 @@
         if (snap && snap.exists) doc = { id: snap.id, ...snap.data() };
       }
       if (doc && doc.contacts && doc.contacts.length) return doc;
+
+      // Fallback to localStorage if Firestore empty
+      try {
+        const ids = [];
+        if (domain) ids.push(`lusha_cache_${domain.toLowerCase()}`);
+        if (companyName) ids.push(`lusha_cache_name_${companyName.toLowerCase()}`);
+        for (const id of ids) {
+          const raw = localStorage.getItem(id);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.contacts) && parsed.contacts.length) return parsed;
+          }
+        }
+      } catch(_) {}
       return null;
     } catch (_) { return null; }
   }
   async function saveCache({ company, contacts }){
     try {
       const db = await getLushaCacheDB();
-      if (!db) return;
       const domain = (company && (company.domain || company.fqdn)) || '';
       const companyName = company && (company.name || company.companyName) || '';
       const docId = (domain ? domain.toLowerCase() : ('name_' + (companyName || 'unknown').toLowerCase()));
-      const ref = db.collection('lusha_cache').doc(docId);
-      const snap = await ref.get();
-      const existing = snap.exists ? (snap.data() || {}) : {};
+      let existing = {};
+      let ref = null;
+      if (db) {
+        ref = db.collection('lusha_cache').doc(docId);
+        const snap = await ref.get();
+        existing = snap.exists ? (snap.data() || {}) : {};
+      } else {
+        try {
+          const raw = localStorage.getItem(`lusha_cache_${docId}`);
+          existing = raw ? (JSON.parse(raw) || {}) : {};
+        } catch(_) {}
+      }
       const existingContacts = Array.isArray(existing.contacts) ? existing.contacts : [];
       const existingById = new Map(existingContacts.map(c => [c.id || c.contactId, c]));
 
@@ -2000,7 +2096,11 @@
         contacts: mergedContacts,
         updatedAt: new Date()
       };
-      await ref.set(payload); // overwrite with merged payload
+      if (ref) {
+        await ref.set(payload); // overwrite with merged payload
+      }
+      // Always persist to localStorage as a fallback cache
+      try { localStorage.setItem(`lusha_cache_${docId}`, JSON.stringify(payload)); } catch(_) {}
       console.log('[Lusha] Cache saved (merged preserve enrich)', docId, { contacts: mergedContacts.length });
     } catch (e) { console.warn('[Lusha] Cache save failed', e); }
   }
@@ -2008,13 +2108,21 @@
   async function upsertCacheContact({ company }, enriched){
     try {
       const db = await getLushaCacheDB();
-      if (!db) return;
       const domain = (company && (company.domain || company.fqdn)) || '';
       const companyName = company && (company.name || company.companyName) || '';
       const docId = (domain ? domain.toLowerCase() : ('name_' + (companyName || 'unknown').toLowerCase()));
-      const ref = db.collection('lusha_cache').doc(docId);
-      const snap = await ref.get();
-      const existing = snap.exists ? (snap.data() || {}) : {};
+      let ref = null;
+      let existing = {};
+      if (db) {
+        ref = db.collection('lusha_cache').doc(docId);
+        const snap = await ref.get();
+        existing = snap.exists ? (snap.data() || {}) : {};
+      } else {
+        try {
+          const raw = localStorage.getItem(`lusha_cache_${docId}`);
+          existing = raw ? (JSON.parse(raw) || {}) : {};
+        } catch(_) {}
+      }
       const arr = Array.isArray(existing.contacts) ? existing.contacts.slice() : [];
       const idx = arr.findIndex(x => (x.id || x.contactId) === (enriched.id || enriched.contactId));
       const mapped = mapProspectingContact(enriched);
@@ -2041,7 +2149,8 @@
         ...(existing.twitter && { twitter: existing.twitter }),
         ...(existing.facebook && { facebook: existing.facebook })
       };
-      await ref.set(updateData, { merge: true });
+      if (ref) await ref.set(updateData, { merge: true });
+      try { localStorage.setItem(`lusha_cache_${docId}`, JSON.stringify(Object.assign({}, existing, updateData))); } catch(_) {}
       console.log('[Lusha] Cache upserted contact', mapped.id);
     } catch (e) { console.warn('[Lusha] Cache upsert failed', e); }
   }
