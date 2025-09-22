@@ -30,16 +30,30 @@ module.exports = async (req, res) => {
     }
 
     const raw = await resp.json();
+    
+    // Debug logging to see the actual response structure
+    console.log('[Lusha Company API] Raw response structure:', JSON.stringify(raw, null, 2));
 
     const derivedDomain = raw?.data?.domain || raw?.data?.fqdn || normalizeDomain(raw?.data?.website || '');
     const website = raw?.data?.website || (derivedDomain ? `https://${derivedDomain}` : '');
-    const linkedin =
-      raw?.data?.linkedinUrl ||
-      raw?.data?.links?.linkedin ||
-      raw?.data?.social?.linkedin ||
-      raw?.data?.socialNetworks?.linkedinUrl ||
-      raw?.data?.linkedin?.url ||
-      '';
+    
+    // Extract LinkedIn URL - handle both object and string formats
+    let linkedin = '';
+    if (raw?.data?.social?.linkedin) {
+      if (typeof raw.data.social.linkedin === 'string') {
+        linkedin = raw.data.social.linkedin;
+      } else if (typeof raw.data.social.linkedin === 'object' && raw.data.social.linkedin.url) {
+        linkedin = raw.data.social.linkedin.url;
+      }
+    }
+    
+    // Fallback to other possible LinkedIn paths
+    if (!linkedin) {
+      linkedin = raw?.data?.linkedinUrl ||
+                 raw?.data?.links?.linkedin ||
+                 raw?.data?.socialNetworks?.linkedinUrl ||
+                 '';
+    }
 
     // Map the response to a consistent format
     const companyData = {
@@ -50,10 +64,24 @@ module.exports = async (req, res) => {
       description: raw?.data?.description || '',
       employees: raw?.data?.employees || '',
       industry: raw?.data?.mainIndustry || '',
+      // Location fields - extract individual components
+      city: raw?.data?.location?.city || '',
+      state: raw?.data?.location?.state || '',
+      country: raw?.data?.location?.country || '',
+      address: raw?.data?.address || raw?.data?.location?.fullLocation || '',
       location: raw?.data?.location?.fullLocation || '',
+      // Social and contact info
+      linkedin: linkedin,
       logoUrl: raw?.data?.logoUrl || null,
-      linkedin
+      // Additional fields from Lusha
+      foundedYear: raw?.data?.founded || '',
+      revenue: raw?.data?.revenueRange ? raw.data.revenueRange.join(' - ') : '',
+      companyType: raw?.data?.subIndustry || '',
+      phone: raw?.data?.phone || ''
     };
+    
+    // Debug logging to see the mapped response
+    console.log('[Lusha Company API] Mapped company data:', JSON.stringify(companyData, null, 2));
 
     return res.status(200).json(companyData);
   } catch (e) {

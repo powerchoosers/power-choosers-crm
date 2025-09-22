@@ -52,6 +52,8 @@ function normalizeCallForResponse(call) {
     aiInsights: call.aiInsights || null,
     audioUrl: call.recordingUrl || call.audioUrl || '',
     conversationalIntelligence: call.conversationalIntelligence || (call.aiInsights && call.aiInsights.conversationalIntelligence) || null,
+    // Recording SID for CI processing
+    recordingSid: call.recordingSid || call.recording_id || '',
     // Provide phones used by front-end for precise mapping
     targetPhone: call.targetPhone || '',
     businessPhone: call.businessPhone || '',

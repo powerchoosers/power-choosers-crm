@@ -30,14 +30,12 @@
   }
   function toISODate(v){ const d=parseDateFlexible(v); if(!d) return ''; const yyyy=d.getFullYear(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
   function toMDY(v){ 
-    console.log('[Account Detail] toMDY called with:', v);
     const d=parseDateFlexible(v); 
     if(!d) return v?String(v):''; 
     const mm=String(d.getMonth()+1).padStart(2,'0'); 
     const dd=String(d.getDate()).padStart(2,'0'); 
     const yyyy=d.getFullYear(); 
     const result = `${mm}/${dd}/${yyyy}`;
-    console.log('[Account Detail] toMDY result:', result);
     return result;
   }
   function formatDateInputAsMDY(raw){
@@ -141,6 +139,32 @@
         pointer-events: none;
       }
     `;
+    document.head.appendChild(style);
+  }
+
+  function injectAccountHeaderStyles() {
+    if (document.getElementById('account-detail-header-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'account-detail-header-styles';
+    style.textContent = `
+      /* Account Detail: header action divider and alignment */
+      #account-detail-header .contact-header-profile { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+      /* Reset margin added globally so spacing is controlled here */
+      #account-detail-header .linkedin-header-btn { margin-left: 0; }
+      /* Vertical divider between LinkedIn and the List/Sequence group */
+      #account-detail-header .header-action-divider {
+        width: 1px;
+        height: 24px;
+        background: var(--border-light);
+        opacity: 0.9;
+        display: inline-block;
+        margin: 0 var(--spacing-sm);
+        border-radius: 1px;
+      }
+      #account-detail-header .list-header-btn svg { display: block; }
+      #account-detail-header .list-seq-group { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+    `;
+    // Append to head so rules actually apply
     document.head.appendChild(style);
   }
 
@@ -249,6 +273,9 @@
   function renderAccountDetail() {
     if (!state.currentAccount || !els.mainContent) return;
     
+    // Inject header styles for divider and button layout
+    injectAccountHeaderStyles();
+    
     // Inject section header styles if not already present
     injectSectionHeaderStyles();
 
@@ -300,7 +327,14 @@
               ${favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : ''}
               <div class="avatar-circle-small" style="${favDomain ? 'display:none;' : ''}">${escapeHtml(getInitials(name))}</div>
               <div class="contact-header-text">
-                <h2 class="page-title contact-page-title">${escapeHtml(name)}</h2>
+                <div class="contact-title-row">
+                  <h2 class="page-title contact-page-title" id="account-name">${escapeHtml(name)}</h2>
+                  <div class="title-actions" aria-hidden="true">
+                    <button type="button" class="icon-btn-sm title-edit" title="Edit account">${editIcon()}</button>
+                    <button type="button" class="icon-btn-sm title-copy" title="Copy name">${copyIcon()}</button>
+                    <button type="button" class="icon-btn-sm title-clear" title="Clear name">${trashIcon()}</button>
+                  </div>
+                </div>
                 <div class="contact-subtitle">${industry ? escapeHtml(industry) : ''}</div>
               </div>
               <button class="quick-action-btn linkedin-header-btn" data-action="linkedin">
@@ -310,6 +344,25 @@
                   <circle cx="4" cy="4" r="2"/>
                 </svg>
               </button>
+              <span class="header-action-divider" aria-hidden="true"></span>
+              <div class="list-seq-group">
+                <button class="quick-action-btn list-header-btn" id="add-account-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="4" cy="6" r="1"></circle>
+                    <circle cx="4" cy="12" r="1"></circle>
+                    <circle cx="4" cy="18" r="1"></circle>
+                    <line x1="8" y1="6" x2="20" y2="6"></line>
+                    <line x1="8" y1="12" x2="20" y2="12"></line>
+                    <line x1="8" y1="18" x2="20" y2="18"></line>
+                  </svg>
+                </button>
+                <button class="quick-action-btn list-header-btn" id="open-account-task-popover" title="Tasks" aria-label="Tasks" aria-haspopup="dialog">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <polyline points="9,11 12,14 22,4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           <div class="page-actions">
@@ -516,7 +569,6 @@
     
     // DEBUG: Add test function to manually trigger Conversational Intelligence
     window.testConversationalIntelligence = async function(callSid) {
-      console.log('[DEBUG] Testing Conversational Intelligence for call:', callSid);
       try {
         const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
         const response = await fetch(base + '/api/twilio/conversational-intelligence', {
@@ -525,7 +577,6 @@
           body: JSON.stringify({ callSid: callSid })
         });
         const result = await response.json();
-        console.log('[DEBUG] Conversational Intelligence result:', result);
         return result;
       } catch (error) {
         console.error('[DEBUG] Conversational Intelligence error:', error);
@@ -945,7 +996,6 @@
             // Use the correct property names from the call object
             const callSid = call.id || call.twilioSid || call.callSid;
             const recordingSid = call.recordingSid || call.recording_id;
-            console.log('[AccountDetail] Direct button - Triggering CI processing for call:', callSid, 'recording:', recordingSid);
             triggerAccountCI(callSid, recordingSid, btn);
             return;
           }
@@ -1019,14 +1069,15 @@
       durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
     }
     
-    const phone = escapeHtml(String(c.counterpartyPretty || c.to || c.from || ''));
+    // Use the actual phone number from the call, not the formatted counterparty
+    const phone = escapeHtml(String(c.targetPhone || c.to || c.from || c.counterpartyPretty || ''));
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
     const sig = `${idAttr}|${c.status||c.outcome||''}|${c.durationSec||c.duration||0}|${c.transcript?1:0}|${c.aiInsights?1:0}`;
     
     return `
       <div class=\"rc-item\" data-id=\"${idAttr}\" data-sig=\"${sig}\">
         <div class="rc-meta">
-          <div class="rc-title">${name}${company?` • ${company}`:''}</div>
+          <div class="rc-title">${name || company || 'Unknown'}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 
                                  data-contact-id="" 
                                  data-account-id="${c.accountId || state.currentAccount?.id || ''}" 
@@ -1490,6 +1541,119 @@
     }
   }
 
+  // Edit Account modal (reuse Add Account modal styles)
+  function openEditAccountModal() {
+    const a = state.currentAccount || {};
+    const overlay = document.createElement('div');
+    overlay.className = 'pc-modal';
+    overlay.tabIndex = -1;
+    overlay.innerHTML = `
+      <div class="pc-modal__backdrop" data-close="edit-account"></div>
+      <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="edit-account-title">
+        <div class="pc-modal__header">
+          <h3 id="edit-account-title">Edit Account</h3>
+          <button class="pc-modal__close" data-close="edit-account" aria-label="Close">×</button>
+        </div>
+        <form id="form-edit-account" class="pc-modal__form">
+          <div class="pc-modal__body">
+            <div class="form-row">
+              <label>Account name<input type="text" name="accountName" class="input-dark" value="${escapeHtml(a.accountName || a.name || a.companyName || '')}" /></label>
+              <label>Industry<input type="text" name="industry" class="input-dark" value="${escapeHtml(a.industry || '')}" /></label>
+            </div>
+            <div class="form-row">
+              <label>Website<input type="text" name="website" class="input-dark" value="${escapeHtml(a.website || a.site || '')}" placeholder="https://example.com" /></label>
+              <label>Phone<input type="text" name="phone" class="input-dark" value="${escapeHtml(a.phone || a.companyPhone || a.primaryPhone || a.mainPhone || '')}" /></label>
+            </div>
+            <div class="form-row">
+              <label>City<input type="text" name="city" class="input-dark" value="${escapeHtml(a.city || a.locationCity || '')}" /></label>
+              <label>State<input type="text" name="state" class="input-dark" value="${escapeHtml(a.state || a.locationState || '')}" /></label>
+            </div>
+            <div class="form-row">
+              <label>LinkedIn URL<input type="url" name="linkedin" class="input-dark" value="${escapeHtml(a.linkedin || a.linkedinUrl || a.linkedin_url || '')}" /></label>
+              <label>Square Footage<input type="number" name="squareFootage" class="input-dark" value="${escapeHtml(String(a.squareFootage ?? a.sqft ?? a.square_feet ?? ''))}" /></label>
+            </div>
+            <div class="form-row">
+              <label>Occupancy %<input type="number" name="occupancyPct" class="input-dark" min="0" max="100" value="${escapeHtml(String(a.occupancyPct ?? a.occupancy ?? a.occupancy_percentage ?? ''))}" /></label>
+              <label>Employees<input type="number" name="employees" class="input-dark" value="${escapeHtml(String(a.employees ?? a.employeeCount ?? ''))}" /></label>
+            </div>
+            <div class="form-row">
+              <label>Short Description<textarea name="shortDescription" class="input-dark" rows="3">${escapeHtml(a.shortDescription || a.short_desc || a.descriptionShort || '')}</textarea></label>
+            </div>
+            <div class="form-row">
+              <label>Electricity Supplier<input type="text" name="electricitySupplier" class="input-dark" value="${escapeHtml(a.electricitySupplier || '')}" /></label>
+              <label>Annual Usage (kWh)<input type="number" name="annualUsage" class="input-dark" value="${escapeHtml(String(a.annualUsage ?? a.annual_usage ?? ''))}" /></label>
+            </div>
+            <div class="form-row">
+              <label>Current Rate ($/kWh)<input type="number" name="currentRate" class="input-dark" step="0.001" value="${escapeHtml(String(a.currentRate ?? a.current_rate ?? ''))}" /></label>
+              <label>Contract End Date<input type="date" name="contractEndDate" class="input-dark" value="${escapeHtml((a.contractEndDate || a.contract_end_date) ? toISODate(a.contractEndDate || a.contract_end_date) : '')}" /></label>
+            </div>
+          </div>
+          <div class="pc-modal__footer">
+            <button type="button" class="btn-text" data-close="edit-account">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
+          </div>
+        </form>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const dialog = overlay.querySelector('.pc-modal__dialog');
+    const backdrop = overlay.querySelector('.pc-modal__backdrop');
+    const form = overlay.querySelector('#form-edit-account');
+    const close = () => { try { overlay.remove(); } catch(_) {} };
+    backdrop?.addEventListener('click', close);
+    overlay.querySelectorAll('[data-close="edit-account"]').forEach(btn => btn.addEventListener('click', close));
+    setTimeout(() => {
+      const closeBtn = overlay.querySelector('.pc-modal__close');
+      const firstInput = overlay.querySelector('input,button,select,textarea,[tabindex]:not([tabindex="-1"])');
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+      else if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+    }, 0);
+    const getFocusables = () => Array.from(dialog.querySelectorAll('a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])')).filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (e.key === 'Tab') {
+        const f = getFocusables(); if (!f.length) return; const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    dialog.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const updates = {
+        accountName: (fd.get('accountName') || '').toString().trim(),
+        industry: (fd.get('industry') || '').toString().trim(),
+        website: (fd.get('website') || '').toString().trim(),
+        phone: (fd.get('phone') || '').toString().trim(),
+        city: (fd.get('city') || '').toString().trim(),
+        state: (fd.get('state') || '').toString().trim(),
+        linkedin: (fd.get('linkedin') || '').toString().trim(),
+        squareFootage: Number((fd.get('squareFootage') || '').toString().trim() || 0) || 0,
+        occupancyPct: Number((fd.get('occupancyPct') || '').toString().trim() || 0) || 0,
+        employees: Number((fd.get('employees') || '').toString().trim() || 0) || 0,
+        shortDescription: (fd.get('shortDescription') || '').toString().trim(),
+        electricitySupplier: (fd.get('electricitySupplier') || '').toString().trim(),
+        annualUsage: Number((fd.get('annualUsage') || '').toString().trim() || 0) || 0,
+        currentRate: (fd.get('currentRate') || '').toString().trim(),
+        contractEndDate: (fd.get('contractEndDate') || '').toString().trim(),
+      };
+
+      const id = state.currentAccount?.id;
+      const db = window.firebaseDB;
+      updates.updatedAt = window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date();
+      if (db && id) {
+        try { await db.collection('accounts').doc(id).update(updates); } catch (err) { console.warn('Failed to save account', err); }
+      }
+      try { Object.assign(state.currentAccount, updates); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) {}
+      try { renderAccountDetail(); } catch (_) {}
+      close();
+    });
+  }
+
   function attachAccountDetailEvents() {
     // Listen for activity refresh events
     document.addEventListener('pc:activities-refresh', (e) => {
@@ -1648,6 +1812,41 @@
           return;
         }
         
+        // Check if we came from adding an account
+        if (window._accountNavigationSource === 'add-account') {
+          try {
+            const restore = window._addAccountReturn || {};
+            console.log('[Account Detail] Back button: Returning to page after adding account:', restore);
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              // Navigate back to the page where the user was before adding the account
+              const targetPage = restore.page || 'accounts';
+              window.crm.navigateToPage(targetPage);
+              
+              // Restore state if we're going back to accounts page
+              if (targetPage === 'accounts') {
+                setTimeout(() => {
+                  try {
+                    const ev = new CustomEvent('pc:accounts-restore', { detail: {
+                      page: restore.page,
+                      scroll: restore.scroll,
+                      searchTerm: restore.searchTerm,
+                      sortColumn: restore.sortColumn,
+                      sortDirection: restore.sortDirection,
+                      selectedItems: restore.selectedItems
+                    }});
+                    document.dispatchEvent(ev);
+                    console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event for add-account flow');
+                  } catch(_) {}
+                }, 60);
+              }
+            }
+            // Clear navigation markers after successful navigation
+            window._accountNavigationSource = null;
+            window._addAccountReturn = null;
+          } catch (_) { /* noop */ }
+          return;
+        }
+        
         // Default behavior: return to accounts page
         try { window.crm && window.crm.navigateToPage('accounts'); } catch (e) { /* noop */ }
         // Rebind accounts page dynamic handlers
@@ -1718,6 +1917,73 @@
     const headerLinkedInBtn = document.querySelector('.linkedin-header-btn');
     if (headerLinkedInBtn) {
       headerLinkedInBtn.addEventListener('click', () => handleQuickAction('linkedin'));
+    }
+
+    // Title actions: edit/copy/clear account name (mirror Contact Detail)
+    const header = document.getElementById('account-detail-header');
+    if (header && !header._nameBound) {
+      header.addEventListener('click', async (e) => {
+        const row = header.querySelector('.contact-title-row');
+        if (!row) return;
+        const nameEl = row.querySelector('#account-name');
+        const actions = row.querySelector('.title-actions');
+        if (!actions) return;
+
+        const editBtn = e.target.closest?.('.title-edit');
+        if (editBtn) { e.preventDefault(); openEditAccountModal(); return; }
+
+        const copyBtn = e.target.closest?.('.title-copy');
+        if (copyBtn) {
+          const txt = (nameEl?.textContent || '').trim();
+          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          return;
+        }
+
+        const clearBtn = e.target.closest?.('.title-clear');
+        if (clearBtn) {
+          e.preventDefault();
+          const id = state.currentAccount?.id;
+          if (!id || !window.firebaseDB) return;
+          try {
+            await window.firebaseDB.collection('accounts').doc(id).update({ accountName: '', updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date() });
+            if (state.currentAccount) state.currentAccount.accountName = '';
+            nameEl.textContent = '';
+            window.crm?.showToast && window.crm.showToast('Saved');
+          } catch (err) { console.warn('Clear account name failed', err); }
+          return;
+        }
+      });
+      header._nameBound = '1';
+    }
+
+    // Header list/task buttons (mirror Contact Detail styles and behavior)
+    const addToListBtn = document.getElementById('add-account-to-list');
+    if (addToListBtn && !addToListBtn._bound) {
+      addToListBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Toggle behavior: close if already open
+        if (document.getElementById('account-lists-panel')) {
+          closeAccountListsPanel();
+        } else {
+          openAccountListsPanel();
+        }
+      });
+      addToListBtn._bound = '1';
+    }
+
+    const taskBtn = document.getElementById('open-account-task-popover');
+    if (taskBtn && !taskBtn._bound) {
+      taskBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (document.querySelector('.task-popover')) {
+          try { document.querySelector('.task-popover')?.remove(); } catch(_) {}
+        } else {
+          openAccountTaskPopover(taskBtn);
+        }
+      });
+      taskBtn._bound = '1';
     }
 
     // Inline edit/copy/delete for Account Information
@@ -2125,6 +2391,213 @@
     </svg>`;
   }
 
+
+
+
+
+
+  // ===== Account Task Popover (mirror ContactDetail) =====
+  function openAccountTaskPopover(anchorEl) {
+    if (!anchorEl) return;
+    // Close any existing
+    try { document.querySelector('.task-popover')?.remove(); } catch(_) {}
+
+    const pop = document.createElement('div');
+    pop.className = 'task-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Create task for account');
+
+    const a = state.currentAccount || {};
+    const company = a.accountName || a.name || a.companyName || 'this account';
+
+    const nextBiz = (function getNextBusinessDayISO(){ const d=new Date(); let day=d.getDay(); let add=1; if(day===5) add=3; if(day===6) add=2; const nd=new Date(d.getFullYear(), d.getMonth(), d.getDate()+add); const yyyy=nd.getFullYear(); const mm=String(nd.getMonth()+1).padStart(2,'0'); const dd=String(nd.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; })();
+    const nextBizDate = new Date(nextBiz + 'T00:00:00');
+
+    pop.innerHTML = `
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="tp-inner">
+        <div class="tp-header">
+          <div class="tp-title">Create Task</div>
+          <button type="button" class="close-btn" id="tp-close" aria-label="Close">×</button>
+        </div>
+        <div class="tp-body">
+          <form id="account-task-form">
+            <div class="form-row">
+              <label>Type
+                <input type="text" name="type" class="input-dark" value="Phone Call" readonly />
+                <button type="button" class="dropdown-toggle-btn" id="type-toggle" aria-label="Open type dropdown">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"></polyline></svg>
+                </button>
+              </label>
+              <label>Priority
+                <input type="text" name="priority" class="input-dark" value="Medium" readonly />
+                <button type="button" class="dropdown-toggle-btn" id="priority-toggle" aria-label="Open priority dropdown">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"></polyline></svg>
+                </button>
+              </label>
+            </div>
+            <div class="type-toolbar" id="type-toolbar" style="display: none;">
+              <div class="dropdown-grid type-grid">
+                <button type="button" class="dropdown-option" data-value="phone-call">Phone Call</button>
+                <button type="button" class="dropdown-option" data-value="manual-email">Manual Email</button>
+                <button type="button" class="dropdown-option" data-value="auto-email">Auto Email</button>
+                <button type="button" class="dropdown-option" data-value="follow-up">Follow-up</button>
+                <button type="button" class="dropdown-option" data-value="demo">Demo</button>
+                <button type="button" class="dropdown-option" data-value="custom-task">Custom Task</button>
+              </div>
+            </div>
+            <div class="priority-toolbar" id="priority-toolbar" style="display: none;">
+              <div class="dropdown-grid priority-grid">
+                <button type="button" class="dropdown-option" data-value="low">Low</button>
+                <button type="button" class="dropdown-option" data-value="medium">Medium</button>
+                <button type="button" class="dropdown-option" data-value="high">High</button>
+              </div>
+            </div>
+            <div class="form-row">
+              <label>Time
+                <input type="text" name="dueTime" class="input-dark" value="10:30 AM" placeholder="10:30 AM" required />
+              </label>
+              <label>Due date
+                <input type="text" name="dueDate" class="input-dark" value="${(nextBizDate.getMonth() + 1).toString().padStart(2, '0')}/${nextBizDate.getDate().toString().padStart(2, '0')}/${nextBizDate.getFullYear()}" readonly />
+                <button type="button" class="calendar-toggle-btn" id="calendar-toggle" aria-label="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                </button>
+              </label>
+            </div>
+            <div class="calendar-toolbar" id="calendar-toolbar" style="display: none;">
+              <div class="calendar-header">
+                <button type="button" class="calendar-nav-btn" id="calendar-prev" aria-label="Previous month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg></button>
+                <div class="calendar-month-year" id="calendar-month-year">September 2025</div>
+                <button type="button" class="calendar-nav-btn" id="calendar-next" aria-label="Next month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg></button>
+              </div>
+              <div class="calendar-weekdays">
+                <div class="calendar-weekday">S</div>
+                <div class="calendar-weekday">M</div>
+                <div class="calendar-weekday">T</div>
+                <div class="calendar-weekday">W</div>
+                <div class="calendar-weekday">T</div>
+                <div class="calendar-weekday">F</div>
+                <div class="calendar-weekday">S</div>
+              </div>
+              <div class="calendar-days" id="calendar-days"></div>
+            </div>
+            <div class="form-row">
+              <label>Notes
+                <textarea name="notes" class="input-dark" rows="3" placeholder="Add context (optional)"></textarea>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary" id="tp-save">Create Task</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+
+    document.body.appendChild(pop);
+
+    // Position under anchor
+    const position = () => {
+      const rect = anchorEl.getBoundingClientRect();
+      const popRect = pop.getBoundingClientRect();
+      const anchorCenter = rect.left + rect.width / 2;
+      const desiredLeft = Math.round(window.scrollX + anchorCenter - popRect.width / 2);
+      const clampedLeft = Math.max(8, Math.min(desiredLeft, (window.scrollX + document.documentElement.clientWidth) - popRect.width - 8));
+      const top = Math.round(window.scrollY + rect.bottom + 10);
+      pop.style.top = `${top}px`;
+      pop.style.left = `${clampedLeft}px`;
+      const arrow = pop.querySelector('.arrow');
+      if (arrow) {
+        const anchorCenterRelativeToPopover = anchorCenter - clampedLeft;
+        arrow.style.left = `${anchorCenterRelativeToPopover}px`;
+      }
+    };
+    position();
+    requestAnimationFrame(() => { position(); setTimeout(() => pop.classList.add('--show'), 10); });
+
+    // Bind events similar to ContactDetail
+    const form = pop.querySelector('#account-task-form');
+    const closeBtn = pop.querySelector('#tp-close');
+    closeBtn?.addEventListener('click', () => { try { pop.remove(); } catch(_) {} });
+
+    // Dropdown toggles
+    const typeToggle = pop.querySelector('#type-toggle');
+    const priorityToggle = pop.querySelector('#priority-toggle');
+    const typeToolbar = pop.querySelector('#type-toolbar');
+    const priorityToolbar = pop.querySelector('#priority-toolbar');
+    const toggleToolbar = (el) => {
+      if (!el) return;
+      const isOpen = el.classList.contains('dropdown-slide-in');
+      const others = [typeToolbar, priorityToolbar].filter(x => x && x !== el);
+      others.forEach(x => x.classList.remove('dropdown-slide-in'));
+      if (isOpen) el.classList.remove('dropdown-slide-in'); else el.classList.add('dropdown-slide-in');
+    };
+    typeToggle?.addEventListener('click', () => toggleToolbar(typeToolbar));
+    priorityToggle?.addEventListener('click', () => toggleToolbar(priorityToolbar));
+    pop.addEventListener('click', (e) => {
+      const opt = e.target.closest?.('.dropdown-option');
+      if (!opt) return;
+      const grid = opt.parentElement;
+      grid.querySelectorAll('.dropdown-option').forEach(b => b.classList.remove('selected'));
+      opt.classList.add('selected');
+      const value = opt.getAttribute('data-value');
+      if (grid.classList.contains('type-grid')) {
+        const input = pop.querySelector('input[name="type"]');
+        if (input) input.value = (value === 'phone-call') ? 'Phone Call' : value.replace(/-/g,' ')
+          .replace(/\b\w/g, c => c.toUpperCase());
+      } else {
+        const input = pop.querySelector('input[name="priority"]');
+        if (input) input.value = value.charAt(0).toUpperCase() + value.slice(1);
+      }
+    });
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const type = String(fd.get('type') || '').trim();
+      const priority = String(fd.get('priority') || '').trim();
+      const dueDate = String(fd.get('dueDate') || '').trim();
+      const dueTime = String(fd.get('dueTime') || '').trim();
+      const notes = String(fd.get('notes') || '').trim();
+      if (!type || !priority || !dueDate || !dueTime) return;
+      const title = `${type} with ${company}`;
+      const newTask = {
+        id: 'task_' + Date.now(),
+        title,
+        contact: '',
+        contactId: '',
+        account: company,
+        accountId: a.id || '',
+        type,
+        priority,
+        dueDate,
+        dueTime,
+        status: 'pending',
+        notes,
+        createdAt: Date.now()
+      };
+      try {
+        const key = 'userTasks';
+        const existing = JSON.parse(localStorage.getItem(key) || '[]');
+        existing.unshift(newTask);
+        localStorage.setItem(key, JSON.stringify(existing));
+      } catch (_) { /* noop */ }
+      try {
+        const db = window.firebaseDB;
+        if (db) {
+          await db.collection('tasks').add({
+            ...newTask,
+            timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to save task to Firebase:', err);
+      }
+      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) {}
+      try { window.crm && typeof window.crm.loadTodaysTasks === 'function' && window.crm.loadTodaysTasks(); } catch(_) {}
+      try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'account-detail', task: newTask } })); } catch(_) {}
+      try { pop.remove(); } catch(_) {}
+    });
+  }
   // Begin inline editing for a field
   function beginEditField(wrap, field) {
     const textEl = wrap.querySelector('.info-value-text');
@@ -2483,6 +2956,414 @@
     return () => {
       document.removeEventListener('pc:energy-updated', onEnergyUpdated);
     };
+  }
+
+  // ===== Lists integration (Add to List) =====
+  let _onAccountListsKeydown = null;
+  let _positionAccountListsPanel = null;
+  let _onAccountListsOutside = null;
+
+  function injectAccountListsStyles() {
+    let style = document.getElementById('account-detail-lists-styles');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'account-detail-lists-styles';
+      document.head.appendChild(style);
+    }
+    style.textContent = `
+      /* Account Detail: Add to List panel */
+      #account-lists-panel { position: fixed; z-index: 1200; width: min(560px, 92vw);
+        background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light);
+        border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
+        transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
+        /* Avoid clipping the pointer arrow */
+        --arrow-size: 10px; }
+      #account-lists-panel.--show { transform: translateY(0); opacity: 1; }
+      #account-lists-panel .list-header { 
+        display: flex; align-items: center; justify-content: space-between; 
+        padding: 14px 16px; border-bottom: 1px solid var(--border-light); 
+        font-weight: 700; background: var(--bg-card); 
+      }
+      #account-lists-panel .list-title { 
+        font-weight: 700; color: var(--text-primary); font-size: 1rem; 
+      }
+      #account-lists-panel .close-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0;
+        background: var(--bg-item) !important; color: var(--grey-300) !important;
+        border: 1px solid var(--border-light); border-radius: var(--border-radius-sm);
+        line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer;
+        transition: var(--transition-fast); box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent; margin-right: 0;
+      }
+      #account-lists-panel .close-btn:hover {
+        background: var(--grey-600) !important; color: var(--text-inverse) !important;
+      }
+      #account-lists-panel .close-btn:focus-visible {
+        outline: 2px solid var(--orange-muted); outline-offset: 2px;
+      }
+      #account-lists-panel .list-body { max-height: min(70vh, 720px); overflow: auto; background: var(--bg-card); }
+      #account-lists-panel .list-body::-webkit-scrollbar { width: 10px; }
+      #account-lists-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
+      #account-lists-panel .list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; cursor:pointer; background: var(--bg-card); border-top: 1px solid var(--border-light); }
+      #account-lists-panel .list-item:first-child { border-top: 0; }
+      #account-lists-panel .list-item:hover { background: var(--bg-hover); }
+      #account-lists-panel .list-item[aria-disabled="true"] { opacity: .6; cursor: default; }
+      #account-lists-panel .list-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; }
+      #account-lists-panel .list-name { font-weight: 600; }
+      #account-lists-panel .list-meta { color: var(--text-muted); font-size: .85rem; }
+
+      /* Pointer arrow (reuse delete-popover pattern) */
+      #account-lists-panel::before,
+      #account-lists-panel::after {
+        content: "";
+        position: absolute;
+        width: var(--arrow-size);
+        height: var(--arrow-size);
+        transform: rotate(45deg);
+        pointer-events: none;
+      }
+      /* Bottom placement (arrow on top edge) */
+      #account-lists-panel[data-placement="bottom"]::before {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        top: calc(-1 * var(--arrow-size) / 2 + 1px);
+        background: var(--border-light);
+      }
+      #account-lists-panel[data-placement="bottom"]::after {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        top: calc(-1 * var(--arrow-size) / 2 + 2px);
+        background: var(--bg-card);
+      }
+      /* Top placement (arrow on bottom edge) */
+      #account-lists-panel[data-placement="top"]::before {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        bottom: calc(-1 * var(--arrow-size) / 2 + 1px);
+        background: var(--border-light);
+      }
+      #account-lists-panel[data-placement="top"]::after {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        bottom: calc(-1 * var(--arrow-size) / 2 + 2px);
+        background: var(--bg-card);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function closeAccountListsPanel() {
+    const panel = document.getElementById('account-lists-panel');
+    const cleanup = () => {
+      if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
+      try { document.removeEventListener('mousedown', _onAccountListsOutside, true); } catch(_) {}
+      // Reset trigger state and restore focus
+      try {
+        const trigger = document.getElementById('add-account-to-list');
+        if (trigger) {
+          trigger.setAttribute('aria-expanded', 'false');
+          // Only restore focus if closed by keyboard (Escape), not by pointer
+          if (document.activeElement === trigger) {
+            trigger.focus();
+          }
+        }
+      } catch(_) {}
+    };
+    if (panel) panel.classList.remove('--show');
+    setTimeout(cleanup, 120);
+
+    try { document.removeEventListener('keydown', _onAccountListsKeydown, true); } catch(_) {}
+    try { window.removeEventListener('resize', _positionAccountListsPanel, true); } catch(_) {}
+    try { window.removeEventListener('scroll', _positionAccountListsPanel, true); } catch(_) {}
+    _onAccountListsKeydown = null; _positionAccountListsPanel = null; _onAccountListsOutside = null;
+  }
+
+  function openAccountListsPanel() {
+    if (document.getElementById('account-lists-panel')) return;
+    injectAccountListsStyles();
+    const panel = document.createElement('div');
+    panel.id = 'account-lists-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Add to list');
+    const a = state.currentAccount || {};
+    const companyName = a.accountName || a.name || a.companyName || 'this company';
+    panel.innerHTML = `
+      <div class="list-header">
+        <div class="list-title">Add ${escapeHtml(companyName)} to list</div>
+        <button type="button" class="close-btn" id="account-lists-close" aria-label="Close">×</button>
+      </div>
+      <div class="list-body" id="account-lists-body">
+        <div class="list-item" tabindex="0" data-action="create">
+          <div>
+            <div class="list-name">Create new list…</div>
+            <div class="list-meta">Create a company list</div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(panel);
+
+    // Position anchored to the Add-to-List icon with pointer
+    _positionAccountListsPanel = function position() {
+      const btn = document.getElementById('add-account-to-list');
+      const rect = btn ? btn.getBoundingClientRect() : null;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pad = 8;  // viewport padding
+      const gap = 8;  // space between button and panel
+      let placement = 'bottom';
+      let top = Math.max(pad, 72);
+      let left = Math.max(pad, (vw - panel.offsetWidth) / 2);
+
+      if (rect) {
+        const panelW = panel.offsetWidth;
+        const panelH = panel.offsetHeight || 320; // fallback before content paints
+        const fitsBottom = rect.bottom + gap + panelH + pad <= vh;
+        const fitsTop = rect.top - gap - panelH - pad >= 0;
+        placement = fitsBottom || !fitsTop ? 'bottom' : 'top';
+
+        if (placement === 'bottom') {
+          top = Math.min(vh - panelH - pad, rect.bottom + gap);
+        } else {
+          top = Math.max(pad, rect.top - gap - panelH);
+        }
+
+        // Prefer centering under the icon while keeping within viewport
+        left = Math.round(
+          Math.min(
+            Math.max(pad, rect.left + (rect.width / 2) - (panelW / 2)),
+            vw - panelW - pad
+          )
+        );
+
+        // Arrow horizontal offset relative to panel's left edge
+        const arrowLeft = Math.round(rect.left + rect.width / 2 - left);
+        panel.style.setProperty('--arrow-left', `${arrowLeft}px`);
+        panel.setAttribute('data-placement', placement);
+      }
+
+      panel.style.top = `${Math.round(top)}px`;
+      panel.style.left = `${Math.round(left)}px`;
+    };
+    _positionAccountListsPanel();
+    window.addEventListener('resize', _positionAccountListsPanel, true);
+    window.addEventListener('scroll', _positionAccountListsPanel, true);
+
+    // Animate in
+    requestAnimationFrame(() => { panel.classList.add('--show'); });
+
+    // Mark trigger expanded
+    try { document.getElementById('add-account-to-list')?.setAttribute('aria-expanded', 'true'); } catch(_) {}
+
+    // Load lists and memberships
+    Promise.resolve(populateAccountListsPanel(panel.querySelector('#account-lists-body')))
+      .then(() => { try { _positionAccountListsPanel && _positionAccountListsPanel(); } catch(_) {} });
+
+    // Close button
+    panel.querySelector('#account-lists-close')?.addEventListener('click', closeAccountListsPanel);
+
+    // Keyboard handling
+    _onAccountListsKeydown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeAccountListsPanel();
+      }
+    };
+    document.addEventListener('keydown', _onAccountListsKeydown, true);
+
+    // Click-away
+    _onAccountListsOutside = (e) => {
+      const inside = panel.contains(e.target);
+      const onAnchor = !!(e.target.closest && e.target.closest('#add-account-to-list'));
+      if (!inside && !onAnchor) closeAccountListsPanel();
+    };
+    document.addEventListener('mousedown', _onAccountListsOutside, true);
+  }
+
+  async function populateAccountListsPanel(body) {
+    if (!body) return;
+    
+    try {
+      const db = window.firebaseDB;
+      if (!db) {
+        body.innerHTML = '<div class="list-item" aria-disabled="true"><div class="list-name">Loading lists...</div><div class="list-meta">Please wait</div></div>';
+        return;
+      }
+
+      // Get account lists (using the same structure as lists-overview.js)
+      let listsSnapshot;
+      try {
+        // Primary query: filter by kind on server
+        let query = db.collection('lists');
+        if (query.where) query = query.where('kind', '==', 'accounts');
+        listsSnapshot = await (query.limit ? query.limit(200).get() : query.get());
+      } catch (e) {
+        console.warn('Primary lists query failed, trying fallback:', e);
+        listsSnapshot = { docs: [] };
+      }
+
+      let lists = (listsSnapshot && listsSnapshot.docs) ? listsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) : [];
+
+      // Fallback: if nothing returned, fetch recent docs without server-side kind filter
+      if (!lists.length) {
+        try {
+          const altSnap = await db.collection('lists').limit(200).get();
+          const all = (altSnap && altSnap.docs) ? altSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) : [];
+          const want = (v) => (v || '').toString().trim().toLowerCase();
+          lists = all.filter(doc => {
+            const k = want(doc.kind || doc.type || doc.listType || doc.category);
+            if (!k) return want(doc.accounts) === 'true';
+            return k === 'accounts' || k === 'account' || k === 'companies' || k === 'company';
+          });
+        } catch (e) {
+          console.warn('Fallback lists query failed:', e);
+        }
+      }
+
+      // Get current account's list memberships
+      const accountId = state.currentAccount?.id;
+      const membershipsSnapshot = accountId ? await db.collection('listMembers').where('targetId', '==', accountId).where('targetType', '==', 'accounts').get() : { docs: [] };
+      const memberships = new Set(membershipsSnapshot.docs.map(doc => doc.data().listId));
+
+      // Build list items
+      const items = lists.map(list => {
+        const isMember = memberships.has(list.id);
+        return `
+          <div class="list-item" tabindex="0" data-list-id="${list.id}" data-action="${isMember ? 'remove' : 'add'}" ${isMember ? 'aria-disabled="true"' : ''}>
+            <div>
+              <div class="list-name">${escapeHtml(list.name || 'Unnamed List')}</div>
+              <div class="list-meta">${list.count || list.memberCount || 0} accounts</div>
+            </div>
+            ${isMember ? '<div style="color: var(--text-muted); font-size: 0.8rem;">Added</div>' : ''}
+          </div>`;
+      }).join('');
+
+      body.innerHTML = items;
+
+      // Bind click handlers
+      body.querySelectorAll('.list-item[data-action]').forEach(item => {
+        item.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const action = item.getAttribute('data-action');
+          const listId = item.getAttribute('data-list-id');
+          
+          if (action === 'create') {
+            const name = prompt('Enter list name:');
+            if (name && name.trim()) {
+              await createAccountListThenAdd(name.trim());
+            }
+          } else if (action === 'add' && listId) {
+            await addCurrentAccountToList(listId);
+          } else if (action === 'remove' && listId) {
+            const memberDoc = membershipsSnapshot.docs.find(doc => doc.data().listId === listId);
+            if (memberDoc) {
+              await removeCurrentAccountFromList(memberDoc.id, lists.find(l => l.id === listId)?.name);
+            }
+          }
+        });
+      });
+    } catch (err) {
+      console.warn('Failed to load lists:', err);
+      body.innerHTML = '<div class="list-item" aria-disabled="true"><div class="list-name">Error loading lists</div><div class="list-meta">Please try again</div></div>';
+    }
+  }
+
+  async function addCurrentAccountToList(listId) {
+    try {
+      const db = window.firebaseDB;
+      const accountId = state.currentAccount?.id;
+      if (!db || !accountId) return;
+
+      const doc = { listId, targetId: accountId, targetType: 'accounts' };
+      if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+        doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+      } else {
+        doc.createdAt = new Date();
+        doc.updatedAt = new Date();
+      }
+      await db.collection('listMembers').add(doc);
+      
+      // Increment list member count (using 'count' field like lists-overview.js)
+      if (window.firebase?.firestore?.FieldValue) {
+        await db.collection('lists').doc(listId).update({
+          count: window.firebase.firestore.FieldValue.increment(1)
+        });
+      }
+      
+      window.crm?.showToast && window.crm.showToast('Added to list');
+    } catch (err) {
+      console.warn('Add to list failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to add to list');
+    } finally {
+      closeAccountListsPanel();
+    }
+  }
+
+  async function removeCurrentAccountFromList(memberDocId, listName) {
+    try {
+      const db = window.firebaseDB;
+      if (db && typeof db.collection === 'function' && memberDocId) {
+        // First get the listId from the member document before deleting it
+        const memberDoc = await db.collection('listMembers').doc(memberDocId).get();
+        const memberData = memberDoc.data();
+        const listId = memberData?.listId;
+        
+        await db.collection('listMembers').doc(memberDocId).delete();
+        
+        // Decrement list member count if we have the listId (using 'count' field like lists-overview.js)
+        if (listId && window.firebase?.firestore?.FieldValue) {
+          await db.collection('lists').doc(listId).update({
+            count: window.firebase.firestore.FieldValue.increment(-1)
+          });
+        }
+      }
+      window.crm?.showToast && window.crm.showToast(`Removed from "${listName}"`);
+    } catch (err) {
+      console.warn('Remove from list failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to remove from list');
+    } finally {
+      closeAccountListsPanel();
+    }
+  }
+
+  async function createAccountListThenAdd(name) {
+    try {
+      const db = window.firebaseDB;
+      let newId = null;
+      if (db && typeof db.collection === 'function') {
+        const payload = { name, kind: 'accounts', count: 1 };
+        if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+          payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        } else {
+          payload.createdAt = new Date();
+          payload.updatedAt = new Date();
+        }
+        const ref = await db.collection('lists').add(payload);
+        newId = ref.id;
+      }
+      if (newId) {
+        // Add the account to the new list
+        const accountId = state.currentAccount?.id;
+        if (accountId) {
+          const doc = { listId: newId, targetId: accountId, targetType: 'accounts' };
+          if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+            doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+            doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          } else {
+            doc.createdAt = new Date();
+            doc.updatedAt = new Date();
+          }
+          await db.collection('listMembers').add(doc);
+        }
+        window.crm?.showToast && window.crm.showToast(`Created list "${name}"`);
+      } else {
+        window.crm?.showToast && window.crm.showToast(`Created list "${name}" (offline)`);
+        closeAccountListsPanel();
+      }
+    } catch (err) {
+      console.warn('Create list failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to create list');
+    } finally {
+      closeAccountListsPanel();
+    }
   }
 
   // Export API

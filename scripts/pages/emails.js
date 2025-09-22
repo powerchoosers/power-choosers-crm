@@ -123,6 +123,12 @@ class EmailManager {
         if (composeWindow) {
             composeWindow.style.display = 'flex';
             composeWindow.classList.add('open');
+            // Ensure it's positioned correctly
+            composeWindow.style.position = 'fixed';
+            composeWindow.style.bottom = '0';
+            composeWindow.style.right = '20px';
+            composeWindow.style.top = 'auto';
+            composeWindow.style.left = 'auto';
         }
     }
 
@@ -130,8 +136,11 @@ class EmailManager {
     closeComposeWindow() {
         const composeWindow = document.getElementById('compose-window');
         if (composeWindow) {
-            composeWindow.style.display = 'none';
             composeWindow.classList.remove('open');
+            // Hide the window
+            setTimeout(() => {
+                composeWindow.style.display = 'none';
+            }, 300); // Wait for animation to complete
         }
     }
 
@@ -592,7 +601,22 @@ class EmailManager {
                         if (status) status.textContent = 'Inserted HTML into editor (prod).';
                     } else {
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
-                        editor.innerHTML = html2;
+                        
+                        // Preserve signature when inserting AI content (production fallback)
+                        const currentContent = editor.innerHTML;
+                        const hasSignature = currentContent.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
+                        let signature = '';
+                        
+                        if (hasSignature) {
+                            // Extract signature from current content
+                            const signatureMatch = currentContent.match(/<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/);
+                            if (signatureMatch) {
+                                signature = signatureMatch[0];
+                            }
+                        }
+                        
+                        // Insert AI content and preserve signature
+                        editor.innerHTML = html2 + signature;
                         this.sanitizeGeneratedEditor(editor, enrichedRecipient);
                         if (status) status.textContent = 'Draft inserted (prod).';
                     }
@@ -651,7 +675,23 @@ class EmailManager {
                 }
                 // Replace variables with actual values before inserting
                 html = this.replaceVariablesInHtml(html, enrichedRecipient);
-                editor.innerHTML = html;
+                
+                // Preserve signature when inserting AI content
+                const currentContent = editor.innerHTML;
+                const hasSignature = currentContent.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
+                let signature = '';
+                
+                if (hasSignature) {
+                    // Extract signature from current content
+                    const signatureMatch = currentContent.match(/<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/);
+                    if (signatureMatch) {
+                        signature = signatureMatch[0];
+                    }
+                }
+                
+                // Insert AI content and preserve signature
+                editor.innerHTML = html + signature;
+                
                 // Extra safety: sanitize DOM for duplicate greetings/closings
                 this.sanitizeGeneratedEditor(editor, enrichedRecipient);
                 if (status) status.textContent = 'Draft inserted.';
@@ -5108,6 +5148,18 @@ function initEmailsPage() {
     // Ensure emailManager is available globally
     window.emailManager = emailManager;
 
+    // Check authentication state from localStorage
+    const isAuthenticated = localStorage.getItem('gmail-authenticated') === 'true';
+    emailManager.isAuthenticated = isAuthenticated;
+
+    // Update UI based on authentication state
+    emailManager.updateAuthenticationUI();
+
+    // Load emails if authenticated
+    if (isAuthenticated) {
+        emailManager.loadEmails();
+    }
+
     // Debug helper: run search and force open suggestions under To field
     window.debugComposeAutocomplete = async function(query = '') {
         try {
@@ -5196,67 +5248,3 @@ window.emailManager = emailManager;
   };
 })();
 
-// Create EmailManager instance
-const emailManager = new EmailManager();
-
-// Initialize emails page
-function initEmailsPage() {
-    console.log('[EmailManager] Initializing emails page...');
-
-    // Check authentication state from localStorage
-    const isAuthenticated = localStorage.getItem('gmail-authenticated') === 'true';
-    emailManager.isAuthenticated = isAuthenticated;
-
-    // Update UI based on authentication state
-    emailManager.updateAuthenticationUI();
-
-    // Load emails if authenticated
-    if (isAuthenticated) {
-        emailManager.loadEmails();
-    }
-
-    // Setup event listeners
-    emailManager.setupEventListeners();
-}
-
-// Update authentication UI
-async function updateAuthenticationUI() {
-    const emailLoading = document.getElementById('email-loading');
-    const emailEmpty = document.getElementById('email-empty');
-    const emailList = document.getElementById('email-list');
-
-    if (emailLoading) {
-        // Check if user is already authenticated
-        const isAuthenticated = localStorage.getItem('gmail-authenticated') === 'true';
-
-        if (isAuthenticated) {
-            // User is authenticated, hide loading and show empty state
-            emailLoading.style.display = 'none';
-            if (emailEmpty) {
-                emailEmpty.style.display = 'block';
-                emailEmpty.innerHTML = `
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                        <polyline points="22,6 12,13 2,6"></polyline>
-                    </svg>
-                    <h3>No emails found</h3>
-                    <p>Your inbox is empty or emails haven't loaded yet.</p>
-                    <button class="btn-primary" onclick="window.emailManager?.refreshEmails()">Refresh</button>
-                `;
-            }
-        } else {
-            // User not authenticated, show login prompt
-            emailLoading.innerHTML = `
-                <div class="email-auth-prompt">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                        <polyline points="22,6 12,13 2,6"></polyline>
-                    </svg>
-                    <h3>Connect to Gmail</h3>
-                    <p>Sign in to Gmail to view and send emails from your CRM.</p>
-                    <button class="btn-primary" onclick="window.emailManager?.authenticateGmail()">Connect Gmail</button>
-                </div>
-            `;
-        }
-    }
-}
