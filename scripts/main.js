@@ -2937,7 +2937,7 @@ function injectEmailSignature() {
             // Add signature to end of existing content
             bodyInput.innerHTML = currentContent + signature;
         }
-        
+
         // Move cursor to before the signature
         const range = document.createRange();
         const sel = window.getSelection();
@@ -2945,6 +2945,46 @@ function injectEmailSignature() {
         range.collapse(false);
         sel.removeAllRanges();
         sel.addRange(range);
+    } else {
+        // Debug: Check if signature is actually being retrieved
+        console.log('[Signature] No signature found - checking settings...');
+        // Try to get signature directly from localStorage as fallback
+        try {
+            const savedSettings = localStorage.getItem('crm-settings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                const signatureData = settings.emailSignature;
+                console.log('[Signature] Settings from localStorage:', signatureData);
+
+                if (signatureData && (signatureData.text || signatureData.image)) {
+                    let signatureHtml = '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
+
+                    if (signatureData.text) {
+                        const textHtml = signatureData.text.replace(/\n/g, '<br>');
+                        signatureHtml += `<div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${textHtml}</div>`;
+                    }
+
+                    if (signatureData.image) {
+                        signatureHtml += `<div style="margin-top: 10px;"><img src="${signatureData.image}" alt="Signature" style="max-width: 200px; max-height: 100px; border-radius: 4px;" /></div>`;
+                    }
+
+                    signatureHtml += '</div>';
+
+                    // Add signature to body
+                    if (!currentContent.trim()) {
+                        bodyInput.innerHTML = '<p><br></p>' + signatureHtml;
+                    } else {
+                        bodyInput.innerHTML = currentContent + signatureHtml;
+                    }
+
+                    console.log('[Signature] Added signature from localStorage');
+                } else {
+                    console.log('[Signature] No signature data found in settings');
+                }
+            }
+        } catch (error) {
+            console.error('[Signature] Error getting signature from localStorage:', error);
+        }
     }
 }
 
