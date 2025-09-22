@@ -9,11 +9,12 @@ module.exports = async (req, res) => {
     if (!esdsl || typeof esdsl !== 'object' || !esdsl.query) {
       return res.status(400).json({ error: 'Missing Elasticsearch DSL body with query' });
     }
+    const payload = { query: esdsl.query };
     const url = `${CDAPI_BASE}/v2/company_multi_source/search/es_dsl`;
     const resp = await fetchWithRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'accept': 'application/json', 'apikey': apiKey },
-      body: JSON.stringify(esdsl)
+      body: JSON.stringify(payload)
     });
     const remaining = resp.headers.get('x-credits-remaining');
     if (!resp.ok) {
