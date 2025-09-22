@@ -897,12 +897,14 @@
     const existingContentHash = el.getAttribute('data-content-hash');
     const contentUnchanged = existingContentHash === contentHash;
     
-    // Avoid first-open flicker: skip animation the very first time we render company summary
+    // Avoid first-open flicker: by default animate unless explicitly skipped
     let shouldAnimate = !skipAnimation;
-    try { if (!window.__lushaCompanyRenderedOnce) { shouldAnimate = false; } } catch(_) {}
-    
+    // Determine source of current open
+    const isFromCache = !!window.__lushaOpenedFromCache;
     // For uncached live searches, always allow animation (new data from API)
     const isUncachedLiveSearch = !window.__lushaOpenedFromCache && !skipAnimation;
+    // On very first render, allow animation for both uncached-live and cached opens
+    try { if (!window.__lushaCompanyRenderedOnce) { shouldAnimate = (isUncachedLiveSearch || isFromCache); } } catch(_) {}
     
     // If content is unchanged and summary already exists, and it's not an uncached live search, don't re-render
     if (contentUnchanged && existingSummary && !isUncachedLiveSearch) {
@@ -1104,10 +1106,20 @@
             }
           } catch(_){ }
           if (addBtn && enrichBtn) {
-            addBtn.style.display = exists ? 'none' : '';
-            enrichBtn.style.display = exists ? '' : 'none';
+            // If we're on the account details page, always show "Enrich Account" since we're viewing an existing account
+            const isOnAccountDetailsPage = window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount;
+            
+            if (isOnAccountDetailsPage) {
+              addBtn.style.display = 'none';
+              enrichBtn.style.display = '';
+              enrichBtn.textContent = 'Enrich Account';
+            } else {
+              addBtn.style.display = exists ? 'none' : '';
+              enrichBtn.style.display = exists ? '' : 'none';
+            }
+            
             addBtn.onclick = () => addAccountToCRM({ company: company.name, companyName: company.name, fqdn: company.domain });
-              enrichBtn.onclick = async () => { try { await addAccountToCRM({ company: company.name, companyName: company.name, fqdn: company.domain }); } catch(_){} };
+            enrichBtn.onclick = async () => { try { await addAccountToCRM({ company: company.name, companyName: company.name, fqdn: company.domain }); } catch(_){} };
           }
           if (liveBtn) {
             // Use a minimum page size of 10 to satisfy Lusha API constraints
@@ -1400,18 +1412,101 @@
         industry: (lastCompanyResult && lastCompanyResult.industry) || '',
         employees: (lastCompanyResult && lastCompanyResult.employees) || '',
         shortDescription: (lastCompanyResult && lastCompanyResult.description) || '',
-        logoUrl: (lastCompanyResult && lastCompanyResult.logoUrl) || '',
-        linkedin: (lastCompanyResult && lastCompanyResult.linkedin) || '',
+        logoUrl: (lastCompanyResult && lastCompanyResult.logoUrl) ? String(lastCompanyResult.logoUrl) : '',
+        linkedin: (lastCompanyResult && lastCompanyResult.linkedin) ? String(lastCompanyResult.linkedin) : '',
+        // Additional fields from Lusha data - now properly mapped from API
+        city: (lastCompanyResult && lastCompanyResult.city) ? String(lastCompanyResult.city) : '',
+        state: (lastCompanyResult && lastCompanyResult.state) ? String(lastCompanyResult.state) : '',
+        country: (lastCompanyResult && lastCompanyResult.country) ? String(lastCompanyResult.country) : '',
+        address: (lastCompanyResult && lastCompanyResult.address) ? String(lastCompanyResult.address) : '',
+        phone: (lastCompanyResult && lastCompanyResult.phone) ? String(lastCompanyResult.phone) : '',
+        foundedYear: (lastCompanyResult && lastCompanyResult.foundedYear) ? String(lastCompanyResult.foundedYear) : '',
+        revenue: (lastCompanyResult && lastCompanyResult.revenue) ? String(lastCompanyResult.revenue) : '',
+        companyType: (lastCompanyResult && lastCompanyResult.companyType) ? String(lastCompanyResult.companyType) : '',
         source: 'lusha',
         updatedAt: new Date(),
         createdAt: new Date()
       };
       if (existingId) {
+        console.log('[Lusha] Enriching account with payload:', payload);
         await window.PCSaves.updateAccount(existingId, payload);
         window.crm?.showToast && window.crm.showToast('Enriched existing account');
+        
+        // Dispatch account-updated event to refresh account details page
+        try {
+          const ev = new CustomEvent('pc:account-updated', { 
+            detail: { 
+              id: existingId, 
+              changes: { 
+                ...payload,
+                updatedAt: new Date()
+              } 
+            } 
+          });
+          document.dispatchEvent(ev);
+        } catch (_) { /* noop */ }
+        
+        // If account details page is open for this account, refresh it immediately
+        try {
+          if (window.AccountDetail && window.AccountDetail.state && 
+              window.AccountDetail.state.currentAccount && 
+              window.AccountDetail.state.currentAccount.id === existingId) {
+            // Update the current account data immediately with enriched data
+            window.AccountDetail.state.currentAccount = {
+              ...window.AccountDetail.state.currentAccount,
+              ...payload
+            };
+            // Re-render the page immediately
+            window.AccountDetail.renderAccountDetail();
+
+            // Update header favicon/icon immediately if logoUrl or domain provided
+            try {
+              const header = document.getElementById('account-detail-header');
+              if (header) {
+                const img = header.querySelector('img.avatar-favicon');
+                const initials = header.querySelector('.avatar-circle-small');
+                // Prefer explicit logoUrl from Lusha; otherwise recompute favicon via domain
+                if (payload.logoUrl && typeof payload.logoUrl === 'string' && payload.logoUrl.trim()) {
+                  if (img) { img.src = payload.logoUrl; img.style.display = ''; }
+                  if (initials) initials.style.display = 'none';
+                } else if (payload.domain && window.__pcFaviconHelper) {
+                  const faviconHTML = window.__pcFaviconHelper.generateFaviconHTML(payload.domain, 64);
+                  const tempDiv = document.createElement('div');
+                  tempDiv.innerHTML = faviconHTML;
+                  const newImg = tempDiv.querySelector('.company-favicon');
+                  if (img && newImg) { img.src = newImg.src; img.style.display = ''; }
+                  if (initials) initials.style.display = 'none';
+                }
+              }
+            } catch(_) {}
+
+            // Also refresh from database after a short delay to ensure consistency
+            setTimeout(() => {
+              try {
+                const refreshedAccount = window.AccountDetail.findAccountById(existingId);
+                if (refreshedAccount) {
+                  window.AccountDetail.state.currentAccount = refreshedAccount;
+                  window.AccountDetail.renderAccountDetail();
+                }
+              } catch (_) { /* noop */ }
+            }, 200); // Reduced delay for faster updates
+          }
+        } catch (_) { /* noop */ }
+        
       } else {
-        await db.collection('accounts').add(payload);
+        const ref = await db.collection('accounts').add(payload);
         window.crm?.showToast && window.crm.showToast('Account added to CRM');
+        
+        // Dispatch account-created event
+        try {
+          const ev = new CustomEvent('pc:account-created', { 
+            detail: { 
+              id: ref.id, 
+              doc: payload 
+            } 
+          });
+          document.dispatchEvent(ev);
+        } catch (_) { /* noop */ }
       }
     } catch (e) {
       console.error('Add account failed', e);
@@ -2270,11 +2365,7 @@
   }
 
   // Debug logging function
-  function lushaLog(...args) {
-    if (window.CRM_DEBUG_LUSHA || localStorage.CRM_DEBUG_LUSHA === '1') {
-      console.log('[Lusha]', ...args);
-    }
-  }
+  function lushaLog(){ /* debug disabled in production */ }
 
   function ensureLushaStyles(){
     if (document.getElementById('lusha-styles')) return;

@@ -6,6 +6,11 @@
   // Global call function: window.Widgets.callNumber(number, name)
   if (!window.Widgets) window.Widgets = {};
 
+  // Debug wrapper for this module (disabled by default)
+  function phoneLog() {
+    try { if (window.CRM_DEBUG_PHONE) console.debug.apply(console, arguments); } catch(_) {}
+  }
+
   // Business phone number for fallback calls
   const DEFAULT_BUSINESS_E164 = '+18176630380';
   const BUSINESS_PHONE = '817-663-0380'; // legacy fallback without formatting
@@ -323,7 +328,20 @@
                 // Ensure timers/states are reset
                 try { stopLiveCallTimer(document.getElementById(WIDGET_ID)); } catch(_) {}
                 isCallInProgress = false;
-                currentCallContext = { number: '', name: '', isActive: false };
+                currentCallContext = { 
+                  number: '', 
+                  name: '', 
+                  company: '',
+                  accountId: null,
+                  accountName: null,
+                  contactId: null,
+                  contactName: null,
+                  city: '',
+                  state: '',
+                  domain: '',
+                  isCompanyPhone: false,
+                  isActive: false 
+                };
                 // Remove incoming notification if present
                 try {
                   const n = document.getElementById(CALL_NOTIFY_ID);
@@ -378,7 +396,20 @@
                     TwilioRTC.state.pendingIncoming = null;
                     TwilioRTC.state.connection = null;
                     isCallInProgress = false;
-                    currentCallContext = { number: '', name: '', isActive: false };
+                    currentCallContext = { 
+                  number: '', 
+                  name: '', 
+                  company: '',
+                  accountId: null,
+                  accountName: null,
+                  contactId: null,
+                  contactName: null,
+                  city: '',
+                  state: '',
+                  domain: '',
+                  isCompanyPhone: false,
+                  isActive: false 
+                };
                     const cardGone = document.getElementById(WIDGET_ID);
                     if (cardGone) {
                       const btnGone = cardGone.querySelector('.call-btn-start');
@@ -448,8 +479,10 @@
                 const callStartTime = Date.now();
                 const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
                 if (typeof updateCallStatus === 'function') {
-                  // Use Twilio CallSid if available so backend persists immediately
-                  updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
+                // Use Twilio CallSid if available so backend persists immediately
+                updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
+                // Immediately notify recent calls refresh so account detail updates without reload
+                try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
                 } else {
                   console.warn('[TwilioRTC] updateCallStatus not available - skipping status update');
                 }
@@ -553,7 +586,20 @@
                 conn.on('error', (error) => {
                   console.error('[Phone] Call error:', error);
                   isCallInProgress = false;
-                  currentCallContext = { number: '', name: '', isActive: false };
+                  currentCallContext = { 
+                  number: '', 
+                  name: '', 
+                  company: '',
+                  accountId: null,
+                  accountName: null,
+                  contactId: null,
+                  contactName: null,
+                  city: '',
+                  state: '',
+                  domain: '',
+                  isCompanyPhone: false,
+                  isActive: false 
+                };
                   
                   // Clear ALL connection state
                   TwilioRTC.state.pendingIncoming = null;
@@ -908,41 +954,57 @@
       if (input) input.style.display = 'none';
 
       // Populate
-      const nameLine = (meta && (meta.name || meta.account)) || (currentCallContext && (currentCallContext.name || currentCallContext.company)) || '';
-      const account = (meta && (meta.account || meta.company)) || (currentCallContext && currentCallContext.company) || '';
-      
-      // Determine if this is a company phone call vs individual contact call
-      const isCompanyPhone = currentCallContext && currentCallContext.isCompanyPhone;
+      const isCompanyPhone = !!(currentCallContext && (currentCallContext.isCompanyPhone || (currentCallContext.company && !currentCallContext.contactId)));
       const city = (meta && meta.city) || (currentCallContext && currentCallContext.city) || '';
       const state = (meta && meta.state) || (currentCallContext && currentCallContext.state) || '';
+      const account = (meta && (meta.account || meta.company)) || (currentCallContext && currentCallContext.company) || '';
+      const domain = (meta && meta.domain) || (currentCallContext && currentCallContext.domain) || '';
+      const displayNumber = number || (currentCallContext && currentCallContext.number) || '';
       
-      // Build subtitle: for company calls show location, for individual calls show company + number
-      let sub;
-      if (isCompanyPhone && (city || state)) {
-        sub = [city, state].filter(Boolean).join(', ');
+      // For company phone calls, show company name only
+      // For individual contact calls, show contact name
+      let nameLine;
+      if (isCompanyPhone) {
+        nameLine = (meta && meta.account) || (currentCallContext && currentCallContext.company) || '';
       } else {
-        sub = [account, number].filter(Boolean).join(' • ');
+        nameLine = (meta && meta.name) || (currentCallContext && currentCallContext.name) || '';
       }
       
-      console.log('[Phone Widget][DEBUG] setContactDisplay called:', {
+      // Build subtitle: for company calls show location + number, for individual calls show company + number
+      let sub;
+      if (isCompanyPhone) {
+        const location = [city, state].filter(Boolean).join(', ');
+        sub = [location, displayNumber].filter(Boolean).join(' • ');
+      } else {
+        sub = [account, displayNumber].filter(Boolean).join(' • ');
+      }
+      
+      phoneLog('[Phone Widget] setContactDisplay', {
         meta: meta,
         currentCallContext: currentCallContext,
         nameLine: nameLine,
         account: account,
-        number: number
+        number: displayNumber,
+        isCompanyPhone: isCompanyPhone,
+        city: city,
+        state: state,
+        domain: domain
       });
-      const favicon = makeFavicon(meta && meta.domain);
+      const favicon = makeFavicon(domain);
       const avatarWrap = box.querySelector('.contact-avatar');
       if (avatarWrap) {
-        // For company phone calls, always try to show company favicon
-        if (isCompanyPhone && favicon) {
+        // For company phone calls, always try to show company favicon (prefer helper)
+        if (isCompanyPhone && domain && window.__pcFaviconHelper) {
+          try { avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28); }
+          catch(_) { avatarWrap.innerHTML = favicon ? `<img class="company-favicon" src="${favicon}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : ''; }
+        } else if (isCompanyPhone && favicon) {
           avatarWrap.innerHTML = `<img class="company-favicon" src="${favicon}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
         } else if (favicon) {
           // For individual contacts, show favicon if available
           avatarWrap.innerHTML = `<img class="company-favicon" src="${favicon}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
         } else {
           // Fallback to initials
-          const initials = (nameLine || account || number || '')
+          const initials = (isCompanyPhone ? (account || (domain ? domain[0] : '')) : (nameLine || account || displayNumber || ''))
             .split(/\s+/)
             .map(s => s.trim()[0])
             .filter(Boolean)
@@ -954,7 +1016,7 @@
       }
       const nameEl = box.querySelector('.contact-name');
       const subEl = box.querySelector('.contact-sub');
-      if (nameEl) nameEl.textContent = nameLine || number || 'On call';
+      if (nameEl) nameEl.textContent = nameLine || displayNumber || 'On call';
       if (subEl) subEl.textContent = sub;
       // Animate input out then pop-in details with synchronized shift
       const inputEl = body.querySelector('.phone-display');
@@ -1094,6 +1156,10 @@
     accountName: null,
     contactId: null,
     contactName: null,
+    city: '',
+    state: '',
+    domain: '',
+    isCompanyPhone: false,
     isActive: false
   };
 
@@ -1139,18 +1205,21 @@
       const micText = card.querySelector('.mic-text');
       if (micText) micText.textContent = formatDuration(elapsed);
       
-            // Broadcast live duration to recent calls sections (throttled to reduce overhead)
-            if (currentCallSid && elapsed % 2000 < 1000) { // Only dispatch every 2 seconds
-              try {
-                document.dispatchEvent(new CustomEvent('pc:live-call-duration', { 
-                  detail: { 
-                    callSid: currentCallSid, 
-                    duration: Math.floor(elapsed / 1000),
-                    durationFormatted: formatDurationForRecentCalls(elapsed)
-                  } 
-                }));
-              } catch(_) {}
-            }
+      // Broadcast live duration to recent calls sections (throttled every ~2s)
+      if (currentCallSid) {
+        const tick = Math.floor(elapsed / 2000);
+        if (tick !== Math.floor((elapsed - 1000) / 2000)) {
+          try {
+            document.dispatchEvent(new CustomEvent('pc:live-call-duration', {
+              detail: {
+                callSid: currentCallSid,
+                duration: Math.floor(elapsed / 1000),
+                durationFormatted: formatDurationForRecentCalls(elapsed)
+              }
+            }));
+          } catch(_) {}
+        }
+      }
     }, 1000);
   }
   function stopLiveCallTimer(card) {
@@ -1792,6 +1861,7 @@
           console.debug('[Phone] Call connected');
           isCallInProgress = true;
           currentCallContext.isActive = true;
+          currentCallContext.number = number;
           try {
             // Capture the Twilio CallSid if exposed by the SDK
             const p = (currentCall && (currentCall.parameters || currentCall._parameters)) || {};
@@ -1810,10 +1880,24 @@
           // Populate in-call contact display (keep header title simple)
           try {
             const meta = await resolvePhoneMeta(number).catch(() => ({}));
-            setContactDisplay(meta || {}, number);
+            // Merge call context data with resolved meta to ensure company info is preserved
+            const mergedMeta = {
+              ...meta,
+              ...(currentCallContext && {
+                name: currentCallContext.name || meta.name,
+                account: currentCallContext.company || meta.account,
+                company: currentCallContext.company || meta.company,
+                city: currentCallContext.city || meta.city,
+                state: currentCallContext.state || meta.state,
+                domain: currentCallContext.domain || meta.domain
+              })
+            };
+            setContactDisplay(mergedMeta, number);
           } catch(_) {}
           // Update call status to connected using same call ID
           updateCallStatus(number, 'connected', callStartTime, 0, twilioCallSid || callId);
+          // Immediately notify account detail to refresh recent calls (so it appears without reload)
+          try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
         });
         
         currentCall.on('disconnect', async () => {
@@ -1911,18 +1995,9 @@
             }
           }
           
-          // Now clear the current call context after final POST
-          console.debug('[Phone] Clearing call context after final POST');
-          currentCallContext = {
-            number: '',
-            name: '',
-            company: '',
-            accountId: null,
-            accountName: null,
-            contactId: null,
-            contactName: null,
-            isActive: false
-          };
+          // Don't clear call context yet - keep it for proper attribution
+          // Context will be cleared when call actually ends
+          console.debug('[Phone] Call context preserved for attribution');
           
           console.debug('[Phone] Call cleanup complete - aggressive anti-redial protection active');
           console.debug('[Phone] Cooldown set:', { lastCallCompleted: disconnectTime, lastCalledNumber: number });
@@ -1970,13 +2045,22 @@
           currentCallContext = {
             number: '',
             name: '',
+            company: '',
+            accountId: null,
+            accountName: null,
+            contactId: null,
+            contactName: null,
+            city: '',
+            state: '',
+            domain: '',
+            isCompanyPhone: false,
             isActive: false
           };
           
-          // Set longer cooldown after error
+          // Set reasonable cooldown after error
           lastCallCompleted = Date.now();
           lastCalledNumber = number;
-          autoTriggerBlockUntil = Date.now() + 15000;
+          autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3 seconds
           
           // Release audio devices
           if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
@@ -2164,7 +2248,7 @@
           businessPhone: biz
         };
 
-        try { console.debug('[Phone] POST /api/calls', { base, payload }); } catch(_) {}
+        phoneLog('[Phone] POST /api/calls', { base, payload });
 
         const resp = await fetch(`${base}/api/calls`, {
           method: 'POST',
@@ -2172,20 +2256,27 @@
           body: JSON.stringify(payload)
         });
         let respJson = null; try { respJson = await resp.json(); } catch(_) {}
-        try { console.debug('[Phone] /api/calls response', { status: resp.status, ok: resp.ok, body: respJson }); } catch(_) {}
+        phoneLog('[Phone] /api/calls response', { status: resp.status, ok: resp.ok, body: respJson });
         
-        // Refresh calls page if it's open (immediate and delayed to catch webhooks)
-        const refreshCalls = (label) => {
+        // Refresh calls page only if it's actually visible, and avoid background refresh while in a live call
+        const isCallsPageActive = () => {
+          try {
+            const el = document.getElementById('calls-page');
+            if (!el) return false;
+            if (typeof el.matches === 'function' && el.matches('.active, .is-active, :not([hidden])')) return true;
+            return el.offsetParent !== null; // visible in layout
+          } catch(_) { return false; }
+        };
+        const refreshCallsIfActive = (label) => {
+          if (isCallInProgress) return; // do not refresh during live call
+          if (!isCallsPageActive()) return;
           if (window.callsModule && typeof window.callsModule.loadData === 'function') {
-            window.callsModule.loadData();
-            console.debug(`[Phone] Refreshed calls page data (${label})`);
+            try { window.callsModule.loadData(); } catch(_) {}
+            phoneLog(`[Phone] Refreshed calls page data (${label})`);
           }
         };
-        // Consolidate refresh timers to reduce overhead
-        const refreshTimes = [1000, 15000, 30000];
-        refreshTimes.forEach((delay, index) => {
-          setTimeout(() => refreshCalls(`t+${delay/1000}s`), delay);
-        });
+        // Single short follow-up refresh only (remove 15s/30s background timers)
+        setTimeout(() => refreshCallsIfActive('t+1s'), 1000);
         
       } catch (error) {
         console.error('[Phone] Failed to update call status:', error);
@@ -2216,7 +2307,7 @@
         setInCallUI(false);
         stopLiveCallTimer(card);
         lastCallCompleted = Date.now();
-        autoTriggerBlockUntil = Date.now() + 10000;
+        autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3 seconds
         // Reset title and clear input
         const title = card.querySelector('.widget-title');
         if (title) title.innerHTML = 'Phone';
@@ -2314,9 +2405,9 @@
           isActive: false
         };
         
-        // Set aggressive cooldown on manual hangup
+        // Set reasonable cooldown on manual hangup
         lastCallCompleted = Date.now();
-        autoTriggerBlockUntil = Date.now() + 15000; // Increased to 15 seconds
+        autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3 seconds
         
         // Release audio devices to ensure proper cleanup
         if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
@@ -2645,7 +2736,7 @@
   let lastCalledNumber = '';
   let isCallInProgress = false;
   const CALLBACK_COOLDOWN = 8000; // 8 seconds cooldown
-  const SAME_NUMBER_COOLDOWN = 15000; // 15 seconds for same number
+  const SAME_NUMBER_COOLDOWN = 5000; // 5 seconds for same number
   // Hard global guard to suppress any auto-dial after a call ends unless there is a fresh user click
   let autoTriggerBlockUntil = 0; // ms epoch
   
@@ -2656,12 +2747,7 @@
   // Global call function for CRM integration
   window.Widgets.callNumber = function(number, contactName = '', autoTrigger = false, source = 'unknown') {
     // Add stack trace to debug who's calling this function
-    const stack = new Error().stack;
-    console.debug('[Phone] ═══ CALLNUMBER INVOKED ═══');
-    console.debug('[Phone] Parameters:', { number, contactName, autoTrigger, source, isCallInProgress });
-    console.debug('[Phone] Current call context:', currentCallContext);
-    console.debug('[Phone] Cooldowns:', { lastCallCompleted: new Date(lastCallCompleted || 0), lastCalledNumber });
-    console.debug('[Phone] Call stack:', stack?.split('\n').slice(0, 8).join('\n')); // More stack trace
+    phoneLog('[Phone] CALLNUMBER', { number, contactName, autoTrigger, source, isCallInProgress, lastCallCompleted, lastCalledNumber, currentCallContext });
     
     const now = Date.now();
     let contactCompany = '';
@@ -2785,16 +2871,23 @@
     }
     window.lastCallNumberTime = now;
     
-    // Set current call context - preserve existing context from setCallContext()
+    // Set current call context - merge to preserve fields set by setCallContext()
     currentCallContext = {
+      ...currentCallContext,
       number: number,
-      name: contactName,
+      name: contactName || currentCallContext?.name || '',
       company: contactCompany || currentCallContext?.company || '',
+      // keep account/contact linkage as-is if already set
       accountId: currentCallContext?.accountId || null,
       accountName: currentCallContext?.accountName || null,
       contactId: currentCallContext?.contactId || null,
       contactName: currentCallContext?.contactName || null,
-      isActive: autoTrigger // Mark as active only if we're auto-triggering
+      // preserve city/state/domain/isCompanyPhone if they were set previously
+      city: currentCallContext?.city || '',
+      state: currentCallContext?.state || '',
+      domain: currentCallContext?.domain || '',
+      isCompanyPhone: currentCallContext?.isCompanyPhone === true || currentCallContext?.isCompanyPhone === false ? currentCallContext.isCompanyPhone : false,
+      isActive: autoTrigger || currentCallContext?.isActive || false
     };
     
     console.debug('[Phone Widget] Call context set in callNumber:', currentCallContext);
@@ -2932,7 +3025,7 @@
       if (ctx.city) currentCallContext.city = ctx.city;
       if (ctx.state) currentCallContext.state = ctx.state;
       if (ctx.domain) currentCallContext.domain = ctx.domain;
-      if (ctx.isCompanyPhone) currentCallContext.isCompanyPhone = ctx.isCompanyPhone;
+      if (ctx.isCompanyPhone !== undefined) currentCallContext.isCompanyPhone = ctx.isCompanyPhone;
       
       console.debug('[Phone Widget] Call context updated:', currentCallContext);
       console.log('[Phone Widget][DEBUG] setCallContext called with:', {

@@ -349,73 +349,104 @@
     const c = state.currentContact || {};
     const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim();
     const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
+    overlay.className = 'pc-modal';
     overlay.tabIndex = -1;
 
     const html = `
-      <div class="step-type-modal edit-contact-modal" role="dialog" aria-modal="true" aria-labelledby="edit-contact-title">
-        <div class="header">
-          <div class="title-wrap">
-            <div class="title" id="edit-contact-title">Edit Contact</div>
-            <div class="subtitle">Update details for ${escapeHtml(fullName || c.name || 'this contact')}</div>
-          </div>
-          <button class="close-btn" aria-label="Close">×</button>
+      <div class="pc-modal__backdrop" data-close="edit-contact"></div>
+      <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="edit-contact-title">
+        <div class="pc-modal__header">
+          <h3 id="edit-contact-title">Edit Contact</h3>
+          <button class="pc-modal__close" data-close="edit-contact" aria-label="Close">×</button>
         </div>
-        <div class="body">
-          <form class="edit-contact-form">
-            <div class="form-grid">
+        <form id="form-edit-contact" class="pc-modal__form">
+          <div class="pc-modal__body">
+            <div class="form-row">
               <label>First name<input type="text" class="input-dark" name="firstName" value="${escapeHtml(c.firstName || '')}" /></label>
               <label>Last name<input type="text" class="input-dark" name="lastName" value="${escapeHtml(c.lastName || '')}" /></label>
+            </div>
+            <div class="form-row">
               <label>Title<input type="text" class="input-dark" name="title" value="${escapeHtml(c.title || '')}" /></label>
               <label>Company<input type="text" class="input-dark" name="companyName" value="${escapeHtml(c.companyName || '')}" /></label>
+            </div>
+            <div class="form-row">
               <label>Email<input type="email" class="input-dark" name="email" value="${escapeHtml(c.email || '')}" /></label>
               <label>Email Status<select class="input-dark" name="emailStatus"><option value="">Not Verified</option><option value="verified" ${c.emailStatus === 'verified' ? 'selected' : ''}>Verified</option></select></label>
+            </div>
+            <div class="form-row">
               <label>Mobile Phone<input type="tel" class="input-dark" name="mobile" value="${escapeHtml(c.mobile || '')}" /></label>
               <label>Work Direct Phone<input type="tel" class="input-dark" name="workDirectPhone" value="${escapeHtml(c.workDirectPhone || '')}" /></label>
+            </div>
+            <div class="form-row">
               <label>Other Phone<input type="tel" class="input-dark" name="otherPhone" value="${escapeHtml(c.otherPhone || '')}" /></label>
               <label>City<input type="text" class="input-dark" name="city" value="${escapeHtml(c.city || c.locationCity || '')}" /></label>
+            </div>
+            <div class="form-row">
               <label>State<input type="text" class="input-dark" name="state" value="${escapeHtml(c.state || c.locationState || '')}" /></label>
               <label>Industry<input type="text" class="input-dark" name="industry" value="${escapeHtml(c.industry || c.companyIndustry || '')}" /></label>
+            </div>
+            <div class="form-row">
               <label>Seniority<input type="text" class="input-dark" name="seniority" value="${escapeHtml(c.seniority || '')}" /></label>
               <label>Department<input type="text" class="input-dark" name="department" value="${escapeHtml(c.department || '')}" /></label>
+            </div>
+            <div class="form-row">
               <label>LinkedIn URL<input type="url" class="input-dark" name="linkedin" value="${escapeHtml(c.linkedin || '')}" /></label>
             </div>
-            <div class="form-actions" style="margin-top: var(--spacing-md); display:flex; justify-content:flex-end; gap: var(--spacing-sm);">
-              <button type="button" class="btn-secondary btn-cancel">Cancel</button>
-              <button type="submit" class="btn-primary btn-save">Save</button>
+            <div class="form-row" style="justify-content:flex-end; gap: var(--spacing-sm);">
+              <button type="button" class="btn-text" data-close="edit-contact">Cancel</button>
+              <button type="submit" class="btn-primary">Save</button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>`;
 
     overlay.innerHTML = html;
 
-    const modal = overlay.querySelector('.edit-contact-modal');
-    const closeBtn = overlay.querySelector('.close-btn');
-    const form = overlay.querySelector('.edit-contact-form');
+    const dialog = overlay.querySelector('.pc-modal__dialog');
+    const backdrop = overlay.querySelector('.pc-modal__backdrop');
+    const form = overlay.querySelector('#form-edit-contact');
 
     const close = () => { if (overlay.parentElement) overlay.parentElement.removeChild(overlay); };
 
-    // Dismiss handlers
-    overlay.addEventListener('click', (e) => { if (e.target === overlay || (e.target.classList && e.target.classList.contains('close-btn'))) close(); });
-    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } });
-    overlay.querySelector('.btn-cancel')?.addEventListener('click', (e) => { e.preventDefault(); close(); });
+    // Open (append to DOM)
+    document.body.appendChild(overlay);
 
-    // Focus trap within modal
-    const trap = (e) => {
-      if (e.key !== 'Tab') return;
-      const focusables = Array.from(modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
-        .filter(el => !el.disabled && el.offsetParent !== null);
-      if (!focusables.length) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    // Focus management
+    setTimeout(() => {
+      const closeBtn = overlay.querySelector('.pc-modal__close');
+      const firstInput = overlay.querySelector('input,button,select,textarea,[tabindex]:not([tabindex="-1"])');
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+      else if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+    }, 0);
+
+    // Click-away and close buttons
+    if (backdrop) backdrop.addEventListener('click', close);
+    overlay.querySelectorAll('[data-close="edit-contact"]').forEach(btn => btn.addEventListener('click', close));
+
+    // Focus trap within dialog
+    const getFocusables = () => Array.from(dialog.querySelectorAll('a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'))
+      .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      } else if (e.key === 'Tab') {
+        const f = getFocusables();
+        if (!f.length) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
-    modal.addEventListener('keydown', trap);
+    dialog.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
 
     // Save handler
     form?.addEventListener('submit', async (e) => {
@@ -461,9 +492,6 @@
       try { renderContactDetail(); } catch (_) {}
       close();
     });
-
-    // Ensure close button restores focus to edit trigger if possible
-    if (closeBtn) closeBtn.addEventListener('click', () => close());
 
     return overlay;
   }
@@ -1421,6 +1449,11 @@
       }
     }
     
+    // Ensure contact has an ID
+    if (contact && !contact.id && contactId) {
+      contact.id = contactId;
+    }
+    
     if (!contact) {
       console.log('[ContactDetail] Contact not found in cache, trying Firestore for:', contactId);
       // Try to load from Firestore as final fallback
@@ -1451,7 +1484,11 @@
       return;
     }
 
+    // Ensure the new contact has a stable id immediately for downstream actions (lists, notes)
+    if (!contact.id && contactId) contact.id = contactId;
     state.currentContact = contact;
+    // Broadcast that contact detail is loaded so dependent widgets can rebind
+    try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch(_) {}
     // Ensure per-contact event handlers are rebound on each view
     // This avoids stale guards after navigating to other pages (e.g., account details)
     state._contactDetailEventsAttached = false;
@@ -4760,6 +4797,13 @@ async function createContactSequenceThenAdd(name) {
     // Mark trigger expanded
     try { document.getElementById('add-contact-to-list')?.setAttribute('aria-expanded', 'true'); } catch(_) {}
 
+    // Ensure currentContact has a stable id before loading memberships
+    try {
+      const id = state.currentContact && state.currentContact.id;
+      if (!id && window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+        state.currentContact.id = window.ContactDetail.state.currentContact.id;
+      }
+    } catch(_) {}
     // Load lists and memberships
     Promise.resolve(populateContactListsPanel(panel.querySelector('#contact-lists-body')))
       .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch(_) {} });
@@ -4956,8 +5000,28 @@ async function createContactSequenceThenAdd(name) {
 
   async function addCurrentContactToList(listId, listName) {
     try {
-      const contactId = state.currentContact?.id;
-      if (!contactId) { closeContactListsPanel(); return; }
+      let contactId = state.currentContact?.id;
+      // Fallback to contactId from URL or DOM if not present yet
+      if (!contactId) {
+        try {
+          const fromDom = document.querySelector('[data-contact-id]')?.getAttribute('data-contact-id');
+          if (fromDom) contactId = fromDom;
+        } catch(_) {}
+      }
+      if (!contactId && typeof window.getPeopleData === 'function') {
+        try {
+          // If we have a single newly-created contact with matching name/company, attempt to resolve id
+          const c = state.currentContact || {};
+          const people = window.getPeopleData() || [];
+          const guess = people.find(p => (p.firstName||p.name||'') === (c.firstName||c.name||'') && (p.accountId||p.companyId||'') === (c.accountId||''));
+          if (guess && guess.id) contactId = guess.id;
+        } catch(_) {}
+      }
+      if (!contactId) { 
+        console.warn('[ContactDetail] No contact ID available for list addition');
+        closeContactListsPanel(); 
+        return; 
+      }
       const db = window.firebaseDB;
       if (db && typeof db.collection === 'function') {
         const doc = { listId, targetId: contactId, targetType: 'people' };

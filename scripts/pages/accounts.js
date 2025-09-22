@@ -150,6 +150,16 @@
     if (addBtn) {
       addBtn.addEventListener('click', async () => {
         try {
+          // Capture current page state before opening modal for back button navigation
+          window._addAccountReturn = {
+            page: state.currentPage,
+            scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+            searchTerm: els.quickSearch ? els.quickSearch.value : '',
+            sortColumn: state.sortColumn,
+            sortDirection: state.sortDirection,
+            selectedItems: Array.from(state.selected || [])
+          };
+          
           if (window.crm && typeof window.crm.showModal === 'function') {
             window.crm.showModal('add-account');
           } else {

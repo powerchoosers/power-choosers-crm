@@ -10062,6 +10062,8 @@ th.drag-over::after {
     cursor: pointer;
     transition: var(--transition-fast);
 }
+
+/* Account Detail header uses the same .contact-title-row animation rules as Contact Detail */
 #contact-detail-header #open-widgets svg {
     width: 18px;
     height: 18px;
@@ -13799,14 +13801,48 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     .settings-content {
         padding: var(--spacing-md);
     }
-    
+
     .phone-number-item {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--spacing-sm);
     }
-    
+
     .phone-actions {
         align-self: flex-end;
     }
 }
+
+/* Email authentication styles */
+.email-auth-prompt,
+.email-auth-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    text-align: center;
+    padding: var(--spacing-xl);
+}
+
+.email-auth-prompt h3,
+.email-auth-error h3 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--text-primary);
+}
+
+.email-auth-prompt p,
+.email-auth-error p {
+    margin: 0;
+    color: var(--text-secondary);
+    max-width: 300px;
+    line-height: 1.5;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+

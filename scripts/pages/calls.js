@@ -159,23 +159,9 @@ var console = {
             const phones = [c.workDirectPhone, c.mobile, c.otherPhone, c.phone].map(norm).filter(Boolean);
             for (const ph of phones) if (ph && !map.has(ph)) map.set(ph,{ id: c.id, name, title, company });
           }
-          // Filter out numbers that are actually company phones to avoid cross-account misattribution
-          try {
-            const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
-            const companyPhones = new Set();
-            const norm10 = (p)=>(p||'').toString().replace(/\D/g,'').slice(-10);
-            accounts.forEach(a => {
-              ['companyPhone','phone','primaryPhone','mainPhone'].forEach(k => {
-                const ph = norm10(a && a[k]);
-                if (ph) companyPhones.add(ph);
-              });
-            });
-            const filtered = new Map();
-            for (const [ph, row] of map.entries()){
-              if (!companyPhones.has(ph)) filtered.set(ph, row);
-            }
-            _phoneToContactCache = filtered; return filtered;
-          } catch(_) { _phoneToContactCache = map; return map; }
+          // Don't filter out company phones - let the attribution logic handle it properly
+          // The issue was that filtering out company phones was causing misattribution
+          _phoneToContactCache = map; return map;
         }
       }
       // 2) Fallback to Firestore (limited) to populate essential mappings
@@ -230,23 +216,9 @@ var console = {
             if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
           });
         }catch(_){ /* ignore */ }
-        // Filter out numbers that are actually company phones to avoid cross-account misattribution
-        try {
-          const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
-          const companyPhones = new Set();
-          const norm10 = (p)=>(p||'').toString().replace(/\D/g,'').slice(-10);
-          accounts.forEach(a => {
-            ['companyPhone','phone','primaryPhone','mainPhone'].forEach(k => {
-              const ph = norm10(a && a[k]);
-              if (ph) companyPhones.add(ph);
-            });
-          });
-          const filtered = new Map();
-          for (const [ph, row] of map.entries()){
-            if (!companyPhones.has(ph)) filtered.set(ph, row);
-          }
-          _phoneToContactCache = filtered; return filtered;
-        } catch(_) { _phoneToContactCache = map; return map; }
+        // Don't filter out company phones - let the attribution logic handle it properly
+        // The issue was that filtering out company phones was causing misattribution
+        _phoneToContactCache = map; return map;
       }
     }catch(_){ }
     return new Map();
@@ -1048,16 +1020,17 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
                   }
                 }
               } else {
-                // Contact name is same as company name - treat as no contact name
+                // Contact name is same as company name - this is a company phone call
+                // Don't clear the contact name, keep it as the company name for proper attribution
                 if (window.CRM_DEBUG_CALLS) {
-                  console.log('[Calls][contactId] Contact name same as company name, will find most active contact:', {
+                  console.log('[Calls][contactId] Contact name same as company name - treating as company phone call:', {
                     contactName: c.contactName,
                     company: c.company
                   });
                 }
-                // Clear the contact name so the system will find the most active contact
-                contactName = '';
-                console.log('[Calls][contactId] CLEARED contact name, will now find most active contact for account');
+                // Keep the contact name as the company name for company phone calls
+                contactName = c.contactName;
+                console.log('[Calls][contactId] Keeping company name as contact name for company phone call');
               }
             }
             else if (c.contactId) {

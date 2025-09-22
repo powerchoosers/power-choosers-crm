@@ -149,16 +149,81 @@ class PowerChoosersCRM {
 
             const ref = await db.collection('accounts').add(doc);
 
+            // Create UI document for notifications and navigation
+            const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
+
             // Notify Accounts page to update its state without reload
             try {
-              const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
               document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc: uiDoc } }));
             } catch (_) { /* noop */ }
 
             if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Account added!');
-            // Reset form fields for next time
-            try { form.reset(); } catch (_) { /* noop */ }
-            close();
+            
+            // Navigate to account details page after successful creation
+            try {
+              // Set up navigation source tracking for back button
+              window._accountNavigationSource = 'add-account';
+              // Use the state that was captured when the add account button was clicked
+              // If no state was captured, create a default one
+              if (!window._addAccountReturn) {
+                window._addAccountReturn = {
+                  page: window.crm?.currentPage || 'accounts',
+                  scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                  searchTerm: '',
+                  sortColumn: '',
+                  sortDirection: '',
+                  selectedItems: []
+                };
+              }
+              
+              // Navigate to account details page
+              console.log('[Add Account] Attempting navigation to account details for ID:', ref.id);
+              console.log('[Add Account] AccountDetail available:', !!window.AccountDetail);
+              console.log('[Add Account] AccountDetail.show available:', !!(window.AccountDetail && typeof window.AccountDetail.show === 'function'));
+              
+              if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                // Prefetch the account data for immediate display
+                window._prefetchedAccountForDetail = Object.assign({}, uiDoc, { id: ref.id });
+                console.log('[Add Account] Calling AccountDetail.show with ID:', ref.id);
+                window.AccountDetail.show(ref.id);
+              } else {
+                // Try to navigate to account-details page and then show the account
+                console.log('[Add Account] AccountDetail not available, using fallback navigation');
+                if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                  window.crm.navigateToPage('account-details');
+                  
+                  // Retry showing the account detail after page navigation
+                  let retryCount = 0;
+                  const maxRetries = 20; // 2 seconds with 100ms intervals
+                  const retryInterval = setInterval(() => {
+                    retryCount++;
+                    if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                      console.log('[Add Account] Retry successful, showing account detail');
+                      window._prefetchedAccountForDetail = Object.assign({}, uiDoc, { id: ref.id });
+                      window.AccountDetail.show(ref.id);
+                      clearInterval(retryInterval);
+                    } else if (retryCount >= maxRetries) {
+                      console.error('[Add Account] Failed to load AccountDetail after retries');
+                      clearInterval(retryInterval);
+                    }
+                  }, 100);
+                } else {
+                  console.error('[Add Account] No navigation method available');
+                }
+              }
+              
+              // Close modal after navigation is initiated
+              setTimeout(() => {
+                try { form.reset(); } catch (_) { /* noop */ }
+                close();
+              }, 100); // Small delay to ensure navigation starts
+              
+            } catch (e) {
+              console.error('Navigation to account details failed:', e);
+              // If navigation fails, still close the modal
+              try { form.reset(); } catch (_) { /* noop */ }
+              close();
+            }
           } catch (err) {
             if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Failed to add account');
             console.error('Add account failed', err);
@@ -1176,6 +1241,8 @@ class PowerChoosersCRM {
                 this.showModal('add-contact');
                 break;
             case 'Add Account':
+                // Capture current page state before opening modal for back button navigation
+                this.captureCurrentPageState();
                 this.showModal('add-account');
                 break;
             case 'Bulk Import CSV':
@@ -1183,6 +1250,72 @@ class PowerChoosersCRM {
                 break;
             default:
                 this.showToast(`${action} clicked`);
+        }
+    }
+
+    captureCurrentPageState() {
+        // Capture current page state for back button navigation from Quick Actions
+        try {
+            const currentPage = this.currentPage;
+            let pageState = {
+                page: currentPage,
+                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                searchTerm: '',
+                sortColumn: '',
+                sortDirection: '',
+                selectedItems: []
+            };
+
+            // Try to capture page-specific state based on current page
+            if (currentPage === 'accounts') {
+                const quickSearch = document.getElementById('accounts-quick-search');
+                if (quickSearch) pageState.searchTerm = quickSearch.value;
+                
+                // Try to get accounts page state if available
+                if (window.accountsModule && window.accountsModule.state) {
+                    const state = window.accountsModule.state;
+                    pageState.sortColumn = state.sortColumn || '';
+                    pageState.sortDirection = state.sortDirection || '';
+                    pageState.selectedItems = Array.from(state.selected || []);
+                }
+            } else if (currentPage === 'people') {
+                const quickSearch = document.getElementById('people-quick-search');
+                if (quickSearch) pageState.searchTerm = quickSearch.value;
+                
+                // Try to get people page state if available
+                if (window.peopleModule && window.peopleModule.state) {
+                    const state = window.peopleModule.state;
+                    pageState.sortColumn = state.sortColumn || '';
+                    pageState.sortDirection = state.sortDirection || '';
+                    pageState.selectedItems = Array.from(state.selected || []);
+                }
+            } else if (currentPage === 'calls') {
+                const quickSearch = document.getElementById('calls-quick-search');
+                if (quickSearch) pageState.searchTerm = quickSearch.value;
+                
+                // Try to get calls page state if available
+                if (window.callsModule && window.callsModule.state) {
+                    const state = window.callsModule.state;
+                    pageState.sortColumn = state.sortColumn || '';
+                    pageState.sortDirection = state.sortDirection || '';
+                    pageState.selectedItems = Array.from(state.selected || []);
+                }
+            }
+
+            // Store the captured state for use in account creation
+            window._addAccountReturn = pageState;
+            console.log('[Quick Actions] Captured page state for Add Account:', pageState);
+        } catch (e) {
+            console.error('Failed to capture current page state:', e);
+            // Fallback to basic state
+            window._addAccountReturn = {
+                page: this.currentPage || 'accounts',
+                scroll: 0,
+                searchTerm: '',
+                sortColumn: '',
+                sortDirection: '',
+                selectedItems: []
+            };
         }
     }
 
@@ -3028,6 +3161,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
                     const isVisible = !composeWindow.style.display || composeWindow.style.display !== 'none';
                     if (isVisible) {
+                        // Ensure compose window is positioned correctly
+                        composeWindow.style.position = 'fixed';
+                        composeWindow.style.bottom = '0';
+                        composeWindow.style.right = '20px';
+                        composeWindow.style.top = 'auto';
+                        composeWindow.style.left = 'auto';
+                        
                         // Compose window is now visible, inject signature
                         setTimeout(() => {
                             injectEmailSignature();
