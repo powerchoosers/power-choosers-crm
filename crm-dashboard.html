@@ -1294,6 +1294,164 @@
                         </div>
                     </div>
 
+                    <!-- Settings Page (Container-based) -->
+                    <div class="page" id="settings-page" data-page="settings">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Settings</h2>
+                                    <div class="page-actions">
+                                        <button class="btn-primary" id="save-settings-btn">Save Changes</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="page-content">
+                                <div class="settings-sections">
+                                    <!-- Email Settings Section -->
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                                <polyline points="22,6 12,13 2,6"></polyline>
+                                            </svg>
+                                            Email Settings
+                                        </h3>
+                                        <div class="settings-content">
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Email Signature</h4>
+                                                <div class="settings-field">
+                                                    <label for="email-signature-text">Text Signature</label>
+                                                    <textarea id="email-signature-text" class="settings-textarea" placeholder="Enter your email signature text..." rows="4"></textarea>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label for="email-signature-image">Image Signature</label>
+                                                    <div class="image-upload-area">
+                                                        <input type="file" id="email-signature-image" accept="image/*" hidden>
+                                                        <button type="button" class="btn-secondary" id="upload-signature-image">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+                                                                <circle cx="12" cy="13" r="3"></circle>
+                                                            </svg>
+                                                            Upload Image
+                                                        </button>
+                                                        <div id="signature-image-preview" class="image-preview" hidden></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Gemini AI Prompts</h4>
+                                                <div class="settings-field">
+                                                    <label for="email-greeting-prompt">Email Greeting Prompt</label>
+                                                    <textarea id="email-greeting-prompt" class="settings-textarea" placeholder="Enter the prompt for generating email greetings..." rows="3"></textarea>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label for="email-body-prompt">Email Body Prompt</label>
+                                                    <textarea id="email-body-prompt" class="settings-textarea" placeholder="Enter the prompt for generating email body content..." rows="4"></textarea>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label for="email-subject-prompt">Email Subject Prompt</label>
+                                                    <textarea id="email-subject-prompt" class="settings-textarea" placeholder="Enter the prompt for generating email subjects..." rows="3"></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Twilio Settings Section -->
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                            </svg>
+                                            Twilio Phone Numbers
+                                        </h3>
+                                        <div class="settings-content">
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Business Phone Numbers</h4>
+                                                <div class="phone-numbers-list" id="twilio-numbers-list">
+                                                    <div class="phone-number-item">
+                                                        <div class="phone-info">
+                                                            <span class="phone-number">+1 (555) 123-4567</span>
+                                                            <span class="phone-label">Primary Business Line</span>
+                                                        </div>
+                                                        <div class="phone-actions">
+                                                            <button class="btn-small btn-secondary" data-action="edit">Edit</button>
+                                                            <button class="btn-small btn-danger" data-action="remove">Remove</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn-secondary" id="add-phone-number">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                    </svg>
+                                                    Add Phone Number
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- General Settings Section -->
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="3"></circle>
+                                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                            </svg>
+                                            General Settings
+                                        </h3>
+                                        <div class="settings-content">
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">User Preferences</h4>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="auto-save-notes" checked>
+                                                        <span class="checkmark"></span>
+                                                        Auto-save notes and activities
+                                                    </label>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-notifications" checked>
+                                                        <span class="checkmark"></span>
+                                                        Email notifications for new activities
+                                                    </label>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="call-recording-notifications">
+                                                        <span class="checkmark"></span>
+                                                        Notifications for call recordings
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Display Settings</h4>
+                                                <div class="settings-field">
+                                                    <label for="items-per-page">Items per page</label>
+                                                    <select id="items-per-page" class="settings-select">
+                                                        <option value="25">25</option>
+                                                        <option value="50" selected>50</option>
+                                                        <option value="100">100</option>
+                                                    </select>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label for="default-view">Default view</label>
+                                                    <select id="default-view" class="settings-select">
+                                                        <option value="table" selected>Table View</option>
+                                                        <option value="cards">Card View</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </main>
 
                 <aside class="widget-panel" id="widget-panel">
@@ -1680,6 +1838,7 @@
     <script src="scripts/pages/deals.js"></script>
     <script src="scripts/pages/tasks.js"></script>
     <script src="scripts/pages/call-scripts.js"></script>
+    <script src="scripts/pages/settings.js"></script>
     <script src="scripts/global-search.js"></script>
     <script src="scripts/widgets/phone.js"></script>
     <script src="scripts/widgets/notes.js"></script>

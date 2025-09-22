@@ -9962,12 +9962,8 @@ th.drag-over::after {
 #people-table td .company-favicon {
     width: 28px;
     height: 28px;
-    border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-item, #3a3f46);
-    padding: 2px;
-    box-sizing: border-box;
 }
 #people-table td .company-name {
     display: inline-block;
@@ -10002,12 +9998,8 @@ th.drag-over::after {
 #accounts-table .name-cell .company-favicon {
     width: 28px;
     height: 28px;
-    border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-item, #3a3f46);
-    padding: 2px;
-    box-sizing: border-box;
 }
 #accounts-table .name-cell .name-text {
     display: inline-block;
@@ -10337,12 +10329,8 @@ th.drag-over::after {
 #people-table .company-favicon {
     width: 28px;
     height: 28px;
-    border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-item, #3a3f46);
-    padding: 2px;
-    box-sizing: border-box;
 }
 #people-table .company-name {
     display: inline-block;
@@ -10354,16 +10342,12 @@ th.drag-over::after {
     display: inline-block;
     width: 28px;
     height: 28px;
-    border-radius: 50%;
-    background: var(--bg-item);
-    overflow: hidden;
 }
 
 .company-favicon-container .company-favicon {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 50%;
     transition: opacity 0.2s ease;
 }
 
@@ -10376,14 +10360,11 @@ th.drag-over::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg-item);
-    border-radius: 50%;
 }
 
 /* Fallback favicon styling */
 .company-favicon.company-favicon--fallback {
     padding: 0; /* Remove padding for SVG icon */
-    background: var(--bg-item, #3a3f46);
     color: var(--text-primary); /* Ensure icon color is visible */
     display: flex;
     align-items: center;
@@ -13554,4 +13535,278 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     min-width: 80px;
     height: 40px;
     padding: 0 var(--spacing-md);
+}
+
+/* === SETTINGS PAGE STYLES === */
+.settings-sections {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.settings-section {
+    background: var(--bg-container);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.settings-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin: 0;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-light);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.settings-section-title svg {
+    color: var(--orange-primary);
+}
+
+.settings-content {
+    padding: var(--spacing-lg);
+}
+
+.settings-group {
+    margin-bottom: var(--spacing-xl);
+}
+
+.settings-group:last-child {
+    margin-bottom: 0;
+}
+
+.settings-group-title {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: var(--spacing-xs);
+}
+
+.settings-field {
+    margin-bottom: var(--spacing-md);
+}
+
+.settings-field:last-child {
+    margin-bottom: 0;
+}
+
+.settings-field label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.settings-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    transition: var(--transition-fast);
+}
+
+.settings-textarea:focus {
+    outline: none;
+    border-color: var(--orange-primary);
+    box-shadow: 0 0 0 2px var(--orange-muted);
+}
+
+.settings-select {
+    width: 100%;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: var(--transition-fast);
+}
+
+.settings-select:focus {
+    outline: none;
+    border-color: var(--orange-primary);
+    box-shadow: 0 0 0 2px var(--orange-muted);
+}
+
+/* Image upload area */
+.image-upload-area {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.image-upload-area .btn-secondary {
+    width: auto;
+    max-width: 200px;
+    align-self: flex-start;
+}
+
+.image-preview {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.image-preview img {
+    border-radius: var(--border-radius);
+}
+
+/* Phone numbers list */
+.phone-numbers-list {
+    margin-bottom: var(--spacing-md);
+}
+
+.phone-number-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-sm);
+}
+
+.phone-number-item:last-child {
+    margin-bottom: 0;
+}
+
+.phone-number-item.empty-state {
+    justify-content: center;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.phone-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.phone-number {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 16px;
+}
+
+.phone-label {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.phone-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+/* Checkbox styling */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-weight: 400;
+    color: var(--text-primary);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.checkmark {
+    position: relative;
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    transition: var(--transition-fast);
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkmark {
+    background: var(--orange-primary);
+    border-color: var(--orange-primary);
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* Button styling for settings */
+.btn-small {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 12px;
+    height: auto;
+    min-height: 28px;
+}
+
+.btn-danger {
+    background: var(--red-subtle);
+    border-color: var(--red-subtle);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    border-color: #bd2130;
+    color: white;
+}
+
+/* Save button state */
+#save-settings-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#save-settings-btn:disabled:hover {
+    background: var(--orange-primary);
+    border-color: var(--orange-primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .settings-content {
+        padding: var(--spacing-md);
+    }
+    
+    .phone-number-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+    
+    .phone-actions {
+        align-self: flex-end;
+    }
 }
