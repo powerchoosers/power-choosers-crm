@@ -160,6 +160,9 @@ export default async function handler(req, res){
       }
 
       // Create CI transcript with proper channel participants for speaker separation
+      const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+      const webhookUrl = `${base}/api/twilio/conversational-intelligence-webhook`;
+      
       const createArgs = serviceSid ? { 
         serviceSid, 
         channel: { 
@@ -169,7 +172,9 @@ export default async function handler(req, res){
             { role: 'Customer', channel_participant: agentChannelNum === 1 ? 2 : 1 }
           ]
         }, 
-        customerKey: callSid 
+        customerKey: callSid,
+        webhookUrl: webhookUrl,
+        webhookMethod: 'POST'
       } : { 
         channel: { 
           media_properties: { source_sid: recordingSid },
@@ -178,7 +183,9 @@ export default async function handler(req, res){
             { role: 'Customer', channel_participant: agentChannelNum === 1 ? 2 : 1 }
           ]
         }, 
-        customerKey: callSid 
+        customerKey: callSid,
+        webhookUrl: webhookUrl,
+        webhookMethod: 'POST'
       };
       
       const idemKey = (callSid && recordingSid) ? `${callSid}-${recordingSid}` : undefined;
