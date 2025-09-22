@@ -2807,40 +2807,29 @@ window.__pcFaviconHelper = {
         const containerId = `favicon-${cleanDomain.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
         
         return `
-            <div class="company-favicon-container" id="${containerId}">
-                <img class="company-favicon" 
-                     src="${faviconSources[0]}" 
-                     alt="" 
-                     referrerpolicy="no-referrer" 
-                     loading="lazy"
-                     onload="window.__pcFaviconHelper.onFaviconLoad('${containerId}')"
-                     onerror="window.__pcFaviconHelper.onFaviconError('${containerId}', '${cleanDomain}', ${size})" />
-                <span class="company-favicon-fallback" style="display:none">${fallbackIcon}</span>
-            </div>
+            <img class="company-favicon" 
+                 id="${containerId}"
+                 src="${faviconSources[0]}" 
+                 alt="" 
+                 referrerpolicy="no-referrer" 
+                 loading="lazy"
+                 onload="window.__pcFaviconHelper.onFaviconLoad('${containerId}')"
+                 onerror="window.__pcFaviconHelper.onFaviconError('${containerId}', '${cleanDomain}', ${size})" />
         `;
     },
 
     // Handle successful favicon load
     onFaviconLoad: function(containerId) {
-        const container = document.getElementById(containerId);
-        if (container) {
-            container.classList.add('favicon-loaded');
-            const fallback = container.querySelector('.company-favicon-fallback');
-            if (fallback) {
-                fallback.style.display = 'none';
-            }
+        const img = document.getElementById(containerId);
+        if (img) {
+            img.classList.add('favicon-loaded');
         }
     },
 
     // Handle favicon load error and try next source
     onFaviconError: function(containerId, domain, size) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const img = container.querySelector('.company-favicon');
-        const fallback = container.querySelector('.company-favicon-fallback');
-        
-        if (!img || !fallback) return;
+        const img = document.getElementById(containerId);
+        if (!img) return;
 
         // Get current source index from data attribute
         let currentIndex = parseInt(img.dataset.sourceIndex || '0');
@@ -2859,12 +2848,72 @@ window.__pcFaviconHelper = {
             img.dataset.sourceIndex = currentIndex.toString();
             img.src = faviconSources[currentIndex];
         } else {
-            // All sources failed, show fallback
-            container.classList.add('favicon-failed');
-            fallback.style.display = 'block';
+            // All sources failed, show fallback icon
+            img.classList.add('favicon-failed');
             img.style.display = 'none';
+            // Insert fallback icon after the failed image
+            const fallbackIcon = window.__pcAccountsIcon();
+            img.insertAdjacentHTML('afterend', fallbackIcon);
         }
     }
+};
+
+// Global email signature helper function
+window.getEmailSignature = function() {
+    if (window.SettingsPage && window.SettingsPage.getEmailSignature) {
+        return window.SettingsPage.getEmailSignature();
+    }
+    
+    // Fallback: try to get from localStorage
+    try {
+        const savedSettings = localStorage.getItem('crm-settings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            const signature = settings.emailSignature;
+            if (signature && (signature.text || signature.image)) {
+                let signatureHtml = '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
+                
+                if (signature.text) {
+                    const textHtml = signature.text.replace(/\n/g, '<br>');
+                    signatureHtml += `<div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${textHtml}</div>`;
+                }
+                
+                if (signature.image) {
+                    signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: 200px; max-height: 100px; border-radius: 4px;" /></div>`;
+                }
+                
+                signatureHtml += '</div>';
+                return signatureHtml;
+            }
+        }
+    } catch (error) {
+        console.error('Error getting email signature from localStorage:', error);
+    }
+    
+    return '';
+};
+
+// Global email signature text helper function
+window.getEmailSignatureText = function() {
+    if (window.SettingsPage && window.SettingsPage.getEmailSignatureText) {
+        return window.SettingsPage.getEmailSignatureText();
+    }
+    
+    // Fallback: try to get from localStorage
+    try {
+        const savedSettings = localStorage.getItem('crm-settings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            const signature = settings.emailSignature;
+            if (signature && signature.text) {
+                return '\n\n' + signature.text;
+            }
+        }
+    } catch (error) {
+        console.error('Error getting email signature text from localStorage:', error);
+    }
+    
+    return '';
 };
 
 // Initialize CRM when DOM is loaded
