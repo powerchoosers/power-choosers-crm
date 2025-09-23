@@ -68,6 +68,33 @@ class EmailTrackingManager {
             }
 
             const emailRef = this.db.collection('emails').doc(trackingId);
+            
+            // Check if document exists before trying to update
+            const doc = await emailRef.get();
+            if (!doc.exists) {
+                // Silently ignore - this is expected for old emails sent before tracking was fixed
+                return;
+            }
+
+            const emailData = doc.data();
+            const existingOpens = emailData.opens || [];
+            
+            // Check if this user/IP combination has opened the email very recently (within 5 seconds)
+            // This prevents immediate duplicate fires but allows genuine re-opens within 1 minute to be counted
+            const userKey = `${openData.userAgent}_${openData.ip}`;
+            const now = new Date();
+            const fiveSecondsAgo = new Date(now.getTime() - 5000); // 5 seconds ago
+            
+            const recentOpen = existingOpens.find(open => {
+                const openTime = new Date(open.openedAt);
+                return `${open.userAgent}_${open.ip}` === userKey && openTime > fiveSecondsAgo;
+            });
+            
+            if (recentOpen) {
+                console.log('[EmailTracking] Recent open detected, preventing rapid duplicate:', trackingId);
+                return;
+            }
+
             await emailRef.update({
                 opens: window.firebase.firestore.FieldValue.arrayUnion(openData),
                 openCount: window.firebase.firestore.FieldValue.increment(1),
@@ -77,7 +104,10 @@ class EmailTrackingManager {
 
             console.log('[EmailTracking] Email open updated:', trackingId);
         } catch (error) {
-            console.error('[EmailTracking] Error updating email open:', error);
+            // Only log errors that aren't "document not found" errors
+            if (!error.message.includes('No document to update') && !error.message.includes('Document not found')) {
+                console.error('[EmailTracking] Error updating email open:', error);
+            }
         }
     }
 
@@ -700,10 +730,10 @@ class EmailTrackingManager {
      */
     async saveEmailRecord(emailData) {
         try {
-            const { to, subject, content, from, gmailMessageId } = emailData;
+            const { id, to, subject, content, from, gmailMessageId, sentAt, sentVia } = emailData;
             
-            // Generate unique tracking ID
-            const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            // Use the provided tracking ID or generate a new one
+            const trackingId = id || `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
             // Create email record
             const emailRecord = {
@@ -713,19 +743,19 @@ class EmailTrackingManager {
                 content: content,
                 originalContent: content,
                 from: from || 'noreply@powerchoosers.com',
-                sentAt: new Date().toISOString(),
+                sentAt: sentAt || new Date().toISOString(),
                 opens: [],
                 replies: [],
                 openCount: 0,
                 replyCount: 0,
                 status: 'sent',
                 gmailMessageId: gmailMessageId, // Store Gmail's message ID
-                sentVia: 'gmail_api' // Mark as sent via Gmail API
+                sentVia: sentVia || 'gmail_api' // Mark as sent via Gmail API
             };
 
             // Save to Firebase
             await this.db.collection('emails').doc(trackingId).set(emailRecord);
-            console.log('[EmailTracking] Gmail email record saved:', emailRecord);
+            console.log('[EmailTracking] Gmail email record saved:', trackingId);
             
             return { success: true, trackingId };
         } catch (error) {

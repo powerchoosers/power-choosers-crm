@@ -733,13 +733,17 @@
     function acceptCall() {
       if (state.pendingIncoming) {
         console.debug('[TwilioRTC] Accepting incoming call');
+        
+        // Store toast ID before clearing pending state
+        const toastId = state.pendingIncoming.toastId;
+        
         state.pendingIncoming.accept();
         state.connection = state.pendingIncoming;
         state.pendingIncoming = null;
         
         // Remove toast notification
-        if (state.pendingIncoming && state.pendingIncoming.toastId && window.ToastManager) {
-          window.ToastManager.removeToast(state.pendingIncoming.toastId);
+        if (toastId && window.ToastManager) {
+          window.ToastManager.removeToast(toastId);
         }
         
         return true;
@@ -751,12 +755,16 @@
     function declineCall() {
       if (state.pendingIncoming) {
         console.debug('[TwilioRTC] Declining incoming call');
+        
+        // Store toast ID before clearing pending state
+        const toastId = state.pendingIncoming.toastId;
+        
         state.pendingIncoming.reject();
         state.pendingIncoming = null;
         
         // Remove toast notification
-        if (state.pendingIncoming && state.pendingIncoming.toastId && window.ToastManager) {
-          window.ToastManager.removeToast(state.pendingIncoming.toastId);
+        if (toastId && window.ToastManager) {
+          window.ToastManager.removeToast(toastId);
         }
         
         return true;
@@ -2385,11 +2393,21 @@
         try { clearContactDisplay(); } catch(_) {}
         stopLiveCallTimer(card);
         
-        // Clear context on manual hangup
+        // Clear context on manual hangup but preserve important associations for recent calls
         currentCallContext = {
           number: '',
           name: '',
-          isActive: false
+          isActive: false,
+          // Preserve contact/account associations for recent calls display
+          contactId: currentCallContext?.contactId || null,
+          contactName: currentCallContext?.contactName || null,
+          accountId: currentCallContext?.accountId || null,
+          accountName: currentCallContext?.accountName || null,
+          company: currentCallContext?.company || '',
+          city: currentCallContext?.city || '',
+          state: currentCallContext?.state || '',
+          domain: currentCallContext?.domain || '',
+          isCompanyPhone: currentCallContext?.isCompanyPhone || false
         };
         
         // Set reasonable cooldown on manual hangup

@@ -959,9 +959,33 @@
         const thisAcc = String(state.currentAccount?.accountName || state.currentAccount?.name || '').toLowerCase().trim();
         const matchByAccountName = thisAcc && callAcc && callAcc === thisAcc;
         
-        const shouldInclude = matchByAccountId || matchByContactId || matchByToPhone || matchByFromPhone || matchByAccountName;
+        // Additional matching: check if call was made to/from company phone even if not explicitly linked
+        const targetPhone = norm10(c.targetPhone);
+        const matchByTargetPhone = targetPhone && accountNumbers.has(targetPhone);
         
-        // Call included in filtered results
+        const shouldInclude = matchByAccountId || matchByContactId || matchByToPhone || matchByFromPhone || matchByAccountName || matchByTargetPhone;
+        
+        // Debug logging for troubleshooting
+        if (shouldInclude) {
+          console.log('[Account Detail] Recent call included:', {
+            callSid: c.callSid || c.id,
+            accountId: c.accountId,
+            contactId: c.contactId,
+            accountName: c.accountName,
+            contactName: c.contactName,
+            to: c.to,
+            from: c.from,
+            targetPhone: c.targetPhone,
+            matches: {
+              byAccountId: matchByAccountId,
+              byContactId: matchByContactId,
+              byToPhone: matchByToPhone,
+              byFromPhone: matchByFromPhone,
+              byAccountName: matchByAccountName,
+              byTargetPhone: matchByTargetPhone
+            }
+          });
+        }
         
         return shouldInclude;
       });
@@ -1849,30 +1873,57 @@
             const restore = window._accountsReturn || {};
             console.log('[Account Detail] Back button: Returning to accounts page with restore data:', restore);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
-              // Hint Accounts page to avoid forcing page=1 during initial load
+              // Set robust restoration flags with longer timeout
               try { 
                 window.__restoringAccounts = true; 
-                window.__restoringAccountsUntil = Date.now() + 4000; 
+                window.__restoringAccountsUntil = Date.now() + 10000; // Increased to 10 seconds
+                // Store restore data globally for fallback
+                window.__accountsRestoreData = restore;
               } catch (_) {}
+              
               window.crm.navigateToPage('accounts');
+              
               // Dispatch an event for Accounts page to restore UI state when ready
               const start = Date.now();
-              const deadline = start + 2000;
+              const deadline = start + 8000; // Increased to 8 seconds
+              let attempts = 0;
               (function tryRestore(){
-                if (Date.now() > deadline) return; // give up quietly
-                try {
-                  const page = document.getElementById('accounts-page');
-                  if (page && page.offsetParent !== null) {
+                attempts++;
+                if (Date.now() > deadline) {
+                  console.warn('[Account Detail] Back button: Accounts page not ready after 8 seconds, using fallback');
+                  // Fallback: try to restore anyway
+                  try {
                     const ev = new CustomEvent('pc:accounts-restore', { detail: {
                       page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm,
-                      sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page
+                      sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page,
+                      timestamp: Date.now(), fallback: true
                     } });
                     document.dispatchEvent(ev);
-                    console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event (ready)');
+                    console.log('[Account Detail] Back button: Dispatched fallback pc:accounts-restore event');
+                  } catch(_) {}
+                  return;
+                }
+                
+                try {
+                  const page = document.getElementById('accounts-page');
+                  const accountsModule = window.accountsModule;
+                  if (page && page.offsetParent !== null && accountsModule) {
+                    const ev = new CustomEvent('pc:accounts-restore', { detail: {
+                      page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm,
+                      sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page,
+                      timestamp: Date.now()
+                    } });
+                    document.dispatchEvent(ev);
+                    console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event (ready) after', attempts, 'attempts');
+                    
+                    // Clear global restore data after successful dispatch
+                    try { window.__accountsRestoreData = null; } catch(_) {}
                     return;
                   }
                 } catch(_) {}
-                requestAnimationFrame(tryRestore);
+                
+                // Use setTimeout instead of requestAnimationFrame for more reliable timing
+                setTimeout(tryRestore, 100);
               })();
             }
             // Clear navigation markers after successful navigation
@@ -2596,7 +2647,7 @@
               </div>
               <div class="calendar-days" id="calendar-days"></div>
             </div>
-            <div class="form-row">
+            <div class="form-row" style="grid-template-columns: 1fr;">
               <label>Notes
                 <textarea name="notes" class="input-dark" rows="3" placeholder="Add context (optional)"></textarea>
               </label>
@@ -3520,6 +3571,489 @@
       window.crm?.showToast && window.crm.showToast('Failed to create list');
     } finally {
       closeAccountListsPanel();
+    }
+  }
+
+  // ===== Task Popover (mirror Contact Detail) =====
+  let _onAccountTaskPopoverKeydown = null;
+  let _onAccountTaskPopoverOutside = null;
+  let _positionAccountTaskPopover = null;
+
+  function injectAccountTaskPopoverStyles() {
+    if (document.getElementById('account-task-popover-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'account-task-popover-styles';
+    style.textContent = `
+      /* Account Detail: Task popover (mirror Contact Detail exactly) */
+      .task-popover { position: fixed; z-index: 1300; width: min(520px, 92vw); background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); opacity: 0; transform: translateY(-8px); transition: transform 180ms ease, opacity 180ms ease; --arrow-size: 10px; }
+      .task-popover.--show { opacity: 1; transform: translateY(0); }
+
+      .task-popover::before,
+      .task-popover::after { content: ""; position: absolute; width: var(--arrow-size); height: var(--arrow-size); transform: rotate(45deg); pointer-events: none; }
+      .task-popover[data-placement="bottom"]::before { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); top: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
+      .task-popover[data-placement="bottom"]::after  { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); top: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
+      .task-popover[data-placement="top"]::before    { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); bottom: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
+      .task-popover[data-placement="top"]::after     { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); bottom: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
+
+      .task-popover .tp-inner { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+      .task-popover .tp-header { display: flex; align-items: center; justify-content: space-between; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid var(--border-light); }
+      .task-popover .tp-title { font-weight: 700; color: var(--text-primary); font-size: 1rem; }
+      .task-popover .tp-body { display: flex; flex-direction: column; gap: 12px; max-height: min(70vh, 620px); overflow: auto; padding: 8px; }
+      .task-popover .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .task-popover label { display: flex; align-items: center; gap: 8px; position: relative; }
+      .task-popover .input-dark, .task-popover textarea.input-dark { width: 100%; }
+      .task-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
+      .task-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
+
+      /* Fixed positioning for dropdown arrows - no transform on hover */
+      .dropdown-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .dropdown-toggle-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+
+      /* Fixed positioning for calendar icon - no transform on hover */
+      .calendar-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .calendar-toggle-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+
+      .dropdown-toolbar, .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
+      .dropdown-toolbar .dropdown-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .dropdown-toolbar .dropdown-option { display: inline-flex; align-items: center; justify-content: center; padding: 8px 10px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .dropdown-toolbar .dropdown-option:hover { background: var(--bg-secondary); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .dropdown-toolbar .dropdown-option.selected { background: var(--primary-700); color: #fff; }
+
+      .calendar-toolbar header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .calendar-toolbar .month-label { font-weight: 600; }
+      .calendar-toolbar .calendar-nav-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .calendar-toolbar .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .calendar-toolbar .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+      .calendar-toolbar .calendar-grid button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; }
+      .calendar-toolbar .calendar-grid button.today { border-color: var(--orange-primary); }
+      .calendar-toolbar .calendar-grid button.selected { background: var(--primary-700); color: #fff; }
+
+      /* Slide animations for dropdowns and calendar */
+      .dropdown-slide-in { animation: ddIn 160ms ease forwards; }
+      .dropdown-slide-out { animation: ddOut 160ms ease forwards; }
+      .calendar-slide-in { animation: calIn 200ms ease forwards; }
+      .calendar-slide-out { animation: calOut 200ms ease forwards; }
+      @keyframes ddIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes ddOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-6px); } }
+      @keyframes calIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes calOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
+
+      /* Footer list of tasks */
+      .tp-footer { margin-top: 4px; border-top: 1px solid var(--border-light); padding-top: 8px; }
+      .tp-subtitle { color: var(--text-secondary); font-size: .9rem; margin-bottom: 6px; }
+      .tp-task { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-top: 1px solid var(--border-dark); }
+      .tp-task:first-child { border-top: 0; }
+      .tp-task-title { color: var(--text-primary); }
+      .tp-badge { padding: 2px 6px; border-radius: 10px; font-size: 11px; text-transform: capitalize; }
+      .tp-badge.pending { background: var(--grey-700); color: var(--text-inverse); }
+      .tp-badge.completed { background: var(--primary-700); color: #fff; }
+      .tp-task-due { color: var(--text-secondary); font-size: 12px; margin-left: 8px; }
+
+      /* Expanded container when calendar is open - wider for better UX */
+      .task-popover.calendar-expanded { width: min(640px, 94vw); }
+
+      /* Support explicit arrow element (legacy) */
+      .task-popover .arrow { position: absolute; width: var(--arrow-size); height: var(--arrow-size); transform: rotate(45deg); background: var(--bg-card); border-left: 1px solid var(--border-light); border-top: 1px solid var(--border-light); display: none; }
+      .task-popover[data-placement="bottom"] .arrow { display: block; top: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); }
+      .task-popover[data-placement="top"] .arrow { display: block; bottom: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function openAccountTaskPopover(anchorEl) {
+    if (!anchorEl) return;
+    // Close any existing
+    try { document.querySelector('.task-popover')?.remove(); } catch(_) {}
+
+    // Ensure styles are injected FIRST
+    injectAccountTaskPopoverStyles();
+
+    const pop = document.createElement('div');
+    pop.className = 'task-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Create task for account');
+
+    const a = state.currentAccount || {};
+    const company = a.accountName || a.name || a.companyName || 'this account';
+
+    const getNextBusinessDayISO = () => {
+      const d = new Date();
+      let day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      let add = 1;
+      if (day === 5) add = 3; // Friday -> Monday
+      if (day === 6) add = 2; // Saturday -> Monday
+      const nd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + add);
+      const yyyy = nd.getFullYear();
+      const mm = String(nd.getMonth() + 1).padStart(2, '0');
+      const dd = String(nd.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+    const nextBiz = getNextBusinessDayISO();
+    const nextBizDate = new Date(nextBiz + 'T00:00:00');
+
+    pop.innerHTML = `
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="tp-inner">
+        <div class="tp-header">
+          <div class="tp-title">Create Task</div>
+          <button type="button" class="close-btn" id="tp-close" aria-label="Close">×</button>
+        </div>
+        <div class="tp-body">
+          <form id="account-task-form">
+            <div class="form-row">
+              <label>Type
+                <input type="text" name="type" class="input-dark" value="Phone Call" readonly />
+                <button type="button" class="dropdown-toggle-btn" id="type-toggle" aria-label="Open type dropdown">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"></polyline></svg>
+                </button>
+              </label>
+              <label>Priority
+                <input type="text" name="priority" class="input-dark" value="Medium" readonly />
+                <button type="button" class="dropdown-toggle-btn" id="priority-toggle" aria-label="Open priority dropdown">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"></polyline></svg>
+                </button>
+              </label>
+            </div>
+            <div class="type-toolbar" id="type-toolbar" style="display: none;">
+              <div class="dropdown-grid type-grid">
+                <button type="button" class="dropdown-option" data-value="phone-call">Phone Call</button>
+                <button type="button" class="dropdown-option" data-value="manual-email">Manual Email</button>
+                <button type="button" class="dropdown-option" data-value="auto-email">Auto Email</button>
+                <button type="button" class="dropdown-option" data-value="follow-up">Follow-up</button>
+                <button type="button" class="dropdown-option" data-value="demo">Demo</button>
+                <button type="button" class="dropdown-option" data-value="custom-task">Custom Task</button>
+              </div>
+            </div>
+            <div class="priority-toolbar" id="priority-toolbar" style="display: none;">
+              <div class="dropdown-grid priority-grid">
+                <button type="button" class="dropdown-option" data-value="low">Low</button>
+                <button type="button" class="dropdown-option" data-value="medium">Medium</button>
+                <button type="button" class="dropdown-option" data-value="high">High</button>
+              </div>
+            </div>
+            <div class="form-row">
+              <label>Time
+                <input type="text" name="dueTime" class="input-dark" value="10:30 AM" placeholder="10:30 AM" required />
+              </label>
+              <label>Due date
+                <input type="text" name="dueDate" class="input-dark" value="${(nextBizDate.getMonth() + 1).toString().padStart(2, '0')}/${nextBizDate.getDate().toString().padStart(2, '0')}/${nextBizDate.getFullYear()}" readonly />
+                <button type="button" class="calendar-toggle-btn" id="calendar-toggle" aria-label="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                </button>
+              </label>
+            </div>
+            <div class="calendar-toolbar" id="calendar-toolbar" style="display: none;">
+              <div class="calendar-header">
+                <button type="button" class="calendar-nav-btn" id="calendar-prev" aria-label="Previous month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg></button>
+                <div class="calendar-month-year" id="calendar-month-year">September 2025</div>
+                <button type="button" class="calendar-nav-btn" id="calendar-next" aria-label="Next month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg></button>
+              </div>
+              <div class="calendar-weekdays">
+                <div class="calendar-weekday">S</div>
+                <div class="calendar-weekday">M</div>
+                <div class="calendar-weekday">T</div>
+                <div class="calendar-weekday">W</div>
+                <div class="calendar-weekday">T</div>
+                <div class="calendar-weekday">F</div>
+                <div class="calendar-weekday">S</div>
+              </div>
+              <div class="calendar-days" id="calendar-days"></div>
+            </div>
+            <div class="form-row" style="grid-template-columns: 1fr;">
+              <label>Notes
+                <textarea name="notes" class="input-dark" rows="3" placeholder="Add context (optional)"></textarea>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary" id="tp-save">Create Task</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+
+    document.body.appendChild(pop);
+
+    // Position under anchor
+    _positionAccountTaskPopover = function position() {
+      const rect = anchorEl.getBoundingClientRect();
+      const popRect = pop.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pad = 8;
+      const gap = 8;
+      let placement = 'bottom';
+      let top = Math.max(pad, 72);
+      let left = Math.max(pad, (vw - popRect.width) / 2);
+
+      if (rect) {
+        const panelW = popRect.width;
+        const panelH = popRect.height || 320; // fallback before content paints
+        const fitsBottom = rect.bottom + gap + panelH + pad <= vh;
+        const fitsTop = rect.top - gap - panelH - pad >= 0;
+        placement = fitsBottom || !fitsTop ? 'bottom' : 'top';
+
+        if (placement === 'bottom') {
+          top = Math.min(vh - panelH - pad, rect.bottom + gap);
+        } else {
+          top = Math.max(pad, rect.top - gap - panelH);
+        }
+
+        left = Math.round(
+          Math.min(
+            Math.max(pad, rect.left + (rect.width / 2) - (panelW / 2)),
+            vw - panelW - pad
+          )
+        );
+
+        const arrowLeft = Math.round(rect.left + rect.width / 2 - left);
+        pop.style.setProperty('--arrow-left', `${arrowLeft}px`);
+        pop.setAttribute('data-placement', placement);
+      }
+
+      pop.style.top = `${Math.round(top)}px`;
+      pop.style.left = `${Math.round(left)}px`;
+    };
+    _positionAccountTaskPopover();
+    window.addEventListener('resize', _positionAccountTaskPopover, true);
+    window.addEventListener('scroll', _positionAccountTaskPopover, true);
+
+    requestAnimationFrame(() => { pop.classList.add('--show'); });
+
+    // Bind events similar to ContactDetail
+    const form = pop.querySelector('#account-task-form');
+    const closeBtn = pop.querySelector('#tp-close');
+    const typeToggle = pop.querySelector('#type-toggle');
+    const priorityToggle = pop.querySelector('#priority-toggle');
+    const calendarToggle = pop.querySelector('#calendar-toggle');
+    const typeToolbar = pop.querySelector('#type-toolbar');
+    const priorityToolbar = pop.querySelector('#priority-toolbar');
+    const calendarToolbar = pop.querySelector('#calendar-toolbar');
+    const calendarMonthYear = pop.querySelector('#calendar-month-year');
+    const calendarDays = pop.querySelector('#calendar-days');
+    const calendarPrev = pop.querySelector('#calendar-prev');
+    const calendarNext = pop.querySelector('#calendar-next');
+    const dueDateInput = pop.querySelector('input[name="dueDate"]');
+    const typeInput = pop.querySelector('input[name="type"]');
+    const priorityInput = pop.querySelector('input[name="priority"]');
+
+    let currentDate = new Date(nextBizDate.getFullYear(), nextBizDate.getMonth(), 1); // Start calendar at the month of the next business day
+
+    const generateCalendar = () => {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      calendarMonthYear.textContent = `${new Date(year, month).toLocaleString('default', { month: 'long' })} ${year}`;
+      calendarDays.innerHTML = '';
+
+      const firstDayOfMonth = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      for (let i = 0; i < firstDayOfMonth; i++) {
+        const emptyDiv = document.createElement('div');
+        calendarDays.appendChild(emptyDiv);
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayBtn = document.createElement('button');
+        dayBtn.type = 'button';
+        dayBtn.textContent = day;
+        dayBtn.classList.add('calendar-day');
+
+        const currentDay = new Date(year, month, day);
+        if (currentDay.toDateString() === new Date().toDateString()) {
+          dayBtn.classList.add('today');
+        }
+        if (currentDay.toDateString() === nextBizDate.toDateString()) {
+          dayBtn.classList.add('selected');
+        }
+
+        dayBtn.addEventListener('click', () => {
+          const selectedDate = new Date(year, month, day);
+          dueDateInput.value = `${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}/${selectedDate.getDate().toString().padStart(2, '0')}/${selectedDate.getFullYear()}`;
+          closeCalendar();
+        });
+        calendarDays.appendChild(dayBtn);
+      }
+    };
+
+    const openCalendar = () => {
+      generateCalendar();
+      calendarToolbar.style.display = 'block';
+      calendarToolbar.offsetHeight; // Force reflow
+      calendarToolbar.classList.add('calendar-slide-in');
+      pop.classList.add('calendar-expanded');
+      position(); // Reposition popover after expanding
+    };
+
+    const closeCalendar = () => {
+      if (!calendarToolbar) return;
+      calendarToolbar.classList.remove('calendar-slide-in');
+      calendarToolbar.classList.add('calendar-slide-out');
+      
+      const handleEnd = (ev) => {
+        if (ev.target !== calendarToolbar) return;
+        calendarToolbar.removeEventListener('transitionend', handleEnd);
+        calendarToolbar.style.display = 'none';
+        calendarToolbar.classList.remove('calendar-slide-out');
+        pop.classList.remove('calendar-expanded');
+        position(); // Reposition popover after shrinking
+      };
+      calendarToolbar.addEventListener('transitionend', handleEnd);
+      setTimeout(() => {
+        try { calendarToolbar.removeEventListener('transitionend', handleEnd); } catch (_) {}
+        calendarToolbar.style.display = 'none';
+        calendarToolbar.classList.remove('calendar-slide-out');
+        pop.classList.remove('calendar-expanded');
+        position();
+      }, 600);
+    };
+
+    const toggleToolbar = (el, type) => {
+      if (!el) return;
+      const isOpen = el.classList.contains('dropdown-slide-in') || el.classList.contains('calendar-slide-in');
+      const others = [typeToolbar, priorityToolbar, calendarToolbar].filter(x => x && x !== el);
+      others.forEach(x => {
+        x.classList.remove('dropdown-slide-in', 'calendar-slide-in');
+        x.classList.add('dropdown-slide-out'); // Ensure slide-out animation
+        setTimeout(() => { x.style.display = 'none'; x.classList.remove('dropdown-slide-out'); }, 160);
+      });
+      
+      if (isOpen) {
+        el.classList.remove('dropdown-slide-in', 'calendar-slide-in');
+        el.classList.add('dropdown-slide-out');
+        setTimeout(() => { el.style.display = 'none'; el.classList.remove('dropdown-slide-out'); }, 160);
+      } else {
+        el.style.display = 'block';
+        el.offsetHeight; // Force reflow
+        el.classList.add(type === 'calendar' ? 'calendar-slide-in' : 'dropdown-slide-in');
+        if (type === 'calendar') {
+          pop.classList.add('calendar-expanded');
+          generateCalendar();
+        }
+      }
+      position(); // Reposition popover after expanding/shrinking
+    };
+
+    closeBtn?.addEventListener('click', () => {
+      closeAccountTaskPopover();
+      // Restore focus to the trigger button
+      try { anchorEl?.focus(); } catch(_) {}
+    });
+
+    typeToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleToolbar(typeToolbar, 'dropdown'); });
+    priorityToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleToolbar(priorityToolbar, 'dropdown'); });
+    calendarToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleToolbar(calendarToolbar, 'calendar'); });
+
+    calendarPrev?.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); generateCalendar(); });
+    calendarNext?.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); generateCalendar(); });
+
+    // Type option selection
+    typeToolbar?.addEventListener('click', (e) => {
+      const option = e.target.closest('.dropdown-option');
+      if (option) {
+        const value = option.dataset.value;
+        typeInput.value = option.textContent;
+        typeToolbar.querySelectorAll('.dropdown-option').forEach(btn => btn.classList.remove('selected'));
+        option.classList.add('selected');
+        toggleToolbar(typeToolbar, 'dropdown'); // Close dropdown after selection
+      }
+    });
+
+    // Priority option selection
+    priorityToolbar?.addEventListener('click', (e) => {
+      const option = e.target.closest('.dropdown-option');
+      if (option) {
+        const value = option.dataset.value;
+        priorityInput.value = option.textContent;
+        priorityToolbar.querySelectorAll('.dropdown-option').forEach(btn => btn.classList.remove('selected'));
+        option.classList.add('selected');
+        toggleToolbar(priorityToolbar, 'dropdown'); // Close dropdown after selection
+      }
+    });
+
+    // Set initial selected states
+    typeToolbar?.querySelector('[data-value="phone-call"]')?.classList.add('selected');
+    priorityToolbar?.querySelector('[data-value="medium"]')?.classList.add('selected');
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const type = String(fd.get('type') || '').trim();
+      const priority = String(fd.get('priority') || '').trim();
+      const dueDate = String(fd.get('dueDate') || '').trim();
+      const dueTime = String(fd.get('dueTime') || '').trim();
+      const notes = String(fd.get('notes') || '').trim();
+      if (!type || !priority || !dueDate || !dueTime) return;
+      const title = `${type} — ${company}`;
+      const accountId = a.id || '';
+      const newTask = {
+        id: 'task_' + Date.now(),
+        title,
+        account: company,
+        accountId,
+        type,
+        priority,
+        dueDate,
+        dueTime,
+        status: 'pending',
+        notes,
+        createdAt: Date.now()
+      };
+      try {
+        const key = 'userTasks';
+        const existing = JSON.parse(localStorage.getItem(key) || '[]');
+        existing.unshift(newTask);
+        localStorage.setItem(key, JSON.stringify(existing));
+      } catch (_) { /* noop */ }
+      try {
+        const db = window.firebaseDB;
+        if (db) {
+          await db.collection('tasks').add({
+            ...newTask,
+            timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to save task to Firebase:', err);
+      }
+      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) {}
+      try { window.crm && typeof window.crm.loadTodaysTasks === 'function' && window.crm.loadTodaysTasks(); } catch(_) {}
+      try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'account-detail', task: newTask } })); } catch(_) {}
+      closeAccountTaskPopover();
+    });
+
+    _onAccountTaskPopoverOutside = (ev) => {
+      const t = ev.target;
+      if (!pop.contains(t) && t !== anchorEl) {
+        closeAccountTaskPopover();
+      }
+    };
+    _onAccountTaskPopoverKeydown = (ev) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        closeAccountTaskPopover();
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('mousedown', _onAccountTaskPopoverOutside);
+      document.addEventListener('keydown', _onAccountTaskPopoverKeydown);
+    }, 0);
+  }
+
+  function closeAccountTaskPopover() {
+    const ex = document.querySelector('.task-popover');
+    if (ex) {
+      ex.classList.remove('--show');
+      setTimeout(() => {
+        if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+        // Clean up event listeners
+        document.removeEventListener('mousedown', _onAccountTaskPopoverOutside);
+        document.removeEventListener('keydown', _onAccountTaskPopoverKeydown);
+        window.removeEventListener('resize', _positionAccountTaskPopover);
+        window.removeEventListener('scroll', _positionAccountTaskPopover);
+        _onAccountTaskPopoverOutside = null;
+        _onAccountTaskPopoverKeydown = null;
+        _positionAccountTaskPopover = null;
+      }, 400); // Match the 400ms transition duration
     }
   }
 

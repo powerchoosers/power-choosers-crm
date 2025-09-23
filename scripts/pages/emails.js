@@ -615,9 +615,22 @@ class EmailManager {
                             }
                         }
                         
-                        // Insert AI content and preserve signature
-                        editor.innerHTML = html2 + signature;
+                        // Insert AI content and preserve signature at the very end
+                        // Remove any existing signature from AI content first
+                        const cleanHtml2 = html2.replace(/<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/g, '');
+                        
+                        // Place signature after the AI content's closing
+                        let finalContent2 = cleanHtml2;
+                        if (signature) {
+                            // Always place signature at the very end, after any existing content
+                            // Add proper spacing between AI content and signature
+                            finalContent2 = cleanHtml2 + '<br><br>' + signature;
+                        }
+                        
+                        editor.innerHTML = finalContent2;
                         this.sanitizeGeneratedEditor(editor, enrichedRecipient);
+                        // Ensure signature is positioned after the standardized closing
+                        this.moveSignatureToEnd(editor);
                         if (status) status.textContent = 'Draft inserted (prod).';
                     }
                     editor.classList.remove('fade-in');
@@ -689,11 +702,24 @@ class EmailManager {
                     }
                 }
                 
-                // Insert AI content and preserve signature
-                editor.innerHTML = html + signature;
+                // Insert AI content and preserve signature at the very end
+                // Remove any existing signature from AI content first
+                const cleanHtml = html.replace(/<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/g, '');
+                
+                // Place signature after the AI content's closing
+                let finalContent = cleanHtml;
+                if (signature) {
+                    // Always place signature at the very end, after any existing content
+                    // Add proper spacing between AI content and signature
+                    finalContent = cleanHtml + '<br><br>' + signature;
+                }
+                
+                editor.innerHTML = finalContent;
                 
                 // Extra safety: sanitize DOM for duplicate greetings/closings
                 this.sanitizeGeneratedEditor(editor, enrichedRecipient);
+                // Ensure signature is positioned after the standardized closing
+                this.moveSignatureToEnd(editor);
                 if (status) status.textContent = 'Draft inserted.';
             }
 
@@ -1589,13 +1615,12 @@ class EmailManager {
                 senderChip.textContent = 'sender first name';
             }
 
-            // Append a clean closing block at the end: "Best regards," then sender name (chip or token)
-            const pClose = document.createElement('p');
-            pClose.textContent = 'Best regards,';
-            editor.appendChild(pClose);
-            const pName = document.createElement('p');
-            pName.appendChild(senderChip);
-            editor.appendChild(pName);
+            // Append a clean closing block at the end on a tight stack: closing + name
+            const pCloseName = document.createElement('p');
+            pCloseName.appendChild(document.createTextNode('Best regards,'));
+            pCloseName.appendChild(document.createElement('br'));
+            pCloseName.appendChild(senderChip);
+            editor.appendChild(pCloseName);
 
             // Remove empty paragraphs and collapse extra blanks (leave natural spacing to CSS)
             Array.from(editor.querySelectorAll('p')).forEach((p, idx, arr) => {
@@ -1604,6 +1629,32 @@ class EmailManager {
             });
         } catch (e) {
             console.warn('sanitizeGeneratedEditor failed', e);
+        }
+    }
+
+    // Ensure signature block is after the standardized closing lines
+    moveSignatureToEnd(editor) {
+        try {
+            if (!editor) return;
+            const html = editor.innerHTML || '';
+            const sigRegex = /<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/;
+            const match = html.match(sigRegex);
+            if (!match) return; // no signature present
+
+            // Remove signature from current position
+            const withoutSig = html.replace(sigRegex, '');
+
+            // Ensure closing exists (sanitizeGeneratedEditor should have appended one)
+            // Append signature after everything
+            editor.innerHTML = withoutSig + match[0];
+
+            // Remove extra empty paragraphs at the end
+            Array.from(editor.querySelectorAll('p')).forEach(p => {
+                const t = (p.textContent || '').replace(/\u00A0/g, ' ').trim();
+                if (!t) p.remove();
+            });
+        } catch (e) {
+            console.warn('[Email] moveSignatureToEnd failed', e);
         }
     }
 
@@ -2909,11 +2960,7 @@ class EmailManager {
             bccRow.style.display = isVisible ? 'none' : 'flex';
         });
 
-        // Send button
-        const sendBtn = document.getElementById('compose-send');
-        sendBtn?.addEventListener('click', () => {
-            this.sendEmail();
-        });
+        // Send button event listener is already set up in setupEventListeners()
 
         // Initialize editor functionality
         this.initializeComposeEditor();
