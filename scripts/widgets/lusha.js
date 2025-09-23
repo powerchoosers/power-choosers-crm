@@ -997,7 +997,7 @@
         ${descHtml}
         <div style="margin-top:8px;display:flex;gap:8px;width:100%;">${accBtn}${enrBtn}
           <button class="lusha-action-btn" id="lusha-live-search-btn" style="margin-left:auto;">
-            Search (uses credits)
+            Search
           </button>
         </div>
       </div>`;
@@ -1222,7 +1222,24 @@
     const emailList = emailsArr.length ? emailsArr : (contact.email ? [contact.email] : []);
     const phoneList = phonesArr.length ? phonesArr : (contact.phone ? [contact.phone] : []);
 
-    const renderList = (arr, attr) => arr.map(v => `<div class="lusha-value-item">${escapeHtml(v)}</div>`).join('') || `<div class="lusha-value-item">—</div>`;
+    const renderList = (arr, attr) => {
+      if (arr && arr.length > 0) {
+        return arr.map(v => {
+          let content;
+          if (attr === 'email') {
+            content = formatEmailLink(v);
+          } else if (attr === 'phone number') {
+            content = formatPhoneLink(v);
+          } else {
+            content = escapeHtml(v);
+          }
+          return `<div class="lusha-value-item">${content}</div>`;
+        }).join('');
+      } else {
+        // Show placeholder for unrevealed data
+        return `<div class="lusha-placeholder"></div>`;
+      }
+    };
 
     // Get LinkedIn URL for the contact
     const linkedinUrl = contact.linkedin || contact.linkedinUrl || '';
@@ -1252,7 +1269,7 @@
               <button class="lusha-mini-btn" data-reveal="email">${hasAnyEmails ? 'Enrich' : 'Reveal'}</button>
             </div>
             <div class="lusha-field-body" data-email-list>
-              ${renderList(emailList)}
+              ${renderList(emailList, 'email')}
             </div>
           </div>
           <div class="lusha-field">
@@ -1261,7 +1278,7 @@
               <button class="lusha-mini-btn" data-reveal="phones">${hasAnyPhones ? 'Enrich' : 'Reveal'}</button>
             </div>
             <div class="lusha-field-body" data-phones-list>
-              ${renderList(phoneList)}
+              ${renderList(phoneList, 'phone number')}
             </div>
           </div>
           ${location ? `<div class=\"lusha-field\"><div class=\"lusha-field-header\"><div class=\"lusha-label\">Location</div></div><div class=\"lusha-field-body\">${escapeHtml(location)}</div></div>` : ''}
@@ -1615,10 +1632,12 @@
         lushaLog('Using cached data for', which, '- no API call needed');
         if (which === 'email') {
           const emails = Array.isArray(contact.emails) ? contact.emails.map(e => e.address || e).filter(Boolean) : [];
-          wrap.innerHTML = emails.length ? emails.map(v => `<div class="lusha-value-item">${escapeHtml(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          const newContent = emails.length ? emails.map(v => `<div class="lusha-value-item">${formatEmailLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          animateRevealContent(wrap, newContent);
         } else if (which === 'phones') {
           const phones = Array.isArray(contact.phones) ? contact.phones.map(p => p.number || p).filter(Boolean) : [];
-          wrap.innerHTML = phones.length ? phones.map(v => `<div class="lusha-value-item">${escapeHtml(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          const newContent = phones.length ? phones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          animateRevealContent(wrap, newContent);
         }
         
         // Update button to show "Enrich" instead of "Reveal"
@@ -1706,7 +1725,8 @@
         const wrap = container.querySelector('[data-email-list]');
         if (wrap) {
           const emails = Array.isArray(enriched.emails) ? enriched.emails.map(e => e.address).filter(Boolean) : [];
-          wrap.innerHTML = emails.length ? emails.map(v => `<div class="lusha-value-item">${escapeHtml(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          const newContent = emails.length ? emails.map(v => `<div class="lusha-value-item">${formatEmailLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          animateRevealContent(wrap, newContent);
           
           // Update contact object with revealed emails
           contact.emails = enriched.emails || [];
@@ -1718,7 +1738,8 @@
         const wrap = container.querySelector('[data-phones-list]');
         if (wrap) {
           const phones = Array.isArray(enriched.phones) ? enriched.phones.map(p => p.number).filter(Boolean) : [];
-          wrap.innerHTML = phones.length ? phones.map(v => `<div class="lusha-value-item">${escapeHtml(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          const newContent = phones.length ? phones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
+          animateRevealContent(wrap, newContent);
           
           // Update contact object with revealed phones
           contact.phones = enriched.phones || [];
@@ -2461,6 +2482,18 @@
         background: var(--bg-card);
         overflow: hidden;
         word-wrap: break-word;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease;
+        cursor: pointer;
+        position: relative;
+        z-index: 1;
+      }
+      
+      #lusha-widget .lusha-contact-item:hover {
+        transform: translateY(-4px) scale(1.01) !important;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2) !important;
+        z-index: 100 !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        background: var(--bg-card) !important;
       }
       
       /* Contact Header */
@@ -2546,6 +2579,8 @@
         flex-direction: column;
         gap: 3px;
         min-height: 20px;
+        transition: height 0.3s ease;
+        overflow: hidden;
       }
       
       #lusha-widget .lusha-value-item {
@@ -2555,6 +2590,69 @@
         white-space: normal;
         line-height: 1.4;
         padding: 2px 0;
+      }
+      
+      /* Clickable phone and email links */
+      #lusha-widget .lusha-value-item a {
+        color: var(--text-primary);
+        text-decoration: none;
+        cursor: pointer;
+        transition: color 0.2s ease;
+      }
+      
+      #lusha-widget .lusha-value-item a:hover {
+        color: var(--text-inverse);
+        text-decoration: none;
+      }
+      
+      /* Placeholder for unrevealed data */
+      #lusha-widget .lusha-placeholder {
+        font-size: 14px;
+        color: transparent;
+        word-break: break-word;
+        white-space: normal;
+        line-height: 1.4;
+        padding: 2px 0;
+        border: 1px dashed var(--text-muted);
+        border-radius: 4px;
+        background: transparent;
+        opacity: 0.8;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        transition: all 0.3s ease;
+        margin: 2px 0;
+      }
+      
+      /* Animation classes */
+      #lusha-widget .lusha-reveal-in {
+        animation: lushaRevealIn 0.4s ease-out forwards;
+      }
+      
+      #lusha-widget .lusha-placeholder-out {
+        animation: lushaPlaceholderOut 0.3s ease-in forwards;
+      }
+      
+      @keyframes lushaRevealIn {
+        0% {
+          opacity: 0;
+          transform: translateY(8px) scale(0.95);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      
+      @keyframes lushaPlaceholderOut {
+        0% {
+          opacity: 0.6;
+          transform: scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(0.95);
+        }
       }
       
       /* Buttons */
@@ -2728,10 +2826,13 @@
       #lusha-widget .lusha-usage-wrap {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 0;
         margin: 10px 0 0 0;
         color: var(--text-muted);
         font-size: 12px;
+      }
+      #lusha-widget #lusha-usage-text {
+        margin-left: 8px;
       }
       #lusha-widget .lusha-usage-bar {
         position: relative;
@@ -2741,6 +2842,7 @@
         border: 1px solid var(--border-light);
         flex: 1;
         overflow: hidden;
+        margin-left: 8px;
       }
       #lusha-widget .lusha-usage-fill {
         position: absolute;
@@ -2752,7 +2854,10 @@
 
       /* Layout to keep usage footer stuck to bottom of results */
       #lusha-widget .lusha-results { display: flex; flex-direction: column; }
-      #lusha-widget #lusha-contacts-list { flex: 1 1 auto; }
+      #lusha-widget #lusha-contacts-list { 
+        flex: 1 1 auto; 
+        perspective: 1000px;
+      }
       #lusha-widget .lusha-usage-footer { margin-top: 10px; }
     `;
     document.head.appendChild(style);
@@ -2766,6 +2871,21 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  // Helper function to format phone numbers as clickable links
+  function formatPhoneLink(phone) {
+    if (!phone) return '—';
+    const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
+    const displayPhone = escapeHtml(phone);
+    return `<a href="tel:${cleanPhone}" title="Click to call">${displayPhone}</a>`;
+  }
+
+  // Helper function to format emails as clickable links
+  function formatEmailLink(email) {
+    if (!email) return '—';
+    const displayEmail = escapeHtml(email);
+    return `<a href="mailto:${displayEmail}" title="Click to email">${displayEmail}</a>`;
   }
 
   function showCreditsUsed(credits, type) {
@@ -2881,6 +3001,101 @@ function crossfadeToResults(){
   } catch(_) {}
 }
 
+// Helper function to animate placeholder out and content in
+function animateRevealContent(container, newContent) {
+  try {
+    const placeholder = container.querySelector('.lusha-placeholder');
+    const contactCard = container.closest('.lusha-contact-item');
+    
+    if (placeholder) {
+      // Store current height for smooth transition
+      const currentHeight = container.offsetHeight;
+      
+      // Animate placeholder out
+      placeholder.classList.add('lusha-placeholder-out');
+      
+      // After placeholder animation, replace with new content
+      setTimeout(() => {
+        // Temporarily set height to prevent layout jump
+        container.style.height = currentHeight + 'px';
+        container.style.transition = 'height 0.3s ease';
+        
+        container.innerHTML = newContent;
+        
+        // Calculate new height after content is added
+        const newHeight = container.offsetHeight;
+        
+        // Animate to new height
+        requestAnimationFrame(() => {
+          container.style.height = newHeight + 'px';
+        });
+        
+        // Animate new content in
+        const newItems = container.querySelectorAll('.lusha-value-item');
+        newItems.forEach((item, index) => {
+          item.style.opacity = '0';
+          item.style.transform = 'translateY(8px) scale(0.95)';
+          
+          setTimeout(() => {
+            item.classList.add('lusha-reveal-in');
+          }, index * 100); // Stagger animation for multiple items
+        });
+        
+        // Remove height constraint after animation
+        setTimeout(() => {
+          container.style.height = '';
+          container.style.transition = '';
+        }, 300);
+        
+        // Add subtle card animation if contact card exists
+        if (contactCard) {
+          contactCard.style.transition = 'transform 0.3s ease, box-shadow 0.3s ease';
+          contactCard.style.transform = 'scale(1.01)';
+          contactCard.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15)';
+          
+          setTimeout(() => {
+            contactCard.style.transform = '';
+            contactCard.style.boxShadow = '';
+            contactCard.style.transition = '';
+          }, 300);
+        }
+        
+      }, 300); // Match placeholder-out animation duration
+    } else {
+      // No placeholder, just replace content with smooth height transition
+      const currentHeight = container.offsetHeight;
+      container.style.height = currentHeight + 'px';
+      container.style.transition = 'height 0.3s ease';
+      
+      container.innerHTML = newContent;
+      
+      const newHeight = container.offsetHeight;
+      requestAnimationFrame(() => {
+        container.style.height = newHeight + 'px';
+      });
+      
+      const newItems = container.querySelectorAll('.lusha-value-item');
+      newItems.forEach((item, index) => {
+        item.style.opacity = '0';
+        item.style.transform = 'translateY(8px) scale(0.95)';
+        
+        setTimeout(() => {
+          item.classList.add('lusha-reveal-in');
+        }, index * 100);
+      });
+      
+      // Remove height constraint after animation
+      setTimeout(() => {
+        container.style.height = '';
+        container.style.transition = '';
+      }, 300);
+    }
+  } catch(e) {
+    console.warn('Animation failed, falling back to direct replacement:', e);
+    container.innerHTML = newContent;
+  }
+}
+
 // Helper function to set credit total (can be called manually if needed)
 function setLushaCreditTotal(total) {
   try {
@@ -2917,20 +3132,54 @@ function fixLushaCreditDisplay() {
       const currentText = txt.textContent;
       const usedMatch = currentText.match(/(\d+)/);
       const used = usedMatch ? parseInt(usedMatch[1]) : 0;
-      const total = 600;
+      
+      // Calculate total: if we have 323 used and 277 remaining, total = 600
+      // This matches your 600-credit plan
+      const total = 600; // Your plan total
       const pct = Math.round((used / total) * 100);
       
       txt.textContent = `${used}/${total}`;
       if (fill) fill.style.width = pct + '%';
       if (lab) lab.textContent = 'Credits';
       
-      console.log('[Lusha Usage] Quick fix applied - used:', used, 'total:', total, 'pct:', pct);
+      console.log('[Lusha Usage] Quick fix applied - used:', used, 'total:', total, 'pct:', pct + '%');
     }
   } catch(e) {
     console.error('[Lusha Usage] Quick fix failed:', e);
   }
 }
 window.fixLushaCreditDisplay = fixLushaCreditDisplay;
+
+// Test function to verify hover effects are working
+function testLushaHoverEffects() {
+  const contactItems = document.querySelectorAll('.lusha-contact-item');
+  console.log('Found', contactItems.length, 'contact items');
+  
+  if (contactItems.length > 0) {
+    const firstItem = contactItems[0];
+    console.log('Testing hover effect on first contact item...');
+    
+    // Manually apply the hover styles
+    firstItem.style.transform = 'translateY(-20px) scale(1.05)';
+    firstItem.style.boxShadow = '0 20px 50px rgba(0, 0, 0, 0.4)';
+    firstItem.style.zIndex = '1000';
+    firstItem.style.border = '3px solid #ff6b35';
+    
+    console.log('Applied test styles. You should see the card lift up with an orange border.');
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      firstItem.style.transform = '';
+      firstItem.style.boxShadow = '';
+      firstItem.style.zIndex = '';
+      firstItem.style.border = '';
+      console.log('Removed test styles.');
+    }, 3000);
+  } else {
+    console.log('No contact items found. Make sure the Lusha widget is open and has results.');
+  }
+}
+window.testLushaHoverEffects = testLushaHoverEffects;
 
 // Fetch and render live Lusha usage bar (rate-limited server endpoint)
 async function renderUsageBar(){
@@ -2949,8 +3198,8 @@ async function renderUsageBar(){
     const resp = await fetch(`${base}/api/lusha/usage`, { method: 'GET' });
     if (!resp.ok) {
       console.log('[Lusha Usage] API request failed:', resp.status, resp.statusText);
-      // Fallback: show configured total with 0 used if API fails
-      const fallbackLimit = configuredTotal || 600;
+      // Fallback: show hard-coded 600 total with 0 used if API fails
+      const fallbackLimit = 600;
       const fallbackUsed = 0;
       const fallbackPct = 0;
       
@@ -2971,7 +3220,7 @@ async function renderUsageBar(){
         wrap.id = 'lusha-usage-wrap';
         wrap.className = 'lusha-usage-wrap';
         wrap.innerHTML = `
-          <div id="lusha-usage-label" style="min-width:120px;">Credits</div>
+          <div id="lusha-usage-label">Credits</div>
           <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
           <div id="lusha-usage-text">–</div>
         `;
@@ -3039,29 +3288,12 @@ async function renderUsageBar(){
     let limit;
     let used;
 
-    // Always prefer configured total if we have it, even if API doesn't return total
-    console.log('[Lusha Usage] DEBUG - configuredTotal:', configuredTotal, 'creditsTotal:', creditsTotal, 'creditsUsed:', creditsUsed);
+    // Hard code to always show Usage/600 format
+    limit = 600; // Your 600-credit plan
+      used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
+      label = 'Credits';
     
-    if (configuredTotal && configuredTotal > 0) {
-      limit = configuredTotal;
-      used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
-      label = 'Credits';
-      console.log('[Lusha Usage] Using configured total mode - limit:', limit, 'used:', used, 'configuredTotal:', configuredTotal);
-    } else if (creditsTotal != null) {
-      // If total is known but used is missing, assume 0 rather than falling back to daily headers
-      limit = creditsTotal;
-      used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
-      label = 'Credits';
-      console.log('[Lusha Usage] Using API credits mode - limit:', limit, 'used:', used);
-    } else {
-      // Fallback: show requests today (rate-limit headers)
-      const dailyLimit = toNum(usage.dailyLimit) ?? toNum(headers.dailyLimit) ?? 0;
-      const dailyUsed = toNum(usage.dailyUsage) ?? toNum(headers.dailyUsage) ?? 0;
-      const dailyRemaining = toNum(usage.dailyRemaining) ?? toNum(headers.dailyRemaining) ?? (dailyLimit ? (dailyLimit - dailyUsed) : 0);
-      limit = dailyLimit > 0 ? dailyLimit : (dailyUsed + dailyRemaining);
-      used = dailyUsed;
-      label = 'Requests today';
-    }
+    console.log('[Lusha Usage] Hard coded display - used:', used, 'total:', limit, 'format: Usage/600');
 
     const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
 
@@ -3082,7 +3314,7 @@ async function renderUsageBar(){
       wrap.id = 'lusha-usage-wrap';
       wrap.className = 'lusha-usage-wrap';
       wrap.innerHTML = `
-        <div id="lusha-usage-label" style="min-width:120px;">${label}</div>
+          <div id="lusha-usage-label">${label}</div>
         <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
         <div id="lusha-usage-text">–</div>
       `;
