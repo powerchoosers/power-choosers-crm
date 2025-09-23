@@ -530,10 +530,7 @@
                       btn.classList.add('btn-primary');
                       // Disable button briefly to prevent accidental immediate redial
                       btn.disabled = true;
-                      setTimeout(() => { 
-                        btn.disabled = false; 
-                        console.debug('[Phone] DISCONNECT: Button re-enabled after 2s cooldown');
-                      }, 2000);
+                      setTimeout(() => { btn.disabled = false; }, 200);
                     }
                     const input = widget.querySelector('.phone-display');
                     if (input) input.value = '';
@@ -547,28 +544,18 @@
                   setInCallUI(false);
                   console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
                   
-                  // CRITICAL: Terminate any active server-side call to prevent callback loops
+                  // Fire-and-forget termination of any active server-side call to avoid UI stall
                   if (window.currentServerCallSid) {
                     try {
                       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-                      console.debug('[Phone] DISCONNECT: Terminating server call SID:', window.currentServerCallSid);
-                      
-                      const terminateResponse = await fetch(`${base}/api/twilio/hangup`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callSid: window.currentServerCallSid })
-                      });
-                      
-                      if (terminateResponse.ok) {
-                        console.debug('[Phone] DISCONNECT: Server call terminated successfully');
-                      } else {
-                        console.warn('[Phone] DISCONNECT: Failed to terminate server call:', terminateResponse.status);
-                      }
-                    } catch (e) {
-                      console.error('[Phone] DISCONNECT: Error terminating server call:', e);
-                    } finally {
-                      window.currentServerCallSid = null;
-                    }
+                      const sid = window.currentServerCallSid;
+                      console.debug('[Phone] DISCONNECT: Terminating server call SID (async):', sid);
+                      fetch(`${base}/api/twilio/hangup`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ callSid: sid })
+                      }).catch(()=>{});
+                    } catch (_) {}
+                    window.currentServerCallSid = null;
                   }
                   
                   // Release the input device to avoid the red recording symbol
@@ -2871,17 +2858,20 @@
     }
     window.lastCallNumberTime = now;
     
-    // Set current call context - merge to preserve fields set by setCallContext()
+    // Set current call context - merge to preserve fields set by setCallContext(),
+    // but if we are in explicit company mode, clear stale contact fields
+    const forceCompanyMode = currentCallContext?.isCompanyPhone === true && (!currentCallContext?.contactId);
     currentCallContext = {
       ...currentCallContext,
       number: number,
       name: contactName || currentCallContext?.name || '',
       company: contactCompany || currentCallContext?.company || '',
-      // keep account/contact linkage as-is if already set
+      // keep account linkage as-is if already set
       accountId: currentCallContext?.accountId || null,
       accountName: currentCallContext?.accountName || null,
-      contactId: currentCallContext?.contactId || null,
-      contactName: currentCallContext?.contactName || null,
+      // clear contact linkage if forcing company mode
+      contactId: forceCompanyMode ? null : (currentCallContext?.contactId || null),
+      contactName: forceCompanyMode ? '' : (currentCallContext?.contactName || null),
       // preserve city/state/domain/isCompanyPhone if they were set previously
       city: currentCallContext?.city || '',
       state: currentCallContext?.state || '',
@@ -3014,6 +3004,8 @@
       currentCallContext.state = '';
       currentCallContext.domain = '';
       currentCallContext.isCompanyPhone = false;
+      currentCallContext.suggestedContactId = null;
+      currentCallContext.suggestedContactName = '';
       
       // Set new context
       currentCallContext.accountId = ctx.accountId || null;
@@ -3026,6 +3018,8 @@
       if (ctx.state) currentCallContext.state = ctx.state;
       if (ctx.domain) currentCallContext.domain = ctx.domain;
       if (ctx.isCompanyPhone !== undefined) currentCallContext.isCompanyPhone = ctx.isCompanyPhone;
+      if (ctx.suggestedContactId) currentCallContext.suggestedContactId = ctx.suggestedContactId;
+      if (ctx.suggestedContactName) currentCallContext.suggestedContactName = ctx.suggestedContactName;
       
       console.debug('[Phone Widget] Call context updated:', currentCallContext);
       console.log('[Phone Widget][DEBUG] setCallContext called with:', {

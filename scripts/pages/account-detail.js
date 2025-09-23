@@ -142,6 +142,80 @@
     document.head.appendChild(style);
   }
 
+  function injectAccountTaskPopoverStyles() {
+    if (document.getElementById('account-task-popover-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'account-task-popover-styles';
+    style.textContent = `
+      /* Account Detail: Task popover (mirror Contact Detail) */
+      .task-popover { position: fixed; z-index: 1300; width: min(520px, 92vw); background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); opacity: 0; transform: translateY(-8px); transition: transform 180ms ease, opacity 180ms ease; --arrow-size: 10px; }
+      .task-popover.--show { opacity: 1; transform: translateY(0); }
+
+      .task-popover::before,
+      .task-popover::after { content: ""; position: absolute; width: var(--arrow-size); height: var(--arrow-size); transform: rotate(45deg); pointer-events: none; }
+      .task-popover[data-placement="bottom"]::before { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); top: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
+      .task-popover[data-placement="bottom"]::after  { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); top: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
+      .task-popover[data-placement="top"]::before    { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); bottom: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
+      .task-popover[data-placement="top"]::after     { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); bottom: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
+
+      .task-popover .tp-inner { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+      .task-popover .tp-header { display: flex; align-items: center; justify-content: space-between; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid var(--border-light); }
+      .task-popover .tp-title { font-weight: 700; color: var(--text-primary); font-size: 1rem; }
+      .task-popover .tp-body { display: flex; flex-direction: column; gap: 12px; max-height: min(70vh, 620px); overflow: auto; padding: 8px; }
+      .task-popover .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .task-popover label { display: flex; align-items: center; gap: 8px; position: relative; }
+      .task-popover .input-dark, .task-popover textarea.input-dark { width: 100%; }
+      .task-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
+      .task-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
+
+      .dropdown-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .dropdown-toggle-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); transform: translateY(calc(-50% - 1px)); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+
+      .dropdown-toolbar, .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
+      .dropdown-toolbar .dropdown-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .dropdown-toolbar .dropdown-option { display: inline-flex; align-items: center; justify-content: center; padding: 8px 10px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .dropdown-toolbar .dropdown-option:hover { background: var(--bg-secondary); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .dropdown-toolbar .dropdown-option.selected { background: var(--primary-700); color: #fff; }
+
+      .calendar-toolbar header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .calendar-toolbar .month-label { font-weight: 600; }
+      .calendar-toolbar .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+      .calendar-toolbar .calendar-grid button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; }
+      .calendar-toolbar .calendar-grid button.today { border-color: var(--accent-color); }
+      .calendar-toolbar .calendar-grid button.selected { background: var(--primary-700); color: #fff; }
+
+      /* Slide animations for dropdowns and calendar */
+      .dropdown-slide-in { animation: ddIn 160ms ease forwards; }
+      .dropdown-slide-out { animation: ddOut 160ms ease forwards; }
+      .calendar-slide-in { animation: calIn 200ms ease forwards; }
+      .calendar-slide-out { animation: calOut 200ms ease forwards; }
+      @keyframes ddIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes ddOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-6px); } }
+      @keyframes calIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes calOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
+
+      /* Footer list of tasks */
+      .tp-footer { margin-top: 4px; border-top: 1px solid var(--border-light); padding-top: 8px; }
+      .tp-subtitle { color: var(--text-secondary); font-size: .9rem; margin-bottom: 6px; }
+      .tp-task { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-top: 1px solid var(--border-dark); }
+      .tp-task:first-child { border-top: 0; }
+      .tp-task-title { color: var(--text-primary); }
+      .tp-badge { padding: 2px 6px; border-radius: 10px; font-size: 11px; text-transform: capitalize; }
+      .tp-badge.pending { background: var(--grey-700); color: var(--text-inverse); }
+      .tp-badge.completed { background: var(--primary-700); color: #fff; }
+      .tp-task-due { color: var(--text-secondary); font-size: 12px; margin-left: 8px; }
+
+      /* Expanded container when calendar is open */
+      .task-popover.calendar-expanded { width: min(620px, 94vw); }
+
+      /* Support explicit arrow element (legacy) */
+      .task-popover .arrow { position: absolute; width: var(--arrow-size); height: var(--arrow-size); transform: rotate(45deg); background: var(--bg-card); border-left: 1px solid var(--border-light); border-top: 1px solid var(--border-light); display: none; }
+      .task-popover[data-placement="bottom"] .arrow { display: block; top: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); }
+      .task-popover[data-placement="top"] .arrow { display: block; bottom: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); }
+    `;
+    document.head.appendChild(style);
+  }
+
   function injectAccountHeaderStyles() {
     if (document.getElementById('account-detail-header-styles')) return;
     const style = document.createElement('style');
@@ -917,22 +991,12 @@
         const pretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
         c.direction = c.direction || direction;
         c.counterpartyPretty = c.counterpartyPretty || pretty;
-        // Fill missing account/contact names from current context
+        // Fill missing account name from current account only; do not guess contact
         try {
           if (!c.accountName) {
             const a = state.currentAccount || {};
             const acctName = a.accountName || a.name || a.companyName || '';
             if (acctName) c.accountName = acctName;
-          }
-          if (!c.contactName && typeof window.getPeopleData === 'function') {
-            // pick a recent contact for this account
-            const people = window.getPeopleData() || [];
-            const list = people.filter(p=> p && (p.accountId===accountId || p.accountID===accountId));
-            if (list.length) {
-              const p = list[0];
-              const full = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
-              if (full) c.contactName = full;
-            }
           }
         } catch(_) {}
         try { console.log('[Account Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
@@ -1114,12 +1178,14 @@
         window.ToastManager.showToast({
           type: 'info',
           title: 'Processing Call',
-          message: 'Starting conversational intelligence analysis...'
+          message: 'Starting conversational intelligence analysis...',
+          sound: false
         });
       }
 
-      // Call the CI request endpoint
-      const response = await fetch('/api/twilio/ci-request', {
+      // Call the CI request endpoint (always via API base URL)
+      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+      const response = await fetch(`${base}/api/twilio/ci-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1775,17 +1841,30 @@
             console.log('[Account Detail] Back button: Returning to accounts page with restore data:', restore);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               // Hint Accounts page to avoid forcing page=1 during initial load
-              try { window.__restoringAccounts = true; } catch (_) {}
+              try { 
+                window.__restoringAccounts = true; 
+                window.__restoringAccountsUntil = Date.now() + 4000; 
+              } catch (_) {}
               window.crm.navigateToPage('accounts');
-              // Dispatch an event for Accounts page to restore UI state
-              setTimeout(() => {
+              // Dispatch an event for Accounts page to restore UI state when ready
+              const start = Date.now();
+              const deadline = start + 2000;
+              (function tryRestore(){
+                if (Date.now() > deadline) return; // give up quietly
                 try {
-                  const ev = new CustomEvent('pc:accounts-restore', { detail: {
-                    page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm } });
-                  document.dispatchEvent(ev);
-                  console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event');
+                  const page = document.getElementById('accounts-page');
+                  if (page && page.offsetParent !== null) {
+                    const ev = new CustomEvent('pc:accounts-restore', { detail: {
+                      page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm,
+                      sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page
+                    } });
+                    document.dispatchEvent(ev);
+                    console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event (ready)');
+                    return;
+                  }
                 } catch(_) {}
-              }, 60);
+                requestAnimationFrame(tryRestore);
+              })();
             }
             // Clear navigation markers after successful navigation
             window._accountNavigationSource = null;
@@ -2343,6 +2422,25 @@
         try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) {}
         break;
       }
+      case 'maps': {
+        // Toggle Google Maps: if open, close; else open for this account
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen()) {
+              if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
+            } else if (typeof api.openMapsForAccount === 'function') {
+              api.openMapsForAccount(accountId); return;
+            } else if (typeof api.openMaps === 'function') {
+              // Fallback to contact version with account prefix
+              api.openMaps('account-' + accountId); return;
+            }
+          } catch (_) { /* noop */ }
+        }
+        console.log('Widget: Google Maps for account', accountId);
+        try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) {}
+        break;
+      }
       default:
         console.log('Unknown widget action:', which, 'for account', accountId);
     }
@@ -2407,6 +2505,8 @@
     if (!anchorEl) return;
     // Close any existing
     try { document.querySelector('.task-popover')?.remove(); } catch(_) {}
+    // Ensure styles are present before first render (so it doesn't rely on Contact Detail injection)
+    try { injectAccountTaskPopoverStyles(); } catch(_) {}
 
     const pop = document.createElement('div');
     pop.className = 'task-popover';
@@ -2511,6 +2611,7 @@
       const top = Math.round(window.scrollY + rect.bottom + 10);
       pop.style.top = `${top}px`;
       pop.style.left = `${clampedLeft}px`;
+      try { pop.style.setProperty('--arrow-left', `${Math.round(anchorCenter - clampedLeft)}px`); pop.setAttribute('data-placement','bottom'); } catch(_) {}
       const arrow = pop.querySelector('.arrow');
       if (arrow) {
         const anchorCenterRelativeToPopover = anchorCenter - clampedLeft;
@@ -2530,6 +2631,9 @@
     const priorityToggle = pop.querySelector('#priority-toggle');
     const typeToolbar = pop.querySelector('#type-toolbar');
     const priorityToolbar = pop.querySelector('#priority-toolbar');
+    const calendarToggle = pop.querySelector('#calendar-toggle');
+    const calendarToolbar = pop.querySelector('#calendar-toolbar');
+    const dateInput = pop.querySelector('input[name="dueDate"]');
     const toggleToolbar = (el) => {
       if (!el) return;
       const isOpen = el.classList.contains('dropdown-slide-in');
@@ -2539,6 +2643,38 @@
     };
     typeToggle?.addEventListener('click', () => toggleToolbar(typeToolbar));
     priorityToggle?.addEventListener('click', () => toggleToolbar(priorityToolbar));
+
+    // Calendar dropdown (mirrors Contact Detail behavior)
+    let calDate = new Date();
+    function toMDY(d){ const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); const yyyy=d.getFullYear(); return `${mm}/${dd}/${yyyy}`; }
+    function renderCalendar(){
+      if (!calendarToolbar) return;
+      const y = calDate.getFullYear(); const m = calDate.getMonth();
+      const first = new Date(y, m, 1); const last = new Date(y, m+1, 0);
+      const start = first.getDay(); const total = last.getDate();
+      const todayISO = new Date().toISOString().split('T')[0];
+      const label = first.toLocaleString(undefined, { month:'long', year:'numeric' });
+      const days = [];
+      for (let i=0;i<start;i++) days.push('<span></span>');
+      for (let d=1; d<=total; d++){
+        const iso = new Date(y,m,d).toISOString().split('T')[0];
+        const isToday = iso === todayISO ? 'today' : '';
+        days.push(`<button type="button" data-iso="${iso}" class="${isToday}">${d}</button>`);
+      }
+      calendarToolbar.innerHTML = `
+        <header><button type="button" id="acct-cal-prev">◀</button><div class="month-label">${label}</div><button type="button" id="acct-cal-next">▶</button></header>
+        <div class="calendar-grid">${days.join('')}</div>`;
+      calendarToolbar.querySelector('#acct-cal-prev')?.addEventListener('click', ()=>{ calDate = new Date(y, m-1, 1); renderCalendar(); });
+      calendarToolbar.querySelector('#acct-cal-next')?.addEventListener('click', ()=>{ calDate = new Date(y, m+1, 1); renderCalendar(); });
+      calendarToolbar.querySelectorAll('.calendar-grid button[data-iso]')?.forEach(btn=>{
+        btn.addEventListener('click', ()=>{ try { const sel = new Date(btn.getAttribute('data-iso')); dateInput.value = toMDY(sel); closeCalendar(); } catch(_){} });
+      });
+    }
+    function openCalendar(){ if (!calendarToolbar) return; renderCalendar(); calendarToolbar.style.display='block'; calendarToolbar.offsetHeight; calendarToolbar.classList.add('calendar-slide-in'); pop.classList.add('calendar-expanded'); }
+    function closeCalendar(){ if (!calendarToolbar) return; calendarToolbar.classList.remove('calendar-slide-in'); calendarToolbar.classList.add('calendar-slide-out'); setTimeout(()=>{ calendarToolbar.style.display='none'; calendarToolbar.classList.remove('calendar-slide-out'); }, 200); pop.classList.remove('calendar-expanded'); }
+    function toggleCalendar(){ const visible = calendarToolbar && calendarToolbar.style.display === 'block'; if (visible) closeCalendar(); else openCalendar(); }
+    calendarToggle?.addEventListener('click', (e)=>{ e.stopPropagation(); toggleCalendar(); });
+    calendarToolbar?.addEventListener('mousedown', (e)=> e.stopPropagation());
     pop.addEventListener('click', (e) => {
       const opt = e.target.closest?.('.dropdown-option');
       if (!opt) return;
@@ -2603,6 +2739,12 @@
       try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'account-detail', task: newTask } })); } catch(_) {}
       try { pop.remove(); } catch(_) {}
     });
+
+    // Outside click and Escape close (and close toolbars)
+    const onOutside = (ev) => { if (!pop.contains(ev.target) && ev.target !== anchorEl) { cleanup(); } };
+    const onEsc = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); cleanup(); } };
+    function cleanup(){ try { document.removeEventListener('mousedown', onOutside, true); document.removeEventListener('keydown', onEsc, true); } catch(_) {} try { pop.remove(); } catch(_) {} }
+    setTimeout(()=>{ document.addEventListener('mousedown', onOutside, true); document.addEventListener('keydown', onEsc, true); }, 0);
   }
   // Begin inline editing for a field
   function beginEditField(wrap, field) {

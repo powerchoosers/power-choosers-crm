@@ -47,15 +47,45 @@
     // Add subtle hover styling without changing base color
     phoneElement.style.cursor = 'pointer';
     phoneElement.style.transition = 'opacity 0.2s ease';
-    phoneElement.title = `Call ${displayPhone}${contactName ? ` (${contactName})` : ''}`;
+    // Prefer explicit data attributes to decide which name to show. Use custom tooltip attr only.
+    try {
+      const hasContactId = !!phoneElement.getAttribute('data-contact-id');
+      const hasAccountId = !!phoneElement.getAttribute('data-account-id');
+      const attrContact = (phoneElement.getAttribute('data-contact-name') || '').trim();
+      const attrCompany = (phoneElement.getAttribute('data-company-name') || '').trim();
+      const nameForTitle = hasContactId && attrContact ? attrContact : (hasAccountId && attrCompany ? attrCompany : contactName);
+      const tt = `Call ${displayPhone}${nameForTitle ? ` (${nameForTitle})` : ''}`;
+      phoneElement.setAttribute('data-pc-title', tt);
+      phoneElement.removeAttribute('title');
+    } catch(_) {
+      const tt = `Call ${displayPhone}${contactName ? ` (${contactName})` : ''}`;
+      phoneElement.setAttribute('data-pc-title', tt);
+      phoneElement.removeAttribute('title');
+    }
     
     // Update display text if needed
     if (phoneElement.textContent.trim() !== displayPhone) {
       phoneElement.textContent = displayPhone;
     }
     
-    // Add hover effects
+    // Add hover effects and refresh tooltip on every hover to prevent stale names
     phoneElement.addEventListener('mouseenter', function() {
+      try {
+        const textNow = (this.textContent || '').trim();
+        const displayNow = formatPhoneForDisplay(textNow);
+        const hasContactId = !!this.getAttribute('data-contact-id');
+        const hasAccountId = !!this.getAttribute('data-account-id');
+        const attrContact = (this.getAttribute('data-contact-name') || '').trim();
+        const attrCompany = (this.getAttribute('data-company-name') || '').trim();
+        // Prefer attributes; fallback to row-derived name
+        let nameForTitle = hasContactId && attrContact ? attrContact : (hasAccountId && attrCompany ? attrCompany : '');
+        if (!nameForTitle) {
+          nameForTitle = findContactName(this) || '';
+        }
+        const tt = `Call ${displayNow}${nameForTitle ? ` (${nameForTitle})` : ''}`;
+        this.setAttribute('data-pc-title', tt);
+        this.removeAttribute('title');
+      } catch(_) {}
       this.style.opacity = '0.7';
     });
     
@@ -228,9 +258,32 @@
           context.accountId = account.id || account.accountId || account._id;
           context.accountName = account.name || account.accountName;
           context.company = context.accountName;
+          // Include location/domain hints for the phone widget display
+          try { if (account.city) context.city = account.city; } catch(_) {}
+          try { if (account.state) context.state = account.state; } catch(_) {}
+          try { if (account.domain) context.domain = account.domain; } catch(_) {}
         }
       }
     } catch (_) { /* noop */ }
+
+    // Force company-mode context when clicking the Account's company phone
+    try {
+      const isAccountCompanyPhone = !!phoneElement.closest('#account-detail-view') && (
+        phoneElement.matches('#account-detail-view .info-value-wrap[data-field="companyPhone"] .info-value-text') ||
+        (
+          // Or if element explicitly has account id but no contact id
+          (phoneElement.getAttribute('data-account-id') && !phoneElement.getAttribute('data-contact-id'))
+        )
+      );
+      if (isAccountCompanyPhone) {
+        // Clear any stale contact attribution and mark as company phone
+        context.contactId = null;
+        context.contactName = '';
+        // Ensure name is the company/account name in this mode
+        context.name = context.accountName || context.company || contactName || '';
+        context.isCompanyPhone = true;
+      }
+    } catch(_) {}
 
     console.debug('[ClickToCall] Setting call context:', context);
     window.Widgets.setCallContext(context);
@@ -331,16 +384,21 @@
     
     specificSelectors.forEach(selector => {
       document.querySelectorAll(selector).forEach(element => {
-        if (element.classList.contains('clickable-phone')) return;
-        
         // Skip phone widget input field to prevent interference
         if (element.closest('#phone-widget') || element.classList.contains('phone-display')) {
           return;
         }
-        
-        const text = element.textContent.trim();
-        if (isValidPhoneNumber(text)) {
-          const contactName = findContactName(element);
+
+        const text = (element.textContent || '').trim();
+        if (!isValidPhoneNumber(text)) return;
+
+        const contactName = findContactName(element);
+        const displayPhone = formatPhoneForDisplay(text);
+        // Always refresh hover title to avoid stale names when content changes
+        try { element.title = `Call ${displayPhone}${contactName ? ` (${contactName})` : ''}`; } catch(_) {}
+
+        // Bind click handler only once
+        if (!element.classList.contains('clickable-phone')) {
           makePhoneClickable(element, text, contactName);
         }
       });

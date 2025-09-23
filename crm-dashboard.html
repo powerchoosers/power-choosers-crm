@@ -1829,9 +1829,8 @@
       // Google Maps API Key Configuration
       (function(){
         try {
-          // Set Google Maps API key from environment variable
-          // This will be available as GOOGLE_MAPS_API in Vercel deployment
-          window.GOOGLE_MAPS_API = '{{GOOGLE_MAPS_API}}';
+          // Set Google Maps API key directly
+          window.GOOGLE_MAPS_API = 'AIzaSyCydOVPsFnyY83M5ABb2lBZWcMqh4wqV2k';
           console.log('Google Maps API key configured');
         } catch (e) {
           console.warn('Google Maps API key init error:', e);
@@ -2142,5 +2141,37 @@
             </div>
         </div>
     </div>
+
+    <script>
+      (function(){
+        function initGoogleMapsCallback() {
+          // API is ready
+          window.googleMapsApiReady = true;
+          document.dispatchEvent(new CustomEvent('google-maps-api-ready'));
+        }
+
+        // Dynamically load the Google Maps script
+        function loadGoogleMapsScript(apiKey) {
+          if (document.getElementById('google-maps-script')) {
+            // Already loaded or loading
+            if (window.googleMapsApiReady) {
+              initGoogleMapsCallback();
+            }
+            return;
+          }
+          const script = document.createElement('script');
+          script.id = 'google-maps-script';
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&callback=initGoogleMapsCallback`;
+          script.async = true;
+          script.defer = true;
+          document.head.appendChild(script);
+        }
+
+        // Listen for config ready event to get API key
+        window.addEventListener('google-maps-api-ready', function() {
+          loadGoogleMapsScript(window.GOOGLE_MAPS_API);
+        });
+      })();
+    </script>
 </body>
 </html>
