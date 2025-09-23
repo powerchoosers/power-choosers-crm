@@ -13847,9 +13847,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 }
 
 /* Google Maps Widget Styles */
-.maps-card {
-    /* Use standard widget card styling */
-}
+/* .maps-card inherits from .widget-card - no additional styles needed */
 
 /* Maps widget mount animation helper */
 .maps-anim {
@@ -13865,9 +13863,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     gap: var(--spacing-sm);
 }
 
-.maps-search-container {
-    /* Search container styling */
-}
+/* .maps-search-container inherits from parent - no additional styles needed */
 
 .search-input-wrap {
     display: flex;
@@ -14065,9 +14061,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 }
 
 /* Use same close button styles as notes widget */
-.widget-card .maps-close {
-    /* Inherit from .notes-close; this block ensures specificity parity */
-}
+/* .widget-card .maps-close inherits from .notes-close - no additional styles needed */
 
 /* Responsive Design */
 @media (max-width: 768px) {

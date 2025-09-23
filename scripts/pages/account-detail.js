@@ -1183,8 +1183,11 @@
         });
       }
 
-      // Call the CI request endpoint (always via API base URL)
-      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+      // Call the CI request endpoint (always via Vercel API)
+      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
+        base = 'https://power-choosers-crm.vercel.app';
+      }
       const response = await fetch(`${base}/api/twilio/ci-request`, {
         method: 'POST',
         headers: {

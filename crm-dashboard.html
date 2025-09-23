@@ -32,13 +32,7 @@
         });
     </script>
     <script>
-        // Default API base: use current origin unless explicitly overridden elsewhere
-        (function(){
-          if (!window.API_BASE_URL) {
-            window.API_BASE_URL = window.location.origin.replace(/\/$/, '');
-            try { console.log('[CRM] API_BASE_URL set to', window.API_BASE_URL); } catch(_) {}
-          }
-        })();
+        // API base will be set later based on environment
     </script>
     <script>
         // Optional: Configure your Twilio/Business phone numbers so Calls page can identify the counterparty correctly
@@ -2142,6 +2136,18 @@
         </div>
     </div>
 
+    <script>
+      // Google Maps API Key Configuration
+      (function(){
+        try {
+          // Set Google Maps API key directly
+          window.GOOGLE_MAPS_API = 'AIzaSyCydOVPsFnyY83M5ABb2lBZWcMqh4wqV2k';
+          console.log('Google Maps API key configured');
+        } catch (e) {
+          console.warn('Google Maps API key init error:', e);
+        }
+      })();
+    </script>
     <script>
       (function(){
         function initGoogleMapsCallback() {
