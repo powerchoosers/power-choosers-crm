@@ -1162,9 +1162,14 @@
   }
   // Trigger on-demand CI processing for a call
   async function triggerAccountCI(callSid, recordingSid, btn) {
-    if (!callSid || !recordingSid) {
-      console.warn('[AccountDetail] Missing callSid or recordingSid for CI processing:', { callSid, recordingSid });
+    if (!callSid) {
+      console.warn('[AccountDetail] Missing callSid for CI processing:', { callSid, recordingSid });
       return;
+    }
+    
+    // If no recordingSid provided, the API will look it up by callSid
+    if (!recordingSid) {
+      console.log('[AccountDetail] No recordingSid provided, API will look up recording for callSid:', callSid);
     }
 
     try {
@@ -1202,6 +1207,7 @@
       if (!response.ok) {
         try {
           const err = await response.json().catch(()=>({}));
+          console.error('[AccountDetail] CI request error response:', response.status, err);
           const msg = (err && (err.error || err.details)) ? String(err.error || err.details) : `CI request failed: ${response.status} ${response.statusText}`;
           if (window.ToastManager) { window.ToastManager.showToast(msg, 'error'); }
         } catch(_) {

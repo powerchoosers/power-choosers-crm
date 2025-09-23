@@ -40,6 +40,12 @@ export default async function handler(req, res){
       return;
     }
 
+    if (!serviceSid) {
+      res.statusCode = 500; res.setHeader('Content-Type','application/json');
+      res.end(JSON.stringify({ error: 'Conversational Intelligence service not configured. Missing TWILIO_INTELLIGENCE_SERVICE_SID environment variable.' }));
+      return;
+    }
+
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
     // If we already created a transcript for this call, return it
@@ -168,19 +174,8 @@ export default async function handler(req, res){
       const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
       const webhookUrl = `${base}/api/twilio/conversational-intelligence-webhook`;
       
-      const createArgs = serviceSid ? { 
+      const createArgs = { 
         serviceSid, 
-        channel: { 
-          media_properties: { source_sid: recordingSid },
-          participants: [
-            { role: 'Agent', channel_participant: agentChannelNum },
-            { role: 'Customer', channel_participant: agentChannelNum === 1 ? 2 : 1 }
-          ]
-        }, 
-        customerKey: callSid,
-        webhookUrl: webhookUrl,
-        webhookMethod: 'POST'
-      } : { 
         channel: { 
           media_properties: { source_sid: recordingSid },
           participants: [
