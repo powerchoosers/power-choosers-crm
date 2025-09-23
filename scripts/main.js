@@ -657,42 +657,8 @@ class PowerChoosersCRM {
             });
         }
         
-        // Fallback to simple toast notification
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            top: 90px;
-            right: 25px;
-            background: var(--grey-800);
-            color: var(--text-inverse);
-            padding: 12px 20px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-lg);
-            z-index: 10000;
-            font-size: 0.875rem;
-            opacity: 0;
-            transform: translateY(-10px);
-            transition: all 0.3s ease;
-        `;
-        
-        document.body.appendChild(toast);
-        
-        // Animate in
-        setTimeout(() => {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateY(0)';
-        }, 100);
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(-10px)';
-            setTimeout(() => {
-                document.body.removeChild(toast);
-            }, 300);
-        }, 3000);
+        // No fallback - ToastManager should always be available
+        console.warn('ToastManager not available for toast notification:', message);
     }
 
     // Unified pagination component

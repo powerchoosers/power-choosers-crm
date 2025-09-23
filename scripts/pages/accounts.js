@@ -19,48 +19,96 @@
         const detail = ev && ev.detail ? ev.detail : {};
         console.log('[Accounts] Restoring state from back button:', detail);
         
-        // Restore pagination
+        // Set restoration flag immediately to prevent any interference
+        try { 
+          window.__restoringAccounts = true; 
+          window.__restoringAccountsUntil = Date.now() + 15000; // 15 seconds
+        } catch (_) {}
+        
+        // Restore pagination with validation
         const targetPage = Math.max(1, parseInt(detail.currentPage || detail.page || state.currentPage || 1, 10));
         if (targetPage !== state.currentPage) {
           state.currentPage = targetPage;
+          console.log('[Accounts] Restored page to:', targetPage);
         }
         
         // Restore search term
         if (detail.searchTerm && els.quickSearch) {
           els.quickSearch.value = detail.searchTerm;
+          console.log('[Accounts] Restored search term:', detail.searchTerm);
         }
         
         // Restore sorting
-        if (detail.sortColumn) state.sortColumn = detail.sortColumn;
-        if (detail.sortDirection) state.sortDirection = detail.sortDirection;
+        if (detail.sortColumn) {
+          state.sortColumn = detail.sortColumn;
+          console.log('[Accounts] Restored sort column:', detail.sortColumn);
+        }
+        if (detail.sortDirection) {
+          state.sortDirection = detail.sortDirection;
+          console.log('[Accounts] Restored sort direction:', detail.sortDirection);
+        }
         
         // Re-render with restored state
         render();
         
-        // Restore scroll position
+        // Restore scroll position with multiple attempts
         const y = parseInt(detail.scroll || 0, 10);
-        setTimeout(() => {
+        if (y > 0) {
+          // Try immediate scroll
           try { window.scrollTo(0, y); } catch (_) {}
-        }, 100);
+          
+          // Try again after render
+          setTimeout(() => {
+            try { window.scrollTo(0, y); } catch (_) {}
+          }, 100);
+          
+          // Final attempt after longer delay
+          setTimeout(() => {
+            try { window.scrollTo(0, y); } catch (_) {}
+          }, 500);
+          
+          console.log('[Accounts] Restored scroll position to:', y);
+        }
 
-        // Clear restoring hint flag shortly after to avoid onSnapshot flicker resetting page to 1
+        // Clear restoring hint flag with longer delay to ensure stability
         try {
-          setTimeout(() => { try { if (window.__restoringAccounts) window.__restoringAccounts = false; } catch(_){} }, 800);
+          setTimeout(() => { 
+            try { 
+              if (window.__restoringAccounts) {
+                window.__restoringAccounts = false; 
+                console.log('[Accounts] Cleared restoration flag');
+                
+                // Trigger a final render to apply any pending account updates
+                // that were skipped during restoration
+                setTimeout(() => {
+                  try {
+                    render();
+                    console.log('[Accounts] Applied pending updates after restoration');
+                  } catch (_) {}
+                }, 100);
+              }
+            } catch(_){} 
+          }, 2000); // Increased to 2 seconds
         } catch (_) {}
         
-        // Restore selected items
+        // Restore selected items with better timing
         if (detail.selectedItems && Array.isArray(detail.selectedItems)) {
           setTimeout(() => {
             try {
+              let restoredCount = 0;
               detail.selectedItems.forEach(id => {
                 const checkbox = document.querySelector(`input.row-select[data-id="${id}"]`);
                 if (checkbox && !checkbox.checked) {
                   checkbox.checked = true;
                   checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                  restoredCount++;
                 }
               });
+              if (restoredCount > 0) {
+                console.log('[Accounts] Restored', restoredCount, 'selected items');
+              }
             } catch (_) {}
-          }, 150);
+          }, 300); // Increased delay for better reliability
         }
         
         console.log('[Accounts] State restored successfully');
@@ -69,6 +117,56 @@
       }
     });
     document._accountsRestoreBound = true;
+  }
+
+  // Fallback: Check for global restore data on page load
+  if (!window._accountsFallbackChecked) {
+    window._accountsFallbackChecked = true;
+    setTimeout(() => {
+      try {
+        if (window.__accountsRestoreData && !window.__restoringAccounts) {
+          console.log('[Accounts] Fallback: Found global restore data, applying:', window.__accountsRestoreData);
+          const restore = window.__accountsRestoreData;
+          
+          // Set restoration flag
+          window.__restoringAccounts = true;
+          window.__restoringAccountsUntil = Date.now() + 10000;
+          
+          // Apply restore data
+          const targetPage = Math.max(1, parseInt(restore.currentPage || restore.page || 1, 10));
+          if (targetPage !== state.currentPage) {
+            state.currentPage = targetPage;
+          }
+          
+          if (restore.searchTerm && els.quickSearch) {
+            els.quickSearch.value = restore.searchTerm;
+          }
+          
+          if (restore.sortColumn) state.sortColumn = restore.sortColumn;
+          if (restore.sortDirection) state.sortDirection = restore.sortDirection;
+          
+          render();
+          
+          const y = parseInt(restore.scroll || 0, 10);
+          if (y > 0) {
+            setTimeout(() => { try { window.scrollTo(0, y); } catch (_) {} }, 100);
+          }
+          
+          // Clear the global data
+          window.__accountsRestoreData = null;
+          
+          setTimeout(() => {
+            try { 
+              window.__restoringAccounts = false; 
+              // Apply any pending updates after fallback restoration
+              setTimeout(() => {
+                try { render(); } catch (_) {}
+              }, 100);
+            } catch(_) {}
+          }, 2000);
+        }
+      } catch (_) {}
+    }, 1000);
   }
 
   // Column order for Accounts table headers (draggable)
@@ -490,19 +588,29 @@
           // Capture return state so Account Detail can restore Accounts on back
           try {
             window._accountNavigationSource = 'accounts';
+            
+            // Capture comprehensive state snapshot
+            const currentState = {
+              page: state.currentPage,
+              currentPage: state.currentPage, // Include both for compatibility
+              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+              searchTerm: els.quickSearch ? els.quickSearch.value : '',
+              sortColumn: state.sortColumn,
+              sortDirection: state.sortDirection,
+              filters: getCurrentFilters ? getCurrentFilters() : {},
+              selectedItems: getSelectedItems ? getSelectedItems() : [],
+              timestamp: Date.now() // Add timestamp for debugging
+            };
+            
             // Prefer module API to capture a consistent snapshot
             if (window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
-              window._accountsReturn = window.accountsModule.getCurrentState();
+              const moduleState = window.accountsModule.getCurrentState();
+              window._accountsReturn = { ...currentState, ...moduleState };
             } else {
-              window._accountsReturn = {
-                page: state.currentPage,
-                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-                searchTerm: els.quickSearch ? els.quickSearch.value : '',
-                sortColumn: state.sortColumn,
-                sortDirection: state.sortDirection,
-                selectedItems: Array.from(state.selected || [])
-              };
+              window._accountsReturn = currentState;
             }
+            
+            console.log('[Accounts] Captured state for back navigation:', window._accountsReturn);
           } catch (_) { /* noop */ }
           window.AccountDetail.show(id);
         }
@@ -546,6 +654,7 @@
           const id = d.id;
           const changes = d.changes || {};
           if (!id) return;
+          
           // Update in-memory rows
           const apply = (arr) => {
             if (!Array.isArray(arr)) return;
@@ -558,7 +667,14 @@
           };
           apply(state.data);
           apply(state.filtered);
-          render();
+          
+          // Only re-render if we're not in the middle of a restoration
+          // This prevents account updates from resetting the page when user is on Account Details
+          if (!window.__restoringAccounts) {
+            render();
+          } else {
+            console.log('[Accounts] Skipping render due to active restoration - account update will be applied when restoration completes');
+          }
         } catch (_) { /* noop */ }
       };
       document.addEventListener('pc:account-updated', els.page._accountUpdatedHandler);

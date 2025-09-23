@@ -1503,6 +1503,14 @@
     // Ensure the new contact has a stable id immediately for downstream actions (lists, notes)
     if (!contact.id && contactId) contact.id = contactId;
     state.currentContact = contact;
+    
+    // Debug logging for contact ID availability
+    console.log('[Contact Detail] Contact loaded:', {
+      contactId: contact.id,
+      contactName: contact.firstName + ' ' + contact.lastName,
+      hasId: !!contact.id,
+      stateContactId: state.currentContact?.id
+    });
     // Broadcast that contact detail is loaded so dependent widgets can rebind
     try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch(_) {}
     // Ensure per-contact event handlers are rebound on each view
@@ -1530,6 +1538,11 @@
       if (window.ContactDetail && window.ContactDetail.setupEnergyUpdateListener) {
         window.ContactDetail.setupEnergyUpdateListener();
       }
+    } catch (_) {}
+    
+    // Setup contact created listener for cases where new contacts are created from Account Details
+    try {
+      setupContactCreatedListener();
     } catch (_) {}
     
     // Add click handler to persist default phone when star button is clicked
@@ -3416,9 +3429,30 @@
         const from10 = String(c.from||'').replace(/\D/g,'').slice(-10);
         const matchByPhone = uniq.includes(to10) || uniq.includes(from10);
         
-        const shouldInclude = matchByContactId || matchByPhone;
+        // Additional matching: check targetPhone field
+        const targetPhone = String(c.targetPhone||'').replace(/\D/g,'').slice(-10);
+        const matchByTargetPhone = targetPhone && uniq.includes(targetPhone);
         
-        // Call included in filtered results
+        const shouldInclude = matchByContactId || matchByPhone || matchByTargetPhone;
+        
+        // Debug logging for troubleshooting
+        if (shouldInclude) {
+          console.log('[Contact Detail] Recent call included:', {
+            callSid: c.callSid || c.id,
+            contactId: c.contactId,
+            contactName: c.contactName,
+            accountId: c.accountId,
+            accountName: c.accountName,
+            to: c.to,
+            from: c.from,
+            targetPhone: c.targetPhone,
+            matches: {
+              byContactId: matchByContactId,
+              byPhone: matchByPhone,
+              byTargetPhone: matchByTargetPhone
+            }
+          });
+        }
         
         return shouldInclude;
       });
@@ -5051,9 +5085,21 @@ async function createContactSequenceThenAdd(name) {
         } catch(_) {}
       }
       if (!contactId) { 
-        console.warn('[ContactDetail] No contact ID available for list addition');
-        closeContactListsPanel(); 
-        return; 
+        console.warn('[ContactDetail] No contact ID available for list addition', {
+          contactId: contactId,
+          stateContact: state.currentContact,
+          stateContactId: state.currentContact?.id
+        });
+        
+        // Try to get contact ID from state
+        const stateContactId = state.currentContact?.id;
+        if (stateContactId) {
+          console.log('[ContactDetail] Using contact ID from state:', stateContactId);
+          contactId = stateContactId;
+        } else {
+          closeContactListsPanel(); 
+          return; 
+        }
       }
       const db = window.firebaseDB;
       if (db && typeof db.collection === 'function') {
@@ -5255,6 +5301,53 @@ async function createContactSequenceThenAdd(name) {
     };
   }
 
+  // Listen for new contact creation to update state when navigating from Account Details
+  function setupContactCreatedListener() {
+    const onContactCreated = (e) => {
+      try {
+        const d = e.detail || {};
+        const { id, doc } = d;
+        
+        // If we're currently on the Contact Detail page but don't have a contact ID yet,
+        // and this newly created contact matches our current state, update it
+        if (id && doc && !state.currentContact?.id) {
+          // Check if this contact matches what we're currently displaying
+          const currentName = state.currentContact?.firstName || state.currentContact?.name || '';
+          const newName = doc.firstName || doc.name || '';
+          const currentCompany = state.currentContact?.companyName || state.currentContact?.accountName || '';
+          const newCompany = doc.companyName || '';
+          
+          // If names match and we're on the contact detail page, update the state
+          if (currentName && newName && currentName.toLowerCase() === newName.toLowerCase() && 
+              currentCompany && newCompany && currentCompany.toLowerCase() === newCompany.toLowerCase()) {
+            console.log('[Contact Detail] Updating state with new contact ID:', id);
+            state.currentContact.id = id;
+            state.currentContact = { ...state.currentContact, ...doc, id };
+            
+            // Update the DOM to reflect the new contact ID
+            const contactIdEl = document.querySelector('[data-contact-id]');
+            if (contactIdEl) {
+              contactIdEl.setAttribute('data-contact-id', id);
+            }
+            
+            // Update the page title if it exists
+            const pageTitle = document.querySelector('#contact-detail-header .contact-name');
+            if (pageTitle && !pageTitle.getAttribute('data-contact-id')) {
+              pageTitle.setAttribute('data-contact-id', id);
+            }
+          }
+        }
+      } catch(_) {}
+    };
+    
+    document.addEventListener('pc:contact-created', onContactCreated);
+    
+    // Return cleanup function
+    return () => {
+      document.removeEventListener('pc:contact-created', onContactCreated);
+    };
+  }
+
   // Add toMDY function for date formatting
   function toMDY(v) {
     console.log('[Contact Detail] toMDY called with:', v);
@@ -5303,6 +5396,7 @@ async function createContactSequenceThenAdd(name) {
   window.ContactDetail = {
     show: showContactDetail,
     setupEnergyUpdateListener: setupEnergyUpdateListener,
+    setupContactCreatedListener: setupContactCreatedListener,
     // Expose internal state for widgets to read linked account id
     state: state
   };
