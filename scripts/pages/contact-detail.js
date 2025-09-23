@@ -3690,6 +3690,11 @@
       try { console.warn('[ContactDetail] Missing callSid for CI processing:', { callSid, recordingSid }); } catch(_) {}
       return;
     }
+    
+    // If no recordingSid provided, the API will look it up by callSid
+    if (!recordingSid) {
+      try { console.log('[ContactDetail] No recordingSid provided, API will look up recording for callSid:', callSid); } catch(_) {}
+    }
     try {
       // Show loading spinner on the button (proper orange spinning element)
       try { 
@@ -3733,6 +3738,7 @@
       if (!response.ok) {
         try {
           const err = await response.json().catch(()=>({}));
+          console.error('[ContactDetail] CI request error response:', response.status, err);
           const msg = (err && (err.error || err.details)) ? String(err.error || err.details) : `CI request failed: ${response.status} ${response.statusText}`;
           if (window.ToastManager) { window.ToastManager.showToast(msg, 'error'); }
         } catch(_) {
