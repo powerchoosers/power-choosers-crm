@@ -7,7 +7,6 @@
 
   const WIDGET_ID = 'maps-widget';
   let map = null;
-  let placesService = null;
   let currentContactId = null;
   let currentAccountId = null;
   let currentEntityType = 'contact'; // 'contact' or 'account'
@@ -25,13 +24,14 @@
         return;
       }
 
-      // Load Google Maps API
+      // Load Google Maps API with Places and Marker libraries using async pattern
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${window.GOOGLE_MAPS_API}&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${window.GOOGLE_MAPS_API}&v=weekly&loading=async&libraries=places,marker&callback=initGoogleMapsCallback`;
       script.async = true;
       script.defer = true;
       
-      script.onload = () => {
+      // Set up global callback
+      window.initGoogleMapsCallback = () => {
         isGoogleMapsLoaded = true;
         resolve();
       };
@@ -51,12 +51,12 @@
         // For account detail page, get the account name
         const accountData = window.getAccountsData ? window.getAccountsData() : [];
         const account = accountData.find(a => String(a.id) === String(currentAccountId));
-        return account ? account.name : '';
+        return account ? (account.accountName || account.name || account.companyName) : '';
       } else if (currentEntityType === 'contact' && currentContactId) {
         // For contact detail page, get the contact's company
         const peopleData = window.getPeopleData ? window.getPeopleData() : [];
         const contact = peopleData.find(p => String(p.id) === String(currentContactId));
-        return contact ? (contact.company || contact.account_name || '') : '';
+        return contact ? (contact.companyName || contact.company || contact.account_name || '') : '';
       }
       return '';
     } catch (error) {
@@ -65,353 +65,801 @@
     }
   }
 
-  // Create the widget HTML
-  function createWidgetHTML() {
+  // Get the widget panel content element
+  function getPanelContentEl() {
+    const panel = document.getElementById('widget-panel');
+    if (!panel) return null;
+    const content = panel.querySelector('.widget-content');
+    return content || panel;
+  }
+
+  // Remove existing widget
+  function removeExistingWidget() {
+    const existing = document.getElementById(WIDGET_ID);
+    if (existing && existing.parentElement) {
+      existing.parentElement.removeChild(existing);
+    }
+  }
+
+  // Close maps widget
+  function closeMapsWidget() {
+    const card = document.getElementById(WIDGET_ID);
+    if (!card) return;
+    
+    const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduce) {
+      if (card.parentElement) card.parentElement.removeChild(card);
+      return;
+    }
+    
+    // Prepare collapse animation from current height and paddings
+    const cs = window.getComputedStyle(card);
+    const pt = parseFloat(cs.paddingTop) || 0;
+    const pb = parseFloat(cs.paddingBottom) || 0;
+    const start = card.scrollHeight; // includes padding
+    card.style.overflow = 'hidden';
+    card.style.height = start + 'px';
+    card.style.opacity = '1';
+    card.style.transform = 'translateY(0)';
+    // Force reflow
+    void card.offsetHeight;
+    card.style.transition = 'height 360ms ease-out, opacity 360ms ease-out, transform 360ms ease-out, padding-top 360ms ease-out, padding-bottom 360ms ease-out';
+    card.style.height = '0px';
+    card.style.paddingTop = '0px';
+    card.style.paddingBottom = '0px';
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(-6px)';
+    const pending = new Set(['height', 'padding-top', 'padding-bottom']);
+    const onEnd = (e) => {
+      if (!e) return;
+      if (pending.has(e.propertyName)) pending.delete(e.propertyName);
+      if (pending.size > 0) return;
+      card.removeEventListener('transitionend', onEnd);
+      if (card.parentElement) card.parentElement.removeChild(card);
+    };
+    card.addEventListener('transitionend', onEnd);
+  }
+
+  // Create the widget card
+  function createWidgetCard() {
     const companyName = getCompanyName();
     
-    return `
-      <div id="${WIDGET_ID}" class="widget-panel">
-        <div class="widget-header">
-          <h3 class="widget-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
-            Google Maps
-          </h3>
-          <button class="widget-close" aria-label="Close widget">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-        <div class="widget-content">
-          <div class="maps-search-container">
-            <div class="search-input-wrap">
-              <input 
-                type="text" 
-                id="maps-search-input" 
-                class="search-input" 
-                placeholder="Search for locations..." 
-                value="${companyName}"
-                autocomplete="off"
-              >
-              <button id="maps-search-btn" class="search-btn" title="Search">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <circle cx="11" cy="11" r="8"/>
-                  <path d="M21 21l-4.35-4.35"/>
-                </svg>
-              </button>
-            </div>
+    const card = document.createElement('div');
+    card.className = 'widget-card maps-card';
+    card.id = WIDGET_ID;
+
+    card.innerHTML = `
+      <div class="widget-card-header">
+        <h4 class="widget-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          Google Maps
+        </h4>
+        <button type="button" class="notes-close maps-close" title="Close" aria-label="Close">×</button>
+      </div>
+      <div class="maps-body">
+        <div class="maps-search-container">
+          <div class="search-input-wrap">
+            <input 
+              type="text" 
+              id="maps-search-input" 
+              class="search-input" 
+              placeholder="Search for locations..." 
+              value="${companyName}"
+              autocomplete="off"
+            >
+            <button id="maps-search-btn" class="search-btn" title="Search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+            </button>
           </div>
-          <div id="maps-container" class="maps-container">
-            <div class="maps-loading">
-              <div class="loading-spinner"></div>
-              <p>Loading Google Maps...</p>
-            </div>
+        </div>
+        <div id="maps-container" class="maps-container">
+          <div class="maps-loading">
+            <div class="loading-spinner"></div>
+            <p>Loading Google Maps...</p>
           </div>
         </div>
       </div>
     `;
+
+    return card;
   }
 
   // Initialize the map
-  function initializeMap() {
-    const mapContainer = document.getElementById('maps-container');
-    if (!mapContainer) return;
+  async function initializeMap() {
+    try {
+      await initializeGoogleMaps();
+      
+      const mapContainer = document.getElementById('maps-container');
+      if (!mapContainer) return;
 
-    // Clear loading state
-    mapContainer.innerHTML = '';
+      // Clear loading state and prepare for map animation
+      mapContainer.innerHTML = '';
+      mapContainer.style.opacity = '0';
+      mapContainer.style.transition = 'opacity 0.5s ease-in-out';
 
-    // Create map
-    map = new google.maps.Map(mapContainer, {
-      center: { lat: 39.8283, lng: -98.5795 }, // Center of US
-      zoom: 4,
-      mapTypeControl: true,
-      streetViewControl: true,
-      fullscreenControl: true,
-      zoomControl: true,
-      styles: [
-        {
-          featureType: 'poi',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }]
-        }
-      ]
-    });
-
-    // Initialize Places service
-    placesService = new google.maps.places.PlacesService(map);
-
-    // Add search functionality
-    setupSearchFunctionality();
-
-    // If we have a company name, search for it automatically
-    const companyName = getCompanyName();
-    if (companyName) {
-      searchForPlaces(companyName);
-    }
-  }
-
-  // Setup search functionality
-  function setupSearchFunctionality() {
-    const searchInput = document.getElementById('maps-search-input');
-    const searchBtn = document.getElementById('maps-search-btn');
-
-    if (!searchInput || !searchBtn) return;
-
-    // Search on button click
-    searchBtn.addEventListener('click', () => {
-      const query = searchInput.value.trim();
-      if (query) {
-        searchForPlaces(query);
+      // Create map (optionally use Map ID for vector map/advanced markers if available)
+      const mapOptions = {
+        center: { lat: 39.8283, lng: -98.5795 }, // Center of US
+        zoom: 2, // Very broad overview - much less zoomed in
+        mapTypeId: google.maps.MapTypeId.SATELLITE, // Start in satellite view
+        mapTypeControl: true,
+        streetViewControl: true,
+        fullscreenControl: true,
+        zoomControl: true,
+        tilt: 0, // No tilt - flat view
+        styles: [
+          {
+            featureType: 'all',
+            elementType: 'geometry.fill',
+            stylers: [{ color: '#2c2c2c' }]
+          },
+          {
+            featureType: 'water',
+            elementType: 'geometry',
+            stylers: [{ color: '#1e1e1e' }]
+          },
+          {
+            featureType: 'road',
+            elementType: 'geometry',
+            stylers: [{ color: '#404040' }]
+          }
+        ]
+      };
+      if (window.GOOGLE_MAP_ID) {
+        mapOptions.mapId = window.GOOGLE_MAP_ID;
       }
-    });
+      map = new google.maps.Map(mapContainer, mapOptions);
 
-    // Search on Enter key
-    searchInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        const query = searchInput.value.trim();
-        if (query) {
-          searchForPlaces(query);
-        }
+      // Animate map appearance after it's loaded
+      setTimeout(() => {
+        mapContainer.style.opacity = '1';
+      }, 100);
+
+      // Add click listener for map clicks (satellite view prospecting)
+      map.addListener('click', async (event) => {
+        const clickedLocation = {
+          lat: event.latLng.lat(),
+          lng: event.latLng.lng()
+        };
+        await handleMapClick(clickedLocation);
+      });
+
+      // Perform initial search if company name exists
+      const companyName = getCompanyName();
+      if (companyName) {
+        await searchPlaces(companyName);
       }
-    });
 
-    // Auto-search when typing (with debounce)
-    let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
-        const query = e.target.value.trim();
-        if (query.length > 2) {
-          searchForPlaces(query);
-        }
-      }, 500);
-    });
-  }
-
-  // Search for places
-  function searchForPlaces(query) {
-    if (!placesService || !query) return;
-
-    const request = {
-      query: query,
-      fields: ['name', 'geometry', 'formatted_address', 'place_id', 'rating', 'user_ratings_total', 'types']
-    };
-
-    placesService.textSearch(request, (results, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-        displaySearchResults(results);
-      } else {
-        console.warn('[Maps Widget] Places search failed:', status);
-        showNoResults();
-      }
-    });
-  }
-
-  // Display search results
-  function displaySearchResults(results) {
-    // Clear existing markers
-    if (window.mapsMarkers) {
-      window.mapsMarkers.forEach(marker => marker.setMap(null));
-    }
-    window.mapsMarkers = [];
-
-    if (!results || results.length === 0) {
-      showNoResults();
-      return;
-    }
-
-    const bounds = new google.maps.LatLngBounds();
-    const infoWindow = new google.maps.InfoWindow();
-
-    results.forEach((place, index) => {
-      if (place.geometry && place.geometry.location) {
-        const marker = new google.maps.Marker({
-          position: place.geometry.location,
-          map: map,
-          title: place.name,
-          animation: google.maps.Animation.DROP
-        });
-
-        // Create info window content
-        const infoContent = `
-          <div class="maps-info-window">
-            <h4>${place.name}</h4>
-            <p class="address">${place.formatted_address}</p>
-            ${place.rating ? `<p class="rating">⭐ ${place.rating} (${place.user_ratings_total || 0} reviews)</p>` : ''}
-            <p class="types">${place.types ? place.types.slice(0, 3).join(', ') : ''}</p>
+    } catch (error) {
+      console.error('[Maps Widget] Error initializing map:', error);
+      const mapContainer = document.getElementById('maps-container');
+      if (mapContainer) {
+        mapContainer.innerHTML = `
+          <div class="maps-error">
+            <p>Failed to load Google Maps. Please check your API key.</p>
           </div>
         `;
+      }
+    }
+  }
 
-        marker.addListener('click', () => {
-          infoWindow.setContent(infoContent);
-          infoWindow.open(map, marker);
+  // Build rich info window content
+  function buildInfoWindowContent(place) {
+    const phone = place.nationalPhoneNumber || place.internationalPhoneNumber || '';
+    const website = place.websiteURI || '';
+    const rating = place.rating ? place.rating.toFixed(1) : '';
+    const reviewCount = place.userRatingCount || 0;
+    const priceLevel = place.priceLevel ? '$'.repeat(place.priceLevel) : '';
+    const businessStatus = place.businessStatus || '';
+    
+    // Clean up business types for better display
+    let businessType = '';
+    if (place.types && place.types.length > 0) {
+      // Filter out generic types and format nicely
+      const cleanTypes = place.types
+        .filter(type => !['establishment', 'point_of_interest', 'store'].includes(type))
+        .map(type => type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))
+        .slice(0, 2); // Show max 2 types
+      
+      if (cleanTypes.length > 0) {
+        businessType = cleanTypes.join(' • ');
+      }
+    }
+    
+    // Get photo if available
+    let photoHtml = '';
+    if (place.photos && place.photos.length > 0) {
+      const photo = place.photos[0];
+      // Some builds expose getUri/getURI; fall back to getUrl for older types
+      const getPhotoUri = (p) => {
+        if (typeof p.getURI === 'function') return p.getURI({ maxWidth: 60, maxHeight: 45 });
+        if (typeof p.getUri === 'function') return p.getUri({ maxWidth: 60, maxHeight: 45 });
+        if (typeof p.getUrl === 'function') return p.getUrl({ maxWidth: 60, maxHeight: 45 });
+        return '';
+      };
+      const photoUrl = getPhotoUri(photo);
+      photoHtml = `<div class="place-photo"><img src="${photoUrl}" alt="${place.displayName}" style="width: 100%; height: 40px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;"></div>`;
+    }
+
+    return `
+      <div class="maps-info-window">
+        ${photoHtml}
+        <h3>${place.displayName}</h3>
+        <p class="address">${place.formattedAddress}</p>
+        ${rating ? `<p class="rating">⭐ ${rating}/5 (${reviewCount} reviews)</p>` : ''}
+        ${priceLevel ? `<p class="price">${priceLevel}</p>` : ''}
+        ${businessType ? `<p class="types">${businessType}</p>` : ''}
+        ${phone ? `<p class="phone"><span class="icon-phone" aria-hidden="true"></span> <a href="tel:${phone}" class="link call-link" data-phone="${phone}">${phone}</a></p>` : ''}
+        ${website ? `<p class="website"><span class="icon-globe" aria-hidden="true"></span> <a href="${website}" target="_blank" rel="noopener" class="link">Visit Website</a></p>` : ''}
+        ${businessStatus && businessStatus !== 'OPERATIONAL' ? `<p class="status"><strong>Status:</strong> ${businessStatus}</p>` : ''}
+      </div>
+    `;
+  }
+
+  // Handle map clicks to find businesses at that location
+  async function handleMapClick(clickedLocation) {
+    try {
+      const { Place } = await google.maps.importLibrary("places");
+      
+      // Search for businesses at the clicked location
+      const request = {
+        textQuery: 'business company office store restaurant',
+        fields: [
+          'displayName', 
+          'location', 
+          'formattedAddress', 
+          'rating', 
+          'userRatingCount',
+          'nationalPhoneNumber',
+          'internationalPhoneNumber',
+          'businessStatus',
+          'priceLevel',
+          'types',
+          'photos'
+        ],
+        locationBias: clickedLocation,
+        maxResultCount: 5,
+        includedType: 'establishment'
+      };
+
+      const { places } = await Place.searchByText(request);
+
+      if (places && places.length > 0) {
+        // Find the closest business to the clicked location
+        let closestPlace = places[0];
+        let minDistance = getDistance(clickedLocation, places[0].location);
+        
+        places.forEach(place => {
+          const distance = getDistance(clickedLocation, place.location);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestPlace = place;
+          }
         });
 
-        window.mapsMarkers.push(marker);
-        bounds.extend(place.geometry.location);
-      }
-    });
+        // Auto-fill search bar with the business name
+        const searchInput = document.getElementById('maps-search-input');
+        if (searchInput && closestPlace.displayName) {
+          searchInput.value = closestPlace.displayName;
+        }
 
-    // Fit map to show all results
-    if (window.mapsMarkers.length > 0) {
-      map.fitBounds(bounds);
-      
-      // If only one result, zoom in more
-      if (window.mapsMarkers.length === 1) {
-        map.setZoom(15);
-      }
-    }
-  }
+        // Show info window for the closest business
+        const infoContent = buildInfoWindowContent(closestPlace);
+        const infoWindow = new google.maps.InfoWindow({ 
+          content: infoContent,
+          position: clickedLocation
+        });
+        
+        infoWindow.open(map);
 
-  // Show no results message
-  function showNoResults() {
-    const mapContainer = document.getElementById('maps-container');
-    if (mapContainer) {
-      const noResults = document.createElement('div');
-      noResults.className = 'maps-no-results';
-      noResults.innerHTML = `
-        <div class="no-results-content">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
-          <h4>No locations found</h4>
-          <p>Try searching for a different term or check your spelling.</p>
-        </div>
-      `;
-      mapContainer.appendChild(noResults);
-    }
-  }
-
-  // Open widget for contact
-  window.Widgets.openMaps = function(contactId) {
-    currentContactId = contactId;
-    currentAccountId = null;
-    currentEntityType = 'contact';
-    openWidget();
-  };
-
-  // Open widget for account
-  window.Widgets.openMapsForAccount = function(accountId) {
-    currentAccountId = accountId;
-    currentContactId = null;
-    currentEntityType = 'account';
-    openWidget();
-  };
-
-  // Open the widget
-  function openWidget() {
-    // Remove existing widget if present
-    const existingWidget = document.getElementById(WIDGET_ID);
-    if (existingWidget) {
-      existingWidget.remove();
-    }
-
-    // Create and show widget
-    const widgetHTML = createWidgetHTML();
-    document.body.insertAdjacentHTML('beforeend', widgetHTML);
-
-    const widget = document.getElementById(WIDGET_ID);
-    if (!widget) return;
-
-    // Add event listeners
-    const closeBtn = widget.querySelector('.widget-close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', closeWidget);
-    }
-
-    // Close on escape key
-    const escapeHandler = (e) => {
-      if (e.key === 'Escape') {
-        closeWidget();
-        document.removeEventListener('keydown', escapeHandler);
-      }
-    };
-    document.addEventListener('keydown', escapeHandler);
-
-    // Initialize Google Maps
-    initializeGoogleMaps()
-      .then(() => {
-        // Small delay to ensure DOM is ready
+        // Add click-to-call functionality
         setTimeout(() => {
-          initializeMap();
+          const callLinks = document.querySelectorAll('.call-link');
+          callLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+              e.preventDefault();
+              const phoneNumber = link.getAttribute('data-phone');
+              if (phoneNumber && window.Widgets && window.Widgets.callNumber) {
+                // Set the click timestamp for fresh user gesture
+                if (window.Widgets) {
+                  window.Widgets._lastClickToCallAt = Date.now();
+                }
+                // Use the CRM's call function with click-to-call source and auto-trigger
+                window.Widgets.callNumber(phoneNumber, '', true, 'click-to-call');
+              } else if (phoneNumber) {
+                window.location.href = `tel:${phoneNumber}`;
+              }
+            });
+          });
         }, 100);
-      })
-      .catch((error) => {
-        console.error('[Maps Widget] Failed to initialize Google Maps:', error);
+
+        // Search for nearby businesses around this location
+        await searchNearbyBusinesses(clickedLocation);
+      }
+    } catch (error) {
+      console.error('[Maps Widget] Error handling map click:', error);
+    }
+  }
+
+  // Calculate distance between two points (simple approximation)
+  function getDistance(point1, point2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+    const dLng = (point2.lng - point1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // Search for nearby businesses for prospecting
+  async function searchNearbyBusinesses(centerLocation) {
+    try {
+      const { Place } = await google.maps.importLibrary("places");
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+      
+      // Search for nearby businesses within 1km radius
+      const request = {
+        textQuery: 'business company office',
+        fields: [
+          'displayName', 
+          'location', 
+          'formattedAddress', 
+          'rating', 
+          'userRatingCount',
+          'nationalPhoneNumber',
+          'internationalPhoneNumber',
+          'businessStatus',
+          'priceLevel',
+          'types',
+          'photos'
+        ],
+        locationBias: centerLocation,
+        maxResultCount: 20,
+        includedType: 'establishment'
+      };
+
+      const { places } = await Place.searchByText(request);
+
+      if (places && places.length > 0) {
+        // Add nearby business markers with different styling
+        places.forEach(nearbyPlace => {
+          // Skip if it's the same place we clicked on
+          if (nearbyPlace.location.lat === centerLocation.lat && 
+              nearbyPlace.location.lng === centerLocation.lng) {
+            return;
+          }
+
+          const useAdvanced = Boolean(window.GOOGLE_MAP_ID) &&
+            google.maps && google.maps.marker &&
+            typeof google.maps.marker.AdvancedMarkerElement === 'function';
+
+          let nearbyMarker;
+          if (useAdvanced) {
+            nearbyMarker = new google.maps.marker.AdvancedMarkerElement({
+              position: nearbyPlace.location,
+              map: map,
+              title: nearbyPlace.displayName
+            });
+          } else {
+            nearbyMarker = new google.maps.Marker({
+              position: nearbyPlace.location,
+              map: map,
+              title: nearbyPlace.displayName,
+              icon: {
+                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" fill="#4285F4" stroke="#fff" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="4" fill="#fff"/>
+                  </svg>
+                `),
+                scaledSize: new google.maps.Size(24, 24),
+                anchor: new google.maps.Point(12, 12)
+              }
+            });
+          }
+
+          // Build info content for nearby businesses
+          const nearbyInfoContent = buildInfoWindowContent(nearbyPlace);
+          const nearbyInfoWindow = new google.maps.InfoWindow({ content: nearbyInfoContent });
+
+          // Click handler for nearby businesses
+          const openNearbyInfo = async () => {
+            map.setCenter(nearbyPlace.location);
+            map.setZoom(15);
+            nearbyInfoWindow.open({ anchor: nearbyMarker, map });
+            
+            // Add click-to-call functionality for nearby business info window
+            setTimeout(() => {
+              const callLinks = document.querySelectorAll('.call-link');
+              callLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  const phoneNumber = link.getAttribute('data-phone');
+                  if (phoneNumber && window.Widgets && window.Widgets.callNumber) {
+                    // Set the click timestamp for fresh user gesture
+                    if (window.Widgets) {
+                      window.Widgets._lastClickToCallAt = Date.now();
+                    }
+                    // Use the CRM's call function with click-to-call source and auto-trigger
+                    window.Widgets.callNumber(phoneNumber, '', true, 'click-to-call');
+                  } else if (phoneNumber) {
+                    // Fallback to tel: link
+                    window.location.href = `tel:${phoneNumber}`;
+                  }
+                });
+              });
+            }, 100);
+            
+            // Recursively search for businesses near this new location
+            await searchNearbyBusinesses(nearbyPlace.location);
+          };
+
+          if (useAdvanced && nearbyMarker && typeof nearbyMarker.addListener === 'function') {
+            nearbyMarker.addListener('gmp-click', openNearbyInfo);
+          } else if (nearbyMarker && typeof nearbyMarker.addListener === 'function') {
+            nearbyMarker.addListener('click', openNearbyInfo);
+          }
+
+          window.mapsMarkers.push(nearbyMarker);
+        });
+      }
+    } catch (error) {
+      console.error('[Maps Widget] Error searching nearby businesses:', error);
+    }
+  }
+
+  // Search for places using the new Place API
+  async function searchPlaces(query) {
+    if (!query.trim()) return;
+
+    const searchInput = document.getElementById('maps-search-input');
+    if (searchInput) {
+      searchInput.value = query;
+    }
+
+    try {
+      // Use the new Place API instead of deprecated PlacesService
+      const { Place } = await google.maps.importLibrary("places");
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+      
+      // Create a text search request with basic fields first
+      const request = {
+        textQuery: query,
+        fields: [
+          'displayName', 
+          'location', 
+          'formattedAddress', 
+          'rating', 
+          'userRatingCount',
+          'nationalPhoneNumber',
+          'internationalPhoneNumber',
+          'businessStatus',
+          'priceLevel',
+          'types',
+          'photos'
+        ],
+        locationBias: map.getCenter(),
+        maxResultCount: 10
+      };
+
+      const { places } = await Place.searchByText(request);
+
+      if (places && places.length > 0) {
+        // Clear existing markers
+        if (window.mapsMarkers) {
+          window.mapsMarkers.forEach(marker => marker.setMap(null));
+        }
+        window.mapsMarkers = [];
+
+        // Add markers for each result
+        places.forEach(place => {
+          let marker;
+          const useAdvanced = Boolean(window.GOOGLE_MAP_ID) &&
+            google.maps && google.maps.marker &&
+            typeof google.maps.marker.AdvancedMarkerElement === 'function';
+
+          if (useAdvanced) {
+            marker = new google.maps.marker.AdvancedMarkerElement({
+              position: place.location,
+              map: map,
+              title: place.displayName
+            });
+          } else {
+            marker = new google.maps.Marker({
+              position: place.location,
+              map: map,
+              title: place.displayName
+            });
+          }
+
+          // Build rich info window content
+          const infoContent = buildInfoWindowContent(place);
+          const infoWindow = new google.maps.InfoWindow({ content: infoContent });
+
+          // Bind click per marker type - zoom in and show info
+          const openInfo = async () => {
+            // Zoom in on this specific location
+            map.setCenter(place.location);
+            map.setZoom(15); // Close-up view of the business
+            
+          // Show the info window
+          infoWindow.open({ anchor: marker, map });
+          
+          // Add click-to-call functionality after info window opens
+          setTimeout(() => {
+            const callLinks = document.querySelectorAll('.call-link');
+            callLinks.forEach(link => {
+              link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const phoneNumber = link.getAttribute('data-phone');
+                if (phoneNumber && window.Widgets && window.Widgets.callNumber) {
+                  // Set the click timestamp for fresh user gesture
+                  if (window.Widgets) {
+                    window.Widgets._lastClickToCallAt = Date.now();
+                  }
+                  // Use the CRM's call function with click-to-call source and auto-trigger
+                  window.Widgets.callNumber(phoneNumber, '', true, 'click-to-call');
+                } else if (phoneNumber) {
+                  // Fallback to tel: link
+                  window.location.href = `tel:${phoneNumber}`;
+                }
+              });
+            });
+          }, 100);
+          
+          // Search for nearby businesses for prospecting
+          await searchNearbyBusinesses(place.location);
+          };
+          
+          if (useAdvanced && marker && typeof marker.addListener === 'function') {
+            marker.addListener('gmp-click', openInfo);
+          } else if (marker && typeof marker.addListener === 'function') {
+            marker.addListener('click', openInfo);
+          }
+
+          window.mapsMarkers.push(marker);
+        });
+
+        // Fit map to show all results
+        if (places.length > 0) {
+          const bounds = new google.maps.LatLngBounds();
+          places.forEach(place => {
+            bounds.extend(place.location);
+          });
+          map.fitBounds(bounds);
+        }
+      } else {
+        // No results found
         const mapContainer = document.getElementById('maps-container');
         if (mapContainer) {
           mapContainer.innerHTML = `
             <div class="maps-error">
-              <div class="error-content">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="15" y1="9" x2="9" y2="15"/>
-                  <line x1="9" y1="9" x2="15" y2="15"/>
-                </svg>
-                <h4>Failed to load Google Maps</h4>
-                <p>Please check your internet connection and try again.</p>
-              </div>
+              <p>No locations found for "${query}"</p>
             </div>
           `;
         }
-      });
-
-    // Show widget with animation
-    requestAnimationFrame(() => {
-      widget.classList.add('show');
-    });
-  }
-
-  // Close the widget
-  function closeWidget() {
-    const widget = document.getElementById(WIDGET_ID);
-    if (!widget) return;
-
-    widget.classList.remove('show');
-    
-    setTimeout(() => {
-      widget.remove();
-      
-      // Clean up map and markers
-      if (window.mapsMarkers) {
-        window.mapsMarkers.forEach(marker => marker.setMap(null));
-        window.mapsMarkers = [];
       }
-      
-      map = null;
-      placesService = null;
-    }, 300);
-  }
-
-  // Handle widget button clicks
-  document.addEventListener('click', (e) => {
-    if (e.target.closest('[data-widget="maps"]')) {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // Determine if we're on account or contact detail page
-      const isAccountPage = document.getElementById('account-detail-view');
-      const isContactPage = document.getElementById('contact-detail-view');
-      
-      if (isAccountPage) {
-        // Get account ID from the page
-        const accountId = window.AccountDetail?.state?.accountId;
-        if (accountId) {
-          window.Widgets.openMapsForAccount(accountId);
-        }
-      } else if (isContactPage) {
-        // Get contact ID from the page
-        const contactId = window.ContactDetail?.state?.contactId;
-        if (contactId) {
-          window.Widgets.openMaps(contactId);
-        }
+    } catch (error) {
+      console.error('[Maps Widget] Error searching places:', error);
+      const mapContainer = document.getElementById('maps-container');
+      if (mapContainer) {
+        mapContainer.innerHTML = `
+          <div class="maps-error">
+            <p>Error searching for locations. Please try again.</p>
+          </div>
+        `;
       }
     }
-  });
+  }
+
+  // Setup event listeners
+  function setupEventListeners() {
+    // Close button
+    const closeBtn = document.querySelector('.maps-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeMapsWidget);
+    }
+
+    // Search button
+    const searchBtn = document.getElementById('maps-search-btn');
+    if (searchBtn) {
+      searchBtn.addEventListener('click', () => {
+        const input = document.getElementById('maps-search-input');
+        if (input && input.value.trim()) {
+          searchPlaces(input.value.trim());
+        }
+      });
+    }
+
+    // Search input enter key
+    const searchInput = document.getElementById('maps-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && e.target.value.trim()) {
+          searchPlaces(e.target.value.trim());
+        }
+      });
+    }
+  }
+
+  // Open maps widget for contact
+  function openMaps(contactId) {
+    currentContactId = contactId;
+    currentAccountId = null;
+    currentEntityType = 'contact';
+    
+    removeExistingWidget();
+    
+    const panelContent = getPanelContentEl();
+    if (!panelContent) {
+      console.error('[Maps Widget] Widget panel not found');
+      return;
+    }
+
+    const card = createWidgetCard();
+    
+    // Smooth expand-in animation that pushes other widgets down (like notes widget)
+    const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!prefersReduce) {
+      try { card.classList.add('maps-anim'); } catch (_) {}
+      // Prevent flash before we collapse and read paddings after insertion
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-6px)';
+    }
+
+    // Insert at the top of the panel content to slide down from top
+    if (panelContent.firstChild) {
+      panelContent.insertBefore(card, panelContent.firstChild);
+    } else {
+      panelContent.appendChild(card);
+    }
+
+    if (!prefersReduce) {
+      // Collapse now that it's in the DOM, and store paddings
+      const cs = window.getComputedStyle(card);
+      const pt = parseFloat(cs.paddingTop) || 0;
+      const pb = parseFloat(cs.paddingBottom) || 0;
+      card.dataset._pt = String(pt);
+      card.dataset._pb = String(pb);
+      card.style.overflow = 'hidden';
+      card.style.height = '0px';
+      card.style.paddingTop = '0px';
+      card.style.paddingBottom = '0px';
+
+      // Next frame: expand to natural height + paddings
+      requestAnimationFrame(() => {
+        // scrollHeight here is content height because padding is 0; don't add padding to height to avoid double-count
+        const target = card.scrollHeight;
+        card.style.transition = 'height 360ms ease-out, opacity 360ms ease-out, transform 360ms ease-out, padding-top 360ms ease-out, padding-bottom 360ms ease-out';
+        card.style.height = target + 'px';
+        card.style.paddingTop = pt + 'px';
+        card.style.paddingBottom = pb + 'px';
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+        const pending = new Set(['height', 'padding-top', 'padding-bottom']);
+        const onEnd = (e) => {
+          if (!e) return;
+          if (pending.has(e.propertyName)) pending.delete(e.propertyName);
+          if (pending.size > 0) return;
+          card.removeEventListener('transitionend', onEnd);
+          // Clean up transition styles
+          card.style.transition = '';
+          card.style.overflow = '';
+          card.style.height = '';
+        };
+        card.addEventListener('transitionend', onEnd);
+      });
+    }
+
+    // Setup event listeners
+    setupEventListeners();
+
+    // Initialize map after a short delay to ensure DOM is ready
+    setTimeout(() => {
+      initializeMap();
+    }, 100);
+  }
+
+  // Open maps widget for account
+  function openMapsForAccount(accountId) {
+    currentAccountId = accountId;
+    currentContactId = null;
+    currentEntityType = 'account';
+    
+    removeExistingWidget();
+    
+    const panelContent = getPanelContentEl();
+    if (!panelContent) {
+      console.error('[Maps Widget] Widget panel not found');
+      return;
+    }
+
+    const card = createWidgetCard();
+    
+    // Smooth expand-in animation that pushes other widgets down (like notes widget)
+    const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!prefersReduce) {
+      try { card.classList.add('maps-anim'); } catch (_) {}
+      // Prevent flash before we collapse and read paddings after insertion
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-6px)';
+    }
+
+    // Insert at the top of the panel content to slide down from top
+    if (panelContent.firstChild) {
+      panelContent.insertBefore(card, panelContent.firstChild);
+    } else {
+      panelContent.appendChild(card);
+    }
+
+    if (!prefersReduce) {
+      // Collapse now that it's in the DOM, and store paddings
+      const cs = window.getComputedStyle(card);
+      const pt = parseFloat(cs.paddingTop) || 0;
+      const pb = parseFloat(cs.paddingBottom) || 0;
+      card.dataset._pt = String(pt);
+      card.dataset._pb = String(pb);
+      card.style.overflow = 'hidden';
+      card.style.height = '0px';
+      card.style.paddingTop = '0px';
+      card.style.paddingBottom = '0px';
+
+      // Next frame: expand to natural height + paddings
+      requestAnimationFrame(() => {
+        // scrollHeight here is content height because padding is 0; don't add padding to height to avoid double-count
+        const target = card.scrollHeight;
+        card.style.transition = 'height 360ms ease-out, opacity 360ms ease-out, transform 360ms ease-out, padding-top 360ms ease-out, padding-bottom 360ms ease-out';
+        card.style.height = target + 'px';
+        card.style.paddingTop = pt + 'px';
+        card.style.paddingBottom = pb + 'px';
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+        const pending = new Set(['height', 'padding-top', 'padding-bottom']);
+        const onEnd = (e) => {
+          if (!e) return;
+          if (pending.has(e.propertyName)) pending.delete(e.propertyName);
+          if (pending.size > 0) return;
+          card.removeEventListener('transitionend', onEnd);
+          // Clean up transition styles
+          card.style.transition = '';
+          card.style.overflow = '';
+          card.style.height = '';
+        };
+        card.addEventListener('transitionend', onEnd);
+      });
+    }
+
+    // Setup event listeners
+    setupEventListeners();
+
+    // Initialize map after a short delay to ensure DOM is ready
+    setTimeout(() => {
+      initializeMap();
+    }, 100);
+  }
+
+  // Check if maps widget is open
+  function isMapsOpen() {
+    return document.getElementById(WIDGET_ID) !== null;
+  }
+
+  // Close maps widget
+  function closeMaps() {
+    closeMapsWidget();
+  }
+
+  // Expose public API
+  window.Widgets.openMaps = openMaps;
+  window.Widgets.openMapsForAccount = openMapsForAccount;
+  window.Widgets.isMapsOpen = isMapsOpen;
+  window.Widgets.closeMaps = closeMaps;
 
 })();

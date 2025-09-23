@@ -563,6 +563,22 @@
         try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) {}
         break;
       }
+      case 'maps': {
+        // Toggle Google Maps: if open, close; else open for this contact
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen()) {
+              if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
+            } else if (typeof api.openMaps === 'function') {
+              api.openMaps(contactId); return;
+            }
+          } catch (_) { /* noop */ }
+        }
+        console.log('Widget: Google Maps for contact', contactId);
+        try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) {}
+        break;
+      }
       default:
         console.log('Unknown widget action:', which, 'for contact', contactId);
     }
@@ -3648,8 +3664,8 @@
       durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
     }
     
-    // Prefer normalized counterparty number computed by calls page; fallback to raw
-    const phone = escapeHtml(String(c.counterpartyPretty || c.contactPhone || c.to || c.from || ''));
+    // Prefer the real dialed/peer number: use targetPhone/to/from; fallback to counterpartyPretty
+    const phone = escapeHtml(String(c.targetPhone || c.to || c.from || c.contactPhone || c.counterpartyPretty || ''));
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
     return `
       <div class="rc-item">
@@ -3687,11 +3703,13 @@
           window.ToastManager.showToast({
             type: 'info',
             title: 'Processing Call',
-            message: 'Starting conversational intelligence analysis...'
+            message: 'Starting conversational intelligence analysis...',
+            sound: false
           }); 
         } 
       } catch(_) {}
-      const response = await fetch('/api/twilio/ci-request', {
+      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+      const response = await fetch(`${base}/api/twilio/ci-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ callSid: callSid, recordingSid: recordingSid })

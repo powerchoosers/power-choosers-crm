@@ -490,14 +490,19 @@
           // Capture return state so Account Detail can restore Accounts on back
           try {
             window._accountNavigationSource = 'accounts';
-            window._accountsReturn = {
-              page: state.currentPage,
-              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-              searchTerm: els.quickSearch ? els.quickSearch.value : '',
-              sortColumn: state.sortColumn,
-              sortDirection: state.sortDirection,
-              selectedItems: Array.from(state.selected || [])
-            };
+            // Prefer module API to capture a consistent snapshot
+            if (window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
+              window._accountsReturn = window.accountsModule.getCurrentState();
+            } else {
+              window._accountsReturn = {
+                page: state.currentPage,
+                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                searchTerm: els.quickSearch ? els.quickSearch.value : '',
+                sortColumn: state.sortColumn,
+                sortDirection: state.sortDirection,
+                selectedItems: Array.from(state.selected || [])
+              };
+            }
           } catch (_) { /* noop */ }
           window.AccountDetail.show(id);
         }
@@ -606,8 +611,13 @@
       state.filtered = state.data.slice();
       state.loaded = true;
       state.errorMsg = '';
+      // While restoring from back-nav, do not reset to page 1
       if (!window.__restoringAccounts) {
         state.currentPage = 1;
+      }
+      // Extra guard: if restoring hint is set but stale, clear it
+      if (window.__restoringAccountsUntil && Date.now() > window.__restoringAccountsUntil) {
+        try { window.__restoringAccounts = false; window.__restoringAccountsUntil = 0; } catch(_) {}
       }
       render();
     } catch (e) {
@@ -617,6 +627,9 @@
       state.errorMsg = (e && (e.message || e.code)) ? String(e.message || e.code) : 'Unknown error';
       if (!window.__restoringAccounts) {
         state.currentPage = 1;
+      }
+      if (window.__restoringAccountsUntil && Date.now() > window.__restoringAccountsUntil) {
+        try { window.__restoringAccounts = false; window.__restoringAccountsUntil = 0; } catch(_) {}
       }
       render();
     }
@@ -682,6 +695,9 @@
 
     if (!window.__restoringAccounts) {
       state.currentPage = 1;
+    }
+    if (window.__restoringAccountsUntil && Date.now() > window.__restoringAccountsUntil) {
+      try { window.__restoringAccounts = false; window.__restoringAccountsUntil = 0; } catch(_) {}
     }
     render();
   }
