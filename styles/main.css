@@ -13542,92 +13542,21 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     padding: 0 var(--spacing-md);
 }
 
-/* === SETTINGS PAGE STYLES === */
-.settings-sections {
+/* === SETTINGS PAGE STYLES (SCOPED TO #settings-page) === */
+#settings-page .settings-sections {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
 }
 
-/* Revamped settings layout */
-.settings-layout {
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    gap: var(--spacing-xl);
-}
-
-.settings-sidebar {
-    position: sticky;
-    top: 84px;
-    height: fit-content;
-}
-
-.settings-nav {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+#settings-page .settings-section {
     background: var(--bg-container);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     overflow: hidden;
 }
 
-.settings-nav .nav-item {
-    padding: 12px 14px;
-    color: var(--text-secondary);
-    text-decoration: none;
-    display: block;
-    transition: var(--transition-fast);
-}
-
-.settings-nav .nav-item:hover,
-.settings-nav .nav-item.active {
-    color: var(--text-primary);
-    background: var(--bg-secondary);
-}
-
-.settings-main { min-width: 0; }
-
-.settings-card {
-    background: var(--bg-container);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-lg);
-    margin-bottom: var(--spacing-lg);
-}
-
-.card-title {
-    margin: 0 0 var(--spacing-md) 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.subhead { margin: 0 0 8px 0; color: var(--text-primary); font-size: 14px; font-weight: 600; }
-
-.card-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--spacing-lg);
-}
-
-.card-field { display: flex; flex-direction: column; }
-.card-field.span-2 { grid-column: span 2; }
-
-@media (max-width: 980px) {
-    .settings-layout { grid-template-columns: 1fr; }
-    .settings-sidebar { position: static; }
-    .card-grid { grid-template-columns: 1fr; }
-}
-
-.settings-section {
-    background: var(--bg-container);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius);
-    overflow: hidden;
-}
-
-.settings-section-title {
+#settings-page .settings-section-title {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
@@ -13640,35 +13569,35 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     color: var(--text-primary);
 }
 
-.settings-section-title svg {
+#settings-page .settings-section-title svg {
     color: var(--orange-primary);
 }
 
-.settings-content {
+#settings-page .settings-content {
     padding: var(--spacing-lg);
 }
 
-.section-desc {
+#settings-page .section-desc {
     margin: -8px var(--spacing-lg) var(--spacing-md) var(--spacing-lg);
     color: var(--text-secondary);
     font-size: 0.92rem;
 }
 
-.settings-hint {
+#settings-page .settings-hint {
     margin-top: 6px;
     color: var(--text-muted);
     font-size: 0.85rem;
 }
 
-.settings-group {
+#settings-page .settings-group {
     margin-bottom: var(--spacing-xl);
 }
 
-.settings-group:last-child {
+#settings-page .settings-group:last-child {
     margin-bottom: 0;
 }
 
-.settings-group-title {
+#settings-page .settings-group-title {
     margin: 0 0 var(--spacing-md) 0;
     font-size: 16px;
     font-weight: 600;
@@ -13677,15 +13606,15 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     padding-bottom: var(--spacing-xs);
 }
 
-.settings-field {
+#settings-page .settings-field {
     margin-bottom: var(--spacing-md);
 }
 
-.settings-field:last-child {
+#settings-page .settings-field:last-child {
     margin-bottom: 0;
 }
 
-.settings-field label {
+#settings-page .settings-field label {
     display: block;
     margin-bottom: var(--spacing-xs);
     font-weight: 500;
@@ -13693,7 +13622,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-size: 14px;
 }
 
-.settings-textarea {
+#settings-page .settings-textarea {
     width: 100%;
     min-height: 80px;
     padding: var(--spacing-sm);
@@ -13707,13 +13636,13 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     transition: var(--transition-fast);
 }
 
-.settings-textarea:focus {
+#settings-page .settings-textarea:focus {
     outline: none;
     border-color: var(--orange-primary);
     box-shadow: 0 0 0 2px var(--orange-muted);
 }
 
-.settings-select {
+#settings-page .settings-select {
     width: 100%;
     padding: var(--spacing-sm);
     border: 1px solid var(--border-light);
@@ -13724,26 +13653,26 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     transition: var(--transition-fast);
 }
 
-.settings-select:focus {
+#settings-page .settings-select:focus {
     outline: none;
     border-color: var(--orange-primary);
     box-shadow: 0 0 0 2px var(--orange-muted);
 }
 
 /* Image upload area */
-.image-upload-area {
+#settings-page .image-upload-area {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
 }
 
-.image-upload-area .btn-secondary {
+#settings-page .image-upload-area .btn-secondary {
     width: auto;
     max-width: 200px;
     align-self: flex-start;
 }
 
-.image-preview {
+#settings-page .image-preview {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
@@ -13753,16 +13682,16 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     border-radius: var(--border-radius);
 }
 
-.image-preview img {
+#settings-page .image-preview img {
     border-radius: var(--border-radius);
 }
 
 /* Phone numbers list */
-.phone-numbers-list {
+#settings-page .phone-numbers-list {
     margin-bottom: var(--spacing-md);
 }
 
-.phone-number-item {
+#settings-page .phone-number-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -13773,41 +13702,41 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     margin-bottom: var(--spacing-sm);
 }
 
-.phone-number-item:last-child {
+#settings-page .phone-number-item:last-child {
     margin-bottom: 0;
 }
 
-.phone-number-item.empty-state {
+#settings-page .phone-number-item.empty-state {
     justify-content: center;
     text-align: center;
     color: var(--text-secondary);
     font-style: italic;
 }
 
-.phone-info {
+#settings-page .phone-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
-.phone-number {
+#settings-page .phone-number {
     font-weight: 600;
     color: var(--text-primary);
     font-size: 16px;
 }
 
-.phone-label {
+#settings-page .phone-label {
     color: var(--text-secondary);
     font-size: 14px;
 }
 
-.phone-actions {
+#settings-page .phone-actions {
     display: flex;
     gap: var(--spacing-xs);
 }
 
-/* Checkbox styling */
-.checkbox-label {
+/* Checkbox styling - SCOPED TO SETTINGS PAGE ONLY */
+#settings-page .checkbox-label {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
@@ -13816,8 +13745,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     color: var(--text-primary);
 }
 
-/* hidden via earlier rule; keep here for older blocks */
-.checkbox-label input[type="checkbox"] {
+#settings-page .checkbox-label input[type="checkbox"] {
     position: absolute;
     opacity: 0;
     width: 0;
@@ -13826,7 +13754,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     pointer-events: none;
 }
 
-.checkmark {
+#settings-page .checkmark {
     position: relative;
     display: inline-block;
     width: 18px;
@@ -13838,12 +13766,12 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     transition: var(--transition-fast);
 }
 
-.checkbox-label input[type="checkbox"]:checked + .checkmark {
+#settings-page .checkbox-label input[type="checkbox"]:checked + .checkmark {
     background: var(--orange-primary);
     border-color: var(--orange-primary);
 }
 
-.checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+#settings-page .checkbox-label input[type="checkbox"]:checked + .checkmark::after {
     content: '';
     position: absolute;
     left: 6px;
@@ -13856,49 +13784,49 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 }
 
 /* Button styling for settings */
-.btn-small {
+#settings-page .btn-small {
     padding: var(--spacing-xs) var(--spacing-sm);
     font-size: 12px;
     height: auto;
     min-height: 28px;
 }
 
-.btn-danger {
+#settings-page .btn-danger {
     background: var(--red-subtle);
     border-color: var(--red-subtle);
     color: white;
 }
 
-.btn-danger:hover {
+#settings-page .btn-danger:hover {
     background: #c82333;
     border-color: #bd2130;
     color: white;
 }
 
 /* Save button state */
-#save-settings-btn:disabled {
+#settings-page #save-settings-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
 
-#save-settings-btn:disabled:hover {
+#settings-page #save-settings-btn:disabled:hover {
     background: var(--orange-primary);
     border-color: var(--orange-primary);
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .settings-content {
+    #settings-page .settings-content {
         padding: var(--spacing-md);
     }
 
-    .phone-number-item {
+    #settings-page .phone-number-item {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--spacing-sm);
     }
 
-    .phone-actions {
+    #settings-page .phone-actions {
         align-self: flex-end;
     }
 }
