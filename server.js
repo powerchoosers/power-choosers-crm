@@ -155,6 +155,31 @@ async function handleApiTwilioConversationalIntelligence(req, res) {
   }
 }
 
+// Proxy Twilio CI request (starts transcript processing) to Vercel
+async function handleApiTwilioCIRequest(req, res) {
+  try {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+    const body = await readJsonBody(req);
+    const upstream = await fetch(`${API_BASE_URL}/api/twilio/ci-request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const text = await upstream.text();
+    let payload; try { payload = text ? JSON.parse(text) : {}; } catch(_) { payload = { ok: false, body: text }; }
+    res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(payload));
+  } catch (error) {
+    console.error('[Twilio CI Request] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
 // Proxy Twilio Conversational Intelligence webhook (Twilio -> our API)
 async function handleApiTwilioConversationalIntelligenceWebhook(req, res) {
   try {
@@ -430,6 +455,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/language-webhook' ||
     pathname === '/api/twilio/conversational-intelligence' ||
     pathname === '/api/twilio/conversational-intelligence-webhook' ||
+    pathname === '/api/twilio/ci-request' ||
     pathname === '/api/twilio/recording' ||
     pathname === '/api/twilio/ai-insights' ||
     pathname === '/api/energy-news' ||
@@ -468,6 +494,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/twilio/conversational-intelligence') {
     return handleApiTwilioConversationalIntelligence(req, res);
+  }
+  if (pathname === '/api/twilio/ci-request') {
+    return handleApiTwilioCIRequest(req, res);
   }
   if (pathname === '/api/twilio/conversational-intelligence-webhook') {
     return handleApiTwilioConversationalIntelligenceWebhook(req, res);
