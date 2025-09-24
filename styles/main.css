@@ -5846,16 +5846,6 @@ html, body {
   color: var(--text-secondary);
 }
 
-/* === Live Call Insights Widget === */
-.live-call-insights-widget {
-  /* Inherit background, border, radius, and padding from .widget-card */
-  margin-bottom: 0; /* Avoid double gap; .widget-content supplies spacing via gap */
-}
-
-/* Force identical outer padding as other widgets (25px sides) */
-.live-call-insights-widget.widget-card {
-  padding: var(--spacing-md) var(--spacing-base) var(--spacing-base) var(--spacing-base);
-}
 
 .live-insights-header {
   display: flex;
@@ -5871,10 +5861,7 @@ html, body {
   font-weight: 600;
 }
 
-/* Ensure exact outer padding to match other widget cards */
-#live-call-insights.widget-card {
-  padding: var(--spacing-md) var(--spacing-base) var(--spacing-base) var(--spacing-base);
-}
+/* live-call-insights styles removed per request */
 
 .live-status {
   display: flex;

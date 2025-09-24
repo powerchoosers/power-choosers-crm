@@ -2225,28 +2225,19 @@
           setInCallUI(false);
           console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
           
-          // CRITICAL: Terminate any active server-side call to prevent callback loops
+          // CRITICAL: Terminate any active server-side call without blocking UI
           if (window.currentServerCallSid) {
+            const sidToTerminate = window.currentServerCallSid;
+            window.currentServerCallSid = null;
             try {
               const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-              console.debug('[Phone] DISCONNECT: Terminating server call SID:', window.currentServerCallSid);
-              
-              const terminateResponse = await fetch(`${base}/api/twilio/hangup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ callSid: window.currentServerCallSid })
-              });
-              
-              if (terminateResponse.ok) {
-                console.debug('[Phone] DISCONNECT: Server call terminated successfully');
-              } else {
-                console.warn('[Phone] DISCONNECT: Failed to terminate server call:', terminateResponse.status);
-              }
-            } catch (e) {
-              console.error('[Phone] DISCONNECT: Error terminating server call:', e);
-            } finally {
-              window.currentServerCallSid = null;
-            }
+              console.debug('[Phone] DISCONNECT: Terminating server call SID (non-blocking):', sidToTerminate);
+              // Fire-and-forget; do not await
+              fetch(`${base}/api/twilio/hangup`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callSid: sidToTerminate })
+              }).catch(()=>{});
+            } catch(_) { /* ignore */ }
           }
           
           // Release the input device to avoid the red recording symbol
