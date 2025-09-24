@@ -467,7 +467,7 @@
       ]
     },
     pathA: {
-      text: "Got it. now {{contact.first_name}}, we've been working with other {{account.industry}}'s in {{account.city}}, and my main job here — is to make sure account holders like yourself aren't — blind sided by next years' rate increases.. <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>",
+      text: "Got it. now {{contact.first_name}}, I work directly with NRG, TXU, APG & E —  and rates are about to go up for every supplier next year... <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>",
       responses: [
         { label: "It's tough / struggling", next: 'pathA_struggling' },
         { label: 'Have not renewed / contract not up yet', next: 'pathA_not_renewed' },

@@ -1574,8 +1574,9 @@
         </div>
         <div class="dial-actions">
           <button type="button" class="btn-primary call-btn-start" title="Call">Call</button>
-          <button type="button" class="btn-text clear-btn" title="Clear">Clear</button>
+          <button type="button" class="btn-text scripts-toggle" title="Scripts">Scripts</button>
         </div>
+        <div class="mini-scripts-wrap" hidden></div>
       </div>
     `;
 
@@ -1599,6 +1600,324 @@
       input.value = '';
       try { input.focus(); } catch (_) {}
     };
+
+    // --- Mini Scripts (embedded call scripts) ---
+    function ensureMiniScriptsStyles(){
+      if (document.getElementById('phone-mini-scripts-styles')) return;
+      const style = document.createElement('style');
+      style.id = 'phone-mini-scripts-styles';
+      style.textContent = `
+        .mini-scripts { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px; margin-top: 10px; }
+        .mini-scripts .ms-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .mini-scripts .ms-search { position: relative; display: flex; align-items: center; gap: 8px; flex: 1; }
+        .mini-scripts .ms-search input { flex: 1; }
+        .mini-scripts .ms-actions { display: flex; gap: 6px; }
+        .mini-scripts .ms-suggest { position: absolute; top: 34px; left: 0; right: 0; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; z-index: 50; max-height: 200px; overflow: auto; padding: 6px 0; }
+        .mini-scripts .ms-suggest[hidden] { display: none; }
+        .mini-scripts .ms-suggest .item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; }
+        .mini-scripts .ms-suggest .item:hover { background: var(--bg-subtle); }
+        .mini-scripts .ms-suggest .glyph { width: 20px; height: 20px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 11px; font-weight: 700; }
+        .mini-scripts .ms-row { display: flex; gap: 8px; margin: 8px 0; }
+        .mini-scripts .ms-row .btn-secondary { flex: 1; }
+        .mini-scripts .ms-row.--single { justify-content: stretch; }
+        .mini-scripts .ms-display { color: var(--text-primary); line-height: 1.4; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; margin: 8px 0; }
+        .mini-scripts .ms-responses { display: flex; flex-wrap: wrap; gap: 8px; }
+        .mini-scripts .ms-var { color: var(--grey-400); font-weight: 400; }
+        .mini-scripts .ms-toolbar { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+        .mini-scripts .icon-btn { background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 6px; border-radius: 6px; transition: color 0.2s ease; }
+        .mini-scripts .icon-btn:hover { color: var(--text-inverse); }
+      `;
+      document.head.appendChild(style);
+    }
+
+    function buildMiniScriptsUI(card){
+      ensureMiniScriptsStyles();
+      const body = card.querySelector('.phone-body');
+      const wrap = card.querySelector('.mini-scripts-wrap');
+      if (!body || !wrap) return;
+
+      // Clear and build shell
+      wrap.innerHTML = '';
+      const el = document.createElement('div');
+      el.className = 'mini-scripts';
+      el.innerHTML = `
+        <div class="ms-top">
+          <div class="ms-search">
+            <input type="text" class="input-dark ms-input" placeholder="Search contact for this call…" aria-label="Search contact" autocomplete="off" />
+            <div class="ms-suggest" role="listbox" aria-label="Contact suggestions" hidden></div>
+          </div>
+          <div class="ms-actions">
+            <button type="button" class="icon-btn ms-back" title="Back" aria-label="Back" data-action="back">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
+            <button type="button" class="icon-btn ms-reset" title="Reset" aria-label="Reset" data-action="reset">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15A9 9 0 1 1 17 8.5L23 10"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="ms-row">
+          <button type="button" class="btn-secondary ms-gk">Gate Keeper</button>
+          <button type="button" class="btn-secondary ms-vm">Voicemail</button>
+        </div>
+        <div class="ms-row --single">
+          <button type="button" class="btn-secondary ms-dm">Decision Maker</button>
+        </div>
+        <div class="ms-display" aria-live="polite"></div>
+        <div class="ms-responses"></div>
+      `;
+      wrap.appendChild(el);
+
+      const state = { current: '', history: [], overrideContactId: null };
+
+      // Data helpers (subset from scripts page)
+      function escapeHtml(str){ if (str == null) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+      function splitName(s){ const parts = String(s||'').trim().split(/\s+/); return { first: parts[0]||'', last: parts.slice(1).join(' ')||'', full: String(s||'').trim() }; }
+      function normPhone(p){ return String(p||'').replace(/\D/g,'').slice(-10); }
+      function normDomain(email){ return String(email||'').split('@')[1]?.toLowerCase() || ''; }
+      function normName(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim(); }
+      function getPeopleCache(){ try { return (typeof window.getPeopleData==='function' ? (window.getPeopleData()||[]) : []); } catch(_) { return []; } }
+      function getAccountsCache(){ try { return (typeof window.getAccountsData==='function' ? (window.getAccountsData()||[]) : []); } catch(_) { return []; } }
+      function formatDateMDY(v){ try { const d = new Date(v); if (!isFinite(+d)) return String(v||''); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0'); const yyyy = d.getFullYear(); return `${mm}/${dd}/${yyyy}`; } catch(_) { return String(v||''); } }
+      function toMDY(v){ try { const d = new Date(v); if (!isFinite(+d)) return String(v||''); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0'); const yyyy = d.getFullYear(); return `${mm}/${dd}/${yyyy}`; } catch(_) { return String(v||''); } }
+
+      function normalizeAccount(a){ const obj = a ? { ...a } : {}; obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || obj.energySupplier || obj.electricitySupplier || obj.supplierName || ''; const end = obj.contractEnd || obj.contract_end || obj.renewalDate || obj.renewal_date || obj.contractEndDate || obj.contract_end_date || obj.contractExpiry || obj.expiration || obj.expirationDate || obj.expiresOn || ''; obj.contract_end = end || ''; obj.contractEnd = end || obj.contractEnd || ''; obj.name = obj.name || obj.accountName || obj.companyName || ''; obj.industry = obj.industry || ''; obj.city = obj.city || obj.locationCity || obj.billingCity || ''; obj.state = obj.state || obj.region || obj.billingState || ''; obj.website = obj.website || obj.domain || ''; obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || ''; return obj; }
+      function normalizeContact(c){ const obj = c ? { ...c } : {}; const nameGuess = obj.name || ((obj.firstName||obj.first_name||'') + ' ' + (obj.lastName||obj.last_name||'')).trim(); const sp = splitName(nameGuess); obj.firstName = obj.firstName || obj.first_name || sp.first; obj.lastName = obj.lastName || obj.last_name || sp.last; obj.full_name = obj.full_name || sp.full; obj.first_name = obj.firstName; obj.last_name = obj.lastName; obj.email = obj.email || obj.work_email || obj.personal_email || ''; obj.title = obj.title || obj.jobTitle || obj.job_title || ''; obj.company = obj.company || obj.companyName || ''; obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || ''; return obj; }
+
+      function findAccountForContact(contact){ if (!contact) return {}; const accounts = getAccountsCache(); try { if (contact.accountId) { const hitById = accounts.find(a => String(a.id||a.accountId||'') === String(contact.accountId)); if (hitById) return hitById; } } catch(_) {} const clean = (s)=> String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim(); const comp = clean(contact.company||contact.companyName||''); if (comp) { const hit = accounts.find(a=> { const nm = clean(a.accountName||a.name||a.companyName||''); return nm && nm === comp; }); if (hit) return hit; } const domain = normDomain(contact.email||''); if (domain) { const match = accounts.find(a=> { const d = String(a.domain||a.website||'').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0]; return d && (domain.endsWith(d) || d.endsWith(domain)); }); if (match) return match; } return {}; }
+
+      function getAccountKey(a){ return String((a && (a.accountName||a.name||a.companyName||''))||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim(); }
+
+      function getLiveData(){
+        // Build from current call context + optional override contact
+        const ctx = currentCallContext || {};
+        let contact = null; let account = null;
+        // Prefer override contact if selected
+        try {
+          if (state.overrideContactId) {
+            const people = getPeopleCache();
+            contact = people.find(p => String(p.id||p.contactId||p._id||'') === String(state.overrideContactId)) || null;
+          }
+        } catch(_) {}
+        // If not selected, try to infer from context name
+        if (!contact && ctx && ctx.name) {
+          try {
+            const people = getPeopleCache();
+            const nm = normName(ctx.name);
+            contact = people.find(p => normName(p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) === nm) || null;
+          } catch(_) {}
+        }
+        // Resolve account from contact or context
+        try { account = findAccountForContact(contact) || {}; } catch(_) { account = {}; }
+        if (!account || !account.name) {
+          const accounts = getAccountsCache();
+          const nm = String(ctx.company||'').trim();
+          if (nm) {
+            const hit = accounts.find(a => getAccountKey(a) === getAccountKey({ name: nm }));
+            if (hit) account = hit;
+          }
+        }
+        contact = normalizeContact(contact);
+        account = normalizeAccount(account);
+
+        // Read live Energy fields from Account Detail DOM and Health widget
+        try {
+          const detailSupplier = document.querySelector('#account-detail-view .info-value-wrap[data-field="electricitySupplier"] .info-value-text')?.textContent?.trim() || '';
+          const detailContractEnd = document.querySelector('#account-detail-view .info-value-wrap[data-field="contractEndDate"] .info-value-text')?.textContent?.trim() || '';
+          const healthSupplier = document.querySelector('#health-supplier')?.value?.trim();
+          const healthContractEnd = document.querySelector('#health-contract-end')?.value;
+          const finalSupplier = healthSupplier || detailSupplier;
+          const finalContractEnd = healthContractEnd ? toMDY(healthContractEnd) : detailContractEnd;
+          if (finalSupplier) account.supplier = finalSupplier;
+          if (finalContractEnd) { account.contract_end = finalContractEnd; account.contractEnd = finalContractEnd; }
+        } catch(_) {}
+
+        // Borrow missing from contact if needed
+        if (!account.supplier && contact.supplier) account.supplier = contact.supplier;
+        if (!account.contract_end && contact.contract_end) account.contract_end = contact.contract_end;
+        if (!account.contractEnd && contact.contract_end) account.contractEnd = contact.contract_end;
+
+        return { contact, account };
+      }
+
+      function dayPart(){ try { const h = new Date().getHours(); if (h < 12) return 'morning'; if (h < 17) return 'afternoon'; return 'evening'; } catch(_) { return 'day'; } }
+      function chip(scope, key){
+        const friendly = {
+          'name': 'company name',
+          'first_name': 'first name',
+          'last_name': 'last name',
+          'full_name': 'full name',
+          'phone': 'phone',
+          'mobile': 'mobile',
+          'email': 'email',
+          'title': 'title',
+          'supplier': 'supplier',
+          'contract_end': 'contract end',
+          'industry': 'industry',
+          'city': 'city',
+          'state': 'state',
+          'website': 'website'
+        }[key] || String(key).replace(/_/g,' ').toLowerCase();
+        const token = `{{${scope}.${key}}}`;
+        return `<span class="var-chip" data-var="${scope}.${key}" data-token="${token}" contenteditable="false">${friendly}</span>`;
+      }
+      function renderTemplateChips(str){
+        if (!str) return '';
+        // Replace known tokens with chips without substituting live values
+        let result = String(str);
+        // day.part should always render as actual text
+        try {
+          const dp = dayPart();
+          result = result.replace(/\{\{\s*day\.part\s*\}\}/gi, escapeHtml(dp));
+        } catch(_) {}
+        const tokens = [
+          'contact.first_name','contact.last_name','contact.full_name','contact.phone','contact.mobile','contact.email','contact.title',
+          'account.name','account.industry','account.city','account.state','account.website','account.supplier','account.contract_end'
+        ];
+        tokens.forEach(key => {
+          const [scope, k] = key.split('.');
+          const pattern = new RegExp(`\\{\\{\\s*${key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\}}`, 'gi');
+          if (scope && k) result = result.replace(pattern, chip(scope, k));
+        });
+        return result;
+      }
+
+      function renderTemplateValues(str){
+        if (!str) return '';
+        const data = getLiveData();
+        const values = {
+          'day.part': dayPart(),
+          'contact.first_name': data.contact.firstName || data.contact.first_name || '',
+          'contact.last_name': data.contact.lastName || data.contact.last_name || '',
+          'contact.full_name': data.contact.full_name || ((data.contact.firstName||'') + ' ' + (data.contact.lastName||'')),
+          'contact.phone': data.contact.workDirectPhone || data.contact.mobile || data.contact.otherPhone || data.contact.phone || '',
+          'contact.mobile': data.contact.mobile || '',
+          'contact.email': data.contact.email || '',
+          'contact.title': data.contact.title || data.contact.jobTitle || '',
+          'account.name': data.account.name || data.account.accountName || data.account.companyName || '',
+          'account.industry': data.account.industry || '',
+          'account.city': data.account.city || '',
+          'account.state': data.account.state || data.account.region || data.account.billingState || '',
+          'account.website': data.account.website || data.account.domain || normDomain(data.contact.email) || '',
+          'account.supplier': data.account.supplier || data.account.currentSupplier || data.contact.supplier || data.contact.currentSupplier || '',
+          'account.contract_end': formatDateMDY(data.account.contractEnd || data.account.contract_end || data.account.renewalDate || data.contact.contract_end || data.contact.contractEnd || '')
+        };
+        let result = String(str);
+        for (const [key, value] of Object.entries(values)) {
+          const pattern = new RegExp(`\\{\\{\\s*${key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\}}`, 'gi');
+          result = result.replace(pattern, escapeHtml(value || ''));
+        }
+        return result;
+      }
+
+      // Flow: prefer scripts page FLOW if exported; fallback to local subset
+      const FLOW = (window.callScriptsModule && window.callScriptsModule.FLOW) || {
+        hook: { text: 'Good {{day.part}}, is this {{contact.first_name}}?', responses: [ { label: 'Yes, this is', next: 'main_script_start' }, { label: 'Not me', next: 'gatekeeper_intro' } ] },
+        main_script_start: { text: "Perfect — So, my name is Lewis with PowerChoosers.com, and — I understand you're responsible for electricity agreements and contracts for {{account.name}}. Is that still accurate?", responses: [ { label: "Yes, that's me / I handle that", next: 'pathA' }, { label: 'That would be someone else / not the right person', next: 'gatekeeper_intro' } ] },
+        gatekeeper_intro: { text: 'Good {{day.part}}. I am looking to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?', responses: [ { label: "What's this about?", next: 'gatekeeper_whats_about' }, { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' } ] },
+        gatekeeper_whats_about: { text: 'My name is Lewis with PowerChoosers.com and I am looking to speak with someone about the future electricity agreements for {{account.name}}. Who would be the best person for that?', responses: [ { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' }, { label: 'I can help you', next: 'pathA' } ] },
+        transfer_dialing: { text: 'Connecting... Ringing...', responses: [ { label: 'Call connected', next: 'hook' }, { label: 'Not connected', next: 'voicemail' } ] },
+        voicemail: { text: 'Good {{day.part}}, this is Lewis. Please call me back at 817-663-0380. I also sent a short email explaining why I am reaching out today. Thank you and have a great day.', responses: [ { label: 'End call / start new call', next: 'start' } ] },
+        pathA: { text: "Got it. now {{contact.first_name}}, I work directly with NRG, TXU, APG & E —  and rates are about to go up for every supplier next year... <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>", responses: [ { label: "It's tough / struggling", next: 'discovery' }, { label: 'Have not renewed / contract not up yet', next: 'pathA_not_renewed' }, { label: 'Locked in / just renewed', next: 'pathA_locked_in' }, { label: 'Shopping around / looking at options', next: 'pathA_shopping' }, { label: 'Have someone handling it / work with broker', next: 'pathA_broker' }, { label: "Haven't thought about it / what rate increase?", next: 'pathA_unaware' } ] },
+        pathA_not_renewed: { text: "Makes sense — when it comes to getting the best price, it's pretty easy to renew at the wrong time and end up overpaying. When does your contract expire? Do you know who your supplier is? <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take. <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>", responses: [ { label: 'Yes — schedule health check', next: 'schedule_health_check' }, { label: 'Send me details by email', next: 'send_details_email' } ] },
+        discovery: { text: 'Great — let me grab a few details for {{account.name}} so we can give you an accurate baseline.', responses: [ { label: 'Continue', next: 'schedule_health_check' } ] },
+        schedule_health_check: { text: "Perfect — I’ll set up a quick energy health check. What works best for you, {{contact.first_name}} — a 10-minute call today or tomorrow? I’ll bring ERCOT forward pricing so you can see it live for {{account.name}}.", responses: [ { label: 'Book on calendar', next: 'start' }, { label: 'Text me times', next: 'start' } ] },
+        send_details_email: { text: "No problem — I’ll send a quick overview with ERCOT forward pricing and next steps for {{account.name}}. Do you want me to send it to {{contact.full_name}} at {{contact.email}} or is there a better address?", responses: [ { label: 'Send now', next: 'start' } ] },
+        pathA_locked_in: { text: "Good to hear you’re covered. Quick sanity check — did you lock pre-increase or after the jump? If after, there may be a chance to re-rate or layer a future-start at a better position if the market relaxes. Want me to take a quick look at what’s possible for {{account.name}}?", responses: [ { label: 'Sure, take a look', next: 'discovery' }, { label: 'We’re fine as-is', next: 'voicemail' } ] },
+        pathA_shopping: { text: "Great — then let’s make sure you have leverage. Other {{account.industry}} accounts in {{account.city}} are comparing fixed vs. hybrid structures and watching forward curves. I can send a clean apples-to-apples view for {{account.name}} so you’re not guessing. Want me to spin that up?", responses: [ { label: 'Yes, send apples-to-apples', next: 'discovery' }, { label: 'Already have options', next: 'discovery' }, { label: 'Circle back next week', next: 'voicemail' } ] },
+        pathA_broker: { text: "All good — we work alongside existing brokers often. My angle is purely market timing and contract mechanics so {{account.name}} doesn’t overpay. If I spot a price window that beats what you’re seeing, I’ll flag it. Want me to keep an eye out and share any meaningful dips?", responses: [ { label: 'Yes, keep me posted', next: 'discovery' }, { label: 'We’re set with our broker', next: 'voicemail' }, { label: 'What would you need?', next: 'discovery' } ] },
+        pathA_unaware: { text: "Fair question — rates stepped up across most markets this year, and many {{account.industry}} accounts in {{account.city}} only feel it at renewal. My role is to get ahead of that so {{account.name}} isn’t surprised. Quick baseline: when roughly is your next expiration, and do you prefer fixed or a blended approach?", responses: [ { label: 'Share expiration month', next: 'discovery' }, { label: 'Not sure / need to check', next: 'discovery' }, { label: 'We’ll deal with it later', next: 'voicemail' } ] },
+        start: { text: "Click 'Dial' to begin the call.", responses: [ { label: 'Back to beginning', next: 'start' } ] }
+      };
+
+      const display = el.querySelector('.ms-display');
+      const responses = el.querySelector('.ms-responses');
+
+      function renderNode(){
+        const key = state.current;
+        const node = FLOW[key];
+        if (!node) { display.innerHTML = ''; responses.innerHTML = ''; return; }
+        const live = (function(){ try { return hasActiveCall() || (currentCallContext && currentCallContext.isActive); } catch(_) { return false; } })();
+        display.innerHTML = live ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
+        responses.innerHTML = '';
+        (node.responses || []).forEach(r => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn-secondary';
+          b.textContent = r.label || '';
+          b.addEventListener('click', () => { if (r.next && FLOW[r.next]) { state.history.push(state.current); state.current = r.next; renderNode(); } });
+          responses.appendChild(b);
+        });
+      }
+
+      function startAt(key){ state.current = key; state.history = []; renderNode(); }
+      function goBack(){ if (!state.history.length) return; state.current = state.history.pop(); renderNode(); }
+      function resetAll(){ state.current = ''; state.history = []; state.overrideContactId = null; display.innerHTML=''; responses.innerHTML=''; inputEl.value=''; closeSuggest(); }
+
+      // Buttons
+      el.querySelector('.ms-gk').addEventListener('click', () => startAt('gatekeeper_intro'));
+      el.querySelector('.ms-vm').addEventListener('click', () => startAt('voicemail'));
+      el.querySelector('.ms-dm').addEventListener('click', () => startAt('hook'));
+      el.querySelector('.ms-back').addEventListener('click', goBack);
+      el.querySelector('.ms-reset').addEventListener('click', resetAll);
+
+      // Search suggestions (account-scoped)
+      const inputEl = el.querySelector('.ms-input');
+      const panelEl = el.querySelector('.ms-suggest');
+      function closeSuggest(){ panelEl.hidden = true; }
+      function openSuggest(){ panelEl.hidden = false; }
+      function setSelectedContact(id){ state.overrideContactId = id ? String(id) : null; try { const people = getPeopleCache(); const sel = people.find(p => String(p.id||p.contactId||p._id||'') === String(id)); if (sel){ const name = sel.name || ((sel.firstName||'') + ' ' + (sel.lastName||'')); inputEl.value = name; } } catch(_) {} closeSuggest(); renderNode(); }
+      function buildSuggestions(q){
+        const people = getPeopleCache();
+        const ctxData = getLiveData();
+        const accKey = getAccountKey(ctxData.account);
+        const qn = String(q||'').trim().toLowerCase();
+        const filtered = people.filter(p => {
+          const nm = (p.name || ((p.firstName||'') + ' ' + (p.lastName||''))).toLowerCase();
+          const acct = getAccountKey({ name: p.company || p.companyName || '' });
+          const matchAccount = !accKey || (acct === accKey);
+          const matchName = !qn || nm.includes(qn);
+          return matchAccount && matchName;
+        }).slice(0, 8);
+        if (!filtered.length){ panelEl.innerHTML = '<div class="item" aria-disabled="true">No matches</div>'; openSuggest(); return; }
+        panelEl.innerHTML = filtered.map(p => {
+          const nm = (p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) || '';
+          const first = (nm||'?').charAt(0).toUpperCase();
+          return `<div class="item" role="option" data-id="${escapeHtml(p.id||p.contactId||p._id||'')}"><div class="glyph">${first}</div><div class="label">${escapeHtml(nm)}</div></div>`;
+        }).join('');
+        openSuggest();
+      }
+      inputEl.addEventListener('input', () => { const v = inputEl.value||''; if (!v.trim()){ state.overrideContactId = null; closeSuggest(); renderNode(); return; } buildSuggestions(v); });
+      inputEl.addEventListener('keydown', (e) => { if (e.key==='Escape'){ closeSuggest(); return; } if (e.key==='Enter'){ const first = panelEl.querySelector('.item'); if (first){ const id = first.getAttribute('data-id'); if (id) setSelectedContact(id); closeSuggest(); e.preventDefault(); } } });
+      panelEl.addEventListener('click', (e) => { const it = e.target.closest && e.target.closest('.item'); if (!it) return; const id = it.getAttribute('data-id'); if (id) setSelectedContact(id); });
+      document.addEventListener('click', (e) => { if (!el.contains(e.target)) closeSuggest(); });
+
+      // Energy updates
+      let lastEnergyAt = 0; const TH = 3000;
+      const onEnergy = (ev) => { try { const now = Date.now(); if (now - lastEnergyAt < TH) return; lastEnergyAt = now; const d = ev.detail||{}; const live = getLiveData(); const contactId = live.contact?.id || live.contact?.contactId || live.contact?._id; const accountId = live.account?.id || live.account?.accountId || live.account?._id; const relevant = (d.entity==='contact' && String(d.id)===String(contactId)) || (d.entity==='account' && String(d.id)===String(accountId)); if (relevant) renderNode(); } catch(_) {} };
+      document.addEventListener('pc:energy-updated', onEnergy);
+
+      // Re-render on call state changes (e.g., connected -> substitute values)
+      try { card.addEventListener('callStateChanged', () => renderNode()); } catch(_) {}
+
+      // Initialize empty
+      state.current = '';
+    }
+
+    function toggleMiniScripts(card){
+      const wrap = card.querySelector('.mini-scripts-wrap');
+      if (!wrap) return;
+      const snapshot = captureLayoutSnapshot(card);
+      const isHidden = wrap.hasAttribute('hidden');
+      if (isHidden) {
+        buildMiniScriptsUI(card);
+        wrap.removeAttribute('hidden');
+        try { const si = wrap.querySelector('.ms-input'); if (si) si.focus(); } catch(_) {}
+      } else {
+        wrap.setAttribute('hidden','');
+        wrap.innerHTML = '';
+      }
+      runFlipFromSnapshot(snapshot, card, 300);
+    }
 
     const backspace = () => {
       if (!input) return;
@@ -1705,6 +2024,8 @@
 
     // Actions
     const callBtn = card.querySelector('.call-btn-start');
+    const scriptsToggle = card.querySelector('.scripts-toggle');
+    if (scriptsToggle && !scriptsToggle._bound) { scriptsToggle.addEventListener('click', () => toggleMiniScripts(card)); scriptsToggle._bound = true; }
     let currentCall = null;
 
     async function placeBrowserCall(number) {
@@ -2534,6 +2855,13 @@
 
     // Keyboard input support: digits, *, #, and letter->T9 digit mapping
     card.addEventListener('keydown', (e) => {
+      // If user is typing in the mini-scripts search, don't intercept keys for dialpad
+      try {
+        const active = document.activeElement;
+        if (active && active.classList && active.classList.contains('ms-input')) {
+          return; // let the input handle typing
+        }
+      } catch(_) {}
       const { key } = e;
       // Do not intercept common shortcuts (paste/copy/select-all, etc.)
       if (e.ctrlKey || e.metaKey || e.altKey) return;
