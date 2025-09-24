@@ -54,20 +54,6 @@ export default async function handler(req, res){
 
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-    // IMPORTANT: Mark CI as requested BEFORE creating transcript so webhook gating will allow processing
-    try{
-      await fetch(`${base}/api/calls`,{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          callSid,
-          recordingSid,
-          conversationalIntelligence: { transcriptSid: '', status: 'queued' },
-          aiInsights: null,
-          ciRequested: true
-        })
-      }).catch(()=>{});
-    }catch(_){ }
-
     // If we already created a transcript for this call, return it
     let ciTranscriptSid = '';
     let existingRecordingSid = '';
@@ -168,6 +154,14 @@ export default async function handler(req, res){
     console.log(`[CI Request] Using recording: ${recordingSid} for call: ${callSid}`);
 
     if (!ciTranscriptSid){
+      // Pre-flag the call so webhook gating sees ciRequested=true even if webhook arrives very fast
+      try {
+        await fetch(`${base}/api/calls`,{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ callSid, recordingSid, ciRequested: true, conversationalIntelligence: { status: 'queued' } })
+        }).catch(()=>{});
+      } catch(_) {}
+
       // Determine channel mapping for proper speaker separation
       let agentChannelNum = 1; // Default to channel 1 for agent
       try {

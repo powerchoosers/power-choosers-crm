@@ -358,7 +358,7 @@
         <div class="pc-modal__header">
           <h3 id="edit-contact-title">Edit Contact</h3>
           <button class="pc-modal__close" data-close="edit-contact" aria-label="Close">×</button>
-        </div>
+          </div>
         <form id="form-edit-contact" class="pc-modal__form">
           <div class="pc-modal__body">
             <div class="form-row">
@@ -396,7 +396,7 @@
               <button type="button" class="btn-text" data-close="edit-contact">Cancel</button>
               <button type="submit" class="btn-primary">Save</button>
             </div>
-          </div>
+        </div>
         </form>
       </div>`;
 
@@ -3739,7 +3739,7 @@
     try {
       // Show loading spinner on the button (proper orange spinning element)
       try { 
-        btn.innerHTML = '<div class="loading-spinner" aria-hidden="true"></div>'; 
+        btn.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px; border: 2px solid var(--grey-600); border-top: 2px solid var(--orange-subtle); border-radius: 50%; animation: spin 1s linear infinite; position: relative; top: 5px; display: inline-block; vertical-align: middle;" aria-hidden="true"></div>'; 
         btn.classList.add('processing'); 
         btn.disabled = true; 
       } catch(_) {}
