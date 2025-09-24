@@ -135,7 +135,7 @@
     // Try to find the contact/account name from the table row
     const row = phoneElement.closest('tr');
     if (row) {
-      // Prefer explicit account name element if present
+      // Prefer explicit account or contact name element if present
       const nameEl = row.querySelector('.account-name, .name-text');
       const nameFromEl = nameEl && nameEl.textContent ? nameEl.textContent.trim() : '';
       if (nameFromEl && nameFromEl !== 'N/A') return nameFromEl;
@@ -150,22 +150,31 @@
       }
     }
 
-    // Contact detail view header name
+    // Prefer account detail context if element lives inside account detail view
     try {
-      if (document.getElementById('contact-detail-view') && document.getElementById('contact-detail-header')) {
-        const n = document.getElementById('contact-name');
+      if (phoneElement.closest && phoneElement.closest('#account-detail-view')) {
+        const n = document.querySelector('#account-detail-header .page-title.contact-page-title, #account-name');
         const txt = (n && n.textContent || '').trim();
         if (txt) return txt;
       }
     } catch (_) { /* noop */ }
 
-    // Account detail view header name
+    // Otherwise, use contact detail context if present
     try {
-      if (document.getElementById('account-detail-view') && document.getElementById('account-detail-header')) {
-        const n = document.querySelector('#account-detail-header .page-title.contact-page-title');
-        const txt = (n && n.textContent || '').trim();
-        if (txt) return txt;
+      if (!phoneElement.closest || !phoneElement.closest('#account-detail-view')) {
+        if (document.getElementById('contact-detail-view') && document.getElementById('contact-detail-header')) {
+          const n = document.getElementById('contact-name');
+          const txt = (n && n.textContent || '').trim();
+          if (txt) return txt;
+        }
       }
+    } catch (_) { /* noop */ }
+
+    // As a final fallback, try global account header if visible
+    try {
+      const n = document.querySelector('#account-detail-header .page-title.contact-page-title, #account-name');
+      const txt = (n && n.textContent || '').trim();
+      if (txt) return txt;
     } catch (_) { /* noop */ }
 
     return '';
@@ -404,10 +413,19 @@
         const text = (element.textContent || '').trim();
         if (!isValidPhoneNumber(text)) return;
 
-        const contactName = findContactName(element);
+        // Build tooltip text with strong preference for explicit data attributes
         const displayPhone = formatPhoneForDisplay(text);
-        // Always refresh hover title to avoid stale names when content changes
-        try { element.title = `Call ${displayPhone}${contactName ? ` (${contactName})` : ''}`; } catch(_) {}
+        let nameForTitle = '';
+        try {
+          const hasContactId = !!element.getAttribute('data-contact-id');
+          const hasAccountId = !!element.getAttribute('data-account-id');
+          const attrContact = (element.getAttribute('data-contact-name') || '').trim();
+          const attrCompany = (element.getAttribute('data-company-name') || '').trim();
+          nameForTitle = hasContactId && attrContact ? attrContact : (hasAccountId && attrCompany ? attrCompany : '');
+        } catch(_) {}
+        if (!nameForTitle) nameForTitle = findContactName(element) || '';
+        // Use custom tooltip attribute and remove native title to avoid stale browser tooltips
+        try { element.setAttribute('data-pc-title', `Call ${displayPhone}${nameForTitle ? ` (${nameForTitle})` : ''}`); element.removeAttribute('title'); } catch(_) {}
 
         // Bind click handler only once
         if (!element.classList.contains('clickable-phone')) {
