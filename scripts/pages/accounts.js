@@ -1628,6 +1628,9 @@
     const ids = Array.from(state.selected || []);
     if (!ids.length) return;
     
+    // Store current page before deletion to preserve pagination
+    const currentPageBeforeDeletion = state.currentPage;
+    
     // Show progress toast
     const progressToast = window.crm?.showProgressToast ? 
       window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'account' : 'accounts'}...`, ids.length, 0) : null;
@@ -1676,6 +1679,16 @@
         const idSet = new Set(ids);
         state.filtered = state.filtered.filter((a) => a && !idSet.has(a.id));
       }
+      
+      // Calculate new total pages after deletion
+      const newTotalPages = Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
+      
+      // Only adjust page if current page is beyond the new total
+      if (currentPageBeforeDeletion > newTotalPages) {
+        state.currentPage = newTotalPages;
+      }
+      // Otherwise, keep the current page
+      
       state.selected.clear();
       render();
       hideBulkActionsBar();

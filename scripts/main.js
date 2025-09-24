@@ -1872,6 +1872,80 @@ class PowerChoosersCRM {
                 sel.addEventListener('change', () => this.saveFieldMappingToStorage(modal));
             });
         }
+        
+        // Populate list assignment dropdown
+        this.populateListAssignment(modal);
+    }
+
+    async populateListAssignment(modal) {
+        const listSelect = modal.querySelector('#csv-assign-list');
+        if (!listSelect) return;
+        
+        // Clear existing options except the first one
+        listSelect.innerHTML = '<option value="">No list assignment</option>';
+        
+        try {
+            const db = window.firebaseDB;
+            if (!db) return;
+            
+            const importType = modal._importType || 'contacts';
+            const listKind = importType === 'accounts' ? 'accounts' : 'people';
+            
+            // Load lists of the appropriate kind
+            let query = db.collection('lists');
+            if (query.where) {
+                query = query.where('kind', '==', listKind);
+            }
+            const snap = await (query.limit ? query.limit(200).get() : query.get());
+            const lists = (snap && snap.docs) ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            
+            // Sort by name
+            lists.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            
+            // Add list options
+            lists.forEach(list => {
+                const option = document.createElement('option');
+                option.value = list.id;
+                option.textContent = list.name || 'Unnamed List';
+                listSelect.appendChild(option);
+            });
+            
+        } catch (error) {
+            console.error('Failed to load lists for assignment:', error);
+        }
+    }
+
+    async assignToList(db, recordId, modal) {
+        const listSelect = modal.querySelector('#csv-assign-list');
+        if (!listSelect || !listSelect.value) return;
+        
+        const listId = listSelect.value;
+        if (!listId) return;
+        
+        try {
+            const importType = modal._importType || 'contacts';
+            const targetType = importType === 'accounts' ? 'accounts' : 'people';
+            
+            // Check if already in list to avoid duplicates
+            const existingQuery = await db.collection('listMembers')
+                .where('listId', '==', listId)
+                .where('targetId', '==', recordId)
+                .where('targetType', '==', targetType)
+                .limit(1)
+                .get();
+            
+            if (existingQuery.empty) {
+                // Add to list
+                await db.collection('listMembers').add({
+                    listId: listId,
+                    targetId: recordId,
+                    targetType: targetType,
+                    addedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+                });
+            }
+        } catch (error) {
+            console.error('Failed to assign record to list:', error);
+        }
     }
 
     getCRMFields(importType) {
@@ -1969,6 +2043,12 @@ class PowerChoosersCRM {
         const mappings = this.getFieldMappings(modal);
         const mappedFieldCount = Object.keys(mappings).length;
         
+        // Get selected list info
+        const listSelect = modal.querySelector('#csv-assign-list');
+        const selectedListName = listSelect && listSelect.value ? 
+            (listSelect.selectedOptions[0]?.textContent || 'Unknown List') : 
+            'No list assignment';
+        
         // Generate summary
         const summaryHTML = `
             <div class="summary-item">
@@ -1982,6 +2062,10 @@ class PowerChoosersCRM {
             <div class="summary-item">
                 <div class="summary-value">${modal._importType === 'contacts' ? 'Contacts' : 'Accounts'}</div>
                 <div class="summary-label">Import Type</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">${selectedListName}</div>
+                <div class="summary-label">List Assignment</div>
             </div>
         `;
         
@@ -2235,6 +2319,9 @@ class PowerChoosersCRM {
                             await existingRecord.ref.update(updateData);
                             enriched++;
 
+                            // Assign to list if selected
+                            await this.assignToList(db, existingRecord.id, modal);
+
                             // Live update tables (use UI-friendly timestamps)
                             try {
                                 if (modal._importType === 'accounts') {
@@ -2261,6 +2348,9 @@ class PowerChoosersCRM {
                             
                             const ref = await db.collection(collection).add(doc);
                             imported++;
+
+                            // Assign to list if selected
+                            await this.assignToList(db, ref.id, modal);
 
                             // Live update tables (use UI-friendly timestamps so lists don't show N/A)
                             try {

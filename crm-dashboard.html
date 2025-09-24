@@ -1361,6 +1361,7 @@
                                             Email Deliverability & Tracking
                                         </h3>
                                         <div class="settings-content">
+                                            <p class="section-desc">Defaults for deliverability. For cold outreach, keep things simple: no pixel, no bulk headers, Gmail API only, minimal template.</p>
                                             <div class="settings-group">
                                                 <h4 class="settings-group-title">Tracking</h4>
                                                 <div class="settings-field">
@@ -1369,6 +1370,7 @@
                                                         <span class="checkmark"></span>
                                                         Enable read tracking pixel
                                                     </label>
+                                                    <div class="settings-hint">Adds a hidden 1×1 image to count opens. May trigger spam filters on cold emails and is often prefetched by Gmail.</div>
                                                 </div>
                                             </div>
                                             <div class="settings-group">
@@ -1379,6 +1381,7 @@
                                                         <span class="checkmark"></span>
                                                         Add "Precedence: bulk" header
                                                     </label>
+                                                    <div class="settings-hint">Signals bulk mail to inbox providers. Use only for opt‑in newsletters, not one‑to‑one outreach.</div>
                                                 </div>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
@@ -1386,6 +1389,7 @@
                                                         <span class="checkmark"></span>
                                                         Add List-Unsubscribe headers
                                                     </label>
+                                                    <div class="settings-hint">Enables one‑click unsubscribe in email clients. Recommended for opt‑in lists; avoid for individual cold emails.</div>
                                                 </div>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
@@ -1393,6 +1397,7 @@
                                                         <span class="checkmark"></span>
                                                         Add Priority/Importance headers
                                                     </label>
+                                                    <div class="settings-hint">Adds priority flags. These rarely help deliverability and can look artificial—leave off unless required.</div>
                                                 </div>
                                             </div>
                                             <div class="settings-group">
@@ -1403,6 +1408,7 @@
                                                         <span class="checkmark"></span>
                                                         Force Gmail API only (disable fallback)
                                                     </label>
+                                                    <div class="settings-hint">Sends only from your authenticated Gmail. Disables fallback sends (e.g., noreply@powerchoosers.com) that can hurt reputation.</div>
                                                 </div>
                                             </div>
                                             <div class="settings-group">
@@ -1413,6 +1419,7 @@
                                                         <span class="checkmark"></span>
                                                         Use branded HTML template
                                                     </label>
+                                                    <div class="settings-hint">Styled HTML looks like a campaign. For cold outreach, keep this off and send a minimal email.</div>
                                                 </div>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
@@ -1420,6 +1427,7 @@
                                                         <span class="checkmark"></span>
                                                         Include image in signature
                                                     </label>
+                                                    <div class="settings-hint">Images make signatures look polished but can increase spam risk. Prefer text‑only for first‑touch emails.</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1817,6 +1825,18 @@
                                 <input type="checkbox" id="csv-update-existing" checked>
                                 Update existing records if found
                             </label>
+                        </div>
+                        
+                        <div class="list-assignment-section">
+                            <h5>Add to List (Optional)</h5>
+                            <div class="form-row">
+                                <label>Assign imported records to a list</label>
+                                <select id="csv-assign-list" class="input-dark">
+                                    <option value="">No list assignment</option>
+                                    <!-- List options will be populated by JavaScript -->
+                                </select>
+                            </div>
+                            <p class="help-text">All imported contacts/accounts will be added to the selected list</p>
                         </div>
                     </div>
                 </div>
