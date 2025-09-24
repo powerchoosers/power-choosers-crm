@@ -42,6 +42,7 @@ class SettingsPage {
         this.loadSettings();
         this.setupEventListeners();
         this.renderSettings();
+        this.setupSidebarNav();
     }
 
     setupEventListeners() {
@@ -258,6 +259,49 @@ class SettingsPage {
         if (sigimg) sigimg.checked = !!d.signatureImageEnabled;
 
         this.updateSaveButton();
+    }
+
+    setupSidebarNav() {
+        try {
+            const container = document.getElementById('settings-page');
+            if (!container) return;
+            const nav = container.querySelector('.settings-nav');
+            const links = nav ? Array.from(nav.querySelectorAll('.nav-item')) : [];
+            const sections = links.map(a => document.getElementById(a.dataset.target)).filter(Boolean);
+
+            const setActive = (id) => {
+                links.forEach(a => a.classList.toggle('active', a.dataset.target === id));
+            };
+
+            links.forEach(a => {
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const target = document.getElementById(a.dataset.target);
+                    if (!target) return;
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setActive(a.dataset.target);
+                    history.replaceState(null, '', `#${a.dataset.target}`);
+                });
+            });
+
+            // Intersection observer to highlight active section
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.id;
+                        setActive(id);
+                    }
+                });
+            }, { rootMargin: '-40% 0px -50% 0px', threshold: 0.01 });
+
+            sections.forEach(sec => io.observe(sec));
+
+            // Activate based on hash on load
+            const hash = (location.hash || '').replace('#','');
+            if (hash) setActive(hash);
+        } catch (e) {
+            console.warn('[Settings] Sidebar nav setup failed:', e);
+        }
     }
 
     renderPhoneNumbers() {

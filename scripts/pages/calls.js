@@ -1723,7 +1723,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
       <td class="name-cell" data-contact-id="${r.contactId || ''}">${contactCell}</td>
       <td>${title}</td>
-      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: row.logoUrl, domain: favDomain, size: 32 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : safeAccountIcon) : safeAccountIcon)}<span class="company-name">${company || (hasContact ? '' : '—')}</span></span></a></td>
+      <td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ domain: favDomain, size: 32 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : safeAccountIcon) : safeAccountIcon)}<span class="company-name">${company || (hasContact ? '' : '—')}</span></span></a></td>
       <td>${numberCell}</td>
       <td>${directionCell || '—'}</td>
       <td>${callTimeStr}</td>
