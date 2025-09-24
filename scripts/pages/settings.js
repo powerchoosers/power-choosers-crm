@@ -444,6 +444,737 @@ class SettingsPage {
     }
 }
 
+// Inject modern styles for settings page only
+function injectModernStyles() {
+    // Only inject if we're on the settings page
+    if (!document.getElementById('settings-page')) return;
+    
+    // Create style element with scoped styles
+    const style = document.createElement('style');
+    style.textContent = `
+        /* Modern Settings Page Styles - Scoped to #settings-page */
+        #settings-page .settings-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        
+        #settings-page .settings-section {
+            background: var(--bg-container);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        #settings-page .settings-section:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+        
+        #settings-page .settings-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--orange-primary) 0%, #ff8c42 100%);
+        }
+        
+        #settings-page .settings-section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 24px;
+            margin: 0;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-container) 100%);
+            border-bottom: 1px solid var(--border-light);
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        #settings-page .settings-section-title svg {
+            color: #ffffff;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+        }
+        
+        #settings-page .settings-content {
+            padding: 24px;
+        }
+        
+        #settings-page .section-desc {
+            margin: -8px 24px 16px 24px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.5;
+            background: var(--orange-muted);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4px solid var(--orange-primary);
+        }
+        
+        #settings-page .settings-hint {
+            margin-top: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.4;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid var(--border-light);
+        }
+        
+        #settings-page .settings-group {
+            margin-bottom: 24px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
+        }
+        
+        #settings-page .settings-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        #settings-page .settings-group-title {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--orange-primary);
+            position: relative;
+        }
+        
+        #settings-page .settings-group-title::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 30px;
+            height: 2px;
+            background: var(--orange-primary);
+        }
+        
+        #settings-page .settings-field {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        #settings-page .settings-field:last-child {
+            margin-bottom: 0;
+        }
+        
+        #settings-page .settings-field label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        #settings-page .settings-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px 16px;
+            border: 2px solid var(--border-light);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        #settings-page .settings-textarea:focus {
+            outline: none;
+            border-color: var(--orange-primary);
+            box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        #settings-page .settings-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-light);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+        }
+        
+        #settings-page .settings-select:focus {
+            outline: none;
+            border-color: var(--orange-primary);
+            box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        #settings-page .checkbox-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            position: relative;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-light);
+        }
+        
+        #settings-page .checkbox-label:hover {
+            background: var(--bg-secondary);
+            border-color: var(--orange-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(255, 140, 0, 0.1);
+        }
+        
+        #settings-page .checkmark {
+            position: relative;
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: var(--grey-700);
+            border: 2px solid var(--grey-700);
+            border-radius: 6px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        
+        #settings-page .checkbox-label input[type="checkbox"]:checked + .checkmark {
+            background: var(--orange-primary);
+            border-color: var(--orange-primary);
+            box-shadow: 0 2px 8px rgba(255, 140, 0, 0.3);
+            transform: scale(1.05);
+        }
+        
+        #settings-page .checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 2px;
+            width: 5px;
+            height: 10px;
+            border: solid #fff;
+            border-width: 0 3px 3px 0;
+            transform: rotate(45deg);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        
+        #settings-page .btn-small {
+            padding: 8px 12px;
+            font-size: 12px;
+            height: auto;
+            min-height: 32px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        
+        #settings-page .btn-danger {
+            background: var(--red-subtle);
+            border-color: var(--red-subtle);
+            color: white;
+        }
+        
+        #settings-page .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+        
+        #settings-page #save-settings-btn {
+            background: linear-gradient(135deg, var(--orange-primary) 0%, #ff8c42 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            box-shadow: 0 2px 8px rgba(255, 140, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        #settings-page #save-settings-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
+        }
+        
+        #settings-page #save-settings-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 2px 8px rgba(255, 140, 0, 0.2);
+        }
+        
+        /* Voicemail Styles */
+        #settings-page .voicemail-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        
+        #settings-page .settings-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-light);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        #settings-page .settings-input:focus {
+            outline: none;
+            border-color: var(--orange-primary);
+            box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        #settings-page .voicemail-recorder {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        
+        #settings-page .recorder-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            min-width: 0;
+        }
+        
+        #settings-page .record-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            background: transparent;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        #settings-page .play-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            background: transparent;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        #settings-page .record-button:hover {
+            background: #ffffff;
+            color: var(--orange-primary);
+            transform: translateY(-1px);
+        }
+
+        #settings-page .play-button:hover {
+            background: #ffffff;
+            color: var(--orange-primary);
+            transform: translateY(-1px);
+        }
+        
+        #settings-page .record-button.recording {
+            background: var(--red-subtle);
+            border-color: var(--red-subtle);
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        #settings-page .waveform-container {
+            flex: 1;
+            height: 40px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            min-width: 0;
+            overflow: hidden;
+        }
+        
+        #settings-page .waveform {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            height: 100%;
+            width: 100%;
+        }
+        
+        #settings-page .waveform-bar {
+            background: var(--orange-primary);
+            width: 3px;
+            border-radius: 1px;
+            transition: height 0.1s ease;
+        }
+        
+        #settings-page .recording-time {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 14px;
+            min-width: 50px;
+            text-align: center;
+            background: var(--bg-secondary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+        }
+        
+        #settings-page .delete-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: none;
+            background: var(--red-subtle);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        
+        #settings-page .delete-button:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+        }
+
+        /* Ensure icons keep aspect and aren't squashed */
+        #settings-page .record-button svg,
+        #settings-page .play-button svg {
+            width: 18px;
+            height: 18px;
+            display: block;
+            flex-shrink: 0;
+        }
+        
+        #settings-page .delete-button svg {
+            width: 16px;
+            height: 16px;
+            display: block;
+            flex-shrink: 0;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #settings-page .settings-sections {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            
+            #settings-page .settings-content {
+                padding: 16px;
+            }
+            
+            #settings-page .phone-number-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            
+            #settings-page .phone-actions {
+                align-self: flex-end;
+            }
+        }
+    `;
+    
+    // Inject the styles into the head
+    document.head.appendChild(style);
+    
+    // Update section titles and add voicemail section
+    updateSectionTitles();
+    addVoicemailSection();
+}
+
+function updateSectionTitles() {
+    // Change "Twilio Phone Numbers" to "Phone Settings"
+    const twilioSection = document.querySelector('#settings-page .settings-section-title');
+    if (twilioSection && twilioSection.textContent.includes('Twilio Phone Numbers')) {
+        twilioSection.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+            </svg>
+            Phone Settings
+        `;
+    }
+}
+
+function addVoicemailSection() {
+    // Find the correct Phone Settings card (by heading text)
+    const sections = Array.from(document.querySelectorAll('#settings-page .settings-section'));
+    const phoneSection = sections.find(sec => {
+        const titleEl = sec.querySelector('.settings-section-title');
+        if (!titleEl) return false;
+        const txt = (titleEl.textContent || '').toLowerCase();
+        return txt.includes('phone settings') || txt.includes('business phone numbers') || txt.includes('twilio');
+    });
+    if (!phoneSection) return;
+    
+    // Target its content wrapper so our block sits under Business Phone Numbers
+    const phoneContent = phoneSection.querySelector('.settings-content');
+    if (!phoneContent) return;
+    
+    // Add voicemail section after existing phone content
+    const voicemailHTML = `
+        <div class="settings-group">
+            <h4 class="settings-group-title">My Voicemail</h4>
+            <div class="voicemail-container">
+                <div class="settings-field">
+                    <label for="voicemail-name">Voicemail name *</label>
+                    <input type="text" id="voicemail-name" class="settings-input" placeholder="Voicemail Recording">
+                </div>
+                <div class="voicemail-recorder">
+                    <div class="recorder-controls">
+                        <button id="record-btn" class="record-button">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <circle cx="12" cy="12" r="8"></circle>
+                            </svg>
+                        </button>
+                        <button id="play-btn" class="play-button" style="display: none;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5,3 19,12 5,21"></polygon>
+                            </svg>
+                        </button>
+                        <div class="waveform-container">
+                            <div id="waveform" class="waveform"></div>
+                        </div>
+                        <div id="recording-time" class="recording-time">00:00</div>
+                        <button id="delete-recording" class="delete-button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3,6 5,6 21,6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    // Append to the end of the phone content so it appears beneath Business Phone Numbers
+    phoneContent.insertAdjacentHTML('beforeend', voicemailHTML);
+    
+    // Initialize voicemail functionality
+    initVoicemailRecording();
+}
+
+function initVoicemailRecording() {
+    const recordBtn = document.getElementById('record-btn');
+    const playBtn = document.getElementById('play-btn');
+    const deleteBtn = document.getElementById('delete-recording');
+    const timeDisplay = document.getElementById('recording-time');
+    const waveform = document.getElementById('waveform');
+    
+    if (!recordBtn || !playBtn || !deleteBtn || !timeDisplay || !waveform) return;
+    
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingStartTime = null;
+    let recordingInterval = null;
+    let isRecording = false;
+    let hasRecording = false;
+    let audioBlob = null;
+    let audioElement = null;
+    
+    // Initialize waveform with static bars
+    initWaveform(waveform);
+    
+    recordBtn.addEventListener('click', () => {
+        if (!isRecording) {
+            startRecording();
+        } else {
+            stopRecording();
+        }
+    });
+    
+    playBtn.addEventListener('click', () => {
+        if (hasRecording && audioBlob) {
+            playRecording();
+        }
+    });
+    
+    deleteBtn.addEventListener('click', () => {
+        deleteRecording();
+    });
+    
+    function startRecording() {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    saveRecording(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                recordingStartTime = Date.now();
+                
+                // Update UI for recording state - show stop icon
+                recordBtn.classList.add('recording');
+                recordBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>';
+                playBtn.style.display = 'none';
+                
+                // Start timer
+                recordingInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60);
+                    const seconds = elapsed % 60;
+                    timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    // Animate waveform during recording
+                    animateWaveform(waveform);
+                }, 100);
+            })
+            .catch(err => {
+                console.error('Error accessing microphone:', err);
+                alert('Could not access microphone. Please check permissions.');
+            });
+    }
+    
+    function stopRecording() {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+            hasRecording = true;
+            
+            // Update UI for stopped recording state - show circle icon again
+            recordBtn.classList.remove('recording');
+            recordBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"></circle></svg>';
+            playBtn.style.display = 'flex';
+            
+            if (recordingInterval) {
+                clearInterval(recordingInterval);
+                recordingInterval = null;
+            }
+        }
+    }
+    
+    function playRecording() {
+        if (audioBlob && !audioElement) {
+            const audioUrl = URL.createObjectURL(audioBlob);
+            audioElement = new Audio(audioUrl);
+            
+            audioElement.onended = () => {
+                playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"></polygon></svg>';
+            };
+            
+            audioElement.onplay = () => {
+                playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="18" y1="4" x2="18" y2="20"></line></svg>';
+            };
+            
+            audioElement.onpause = () => {
+                playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"></polygon></svg>';
+            };
+        }
+        
+        if (audioElement) {
+            if (audioElement.paused) {
+                audioElement.play();
+            } else {
+                audioElement.pause();
+            }
+        }
+    }
+    
+    function deleteRecording() {
+        if (confirm('Delete this recording?')) {
+            timeDisplay.textContent = '00:00';
+            initWaveform(waveform);
+            recordBtn.classList.remove('recording');
+            recordBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"></circle></svg>';
+            playBtn.style.display = 'none';
+            isRecording = false;
+            hasRecording = false;
+            audioBlob = null;
+            if (audioElement) {
+                audioElement.pause();
+                audioElement = null;
+            }
+        }
+    }
+    
+    function saveRecording(audioBlob) {
+        // Store in localStorage for now (you can implement server storage later)
+        const reader = new FileReader();
+        reader.onload = () => {
+            const audioData = reader.result;
+            localStorage.setItem('voicemail-recording', audioData);
+            console.log('Recording saved to localStorage');
+        };
+        reader.readAsDataURL(audioBlob);
+    }
+    
+    function initWaveform(waveform) {
+        waveform.innerHTML = '';
+        for (let i = 0; i < 50; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'waveform-bar';
+            bar.style.height = '4px';
+            waveform.appendChild(bar);
+        }
+    }
+    
+    function animateWaveform(waveform) {
+        const bars = waveform.querySelectorAll('.waveform-bar');
+        bars.forEach(bar => {
+            const height = Math.random() * 20 + 4;
+            bar.style.height = `${height}px`;
+        });
+    }
+}
+
 // Initialize settings page when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     // Only initialize if we're on the settings page
@@ -452,316 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Inject modern styles for settings page only
-function injectModernStyles() {
-        // Only inject if we're on the settings page
-        if (!document.getElementById('settings-page')) return;
-        
-        // Create style element with scoped styles
-        const style = document.createElement('style');
-        style.textContent = `
-            /* Modern Settings Page Styles - Scoped to #settings-page */
-            #settings-page .settings-sections {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-                gap: 24px;
-                margin-bottom: 32px;
-            }
-            
-            #settings-page .settings-section {
-                background: var(--bg-container);
-                border: 1px solid var(--border-light);
-                border-radius: 12px;
-                overflow: hidden;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                transition: all 0.2s ease;
-                position: relative;
-            }
-            
-            #settings-page .settings-section:hover {
-                transform: translateY(-1px);
-                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-            }
-            
-            #settings-page .settings-section::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 3px;
-                background: linear-gradient(90deg, var(--orange-primary) 0%, #ff8c42 100%);
-            }
-            
-            #settings-page .settings-section-title {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 20px 24px;
-                margin: 0;
-                background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-container) 100%);
-                border-bottom: 1px solid var(--border-light);
-                font-size: 18px;
-                font-weight: 600;
-                color: var(--text-primary);
-            }
-            
-            #settings-page .settings-section-title svg {
-                color: var(--orange-primary);
-                filter: drop-shadow(0 1px 2px rgba(255, 140, 0, 0.3));
-            }
-            
-            #settings-page .settings-content {
-                padding: 24px;
-            }
-            
-            #settings-page .section-desc {
-                margin: -8px 24px 16px 24px;
-                color: var(--text-secondary);
-                font-size: 14px;
-                line-height: 1.5;
-                background: var(--orange-muted);
-                padding: 12px 16px;
-                border-radius: 8px;
-                border-left: 4px solid var(--orange-primary);
-            }
-            
-            #settings-page .settings-hint {
-                margin-top: 8px;
-                color: var(--text-muted);
-                font-size: 13px;
-                line-height: 1.4;
-                padding: 8px 12px;
-                background: var(--bg-secondary);
-                border-radius: 6px;
-                border-left: 3px solid var(--border-light);
-            }
-            
-            #settings-page .settings-group {
-                margin-bottom: 24px;
-                padding: 16px;
-                background: var(--bg-secondary);
-                border-radius: 8px;
-                border: 1px solid var(--border-light);
-            }
-            
-            #settings-page .settings-group:last-child {
-                margin-bottom: 0;
-            }
-            
-            #settings-page .settings-group-title {
-                margin: 0 0 16px 0;
-                font-size: 16px;
-                font-weight: 600;
-                color: var(--text-primary);
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                padding-bottom: 8px;
-                border-bottom: 2px solid var(--orange-primary);
-                position: relative;
-            }
-            
-            #settings-page .settings-group-title::after {
-                content: '';
-                position: absolute;
-                bottom: -2px;
-                left: 0;
-                width: 30px;
-                height: 2px;
-                background: var(--orange-primary);
-            }
-            
-            #settings-page .settings-field {
-                margin-bottom: 20px;
-                position: relative;
-            }
-            
-            #settings-page .settings-field:last-child {
-                margin-bottom: 0;
-            }
-            
-            #settings-page .settings-field label {
-                display: block;
-                margin-bottom: 8px;
-                font-weight: 500;
-                color: var(--text-primary);
-                font-size: 14px;
-                line-height: 1.4;
-            }
-            
-            #settings-page .settings-textarea {
-                width: 100%;
-                min-height: 100px;
-                padding: 12px 16px;
-                border: 2px solid var(--border-light);
-                border-radius: 8px;
-                background: var(--bg-primary);
-                color: var(--text-primary);
-                font-family: inherit;
-                font-size: 14px;
-                resize: vertical;
-                transition: all 0.2s ease;
-                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-            }
-            
-            #settings-page .settings-textarea:focus {
-                outline: none;
-                border-color: var(--orange-primary);
-                box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
-                transform: translateY(-1px);
-            }
-            
-            #settings-page .settings-select {
-                width: 100%;
-                padding: 12px 16px;
-                border: 2px solid var(--border-light);
-                border-radius: 8px;
-                background: var(--bg-primary);
-                color: var(--text-primary);
-                font-size: 14px;
-                transition: all 0.2s ease;
-                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-                cursor: pointer;
-            }
-            
-            #settings-page .settings-select:focus {
-                outline: none;
-                border-color: var(--orange-primary);
-                box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
-                transform: translateY(-1px);
-            }
-            
-            #settings-page .checkbox-label {
-                display: flex;
-                align-items: flex-start;
-                gap: 12px;
-                cursor: pointer;
-                font-weight: 500;
-                color: var(--text-primary);
-                padding: 12px 16px;
-                border-radius: 8px;
-                transition: all 0.2s ease;
-                position: relative;
-                background: var(--bg-primary);
-                border: 2px solid var(--border-light);
-            }
-            
-            #settings-page .checkbox-label:hover {
-                background: var(--bg-secondary);
-                border-color: var(--orange-primary);
-                transform: translateY(-1px);
-                box-shadow: 0 2px 8px rgba(255, 140, 0, 0.1);
-            }
-            
-            #settings-page .checkmark {
-                position: relative;
-                display: inline-block;
-                width: 20px;
-                height: 20px;
-                background: var(--grey-700);
-                border: 2px solid var(--grey-700);
-                border-radius: 6px;
-                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-                transition: all 0.2s ease;
-                flex-shrink: 0;
-                margin-top: 2px;
-            }
-            
-            #settings-page .checkbox-label input[type="checkbox"]:checked + .checkmark {
-                background: var(--orange-primary);
-                border-color: var(--orange-primary);
-                box-shadow: 0 2px 8px rgba(255, 140, 0, 0.3);
-                transform: scale(1.05);
-            }
-            
-            #settings-page .checkbox-label input[type="checkbox"]:checked + .checkmark::after {
-                content: '';
-                position: absolute;
-                left: 6px;
-                top: 2px;
-                width: 5px;
-                height: 10px;
-                border: solid #fff;
-                border-width: 0 3px 3px 0;
-                transform: rotate(45deg);
-                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-            }
-            
-            #settings-page .btn-small {
-                padding: 8px 12px;
-                font-size: 12px;
-                height: auto;
-                min-height: 32px;
-                border-radius: 6px;
-                transition: all 0.2s ease;
-            }
-            
-            #settings-page .btn-danger {
-                background: var(--red-subtle);
-                border-color: var(--red-subtle);
-                color: white;
-            }
-            
-            #settings-page .btn-danger:hover {
-                background: #c82333;
-                border-color: #bd2130;
-                color: white;
-                transform: translateY(-1px);
-            }
-            
-            #settings-page #save-settings-btn {
-                background: linear-gradient(135deg, var(--orange-primary) 0%, #ff8c42 100%);
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
-                font-weight: 600;
-                color: white;
-                box-shadow: 0 2px 8px rgba(255, 140, 0, 0.3);
-                transition: all 0.2s ease;
-            }
-            
-            #settings-page #save-settings-btn:hover:not(:disabled) {
-                transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
-            }
-            
-            #settings-page #save-settings-btn:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
-                transform: none;
-                box-shadow: 0 2px 8px rgba(255, 140, 0, 0.2);
-            }
-            
-            /* Responsive adjustments */
-            @media (max-width: 768px) {
-                #settings-page .settings-sections {
-                    grid-template-columns: 1fr;
-                    gap: 16px;
-                }
-                
-                #settings-page .settings-content {
-                    padding: 16px;
-                }
-                
-                #settings-page .phone-number-item {
-                    flex-direction: column;
-                    align-items: flex-start;
-                    gap: 12px;
-                }
-                
-                #settings-page .phone-actions {
-                    align-self: flex-end;
-                }
-            }
-        `;
-        
-        // Inject the styles into the head
-        document.head.appendChild(style);
-    }
-
-    // Export for use in other modules
-    if (typeof module !== 'undefined' && module.exports) {
-        module.exports = SettingsPage;
-    }
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SettingsPage;
+}

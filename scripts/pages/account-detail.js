@@ -1253,6 +1253,12 @@
       btn.classList.remove('not-processed');
       btn.classList.add('processing');
 
+      // Store transcript SID for status checking
+      try { if (result && result.transcriptSid) { btn.setAttribute('data-transcript-sid', result.transcriptSid); } } catch(_) {}
+
+      // Poll for insights becoming available and enable the button when ready
+      try { arcPollInsightsUntilReady(callSid, btn); } catch(_) {}
+
     } catch (error) {
       console.error('[AccountDetail] Failed to trigger CI processing:', error);
       
@@ -1270,6 +1276,55 @@
         });
       }
     }
+  }
+
+  // Poll /api/calls for this call until transcript and aiInsights are present, then enable insights button (Account Detail)
+  function arcPollInsightsUntilReady(callSid, btn){
+    let attempts = 0;
+    const maxAttempts = 40; // ~2 minutes at 3s
+    const delayMs = 3000;
+    const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm.vercel.app';
+    const isReady = (call) => {
+      const hasTranscript = !!(call && typeof call.transcript === 'string' && call.transcript.trim());
+      const insights = call && call.aiInsights;
+      const hasInsights = !!(insights && typeof insights === 'object' && Object.keys(insights).length > 0);
+      return hasTranscript && hasInsights;
+    };
+    const finalizeReady = (call) => {
+      try {
+        // Update state cache so future renders show full insights
+        if (Array.isArray(state._arcCalls)) {
+          const idMatch = String(callSid);
+          state._arcCalls = state._arcCalls.map(x => {
+            const xid = String(x.id || x.twilioSid || x.callSid || '');
+            if (xid === idMatch) {
+              return { ...x, transcript: call.transcript || x.transcript, formattedTranscript: call.formattedTranscript || x.formattedTranscript, aiInsights: call.aiInsights || x.aiInsights, conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence };
+            }
+            return x;
+          });
+        }
+      } catch(_) {}
+      try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch(_) {}
+      try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch(_) {}
+    };
+    const attempt = () => {
+      attempts++;
+      fetch(`${base}/api/calls?callSid=${encodeURIComponent(callSid)}`)
+        .then(r => r.json()).then(j => {
+          const call = j && j.ok && Array.isArray(j.calls) && j.calls[0];
+          if (call && isReady(call)) { finalizeReady(call); return; }
+          if (attempts < maxAttempts) { setTimeout(attempt, delayMs); }
+          else {
+            try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+          }
+        }).catch(()=>{
+          if (attempts < maxAttempts) { setTimeout(attempt, delayMs); }
+          else {
+            try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+          }
+        });
+    };
+    attempt();
   }
 
   // Inline expanding details
