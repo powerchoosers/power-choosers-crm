@@ -55,7 +55,13 @@ class SettingsPage {
         // Email signature text
         const signatureText = document.getElementById('email-signature-text');
         if (signatureText) {
-            signatureText.addEventListener('input', () => this.markDirty());
+            signatureText.addEventListener('input', (e) => {
+                // Persist text to state as the user types
+                this.state.settings.emailSignature.text = e.target.value || '';
+                this.markDirty();
+                // Update preview to reflect latest text above image
+                this.renderSignatureSection();
+            });
         }
 
         // Email signature image upload
@@ -190,11 +196,8 @@ class SettingsPage {
     }
 
     renderSettings() {
-        // Render email signature text
-        const signatureText = document.getElementById('email-signature-text');
-        if (signatureText) {
-            signatureText.value = this.state.settings.emailSignature.text || '';
-        }
+        // Render email signature section (text + image preview + controls)
+        this.renderSignatureSection();
 
         // Render Gemini prompts
         const greetingPrompt = document.getElementById('email-greeting-prompt');
@@ -261,6 +264,76 @@ class SettingsPage {
         this.updateSaveButton();
     }
 
+    // Render the email signature UI (text field value, image preview, button label, remove action)
+    renderSignatureSection() {
+        const signature = this.state.settings.emailSignature || {};
+
+        // Sync textarea value from state
+        const signatureTextArea = document.getElementById('email-signature-text');
+        if (signatureTextArea && signatureTextArea.value !== (signature.text || '')) {
+            signatureTextArea.value = signature.text || '';
+        }
+
+        // Elements
+        const uploadBtn = document.getElementById('upload-signature-image');
+        const preview = document.getElementById('signature-image-preview');
+
+        if (!preview) return;
+
+        // Build preview HTML: text (if any) above image (if any)
+        let html = '';
+        if (signature.text) {
+            const textHtml = (signature.text || '').replace(/\n/g, '<br>');
+            html += `<div class="signature-text-preview" style="font-family: inherit; font-size: 14px; color: var(--text-primary); line-height: 1.4; margin-bottom: ${signature.image ? '10px' : '0'};">${textHtml}</div>`;
+        }
+        if (signature.image) {
+            html += `
+                <div class="signature-image-wrap" style="display:flex; align-items:center; gap:12px;">
+                    <img src="${signature.image}" alt="Signature preview" style="max-width: 200px; max-height: 100px; border-radius: 4px;">
+                    <button type="button" class="btn-small btn-danger" id="remove-signature-image" title="Remove image">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <polyline points="3,6 5,6 21,6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>`;
+        }
+
+        // Apply preview state
+        if (html) {
+            preview.hidden = false;
+            preview.innerHTML = html;
+        } else {
+            preview.hidden = true;
+            preview.innerHTML = '';
+        }
+
+        // Toggle upload button label between Upload vs Edit
+        if (uploadBtn) {
+            if (signature.image) {
+                uploadBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+                        <circle cx="12" cy="13" r="3"></circle>
+                    </svg>
+                    Edit Image`;
+            } else {
+                uploadBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+                        <circle cx="12" cy="13" r="3"></circle>
+                    </svg>
+                    Upload Image`;
+            }
+        }
+
+        // Wire remove button if present
+        const removeBtn = document.getElementById('remove-signature-image');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => this.removeSignatureImage());
+        }
+    }
+
     renderPhoneNumbers() {
         const phoneList = document.getElementById('twilio-numbers-list');
         if (!phoneList) return;
@@ -314,40 +387,22 @@ class SettingsPage {
         // Create preview
         const reader = new FileReader();
         reader.onload = (e) => {
-            const preview = document.getElementById('signature-image-preview');
-            if (preview) {
-                preview.innerHTML = `
-                    <img src="${e.target.result}" alt="Signature preview" style="max-width: 200px; max-height: 100px; border-radius: 4px;">
-                    <button type="button" class="btn-small btn-danger" id="remove-signature-image">Remove</button>
-                `;
-                preview.hidden = false;
-
-                // Add remove button listener
-                const removeBtn = preview.querySelector('#remove-signature-image');
-                if (removeBtn) {
-                    removeBtn.addEventListener('click', () => this.removeSignatureImage());
-                }
-            }
-
-            // Store the image data
+            // Store the image data then re-render the signature section
             this.state.settings.emailSignature.image = e.target.result;
             this.markDirty();
+            this.renderSignatureSection();
         };
         reader.readAsDataURL(file);
     }
 
     removeSignatureImage() {
         this.state.settings.emailSignature.image = null;
-        const preview = document.getElementById('signature-image-preview');
-        if (preview) {
-            preview.hidden = true;
-            preview.innerHTML = '';
-        }
         const imageInput = document.getElementById('email-signature-image');
         if (imageInput) {
             imageInput.value = '';
         }
         this.markDirty();
+        this.renderSignatureSection();
     }
 
     showAddPhoneModal() {

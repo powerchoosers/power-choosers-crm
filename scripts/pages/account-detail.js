@@ -1697,6 +1697,11 @@
             companyInput.value = accountName;
           }
         }
+        // Persist the navigation context so after creating the contact we return here
+        try {
+          window._contactNavigationSource = 'account-details';
+          window._contactNavigationAccountId = state.currentAccount?.id || null;
+        } catch (_) {}
       }
       
       // Open the modal using the proper function
@@ -3153,9 +3158,85 @@
     } else if (field === 'annualUsage' && val) {
       const numeric = String(val).replace(/[^0-9]/g, '');
       textEl.textContent = numeric ? numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '--';
+    } else if (field === 'companyPhone' || field === 'phone' || field === 'primaryPhone' || field === 'mainPhone') {
+      // For phone fields, display in human-friendly format and bind click-to-call immediately
+      const display = formatPhoneForDisplayLocal(val);
+      textEl.textContent = display || '--';
+      try { bindAccountDetailPhoneClick(textEl, val); } catch(_) {}
     } else {
       textEl.textContent = val || '--';
     }
+  }
+
+  // Local helper: display phone as +1 (AAA) BBB-CCCC (similar to click-to-call)
+  function formatPhoneForDisplayLocal(phone) {
+    if (!phone) return '';
+    const raw = String(phone);
+    const digits = raw.replace(/[^\d]/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+    }
+    if (digits.length === 10) {
+      return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+    }
+    if (/^\+/.test(raw)) return raw; // already E.164 with country code
+    return raw; // fallback
+  }
+
+  // After save, ensure the phone element is immediately clickable without reload
+  function bindAccountDetailPhoneClick(el, originalValue) {
+    if (!el) return;
+    const text = (el.textContent || '').trim();
+    const cleaned = String(originalValue || text || '').replace(/[^\d\+]/g, '');
+    // Require at least 10 digits
+    const digitsOnly = cleaned.replace(/\D/g, '');
+    if (digitsOnly.length < 10) return;
+    // Set pointer and tooltip
+    try {
+      el.style.cursor = 'pointer';
+      const account = state.currentAccount || {};
+      const companyName = account.accountName || account.name || account.companyName || '';
+      const displayPhone = formatPhoneForDisplayLocal(cleaned);
+      const tt = `Call ${displayPhone}${companyName ? ` (${companyName})` : ''}`;
+      el.setAttribute('data-pc-title', tt);
+      el.removeAttribute('title');
+      // Ensure data attributes are present for consistent hover logic elsewhere
+      if (account.id) el.setAttribute('data-account-id', account.id);
+      if (companyName) el.setAttribute('data-company-name', companyName);
+      el.setAttribute('data-contact-id', '');
+      el.setAttribute('data-contact-name', '');
+    } catch(_) {}
+    // Bind click only once
+    if (el._pcClickBound) return;
+    el.addEventListener('click', function(e){
+      try { e.preventDefault(); e.stopPropagation(); } catch(_) {}
+      const callNum = digitsOnly.length === 10 ? `+1${digitsOnly}` : (cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`);
+      // Set call context explicitly to company mode
+      try {
+        if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
+          const account = state.currentAccount || {};
+          window.Widgets.setCallContext({
+            accountId: account.id || null,
+            accountName: account.accountName || account.name || account.companyName || null,
+            company: account.accountName || account.name || account.companyName || null,
+            contactId: null,
+            contactName: '',
+            name: account.accountName || account.name || account.companyName || '',
+            city: account.city || account.locationCity || '',
+            state: account.state || account.locationState || '',
+            domain: account.domain || account.website || '',
+            isCompanyPhone: true
+          });
+        }
+      } catch(_) {}
+      try {
+        if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
+          window.Widgets.callNumber(callNum.replace(/\D/g,''), '', true, 'account-detail');
+        }
+      } catch(_) {}
+    });
+    el._pcClickBound = true;
+    el.classList.add('clickable-phone');
   }
 
   // Ensure default action buttons (edit/copy/delete) exist after editing lifecycle

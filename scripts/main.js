@@ -354,7 +354,7 @@ class PowerChoosersCRM {
             if (data.workDirectPhone) { try { normalized.workDirectPhone = this.normalizePhone(data.workDirectPhone); } catch(_) { normalized.workDirectPhone = data.workDirectPhone; } }
             if (data.otherPhone) { try { normalized.otherPhone = this.normalizePhone(data.otherPhone); } catch(_) { normalized.otherPhone = data.otherPhone; } }
 
-            const doc = {
+          const doc = {
               // Known contact fields
               firstName: data.firstName || '',
               lastName: data.lastName || '',
@@ -376,6 +376,14 @@ class PowerChoosersCRM {
               createdAt: now,
               updatedAt: now,
             };
+
+          // If adding from Account Details, link the contact to the current account immediately
+          try {
+            const accountId = window.AccountDetail?.state?.currentAccount?.id;
+            if (accountId) {
+              doc.accountId = accountId;
+            }
+          } catch (_) { /* noop */ }
 
             const ref = await db.collection('contacts').add(doc);
 
@@ -2764,7 +2772,7 @@ class PowerChoosersCRM {
         }
     }
 
-    loadTodaysTasks() {
+    async loadTodaysTasks() {
         const tasksList = document.querySelector('.tasks-list');
         if (!tasksList) return;
 
@@ -2799,20 +2807,44 @@ class PowerChoosersCRM {
         // Today's local midnight
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
-        // Load user tasks from localStorage
-        let todaysTasks = [];
+
+        // Load tasks from both localStorage and Firebase
+        let localTasks = [];
         try {
-            const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-            todaysTasks = userTasks.filter(task => {
-                if (task.status !== 'pending') return false;
-                const d = parseDateStrict(task.dueDate);
-                if (!d) return false;
-                return d.getTime() <= today.getTime(); // due today or overdue
-            });
+            localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        } catch (_) { localTasks = []; }
+
+        let firebaseTasks = [];
+        try {
+            if (window.firebaseDB) {
+                const snapshot = await window.firebaseDB.collection('tasks')
+                    .orderBy('timestamp', 'desc')
+                    .limit(200)
+                    .get();
+                firebaseTasks = snapshot.docs.map(doc => {
+                    const data = doc.data() || {};
+                    const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+                    // Prefer the embedded id saved at creation time so it matches localStorage for dedupe
+                    return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
+                });
+            }
         } catch (e) {
-            console.warn('Could not load user tasks for Today\'s Tasks widget:', e);
+            console.warn("Could not load tasks from Firebase for Today's Tasks widget:", e);
         }
+
+        // Merge and dedupe by task id (local tasks take precedence)
+        const allTasksMap = new Map();
+        localTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+        firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+        const allTasks = Array.from(allTasksMap.values());
+
+        // Filter to today's and overdue pending tasks
+        let todaysTasks = allTasks.filter(task => {
+            if ((task.status || 'pending') !== 'pending') return false;
+            const d = parseDateStrict(task.dueDate);
+            if (!d) return false;
+            return d.getTime() <= today.getTime();
+        });
 
         // Sort by due date/time (earliest to latest)
         todaysTasks.sort((a, b) => {
@@ -2896,7 +2928,7 @@ class PowerChoosersCRM {
                             <polyline points="15,18 9,12 15,6"></polyline>
                         </svg>
                     </button>
-                    <span class="pagination-info">${this.todaysTasksPagination.currentPage} of ${totalPages}</span>
+                    <div class="pagination-current">${this.todaysTasksPagination.currentPage}</div>
                     <button class="pagination-btn next-btn" ${this.todaysTasksPagination.currentPage === totalPages ? 'disabled' : ''} data-action="next">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="9,18 15,12 9,6"></polyline>

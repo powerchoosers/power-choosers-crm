@@ -522,15 +522,15 @@
     const reFilter = debounce(applyFilters, 200);
 
     [els.fName, els.fIndustry, els.fDomain].forEach((inp) => {
-      if (inp) inp.addEventListener('input', reFilter);
+      if (inp) inp.addEventListener('input', () => { state.currentPage = 1; reFilter(); });
     });
     [els.fHasPhone].forEach((chk) => {
-      if (chk) chk.addEventListener('change', reFilter);
+      if (chk) chk.addEventListener('change', () => { state.currentPage = 1; reFilter(); });
     });
 
     if (els.applyBtn) els.applyBtn.addEventListener('click', () => { state.currentPage = 1; applyFilters(); });
     if (els.clearBtn) els.clearBtn.addEventListener('click', () => { clearFilters(); state.currentPage = 1; });
-    if (els.quickSearch) els.quickSearch.addEventListener('input', reFilter);
+    if (els.quickSearch) els.quickSearch.addEventListener('input', () => { state.currentPage = 1; reFilter(); });
 
     // Select-all
     if (els.selectAll) {
@@ -809,9 +809,9 @@
       ) && nameMatch(acctName) && industryMatch(a.industry) && domainMatch(domain) && (!mustPhone || hasPhone);
     });
 
-    if (!window.__restoringAccounts) {
-      state.currentPage = 1;
-    }
+    // Do not reset pagination here. Pagination resets are handled only on user-driven
+    // filter/search changes via event handlers, so passive data updates (e.g., onSnapshot)
+    // won't bounce the user back to page 1.
     if (window.__restoringAccountsUntil && Date.now() > window.__restoringAccountsUntil) {
       try { window.__restoringAccounts = false; window.__restoringAccountsUntil = 0; } catch(_) {}
     }

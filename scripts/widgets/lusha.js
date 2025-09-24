@@ -938,9 +938,10 @@
     }
     
     const website = domain ? `https://${domain}` : '';
-    const logo = (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function')
-      ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: company && company.logoUrl, domain, size: 36 })
-      : (company?.logoUrl ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : ''));
+    // In-widget policy: if Lusha provides a logoUrl, show it directly (do NOT route through global helper)
+    const logo = (company && company.logoUrl)
+      ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
+      : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : '');
     
     // Create collapsible description
     let descHtml = '';

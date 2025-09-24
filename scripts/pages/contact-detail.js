@@ -3852,7 +3852,9 @@
       const hasTranscript = !!(call && typeof call.transcript === 'string' && call.transcript.trim());
       const insights = call && call.aiInsights;
       const hasInsights = !!(insights && typeof insights === 'object' && Object.keys(insights).length > 0);
-      return hasTranscript && hasInsights;
+      const ci = call && call.conversationalIntelligence;
+      const ciCompleted = !!(ci && typeof ci.status === 'string' && ci.status.toLowerCase() === 'completed');
+      return (hasTranscript && hasInsights) || (hasTranscript && ciCompleted);
     };
     const finalizeReady = (call) => {
       try {
@@ -3877,7 +3879,18 @@
         .then(r => r.json()).then(j => {
           const call = j && j.ok && Array.isArray(j.calls) && j.calls[0];
           if (call && isReady(call)) { finalizeReady(call); return; }
-          if (attempts < maxAttempts) { setTimeout(attempt, delayMs); }
+          if (attempts < maxAttempts) {
+            // Kick a fallback poll to server to upsert if webhook raced or failed
+            try {
+              const ci = call && call.conversationalIntelligence; const tsid = ci && ci.transcriptSid;
+              if (!isReady(call) && tsid) {
+                fetch(`${base}/api/twilio/poll-ci-analysis`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ transcriptSid: tsid, callSid }) })
+                  .then(r=>r.json()).then(()=>{})
+                  .catch(()=>{});
+              }
+            } catch(_) {}
+            setTimeout(attempt, delayMs);
+          }
           else {
             try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
           }
@@ -5145,21 +5158,21 @@ async function createContactSequenceThenAdd(name) {
           if (guess && guess.id) contactId = guess.id;
         } catch(_) {}
       }
-      if (!contactId) { 
-        console.warn('[ContactDetail] No contact ID available for list addition', {
-          contactId: contactId,
-          stateContact: state.currentContact,
-          stateContactId: state.currentContact?.id
-        });
-        
-        // Try to get contact ID from state
-        const stateContactId = state.currentContact?.id;
-        if (stateContactId) {
-          console.log('[ContactDetail] Using contact ID from state:', stateContactId);
-          contactId = stateContactId;
-        } else {
-          closeContactListsPanel(); 
-          return; 
+      if (!contactId) {
+        // Final fallback: wait briefly for newly created contact ID to propagate
+        const start = Date.now();
+        while (!contactId && Date.now() - start < 1200) {
+          await new Promise(r => setTimeout(r, 120));
+          contactId = state.currentContact?.id || document.querySelector('[data-contact-id]')?.getAttribute('data-contact-id');
+        }
+        if (!contactId) {
+          console.warn('[ContactDetail] No contact ID available for list addition', {
+            contactId: contactId,
+            stateContact: state.currentContact,
+            stateContactId: state.currentContact?.id
+          });
+          closeContactListsPanel();
+          return;
         }
       }
       const db = window.firebaseDB;
@@ -5190,6 +5203,16 @@ async function createContactSequenceThenAdd(name) {
         }
       }
       window.crm?.showToast && window.crm.showToast(`Added to "${listName}"`);
+      // Optimistically mark the list as selected in the panel without full refresh
+      try {
+        const body = document.getElementById('contact-lists-body');
+        const item = body && body.querySelector(`.list-item[data-id="${CSS.escape(listId)}"]`);
+        if (item) {
+          item.setAttribute('data-member-id', 'temp');
+          const check = item.querySelector('.list-check');
+          if (check) check.textContent = '✓';
+        }
+      } catch (_) { /* noop */ }
     } catch (err) {
       console.warn('Add to list failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to add to list');
