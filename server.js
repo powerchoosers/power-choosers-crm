@@ -821,42 +821,81 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
     const trackingId = parsedUrl.pathname.split('/').pop();
     const userAgent = req.headers['user-agent'] || '';
     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    const referer = req.headers.referer || '';
 
-    // Update database with open event
-    const openEvent = {
-      trackingId,
-      openedAt: new Date().toISOString(),
-      userAgent,
-      ip
-    };
+    // Detect common image proxy user agents (e.g., Gmail's GoogleImageProxy)
+    const ua = String(userAgent).toLowerCase();
+    const isGoogleProxy = ua.includes('googleimageproxy');
+    const isGenericProxy = isGoogleProxy || ua.includes('proxy');
+
+    // Create a unique session key for this user/email combination
+    const sessionKey = `${trackingId}_${ip}_${isGenericProxy ? 'proxy' : userAgent}`;
     
-    // Since we're using client-side Firebase, we'll trigger a client-side update
-    // The tracking pixel will be loaded by the email client, which will then
-    // make a request to update Firebase via the client-side tracking system
-
-    // Store the tracking event in memory for the client to pick up
-    if (!global.emailTrackingEvents) {
-      global.emailTrackingEvents = new Map();
+    // Initialize tracking sessions if not exists
+    if (!global.emailTrackingSessions) {
+      global.emailTrackingSessions = new Map();
     }
     
-    const eventKey = `${trackingId}_open`;
-    global.emailTrackingEvents.set(eventKey, {
-      trackingId,
-      type: 'open',
-      data: openEvent,
-      timestamp: new Date().toISOString()
-    });
+    // Check if this session has already been tracked recently
+    const now = Date.now();
+    // Proxies can hammer the pixel repeatedly; use a long window for proxies
+    const windowMs = isGenericProxy ? (12 * 60 * 60 * 1000) : 5000; // 12h for proxies, 5s for real clients
+    const windowStart = now - windowMs;
+    
+    const existingSession = global.emailTrackingSessions.get(sessionKey);
+    if (existingSession && existingSession.lastTracked > windowStart) {
+      console.log('[Email] Session already tracked recently, skipping:', trackingId);
+      // Still return the pixel but don't create duplicate events
+    } else {
+      // Create new tracking event
+      const openEvent = {
+        trackingId,
+        openedAt: new Date().toISOString(),
+        userAgent,
+        ip,
+        referer
+      };
+      
+      // Store the session
+      global.emailTrackingSessions.set(sessionKey, {
+        lastTracked: now,
+        openEvent
+      });
+      
+      // Store the tracking event in memory for the client to pick up
+      if (!global.emailTrackingEvents) {
+        global.emailTrackingEvents = new Map();
+      }
+      
+      const eventKey = `${trackingId}_open_${now}`;
+      global.emailTrackingEvents.set(eventKey, {
+        trackingId,
+        type: 'open',
+        data: openEvent,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('[Email] New tracking event created:', trackingId, 'Session:', sessionKey);
+    }
 
-    // Return a 1x1 transparent pixel
+    // Return a 1x1 transparent pixel with proper headers
     const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
     
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': 'image/png',
       'Content-Length': pixel.length,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    });
+      'X-Content-Type-Options': 'nosniff'
+    };
+    if (isGenericProxy) {
+      // Encourage proxy to cache to avoid repeated refetches
+      headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+    } else {
+      // For real user agents, avoid caching so a true reopen can refetch
+      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      headers['Pragma'] = 'no-cache';
+      headers['Expires'] = '0';
+    }
+    res.writeHead(200, headers);
     res.end(pixel);
 
   } catch (error) {
@@ -922,6 +961,11 @@ async function handleApiEmailTrackingEvents(req, res) {
 
   try {
     const events = global.emailTrackingEvents ? Array.from(global.emailTrackingEvents.values()) : [];
+    
+    // Clear events after reading so they are not reprocessed next poll
+    if (global.emailTrackingEvents) {
+      global.emailTrackingEvents.clear();
+    }
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
