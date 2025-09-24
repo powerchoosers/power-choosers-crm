@@ -630,9 +630,40 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     // insights button (prevent duplicate listeners)
     els.tbody.querySelectorAll('button.insights-btn').forEach(btn=>{
       if (!btn._insightsListenerBound) {
-        btn.addEventListener('click',(e)=>{
-          if(btn.disabled) { e.preventDefault(); return; }
-          openInsightsModal(btn.getAttribute('data-id'));
+        btn.addEventListener('click', async (e)=>{
+          e.preventDefault();
+          const id = btn.getAttribute('data-id');
+          const row = state.data.find(c => String(c.id||c.callSid||'') === String(id));
+          if (!row) return;
+          const needsProcessing = (!row.transcript || !row.aiInsights || Object.keys(row.aiInsights||{}).length === 0);
+          if (needsProcessing) {
+            // Trigger CI request for this single call, then poll until ready
+            try {
+              btn.disabled = true;
+              btn.innerHTML = '⏳';
+              let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+              if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+              const res = await fetch(`${base}/api/twilio/ci-request`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callSid: row.id || row.callSid })
+              });
+              if (!res.ok) { btn.disabled = false; btn.innerHTML = svgIcon('insights'); return; }
+              // Poll until available, then open modal
+              await callsPollInsightsUntilReady(row.id || row.callSid, (call)=>{
+                // update local state row
+                try {
+                  const idx = state.data.findIndex(x => String(x.id||x.callSid||'') === String(id));
+                  if (idx >= 0) state.data[idx] = { ...state.data[idx], transcript: call.transcript || state.data[idx].transcript, formattedTranscript: call.formattedTranscript || state.data[idx].formattedTranscript, aiInsights: call.aiInsights || state.data[idx].aiInsights };
+                } catch(_) {}
+                btn.disabled = false; btn.innerHTML = svgIcon('insights');
+                openInsightsModal(id);
+              });
+            } catch(_) {
+              btn.disabled = false; btn.innerHTML = svgIcon('insights');
+            }
+            return;
+          }
+          if(btn.disabled) { return; }
+          openInsightsModal(id);
         });
         btn._insightsListenerBound = true;
       }
@@ -726,6 +757,30 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           }
         } catch(_) {}
       });
+    });
+  }
+
+  // Poll /api/calls for this call until transcript and aiInsights are present, then run callback
+  async function callsPollInsightsUntilReady(callSid, onReady){
+    let attempts = 0; const maxAttempts = 40; const delayMs = 3000;
+    const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm.vercel.app';
+    const isReady = (call) => {
+      const hasTranscript = !!(call && typeof call.transcript === 'string' && call.transcript.trim());
+      const insights = call && call.aiInsights; const hasInsights = !!(insights && typeof insights === 'object' && Object.keys(insights).length > 0);
+      return hasTranscript && hasInsights;
+    };
+    return await new Promise((resolve)=>{
+      const attempt = ()=>{
+        attempts++;
+        fetch(`${base}/api/calls?callSid=${encodeURIComponent(callSid)}`)
+          .then(r=>r.json()).then(j=>{
+            const call = j && j.ok && Array.isArray(j.calls) && j.calls[0];
+            if (call && isReady(call)) { try{ onReady && onReady(call); }catch(_){} resolve(true); return; }
+            if (attempts < maxAttempts) { setTimeout(attempt, delayMs); }
+            else { resolve(false); }
+          }).catch(()=>{ if (attempts < maxAttempts) { setTimeout(attempt, delayMs); } else { resolve(false); } });
+      };
+      attempt();
     });
   }
 
