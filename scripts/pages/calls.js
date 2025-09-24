@@ -769,7 +769,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     const isReady = (call) => {
       const hasTranscript = !!(call && typeof call.transcript === 'string' && call.transcript.trim());
       const insights = call && call.aiInsights; const hasInsights = !!(insights && typeof insights === 'object' && Object.keys(insights).length > 0);
-      return hasTranscript && hasInsights;
+      // Accept either transcript+insights OR transcript with completed CI status and empty insights
+      const ci = call && call.conversationalIntelligence;
+      const ciCompleted = !!(ci && typeof ci.status === 'string' && ci.status.toLowerCase() === 'completed');
+      return (hasTranscript && hasInsights) || (hasTranscript && ciCompleted);
     };
     return await new Promise((resolve)=>{
       const attempt = ()=>{
@@ -778,7 +781,18 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           .then(r=>r.json()).then(j=>{
             const call = j && j.ok && Array.isArray(j.calls) && j.calls[0];
             if (call && isReady(call)) { try{ onReady && onReady(call); }catch(_){} resolve(true); return; }
-            if (attempts < maxAttempts) { setTimeout(attempt, delayMs); }
+            if (attempts < maxAttempts) {
+              // Fallback: if server created transcript but webhook didn’t update yet, poll our CI status endpoint
+              try {
+                const ci = call && call.conversationalIntelligence; const tsid = ci && ci.transcriptSid;
+                if (!isReady(call) && tsid) {
+                  fetch(`${base}/api/twilio/poll-ci-analysis`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ transcriptSid: tsid, callSid }) })
+                    .then(r=>r.json()).then(()=>{ /* no-op; server will upsert when ready */ })
+                    .catch(()=>{});
+                }
+              } catch(_) {}
+              setTimeout(attempt, delayMs);
+            }
             else { resolve(false); }
           }).catch(()=>{ if (attempts < maxAttempts) { setTimeout(attempt, delayMs); } else { resolve(false); } });
       };

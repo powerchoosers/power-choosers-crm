@@ -303,6 +303,22 @@
         // Ensure name is the company/account name in this mode
         context.name = context.accountName || context.company || contactName || '';
         context.isCompanyPhone = true;
+        // Ensure logoUrl/domain hints are present for company-mode icon
+        try {
+          const account = window.AccountDetail?.state?.currentAccount || {};
+          if (account.logoUrl && !context.logoUrl) context.logoUrl = String(account.logoUrl);
+          if (!context.domain) {
+            let d = account.domain || '';
+            if (!d && account.website) {
+              try { const u = new URL(account.website.startsWith('http') ? account.website : `https://${account.website}`); d = u.hostname; } catch(_) {
+                d = String(account.website).replace(/^https?:\/\//i,'').split('/')[0];
+              }
+            }
+            if (d) context.domain = d.replace(/^www\./i,'');
+          }
+          if (!context.city && account.city) context.city = account.city;
+          if (!context.state && account.state) context.state = account.state;
+        } catch(_) {}
       }
     } catch(_) {}
 
@@ -429,7 +445,8 @@
 
         // Bind click handler only once
         if (!element.classList.contains('clickable-phone')) {
-          makePhoneClickable(element, text, contactName);
+          const contactNameForClick = nameForTitle || '';
+          makePhoneClickable(element, text, contactNameForClick);
         }
       });
     });

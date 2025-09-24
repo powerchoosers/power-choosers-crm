@@ -479,8 +479,8 @@
                 const callStartTime = Date.now();
                 const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
                 if (typeof updateCallStatus === 'function') {
-                // Use Twilio CallSid if available so backend persists immediately
-                updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
+                  // Use Twilio CallSid if available so backend persists immediately
+                  updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
                 // Immediately notify recent calls refresh so account detail updates without reload
                 try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
                 } else {
@@ -555,7 +555,7 @@
                         body: JSON.stringify({ callSid: sid })
                       }).catch(()=>{});
                     } catch (_) {}
-                    window.currentServerCallSid = null;
+                      window.currentServerCallSid = null;
                   }
                   
                   // Release the input device to avoid the red recording symbol
@@ -876,7 +876,7 @@
   // Use the new favicon helper system if available
   if (window.__pcFaviconHelper) {
     const faviconHTML = (typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function')
-      ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: (acct && acct.logoUrl) || '', domain: d, size: 64 })
+      ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: (currentCallContext && currentCallContext.logoUrl) || '', domain: d, size: 64 })
       : window.__pcFaviconHelper.generateFaviconHTML(d, 64);
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = faviconHTML;
@@ -951,7 +951,8 @@
       if (input) input.style.display = 'none';
 
       // Populate
-      const isCompanyPhone = !!(currentCallContext && (currentCallContext.isCompanyPhone || (currentCallContext.company && !currentCallContext.contactId)));
+      // Explicitly use setCallContext's isCompanyPhone to avoid accidental flips
+      const isCompanyPhone = !!(currentCallContext && currentCallContext.isCompanyPhone);
       // In company-call mode, prefer Account context (account-detail source) over contact/meta hints
       const city = isCompanyPhone
         ? ((currentCallContext && currentCallContext.city) || (meta && meta.city) || '')
@@ -959,12 +960,14 @@
       const state = isCompanyPhone
         ? ((currentCallContext && currentCallContext.state) || (meta && meta.state) || '')
         : ((meta && meta.state) || (currentCallContext && currentCallContext.state) || '');
-      const account = (meta && (meta.account || meta.company)) || (currentCallContext && currentCallContext.company) || '';
+      const account = isCompanyPhone
+        ? ((currentCallContext && currentCallContext.company) || (meta && (meta.account || meta.company)) || '')
+        : ((meta && (meta.account || meta.company)) || (currentCallContext && currentCallContext.company) || '');
       const domain = isCompanyPhone
-        ? ((currentCallContext && currentCallContext.domain) || '')
+        ? ((currentCallContext && currentCallContext.domain) || (meta && meta.domain) || '')
         : ((meta && meta.domain) || (currentCallContext && currentCallContext.domain) || '');
       const logoUrl = isCompanyPhone
-        ? ((currentCallContext && currentCallContext.logoUrl) || '')
+        ? ((currentCallContext && currentCallContext.logoUrl) || (meta && meta.logoUrl) || '')
         : ((meta && meta.logoUrl) || (currentCallContext && currentCallContext.logoUrl) || '');
       const displayNumber = number || (currentCallContext && currentCallContext.number) || '';
       
@@ -972,7 +975,7 @@
       // For individual contact calls, show contact name
       let nameLine;
       if (isCompanyPhone) {
-        nameLine = (currentCallContext && currentCallContext.company) || (meta && meta.account) || '';
+        nameLine = (currentCallContext && currentCallContext.company) || (meta && (meta.account || meta.company)) || '';
       } else {
         nameLine = (meta && meta.name) || (currentCallContext && currentCallContext.name) || '';
       }
@@ -1003,7 +1006,15 @@
         if (isCompanyPhone) {
           // Prefer explicit logoUrl, then domain favicon, then nav fallback
           if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') {
-            avatarWrap.innerHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+            // If both logoUrl and domain are missing (deep bug), explicitly fall back to accounts icon
+            const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+            if (html && html.indexOf('company-favicon') !== -1) {
+              avatarWrap.innerHTML = html;
+            } else if (domain && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') {
+              avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
+            } else if (typeof window.__pcAccountsIcon === 'function') {
+              avatarWrap.innerHTML = window.__pcAccountsIcon();
+            }
           } else if (domain && window.__pcFaviconHelper) {
             avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
           } else if (typeof window.__pcAccountsIcon === 'function') {
@@ -1159,6 +1170,7 @@
     city: '',
     state: '',
     domain: '',
+    logoUrl: '',
     isCompanyPhone: false,
     isActive: false
   };
@@ -1209,17 +1221,17 @@
       if (currentCallSid) {
         const tick = Math.floor(elapsed / 2000);
         if (tick !== Math.floor((elapsed - 1000) / 2000)) {
-          try {
-            document.dispatchEvent(new CustomEvent('pc:live-call-duration', {
-              detail: {
-                callSid: currentCallSid,
-                duration: Math.floor(elapsed / 1000),
-                durationFormatted: formatDurationForRecentCalls(elapsed)
-              }
-            }));
-          } catch(_) {}
+              try {
+                document.dispatchEvent(new CustomEvent('pc:live-call-duration', { 
+                  detail: { 
+                    callSid: currentCallSid, 
+                    duration: Math.floor(elapsed / 1000),
+                    durationFormatted: formatDurationForRecentCalls(elapsed)
+                  } 
+                }));
+              } catch(_) {}
         }
-      }
+            }
     }, 1000);
   }
   function stopLiveCallTimer(card) {
@@ -1813,7 +1825,7 @@
       const FLOW = (window.callScriptsModule && window.callScriptsModule.FLOW) || {
         hook: { text: 'Good {{day.part}}, is this {{contact.first_name}}?', responses: [ { label: 'Yes, this is', next: 'main_script_start' }, { label: 'Not me', next: 'gatekeeper_intro' } ] },
         main_script_start: { text: "Perfect — So, my name is Lewis with PowerChoosers.com, and — I understand you're responsible for electricity agreements and contracts for {{account.name}}. Is that still accurate?", responses: [ { label: "Yes, that's me / I handle that", next: 'pathA' }, { label: 'That would be someone else / not the right person', next: 'gatekeeper_intro' } ] },
-        gatekeeper_intro: { text: 'Good {{day.part}}. I am looking to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?', responses: [ { label: "What's this about?", next: 'gatekeeper_whats_about' }, { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' } ] },
+        gatekeeper_intro: { text: 'Good {{day.part}}. I am needin\' to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?', responses: [ { label: "What's this about?", next: 'gatekeeper_whats_about' }, { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' } ] },
         gatekeeper_whats_about: { text: 'My name is Lewis with PowerChoosers.com and I am looking to speak with someone about the future electricity agreements for {{account.name}}. Who would be the best person for that?', responses: [ { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' }, { label: 'I can help you', next: 'pathA' } ] },
         transfer_dialing: { text: 'Connecting... Ringing...', responses: [ { label: 'Call connected', next: 'hook' }, { label: 'Not connected', next: 'voicemail' } ] },
         voicemail: { text: 'Good {{day.part}}, this is Lewis. Please call me back at 817-663-0380. I also sent a short email explaining why I am reaching out today. Thank you and have a great day.', responses: [ { label: 'End call / start new call', next: 'start' } ] },
@@ -3289,6 +3301,7 @@
       currentCallContext.city = '';
       currentCallContext.state = '';
       currentCallContext.domain = '';
+      currentCallContext.logoUrl = '';
       currentCallContext.isCompanyPhone = false;
       currentCallContext.suggestedContactId = null;
       currentCallContext.suggestedContactName = '';
@@ -3303,6 +3316,7 @@
       if (ctx.city) currentCallContext.city = ctx.city;
       if (ctx.state) currentCallContext.state = ctx.state;
       if (ctx.domain) currentCallContext.domain = ctx.domain;
+      if (ctx.logoUrl) currentCallContext.logoUrl = ctx.logoUrl;
       if (ctx.isCompanyPhone !== undefined) currentCallContext.isCompanyPhone = ctx.isCompanyPhone;
       if (ctx.suggestedContactId) currentCallContext.suggestedContactId = ctx.suggestedContactId;
       if (ctx.suggestedContactName) currentCallContext.suggestedContactName = ctx.suggestedContactName;

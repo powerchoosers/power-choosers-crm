@@ -74,6 +74,28 @@ export default async function handler(req, res) {
             });
         }
         
+        // Compute agent/customer channel mapping (align with webhook)
+        let channelRoleMap = { agentChannel: '1', customerChannel: '2' };
+        try {
+            let callResource = null;
+            try { callResource = callSid ? await client.calls(callSid).fetch() : null; } catch(_) {}
+            const fromStr = callResource?.from || '';
+            const toStr = callResource?.to || '';
+            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+            const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+              .split(',').map(norm).filter(Boolean);
+            const from10 = norm(fromStr);
+            const to10 = norm(toStr);
+            const isBiz = (p) => !!p && envBiz.includes(p);
+            const fromIsClient = /^client:/i.test(fromStr);
+            const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
+            channelRoleMap.agentChannel = fromIsAgent ? '1' : '2';
+            channelRoleMap.customerChannel = fromIsAgent ? '2' : '1';
+            console.log('[Poll CI Analysis] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr });
+        } catch(e) {
+            console.warn('[Poll CI Analysis] Failed to compute channel-role mapping, defaulting:', e?.message);
+        }
+
         // Analysis is complete, fetch sentences
         let sentences = [];
         try {
@@ -111,7 +133,8 @@ export default async function handler(req, res) {
                     startTime: s.startTime,
                     endTime: s.endTime,
                     channel: channel,
-                    channelNum: channelNum
+                    channelNum: channelNum,
+                    speaker: channelNum === Number(channelRoleMap.agentChannel || '1') ? 'Agent' : 'Customer'
                 };
             });
             
@@ -122,6 +145,40 @@ export default async function handler(req, res) {
             console.error('[Poll CI Analysis] Error fetching sentences:', error);
         }
         
+        // Build transcript strings and proactively upsert to /api/calls (fallback if webhook races/fails)
+        try {
+            const transcriptText = sentences.map(s => s.text || '').filter(Boolean).join(' ');
+            const formattedTranscript = sentences
+              .filter(s => s.text && s.text.trim())
+              .map(s => `${s.speaker}: ${s.text.trim()}`)
+              .join('\n\n');
+            if (transcriptText || sentences.length > 0) {
+                const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+                const ai = {
+                    summary: `Analysis of ${transcriptText.split(/\s+/).filter(Boolean).length}-word conversation.`,
+                    sentiment: 'Neutral',
+                    keyTopics: [],
+                    nextSteps: ['Follow up'],
+                    painPoints: [],
+                    decisionMakers: [],
+                    speakerTurns: sentences.map(x=>({ role: x.speaker.toLowerCase(), t: Math.max(0, Math.floor(x.startTime||0)), text: x.text||'' })),
+                    conversationalIntelligence: {
+                        transcriptSid,
+                        status: transcript.status,
+                        sentenceCount: sentences.length,
+                        channelRoleMap
+                    },
+                    source: 'twilio-conversational-intelligence'
+                };
+                await fetch(`${base}/api/calls`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ callSid, transcript: transcriptText, formattedTranscript, aiInsights: ai, conversationalIntelligence: ai.conversationalIntelligence })
+                }).catch(()=>{});
+            }
+        } catch(e) {
+            console.warn('[Poll CI Analysis] Fallback upsert failed:', e?.message || e);
+        }
+
         return res.status(200).json({
             success: true,
             analysisComplete: true,
@@ -133,7 +190,8 @@ export default async function handler(req, res) {
             },
             sentences: sentences,
             sentenceCount: sentences.length,
-            message: 'Analysis completed successfully'
+            updated: true,
+            message: 'Analysis completed (fallback upsert attempted)'
         });
         
     } catch (error) {
