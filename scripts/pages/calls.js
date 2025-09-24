@@ -641,8 +641,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             try {
               btn.disabled = true;
               btn.innerHTML = '⏳';
-              let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-              if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+              let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
+                ? window.crm.getApiBaseUrl()
+                : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm.vercel.app');
+              base = String(base).replace(/\/$/, '');
               const res = await fetch(`${base}/api/twilio/ci-request`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callSid: row.id || row.callSid })
               });

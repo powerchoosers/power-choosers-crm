@@ -13864,6 +13864,27 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     100% { transform: rotate(360deg); }
 }
 
+/* CI processing button spinner (consistent across Account/Contact pages) */
+.ci-btn-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    border: 2px solid var(--grey-600);
+    border-top-color: var(--orange-subtle);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    vertical-align: middle;
+}
+
+/* Ensure rc-icon-btn keeps fixed square bounds so spinner doesn't stretch */
+.rc-icon-btn.processing {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+}
+
 /* Google Maps Widget Styles */
 /* .maps-card inherits from .widget-card - no additional styles needed */
 
