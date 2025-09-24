@@ -261,7 +261,19 @@
           // Include location/domain hints for the phone widget display
           try { if (account.city) context.city = account.city; } catch(_) {}
           try { if (account.state) context.state = account.state; } catch(_) {}
-          try { if (account.domain) context.domain = account.domain; } catch(_) {}
+          // Prefer explicit logoUrl for icons
+          try { if (account.logoUrl) context.logoUrl = String(account.logoUrl); } catch(_) {}
+          // Ensure domain is present: derive from website if missing
+          try {
+            let domain = account.domain || '';
+            if (!domain && account.website) {
+              try { const u = new URL(account.website.startsWith('http') ? account.website : `https://${account.website}`); domain = u.hostname; } catch(_) {
+                domain = String(account.website).replace(/^https?:\/\//i,'').split('/')[0];
+              }
+              domain = domain.replace(/^www\./i,'');
+            }
+            if (domain) context.domain = domain;
+          } catch(_) {}
         }
       }
     } catch (_) { /* noop */ }

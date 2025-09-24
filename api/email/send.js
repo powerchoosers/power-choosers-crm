@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { to, subject, content, from } = req.body;
+    const { to, subject, content, from, _deliverability } = req.body;
 
     if (!to || !subject || !content) {
       return res.status(400).json({ error: 'Missing required fields: to, subject, content' });
@@ -19,15 +19,18 @@ export default async function handler(req, res) {
     // Generate unique tracking ID
     const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Create tracking pixel URL for Vercel deployment
-    const baseUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : req.headers.origin || 'http://localhost:3000';
-    const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
-    
-    // Inject tracking pixel into email content
-    const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-    const emailContent = content + trackingPixel;
+    // Conditionally inject tracking pixel
+    let emailContent = content;
+    if (_deliverability?.enableTracking) {
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : req.headers.origin || 'http://localhost:3000';
+      const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
+      const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
+      if (!/\/api\/email\/track\//.test(emailContent)) {
+        emailContent = emailContent + trackingPixel;
+      }
+    }
 
     // Store email record in database
     const emailRecord = {

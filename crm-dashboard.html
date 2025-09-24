@@ -1352,6 +1352,79 @@
                                         </div>
                                     </div>
 
+                                    <!-- Deliverability & Tracking Section -->
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                            </svg>
+                                            Email Deliverability & Tracking
+                                        </h3>
+                                        <div class="settings-content">
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Tracking</h4>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-trk-enabled">
+                                                        <span class="checkmark"></span>
+                                                        Enable read tracking pixel
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Headers & Compliance</h4>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-bulk-headers">
+                                                        <span class="checkmark"></span>
+                                                        Add "Precedence: bulk" header
+                                                    </label>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-list-unsub">
+                                                        <span class="checkmark"></span>
+                                                        Add List-Unsubscribe headers
+                                                    </label>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-priority-headers">
+                                                        <span class="checkmark"></span>
+                                                        Add Priority/Importance headers
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Sending Method</h4>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-force-gmail" checked>
+                                                        <span class="checkmark"></span>
+                                                        Force Gmail API only (disable fallback)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Template Style</h4>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-branded-html">
+                                                        <span class="checkmark"></span>
+                                                        Use branded HTML template
+                                                    </label>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-sig-image-enabled">
+                                                        <span class="checkmark"></span>
+                                                        Include image in signature
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- Twilio Settings Section -->
                                     <div class="settings-section">
                                         <h3 class="settings-section-title">
@@ -1596,6 +1669,11 @@
                     <div class="form-row">
                         <label>Current Rate ($/kWh)<input type="number" name="currentRate" class="input-dark" step="0.001" /></label>
                         <label>Contract End Date<input type="date" name="contractEndDate" class="input-dark" /></label>
+                    </div>
+                    <div class="form-row" style="grid-template-columns: 1fr;">
+                        <label>Icon URL (Company logo or favicon)
+                            <input type="url" name="logoUrl" class="input-dark" placeholder="https://example.com/logo.png" />
+                        </label>
                     </div>
                 </div>
                 <div class="pc-modal__footer">

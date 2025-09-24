@@ -9,6 +9,15 @@ class SettingsPage {
                     text: '',
                     image: null
                 },
+                emailDeliverability: {
+                    enableTracking: false,
+                    includeBulkHeaders: false,
+                    includeListUnsubscribe: false,
+                    includePriorityHeaders: false,
+                    forceGmailOnly: true,
+                    useBrandedHtmlTemplate: false,
+                    signatureImageEnabled: false
+                },
                 geminiPrompts: {
                     greeting: '',
                     body: '',
@@ -88,6 +97,34 @@ class SettingsPage {
             if (field) {
                 field.addEventListener('change', () => this.markDirty());
             }
+        });
+
+        // Deliverability & Tracking toggles
+        const deliverabilityFields = [
+            'email-trk-enabled',
+            'email-bulk-headers',
+            'email-list-unsub',
+            'email-priority-headers',
+            'email-force-gmail',
+            'email-branded-html',
+            'email-sig-image-enabled'
+        ];
+        deliverabilityFields.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', () => {
+                const v = el.type === 'checkbox' ? !!el.checked : el.value;
+                switch(id){
+                    case 'email-trk-enabled': this.state.settings.emailDeliverability.enableTracking = v; break;
+                    case 'email-bulk-headers': this.state.settings.emailDeliverability.includeBulkHeaders = v; break;
+                    case 'email-list-unsub': this.state.settings.emailDeliverability.includeListUnsubscribe = v; break;
+                    case 'email-priority-headers': this.state.settings.emailDeliverability.includePriorityHeaders = v; break;
+                    case 'email-force-gmail': this.state.settings.emailDeliverability.forceGmailOnly = v; break;
+                    case 'email-branded-html': this.state.settings.emailDeliverability.useBrandedHtmlTemplate = v; break;
+                    case 'email-sig-image-enabled': this.state.settings.emailDeliverability.signatureImageEnabled = v; break;
+                }
+                this.markDirty();
+            });
         });
 
         // Phone number actions
@@ -202,6 +239,23 @@ class SettingsPage {
         if (defaultView) {
             defaultView.value = this.state.settings.general.defaultView;
         }
+
+        // Render deliverability settings
+        const d = this.state.settings.emailDeliverability || {};
+        const trk = document.getElementById('email-trk-enabled');
+        if (trk) trk.checked = !!d.enableTracking;
+        const bulk = document.getElementById('email-bulk-headers');
+        if (bulk) bulk.checked = !!d.includeBulkHeaders;
+        const unsub = document.getElementById('email-list-unsub');
+        if (unsub) unsub.checked = !!d.includeListUnsubscribe;
+        const pri = document.getElementById('email-priority-headers');
+        if (pri) pri.checked = !!d.includePriorityHeaders;
+        const gm = document.getElementById('email-force-gmail');
+        if (gm) gm.checked = !!d.forceGmailOnly;
+        const html = document.getElementById('email-branded-html');
+        if (html) html.checked = !!d.useBrandedHtmlTemplate;
+        const sigimg = document.getElementById('email-sig-image-enabled');
+        if (sigimg) sigimg.checked = !!d.signatureImageEnabled;
 
         this.updateSaveButton();
     }

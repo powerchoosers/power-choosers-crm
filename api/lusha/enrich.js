@@ -145,7 +145,13 @@ module.exports = async (req, res) => {
           const city = contact.data?.location?.city || contact.data?.location?.cityName || '';
           const state = contact.data?.location?.state || contact.data?.location?.stateCode || contact.data?.location?.region || '';
           const location = (city || state) ? `${city}${city && state ? ', ' : ''}${state}` : (contact.data?.location?.fullLocation || '');
-          const linkedin = contact.data?.linkedinUrl || contact.data?.linkedin || contact.data?.social?.linkedin || contact.data?.links?.linkedin || '';
+          // Prefer documented socialLinks.linkedin path; fall back to historical aliases
+          const linkedin = contact.data?.socialLinks?.linkedin
+            || contact.data?.linkedinUrl
+            || contact.data?.linkedin
+            || contact.data?.social?.linkedin
+            || contact.data?.links?.linkedin
+            || '';
           return ({
             id: contact.id,
             firstName: contact.data?.name?.first || '',

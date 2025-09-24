@@ -378,7 +378,7 @@
             city: cached.city,
             state: cached.state,
             country: cached.country,
-            phone: cached.phone,
+            // phone intentionally omitted (Lusha company endpoint does not provide a reliable company phone)
             email: cached.email,
             linkedin: cached.linkedin,
             twitter: cached.twitter,
@@ -938,7 +938,9 @@
     }
     
     const website = domain ? `https://${domain}` : '';
-    const logo = company?.logoUrl ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : '');
+    const logo = (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function')
+      ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: company && company.logoUrl, domain, size: 36 })
+      : (company?.logoUrl ? `<img src="${escapeHtml(company.logoUrl)}" alt="${name} logo" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : (domain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 36) : '') : ''));
     
     // Create collapsible description
     let descHtml = '';
@@ -1442,7 +1444,9 @@
           if (s2 && s2.docs && s2.docs[0]) existingId = s2.docs[0].id;
         }
       } catch(_){}
-      const payload = {
+      // Build payload by including ONLY non-empty values from Lusha to avoid overwriting
+      // existing CRM fields with blanks (e.g., phone when not provided by API)
+      const candidateFields = {
         accountName: companyName,
         name: companyName,
         domain: domain || (lastCompanyResult && lastCompanyResult.domain) || '',
@@ -1452,19 +1456,24 @@
         shortDescription: (lastCompanyResult && lastCompanyResult.description) || '',
         logoUrl: (lastCompanyResult && lastCompanyResult.logoUrl) ? String(lastCompanyResult.logoUrl) : '',
         linkedin: (lastCompanyResult && lastCompanyResult.linkedin) ? String(lastCompanyResult.linkedin) : '',
-        // Additional fields from Lusha data - now properly mapped from API
         city: (lastCompanyResult && lastCompanyResult.city) ? String(lastCompanyResult.city) : '',
         state: (lastCompanyResult && lastCompanyResult.state) ? String(lastCompanyResult.state) : '',
         country: (lastCompanyResult && lastCompanyResult.country) ? String(lastCompanyResult.country) : '',
         address: (lastCompanyResult && lastCompanyResult.address) ? String(lastCompanyResult.address) : '',
-        phone: (lastCompanyResult && lastCompanyResult.phone) ? String(lastCompanyResult.phone) : '',
+        // phone intentionally omitted to avoid wiping CRM phone when Lusha omits it
         foundedYear: (lastCompanyResult && lastCompanyResult.foundedYear) ? String(lastCompanyResult.foundedYear) : '',
         revenue: (lastCompanyResult && lastCompanyResult.revenue) ? String(lastCompanyResult.revenue) : '',
-        companyType: (lastCompanyResult && lastCompanyResult.companyType) ? String(lastCompanyResult.companyType) : '',
-        source: 'lusha',
-        updatedAt: new Date(),
-        createdAt: new Date()
+        companyType: (lastCompanyResult && lastCompanyResult.companyType) ? String(lastCompanyResult.companyType) : ''
       };
+      const payload = { source: 'lusha', updatedAt: new Date(), createdAt: new Date() };
+      Object.keys(candidateFields).forEach((key) => {
+        const val = candidateFields[key];
+        if (typeof val === 'string') {
+          if (val && val.trim()) payload[key] = val.trim();
+        } else if (val !== null && val !== undefined) {
+          payload[key] = val;
+        }
+      });
       if (existingId) {
         console.log('[Lusha] Enriching account with payload:', payload);
         await window.PCSaves.updateAccount(existingId, payload);
@@ -1748,6 +1757,29 @@
           }
         }
       }
+
+      // Update LinkedIn if provided by enrich response, and reflect in UI header actions
+      try {
+        if (enriched.linkedin && typeof enriched.linkedin === 'string' && enriched.linkedin.trim()) {
+          contact.linkedin = enriched.linkedin.trim();
+          const actionsHeader = container.querySelector('.lusha-contact-actions-header');
+          if (actionsHeader) {
+            let link = actionsHeader.querySelector('.lusha-linkedin-link');
+            if (!link) {
+              const a = document.createElement('a');
+              a.href = contact.linkedin;
+              a.target = '_blank';
+              a.rel = 'noopener';
+              a.className = 'lusha-linkedin-link';
+              a.title = 'View LinkedIn Profile';
+              a.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>';
+              actionsHeader.appendChild(a);
+            } else {
+              link.href = contact.linkedin;
+            }
+          }
+        }
+      } catch(_) {}
 
       // Persist enriched fields in session so paging keeps them
       try {
@@ -2319,7 +2351,7 @@
         city: company && company.city || existing.city || '',
         state: company && company.state || existing.state || '',
         country: company && company.country || existing.country || '',
-        phone: company && company.phone || existing.phone || '',
+        // phone intentionally omitted from cache payload
         email: company && company.email || existing.email || '',
         linkedin: company && company.linkedin || existing.linkedin || '',
         twitter: company && company.twitter || existing.twitter || '',
