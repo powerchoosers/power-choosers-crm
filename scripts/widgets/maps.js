@@ -379,8 +379,7 @@
           });
         }, 100);
 
-        // Search for nearby businesses around this location
-        await searchNearbyBusinesses(clickedLocation);
+        // Nearby business prospecting removed per request
       }
     } catch (error) {
       console.error('[Maps Widget] Error handling map click:', error);
@@ -399,122 +398,7 @@
     return R * c;
   }
 
-  // Search for nearby businesses for prospecting
-  async function searchNearbyBusinesses(centerLocation) {
-    try {
-      const { Place } = await google.maps.importLibrary("places");
-      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-      
-      // Search for nearby businesses within 1km radius
-      const request = {
-        textQuery: 'business company office',
-        fields: [
-          'displayName', 
-          'location', 
-          'formattedAddress', 
-          'rating', 
-          'userRatingCount',
-          'nationalPhoneNumber',
-          'internationalPhoneNumber',
-          'businessStatus',
-          'priceLevel',
-          'types',
-          'photos'
-        ],
-        locationBias: centerLocation,
-        maxResultCount: 20,
-        includedType: 'establishment'
-      };
-
-      const { places } = await Place.searchByText(request);
-
-      if (places && places.length > 0) {
-        // Add nearby business markers with different styling
-        places.forEach(nearbyPlace => {
-          // Skip if it's the same place we clicked on
-          if (nearbyPlace.location.lat === centerLocation.lat && 
-              nearbyPlace.location.lng === centerLocation.lng) {
-            return;
-          }
-
-          const useAdvanced = Boolean(window.GOOGLE_MAP_ID) &&
-            google.maps && google.maps.marker &&
-            typeof google.maps.marker.AdvancedMarkerElement === 'function';
-
-          let nearbyMarker;
-          if (useAdvanced) {
-            nearbyMarker = new google.maps.marker.AdvancedMarkerElement({
-              position: nearbyPlace.location,
-              map: map,
-              title: nearbyPlace.displayName
-            });
-          } else {
-            nearbyMarker = new google.maps.Marker({
-              position: nearbyPlace.location,
-              map: map,
-              title: nearbyPlace.displayName,
-              icon: {
-                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="10" fill="#4285F4" stroke="#fff" stroke-width="2"/>
-                    <circle cx="12" cy="12" r="4" fill="#fff"/>
-                  </svg>
-                `),
-                scaledSize: new google.maps.Size(24, 24),
-                anchor: new google.maps.Point(12, 12)
-              }
-            });
-          }
-
-          // Build info content for nearby businesses
-          const nearbyInfoContent = buildInfoWindowContent(nearbyPlace);
-          const nearbyInfoWindow = new google.maps.InfoWindow({ content: nearbyInfoContent });
-
-          // Click handler for nearby businesses
-          const openNearbyInfo = async () => {
-            map.setCenter(nearbyPlace.location);
-            map.setZoom(15);
-            nearbyInfoWindow.open({ anchor: nearbyMarker, map });
-            
-            // Add click-to-call functionality for nearby business info window
-            setTimeout(() => {
-              const callLinks = document.querySelectorAll('.call-link');
-              callLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
-                  e.preventDefault();
-                  const phoneNumber = link.getAttribute('data-phone');
-                  if (phoneNumber && window.Widgets && window.Widgets.callNumber) {
-                    // Set the click timestamp for fresh user gesture
-                    if (window.Widgets) {
-                      window.Widgets._lastClickToCallAt = Date.now();
-                    }
-                    // Use the CRM's call function with click-to-call source and auto-trigger
-                    window.Widgets.callNumber(phoneNumber, '', true, 'click-to-call');
-                  } else if (phoneNumber) {
-                    // Fallback to tel: link
-                    window.location.href = `tel:${phoneNumber}`;
-                  }
-                });
-              });
-            }, 100);
-            
-            // Recursively search for businesses near this new location
-            await searchNearbyBusinesses(nearbyPlace.location);
-          };
-
-          if (useAdvanced && nearbyMarker && typeof nearbyMarker.addListener === 'function') {
-            nearbyMarker.addListener('gmp-click', openNearbyInfo);
-          } else if (nearbyMarker && typeof nearbyMarker.addListener === 'function') {
-            nearbyMarker.addListener('click', openNearbyInfo);
-          }
-
-          window.mapsMarkers.push(nearbyMarker);
-        });
-      }
-    } catch (error) {
-      console.error('[Maps Widget] Error searching nearby businesses:', error);
-    }
-  }
+  // Nearby business prospecting removed per request
 
   // Search for places using the new Place API
   async function searchPlaces(query) {
@@ -615,8 +499,7 @@
             });
           }, 100);
           
-          // Search for nearby businesses for prospecting
-          await searchNearbyBusinesses(place.location);
+          // Nearby business prospecting removed per request
           };
           
           if (useAdvanced && marker && typeof marker.addListener === 'function') {

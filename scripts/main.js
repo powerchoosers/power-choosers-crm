@@ -246,6 +246,23 @@ class PowerChoosersCRM {
     document.addEventListener('keydown', handleKeyDown);
   }
 
+  // Prefer PUBLIC_BASE_URL → API_BASE_URL → Vercel fallback → location.origin
+  getApiBaseUrl() {
+    try {
+      const fromWindow = (window.PUBLIC_BASE_URL || window.API_BASE_URL || '').toString().trim();
+      if (fromWindow) return fromWindow.replace(/\/$/, '');
+    } catch(_) {}
+    try {
+      if (typeof PUBLIC_BASE_URL !== 'undefined' && PUBLIC_BASE_URL) return String(PUBLIC_BASE_URL).replace(/\/$/, '');
+    } catch(_) {}
+    try {
+      if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) return String(API_BASE_URL).replace(/\/$/, '');
+    } catch(_) {}
+    const vercel = 'https://power-choosers-crm.vercel.app';
+    if (/^https?:\/\//i.test(vercel)) return vercel;
+    try { return (window.location && window.location.origin) ? window.location.origin.replace(/\/$/, '') : vercel; } catch(_) { return vercel; }
+  }
+
   createAddContactModal() {
     const modal = document.getElementById('modal-add-contact');
     if (!modal) {

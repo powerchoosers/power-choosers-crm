@@ -1200,8 +1200,8 @@
     }
 
     try {
-      // Show loading spinner on the button (proper orange spinning element)
-      btn.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px; border: 2px solid var(--grey-600); border-top: 2px solid var(--orange-subtle); border-radius: 50%; animation: spin 1s linear infinite; position: relative; top: 5px; display: inline-block; vertical-align: middle;" aria-hidden="true"></div>';
+      // Show loading spinner on the button (scoped, consistent across pages)
+      btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>';
       btn.classList.add('processing');
       btn.disabled = true;
 
@@ -1215,11 +1215,11 @@
         });
       }
 
-      // Call the CI request endpoint (always via Vercel API)
-      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
-        base = 'https://power-choosers-crm.vercel.app';
-      }
+      // Call the CI request endpoint using resolved API base
+      let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
+        ? window.crm.getApiBaseUrl()
+        : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm.vercel.app');
+      base = String(base).replace(/\/$/, '');
       const response = await fetch(`${base}/api/twilio/ci-request`, {
         method: 'POST',
         headers: {
@@ -1451,8 +1451,10 @@
         const btn = document.querySelector('button.rc-icon-btn[data-ci-btn="1"]');
         if (btn){ btn.classList.add('is-loading'); btn.disabled = true; }
         // Show spinner by swapping inner SVG to a small loader
-        if (btn){ btn.innerHTML = '<span class="loader" style="display:inline-block;width:16px;height:16px;border:2px solid var(--orange-subtle);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>'; }
-        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/,'');
+        if (btn){ btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>'; }
+        const base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
+          ? window.crm.getApiBaseUrl()
+          : (window.PUBLIC_BASE_URL || window.API_BASE_URL || window.location.origin || '').replace(/\/$/,'');
         const url = `${base}/api/twilio/ci-request`;
         const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ callSid, recordingSid }) });
         const data = await resp.json().catch(()=>({}));

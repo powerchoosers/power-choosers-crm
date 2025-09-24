@@ -128,7 +128,10 @@ class LiveCallInsights {
 
     async fetchLiveInsights() {
         try {
-            const response = await fetch(`/api/calls?callSid=${this.currentCallSid}`);
+            const base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
+              ? window.crm.getApiBaseUrl()
+              : (window.PUBLIC_BASE_URL || window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+            const response = await fetch(`${base}/api/calls?callSid=${this.currentCallSid}`);
             const data = await response.json();
 
             if (data && data.ok && Array.isArray(data.calls)) {

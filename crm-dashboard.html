@@ -1918,15 +1918,27 @@
       })();
     </script>
     <script>
-      // Google Maps API Key Configuration
+      // Google Maps API Key Configuration (fetched from Vercel serverless function)
       (function(){
-        try {
-          // Set Google Maps API key directly
-          window.GOOGLE_MAPS_API = 'AIzaSyCydOVPsFnyY83M5ABb2lBZWcMqh4wqV2k';
-          console.log('Google Maps API key configured');
-        } catch (e) {
-          console.warn('Google Maps API key init error:', e);
+        async function setMapsConfig() {
+          try {
+            const res = await fetch('/api/maps/config', { method: 'GET', cache: 'no-store' });
+            if (!res.ok) throw new Error('Failed to fetch maps config');
+            const data = await res.json();
+            window.GOOGLE_MAPS_API = data.apiKey || '';
+            if (data.mapId) window.GOOGLE_MAP_ID = data.mapId;
+            console.log('[Maps] Config loaded');
+            // Signal that config is ready so the loader can proceed
+            document.dispatchEvent(new CustomEvent('google-maps-api-ready'));
+          } catch (e) {
+            console.warn('[Maps] Failed to load config from /api/maps/config', e);
+            // Fallback: try using any pre-set global (e.g., from dev tools)
+            if (window.GOOGLE_MAPS_API) {
+              document.dispatchEvent(new CustomEvent('google-maps-api-ready'));
+            }
+          }
         }
+        setMapsConfig();
       })();
     </script>
     <script src="scripts/pages/contact-detail.js"></script>

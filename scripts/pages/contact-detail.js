@@ -3737,9 +3737,9 @@
       try { console.log('[ContactDetail] No recordingSid provided, API will look up recording for callSid:', callSid); } catch(_) {}
     }
     try {
-      // Show loading spinner on the button (proper orange spinning element)
+      // Show loading spinner on the button (scoped, consistent across pages)
       try { 
-        btn.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px; border: 2px solid var(--grey-600); border-top: 2px solid var(--orange-subtle); border-radius: 50%; animation: spin 1s linear infinite; position: relative; top: 5px; display: inline-block; vertical-align: middle;" aria-hidden="true"></div>'; 
+        btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>'; 
         btn.classList.add('processing'); 
         btn.disabled = true; 
       } catch(_) {}
@@ -3754,10 +3754,10 @@
           }); 
         } 
       } catch(_) {}
-      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
-        base = 'https://power-choosers-crm.vercel.app';
-      }
+      let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
+        ? window.crm.getApiBaseUrl()
+        : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm.vercel.app');
+      base = String(base).replace(/\/$/, '');
       const response = await fetch(`${base}/api/twilio/ci-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
