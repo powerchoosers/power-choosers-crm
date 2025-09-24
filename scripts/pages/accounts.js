@@ -460,7 +460,7 @@
       commitHeaderMove(dragSrcTh, dragOverTh);
       
       // Update the column order and persist
-      const newOrder = getHeaderOrderFromDom();
+      const newOrder = getAccountsHeaderOrderFromDom();
       if (newOrder.length > 0) {
         accountsColumnOrder = newOrder;
         persistAccountsColumnOrder(newOrder);
