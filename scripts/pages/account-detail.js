@@ -1201,7 +1201,7 @@
 
     try {
       // Show loading spinner on the button (proper orange spinning element)
-      btn.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px; border: 2px solid var(--grey-600); border-top: 2px solid var(--orange-subtle); border-radius: 50%; animation: spin 1s linear infinite;" aria-hidden="true"></div>';
+      btn.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px; border: 2px solid var(--grey-600); border-top: 2px solid var(--orange-subtle); border-radius: 50%; animation: spin 1s linear infinite; position: relative; top: 5px; display: inline-block; vertical-align: middle;" aria-hidden="true"></div>';
       btn.classList.add('processing');
       btn.disabled = true;
 

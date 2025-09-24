@@ -1632,10 +1632,6 @@ button:hover:not(:disabled),
     border-top: 2px solid var(--orange-subtle);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    vertical-align: middle;
 }
 
 @keyframes spin {
