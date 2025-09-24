@@ -117,6 +117,7 @@ class EmailTrackingManager {
     async sendEmail(emailData) {
         try {
             const { to, subject, content, from } = emailData;
+            const deliver = emailData?._deliverability || {};
             
             if (!to || !subject || !content) {
                 throw new Error('Missing required fields: to, subject, content');
@@ -125,13 +126,17 @@ class EmailTrackingManager {
             // Generate unique tracking ID
             const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            // Create tracking pixel URL using configured API base (prod -> Vercel)
-            const baseUrl = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-            const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
-            
-            // Inject tracking pixel into email content
-            const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-            const emailContent = content + trackingPixel;
+            // Conditionally inject tracking pixel
+            let emailContent = content;
+            if (deliver.enableTracking) {
+                const baseUrl = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+                const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
+                const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
+                // Avoid double injection if present
+                if (!/\/api\/email\/track\//.test(emailContent)) {
+                    emailContent = emailContent + trackingPixel;
+                }
+            }
 
             // Create email record
             const emailRecord = {

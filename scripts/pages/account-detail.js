@@ -398,7 +398,7 @@
               </svg>
             </button>
             <div class="contact-header-profile">
-              ${favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : ''}
+              ${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 64 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '')}
               <div class="avatar-circle-small" style="${favDomain ? 'display:none;' : ''}">${escapeHtml(getInitials(name))}</div>
               <div class="contact-header-text">
                 <div class="contact-title-row">
@@ -1140,7 +1140,10 @@
   }
 
   function rcItemHtml(c){
-    const name = escapeHtml(c.contactName || 'Unknown');
+    // Prefer contact name; if absent and this is a company call, show company instead of "Unknown"
+    const hasContact = !!(c.contactId && c.contactName);
+    const displayName = hasContact ? (c.contactName) : (c.accountName || c.company || 'Unknown');
+    const name = escapeHtml(displayName);
     const company = escapeHtml(c.accountName || c.company || '');
     const outcome = escapeHtml(c.outcome || c.status || '');
     const ts = c.callTime || c.timestamp || new Date().toISOString();
@@ -1692,6 +1695,11 @@
               <label>Current Rate ($/kWh)<input type="number" name="currentRate" class="input-dark" step="0.001" value="${escapeHtml(String(a.currentRate ?? a.current_rate ?? ''))}" /></label>
               <label>Contract End Date<input type="date" name="contractEndDate" class="input-dark" value="${escapeHtml((a.contractEndDate || a.contract_end_date) ? toISODate(a.contractEndDate || a.contract_end_date) : '')}" /></label>
             </div>
+            <div class="form-row" style="grid-template-columns: 1fr;">
+              <label>Icon URL (Company logo or favicon)
+                <input type="url" name="logoUrl" class="input-dark" value="${escapeHtml(a.logoUrl || '')}" placeholder="https://example.com/logo.png" />
+              </label>
+            </div>
           </div>
           <div class="pc-modal__footer">
             <button type="button" class="btn-text" data-close="edit-account">Cancel</button>
@@ -1744,6 +1752,7 @@
         annualUsage: Number((fd.get('annualUsage') || '').toString().trim() || 0) || 0,
         currentRate: (fd.get('currentRate') || '').toString().trim(),
         contractEndDate: (fd.get('contractEndDate') || '').toString().trim(),
+        logoUrl: (fd.get('logoUrl') || '').toString().trim(),
       };
 
       const id = state.currentAccount?.id;

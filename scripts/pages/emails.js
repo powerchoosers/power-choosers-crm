@@ -669,16 +669,29 @@ class EmailManager {
 
             // Body
             if (mode === 'html') {
-                // Switch to HTML mode and set raw HTML
-                if (!this._isHtmlMode) this.toggleHtmlMode(compose);
+                // Respect settings: allow branded HTML only if enabled
+                try {
+                    const s = (window.SettingsPage && window.SettingsPage.getSettings) ? window.SettingsPage.getSettings() : (JSON.parse(localStorage.getItem('crm-settings')||'{}'));
+                    const allowHtml = s?.emailDeliverability?.useBrandedHtmlTemplate === true;
+                    if (!allowHtml) {
+                        // Fall back to standard mode insertion
+                        mode = 'standard';
+                    }
+                } catch(_) {}
+                if (mode === 'html') {
+                    // Switch to HTML mode and set raw HTML
+                    if (!this._isHtmlMode) this.toggleHtmlMode(compose);
+                }
                 // Warm intro adjustment
                 if ((prompt || '').toLowerCase().includes('warm intro')) {
                     html = this.adjustWarmIntroHtml(html);
                 }
                 // Replace variables with actual values before inserting
                 html = this.replaceVariablesInHtml(html, enrichedRecipient);
-                editor.textContent = html; // raw source in HTML mode
-                if (status) status.textContent = 'Inserted HTML into editor.';
+                if (mode === 'html') {
+                    editor.textContent = html; // raw source in HTML mode
+                    if (status) status.textContent = 'Inserted HTML into editor.';
+                }
             } else {
                 // Insert styled HTML into rich editor
                 if (this._isHtmlMode) this.toggleHtmlMode(compose);
@@ -1613,6 +1626,20 @@ class EmailManager {
                 senderChip.setAttribute('data-token', '{{sender.first_name}}');
                 senderChip.setAttribute('contenteditable', 'false');
                 senderChip.textContent = 'sender first name';
+            }
+
+            // Trim trailing blank paragraphs before appending closing
+            let last = editor.lastElementChild;
+            while (last && last.tagName === 'P') {
+                const txt = (last.textContent || '').replace(/\u00A0/g, ' ').trim();
+                const onlyBr = !txt && last.querySelectorAll('br').length > 0;
+                if (!txt || onlyBr) {
+                    const toRemove = last;
+                    last = last.previousElementSibling;
+                    toRemove.remove();
+                } else {
+                    break;
+                }
             }
 
             // Append a clean closing block at the end on a tight stack: closing + name
@@ -4438,7 +4465,7 @@ class EmailManager {
                 await this.authenticate();
             }
 
-            const { to, subject, content } = emailData;
+            const { to, subject, content, _deliverability } = emailData;
             
             // Get current user's email address
             const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
@@ -4458,15 +4485,18 @@ class EmailManager {
             // Generate unique tracking ID for this email
             const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            // Create tracking pixel URL using configured API base (prod -> Vercel)
-            const baseUrl = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-            const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
+            // Conditionally inject tracking pixel
+            let contentWithTracking = content;
+            if (_deliverability?.enableTracking) {
+                const baseUrl = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+                const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
+                const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
+                if (!/\/api\/email\/track\//.test(contentWithTracking)) {
+                    contentWithTracking = contentWithTracking + trackingPixel;
+                }
+            }
             
-            // Inject tracking pixel into email content
-            const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-            const contentWithTracking = content + trackingPixel;
-            
-            // Create email message in Gmail format with spam prevention headers
+            // Create email message in Gmail format with conditional headers
             const recipients = Array.isArray(to) ? to.join(', ') : to;
             const emailLines = [
                 `To: ${recipients}`,
@@ -4475,13 +4505,10 @@ class EmailManager {
                 'MIME-Version: 1.0',
                 'Content-Type: text/html; charset=utf-8',
                 'X-Mailer: Power Choosers CRM',
-                'X-Priority: 3',
-                'X-MSMail-Priority: Normal',
-                'Importance: Normal',
-                'List-Unsubscribe: <mailto:unsubscribe@powerchoosers.com>',
-                'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
+                ...(_deliverability?.includePriorityHeaders ? ['X-Priority: 3','X-MSMail-Priority: Normal','Importance: Normal'] : []),
+                ...(_deliverability?.includeListUnsubscribe ? ['List-Unsubscribe: <mailto:unsubscribe@powerchoosers.com>','List-Unsubscribe-Post: List-Unsubscribe=One-Click'] : []),
                 'X-Auto-Response-Suppress: All',
-                'Precedence: bulk',
+                ...(_deliverability?.includeBulkHeaders ? ['Precedence: bulk'] : []),
                 '',
                 contentWithTracking
             ];
@@ -4578,6 +4605,8 @@ class EmailManager {
         }
 
         try {
+            const settings = (window.SettingsPage && window.SettingsPage.getSettings) ? window.SettingsPage.getSettings() : (JSON.parse(localStorage.getItem('crm-settings')||'{}'));
+            const deliver = settings?.emailDeliverability || {};
             // Show sending state
             const sendButton = document.querySelector('#compose-send');
             if (sendButton) {
@@ -4585,10 +4614,16 @@ class EmailManager {
                 sendButton.textContent = 'Sending...';
             }
 
+            // Optionally remove signature image if disabled
+            let preparedBody = body;
+            if (deliver.signatureImageEnabled === false) {
+                preparedBody = preparedBody.replace(/<img[^>]*alt=\"Signature\"[\s\S]*?>/gi, '');
+            }
+
             // Check if signature is already in the body (prevent duplication)
             const signature = window.getEmailSignature ? window.getEmailSignature() : '';
-            const hasSignature = body.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
-            const contentWithSignature = hasSignature ? body : body + signature;
+            const hasSignature = preparedBody.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
+            const contentWithSignature = hasSignature ? preparedBody : preparedBody + signature;
 
             const emailData = {
                 to: to.split(',').map(email => email.trim()),
@@ -4606,19 +4641,21 @@ class EmailManager {
                 });
                 
                 if (this.isAuthenticated && this.accessToken) {
-                    result = await this.sendEmailViaGmail(emailData);
+                    result = await this.sendEmailViaGmail({ ...emailData, _deliverability: deliver });
                     console.log('[EmailManager] Email sent via Gmail API');
                 } else {
-                    throw new Error('Gmail API not authenticated');
+                    if (deliver.forceGmailOnly !== false) throw new Error('Gmail API not authenticated');
+                    throw new Error('Gmail API not authenticated (fallback allowed)');
                 }
             } catch (gmailError) {
-                console.warn('[EmailManager] Gmail API failed, using email tracking manager:', gmailError);
+                console.warn('[EmailManager] Gmail API failed:', gmailError);
                 
-                // Fallback to email tracking manager
-                if (window.emailTrackingManager) {
+                // Fallback to email tracking manager if allowed
+                if (window.emailTrackingManager && deliver.forceGmailOnly === false) {
                     const trackingEmailData = {
                         ...emailData,
-                        from: 'noreply@powerchoosers.com'
+                        from: 'noreply@powerchoosers.com',
+                        _deliverability: deliver
                     };
                     result = await window.emailTrackingManager.sendEmail(trackingEmailData);
                     console.log('[EmailManager] Email sent via tracking manager (simulation mode)');

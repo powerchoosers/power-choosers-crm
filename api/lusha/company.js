@@ -76,8 +76,7 @@ module.exports = async (req, res) => {
       // Additional fields from Lusha
       foundedYear: raw?.data?.founded || '',
       revenue: raw?.data?.revenueRange ? raw.data.revenueRange.join(' - ') : '',
-      companyType: raw?.data?.subIndustry || '',
-      phone: raw?.data?.phone || ''
+      companyType: raw?.data?.subIndustry || ''
     };
     
     // Debug logging to see the mapped response

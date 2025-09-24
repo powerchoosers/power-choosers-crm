@@ -3675,8 +3675,12 @@
   }
 
   function rcItemHtml(c){
-    const name = escapeHtml(c.contactName || 'Unknown');
-    const company = escapeHtml(c.accountName || c.company || '');
+    // Prefer contact name; if absent (company call), show company once
+    const hasContact = !!(c.contactId && c.contactName);
+    const rawCompany = String(c.accountName || c.company || '');
+    const displayName = hasContact ? String(c.contactName) : rawCompany || 'Unknown';
+    const name = escapeHtml(displayName);
+    const company = escapeHtml(rawCompany);
     const outcome = escapeHtml(c.outcome || c.status || '');
     const ts = c.callTime || c.timestamp || new Date().toISOString();
     const when = new Date(ts).toLocaleString();
@@ -3701,10 +3705,13 @@
     // Prefer the real dialed/peer number: use targetPhone/to/from; fallback to counterpartyPretty
     const phone = escapeHtml(String(c.targetPhone || c.to || c.from || c.contactPhone || c.counterpartyPretty || ''));
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
+    // Only append company if we have a real contact and company differs
+    const title = `${name}${(hasContact && rawCompany && rawCompany !== displayName) ? ` • ${company}` : ''}`;
+
     return `
       <div class="rc-item">
         <div class="rc-meta">
-          <div class="rc-title">${name}${company?` • ${company}`:''}</div>
+          <div class="rc-title">${title}</div>
           <div class="rc-sub">${when} • <span class="rc-duration">${durStr}</span> • <span class="phone-number" 
                                  data-contact-id="${c.contactId || state.currentContact?.id || ''}" 
                                  data-account-id="${c.accountId || state.currentContact?.accountId || ''}" 

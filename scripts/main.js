@@ -111,6 +111,11 @@ class PowerChoosersCRM {
             }
           }
 
+          // If explicit logo/icon URL provided, persist as logoUrl
+          if (data.logoUrl) {
+            data.logoUrl = data.logoUrl.trim();
+          }
+
           // Remove empty fields
           Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
 
@@ -142,6 +147,8 @@ class PowerChoosersCRM {
               benefits: data.benefits || '',
               painPoints: data.painPoints || '',
               linkedin: data.linkedin || '',
+              // Branding
+              logoUrl: data.logoUrl || '',
               // Timestamps
               createdAt: now,
               updatedAt: now,
@@ -1884,7 +1891,8 @@ class PowerChoosersCRM {
                 { value: 'contractEndDate', label: 'Contract End Date' },
                 { value: 'benefits', label: 'Benefits' },
                 { value: 'painPoints', label: 'Pain Points' },
-                { value: 'linkedin', label: 'LinkedIn URL' }
+                { value: 'linkedin', label: 'LinkedIn URL' },
+                { value: 'logoUrl', label: 'Icon URL (Logo/Favicon)' }
             ];
         } else {
             return [
@@ -2112,6 +2120,9 @@ class PowerChoosersCRM {
         let enriched = 0;
         let failed = 0;
         const total = modal._csvRows.length;
+        // Queue possible merges for end-of-import confirmation
+        const queuedContactMerges = [];
+        const queuedAccountMerges = [];
         
         try {
             const db = window.firebaseDB;
@@ -2176,26 +2187,14 @@ class PowerChoosersCRM {
                                 if (duplicates.length > 0) {
                                     const bestMatch = duplicates[0];
                                     if (bestMatch.similarity.score >= 0.8) {
-                                        // Show merge confirmation dialog
-                                        mergeAction = await window.ContactMerger.showMergeConfirmation(
-                                            bestMatch.contact,
-                                            doc,
-                                            bestMatch.similarity
-                                        );
-                                        
-                                        if (mergeAction === 'merge') {
-                                            existingRecord = { 
-                                                ref: db.collection('contacts').doc(bestMatch.contact.id),
-                                                data: () => bestMatch.contact
-                                            };
-                                        } else if (mergeAction === 'skip') {
-                                            // Skip this contact (don't create or update)
-                                            return;
-                                        }
-                                        // If 'cancel', we'll stop the entire import
-                                        if (mergeAction === 'cancel') {
-                                            throw new Error('Import cancelled by user');
-                                        }
+                                        // Queue merge; defer user decision to end-of-import summary
+                                        existingRecord = { 
+                                            ref: db.collection('contacts').doc(bestMatch.contact.id),
+                                            data: () => bestMatch.contact
+                                        };
+                                        queuedContactMerges.push({ existingRecord, incoming: doc, similarity: bestMatch.similarity });
+                                        // Skip immediate update for this row
+                                        return;
                                     }
                                 }
                             }
@@ -2210,6 +2209,10 @@ class PowerChoosersCRM {
                                 
                                 if (!query.empty) {
                                     existingRecord = query.docs[0];
+                                    // Queue merge for end-of-import confirmation instead of immediate update
+                                    queuedAccountMerges.push({ existingRecord, incoming: doc });
+                                    // Skip immediate update for this row
+                                    return;
                                 }
                             }
                         }
@@ -2288,6 +2291,56 @@ class PowerChoosersCRM {
                 await new Promise(resolve => setTimeout(resolve, 50));
             }
             
+            // If we queued merges, present a summary and ask once to proceed
+            let userApprovedQueuedMerges = true;
+            try {
+                const totalQueued = queuedContactMerges.length + queuedAccountMerges.length;
+                if (totalQueued > 0) {
+                    userApprovedQueuedMerges = await this.showQueuedMergeSummaryModal({
+                        contacts: queuedContactMerges,
+                        accounts: queuedAccountMerges,
+                        importType: modal._importType
+                    });
+                }
+            } catch(_) {}
+
+            // Apply queued merges if approved
+            if (userApprovedQueuedMerges) {
+                for (const item of queuedAccountMerges) {
+                    try {
+                        const prev = (typeof item.existingRecord.data === 'function') ? item.existingRecord.data() : {};
+                        const updateData = Object.assign({}, prev);
+                        Object.keys(item.incoming || {}).forEach(k => {
+                            const v = item.incoming[k];
+                            if (v !== undefined && v !== null && String(v).trim() !== '') updateData[k] = v;
+                        });
+                        updateData.updatedAt = window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now();
+                        updateData.enrichedAt = updateData.updatedAt;
+                        await item.existingRecord.ref.update(updateData);
+                        enriched++;
+                        // Notify UI
+                        try {
+                            document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: item.existingRecord.id, doc: Object.assign({}, updateData) } }));
+                        } catch(_) {}
+                    } catch(e) { failed++; }
+                }
+                for (const item of queuedContactMerges) {
+                    try {
+                        const prev = (typeof item.existingRecord.data === 'function') ? item.existingRecord.data() : {};
+                        const updateData = window.ContactMerger ? window.ContactMerger.mergeContacts(prev, item.incoming) : Object.assign({}, prev, item.incoming);
+                        updateData.updatedAt = window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now();
+                        updateData.enrichedAt = updateData.updatedAt;
+                        await item.existingRecord.ref.update(updateData);
+                        enriched++;
+                        // Notify UI
+                        try {
+                            const uiChanges = Object.assign({}, updateData, { updatedAt: new Date() });
+                            document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id: item.existingRecord.id, changes: uiChanges } }));
+                        } catch(_) {}
+                    } catch(e) { failed++; }
+                }
+            }
+
             // Show results
             if (progressDiv) progressDiv.hidden = true;
             if (resultsDiv) {
@@ -2337,6 +2390,52 @@ class PowerChoosersCRM {
             if (progressDiv) progressDiv.hidden = true;
             if (startBtn) startBtn.hidden = false;
         }
+    }
+
+    // Display a one-time confirmation modal summarizing all queued merges for this import
+    showQueuedMergeSummaryModal({ contacts = [], accounts = [] } = {}) {
+        return new Promise((resolve) => {
+            try {
+                const total = contacts.length + accounts.length;
+                if (total === 0) return resolve(true);
+                const overlay = document.createElement('div');
+                overlay.className = 'pc-modal';
+                overlay.innerHTML = `
+                  <div class="pc-modal__backdrop" data-close="queued-merge"></div>
+                  <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="merge-batch-title">
+                    <div class="pc-modal__header">
+                      <h3 id="merge-batch-title">Review potential merges</h3>
+                      <button class="pc-modal__close" data-close="queued-merge" aria-label="Close">×</button>
+                    </div>
+                    <div class="pc-modal__body" style="max-height:60vh;overflow:auto;">
+                      <p>${total} existing records look similar and can be enriched instead of creating duplicates.</p>
+                      ${accounts.length ? `<h4>Accounts (${accounts.length})</h4>` : ''}
+                      ${accounts.slice(0, 10).map(it => {
+                        const prev = (typeof it.existingRecord.data === 'function') ? it.existingRecord.data() : {};
+                        const fields = Object.keys(it.incoming||{}).filter(k => (it.incoming[k] != null && String(it.incoming[k]).trim() !== '' && String(it.incoming[k]) !== String(prev[k]||''))).slice(0,6);
+                        return `<div class="merge-row"><strong>${this.escapeHtml(prev.accountName || '')}</strong> → enrich fields: ${fields.map(f=>`<code>${this.escapeHtml(f)}</code>`).join(', ') || '—'}</div>`;
+                      }).join('')}
+                      ${contacts.length ? `<h4 style="margin-top:12px;">Contacts (${contacts.length})</h4>` : ''}
+                      ${contacts.slice(0, 10).map(it => {
+                        const prev = (typeof it.existingRecord.data === 'function') ? it.existingRecord.data() : {};
+                        const fields = Object.keys(it.incoming||{}).filter(k => (it.incoming[k] != null && String(it.incoming[k]).trim() !== '' && String(it.incoming[k]) !== String(prev[k]||''))).slice(0,6);
+                        const name = `${prev.firstName||''} ${prev.lastName||''}`.trim();
+                        return `<div class="merge-row"><strong>${this.escapeHtml(name||prev.email||'Existing contact')}</strong> → enrich fields: ${fields.map(f=>`<code>${this.escapeHtml(f)}</code>`).join(', ') || '—'}</div>`;
+                      }).join('')}
+                      ${total>10?`<div style="margin-top:8px;color:var(--text-secondary)">(+${total-10} more hidden)</div>`:''}
+                    </div>
+                    <div class="pc-modal__footer" style="display:flex;gap:8px;justify-content:flex-end;">
+                      <button type="button" class="btn-secondary" data-action="cancel">Cancel</button>
+                      <button type="button" class="btn-primary" data-action="enrich">Enrich</button>
+                    </div>
+                  </div>`;
+                document.body.appendChild(overlay);
+                const close = (val) => { try { overlay.parentNode && overlay.parentNode.removeChild(overlay); } catch(_) {}; resolve(val); };
+                overlay.querySelectorAll('[data-close="queued-merge"]').forEach(btn => btn.addEventListener('click', () => close(false)));
+                overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => close(false));
+                overlay.querySelector('[data-action="enrich"]').addEventListener('click', () => close(true));
+            } catch(_) { resolve(true); }
+        });
     }
 
     escapeHtml(text) {
@@ -2885,6 +2984,55 @@ window.__pcAccountsIcon = () => {
 
 // Enhanced favicon system with multiple fallback sources
 window.__pcFaviconHelper = {
+    // Prefer explicit account/company logo URL; fallback to computed favicon chain
+    generateCompanyIconHTML: function(opts){
+        try {
+            const size = parseInt((opts && opts.size) || 64, 10) || 64;
+            const logoUrl = (opts && opts.logoUrl) ? String(opts.logoUrl).trim() : '';
+            const domain = (opts && opts.domain) ? String(opts.domain).trim().replace(/^https?:\/\//,'').replace(/\/$/,'') : '';
+            if (logoUrl) {
+                // If user typed a domain or a non-image URL, render favicon for that domain instead
+                const looksLikeDomain = /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(logoUrl) && !/\s/.test(logoUrl);
+                let parsed = null;
+                try { parsed = /^https?:\/\//i.test(logoUrl) ? new URL(logoUrl) : null; } catch(_) { parsed = null; }
+                const path = parsed ? (parsed.pathname || '') : '';
+                const looksLikeImagePath = /\.(png|jpe?g|gif|webp|svg|ico)(\?.*)?$/i.test(path);
+                if (looksLikeDomain || (parsed && !looksLikeImagePath)) {
+                    const d = looksLikeDomain ? logoUrl : (parsed ? parsed.hostname : domain);
+                    const clean = String(d||'').replace(/^www\./i,'');
+                    if (clean) return this.generateFaviconHTML(clean, size);
+                }
+                // Otherwise treat as a direct image URL; fallback to favicon on error
+                const cleanDomain = domain || (parsed ? parsed.hostname.replace(/^www\./i,'') : '');
+                const containerId = `logo-${(cleanDomain||'x').replace(/[^a-z0-9]/gi,'')}-${Date.now()}`;
+                return `<img class="company-favicon" 
+                             id="${containerId}"
+                             src="${logoUrl}" 
+                             alt="" 
+                             referrerpolicy="no-referrer" 
+                             loading="lazy"
+                             style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;"
+                             onerror="window.__pcFaviconHelper.onLogoError('${containerId}','${cleanDomain}',${size})">`;
+            }
+            if (domain) {
+                return this.generateFaviconHTML(domain, size);
+            }
+            return window.__pcAccountsIcon();
+        } catch(_) { return window.__pcAccountsIcon(); }
+    },
+    onLogoError: function(containerId, domain, size){
+        try {
+            const img = document.getElementById(containerId);
+            if (!img) return;
+            const parent = img.parentNode;
+            const html = this.generateFaviconHTML(domain, size);
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            const replacement = div.firstElementChild;
+            if (parent && replacement) parent.replaceChild(replacement, img);
+            else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
+        } catch(_) {}
+    },
     // Generate favicon HTML with multiple fallback sources
     generateFaviconHTML: function(domain, size = 64) {
         if (!domain) {
