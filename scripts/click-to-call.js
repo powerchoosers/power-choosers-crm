@@ -287,16 +287,13 @@
       }
     } catch (_) { /* noop */ }
 
-    // Force company-mode context when clicking the Account's company phone
+    // Force company-mode context when clicking a company phone
     try {
-      const isAccountCompanyPhone = !!phoneElement.closest('#account-detail-view') && (
-        phoneElement.matches('#account-detail-view .info-value-wrap[data-field="companyPhone"] .info-value-text') ||
-        (
-          // Or if element explicitly has account id but no contact id
-          (phoneElement.getAttribute('data-account-id') && !phoneElement.getAttribute('data-contact-id'))
-        )
-      );
-      if (isAccountCompanyPhone) {
+      const inAccount = !!phoneElement.closest('#account-detail-view');
+      const isCompanyField = phoneElement.matches('#account-detail-view .info-value-wrap[data-field="companyPhone"] .info-value-text');
+      const explicitAccountNoContact = (phoneElement.getAttribute('data-account-id') && !phoneElement.getAttribute('data-contact-id'));
+      const isCompanyPhoneClick = (inAccount && (isCompanyField || explicitAccountNoContact)) || explicitAccountNoContact;
+      if (isCompanyPhoneClick) {
         // Clear any stale contact attribution and mark as company phone
         context.contactId = null;
         context.contactName = '';
@@ -319,6 +316,49 @@
           if (!context.city && account.city) context.city = account.city;
           if (!context.state && account.state) context.state = account.state;
         } catch(_) {}
+      }
+    } catch(_) {}
+
+    // Contact Detail: default to company-mode unless clearly calling a personal number (mobile/work/other)
+    try {
+      const inContact = !!phoneElement.closest('#contact-detail-view');
+      if (inContact) {
+        const row = phoneElement.closest('.info-row');
+        const phoneType = (row && (row.getAttribute('data-phone-type') || row.getAttribute('data-field'))) || '';
+        const typeNorm = String(phoneType).toLowerCase();
+        const isPersonal = ['mobile', 'work', 'workdirect', 'work_direct', 'work direct', 'other'].includes(typeNorm);
+        if (isPersonal) {
+          // Personal number → contact mode
+          context.isCompanyPhone = false;
+          try {
+            const cd = window.ContactDetail?.state?.currentContact || {};
+            const cname = cd.name || ((cd.firstName||'') + ' ' + (cd.lastName||''));
+            if (!context.contactId) context.contactId = cd.id || cd.contactId || cd._id || null;
+            if (!context.contactName) context.contactName = cname || '';
+            if (!context.name) context.name = context.contactName || '';
+            // Ensure company fields present for display
+            if (!context.company) context.company = cd.company || cd.companyName || cd.account || context.accountName || '';
+          } catch(_) {}
+        } else {
+          // Company number → company mode; clear contact, keep account attribution only
+          context.contactId = null;
+          context.contactName = '';
+          context.isCompanyPhone = true;
+          // Enrich domain/logo/city/state from contact company fields if account object not available
+          try {
+            const cd = window.ContactDetail?.state?.currentContact || {};
+            if (!context.domain) {
+              let d = cd.companyDomain || '';
+              if (!d && cd.companyWebsite) {
+                try { const u = new URL(cd.companyWebsite.startsWith('http') ? cd.companyWebsite : `https://${cd.companyWebsite}`); d = u.hostname; } catch(_) { d = String(cd.companyWebsite).replace(/^https?:\/\//i,'').split('/')[0]; }
+              }
+              if (d) context.domain = d.replace(/^www\./i,'');
+            }
+            if (!context.city && cd.companyCity) context.city = cd.companyCity;
+            if (!context.state && cd.companyState) context.state = cd.companyState;
+          } catch(_) {}
+          if (!context.name) context.name = context.accountName || context.company || '';
+        }
       }
     } catch(_) {}
 

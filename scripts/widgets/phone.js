@@ -3037,17 +3037,20 @@
     const now = Date.now();
     let contactCompany = '';
 
-    // Attempt to enrich contactName if missing by looking up People data by phone
+    // Do NOT auto-enrich company-mode calls; keep attribution strictly from page context
     try {
-      const normalize = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
-      if (!contactName) {
+      const isCompany = !!(currentCallContext && currentCallContext.isCompanyPhone);
+      if (!isCompany && !contactName) {
+        const normalize = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
         const needle = normalize(number);
         if (needle && typeof window.getPeopleData === 'function') {
           const people = window.getPeopleData() || [];
           const hit = people.find((c) => {
             const a = normalize(c.phone);
             const b = normalize(c.mobile);
-            return (a && a === needle) || (b && b === needle);
+            const w = normalize(c.workDirectPhone);
+            const o = normalize(c.otherPhone);
+            return (a && a === needle) || (b && b === needle) || (w && w === needle) || (o && o === needle);
           });
           if (hit) {
             const fullName = [hit.firstName, hit.lastName].filter(Boolean).join(' ') || (hit.name || '');
@@ -3156,30 +3159,27 @@
     }
     window.lastCallNumberTime = now;
     
-    // Set current call context - merge to preserve fields set by setCallContext(),
-    // but if we are in explicit company mode, clear stale contact fields
-    const forceCompanyMode = currentCallContext?.isCompanyPhone === true && (!currentCallContext?.contactId);
-    currentCallContext = {
-      ...currentCallContext,
+    // Overwrite context deterministically based on explicit page context
+    const isCompanyCall = !!(currentCallContext && currentCallContext.isCompanyPhone);
+    const nextContext = {
       number: number,
-      name: contactName || currentCallContext?.name || '',
-      company: contactCompany || currentCallContext?.company || '',
-      // keep account linkage as-is if already set
-      accountId: currentCallContext?.accountId || null,
-      accountName: currentCallContext?.accountName || null,
-      // clear contact linkage if forcing company mode
-      contactId: forceCompanyMode ? null : (currentCallContext?.contactId || null),
-      contactName: forceCompanyMode ? '' : (currentCallContext?.contactName || null),
-      // preserve city/state/domain/isCompanyPhone if they were set previously
-      city: currentCallContext?.city || '',
-      state: currentCallContext?.state || '',
-      domain: currentCallContext?.domain || '',
-      isCompanyPhone: currentCallContext?.isCompanyPhone === true || currentCallContext?.isCompanyPhone === false ? currentCallContext.isCompanyPhone : false,
-      isActive: autoTrigger || currentCallContext?.isActive || false
+      name: isCompanyCall ? (currentCallContext.company || '') : (contactName || currentCallContext.name || ''),
+      company: currentCallContext.company || contactCompany || '',
+      accountId: currentCallContext.accountId || null,
+      accountName: currentCallContext.accountName || null,
+      contactId: isCompanyCall ? null : (currentCallContext.contactId || null),
+      contactName: isCompanyCall ? '' : (contactName || currentCallContext.contactName || ''),
+      city: currentCallContext.city || '',
+      state: currentCallContext.state || '',
+      domain: currentCallContext.domain || '',
+      logoUrl: currentCallContext.logoUrl || '',
+      isCompanyPhone: isCompanyCall,
+      isActive: !!autoTrigger || !!currentCallContext.isActive
     };
+    currentCallContext = nextContext;
     
     console.debug('[Phone Widget] Call context set in callNumber:', currentCallContext);
-    console.debug('[Phone Widget] Preserved account context:', {
+    console.debug('[Phone Widget] Attribution snapshot:', {
       accountId: currentCallContext.accountId,
       accountName: currentCallContext.accountName,
       contactId: currentCallContext.contactId,

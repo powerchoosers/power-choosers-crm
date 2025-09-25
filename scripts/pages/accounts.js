@@ -1250,14 +1250,15 @@
                   phone: phone
                 });
                 
-                // If no specific contact selected, clear previous contact context to avoid misattribution
+                // Always force company-mode when calling from Accounts list
                 window.Widgets.setCallContext({ 
                   accountId: aid || null, 
                   accountName: name || null, 
                   company: name || null,
-                  contactId: contactId || null,
-                  contactName: contactName || null,
-                  name: (contactName || name) || null
+                  contactId: null,
+                  contactName: '',
+                  name: name || null,
+                  isCompanyPhone: true
                 });
               }
             } catch (_) {}
