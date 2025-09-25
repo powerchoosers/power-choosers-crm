@@ -162,6 +162,9 @@ export default async function handler(req, res) {
     }
     
     try {
+        const _start = Date.now();
+        const _ts = new Date().toISOString();
+        try { console.log('[CI Webhook] Received at', _ts); } catch(_) {}
         console.log('[Conversational Intelligence Webhook] Received webhook:', req.body);
         
         const { 
@@ -251,6 +254,20 @@ export default async function handler(req, res) {
                 }
             }
         } catch(_) {}
+
+        // Defer heavy work: queue background fetch and ACK fast to avoid webhook retries/timeouts
+        try {
+            const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+            const payload = { transcriptSid: TranscriptSid, callSid: isCallSid(CallSid) ? CallSid : '' };
+            // Fire-and-forget; do not await
+            fetch(`${base}/api/twilio/poll-ci-analysis`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            }).then(()=>{ try { console.log('[CI Webhook] Queued background poll for', TranscriptSid); } catch(_) {} })
+              .catch((e)=>{ try { console.warn('[CI Webhook] Background poll queue failed:', e?.message||e); } catch(_) {} });
+        } catch (e) { try { console.warn('[CI Webhook] Queue error:', e?.message||e); } catch(_) {} }
+        const _elapsed = Date.now() - _start;
+        try { console.log('[CI Webhook] ACK 200 queued in', _elapsed + 'ms', 'for', TranscriptSid); } catch(_) {}
+        return res.status(200).json({ success: true, queued: true, transcriptSid: TranscriptSid, elapsedMs: _elapsed });
         
         try {
             // Get the transcript details and validate CI analysis status

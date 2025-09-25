@@ -11,7 +11,9 @@ export default async function handler(req, res) {
     }
     
     try {
+        const _start = Date.now();
         const { transcriptSid, callSid } = req.body;
+        try { console.log('[Poll CI Analysis] Start', { transcriptSid, callSid, ts: new Date().toISOString() }); } catch(_) {}
         
         if (!transcriptSid) {
             return res.status(400).json({ error: 'transcriptSid is required' });
@@ -179,6 +181,8 @@ export default async function handler(req, res) {
             console.warn('[Poll CI Analysis] Fallback upsert failed:', e?.message || e);
         }
 
+        const elapsed = Date.now() - _start;
+        try { console.log('[Poll CI Analysis] Done', { transcriptSid, callSid, elapsedMs: elapsed, sentenceCount: sentences.length }); } catch(_) {}
         return res.status(200).json({
             success: true,
             analysisComplete: true,
@@ -191,7 +195,7 @@ export default async function handler(req, res) {
             sentences: sentences,
             sentenceCount: sentences.length,
             updated: true,
-            message: 'Analysis completed (fallback upsert attempted)'
+            message: 'Analysis completed (background)'
         });
         
     } catch (error) {
