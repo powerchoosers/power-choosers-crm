@@ -6919,7 +6919,22 @@ html, body {
 .dial-actions { padding-bottom: 0; }
 .phone-card.in-call .dial-actions { padding-bottom: 0; }
 .dial-actions .call-btn-start {
-  min-width: 200px;
+  flex: 1;
+  min-width: 0;
+}
+.dial-actions .scripts-toggle {
+  flex: 0 0 40px;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0;
+}
+.dial-actions .scripts-toggle svg {
+  display: block;
+  width: 20px;
+  height: 20px;
 }
 
 /* Dial pad micro-interactions */
