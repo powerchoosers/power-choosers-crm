@@ -789,9 +789,10 @@
                                 </div>
                                 <div class="page-filters">
                                     <div class="filter-tabs">
-                                        <button class="filter-tab active">All <span class="tab-count">25</span></button>
-                                        <button class="filter-tab">Pending <span class="tab-count">7</span></button>
-                                        <button class="filter-tab">Completed <span class="tab-count">7</span></button>
+                                        <button class="filter-tab active">All your tasks</button>
+                                        <button class="filter-tab">Phone Tasks</button>
+                                        <button class="filter-tab">Email Tasks</button>
+                                        <button class="filter-tab">Overdue Tasks</button>
                                     </div>
                                     <div class="filter-actions">
                                         <input type="text" placeholder="Search tasks..." class="search-input-small">
@@ -1527,6 +1528,38 @@
                         </div>
                     </div>
 
+                    <!-- Task Detail Page -->
+                    <div class="page" id="task-detail-page" data-page="task-detail">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <button class="back-btn back-btn--icon" id="task-detail-back-btn" aria-label="Back to Tasks">
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                                      </svg>
+                                    </button>
+                                    <div class="contact-header-text">
+                                        <h2 class="page-title" id="task-detail-title">Task Details</h2>
+                                        <div class="contact-subtitle" id="task-detail-subtitle">Loading task...</div>
+                                    </div>
+                                </div>
+                                <div class="page-actions">
+                                    <button class="btn-secondary" id="task-reschedule-btn">Reschedule</button>
+                                    <button class="btn-primary" id="task-complete-btn">Complete Task</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Task Content Area -->
+                            <div class="page-content" id="task-detail-content">
+                                <!-- Content will be dynamically loaded based on task type -->
+                                <div class="loading-state">
+                                    <div class="loading-spinner"></div>
+                                    <p>Loading task details...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </main>
 
                 <aside class="widget-panel" id="widget-panel">
@@ -1953,6 +1986,7 @@
     <script src="scripts/pages/sequences.js"></script>
     <script src="scripts/pages/deals.js"></script>
     <script src="scripts/pages/tasks.js"></script>
+    <script src="scripts/pages/task-detail.js"></script>
     <script src="scripts/pages/call-scripts.js"></script>
     <script src="scripts/pages/settings.js"></script>
     <script src="scripts/global-search.js"></script>

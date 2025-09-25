@@ -164,8 +164,10 @@
         els.filterTabs.forEach(t=>t.classList.remove('active'));
         tab.classList.add('active');
         const label = (tab.textContent||'').trim().toLowerCase();
-        if(label.startsWith('pending')) state.filterMode='pending';
-        else if(label.startsWith('completed')) state.filterMode='completed';
+        // New filter sections: All your tasks, Phone Tasks, Email Tasks, Overdue Tasks
+        if(label.includes('phone')) state.filterMode='phone';
+        else if(label.includes('email')) state.filterMode='email';
+        else if(label.includes('overdue')) state.filterMode='overdue';
         else state.filterMode='all';
         applyFilters();
       });
@@ -267,10 +269,10 @@
           };
           
           const taskTitles = {
-            'li-connect': 'Send LinkedIn connection request',
-            'li-message': 'Send LinkedIn message',
+            'li-connect': 'Add on LinkedIn',
+            'li-message': 'Send a message on LinkedIn',
             'li-view-profile': 'View LinkedIn profile', 
-            'li-interact-post': 'Interact with LinkedIn post'
+            'li-interact-post': 'Interact with LinkedIn Post'
           };
           
           // Calculate due date based on step delay
@@ -299,8 +301,20 @@
 
   function applyFilters(){
     let arr = state.data.slice();
-    if(state.filterMode==='pending') arr = arr.filter(r=>r.status==='pending');
-    else if(state.filterMode==='completed') arr = arr.filter(r=>r.status==='completed');
+    const today = new Date();
+    const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if(state.filterMode==='phone') {
+      arr = arr.filter(r => /phone|call/i.test(String(r.type||'')));
+    } else if(state.filterMode==='email') {
+      arr = arr.filter(r => /email/i.test(String(r.type||'')));
+    } else if(state.filterMode==='overdue') {
+      arr = arr.filter(r => {
+        if((r.status||'pending') === 'completed') return false;
+        const d = parseDateStrict(r.dueDate);
+        if(!d) return false;
+        return d.getTime() < localMidnight.getTime();
+      });
+    }
     state.filtered = sortTasksChronologically(arr);
     state.currentPage=1; state.selected.clear();
     render();
@@ -313,21 +327,43 @@
   function render(){ if(!els.tbody) return; state.filtered = sortTasksChronologically(state.filtered); const rows=getPageItems(); els.tbody.innerHTML = rows.map(r=>rowHtml(r)).join('');
     // Row events
     els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
-    els.tbody.querySelectorAll('button.btn-success').forEach(btn=>btn.addEventListener('click',()=>{ const id = btn.getAttribute('data-id'); const rec = state.data.find(x=>x.id===id); if(rec){ rec.status='completed'; 
-      // Update localStorage for user tasks
+    
+    // Task link events - open individual task detail pages
+    els.tbody.querySelectorAll('.task-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const taskId = link.getAttribute('data-task-id');
+        if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+          window.TaskDetail.open(taskId, 'tasks');
+        }
+      });
+    });
+    
+    els.tbody.querySelectorAll('button.btn-success').forEach(btn=>btn.addEventListener('click',async ()=>{ const id = btn.getAttribute('data-id'); const recIdx = state.data.findIndex(x=>x.id===id); if(recIdx!==-1){
+      // Remove from state immediately
+      const [removed] = state.data.splice(recIdx,1);
+      state.filtered = state.data.slice();
+      // Remove from localStorage immediately
       try {
         const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-        const userTaskIndex = userTasks.findIndex(task => task.id === id);
-        if (userTaskIndex !== -1) {
-          userTasks[userTaskIndex].status = 'completed';
-          localStorage.setItem('userTasks', JSON.stringify(userTasks));
+        const filtered = userTasks.filter(t => t.id !== id);
+        localStorage.setItem('userTasks', JSON.stringify(filtered));
+      } catch (e) { console.warn('Could not remove task from localStorage:', e); }
+      // Remove from Firebase (best-effort)
+      try {
+        const db = window.firebaseDB;
+        if (db) {
+          // Many tasks store their own id inside the doc; delete by where('id','==',id)
+          const snap = await db.collection('tasks').where('id','==',id).limit(5).get();
+          const batch = db.batch();
+          snap.forEach(doc => batch.delete(doc.ref));
+          if (!snap.empty) await batch.commit();
         }
-      } catch (e) {
-        console.warn('Could not update task status in localStorage:', e);
-      }
-      // Update Today's Tasks widget
+      } catch (e) { console.warn('Could not remove task from Firebase:', e); }
+      // Update Today's Tasks widget and table
       updateTodaysTasksWidget();
-    } btn.textContent='Completed'; btn.disabled=true; btn.style.opacity='0.6'; render(); }));
+    }
+    btn.textContent='Completed'; btn.disabled=true; btn.style.opacity='0.6'; render(); }));
     // Header select state
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
@@ -346,7 +382,12 @@
       <tr>
         <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
         <td>
-          <div class="task-info"><div class="task-title">${title}</div><div class="task-subtitle">${name} • ${account}</div></div>
+          <div class="task-info">
+            <div class="task-title">
+              <a href="#" class="task-link" data-task-id="${id}" style="color: var(--grey-400); text-decoration: none; font-weight: 400; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--grey-400)'">${title}</a>
+            </div>
+            <div class="task-subtitle">${name} • ${account}</div>
+          </div>
         </td>
         <td><span class="type-badge ${type}">${type}</span></td>
         <td><span class="priority-badge ${pr}">${pr}</span></td>
@@ -614,9 +655,34 @@
   }
 
   async function createTask(taskData) {
+    // Generate title using new format if not provided
+    let title = taskData.title;
+    if (!title && taskData.type && (taskData.contact || taskData.account)) {
+      if (window.crm && typeof window.crm.buildTaskTitle === 'function') {
+        title = window.crm.buildTaskTitle(taskData.type, taskData.contact || '', taskData.account || '');
+      } else {
+        // Fallback to new format
+        const typeMap = {
+          'phone-call': 'Call',
+          'manual-email': 'Email',
+          'auto-email': 'Email',
+          'li-connect': 'Add on LinkedIn',
+          'li-message': 'Send a message on LinkedIn',
+          'li-view-profile': 'View LinkedIn profile',
+          'li-interact-post': 'Interact with LinkedIn Post',
+          'custom-task': 'Custom Task for',
+          'follow-up': 'Follow-up with',
+          'demo': 'Demo for'
+        };
+        const action = typeMap[taskData.type] || 'Task for';
+        const name = taskData.contact || taskData.account || 'contact';
+        title = `${action} ${name}`;
+      }
+    }
+    
     const newTask = {
       id: 'task_' + Date.now(),
-      title: taskData.title,
+      title: title || 'Task',
       contact: taskData.contact || '',
       account: taskData.account || '',
       type: taskData.type,

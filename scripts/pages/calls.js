@@ -3576,7 +3576,28 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       const type = inferTaskTypeFromContext(A);
       const contact = String(r.contactName||'');
       const account = String(r.company||'');
-      const title = type==='phone-call' ? `Call ${contact||account||'contact'}` : `Email ${contact||account||'contact'}`;
+      // Use shared function from main CRM class if available
+      let title;
+      if (window.crm && typeof window.crm.buildTaskTitle === 'function') {
+        title = window.crm.buildTaskTitle(type, contact, account);
+      } else {
+        // Fallback to new format
+        const typeMap = {
+          'phone-call': 'Call',
+          'manual-email': 'Email',
+          'auto-email': 'Email',
+          'li-connect': 'Add on LinkedIn',
+          'li-message': 'Send a message on LinkedIn',
+          'li-view-profile': 'View LinkedIn profile',
+          'li-interact-post': 'Interact with LinkedIn Post',
+          'custom-task': 'Custom Task for',
+          'follow-up': 'Follow-up with',
+          'demo': 'Demo for'
+        };
+        const action = typeMap[type] || 'Task for';
+        const name = contact || account || 'contact';
+        title = `${action} ${name}`;
+      }
       const notes = `Auto-created from call timeline for ${contact||account}.`;
       if (window.createTask) {
         await window.createTask({ title, type, priority: 'medium', contact, account, dueDate: parsed.dueDate, dueTime: parsed.dueTime, notes });

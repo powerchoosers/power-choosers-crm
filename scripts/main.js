@@ -505,6 +505,15 @@ class PowerChoosersCRM {
             }, 50);
         }
         
+        // Task detail page - initialize task detail functionality
+        if (pageName === 'task-detail') {
+            setTimeout(() => {
+                if (window.TaskDetail && typeof window.TaskDetail.init === 'function') {
+                    window.TaskDetail.init();
+                }
+            }, 100);
+        }
+        
         // Lists page - ensure overview is shown by default
         if (pageName === 'lists') {
             // Make sure we show the overview, not any detail view
@@ -2907,9 +2916,9 @@ class PowerChoosersCRM {
             tasksHtml = pageTasks.map(task => {
                 const timeText = this.getTaskTimeText(task);
                 return `
-                    <div class="task-item" data-task-id="${task.id}">
+                    <div class="task-item" data-task-id="${task.id}" style="cursor: pointer;">
                         <div class="task-info">
-                            <div class="task-name">${this.escapeHtml(task.title)}</div>
+                            <div class="task-name" style="color: var(--grey-400); font-weight: 400; transition: var(--transition-fast);">${this.escapeHtml(task.title)}</div>
                             <div class="task-time">${timeText}</div>
                         </div>
                         <span class="priority-badge ${task.priority}">${task.priority}</span>
@@ -2939,6 +2948,28 @@ class PowerChoosersCRM {
         }
 
         tasksList.innerHTML = tasksHtml;
+
+        // Attach task click event listeners
+        tasksList.querySelectorAll('.task-item[data-task-id]').forEach(taskItem => {
+            taskItem.addEventListener('click', (e) => {
+                e.preventDefault();
+                const taskId = taskItem.getAttribute('data-task-id');
+                if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+                    window.TaskDetail.open(taskId, 'dashboard');
+                }
+            });
+            
+            // Add hover effects
+            const taskName = taskItem.querySelector('.task-name');
+            if (taskName) {
+                taskItem.addEventListener('mouseenter', () => {
+                    taskName.style.color = 'var(--text-inverse)';
+                });
+                taskItem.addEventListener('mouseleave', () => {
+                    taskName.style.color = 'var(--grey-400)';
+                });
+            }
+        });
 
         // Attach pagination event listeners
         tasksList.querySelectorAll('.pagination-btn').forEach(btn => {
@@ -2991,6 +3022,27 @@ class PowerChoosersCRM {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+    }
+
+    // Shared task title builder with descriptive format
+    buildTaskTitle(type, contactName, accountName = '') {
+        const name = contactName || accountName || 'contact';
+        
+        const typeMap = {
+            'phone-call': 'Call',
+            'manual-email': 'Email',
+            'auto-email': 'Email',
+            'li-connect': 'Add on LinkedIn',
+            'li-message': 'Send a message on LinkedIn',
+            'li-view-profile': 'View LinkedIn profile',
+            'li-interact-post': 'Interact with LinkedIn Post',
+            'custom-task': 'Custom Task for',
+            'follow-up': 'Follow-up with',
+            'demo': 'Demo for'
+        };
+        
+        const action = typeMap[type] || 'Task for';
+        return `${action} ${name}`;
     }
 
     async loadEnergyNews() {
