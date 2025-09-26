@@ -637,30 +637,41 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           if (!row) return;
           const needsProcessing = (!row.transcript || !row.aiInsights || Object.keys(row.aiInsights||{}).length === 0);
           if (needsProcessing) {
-            // Trigger CI request for this single call, then poll until ready
-            try {
-              btn.disabled = true;
-              btn.innerHTML = '⏳';
-              let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
-                ? window.crm.getApiBaseUrl()
-                : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm.vercel.app');
-              base = String(base).replace(/\/$/, '');
-              const res = await fetch(`${base}/api/twilio/ci-request`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callSid: row.id || row.callSid })
+            // Use shared CI processor for consistent functionality
+            if (window.SharedCIProcessor) {
+              const success = await window.SharedCIProcessor.processCall(row.id || row.callSid, row.recordingSid, btn, {
+                context: 'calls-page',
+                onSuccess: (call) => {
+                  console.log('[Calls] CI processing completed:', call);
+                  
+                  // Update local state row
+                  try {
+                    const idx = state.data.findIndex(x => String(x.id||x.callSid||'') === String(id));
+                    if (idx >= 0) {
+                      state.data[idx] = { 
+                        ...state.data[idx], 
+                        transcript: call.transcript || state.data[idx].transcript, 
+                        formattedTranscript: call.formattedTranscript || state.data[idx].formattedTranscript, 
+                        aiInsights: call.aiInsights || state.data[idx].aiInsights 
+                      };
+                    }
+                  } catch(_) {}
+                  
+                  // Reset button and open modal
+                  btn.disabled = false; 
+                  btn.innerHTML = svgIcon('insights');
+                  openInsightsModal(id);
+                },
+                onError: (error) => {
+                  console.error('[Calls] CI processing failed:', error);
+                  btn.disabled = false; 
+                  btn.innerHTML = svgIcon('insights');
+                }
               });
-              if (!res.ok) { btn.disabled = false; btn.innerHTML = svgIcon('insights'); return; }
-              // Poll until available, then open modal
-              await callsPollInsightsUntilReady(row.id || row.callSid, (call)=>{
-                // update local state row
-                try {
-                  const idx = state.data.findIndex(x => String(x.id||x.callSid||'') === String(id));
-                  if (idx >= 0) state.data[idx] = { ...state.data[idx], transcript: call.transcript || state.data[idx].transcript, formattedTranscript: call.formattedTranscript || state.data[idx].formattedTranscript, aiInsights: call.aiInsights || state.data[idx].aiInsights };
-                } catch(_) {}
-                btn.disabled = false; btn.innerHTML = svgIcon('insights');
-                openInsightsModal(id);
-              });
-            } catch(_) {
-              btn.disabled = false; btn.innerHTML = svgIcon('insights');
+            } else {
+              console.error('[Calls] SharedCIProcessor not available');
+              btn.disabled = false; 
+              btn.innerHTML = svgIcon('insights');
             }
             return;
           }

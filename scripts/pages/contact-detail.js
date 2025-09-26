@@ -3920,7 +3920,42 @@
   // Trigger on-demand CI processing for a call (Contact Detail)
   async function triggerContactCI(callSid, recordingSid, btn) {
     if (!callSid) {
-      try { console.warn('[ContactDetail] Missing callSid for CI processing:', { callSid, recordingSid }); } catch(_) {}
+      console.warn('[ContactDetail] Missing callSid for CI processing:', { callSid, recordingSid });
+      return;
+    }
+    
+    // Use shared CI processor for consistent functionality
+    if (window.SharedCIProcessor) {
+      const success = await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
+        context: 'contact-detail',
+        onSuccess: (call) => {
+          console.log('[ContactDetail] CI processing completed:', call);
+          
+          // Update state cache so future renders show full insights
+          try {
+            if (Array.isArray(state._rcCalls)) {
+              const idMatch = String(callSid);
+              state._rcCalls = state._rcCalls.map(x => {
+                const xid = String(x.id || x.twilioSid || x.callSid || '');
+                if (xid === idMatch) {
+                  return { 
+                    ...x, 
+                    transcript: call.transcript || x.transcript, 
+                    formattedTranscript: call.formattedTranscript || x.formattedTranscript, 
+                    aiInsights: call.aiInsights || x.aiInsights, 
+                    conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence 
+                  };
+                }
+                return x;
+              });
+            }
+          } catch(_) {}
+        },
+        onError: (error) => {
+          console.error('[ContactDetail] CI processing failed:', error);
+        }
+      });
+      
       return;
     }
     

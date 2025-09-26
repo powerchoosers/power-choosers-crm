@@ -1190,6 +1190,41 @@
       return;
     }
     
+    // Use shared CI processor for consistent functionality
+    if (window.SharedCIProcessor) {
+      const success = await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
+        context: 'account-detail',
+        onSuccess: (call) => {
+          console.log('[AccountDetail] CI processing completed:', call);
+          
+          // Update state cache so future renders show full insights
+          try {
+            if (Array.isArray(state._arcCalls)) {
+              const idMatch = String(callSid);
+              state._arcCalls = state._arcCalls.map(x => {
+                const xid = String(x.id || x.twilioSid || x.callSid || '');
+                if (xid === idMatch) {
+                  return { 
+                    ...x, 
+                    transcript: call.transcript || x.transcript, 
+                    formattedTranscript: call.formattedTranscript || x.formattedTranscript, 
+                    aiInsights: call.aiInsights || x.aiInsights, 
+                    conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence 
+                  };
+                }
+                return x;
+              });
+            }
+          } catch(_) {}
+        },
+        onError: (error) => {
+          console.error('[AccountDetail] CI processing failed:', error);
+        }
+      });
+      
+      return;
+    }
+    
     // If no recordingSid provided, the API will look it up by callSid
     if (!recordingSid) {
       console.log('[AccountDetail] No recordingSid provided, API will look up recording for callSid:', callSid);
@@ -1243,8 +1278,8 @@
       const result = await response.json();
       console.log('[AccountDetail] CI processing initiated:', result);
 
-      // Update the button to show processing state
-      btn.innerHTML = '<div class="loading-spinner" aria-hidden="true"></div>';
+      // Update the button to show processing state (consistent with contact-detail)
+      btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>';
       btn.title = 'Processing call insights...';
       btn.classList.remove('not-processed');
       btn.classList.add('processing');
