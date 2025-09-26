@@ -281,15 +281,23 @@ export default async function handler(req, res) {
                 console.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
             }
 
-            // Trigger Twilio native transcription and AI analysis
+            // Trigger background processing (non-blocking) - FIXED FREEZE ISSUE
             try {
                 if (finalCallSid) {
-                    await processRecordingWithTwilio(recordingMp3Url, finalCallSid, effectiveRecordingSid || RecordingSid, baseUrl);
+                    // Schedule background processing without blocking webhook response
+                    setImmediate(async () => {
+                        try {
+                            await processRecordingWithTwilio(recordingMp3Url, finalCallSid, effectiveRecordingSid || RecordingSid, baseUrl);
+                        } catch (error) {
+                            console.error('[Recording] Background processing error:', error);
+                        }
+                    });
+                    console.log('[Recording] Background processing scheduled for:', finalCallSid);
                 } else {
                     console.warn('[Recording] Skipping processing due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
                 }
             } catch (error) {
-                console.error('[Recording] Processing error:', error);
+                console.error('[Recording] Error scheduling background processing:', error);
             }
         }
         
