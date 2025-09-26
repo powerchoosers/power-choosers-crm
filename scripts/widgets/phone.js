@@ -951,8 +951,11 @@
       if (input) input.style.display = 'none';
 
       // Populate
-      // Explicitly use setCallContext's isCompanyPhone to avoid accidental flips
-      const isCompanyPhone = !!(currentCallContext && currentCallContext.isCompanyPhone);
+      // Explicitly use setCallContext's isCompanyPhone to avoid accidental flips.
+      // If absent, infer company mode from account context (accountId/accountName/company) when no contact context exists.
+      const hasAccountCtx = !!(currentCallContext && (currentCallContext.accountId || currentCallContext.accountName || currentCallContext.company));
+      const hasContactCtx = !!(currentCallContext && (currentCallContext.contactId || currentCallContext.contactName));
+      const isCompanyPhone = !!(currentCallContext && (currentCallContext.isCompanyPhone || (hasAccountCtx && !hasContactCtx)));
       // In company-call mode, prefer Account context (account-detail source) over contact/meta hints
       const city = isCompanyPhone
         ? ((currentCallContext && currentCallContext.city) || (meta && meta.city) || '')
@@ -975,7 +978,7 @@
       // For individual contact calls, show contact name
       let nameLine;
       if (isCompanyPhone) {
-        nameLine = (currentCallContext && currentCallContext.company) || (meta && (meta.account || meta.company)) || '';
+        nameLine = (currentCallContext && (currentCallContext.company || currentCallContext.accountName)) || (meta && (meta.account || meta.company)) || '';
       } else {
         nameLine = (meta && meta.name) || (currentCallContext && currentCallContext.name) || '';
       }
@@ -3047,25 +3050,8 @@
     // Do NOT auto-enrich company-mode calls; keep attribution strictly from page context
     try {
       const isCompany = !!(currentCallContext && currentCallContext.isCompanyPhone);
-      if (!isCompany && !contactName) {
-        const normalize = (p) => (p || '').toString().replace(/\D/g, '').slice(-10);
-        const needle = normalize(number);
-        if (needle && typeof window.getPeopleData === 'function') {
-          const people = window.getPeopleData() || [];
-          const hit = people.find((c) => {
-            const a = normalize(c.phone);
-            const b = normalize(c.mobile);
-            const w = normalize(c.workDirectPhone);
-            const o = normalize(c.otherPhone);
-            return (a && a === needle) || (b && b === needle) || (w && w === needle) || (o && o === needle);
-          });
-          if (hit) {
-            const fullName = [hit.firstName, hit.lastName].filter(Boolean).join(' ') || (hit.name || '');
-            if (fullName) contactName = fullName;
-            contactCompany = hit.companyName || hit.accountName || hit.company || '';
-          }
-        }
-      }
+      // REMOVED: Contact name lookup from phone number
+      // This was causing contact company info to leak into account detail phone calls
     } catch (_) { /* non-fatal */ }
     
     // Allow click-to-call to bypass most restrictions (user-initiated action)
@@ -3167,11 +3153,14 @@
     window.lastCallNumberTime = now;
     
     // Overwrite context deterministically based on explicit page context
-    const isCompanyCall = !!(currentCallContext && currentCallContext.isCompanyPhone);
+    // Infer company-mode if explicit flag or account context is present (and no contact)
+    const hasAccountCtx = !!(currentCallContext && (currentCallContext.accountId || currentCallContext.accountName || currentCallContext.company));
+    const hasContactCtx = !!(currentCallContext && (currentCallContext.contactId || currentCallContext.contactName));
+    const isCompanyCall = !!(currentCallContext && (currentCallContext.isCompanyPhone || (hasAccountCtx && !hasContactCtx)));
     const nextContext = {
       number: number,
-      name: isCompanyCall ? (currentCallContext.company || '') : (contactName || currentCallContext.name || ''),
-      company: currentCallContext.company || contactCompany || '',
+      name: isCompanyCall ? (currentCallContext.company || currentCallContext.accountName || '') : (contactName || currentCallContext.name || ''),
+      company: currentCallContext.company || currentCallContext.accountName || contactCompany || '',
       accountId: currentCallContext.accountId || null,
       accountName: currentCallContext.accountName || null,
       contactId: isCompanyCall ? null : (currentCallContext.contactId || null),

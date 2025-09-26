@@ -1789,8 +1789,25 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
            <span class="add-contact-text">Add Contact</span>
          </button>`;
 
+    // Get account information for phone widget context
+    let accountInfo = {};
+    try {
+      if (r.accountId && typeof window.getAccountsData === 'function') {
+        const accounts = window.getAccountsData() || [];
+        const account = accounts.find(acc => acc.id === r.accountId || acc.accountId === r.accountId);
+        if (account) {
+          accountInfo = {
+            logoUrl: account.logoUrl || '',
+            city: account.city || account.locationCity || '',
+            state: account.state || account.locationState || '',
+            domain: account.domain || ''
+          };
+        }
+      }
+    } catch(_) {}
+
     return `
-    <tr>
+    <tr data-account-id="${r.accountId || ''}" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}" data-logo-url="${escapeHtml(accountInfo.logoUrl || '')}" data-city="${escapeHtml(accountInfo.city || '')}" data-state="${escapeHtml(accountInfo.state || '')}">
       <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
       <td class="name-cell" data-contact-id="${r.contactId || ''}">${contactCell}</td>
       <td>${title}</td>
@@ -3223,6 +3240,26 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     document.addEventListener('pc:calls-restore', (e) => {
       const { page, scroll, filters, selectedItems, searchTerm } = e.detail || {};
       console.log('[Calls] Restoring state from back navigation:', e.detail);
+      
+      // Clear phone widget context to prevent contact company info from leaking
+      try {
+        if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
+          window.Widgets.setCallContext({
+            contactId: null,
+            contactName: '',
+            name: '',
+            company: '',
+            accountId: null,
+            accountName: null,
+            city: '',
+            state: '',
+            domain: '',
+            logoUrl: '',
+            isCompanyPhone: false
+          });
+          console.log('[Calls] Cleared phone widget context to prevent leakage');
+        }
+      } catch(_) {}
       
       // Restore pagination
       if (page && page > 0) {

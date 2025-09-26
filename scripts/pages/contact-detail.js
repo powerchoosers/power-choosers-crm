@@ -1513,9 +1513,46 @@
     });
     // Broadcast that contact detail is loaded so dependent widgets can rebind
     try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch(_) {}
+    
+    // Clear phone widget context completely when opening contact detail page
+    // This prevents any previous contact/company info from leaking into future calls
+    clearPhoneWidgetContext();
+    
+    // Add event listener to clear contact context when clicking company phone numbers
+    // This prevents contact information from leaking into future calls
+    try {
+      const contactDetailView = document.getElementById('contact-detail-view');
+      if (contactDetailView && !contactDetailView._contactContextCleared) {
+        contactDetailView._contactContextCleared = true;
+        contactDetailView.addEventListener('click', (e) => {
+          // Check if clicking on a company phone number
+          const phoneElement = e.target.closest('.info-value-text[data-field="companyPhone"]');
+          if (phoneElement && window.Widgets && typeof window.Widgets.setCallContext === 'function') {
+            // Clear contact fields but preserve company info
+            const currentContext = window.Widgets.getCallContext ? window.Widgets.getCallContext() : {};
+            window.Widgets.setCallContext({
+              ...currentContext,
+              contactId: null,
+              contactName: '',
+              name: currentContext.company || currentContext.accountName || '',
+              isCompanyPhone: true
+            });
+          }
+        });
+      }
+    } catch(_) {}
+    
     // Ensure per-contact event handlers are rebound on each view
     // This avoids stale guards after navigating to other pages (e.g., account details)
     state._contactDetailEventsAttached = false;
+    
+    // Force re-attachment of event handlers to ensure they work properly
+    // This is especially important after contact creation when the page might not be fully initialized
+    setTimeout(() => {
+      if (!state._contactDetailEventsAttached) {
+        attachContactDetailEvents();
+      }
+    }, 50);
     // Preload notes content early for smooth Notes widget open
     try { preloadNotesForContact(contact.id); } catch (_) { /* noop */ }
     // Non-destructive: hide the existing table/list instead of replacing all HTML
@@ -2330,6 +2367,9 @@
         
         // Check if we came from account details page
         if (window._contactNavigationSource === 'account-details' && window._contactNavigationAccountId) {
+          // Clear phone widget context to prevent contact company info from leaking
+          clearPhoneWidgetContext();
+          
           // Navigate back to account details page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('account-details');
@@ -2348,6 +2388,9 @@
         
         // Check if we came from list detail page
         if (window._contactNavigationSource === 'list-detail' && window._contactNavigationListId) {
+          // Clear phone widget context to prevent contact company info from leaking
+          clearPhoneWidgetContext();
+          
           // Navigate back to list detail page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             // Provide context up-front so navigateToPage's internal init uses it immediately
@@ -2369,6 +2412,9 @@
         
         // Check if we came from calls page
         if (window._contactNavigationSource === 'calls') {
+          // Clear phone widget context to prevent contact company info from leaking
+          clearPhoneWidgetContext();
+          
           // Navigate back to calls page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('calls');
@@ -2381,6 +2427,9 @@
         
         // Check if we came from people page
         if (window._contactNavigationSource === 'people') {
+          // Clear phone widget context to prevent contact company info from leaking
+          clearPhoneWidgetContext();
+          
           try {
             const restore = window._peopleReturn || {};
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
@@ -5385,6 +5434,28 @@ async function createContactSequenceThenAdd(name) {
     };
   }
 
+  // Clear phone widget context completely to prevent any contact/company info leakage
+  function clearPhoneWidgetContext() {
+    try {
+      if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
+        window.Widgets.setCallContext({
+          contactId: null,
+          contactName: '',
+          name: '',
+          company: '',
+          accountId: null,
+          accountName: null,
+          city: '',
+          state: '',
+          domain: '',
+          logoUrl: '',
+          isCompanyPhone: false
+        });
+        console.log('[Contact Detail] Cleared phone widget context to prevent leakage');
+      }
+    } catch(_) {}
+  }
+
   // Listen for new contact creation to update state when navigating from Account Details
   function setupContactCreatedListener() {
     const onContactCreated = (e) => {
@@ -5420,6 +5491,18 @@ async function createContactSequenceThenAdd(name) {
               pageTitle.setAttribute('data-contact-id', id);
             }
           }
+        }
+        
+        // If we're on the contact detail page and this is the contact we're currently viewing,
+        // re-initialize the page to ensure all event handlers are properly attached
+        if (id && state.currentContact?.id === id) {
+          console.log('[Contact Detail] Re-initializing page for contact:', id);
+          // Reset event attachment flag to force re-attachment
+          state._contactDetailEventsAttached = false;
+          // Re-render the contact detail to ensure all elements are properly initialized
+          renderContactDetail();
+          // Re-attach event handlers
+          attachContactDetailEvents();
         }
       } catch(_) {}
     };

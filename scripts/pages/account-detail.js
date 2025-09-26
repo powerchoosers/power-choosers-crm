@@ -434,8 +434,8 @@
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <polyline points="9,11 12,14 22,4"></polyline>
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                  </svg>
-                </button>
+                </svg>
+              </button>
               </div>
             </div>
           </div>
@@ -965,27 +965,6 @@
         
         const shouldInclude = matchByAccountId || matchByContactId || matchByToPhone || matchByFromPhone || matchByAccountName || matchByTargetPhone;
         
-        // Debug logging for troubleshooting
-        if (shouldInclude) {
-          console.log('[Account Detail] Recent call included:', {
-            callSid: c.callSid || c.id,
-            accountId: c.accountId,
-            contactId: c.contactId,
-            accountName: c.accountName,
-            contactName: c.contactName,
-            to: c.to,
-            from: c.from,
-            targetPhone: c.targetPhone,
-            matches: {
-              byAccountId: matchByAccountId,
-              byContactId: matchByContactId,
-              byToPhone: matchByToPhone,
-              byFromPhone: matchByFromPhone,
-              byAccountName: matchByAccountName,
-              byTargetPhone: matchByTargetPhone
-            }
-          });
-        }
         
         return shouldInclude;
       });
@@ -1023,7 +1002,6 @@
             if (acctName) c.accountName = acctName;
           }
         } catch(_) {}
-        try { console.log('[Account Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
       });
       // Save to state and render first page
       try { state._arcCalls = filtered; } catch(_) {}
@@ -1963,15 +1941,15 @@
                 if (Date.now() > deadline) {
                   console.warn('[Account Detail] Back button: Accounts page not ready after 8 seconds, using fallback');
                   // Fallback: try to restore anyway
-                  try {
-                    const ev = new CustomEvent('pc:accounts-restore', { detail: {
+                try {
+                  const ev = new CustomEvent('pc:accounts-restore', { detail: {
                       page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm,
                       sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page,
                       timestamp: Date.now(), fallback: true
                     } });
-                    document.dispatchEvent(ev);
+                  document.dispatchEvent(ev);
                     console.log('[Account Detail] Back button: Dispatched fallback pc:accounts-restore event');
-                  } catch(_) {}
+                } catch(_) {}
                   return;
                 }
                 
@@ -3223,8 +3201,9 @@
       // Ensure data attributes are present for consistent hover logic elsewhere
       if (account.id) el.setAttribute('data-account-id', account.id);
       if (companyName) el.setAttribute('data-company-name', companyName);
-      el.setAttribute('data-contact-id', '');
-      el.setAttribute('data-contact-name', '');
+      // Explicitly remove contact attributes to prevent contact lookup
+      el.removeAttribute('data-contact-id');
+      el.removeAttribute('data-contact-name');
     } catch(_) {}
     // Bind click only once
     if (el._pcClickBound) return;
@@ -3234,8 +3213,69 @@
       // Set call context explicitly to company mode
       try {
         if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
-          const account = state.currentAccount || {};
-          window.Widgets.setCallContext({
+          // Get account data from the current page context
+          let account = {};
+          
+          // Try to get account data from the page URL or global state
+          try {
+            // Check if we're on an account detail page and get the account ID from URL
+            const currentPath = window.location.hash;
+            const accountIdMatch = currentPath.match(/#account-details\/([^\/]+)/);
+            const accountId = accountIdMatch ? accountIdMatch[1] : null;
+            
+            if (accountId && typeof window.getAccountsData === 'function') {
+              const accounts = window.getAccountsData() || [];
+              account = accounts.find(acc => acc.id === accountId || acc.accountId === accountId) || {};
+            }
+            
+            // If still no account, try to get from state or DOM
+            if (!account.id) {
+              account = state.currentAccount || {};
+            }
+            
+            // Last resort: get account name from page title
+            if (!account.id && !account.accountName) {
+              const accountNameEl = document.querySelector('#account-name, .page-title, .account-name, h1');
+              const accountName = accountNameEl ? accountNameEl.textContent?.trim() : '';
+              if (accountName) {
+                account = {
+                  accountName: accountName,
+                  name: accountName,
+                  companyName: accountName
+                };
+              }
+            }
+          } catch(_) {}
+          
+          // Extract domain from website if needed
+          let domain = account.domain || '';
+          if (!domain && account.website) {
+            try {
+              const url = account.website.startsWith('http') ? account.website : `https://${account.website}`;
+              const u = new URL(url);
+              domain = u.hostname.replace(/^www\./i, '');
+            } catch(_) {
+              domain = String(account.website).replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+            }
+          }
+          
+          // Debug: Log the account object to see what fields are available
+          console.log('[Account Detail] Account data for phone widget:', {
+            id: account.id,
+            accountName: account.accountName,
+            name: account.name,
+            companyName: account.companyName,
+            city: account.city,
+            locationCity: account.locationCity,
+            state: account.state,
+            locationState: account.locationState,
+            website: account.website,
+            domain: account.domain,
+            logoUrl: account.logoUrl,
+            allFields: Object.keys(account)
+          });
+
+          const callContext = {
             accountId: account.id || null,
             accountName: account.accountName || account.name || account.companyName || null,
             company: account.accountName || account.name || account.companyName || null,
@@ -3244,9 +3284,13 @@
             name: account.accountName || account.name || account.companyName || '',
             city: account.city || account.locationCity || '',
             state: account.state || account.locationState || '',
-            domain: account.domain || account.website || '',
+            domain: domain,
+            logoUrl: account.logoUrl || '',
             isCompanyPhone: true
-          });
+          };
+          
+          
+          window.Widgets.setCallContext(callContext);
         }
       } catch(_) {}
       try {
