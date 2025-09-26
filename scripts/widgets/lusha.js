@@ -247,8 +247,11 @@
       scheduleSearch();
     }
 
-    // Always attempt to render the usage bar on open (throttled internally)
-    try { renderUsageBar(); } catch(_) {}
+    // Load usage from cache immediately for instant display, then fetch live data
+    try { 
+      loadUsageFromCache().then(() => renderUsageBarLive());
+      renderUsageBar(); 
+    } catch(_) {}
 
     return card;
   }
@@ -347,8 +350,8 @@
           try { renderCompanyPanel({ name: '', domain: '' }, false); } catch(_) {}
           updateResults([]);
           try { crossfadeToResults(); } catch(_) {}
-          try { showCreditsUsed(0, 'cached'); } catch(_) {}
-          try { renderUsageBar(); } catch(_) {}
+          try { showCreditsUsed(0, 'cached', 'search'); } catch(_) {}
+          try { renderUsageBarLive(); } catch(_) {}
           return;
         }
         throw new Error('No company context found');
@@ -407,7 +410,7 @@
           try { crossfadeToResults(); } catch(_) {}
           
           // Show cache indicator in results
-          showCreditsUsed(0, 'cached');
+          showCreditsUsed(0, 'cached', 'search');
           return;
 
         } else if (options.cachedOnly) {
@@ -445,7 +448,8 @@
 
             // Store requestId for reveals when present
             if (data && data.requestId) {
-              window.__lushaLastRequestId = data.requestId;
+              const domain = (lastCompanyResult && lastCompanyResult.domain) || '';
+              storeRequestId(data.requestId, domain);
               lushaLog('Stored requestId from minimal search:', data.requestId);
             }
 
@@ -456,8 +460,8 @@
             // Persist minimal results to lusha_cache immediately so reopen shows them
             try { await saveCache({ company: lastCompanyResult, contacts }); } catch(_) {}
             try { crossfadeToResults(); } catch(_) {}
-            showCreditsUsed(0, 'cached');
-            try { renderUsageBar(); } catch(_) {}
+            showCreditsUsed(0, 'cached', 'search');
+            try { renderUsageBarLive(); } catch(_) {}
             return;
           } catch (minErr) {
             lushaLog('Minimal search failed in cached-only mode', minErr);
@@ -487,18 +491,26 @@
             try { renderCompanyPanel(lastCompanyResult, false); } catch(_) {}
           }
 
-          // Only fetch company data if we don't have it in cache
-          if (!hasCompanyData) {
-          const params = new URLSearchParams();
-          if (domain) params.append('domain', domain);
-          if (companyName) params.append('company', companyName);
-          const url = `${base}/api/lusha/company?${params.toString()}`;
-          lushaLog('Open-live: fetching company summary from:', url);
-          const resp = await fetch(url, { method: 'GET' });
-          if (resp.ok) {
-            const company = await resp.json();
-            lastCompanyResult = company;
-            try { requestAnimationFrame(() => renderCompanyPanel(company, false)); } catch(_) { renderCompanyPanel(company, false); }
+          // Only fetch company data if we don't have it in cache and haven't fetched recently
+          if (!hasCompanyData && !shouldSkipCompanyAPI(domain, companyName)) {
+            const params = new URLSearchParams();
+            if (domain) params.append('domain', domain);
+            if (companyName) params.append('company', companyName);
+            const url = `${base}/api/lusha/company?${params.toString()}`;
+            lushaLog('Open-live: fetching company summary from:', url);
+            const resp = await fetch(url, { method: 'GET' });
+            if (resp.ok) {
+              const company = await resp.json();
+              lastCompanyResult = company;
+              markCompanyCached(domain, companyName);
+              try { requestAnimationFrame(() => renderCompanyPanel(company, false)); } catch(_) { renderCompanyPanel(company, false); }
+            }
+          } else if (!hasCompanyData) {
+            // Try to use cached company data
+            const cachedCompany = await tryLoadCompanyFromCache(domain, companyName);
+            if (cachedCompany) {
+              lastCompanyResult = cachedCompany;
+              try { requestAnimationFrame(() => renderCompanyPanel(cachedCompany, false)); } catch(_) { renderCompanyPanel(cachedCompany, false); }
             }
           }
 
@@ -515,7 +527,8 @@
           const data = await r.json();
           const contacts = Array.isArray(data.contacts) ? data.contacts : [];
           if (data.requestId) {
-            window.__lushaLastRequestId = data.requestId;
+            const domain = (lastCompanyResult && lastCompanyResult.domain) || '';
+            storeRequestId(data.requestId, domain);
             lushaLog('Open-live stored requestId:', data.requestId);
           }
 
@@ -524,8 +537,8 @@
 
           updateResults(contacts, true);
           try { crossfadeToResults(); } catch(_) {}
-          showCreditsUsed(1, 'live');
-          try { renderUsageBar(); } catch(_) {}
+          showCreditsUsed(1, 'live', 'search');
+          try { renderUsageBarLive(); } catch(_) {}
           return;
         } else {
           lushaLog('No cache found, proceeding with live search');
@@ -541,16 +554,36 @@
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
 
-      const params = new URLSearchParams();
-      if (domain) params.append('domain', domain);
-      if (companyName) params.append('company', companyName);
-      const url = `${base}/api/lusha/company?${params.toString()}`;
-      lushaLog('Fetching company data from:', url);
-      const resp = await fetch(url, { method: 'GET' });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const company = await resp.json();
-      lushaLog('Company data received:', company);
-      lastCompanyResult = company;
+      // Enhanced company data fetching with caching
+      let company = null;
+      
+      // Try cache first if not forcing live
+      if (!options.forceLive) {
+        company = await tryLoadCompanyFromCache(domain, companyName);
+        if (company) {
+          console.log('[Lusha] Using cached company data:', company.name);
+          lastCompanyResult = company;
+        }
+      }
+      
+      // Fetch from API if no cache or forcing live
+      if (!company && !shouldSkipCompanyAPI(domain, companyName)) {
+        const params = new URLSearchParams();
+        if (domain) params.append('domain', domain);
+        if (companyName) params.append('company', companyName);
+        const url = `${base}/api/lusha/company?${params.toString()}`;
+        lushaLog('Fetching company data from:', url);
+        const resp = await fetch(url, { method: 'GET' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        company = await resp.json();
+        lushaLog('Company data received:', company);
+        lastCompanyResult = company;
+        markCompanyCached(domain, companyName);
+      } else if (!company) {
+        // Fallback to basic company object
+        company = { name: companyName || '', domain: domain || '' };
+        lastCompanyResult = company;
+      }
       // For uncached live results, animate summary like cached to avoid jitter
       try {
         // Allow one frame for layout to settle before animating the company panel
@@ -584,7 +617,8 @@
         
         // Store requestId for reveal functionality (only on first page)
         if (page === 0 && data.requestId) {
-          window.__lushaLastRequestId = data.requestId;
+          const domain = (company && company.domain) || '';
+          storeRequestId(data.requestId, domain);
           lushaLog('Stored requestId for reveals:', data.requestId);
         }
         
@@ -630,6 +664,11 @@
         }
       }
       
+      // Mark search as completed to prevent duplicate searches
+      const searchDomain = (lastCompanyResult && lastCompanyResult.domain) || domain;
+      const searchCompanyName = (lastCompanyResult && lastCompanyResult.name) || companyName;
+      markSearchCompleted(searchDomain, searchCompanyName, 'contacts', contactsForUI.length);
+      
       updateResults(contactsForUI, true); // Skip animations on refresh
       // Skip crossfade animation on refresh to avoid opacity transitions
       try {
@@ -651,8 +690,8 @@
       } catch(_) {}
       
       // Prospecting search is unbilled; indicate live but 0 credits
-      showCreditsUsed(0, 'live');
-      try { renderUsageBar(); } catch(_) {}
+      showCreditsUsed(0, 'live', 'search');
+      try { renderUsageBarLive(); } catch(_) {}
     } catch (error) {
       lushaLog('Search error:', error);
       console.error('Lusha search error:', error);
@@ -810,7 +849,10 @@
       console.log('[Lusha] Parsed contacts array:', contacts);
 
       // Do NOT auto-enrich to avoid consuming credits; keep requestId for per-contact reveals
-      window.__lushaLastRequestId = data.requestId || null;
+      if (data.requestId) {
+        const domain = (company && company.domain) || '';
+        storeRequestId(data.requestId, domain);
+      }
       window.__lushaLastContactIdSet = contactIdsFromPayload;
 
       // Build a quick name map from search results for backfill later
@@ -1322,10 +1364,10 @@
       copyBtn.addEventListener('click', () => copyContactInfo(contact));
     }
     if (revealEmailBtn) {
-      revealEmailBtn.addEventListener('click', () => { revealForContact(contact, 'email', div).then(() => { try { renderUsageBar(); } catch(_) {} }); });
+      revealEmailBtn.addEventListener('click', () => { revealForContact(contact, 'email', div).then(() => { try { renderUsageBarLive(); } catch(_) {} }); });
     }
     if (revealPhonesBtn) {
-      revealPhonesBtn.addEventListener('click', () => { revealForContact(contact, 'phones', div).then(() => { try { renderUsageBar(); } catch(_) {} }); });
+      revealPhonesBtn.addEventListener('click', () => { revealForContact(contact, 'phones', div).then(() => { try { renderUsageBarLive(); } catch(_) {} }); });
     }
 
     // Update button labels and show Enrich if exists
@@ -1620,8 +1662,34 @@
       lushaLog('Revealing', which, 'for contact:', contact);
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
-      const requestId = window.__lushaOpenedFromCache ? null : window.__lushaLastRequestId; // force live when opened from cache
+      const requestId = window.__lushaOpenedFromCache ? null : getValidRequestId(); // force live when opened from cache, check expiration
       const id = contact.id || contact.contactId;
+      
+      // Enhanced duplicate enrichment protection
+      if (isContactRecentlyEnriched(id, which)) {
+        console.log(`[Lusha] Skipping duplicate ${which} enrichment for contact ${id} (enriched within 6 hours)`);
+        showCreditsUsed(0, 'cached', 'reveal');
+        return;
+      }
+      
+      // Cleanup old tracking data periodically
+      const now = Date.now();
+      if (now - window.__lushaEnrichmentTracker.lastCleanup > 30 * 60 * 1000) { // Every 30 minutes
+        cleanupEnrichmentTracking();
+      }
+      
+      // Get usage before reveal to track exact credits used
+      let usageBefore = window.__lushaUsageTracker.used || 0;
+      try {
+        const usageResp = await fetch(`${base}/api/lusha/usage`, { method: 'GET' });
+        if (usageResp.ok) {
+          const usageData = await usageResp.json();
+          const usage = usageData?.usage || {};
+          usageBefore = usage.used || usage.usedCredits || usage?.credits?.used || usageBefore;
+        }
+      } catch(e) {
+        console.warn('[Lusha Usage] Failed to get usage before reveal:', e);
+      }
       
       let enriched = null;
       
@@ -1657,7 +1725,7 @@
         }
         
         // Show 0 credits used (cached data)
-        showCreditsUsed(0, 'cached');
+        showCreditsUsed(0, 'cached', 'reveal');
         return;
       }
       
@@ -1855,6 +1923,36 @@
       } catch(cacheError) { 
         console.warn('[Lusha] Failed to save to cache:', cacheError);
       }
+      
+      // Track actual credits used for this reveal operation
+      try {
+        const usageResp = await fetch(`${base}/api/lusha/usage`, { method: 'GET' });
+        if (usageResp.ok) {
+          const usageData = await usageResp.json();
+          const usage = usageData?.usage || {};
+          const usageAfter = usage.used || usage.usedCredits || usage?.credits?.used || 0;
+          const creditsUsed = Math.max(0, usageAfter - usageBefore);
+          
+          if (creditsUsed > 0) {
+            console.log(`[Lusha Usage] Reveal ${which}: ${creditsUsed} credits used`);
+            showCreditsUsed(creditsUsed, 'live', 'reveal');
+            await trackCreditsUsed('reveal', usageBefore, usageAfter);
+            // Mark this contact as enriched to prevent duplicates
+            markContactEnriched(id, which);
+          } else {
+            console.log(`[Lusha Usage] Reveal ${which}: 0 credits used (likely cached or free tier)`);
+            showCreditsUsed(0, 'cached', 'reveal');
+            // Still mark as enriched even if no credits used
+            markContactEnriched(id, which);
+          }
+        }
+      } catch(trackingError) {
+        console.warn('[Lusha Usage] Failed to track reveal credits:', trackingError);
+        // Show default 1 credit for reveals if tracking fails
+        showCreditsUsed(1, 'live', 'reveal');
+        // Mark as enriched even if tracking failed
+        markContactEnriched(id, which);
+      }
     } catch(e) { console.warn('Reveal failed', e); }
   }
 
@@ -1966,8 +2064,10 @@
           localStorage.setItem(key, window.__lushaLastRequestId);
         } else {
           const saved = localStorage.getItem(key);
-          if (saved && !window.__lushaLastRequestId) {
+          if (saved && !getValidRequestId()) {
+            // Only restore if we don't have a valid current requestId
             window.__lushaLastRequestId = saved;
+            window.__lushaRequestIdTimestamp = Date.now() - (30 * 60 * 1000); // Mark as 30min old
           }
         }
       }
@@ -2921,7 +3021,7 @@
     return `<a href="mailto:${displayEmail}" title="Click to email">${displayEmail}</a>`;
   }
 
-  function showCreditsUsed(credits, type) {
+  function showCreditsUsed(credits, type, operation = 'search') {
     try {
       const listEl = document.getElementById('lusha-contacts-list');
       if (!listEl) return;
@@ -2930,29 +3030,54 @@
       const existingChip = listEl.querySelector('.lusha-credits-chip');
       if (existingChip) existingChip.remove();
       
-      const text = type === 'cached' ? '0 credits used (cached)' : `${credits} credit${credits !== 1 ? 's' : ''} used`;
+      // Update tracker if credits were used
+      if (credits > 0 && type !== 'cached') {
+        window.__lushaUsageTracker.sessionCreditsUsed += credits;
+        window.__lushaUsageTracker.operations[operation] = (window.__lushaUsageTracker.operations[operation] || 0) + credits;
+        console.log(`[Lusha Credit Usage] ${operation}: ${credits} credits used (Session total: ${window.__lushaUsageTracker.sessionCreditsUsed})`);
+      }
       
-      // Log credit usage for tracking
-      console.log(`[Lusha Credit Usage] ${text} - Type: ${type}`);
+      // Create enhanced chip with operation details
+      let text, chipColor, icon;
+      if (type === 'cached') {
+        text = '0 credits used (cached)';
+        chipColor = 'var(--green-subtle)';
+        icon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L18 4H6L3 7V9H21ZM12 19C13.1 19 14 18.1 14 17C14 15.9 13.1 15 12 15C10.9 15 10 15.9 10 17C10 18.1 10.9 19 12 19ZM18 20H6V18H18V20Z"/>
+        </svg>`;
+      } else {
+        text = `${credits} credit${credits !== 1 ? 's' : ''} used`;
+        chipColor = 'var(--orange-subtle)';
+        icon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>`;
+      }
       
+      // Create chip with operation type
+      const operationText = operation === 'search' ? 'Search' : operation === 'reveal' ? 'Reveal' : 'Enrichment';
       const chip = document.createElement('div');
       chip.className = 'lusha-credits-chip';
       chip.style.display = 'block';
       chip.style.textAlign = 'center';
       chip.style.marginTop = '0px';
       chip.innerHTML = `
-        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--orange-subtle);border:1px solid var(--orange-primary);border-radius:16px;font-size:12px;color:#ffffff;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-          </svg>
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:${chipColor};border:1px solid var(--orange-primary);border-radius:16px;font-size:12px;color:#ffffff;">
+          ${icon}
+          <span style="font-weight: 600;">${operationText}:</span>
           ${escapeHtml(text)}
         </div>
       `;
       
       listEl.appendChild(chip);
 
-      // Also render a live usage bar beneath the chip
-      try { renderUsageBar(); } catch(_) {}
+      // Update usage displays immediately
+      try { 
+        renderUsageBarLive();
+        // Also save to cache if credits were used
+        if (credits > 0 && type !== 'cached') {
+          saveUsageToCache(window.__lushaUsageTracker);
+        }
+      } catch(_) {}
       
       // Animate in the chip
       const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -3153,6 +3278,56 @@ function refreshLushaUsageBar() {
 }
 window.refreshLushaUsageBar = refreshLushaUsageBar;
 
+// Reset session tracking
+function resetLushaSessionTracking() {
+  try {
+    window.__lushaUsageTracker.sessionCreditsUsed = 0;
+    window.__lushaUsageTracker.operations = { searches: 0, enrichments: 0, reveals: 0 };
+    window.__lushaRevealedThisSession = new Set(); // Clear duplicate reveal prevention
+    
+    // Clear enrichment tracking
+    window.__lushaEnrichmentTracker.enrichedContacts.clear();
+    window.__lushaEnrichmentTracker.enrichedCompanies.clear();
+    window.__lushaEnrichmentTracker.requestIds.clear();
+    window.__lushaEnrichmentTracker.recentSearches.clear();
+    
+    console.log('[Lusha Usage] Session tracking and enrichment cache reset');
+    renderUsageBarLive();
+  } catch(e) {
+    console.warn('[Lusha Usage] Failed to reset session tracking:', e);
+  }
+}
+window.resetLushaSessionTracking = resetLushaSessionTracking;
+
+// Get usage statistics
+function getLushaUsageStats() {
+  return {
+    total: window.__lushaUsageTracker.total,
+    used: window.__lushaUsageTracker.used,
+    remaining: window.__lushaUsageTracker.remaining,
+    sessionUsed: window.__lushaUsageTracker.sessionCreditsUsed,
+    operations: { ...window.__lushaUsageTracker.operations },
+    enrichmentTracking: {
+      enrichedContacts: window.__lushaEnrichmentTracker.enrichedContacts.size,
+      enrichedCompanies: window.__lushaEnrichmentTracker.enrichedCompanies.size,
+      cachedRequestIds: window.__lushaEnrichmentTracker.requestIds.size,
+      recentSearches: window.__lushaEnrichmentTracker.recentSearches.size
+    }
+  };
+}
+window.getLushaUsageStats = getLushaUsageStats;
+
+// Force cleanup of enrichment tracking
+function cleanupLushaTracking() {
+  try {
+    cleanupEnrichmentTracking();
+    console.log('[Lusha] Manual cleanup completed');
+  } catch(e) {
+    console.warn('[Lusha] Manual cleanup failed:', e);
+  }
+}
+window.cleanupLushaTracking = cleanupLushaTracking;
+
 // Quick fix function to immediately update the display
 function fixLushaCreditDisplay() {
   try {
@@ -3214,60 +3389,421 @@ function testLushaHoverEffects() {
 }
 window.testLushaHoverEffects = testLushaHoverEffects;
 
+// Enhanced Lusha usage tracking with Firebase caching and live updates
+window.__lushaUsageTracker = window.__lushaUsageTracker || {
+  total: 600,
+  used: 0,
+  remaining: 600,
+  sessionCreditsUsed: 0,
+  operations: {
+    searches: 0,
+    enrichments: 0,
+    reveals: 0
+  },
+  lastUpdated: 0,
+  cacheKey: 'lusha_usage_v2'
+};
+
+// Duplicate enrichment protection system
+window.__lushaEnrichmentTracker = window.__lushaEnrichmentTracker || {
+  enrichedContacts: new Map(), // contactId -> { emails: timestamp, phones: timestamp }
+  enrichedCompanies: new Set(), // domain/companyName set
+  requestIds: new Map(), // requestId -> { timestamp, companyDomain }
+  recentSearches: new Map(), // searchKey -> { timestamp, resultCount }
+  lastCleanup: Date.now()
+};
+
+// Check if we've done this exact search recently
+function isSearchRecent(domain, companyName, searchType = 'contacts') {
+  try {
+    const searchKey = `${searchType}_${domain || companyName}`.toLowerCase();
+    const recent = window.__lushaEnrichmentTracker.recentSearches.get(searchKey);
+    
+    if (recent) {
+      const fifteenMinutes = 15 * 60 * 1000;
+      const isRecent = (Date.now() - recent.timestamp) < fifteenMinutes;
+      if (isRecent) {
+        console.log(`[Lusha] Skipping duplicate ${searchType} search for ${domain || companyName} (searched ${Math.round((Date.now() - recent.timestamp) / 60000)} minutes ago)`);
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Mark search as completed
+function markSearchCompleted(domain, companyName, searchType = 'contacts', resultCount = 0) {
+  try {
+    const searchKey = `${searchType}_${domain || companyName}`.toLowerCase();
+    window.__lushaEnrichmentTracker.recentSearches.set(searchKey, {
+      timestamp: Date.now(),
+      resultCount
+    });
+    
+    // Auto-cleanup after 30 minutes
+    setTimeout(() => {
+      window.__lushaEnrichmentTracker.recentSearches.delete(searchKey);
+    }, 30 * 60 * 1000);
+    
+    console.log(`[Lusha] Marked ${searchType} search completed for ${domain || companyName} (${resultCount} results)`);
+  } catch (e) {
+    console.warn('[Lusha] Failed to mark search as completed:', e);
+  }
+}
+
+// Clean up old tracking data (run periodically)
+function cleanupEnrichmentTracking() {
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  const sixHours = 6 * 60 * 60 * 1000;
+  
+  try {
+    // Clean up contact enrichments older than 6 hours
+    for (const [contactId, enrichments] of window.__lushaEnrichmentTracker.enrichedContacts.entries()) {
+      let hasRecent = false;
+      for (const [type, timestamp] of Object.entries(enrichments)) {
+        if (now - timestamp < sixHours) {
+          hasRecent = true;
+          break;
+        }
+      }
+      if (!hasRecent) {
+        window.__lushaEnrichmentTracker.enrichedContacts.delete(contactId);
+      }
+    }
+    
+    // Clean up request IDs older than 1 hour
+    for (const [requestId, data] of window.__lushaEnrichmentTracker.requestIds.entries()) {
+      if (now - data.timestamp > oneHour) {
+        window.__lushaEnrichmentTracker.requestIds.delete(requestId);
+      }
+    }
+    
+    // Clean up search tracking older than 30 minutes
+    const thirtyMinutes = 30 * 60 * 1000;
+    for (const [searchKey, data] of window.__lushaEnrichmentTracker.recentSearches.entries()) {
+      if (now - data.timestamp > thirtyMinutes) {
+        window.__lushaEnrichmentTracker.recentSearches.delete(searchKey);
+      }
+    }
+    
+    window.__lushaEnrichmentTracker.lastCleanup = now;
+    console.log('[Lusha] Enrichment tracking cleanup completed');
+  } catch (e) {
+    console.warn('[Lusha] Enrichment tracking cleanup failed:', e);
+  }
+}
+
+// Check if contact has been enriched recently
+function isContactRecentlyEnriched(contactId, type) {
+  try {
+    const enrichments = window.__lushaEnrichmentTracker.enrichedContacts.get(contactId);
+    if (!enrichments || !enrichments[type]) return false;
+    
+    const sixHours = 6 * 60 * 60 * 1000;
+    return (Date.now() - enrichments[type]) < sixHours;
+  } catch (e) {
+    console.warn('[Lusha] Failed to check enrichment status:', e);
+    return false;
+  }
+}
+
+// Mark contact as enriched
+function markContactEnriched(contactId, type) {
+  try {
+    if (!window.__lushaEnrichmentTracker.enrichedContacts.has(contactId)) {
+      window.__lushaEnrichmentTracker.enrichedContacts.set(contactId, {});
+    }
+    window.__lushaEnrichmentTracker.enrichedContacts.get(contactId)[type] = Date.now();
+    console.log(`[Lusha] Marked contact ${contactId} as enriched for ${type}`);
+  } catch (e) {
+    console.warn('[Lusha] Failed to mark contact as enriched:', e);
+  }
+}
+
+// RequestId management with expiration
+function storeRequestId(requestId, companyDomain = '') {
+  try {
+    if (!requestId) return;
+    
+    window.__lushaLastRequestId = requestId;
+    window.__lushaRequestIdTimestamp = Date.now();
+    
+    // Store in enrichment tracker for expiration management
+    window.__lushaEnrichmentTracker.requestIds.set(requestId, {
+      timestamp: Date.now(),
+      companyDomain: companyDomain
+    });
+    
+    console.log(`[Lusha] Stored requestId ${requestId} for company ${companyDomain}`);
+  } catch (e) {
+    console.warn('[Lusha] Failed to store requestId:', e);
+  }
+}
+
+function getValidRequestId() {
+  try {
+    const requestId = window.__lushaLastRequestId;
+    const timestamp = window.__lushaRequestIdTimestamp;
+    
+    if (!requestId || !timestamp) {
+      console.log('[Lusha] No requestId available');
+      return null;
+    }
+    
+    // RequestIds expire after 1 hour
+    const oneHour = 60 * 60 * 1000;
+    const isExpired = (Date.now() - timestamp) > oneHour;
+    
+    if (isExpired) {
+      console.log(`[Lusha] RequestId ${requestId} expired (age: ${Math.round((Date.now() - timestamp) / 60000)} minutes)`);
+      window.__lushaLastRequestId = null;
+      window.__lushaRequestIdTimestamp = null;
+      return null;
+    }
+    
+    console.log(`[Lusha] Using valid requestId ${requestId} (age: ${Math.round((Date.now() - timestamp) / 60000)} minutes)`);
+    return requestId;
+  } catch (e) {
+    console.warn('[Lusha] Failed to validate requestId:', e);
+    return null;
+  }
+}
+
+function isRequestIdFresh() {
+  try {
+    const timestamp = window.__lushaRequestIdTimestamp;
+    if (!timestamp) return false;
+    
+    // Consider fresh if less than 30 minutes old
+    const thirtyMinutes = 30 * 60 * 1000;
+    return (Date.now() - timestamp) < thirtyMinutes;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Enhanced company caching logic
+function isCompanyRecentlyCached(domain, companyName) {
+  try {
+    const key = domain || `name_${companyName}`;
+    if (!key || window.__lushaEnrichmentTracker.enrichedCompanies.has(key)) {
+      console.log(`[Lusha] Company ${key} recently cached, skipping API call`);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function markCompanyCached(domain, companyName) {
+  try {
+    const key = domain || `name_${companyName}`;
+    if (key) {
+      window.__lushaEnrichmentTracker.enrichedCompanies.add(key);
+      console.log(`[Lusha] Marked company ${key} as cached`);
+      
+      // Auto-cleanup after 2 hours
+      setTimeout(() => {
+        window.__lushaEnrichmentTracker.enrichedCompanies.delete(key);
+        console.log(`[Lusha] Auto-removed company ${key} from cache tracking`);
+      }, 2 * 60 * 60 * 1000);
+    }
+  } catch (e) {
+    console.warn('[Lusha] Failed to mark company as cached:', e);
+  }
+}
+
+// Check if we should skip company API call
+function shouldSkipCompanyAPI(domain, companyName) {
+  try {
+    // Skip if we recently fetched this company data
+    if (isCompanyRecentlyCached(domain, companyName)) {
+      return true;
+    }
+    
+    // Skip if we have valid cached company data less than 1 hour old
+    const cached = tryLoadCompanyFromCache(domain, companyName);
+    if (cached && cached.lastUpdated) {
+      const oneHour = 60 * 60 * 1000;
+      const age = Date.now() - cached.lastUpdated;
+      if (age < oneHour) {
+        console.log(`[Lusha] Using recent company cache (age: ${Math.round(age / 60000)} minutes)`);
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Try to load company data from cache first
+async function tryLoadCompanyFromCache(domain, companyName) {
+  try {
+    const cached = await tryLoadCache({ domain, companyName });
+    if (cached && cached.company) {
+      console.log('[Lusha] Found company data in cache:', cached.company.name);
+      return cached.company;
+    }
+    return null;
+  } catch (e) {
+    console.warn('[Lusha] Failed to load company from cache:', e);
+    return null;
+  }
+}
+
+// Load usage from Firebase cache for instant display
+async function loadUsageFromCache() {
+  try {
+    const db = await getLushaCacheDB();
+    if (db) {
+      const doc = await db.collection('lusha_usage').doc('current').get();
+      if (doc.exists) {
+        const cached = doc.data();
+        window.__lushaUsageTracker = { ...window.__lushaUsageTracker, ...cached };
+        console.log('[Lusha Usage] Loaded from Firebase cache:', cached);
+        return cached;
+      }
+    }
+    
+    // Fallback to localStorage
+    const localCache = localStorage.getItem('lusha_usage_cache');
+    if (localCache) {
+      const cached = JSON.parse(localCache);
+      window.__lushaUsageTracker = { ...window.__lushaUsageTracker, ...cached };
+      console.log('[Lusha Usage] Loaded from localStorage cache:', cached);
+      return cached;
+    }
+  } catch (e) {
+    console.warn('[Lusha Usage] Cache load failed:', e);
+  }
+  return null;
+}
+
+// Save usage to Firebase cache
+async function saveUsageToCache(usageData) {
+  try {
+    const dataToSave = {
+      ...usageData,
+      lastUpdated: Date.now(),
+      timestamp: new Date().toISOString()
+    };
+    
+    const db = await getLushaCacheDB();
+    if (db) {
+      await db.collection('lusha_usage').doc('current').set(dataToSave, { merge: true });
+      console.log('[Lusha Usage] Saved to Firebase cache:', dataToSave);
+    }
+    
+    // Also save to localStorage as backup
+    localStorage.setItem('lusha_usage_cache', JSON.stringify(dataToSave));
+    console.log('[Lusha Usage] Saved to localStorage backup');
+  } catch (e) {
+    console.warn('[Lusha Usage] Cache save failed:', e);
+  }
+}
+
+// Track credits used for specific operations
+async function trackCreditsUsed(operation, creditsBefore, creditsAfter) {
+  try {
+    const creditsUsed = Math.max(0, creditsBefore - creditsAfter);
+    if (creditsUsed > 0) {
+      window.__lushaUsageTracker.sessionCreditsUsed += creditsUsed;
+      window.__lushaUsageTracker.operations[operation] = (window.__lushaUsageTracker.operations[operation] || 0) + creditsUsed;
+      window.__lushaUsageTracker.used = creditsAfter;
+      window.__lushaUsageTracker.remaining = window.__lushaUsageTracker.total - creditsAfter;
+      
+      console.log(`[Lusha Usage] ${operation}: ${creditsUsed} credits used (Session total: ${window.__lushaUsageTracker.sessionCreditsUsed})`);
+      
+      // Save to cache and update display immediately
+      await saveUsageToCache(window.__lushaUsageTracker);
+      await renderUsageBarLive();
+      return creditsUsed;
+    }
+  } catch (e) {
+    console.warn('[Lusha Usage] Credit tracking failed:', e);
+  }
+  return 0;
+}
+
+// Live usage bar update (no throttling, immediate updates)
+async function renderUsageBarLive(force = false) {
+  try {
+    const footer = document.getElementById('lusha-usage-footer');
+    if (!footer) return;
+    
+    const tracker = window.__lushaUsageTracker;
+    const used = tracker.used || 0;
+    const total = tracker.total || 600;
+    const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((used / total) * 100))) : 0;
+    
+    let wrap = document.getElementById('lusha-usage-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'lusha-usage-wrap';
+      wrap.className = 'lusha-usage-wrap';
+      wrap.innerHTML = `
+        <div id="lusha-usage-label">Credits</div>
+        <div class="lusha-usage-bar">
+          <div class="lusha-usage-fill" id="lusha-usage-fill"></div>
+        </div>
+        <div id="lusha-usage-text">–</div>
+        <div id="lusha-session-text" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Session: ${tracker.sessionCreditsUsed} used</div>
+      `;
+      footer.appendChild(wrap);
+    }
+    
+    const fill = document.getElementById('lusha-usage-fill');
+    const txt = document.getElementById('lusha-usage-text');
+    const sessionTxt = document.getElementById('lusha-session-text');
+    
+    if (fill) {
+      fill.style.width = pct + '%';
+      fill.style.transition = 'width 0.3s ease';
+    }
+    if (txt) txt.textContent = `${used}/${total}`;
+    if (sessionTxt) sessionTxt.textContent = `Session: ${tracker.sessionCreditsUsed} used`;
+    
+    console.log('[Lusha Usage] Live update - used:', used, 'total:', total, 'session:', tracker.sessionCreditsUsed);
+  } catch (e) {
+    console.warn('[Lusha Usage] Live render failed:', e);
+  }
+}
+
 // Fetch and render live Lusha usage bar (rate-limited server endpoint)
 async function renderUsageBar(){
   try {
-    // Throttle to avoid exceeding Lusha's ~5/minute usage endpoint limit
+    // Load from cache first for instant display
+    const cached = await loadUsageFromCache();
+    if (cached) {
+      await renderUsageBarLive();
+    }
+    
+    // Throttle live API calls to avoid exceeding Lusha's ~5/minute usage endpoint limit
     const now = Date.now();
     try {
       if (!window.__lushaUsageLastFetch) window.__lushaUsageLastFetch = 0;
-      // 15s min interval
+      // 15s min interval for live API calls
       if (now - window.__lushaUsageLastFetch < 15000) return;
       window.__lushaUsageLastFetch = now;
     } catch(_) {}
 
     let base = (window.API_BASE_URL || '').replace(/\/$/, '');
     if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+    
+    // Get usage before API call for comparison
+    const usageBefore = window.__lushaUsageTracker.used || 0;
+    
     const resp = await fetch(`${base}/api/lusha/usage`, { method: 'GET' });
     if (!resp.ok) {
       console.log('[Lusha Usage] API request failed:', resp.status, resp.statusText);
-      // Fallback: show hard-coded 600 total with 0 used if API fails
-      const fallbackLimit = 600;
-      const fallbackUsed = 0;
-      const fallbackPct = 0;
-      
-      const resultsEl = document.getElementById('lusha-results');
-      if (!resultsEl) return;
-      
-      let footer = document.getElementById('lusha-usage-footer');
-      if (!footer) {
-        footer = document.createElement('div');
-        footer.id = 'lusha-usage-footer';
-        footer.className = 'lusha-usage-footer';
-        resultsEl.appendChild(footer);
-      }
-      
-      let wrap = document.getElementById('lusha-usage-wrap');
-      if (!wrap) {
-        wrap = document.createElement('div');
-        wrap.id = 'lusha-usage-wrap';
-        wrap.className = 'lusha-usage-wrap';
-        wrap.innerHTML = `
-          <div id="lusha-usage-label">Credits</div>
-          <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
-          <div id="lusha-usage-text">–</div>
-        `;
-        footer.appendChild(wrap);
-      }
-      
-      const fill = document.getElementById('lusha-usage-fill');
-      const txt = document.getElementById('lusha-usage-text');
-      const lab = document.getElementById('lusha-usage-label');
-      if (fill) fill.style.width = fallbackPct + '%';
-      if (txt) txt.textContent = `${fallbackUsed}/${fallbackLimit}`;
-      if (lab) lab.textContent = 'Credits';
-      
-      console.log('[Lusha Usage] Using fallback display - used:', fallbackUsed, 'limit:', fallbackLimit);
+      // Use cached data if available, otherwise fallback
+      await renderUsageBarLive();
       return;
     }
     const data = await resp.json();
@@ -3281,24 +3817,21 @@ async function renderUsageBar(){
       return Number.isFinite(n) ? n : null;
     };
 
-    // Allow manual override if your plan credits are known (e.g., 600)
-    const configuredTotal = (function(){
-      const fromWindow = toNum(window.LUSHA_CREDITS_TOTAL);
-      if (fromWindow != null) return fromWindow;
-      try { const ls = toNum(localStorage.getItem('LUSHA_CREDITS_TOTAL')); if (ls != null) return ls; } catch(_) {}
-      // Default to 600 credits if not configured
-      return 600;
-    })();
-
     // Deterministic pick helper (accepts 0 as valid)
     const pick = (...vals) => {
       for (const v of vals) { const n = toNum(v); if (n != null) return n; }
       return null;
     };
 
-    // Prefer true credits if present in payload
+    // Get current credits used from API
+    const creditsUsed = pick(
+      usage.used,
+      usage.usedCredits,
+      usage?.credits?.used,
+      usage?.account?.credits?.used
+    ) || 0;
+
     const creditsTotal = pick(
-      configuredTotal,
       usage.total,
       usage.totalCredits,
       usage?.credits?.total,
@@ -3307,30 +3840,19 @@ async function renderUsageBar(){
       usage?.plan?.limit,
       usage?.account?.credits?.total,
       usage?.account?.credits?.limit
-    );
-    const creditsUsed = pick(
-      usage.used,
-      usage.usedCredits,
-      usage?.credits?.used,
-      usage?.account?.credits?.used
-    );
+    ) || 600; // Default to 600
 
-    console.log('[Lusha Usage] Calculated creditsTotal:', creditsTotal, 'creditsUsed:', creditsUsed, 'configuredTotal:', configuredTotal);
-
-    let label = 'Credits';
-    let limit;
-    let used;
-
-    // Hard code to always show Usage/600 format
-    limit = 600; // Your 600-credit plan
-      used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
-      label = 'Credits';
+    // Update tracker with live API data
+    window.__lushaUsageTracker.used = creditsUsed;
+    window.__lushaUsageTracker.total = creditsTotal;
+    window.__lushaUsageTracker.remaining = creditsTotal - creditsUsed;
     
-    console.log('[Lusha Usage] Hard coded display - used:', used, 'total:', limit, 'format: Usage/600');
+    console.log('[Lusha Usage] Updated tracker - used:', creditsUsed, 'total:', creditsTotal, 'remaining:', window.__lushaUsageTracker.remaining);
 
-    const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
-
-    // Anchor usage bar in persistent footer (not wiped by pagination)
+    // Save updated usage to cache
+    await saveUsageToCache(window.__lushaUsageTracker);
+    
+    // Ensure footer exists
     const resultsEl = document.getElementById('lusha-results');
     if (!resultsEl) return;
     let footer = document.getElementById('lusha-usage-footer');
@@ -3341,31 +3863,7 @@ async function renderUsageBar(){
       resultsEl.appendChild(footer);
     }
 
-    let wrap = document.getElementById('lusha-usage-wrap');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'lusha-usage-wrap';
-      wrap.className = 'lusha-usage-wrap';
-      wrap.innerHTML = `
-          <div id="lusha-usage-label">${label}</div>
-        <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
-        <div id="lusha-usage-text">–</div>
-      `;
-      footer.appendChild(wrap);
-    } else if (wrap.parentElement !== footer) {
-      // If it exists somewhere else, move it to footer
-      footer.appendChild(wrap);
-    }
-
-    const fill = document.getElementById('lusha-usage-fill');
-    const txt = document.getElementById('lusha-usage-text');
-    const lab = document.getElementById('lusha-usage-label');
-    if (fill) fill.style.width = pct + '%';
-    
-    const displayText = limit ? `${used}/${limit}` : `${used} used`;
-    console.log('[Lusha Usage] Final display - used:', used, 'limit:', limit, 'displayText:', displayText, 'pct:', pct);
-    
-    if (txt) txt.textContent = displayText;
-    if (lab) lab.textContent = label;
+    // Update display with live data
+    await renderUsageBarLive();
   } catch(_) {}
 }

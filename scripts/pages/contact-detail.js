@@ -1518,25 +1518,17 @@
     // This prevents any previous contact/company info from leaking into future calls
     clearPhoneWidgetContext();
     
-    // Add event listener to clear contact context when clicking company phone numbers
-    // This prevents contact information from leaking into future calls
+    // Add event listener for company phone clicks with strict company-mode flow
+    // This implements the AI-suggested approach for Contact Detail company phone calls
     try {
       const contactDetailView = document.getElementById('contact-detail-view');
-      if (contactDetailView && !contactDetailView._contactContextCleared) {
-        contactDetailView._contactContextCleared = true;
+      if (contactDetailView && !contactDetailView._companyPhoneHandlerAdded) {
+        contactDetailView._companyPhoneHandlerAdded = true;
         contactDetailView.addEventListener('click', (e) => {
-          // Check if clicking on a company phone number
-          const phoneElement = e.target.closest('.info-value-text[data-field="companyPhone"]');
+          // Check if clicking on a company phone number using the exact AI-suggested selector
+          const phoneElement = e.target.closest('#contact-detail-view .info-row[data-field="companyPhone"] .info-value-text');
           if (phoneElement && window.Widgets && typeof window.Widgets.setCallContext === 'function') {
-            // Clear contact fields but preserve company info
-            const currentContext = window.Widgets.getCallContext ? window.Widgets.getCallContext() : {};
-            window.Widgets.setCallContext({
-              ...currentContext,
-              contactId: null,
-              contactName: '',
-              name: currentContext.company || currentContext.accountName || '',
-              isCompanyPhone: true
-            });
+            handleCompanyPhoneClick(phoneElement, contact);
           }
         });
       }
@@ -2264,6 +2256,148 @@
     return { value: '', type: 'mobile', field: 'mobile' };
   }
 
+  // Handle company phone clicks with strict company-mode flow (AI-suggested approach)
+  function handleCompanyPhoneClick(phoneElement, contact) {
+    try {
+      console.log('[Contact Detail] Company phone clicked, setting strict company-mode context');
+      
+      // Build account context from contact's associated account (AI-suggested approach)
+      const accountId = contact.accountId || contact.account_id;
+      const accountName = contact.companyName || contact.company || contact.account || '';
+      
+      // Resolve account context with fallback chain (AI suggestion)
+      let resolvedAccount = null;
+      let resolvedDomain = '';
+      
+      // Primary: Contact's associated account data - try multiple methods
+      if (accountId) {
+        // Method 1: Try window.Accounts.getAccountById
+        if (window.Accounts && window.Accounts.getAccountById) {
+          try {
+            resolvedAccount = window.Accounts.getAccountById(accountId);
+          } catch(_) {}
+        }
+        
+        // Method 2: Try window.getAccountsData if available
+        if (!resolvedAccount && typeof window.getAccountsData === 'function') {
+          try {
+            const accounts = window.getAccountsData() || [];
+            resolvedAccount = accounts.find(acc => acc.id === accountId || acc.accountId === accountId);
+          } catch(_) {}
+        }
+        
+        // Method 3: Try window.Accounts.accounts cache
+        if (!resolvedAccount && window.Accounts && window.Accounts.accounts) {
+          try {
+            const accounts = window.Accounts.accounts || [];
+            resolvedAccount = accounts.find(acc => acc.id === accountId || acc.accountId === accountId);
+          } catch(_) {}
+        }
+      }
+      
+      // Fallback: DOM elements (header/company field)
+      if (!resolvedAccount) {
+        const companyFromDOM = document.querySelector('#contact-detail-view .info-row[data-field="companyName"] .info-value-text')?.textContent?.trim();
+        if (companyFromDOM && companyFromDOM !== '--') {
+          resolvedAccount = { name: companyFromDOM, accountName: companyFromDOM };
+        }
+      }
+      
+      // Final fallback: Accounts cache by name match
+      if (!resolvedAccount && accountName && window.Accounts && window.Accounts.accounts) {
+        try {
+          const accounts = window.Accounts.accounts || [];
+          resolvedAccount = accounts.find(acc => 
+            (acc.name && acc.name.toLowerCase() === accountName.toLowerCase()) ||
+            (acc.accountName && acc.accountName.toLowerCase() === accountName.toLowerCase())
+          );
+        } catch(_) {}
+      }
+      
+      // Extract domain from account data
+      if (resolvedAccount) {
+        resolvedDomain = resolvedAccount.domain || resolvedAccount.website || '';
+        if (resolvedDomain && !resolvedDomain.startsWith('http')) {
+          resolvedDomain = 'https://' + resolvedDomain;
+        }
+        if (resolvedDomain) {
+          try {
+            const url = new URL(resolvedDomain);
+            resolvedDomain = url.hostname.replace(/^www\./, '');
+          } catch(_) {
+            resolvedDomain = resolvedDomain.replace(/^https?:\/\//, '').replace(/^www\./, '');
+          }
+        }
+      }
+      
+      // Set strict company-mode context (AI-suggested payload)
+      const contextPayload = {
+        // Account context
+        accountId: accountId || (resolvedAccount && resolvedAccount.id) || null,
+        accountName: (resolvedAccount && resolvedAccount.name) || (resolvedAccount && resolvedAccount.accountName) || accountName || null,
+        company: (resolvedAccount && resolvedAccount.name) || (resolvedAccount && resolvedAccount.accountName) || accountName || null,
+        
+        // Branding/location - ensure these are properly set for phone widget
+        // Priority: resolvedAccount data > contact account fields > contact location fields
+        city: (resolvedAccount && (resolvedAccount.city || resolvedAccount.locationCity)) || 
+              contact.accountCity || contact.accountLocationCity || 
+              contact.city || contact.locationCity || '',
+        state: (resolvedAccount && (resolvedAccount.state || resolvedAccount.locationState)) || 
+               contact.accountState || contact.accountLocationState || 
+               contact.state || contact.locationState || '',
+        domain: resolvedDomain || contact.accountDomain || contact.accountWebsite || '',
+        logoUrl: (resolvedAccount && resolvedAccount.logoUrl) || contact.accountLogoUrl || '',
+        
+        // Force company mode
+        isCompanyPhone: true,
+        
+        // Explicitly clear contact attribution
+        contactId: null,
+        contactName: '',
+        name: (resolvedAccount && resolvedAccount.name) || (resolvedAccount && resolvedAccount.accountName) || accountName || ''
+      };
+      
+      // Debug logging to see what context is being set
+      console.log('[Contact Detail] Resolved account data:', {
+        accountId: accountId,
+        accountName: accountName,
+        resolvedAccount: resolvedAccount,
+        resolvedDomain: resolvedDomain,
+        contactData: {
+          city: contact.city,
+          state: contact.state,
+          locationCity: contact.locationCity,
+          locationState: contact.locationState
+        },
+        finalContext: contextPayload
+      });
+      
+      // Additional debug: log all available account fields if we found an account
+      if (resolvedAccount) {
+        console.log('[Contact Detail] Account fields available:', {
+          id: resolvedAccount.id,
+          accountName: resolvedAccount.accountName,
+          name: resolvedAccount.name,
+          companyName: resolvedAccount.companyName,
+          city: resolvedAccount.city,
+          locationCity: resolvedAccount.locationCity,
+          state: resolvedAccount.state,
+          locationState: resolvedAccount.locationState,
+          website: resolvedAccount.website,
+          domain: resolvedAccount.domain,
+          logoUrl: resolvedAccount.logoUrl,
+          allFields: Object.keys(resolvedAccount)
+        });
+      }
+      
+      console.log('[Contact Detail] Setting company phone context:', contextPayload);
+      window.Widgets.setCallContext(contextPayload);
+      
+    } catch (error) {
+      console.error('[Contact Detail] Error setting company phone context:', error);
+    }
+  }
+
   function renderEmailRow(label, field, value, emailStatus) {
     const text = value ? escapeHtml(String(value)) : '--';
     const hasValue = !!value;
@@ -2305,7 +2439,16 @@
       const contactId = contact.id || contact.contactId || contact._id;
       const accountId = contact.accountId || contact.account_id;
       const contactName = contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '';
-      const companyName = contact.companyName || contact.company || contact.account || '';
+      
+      // Get company name with fallback to DOM
+      let companyName = contact.companyName || contact.company || contact.account || '';
+      if (!companyName) {
+        // Fallback: try to get company name from DOM
+        const companyFromDOM = document.querySelector('#contact-detail-view .info-row[data-field="companyName"] .info-value-text')?.textContent?.trim();
+        if (companyFromDOM && companyFromDOM !== '--') {
+          companyName = companyFromDOM;
+        }
+      }
       
       dataAttributes = `data-contact-id="${contactId || ''}" 
                        data-account-id="${accountId || ''}" 

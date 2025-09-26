@@ -3213,16 +3213,19 @@ window.__pcFaviconHelper = {
             const size = parseInt((opts && opts.size) || 64, 10) || 64;
             const logoUrl = (opts && opts.logoUrl) ? String(opts.logoUrl).trim() : '';
             const domain = (opts && opts.domain) ? String(opts.domain).trim().replace(/^https?:\/\//,'').replace(/\/$/,'') : '';
+            
+            
             if (logoUrl) {
-                // If user typed a domain or a non-image URL, render favicon for that domain instead
-                const looksLikeDomain = /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(logoUrl) && !/\s/.test(logoUrl);
+                // Only treat as domain if it's clearly a bare domain (no protocol, no path)
+                const looksLikeBareDomain = /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(logoUrl) && !/\s/.test(logoUrl) && !logoUrl.includes('/');
                 let parsed = null;
                 try { parsed = /^https?:\/\//i.test(logoUrl) ? new URL(logoUrl) : null; } catch(_) { parsed = null; }
                 const path = parsed ? (parsed.pathname || '') : '';
                 const looksLikeImagePath = /\.(png|jpe?g|gif|webp|svg|ico)(\?.*)?$/i.test(path);
-                if (looksLikeDomain || (parsed && !looksLikeImagePath)) {
-                    const d = looksLikeDomain ? logoUrl : (parsed ? parsed.hostname : domain);
-                    const clean = String(d||'').replace(/^www\./i,'');
+                
+                // Only use favicon fallback for bare domains, not for URLs
+                if (looksLikeBareDomain) {
+                    const clean = String(logoUrl).replace(/^www\./i,'');
                     if (clean) return this.generateFaviconHTML(clean, size);
                 }
                 // Otherwise treat as a direct image URL; fallback to favicon on error
