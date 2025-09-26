@@ -12,17 +12,42 @@ export default async function handler(req, res) {
     
     try {
         const _start = Date.now();
-        const { transcriptSid, callSid } = req.body;
-        try { console.log('[Poll CI Analysis] Start', { transcriptSid, callSid, ts: new Date().toISOString() }); } catch(_) {}
+        const { transcriptSid, callSid: callSidInput } = req.body;
+        try { console.log('[Poll CI Analysis] Start', { transcriptSid, callSid: callSidInput, ts: new Date().toISOString() }); } catch(_) {}
         
         if (!transcriptSid) {
             return res.status(400).json({ error: 'transcriptSid is required' });
         }
         
-        console.log('[Poll CI Analysis] Checking analysis status for:', { transcriptSid, callSid });
+        console.log('[Poll CI Analysis] Checking analysis status for:', { transcriptSid, callSid: callSidInput });
         
         // Get transcript details
         const transcript = await client.intelligence.v2.transcripts(transcriptSid).fetch();
+        
+        // Resolve a reliable Call SID using multiple fallbacks
+        let resolvedCallSid = (callSidInput && /^CA[0-9a-zA-Z]+$/.test(String(callSidInput))) ? callSidInput : '';
+        try {
+            if (!resolvedCallSid) {
+                const fromCustomerKey = (transcript && transcript.customerKey) ? String(transcript.customerKey) : '';
+                if (fromCustomerKey && /^CA[0-9a-zA-Z]+$/.test(fromCustomerKey)) {
+                    resolvedCallSid = fromCustomerKey;
+                }
+            }
+            if (!resolvedCallSid) {
+                const sourceSid = transcript && (transcript.sourceSid || transcript.source_sid || transcript.media_properties?.source_sid) || '';
+                if (sourceSid && /^RE[0-9a-zA-Z]+$/.test(String(sourceSid))) {
+                    try {
+                        const rec = await client.recordings(sourceSid).fetch();
+                        const recCallSid = rec && (rec.callSid || rec.call_sid);
+                        if (recCallSid && /^CA[0-9a-zA-Z]+$/.test(String(recCallSid))) {
+                            resolvedCallSid = String(recCallSid);
+                        }
+                    } catch (e) {
+                        try { console.warn('[Poll CI Analysis] Failed to fetch recording to resolve Call SID:', e?.message); } catch(_) {}
+                    }
+                }
+            }
+        } catch(_) {}
         
         console.log('[Poll CI Analysis] Transcript status:', {
             sid: transcript.sid,
@@ -80,7 +105,7 @@ export default async function handler(req, res) {
         let channelRoleMap = { agentChannel: '1', customerChannel: '2' };
         try {
             let callResource = null;
-            try { callResource = callSid ? await client.calls(callSid).fetch() : null; } catch(_) {}
+            try { callResource = resolvedCallSid ? await client.calls(resolvedCallSid).fetch() : null; } catch(_) {}
             const fromStr = callResource?.from || '';
             const toStr = callResource?.to || '';
             const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
@@ -93,7 +118,7 @@ export default async function handler(req, res) {
             const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
             channelRoleMap.agentChannel = fromIsAgent ? '1' : '2';
             channelRoleMap.customerChannel = fromIsAgent ? '2' : '1';
-            console.log('[Poll CI Analysis] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr });
+            console.log('[Poll CI Analysis] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr, callSid: resolvedCallSid });
         } catch(e) {
             console.warn('[Poll CI Analysis] Failed to compute channel-role mapping, defaulting:', e?.message);
         }
@@ -172,10 +197,15 @@ export default async function handler(req, res) {
                     },
                     source: 'twilio-conversational-intelligence'
                 };
-                await fetch(`${base}/api/calls`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ callSid, transcript: transcriptText, formattedTranscript, aiInsights: ai, conversationalIntelligence: ai.conversationalIntelligence })
-                }).catch(()=>{});
+                const finalCallSid = resolvedCallSid || callSidInput || '';
+                if (!finalCallSid) {
+                    console.warn('[Poll CI Analysis] Unable to upsert /api/calls due to missing Call SID', { transcriptSid });
+                } else {
+                    await fetch(`${base}/api/calls`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ callSid: finalCallSid, transcript: transcriptText, formattedTranscript, aiInsights: ai, conversationalIntelligence: ai.conversationalIntelligence })
+                    }).catch(()=>{});
+                }
             }
         } catch(e) {
             console.warn('[Poll CI Analysis] Fallback upsert failed:', e?.message || e);
@@ -186,6 +216,7 @@ export default async function handler(req, res) {
         return res.status(200).json({
             success: true,
             analysisComplete: true,
+            callSid: resolvedCallSid || callSidInput || '',
             status: {
                 transcriptStatus: transcript.status,
                 analysisStatus: transcript.analysisStatus,

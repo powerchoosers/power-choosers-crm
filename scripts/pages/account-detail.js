@@ -1319,7 +1319,10 @@
       const hasTranscript = !!(call && typeof call.transcript === 'string' && call.transcript.trim());
       const insights = call && call.aiInsights;
       const hasInsights = !!(insights && typeof insights === 'object' && Object.keys(insights).length > 0);
-      return hasTranscript && hasInsights;
+      const ci = call && call.conversationalIntelligence;
+      const ciCompleted = !!(ci && typeof ci.status === 'string' && ci.status.toLowerCase() === 'completed');
+      // Consider it ready if we have a transcript and either insights are present or CI status is completed
+      return (hasTranscript && hasInsights) || (hasTranscript && ciCompleted);
     };
     const finalizeReady = (call) => {
       try {

@@ -635,7 +635,9 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           const id = btn.getAttribute('data-id');
           const row = state.data.find(c => String(c.id||c.callSid||'') === String(id));
           if (!row) return;
-          const needsProcessing = (!row.transcript || !row.aiInsights || Object.keys(row.aiInsights||{}).length === 0);
+          const ci = row && row.conversationalIntelligence;
+          const ciCompleted = !!(ci && typeof ci.status === 'string' && ci.status.toLowerCase() === 'completed');
+          const needsProcessing = (!row.transcript || ((!row.aiInsights || Object.keys(row.aiInsights||{}).length === 0) && !ciCompleted));
           if (needsProcessing) {
             // Use shared CI processor for consistent functionality
             if (window.SharedCIProcessor) {
