@@ -159,16 +159,8 @@
       }
     } catch (_) { /* noop */ }
 
-    // Otherwise, use contact detail context if present
-    try {
-      if (!phoneElement.closest || !phoneElement.closest('#account-detail-view')) {
-        if (document.getElementById('contact-detail-view') && document.getElementById('contact-detail-header')) {
-          const n = document.getElementById('contact-name');
-          const txt = (n && n.textContent || '').trim();
-          if (txt) return txt;
-        }
-      }
-    } catch (_) { /* noop */ }
+    // REMOVED: Contact detail context lookup
+    // This was causing contact company info to leak into account detail phone calls
 
     // As a final fallback, try global account header if visible
     try {
@@ -238,25 +230,8 @@
       }
     }
 
-    // Try to get context from contact detail page
-    try {
-      if (document.getElementById('contact-detail-view')) {
-        const contactDetail = window.ContactDetail;
-        if (contactDetail && contactDetail.state && contactDetail.state.currentContact) {
-          const contact = contactDetail.state.currentContact;
-          context.contactId = contact.id || contact.contactId || contact._id;
-          context.contactName = contact.name || contact.firstName + ' ' + contact.lastName;
-          context.name = context.contactName;
-          context.company = contact.company || contact.companyName || contact.account;
-          context.accountName = context.company;
-          
-          // Try to get linked account ID
-          if (contactDetail.state._linkedAccountId) {
-            context.accountId = contactDetail.state._linkedAccountId;
-          }
-        }
-      }
-    } catch (_) { /* noop */ }
+    // REMOVED: Contact detail page context lookup
+    // This was causing contact company info to leak into account detail phone calls
 
     // Try to get context from account detail page
     try {
@@ -268,20 +243,66 @@
           context.accountName = account.name || account.accountName;
           context.company = context.accountName;
           // Include location/domain hints for the phone widget display
-          try { if (account.city) context.city = account.city; } catch(_) {}
-          try { if (account.state) context.state = account.state; } catch(_) {}
+          try {
+            if (!context.city) {
+              if (account.city) context.city = account.city;
+              else if (account.locationCity) context.city = account.locationCity;
+            }
+          } catch(_) {}
+          try {
+            if (!context.state) {
+              if (account.state) context.state = account.state;
+              else if (account.locationState) context.state = account.locationState;
+            }
+          } catch(_) {}
           // Prefer explicit logoUrl for icons
           try { if (account.logoUrl) context.logoUrl = String(account.logoUrl); } catch(_) {}
-          // Ensure domain is present: derive from website if missing
+          // Ensure domain is present: derive from website/site if missing
           try {
             let domain = account.domain || '';
-            if (!domain && account.website) {
-              try { const u = new URL(account.website.startsWith('http') ? account.website : `https://${account.website}`); domain = u.hostname; } catch(_) {
-                domain = String(account.website).replace(/^https?:\/\//i,'').split('/')[0];
+            if (!domain) {
+              const src = account.website || account.site || '';
+              if (src) {
+                try {
+                  const u = new URL(src.startsWith('http') ? src : `https://${src}`);
+                  domain = u.hostname;
+                } catch(_) {
+                  domain = String(src).replace(/^https?:\/\//i,'').split('/')[0];
+                }
+                domain = domain.replace(/^www\./i,'');
               }
-              domain = domain.replace(/^www\./i,'');
+            }
+            if (!domain) {
+              // DOM fallback: parse website from rendered Account Detail
+              const wEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="website"] .info-value-text a, #account-detail-view .info-value-wrap[data-field=\"website\"] .info-value-text');
+              if (wEl) {
+                const raw = (wEl.getAttribute('href') || wEl.textContent || '').trim();
+                if (raw) {
+                  try {
+                    const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+                    domain = u.hostname.replace(/^www\./i,'');
+                  } catch(_) {
+                    domain = String(raw).replace(/^https?:\/\//i,'').split('/')[0].replace(/^www\./i,'');
+                  }
+                }
+              }
             }
             if (domain) context.domain = domain;
+          } catch(_) {}
+          // As a last resort, read city/state directly from DOM if still empty
+          try {
+            if (!context.city) {
+              const cEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="city"] .info-value-text');
+              const v = (cEl && cEl.textContent || '').trim();
+              if (v && v !== '--') context.city = v;
+            }
+          } catch(_) {}
+          try {
+            if (!context.state) {
+              const sEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="state"] .info-value-text');
+              const v = (sEl && sEl.textContent || '').trim();
+              if (v && v !== '--') context.state = v;
+            }
           } catch(_) {}
         }
       }
@@ -306,61 +327,228 @@
           if (account.logoUrl && !context.logoUrl) context.logoUrl = String(account.logoUrl);
           if (!context.domain) {
             let d = account.domain || '';
-            if (!d && account.website) {
-              try { const u = new URL(account.website.startsWith('http') ? account.website : `https://${account.website}`); d = u.hostname; } catch(_) {
-                d = String(account.website).replace(/^https?:\/\//i,'').split('/')[0];
+            if (!d) {
+              const src = account.website || account.site || '';
+              if (src) {
+                try { const u = new URL(src.startsWith('http') ? src : `https://${src}`); d = u.hostname; } catch(_) {
+                  d = String(src).replace(/^https?:\/\//i,'').split('/')[0];
+                }
               }
             }
-            if (d) context.domain = d.replace(/^www\./i,'');
+            if (!d) {
+              const wEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="website"] .info-value-text a, #account-detail-view .info-value-wrap[data-field=\"website\"] .info-value-text');
+              if (wEl) {
+                const raw = (wEl.getAttribute('href') || wEl.textContent || '').trim();
+                if (raw) {
+                  try { const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`); d = u.hostname; } catch(_) {
+                    d = String(raw).replace(/^https?:\/\//i,'').split('/')[0];
+                  }
+                }
+              }
+            }
+            if (d) context.domain = String(d).replace(/^www\./i,'');
           }
-          if (!context.city && account.city) context.city = account.city;
-          if (!context.state && account.state) context.state = account.state;
+          if (!context.city) {
+            if (account.city) context.city = account.city;
+            else if (account.locationCity) context.city = account.locationCity;
+            else {
+              const cEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="city"] .info-value-text');
+              const v = (cEl && cEl.textContent || '').trim();
+              if (v && v !== '--') context.city = v;
+            }
+          }
+          if (!context.state) {
+            if (account.state) context.state = account.state;
+            else if (account.locationState) context.state = account.locationState;
+            else {
+              const sEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="state"] .info-value-text');
+              const v = (sEl && sEl.textContent || '').trim();
+              if (v && v !== '--') context.state = v;
+            }
+          }
         } catch(_) {}
       }
     } catch(_) {}
 
-    // Contact Detail: default to company-mode unless clearly calling a personal number (mobile/work/other)
-    try {
-      const inContact = !!phoneElement.closest('#contact-detail-view');
-      if (inContact) {
-        const row = phoneElement.closest('.info-row');
-        const phoneType = (row && (row.getAttribute('data-phone-type') || row.getAttribute('data-field'))) || '';
-        const typeNorm = String(phoneType).toLowerCase();
-        const isPersonal = ['mobile', 'work', 'workdirect', 'work_direct', 'work direct', 'other'].includes(typeNorm);
-        if (isPersonal) {
-          // Personal number → contact mode
-          context.isCompanyPhone = false;
-          try {
-            const cd = window.ContactDetail?.state?.currentContact || {};
-            const cname = cd.name || ((cd.firstName||'') + ' ' + (cd.lastName||''));
-            if (!context.contactId) context.contactId = cd.id || cd.contactId || cd._id || null;
-            if (!context.contactName) context.contactName = cname || '';
-            if (!context.name) context.name = context.contactName || '';
-            // Ensure company fields present for display
-            if (!context.company) context.company = cd.company || cd.companyName || cd.account || context.accountName || '';
-          } catch(_) {}
-        } else {
-          // Company number → company mode; clear contact, keep account attribution only
-          context.contactId = null;
-          context.contactName = '';
-          context.isCompanyPhone = true;
-          // Enrich domain/logo/city/state from contact company fields if account object not available
-          try {
-            const cd = window.ContactDetail?.state?.currentContact || {};
-            if (!context.domain) {
-              let d = cd.companyDomain || '';
-              if (!d && cd.companyWebsite) {
-                try { const u = new URL(cd.companyWebsite.startsWith('http') ? cd.companyWebsite : `https://${cd.companyWebsite}`); d = u.hostname; } catch(_) { d = String(cd.companyWebsite).replace(/^https?:\/\//i,'').split('/')[0]; }
-              }
-              if (d) context.domain = d.replace(/^www\./i,'');
-            }
-            if (!context.city && cd.companyCity) context.city = cd.companyCity;
-            if (!context.state && cd.companyState) context.state = cd.companyState;
-          } catch(_) {}
-          if (!context.name) context.name = context.accountName || context.company || '';
+    // For account detail pages, completely bypass contact lookup logic
+    // This ensures we never look for contact information on account pages
+    if (phoneElement.closest('#account-detail-view')) {
+      // Force company mode and clear any contact fields
+      context.contactId = null;
+      context.contactName = '';
+      context.isCompanyPhone = true;
+      // Use account information only
+      try {
+        const account = window.AccountDetail?.state?.currentAccount || {};
+        if (account.id) context.accountId = account.id;
+        if (account.accountName || account.name) {
+          context.accountName = account.accountName || account.name;
+          context.company = context.accountName;
+          context.name = context.accountName;
         }
-      }
-    } catch(_) {}
+        if (!context.city) {
+          if (account.city) context.city = account.city;
+          else if (account.locationCity) context.city = account.locationCity;
+          else {
+            const cEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="city"] .info-value-text');
+            const v = (cEl && cEl.textContent || '').trim();
+            if (v && v !== '--') context.city = v;
+          }
+        }
+        if (!context.state) {
+          if (account.state) context.state = account.state;
+          else if (account.locationState) context.state = account.locationState;
+          else {
+            const sEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="state"] .info-value-text');
+            const v = (sEl && sEl.textContent || '').trim();
+            if (v && v !== '--') context.state = v;
+          }
+        }
+        if (account.logoUrl) context.logoUrl = String(account.logoUrl);
+        if (account.domain) {
+          context.domain = account.domain;
+        } else {
+          const src = account.website || account.site || '';
+          if (src) {
+            try {
+              const u = new URL(src.startsWith('http') ? src : `https://${src}`);
+              context.domain = u.hostname.replace(/^www\./i, '');
+            } catch(_) {
+              context.domain = String(src).replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+            }
+          } else {
+            const wEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="website"] .info-value-text a, #account-detail-view .info-value-wrap[data-field=\"website\"] .info-value-text');
+            if (wEl) {
+              const raw = (wEl.getAttribute('href') || wEl.textContent || '').trim();
+              if (raw) {
+                try { const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`); context.domain = u.hostname.replace(/^www\./i,''); } catch(_) {
+                  context.domain = String(raw).replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+                }
+              }
+            }
+          }
+        }
+      } catch(_) {}
+    }
+
+    // For accounts page (list), treat company phones as company-mode and enrich from accounts cache
+    if (phoneElement.closest('#accounts-table')) {
+      // Force company mode and clear contact fields
+      context.contactId = null;
+      context.contactName = '';
+      context.isCompanyPhone = true;
+      // Ensure company/name fields are set from the row
+      try {
+        const row = phoneElement.closest('tr');
+        if (row) {
+          // Try to resolve accountId from link/button in the row
+          const idFromLink = row.querySelector('.acct-link')?.getAttribute('data-id') || '';
+          const idFromBtn = row.querySelector('.qa-btn[data-action="call"]')?.getAttribute('data-id') || '';
+          const aid = idFromLink || idFromBtn;
+          if (aid) context.accountId = aid;
+          // Company name from visible cell (if not already)
+          if (!context.company || !context.name || !context.accountName) {
+            const nm = row.querySelector('.account-name')?.textContent?.trim();
+            if (nm) {
+              context.company = context.company || nm;
+              context.name = context.name || nm;
+              context.accountName = context.accountName || nm;
+            }
+          }
+        }
+      } catch(_) {}
+      // Enrich from accounts cache if possible
+      try {
+        const getAccounts = (typeof window.getAccountsData === 'function') ? window.getAccountsData : null;
+        const accounts = getAccounts ? (getAccounts() || []) : [];
+        let acc = null;
+        if (context.accountId) {
+          acc = accounts.find(a => String(a.id||'') === String(context.accountId)) || null;
+        }
+        if (!acc && context.company) {
+          const want = String(context.company||'').trim().toLowerCase();
+          acc = accounts.find(a => String(a.accountName||a.name||'').trim().toLowerCase() === want) || null;
+        }
+        if (acc) {
+          if (!context.city) context.city = acc.city || acc.locationCity || '';
+          if (!context.state) context.state = acc.state || acc.locationState || '';
+          if (!context.logoUrl && acc.logoUrl) context.logoUrl = String(acc.logoUrl);
+          if (!context.domain) {
+            let d = acc.domain || '';
+            if (!d) {
+              const src = acc.website || acc.site || '';
+              if (src) {
+                try { const u = new URL(src.startsWith('http') ? src : `https://${src}`); d = u.hostname; } catch(_) {
+                  d = String(src).replace(/^https?:\/\//i,'').split('/')[0];
+                }
+              }
+            }
+            if (d) context.domain = String(d).replace(/^www\./i,'');
+          }
+        }
+      } catch(_) {}
+      // Fall through (do not return) so downstream code can continue
+    }
+
+    // For calls page, completely bypass contact lookup logic
+    // This prevents contact context from leaking into calls page phone clicks
+    if (phoneElement.closest('#calls-table') || document.getElementById('calls-page') || document.getElementById('calls-table')) {
+      // Force company mode and clear any contact fields
+      context.contactId = null;
+      context.contactName = '';
+      context.isCompanyPhone = true;
+      
+      // Try to get company info from the call record itself
+      try {
+        const row = phoneElement.closest('tr');
+        if (row) {
+          // Get company name from the call record
+          const companyCell = row.querySelector('.company-link, .company-cell');
+          if (companyCell) {
+            const companyName = companyCell.textContent?.trim() || companyCell.getAttribute('data-company');
+            if (companyName && companyName !== 'N/A') {
+              context.company = companyName;
+              context.name = companyName;
+              context.accountName = companyName;
+            }
+          }
+          
+          // Try to get account info if available
+          const accountId = row.getAttribute('data-account-id');
+          if (accountId) {
+            context.accountId = accountId;
+          }
+          
+          // Try to get company logo and location info from call record
+          const logoUrl = row.getAttribute('data-logo-url');
+          if (logoUrl) {
+            context.logoUrl = logoUrl;
+          }
+          
+          const city = row.getAttribute('data-city');
+          if (city) {
+            context.city = city;
+          }
+          
+          const state = row.getAttribute('data-state');
+          if (state) {
+            context.state = state;
+          }
+          
+          const domain = row.getAttribute('data-domain');
+          if (domain) {
+            context.domain = domain;
+          }
+        }
+      } catch(_) {}
+      
+      // Use only the phone number and any company info from the call record
+      context.name = context.company || '';
+      context.company = context.company || '';
+    }
+
+    // REMOVED: Contact detail page context lookup
+    // This was causing contact company info to leak into account detail phone calls
 
     console.debug('[ClickToCall] Setting call context:', context);
     window.Widgets.setCallContext(context);

@@ -400,6 +400,38 @@ class PowerChoosersCRM {
             if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Contact added!');
             try { form.reset(); } catch (_) { /* noop */ }
             close();
+
+            // Navigate to the newly created contact detail page
+            try {
+              // Navigate to people page first
+              if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                window.crm.navigateToPage('people');
+                // Show the contact detail after a short delay to ensure page is loaded
+                setTimeout(() => {
+                  if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                    window.ContactDetail.show(ref.id);
+                  } else {
+                    // Retry mechanism in case ContactDetail isn't ready yet
+                    let attempts = 0;
+                    const maxAttempts = 10;
+                    const retryInterval = 100;
+                    const retry = () => {
+                      attempts++;
+                      if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                        window.ContactDetail.show(ref.id);
+                      } else if (attempts < maxAttempts) {
+                        setTimeout(retry, retryInterval);
+                      } else {
+                        console.error('ContactDetail not available after', maxAttempts, 'attempts');
+                      }
+                    };
+                    retry();
+                  }
+                }, 100);
+              }
+            } catch (error) {
+              console.error('Error navigating to contact detail:', error);
+            }
           } catch (err) {
             if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Failed to add contact');
             console.error('Add contact failed', err);
