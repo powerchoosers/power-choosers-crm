@@ -53,7 +53,17 @@
       const hasAccountId = !!phoneElement.getAttribute('data-account-id');
       const attrContact = (phoneElement.getAttribute('data-contact-name') || '').trim();
       const attrCompany = (phoneElement.getAttribute('data-company-name') || '').trim();
-      const nameForTitle = hasContactId && attrContact ? attrContact : (hasAccountId && attrCompany ? attrCompany : contactName);
+      
+      // For Contact Detail company phone calls, prioritize company context
+      let nameForTitle = '';
+      if (phoneElement.closest('#contact-detail-view') && phoneElement.closest('.info-row[data-field="companyPhone"]')) {
+        // This is a company phone on Contact Detail - use company name only
+        nameForTitle = attrCompany || '';
+      } else {
+        // Regular logic for other contexts
+        nameForTitle = hasContactId && attrContact ? attrContact : (hasAccountId && attrCompany ? attrCompany : contactName);
+      }
+      
       const tt = `Call ${displayPhone}${nameForTitle ? ` (${nameForTitle})` : ''}`;
       phoneElement.setAttribute('data-pc-title', tt);
       phoneElement.removeAttribute('title');
@@ -77,11 +87,20 @@
         const hasAccountId = !!this.getAttribute('data-account-id');
         const attrContact = (this.getAttribute('data-contact-name') || '').trim();
         const attrCompany = (this.getAttribute('data-company-name') || '').trim();
-        // Prefer attributes; fallback to row-derived name
-        let nameForTitle = hasContactId && attrContact ? attrContact : (hasAccountId && attrCompany ? attrCompany : '');
+        
+        // For Contact Detail company phone calls, prioritize company context
+        let nameForTitle = '';
+        if (this.closest('#contact-detail-view') && this.closest('.info-row[data-field="companyPhone"]')) {
+          // This is a company phone on Contact Detail - use company name only
+          nameForTitle = attrCompany || '';
+        } else {
+          // Regular logic for other contexts
+          nameForTitle = hasContactId && attrContact ? attrContact : (hasAccountId && attrCompany ? attrCompany : '');
         if (!nameForTitle) {
           nameForTitle = findContactName(this) || '';
+          }
         }
+        
         const tt = `Call ${displayNow}${nameForTitle ? ` (${nameForTitle})` : ''}`;
         this.setAttribute('data-pc-title', tt);
         this.removeAttribute('title');
@@ -230,7 +249,118 @@
       }
     }
 
-    // REMOVED: Contact detail page context lookup
+    // Handle Contact Detail page company phone calls with strict company-mode
+    if (phoneElement.closest('#contact-detail-view') && phoneElement.closest('.info-row[data-field="companyPhone"]')) {
+      // This is a company phone on Contact Detail - force company mode
+      context.contactId = null;
+      context.contactName = '';
+      context.isCompanyPhone = true;
+      
+      // Use company context from data attributes
+      const companyName = phoneElement.getAttribute('data-company-name') || '';
+      const accountId = phoneElement.getAttribute('data-account-id') || '';
+      
+      if (companyName) {
+        context.company = companyName;
+        context.accountName = companyName;
+        context.name = companyName;
+      }
+      
+      if (accountId) {
+        context.accountId = accountId;
+      }
+      
+      // Try to get additional account context from Contact Detail state
+      try {
+        if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+          const contact = window.ContactDetail.state.currentContact;
+          const contactAccountId = contact.accountId || contact.account_id;
+          const contactCompanyName = contact.companyName || contact.company || contact.account || '';
+          
+          if (contactAccountId && !context.accountId) {
+            context.accountId = contactAccountId;
+          }
+          
+          if (contactCompanyName && !context.company) {
+            context.company = contactCompanyName;
+            context.accountName = contactCompanyName;
+            context.name = contactCompanyName;
+          }
+          
+          // Try to get account data for city/state/domain - use multiple methods
+          let accountData = null;
+          if (contactAccountId) {
+            // Method 1: window.Accounts.getAccountById
+            if (window.Accounts && window.Accounts.getAccountById) {
+              try { accountData = window.Accounts.getAccountById(contactAccountId); } catch(_) {}
+            }
+            
+            // Method 2: window.getAccountsData
+            if (!accountData && typeof window.getAccountsData === 'function') {
+              try {
+                const accounts = window.getAccountsData() || [];
+                accountData = accounts.find(acc => acc.id === contactAccountId || acc.accountId === contactAccountId);
+              } catch(_) {}
+            }
+            
+            // Method 3: window.Accounts.accounts cache
+            if (!accountData && window.Accounts && window.Accounts.accounts) {
+              try {
+                const accounts = window.Accounts.accounts || [];
+                accountData = accounts.find(acc => acc.id === contactAccountId || acc.accountId === contactAccountId);
+              } catch(_) {}
+            }
+          }
+          
+          // If still no account data, try name matching
+          if (!accountData && contactCompanyName && window.Accounts && window.Accounts.accounts) {
+            try {
+              const accounts = window.Accounts.accounts || [];
+              accountData = accounts.find(acc => 
+                (acc.name && acc.name.toLowerCase() === contactCompanyName.toLowerCase()) ||
+                (acc.accountName && acc.accountName.toLowerCase() === contactCompanyName.toLowerCase())
+              );
+            } catch(_) {}
+          }
+          
+          if (accountData) {
+            if (!context.city) context.city = accountData.city || accountData.locationCity || '';
+            if (!context.state) context.state = accountData.state || accountData.locationState || '';
+            if (!context.domain) {
+              let domain = accountData.domain || '';
+              if (!domain && accountData.website) {
+                try {
+                  const url = accountData.website.startsWith('http') ? accountData.website : `https://${accountData.website}`;
+                  const u = new URL(url);
+                  domain = u.hostname.replace(/^www\./i, '');
+                } catch(_) {
+                  domain = String(accountData.website).replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+                }
+              }
+              if (domain) context.domain = domain;
+            }
+            // Always use account logo when available
+            if (accountData.logoUrl) {
+              context.logoUrl = String(accountData.logoUrl);
+            }
+          }
+        }
+      } catch(_) {}
+      
+      console.log('[ClickToCall] Contact Detail company phone context:', context);
+      window.Widgets.setCallContext(context);
+      
+      // Also trigger the phone widget to show the contact display immediately
+      if (window.Widgets && typeof window.Widgets.setContactDisplay === 'function') {
+        try {
+          window.Widgets.setContactDisplay(context, '');
+        } catch(_) {}
+      }
+      
+      return;
+    }
+
+    // REMOVED: Contact detail page context lookup for individual contact phones
     // This was causing contact company info to leak into account detail phone calls
 
     // Try to get context from account detail page
@@ -255,7 +385,7 @@
               else if (account.locationState) context.state = account.locationState;
             }
           } catch(_) {}
-          // Prefer explicit logoUrl for icons
+          // Prefer explicit logo for icons
           try { if (account.logoUrl) context.logoUrl = String(account.logoUrl); } catch(_) {}
           // Ensure domain is present: derive from website/site if missing
           try {
@@ -304,6 +434,26 @@
               if (v && v !== '--') context.state = v;
             }
           } catch(_) {}
+          // DOM fallback for logoUrl when state is missing it
+          try {
+            if (!context.logoUrl) {
+              const img = document.querySelector('#account-detail-header img.company-favicon');
+              if (img && img.src) context.logoUrl = img.src;
+            }
+            if (!context.logoUrl) {
+              const img2 = document.querySelector('#account-detail-header img[alt=""], #account-detail-header img');
+              if (img2 && img2.src) context.logoUrl = img2.src;
+            }
+            if (!context.logoUrl) {
+              const link = document.querySelector('#account-detail-view .info-value-wrap[data-field="logoUrl"] .info-value-text a');
+              if (link && link.href) context.logoUrl = link.href;
+            }
+            if (!context.logoUrl) {
+              const txtEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="logoUrl"] .info-value-text');
+              const rawText = txtEl && txtEl.textContent ? txtEl.textContent.trim() : '';
+              if (/^https?:\/\//i.test(rawText)) context.logoUrl = rawText;
+            }
+          } catch(_) {}
         }
       }
     } catch (_) { /* noop */ }
@@ -324,7 +474,22 @@
         // Ensure logoUrl/domain hints are present for company-mode icon
         try {
           const account = window.AccountDetail?.state?.currentAccount || {};
-          if (account.logoUrl && !context.logoUrl) context.logoUrl = String(account.logoUrl);
+          // Always use account logoUrl if available (prioritize over any existing logoUrl)
+          if (account.logoUrl) context.logoUrl = String(account.logoUrl);
+          // DOM fallback for logo if state is empty
+          if (!context.logoUrl) {
+            const headerImg = document.querySelector('#account-detail-header img.company-favicon') || document.querySelector('#account-detail-header img');
+            if (headerImg && headerImg.src) context.logoUrl = headerImg.src;
+          }
+          if (!context.logoUrl) {
+            const link = document.querySelector('#account-detail-view .info-value-wrap[data-field="logoUrl"] .info-value-text a');
+            if (link && link.href) context.logoUrl = link.href;
+          }
+          if (!context.logoUrl) {
+            const txtEl = document.querySelector('#account-detail-view .info-value-wrap[data-field="logoUrl"] .info-value-text');
+            const rawText = txtEl && txtEl.textContent ? txtEl.textContent.trim() : '';
+            if (/^https?:\/\//i.test(rawText)) context.logoUrl = rawText;
+          }
           if (!context.domain) {
             let d = account.domain || '';
             if (!d) {
@@ -665,7 +830,15 @@
           const hasAccountId = !!element.getAttribute('data-account-id');
           const attrContact = (element.getAttribute('data-contact-name') || '').trim();
           const attrCompany = (element.getAttribute('data-company-name') || '').trim();
+          
+          // For Contact Detail company phone calls, prioritize company context
+          if (element.closest('#contact-detail-view') && element.closest('.info-row[data-field="companyPhone"]')) {
+            // This is a company phone on Contact Detail - use company name only
+            nameForTitle = attrCompany || '';
+          } else {
+            // Regular logic for other contexts
           nameForTitle = hasContactId && attrContact ? attrContact : (hasAccountId && attrCompany ? attrCompany : '');
+          }
         } catch(_) {}
         if (!nameForTitle) nameForTitle = findContactName(element) || '';
         // Use custom tooltip attribute and remove native title to avoid stale browser tooltips

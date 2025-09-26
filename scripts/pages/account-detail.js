@@ -153,10 +153,10 @@
 
       .task-popover::before,
       .task-popover::after { content: ""; position: absolute; width: var(--arrow-size); height: var(--arrow-size); transform: rotate(45deg); pointer-events: none; }
-      .task-popover[data-placement="bottom"]::before { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); top: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
-      .task-popover[data-placement="bottom"]::after  { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); top: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
-      .task-popover[data-placement="top"]::before    { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); bottom: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
-      .task-popover[data-placement="top"]::after     { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); bottom: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
+      .task-popover[data-placement="bottom"]::before { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); top: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
+      .task-popover[data-placement="bottom"]::after  { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); top: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
+      .task-popover[data-placement="top"]::before    { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); bottom: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
+      .task-popover[data-placement="top"]::after     { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); bottom: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
 
       .task-popover .tp-inner { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
       .task-popover .tp-header { display: flex; align-items: center; justify-content: space-between; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid var(--border-light); }
@@ -210,8 +210,8 @@
 
       /* Support explicit arrow element (legacy) */
       .task-popover .arrow { position: absolute; width: var(--arrow-size); height: var(--arrow-size); transform: rotate(45deg); background: var(--bg-card); border-left: 1px solid var(--border-light); border-top: 1px solid var(--border-light); display: none; }
-      .task-popover[data-placement="bottom"] .arrow { display: block; top: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); }
-      .task-popover[data-placement="top"] .arrow { display: block; bottom: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); }
+      .task-popover[data-placement="bottom"] .arrow { display: block; top: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); }
+      .task-popover[data-placement="top"] .arrow { display: block; bottom: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); }
     `;
     document.head.appendChild(style);
   }
@@ -354,6 +354,24 @@
     injectSectionHeaderStyles();
 
     const a = state.currentAccount;
+    // Normalize commonly used fields on the in-memory account object so downstream handlers
+    // (including click-to-call) always find what they need without relying on optional fallbacks
+    try {
+      if (a && !a.logoUrl && a.iconUrl) a.logoUrl = a.iconUrl;
+    } catch (_) {}
+    try {
+      if (a && !a.domain) {
+        const src = a.website || a.site || '';
+        if (src) {
+          try {
+            const u = new URL(/^https?:\/\//i.test(src) ? src : `https://${src}`);
+            a.domain = (u.hostname || '').replace(/^www\./i, '');
+          } catch (_) {
+            a.domain = String(src).replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
+          }
+        }
+      }
+    } catch (_) {}
     
     // Find the most relevant contact for this account (for company phone context)
     const mostRelevantContact = findMostRelevantContactForAccount(a.id || a.accountId || a._id);
@@ -3208,44 +3226,17 @@
     // Bind click only once
     if (el._pcClickBound) return;
     el.addEventListener('click', function(e){
-      try { e.preventDefault(); e.stopPropagation(); } catch(_) {}
+      try { 
+        e.preventDefault(); 
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        else e.stopPropagation(); 
+      } catch(_) {}
       const callNum = digitsOnly.length === 10 ? `+1${digitsOnly}` : (cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`);
       // Set call context explicitly to company mode
       try {
         if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
-          // Get account data from the current page context
-          let account = {};
-          
-          // Try to get account data from the page URL or global state
-          try {
-            // Check if we're on an account detail page and get the account ID from URL
-            const currentPath = window.location.hash;
-            const accountIdMatch = currentPath.match(/#account-details\/([^\/]+)/);
-            const accountId = accountIdMatch ? accountIdMatch[1] : null;
-            
-            if (accountId && typeof window.getAccountsData === 'function') {
-              const accounts = window.getAccountsData() || [];
-              account = accounts.find(acc => acc.id === accountId || acc.accountId === accountId) || {};
-            }
-            
-            // If still no account, try to get from state or DOM
-            if (!account.id) {
-              account = state.currentAccount || {};
-            }
-            
-            // Last resort: get account name from page title
-            if (!account.id && !account.accountName) {
-              const accountNameEl = document.querySelector('#account-name, .page-title, .account-name, h1');
-              const accountName = accountNameEl ? accountNameEl.textContent?.trim() : '';
-              if (accountName) {
-                account = {
-                  accountName: accountName,
-                  name: accountName,
-                  companyName: accountName
-                };
-              }
-            }
-          } catch(_) {}
+          // Use the current account from state directly (most reliable)
+          const account = state.currentAccount || {};
           
           // Extract domain from website if needed
           let domain = account.domain || '';
@@ -3259,22 +3250,37 @@
             }
           }
           
-          // Debug: Log the account object to see what fields are available
-          console.log('[Account Detail] Account data for phone widget:', {
-            id: account.id,
-            accountName: account.accountName,
-            name: account.name,
-            companyName: account.companyName,
-            city: account.city,
-            locationCity: account.locationCity,
-            state: account.state,
-            locationState: account.locationState,
-            website: account.website,
-            domain: account.domain,
-            logoUrl: account.logoUrl,
-            allFields: Object.keys(account)
-          });
-
+          // Compute logoUrl with robust fallbacks (account fields -> DOM -> text link)
+          const logoUrlComputed = (function(){
+            try {
+              const fromAccount = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon || account.imageUrl || account.companyImage;
+              if (fromAccount) return String(fromAccount);
+              const root = document.querySelector('#account-detail-view') || document;
+              // Try common header/avatar locations first
+              const imgSel = [
+                '#account-detail-header img.company-favicon',
+                '.page-header img.company-favicon',
+                '.account-header img.company-favicon',
+                '.company-cell__wrap img.company-favicon',
+                '#account-detail-header img[alt=""]',
+                '.page-header img[alt=""]',
+                '.account-header img[alt=""]',
+                '#account-detail-header img',
+                '.page-header img',
+                '.account-header img'
+              ].join(',');
+              const img = root.querySelector(imgSel);
+              if (img && img.src) return img.src;
+              // Try explicit logoUrl field in the info grid
+              const link = root.querySelector('.info-value-wrap[data-field="logoUrl"] a');
+              if (link && link.href) return link.href;
+              const textEl = root.querySelector('.info-value-wrap[data-field="logoUrl"] .info-value-text');
+              const rawText = textEl && textEl.textContent ? textEl.textContent.trim() : '';
+              if (rawText && /^https?:\/\//i.test(rawText)) return rawText;
+              return '';
+            } catch(_) { return ''; }
+          })();
+          
           const callContext = {
             accountId: account.id || null,
             accountName: account.accountName || account.name || account.companyName || null,
@@ -3285,10 +3291,9 @@
             city: account.city || account.locationCity || '',
             state: account.state || account.locationState || '',
             domain: domain,
-            logoUrl: account.logoUrl || '',
+            logoUrl: logoUrlComputed || '',
             isCompanyPhone: true
           };
-          
           
           window.Widgets.setCallContext(callContext);
         }
@@ -3444,23 +3449,23 @@
       }
       /* Bottom placement (arrow on top edge) */
       #account-lists-panel[data-placement="bottom"]::before {
-        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
         top: calc(-1 * var(--arrow-size) / 2 + 1px);
         background: var(--border-light);
       }
       #account-lists-panel[data-placement="bottom"]::after {
-        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
         top: calc(-1 * var(--arrow-size) / 2 + 2px);
         background: var(--bg-card);
       }
       /* Top placement (arrow on bottom edge) */
       #account-lists-panel[data-placement="top"]::before {
-        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
         bottom: calc(-1 * var(--arrow-size) / 2 + 1px);
         background: var(--border-light);
       }
       #account-lists-panel[data-placement="top"]::after {
-        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
         bottom: calc(-1 * var(--arrow-size) / 2 + 2px);
         background: var(--bg-card);
       }
@@ -3801,10 +3806,10 @@
 
       .task-popover::before,
       .task-popover::after { content: ""; position: absolute; width: var(--arrow-size); height: var(--arrow-size); transform: rotate(45deg); pointer-events: none; }
-      .task-popover[data-placement="bottom"]::before { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); top: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
-      .task-popover[data-placement="bottom"]::after  { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); top: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
-      .task-popover[data-placement="top"]::before    { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); bottom: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
-      .task-popover[data-placement="top"]::after     { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); bottom: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
+      .task-popover[data-placement="bottom"]::before { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); top: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
+      .task-popover[data-placement="bottom"]::after  { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); top: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
+      .task-popover[data-placement="top"]::before    { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); bottom: calc(-1 * var(--arrow-size) / 2 + 1px); background: var(--border-light); }
+      .task-popover[data-placement="top"]::after     { left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); bottom: calc(-1 * var(--arrow-size) / 2 + 2px); background: var(--bg-card); }
 
       .task-popover .tp-inner { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
       .task-popover .tp-header { display: flex; align-items: center; justify-content: space-between; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid var(--border-light); }
@@ -3865,8 +3870,8 @@
 
       /* Support explicit arrow element (legacy) */
       .task-popover .arrow { position: absolute; width: var(--arrow-size); height: var(--arrow-size); transform: rotate(45deg); background: var(--bg-card); border-left: 1px solid var(--border-light); border-top: 1px solid var(--border-light); display: none; }
-      .task-popover[data-placement="bottom"] .arrow { display: block; top: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); }
-      .task-popover[data-placement="top"] .arrow { display: block; bottom: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2)); }
+      .task-popover[data-placement="bottom"] .arrow { display: block; top: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); }
+      .task-popover[data-placement="top"] .arrow { display: block; bottom: calc(-1 * var(--arrow-size) / 2 + 2px); left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px)); }
     `;
     document.head.appendChild(style);
   }

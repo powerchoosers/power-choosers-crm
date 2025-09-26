@@ -916,7 +916,7 @@
       .phone-contact .contact-text { display: flex; flex-direction: column; }
       .phone-contact .contact-name { font-weight: 700; color: var(--text-primary, #fff); }
       .phone-contact .contact-sub { color: var(--text-secondary, #b5b5b5); font-size: 12px; }
-      .phone-contact .company-favicon { width: 20px; height: 20px; object-fit: cover; }
+      .phone-contact .company-favicon { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; }
       .phone-contact .avatar-initials { width: 28px; height: 28px; border-radius: 50%; background: var(--primary-700, #ff6b35); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 12px; font-weight: 700; }
     `;
     document.head.appendChild(style);
@@ -972,6 +972,7 @@
       const logoUrl = isCompanyPhone
         ? ((currentCallContext && currentCallContext.logoUrl) || (meta && meta.logoUrl) || '')
         : ((meta && meta.logoUrl) || (currentCallContext && currentCallContext.logoUrl) || '');
+      
       const displayNumber = number || (currentCallContext && currentCallContext.number) || '';
       
       // For company phone calls, show company name only
@@ -1007,10 +1008,14 @@
       const avatarWrap = box.querySelector('.contact-avatar');
       if (avatarWrap) {
         if (isCompanyPhone) {
-          // Prefer explicit logoUrl, then domain favicon, then nav fallback
-          if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') {
-            // If both logoUrl and domain are missing (deep bug), explicitly fall back to accounts icon
-            const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+          // Absolute priority: explicit logoUrl provided by the page/widget
+          if (logoUrl) {
+            try {
+              avatarWrap.innerHTML = `<img class="company-favicon" src="${logoUrl}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy">`;
+            } catch(_) { /* noop */ }
+          } else if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') {
+            // Helper will try multiple favicon sources; fallback to accounts icon if it fails
+            const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: '', domain, size: 28 });
             if (html && html.indexOf('company-favicon') !== -1) {
               avatarWrap.innerHTML = html;
             } else if (domain && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') {
@@ -1020,12 +1025,28 @@
             }
           } else if (domain && window.__pcFaviconHelper) {
             avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
+          } else if (domain) {
+            // Helper not available: fall back to direct favicon URL
+            const src = favicon || (domain ? `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}` : '');
+            if (src) {
+              avatarWrap.innerHTML = `<img class="company-favicon" src="${src}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy">`;
+            } else if (typeof window.__pcAccountsIcon === 'function') {
+              avatarWrap.innerHTML = window.__pcAccountsIcon();
+            }
           } else if (typeof window.__pcAccountsIcon === 'function') {
             avatarWrap.innerHTML = window.__pcAccountsIcon();
           }
-        } else if (favicon) {
-          // For individual contacts, show favicon if available
-          avatarWrap.innerHTML = `<img class="company-favicon" src="${favicon}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
+        } else {
+          // Individual contact: render initials avatar (letter glyphs)
+          const initials = (function(){
+            const n = (nameLine || '').trim();
+            if (!n) return '?';
+            const parts = n.split(/\s+/).filter(Boolean);
+            const a = parts[0] ? parts[0].charAt(0) : '';
+            const b = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+            return (a + b).toUpperCase();
+          })();
+          avatarWrap.innerHTML = `<div class="avatar-initials" aria-hidden="true">${initials}</div>`;
         }
       }
       const nameEl = box.querySelector('.contact-name');
@@ -3181,6 +3202,13 @@
       contactId: currentCallContext.contactId,
       contactName: currentCallContext.contactName
     });
+    
+    // Update the widget display with the new context
+    try {
+      setContactDisplay(currentCallContext, number);
+    } catch (e) {
+      console.warn('[Phone Widget] Failed to update contact display:', e);
+    }
     
     // Open phone widget if not already open
     if (!document.getElementById(WIDGET_ID)) {
