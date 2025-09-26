@@ -1347,6 +1347,15 @@
         .then(r => r.json()).then(j => {
           const call = j && j.ok && Array.isArray(j.calls) && j.calls[0];
           if (call && isReady(call)) { finalizeReady(call); return; }
+          // Kick background analyzer if we know a transcript SID but not ready yet
+          try {
+            const ci = call && call.conversationalIntelligence; const tsid = ci && (ci.transcriptSid || ci.transcriptSID);
+            if (tsid) {
+              fetch(`${base}/api/twilio/poll-ci-analysis`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ transcriptSid: tsid, callSid }) })
+                .then(()=>{})
+                .catch(()=>{});
+            }
+          } catch(_) {}
           if (attempts < maxAttempts) { setTimeout(attempt, delayMs); }
           else {
             try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}

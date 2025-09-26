@@ -120,13 +120,12 @@ window.SharedCIProcessor = (function() {
                 });
             }
 
-            // Start polling for completion
-            pollForCompletion(callSid, btn, {
-                context,
-                onSuccess,
-                onError,
-                onComplete
-            });
+            // Start polling for completion (and trigger background analyzer once)
+            try {
+                pollWithBackgroundTrigger(callSid, btn, { context, onSuccess, onError, onComplete });
+            } catch(_) {
+                pollForCompletion(callSid, btn, { context, onSuccess, onError, onComplete });
+            }
 
             return true;
 
