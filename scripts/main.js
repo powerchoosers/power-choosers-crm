@@ -2813,9 +2813,9 @@ class PowerChoosersCRM {
         }
     }
 
-    async loadTodaysTasks() {
-        const tasksList = document.querySelector('.tasks-list');
-        if (!tasksList) return;
+    async loadTodaysTasks(skipFirebase = false) {
+        const taskLists = Array.from(document.querySelectorAll('.tasks-list'));
+        if (!taskLists.length) return;
 
         // Helpers (scoped to this method)
         const parseDateStrict = (dateStr) => {
@@ -2849,35 +2849,50 @@ class PowerChoosersCRM {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        // Load tasks from both localStorage and Firebase
+        // Always load localStorage tasks first for immediate display
         let localTasks = [];
         try {
             localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
         } catch (_) { localTasks = []; }
 
-        let firebaseTasks = [];
-        try {
-            if (window.firebaseDB) {
-                const snapshot = await window.firebaseDB.collection('tasks')
-                    .orderBy('timestamp', 'desc')
-                    .limit(200)
-                    .get();
-                firebaseTasks = snapshot.docs.map(doc => {
-                    const data = doc.data() || {};
-                    const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-                    // Prefer the embedded id saved at creation time so it matches localStorage for dedupe
-                    return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
-                });
-            }
-        } catch (e) {
-            console.warn("Could not load tasks from Firebase for Today's Tasks widget:", e);
-        }
+        // Render local tasks immediately to prevent flicker
+        this.renderTodaysTasks(localTasks, parseDateStrict, parseTimeToMinutes, today);
 
-        // Merge and dedupe by task id (local tasks take precedence)
-        const allTasksMap = new Map();
-        localTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-        firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-        const allTasks = Array.from(allTasksMap.values());
+        // Then load Firebase tasks in background if not skipped
+        if (!skipFirebase) {
+            let firebaseTasks = [];
+            try {
+                if (window.firebaseDB) {
+                    const snapshot = await window.firebaseDB.collection('tasks')
+                        .orderBy('timestamp', 'desc')
+                        .limit(200)
+                        .get();
+                    firebaseTasks = snapshot.docs.map(doc => {
+                        const data = doc.data() || {};
+                        const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+                        // Prefer the embedded id saved at creation time so it matches localStorage for dedupe
+                        return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
+                    });
+                }
+            } catch (e) {
+                console.warn("Could not load tasks from Firebase for Today's Tasks widget:", e);
+            }
+            
+            // Merge and re-render with Firebase data
+            const allTasksMap = new Map();
+            localTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+            firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+            const mergedTasks = Array.from(allTasksMap.values());
+            
+            this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
+        }
+    }
+    
+    renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today) {
+        const tasksList = document.querySelector('.tasks-list');
+        if (!tasksList) return;
+
+        // allTasks is already merged and deduped by the caller (local first, then Firebase)
 
         // Filter to today's and overdue pending tasks
         let todaysTasks = allTasks.filter(task => {
@@ -2979,15 +2994,18 @@ class PowerChoosersCRM {
             `;
         }
 
-        tasksList.innerHTML = tasksHtml;
+        document.querySelectorAll('.tasks-list').forEach(list => { list.innerHTML = tasksHtml; });
 
         // Attach task click event listeners
-        tasksList.querySelectorAll('.task-item[data-task-id]').forEach(taskItem => {
+        document.querySelectorAll('.tasks-list').forEach(list => {
+          list.querySelectorAll('.task-item[data-task-id]').forEach(taskItem => {
             taskItem.addEventListener('click', (e) => {
                 e.preventDefault();
                 const taskId = taskItem.getAttribute('data-task-id');
                 if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
-                    window.TaskDetail.open(taskId, 'dashboard');
+                    // Use the actual current page as the navigation source so the back button returns correctly
+                    const current = (window.crm && window.crm.currentPage) ? window.crm.currentPage : (document.querySelector('.page.active')?.getAttribute('data-page') || 'dashboard');
+                    window.TaskDetail.open(taskId, current);
                 }
             });
             
@@ -3001,10 +3019,12 @@ class PowerChoosersCRM {
                     taskName.style.color = 'var(--grey-400)';
                 });
             }
+          });
         });
 
         // Attach pagination event listeners
-        tasksList.querySelectorAll('.pagination-btn').forEach(btn => {
+        document.querySelectorAll('.tasks-list').forEach(list => {
+          list.querySelectorAll('.pagination-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 const action = btn.getAttribute('data-action');
@@ -3016,6 +3036,7 @@ class PowerChoosersCRM {
                     this.loadTodaysTasks();
                 }
             });
+          });
         });
     }
 
@@ -3237,7 +3258,7 @@ window.__pcFaviconHelper = {
                              alt="" 
                              referrerpolicy="no-referrer" 
                              loading="lazy"
-                             style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;"
+                             style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;"
                              onerror="window.__pcFaviconHelper.onLogoError('${containerId}','${cleanDomain}',${size})">`;
             }
             if (domain) {
@@ -3268,12 +3289,15 @@ window.__pcFaviconHelper = {
         const cleanDomain = domain.replace(/^www\./i, '');
         const fallbackIcon = window.__pcAccountsIcon();
         
-        // Multiple favicon sources to try
+        // Multiple favicon sources to try - ordered by quality and reliability
         const faviconSources = [
-            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(cleanDomain)}`,
-            `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`,
-            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`,
-            `https://${cleanDomain}/favicon.ico`
+            `https://logo.clearbit.com/${encodeURIComponent(cleanDomain)}`, // Best for company logos
+            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(cleanDomain)}`, // Google's service
+            `https://favicons.githubusercontent.com/${encodeURIComponent(cleanDomain)}`, // GitHub's service  
+            `https://api.faviconkit.com/${encodeURIComponent(cleanDomain)}/${size}`, // FaviconKit API
+            `https://favicon.yandex.net/favicon/${encodeURIComponent(cleanDomain)}`, // Yandex service
+            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(cleanDomain)}.ico`, // DuckDuckGo
+            `https://${cleanDomain}/favicon.ico` // Direct favicon
         ];
 
         // Create a unique ID for this favicon container
@@ -3286,6 +3310,7 @@ window.__pcFaviconHelper = {
                  alt="" 
                  referrerpolicy="no-referrer" 
                  loading="lazy"
+                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;"
                  onload="window.__pcFaviconHelper.onFaviconLoad('${containerId}')"
                  onerror="window.__pcFaviconHelper.onFaviconError('${containerId}', '${cleanDomain}', ${size})" />
         `;
@@ -3308,12 +3333,15 @@ window.__pcFaviconHelper = {
         let currentIndex = parseInt(img.dataset.sourceIndex || '0');
         currentIndex++;
 
-        // Try next favicon source
+        // Try next favicon source - same order as generateFaviconHTML
         const faviconSources = [
-            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`,
-            `https://favicons.githubusercontent.com/${encodeURIComponent(domain)}`,
-            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`,
-            `https://${domain}/favicon.ico`
+            `https://logo.clearbit.com/${encodeURIComponent(domain)}`, // Best for company logos
+            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`, // Google's service
+            `https://favicons.githubusercontent.com/${encodeURIComponent(domain)}`, // GitHub's service
+            `https://api.faviconkit.com/${encodeURIComponent(domain)}/${size}`, // FaviconKit API
+            `https://favicon.yandex.net/favicon/${encodeURIComponent(domain)}`, // Yandex service
+            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`, // DuckDuckGo
+            `https://${domain}/favicon.ico` // Direct favicon
         ];
 
         if (currentIndex < faviconSources.length) {

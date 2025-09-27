@@ -1158,7 +1158,14 @@
           html += `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(id)}" aria-label="Select"${checked}></td>`;
           break;
         case 'name':
-          html += `<td><a href="#" class="company-link" data-account-id="${escapeHtml(id)}" data-account-name="${escapeHtml(acct)}">${acct}</a></td>`;
+          const favDomainAccount = a.domain || (()=>{
+            let d = String(a.website || '').trim();
+            if (/^https?:\/\//i.test(d)) {
+              try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
+            }
+            return d ? d.replace(/^www\./i, '') : '';
+          })();
+          html += `<td><a href="#" class="company-link" data-account-id="${escapeHtml(id)}" data-account-name="${escapeHtml(acct)}"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomainAccount, size: 32 }) : (favDomainAccount ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomainAccount, 32) : '') : '')}<span class="company-name">${acct}</span></span></a></td>`;
           break;
         case 'industry':
           html += `<td>${industry}</td>`;

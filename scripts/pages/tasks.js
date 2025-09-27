@@ -10,6 +10,25 @@
   };
   const els = {};
 
+  // Restore handler for back navigation from Task Detail
+  if (!document._tasksRestoreBound) {
+    document.addEventListener('pc:tasks-restore', (ev) => {
+      try {
+        const d = (ev && ev.detail) || {};
+        if (d.filterMode) state.filterMode = d.filterMode;
+        if (d.currentPage) {
+          const n = parseInt(d.currentPage, 10); if (!isNaN(n) && n > 0) state.currentPage = n;
+        }
+        if (Array.isArray(d.selectedItems)) state.selected = new Set(d.selectedItems);
+        render();
+        if (typeof d.scroll === 'number') {
+          setTimeout(() => { try { window.scrollTo(0, d.scroll); } catch(_) {} }, 80);
+        }
+      } catch (e) { console.warn('[Tasks] Restore failed', e); }
+    });
+    document._tasksRestoreBound = true;
+  }
+
   // Minimal inline icons
   function svgIcon(name){
     switch(name){
@@ -334,6 +353,15 @@
         e.preventDefault();
         const taskId = link.getAttribute('data-task-id');
         if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+          // Capture rich restore state for Tasks page
+          try {
+            window.__tasksRestoreData = {
+              currentPage: state.currentPage,
+              filterMode: state.filterMode,
+              selectedItems: Array.from(state.selected || []),
+              scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0
+            };
+          } catch(_) {}
           window.TaskDetail.open(taskId, 'tasks');
         }
       });
