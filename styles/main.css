@@ -5190,10 +5190,7 @@ html, body {
 #calls-table .company-link .company-favicon {
     width: 28px;
     height: 28px;
-    border-radius: 50%;
-    background: var(--bg-item, #3a3f46);
-    padding: 2px;
-    box-sizing: border-box;
+    border-radius: 6px;
     flex-shrink: 0;
     object-fit: cover;
 }
@@ -5453,12 +5450,9 @@ html, body {
 #list-detail-table .company-favicon {
     width: 28px;
     height: 28px;
-    border-radius: 50%;
+    border-radius: 6px;
     flex-shrink: 0;
     object-fit: cover;
-    background: var(--bg-item, #3a3f46);
-    padding: 2px;
-    box-sizing: border-box;
 }
 
 #list-detail-table .company-name {
@@ -8987,9 +8981,10 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* Account header favicon (fallback to initials avatar if image fails) */
 .contact-header-profile .avatar-favicon {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    width: 64px;
+    height: 64px;
+    border-radius: 6px;
+    object-fit: cover;
     display: block;
     background: var(--bg-item, #3a3f46);
     padding: 4px;
@@ -9966,6 +9961,7 @@ th.drag-over::after {
     height: 28px;
     flex-shrink: 0;
     object-fit: cover;
+    border-radius: 6px;
 }
 #people-table td .company-name {
     display: inline-block;
@@ -10002,6 +9998,7 @@ th.drag-over::after {
     height: 28px;
     flex-shrink: 0;
     object-fit: cover;
+    border-radius: 6px;
 }
 #accounts-table .name-cell .name-text {
     display: inline-block;
@@ -10335,9 +10332,16 @@ th.drag-over::after {
     height: 28px;
     flex-shrink: 0;
     object-fit: cover;
+    border-radius: 6px;
 }
 #people-table .company-name {
     display: inline-block;
+}
+
+/* Global favicon styling - consistent rounded edges */
+.company-favicon {
+    border-radius: 6px !important;
+    object-fit: cover;
 }
 
 /* Enhanced favicon container styling */
@@ -10353,6 +10357,7 @@ th.drag-over::after {
     height: 100%;
     object-fit: cover;
     transition: opacity 0.2s ease;
+    border-radius: 6px;
 }
 
 .company-favicon-container .company-favicon-fallback {
