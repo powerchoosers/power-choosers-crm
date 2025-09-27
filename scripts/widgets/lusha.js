@@ -1609,6 +1609,8 @@
       const data = await resp.json();
       const enriched = (data.contacts && data.contacts[0]) || null;
       if (enriched) {
+        // Track session credits for enrichments
+        trackSessionCredits('enrichments', 1);
         // Update CRM contact by email match
         await addContactToCRM(Object.assign({}, contact, enriched));
       }
@@ -1721,8 +1723,11 @@
       if (!enriched) {
         lushaLog('No enriched data returned');
         window.crm?.showToast && window.crm.showToast('No data available to reveal.');
-          return;
-        }
+        return;
+      }
+      
+      // Track session credits for reveals/enrichments
+      trackSessionCredits('reveals', 1);
       }
       if (!id) {
         lushaLog('No contact ID available for reveal');
@@ -2470,6 +2475,100 @@
     }
   }
 
+  // Session-based credit tracking
+  function initializeSessionTracking() {
+    if (!window.__lushaSessionTracking) {
+      window.__lushaSessionTracking = {
+        sessionStart: Date.now(),
+        creditsUsedThisSession: 0,
+        operations: {
+          searches: 0,
+          enrichments: 0,
+          reveals: 0
+        },
+        lastKnownUsage: null
+      };
+    }
+  }
+
+  // Track credits used in current session
+  function trackSessionCredits(operation, creditsUsed) {
+    initializeSessionTracking();
+    window.__lushaSessionTracking.creditsUsedThisSession += creditsUsed;
+    window.__lushaSessionTracking.operations[operation] = (window.__lushaSessionTracking.operations[operation] || 0) + creditsUsed;
+    console.log(`[Lusha Session] ${operation}: +${creditsUsed} credits (session total: ${window.__lushaSessionTracking.creditsUsedThisSession})`);
+  }
+
+  // Get session credit summary
+  function getSessionCreditSummary() {
+    initializeSessionTracking();
+    return {
+      sessionCreditsUsed: window.__lushaSessionTracking.creditsUsedThisSession,
+      operations: { ...window.__lushaSessionTracking.operations },
+      sessionStart: window.__lushaSessionTracking.sessionStart
+    };
+  }
+
+  // Cache usage data in Firebase
+  async function cacheUsageData(usageData) {
+    try {
+      const db = await getLushaCacheDB();
+      if (!db) {
+        // Fallback to localStorage
+        localStorage.setItem('lusha_usage_cache', JSON.stringify({
+          ...usageData,
+          cachedAt: Date.now()
+        }));
+        return;
+      }
+
+      const usageRef = db.collection('lusha_cache').doc('usage_data');
+      await usageRef.set({
+        ...usageData,
+        cachedAt: Date.now(),
+        lastUpdated: Date.now()
+      });
+      
+      console.log('[Lusha Usage] Cached usage data to Firebase');
+    } catch (e) {
+      console.warn('[Lusha Usage] Failed to cache usage data:', e);
+    }
+  }
+
+  // Load cached usage data
+  async function loadCachedUsageData() {
+    try {
+      const db = await getLushaCacheDB();
+      if (!db) {
+        // Fallback to localStorage
+        const cached = localStorage.getItem('lusha_usage_cache');
+        if (cached) {
+          const data = JSON.parse(cached);
+          // Use cache if less than 5 minutes old
+          if (Date.now() - data.cachedAt < 300000) {
+            return data;
+          }
+        }
+        return null;
+      }
+
+      const usageRef = db.collection('lusha_cache').doc('usage_data');
+      const snap = await usageRef.get();
+      
+      if (snap.exists) {
+        const data = snap.data();
+        // Use cache if less than 5 minutes old
+        if (Date.now() - data.cachedAt < 300000) {
+          return data;
+        }
+      }
+      return null;
+    } catch (e) {
+      console.warn('[Lusha Usage] Failed to load cached usage data:', e);
+      return null;
+    }
+  }
+
   // Debug logging function
   function lushaLog(){ /* debug disabled in production */ }
 
@@ -2930,7 +3029,21 @@
       const existingChip = listEl.querySelector('.lusha-credits-chip');
       if (existingChip) existingChip.remove();
       
-      const text = type === 'cached' ? '0 credits used (cached)' : `${credits} credit${credits !== 1 ? 's' : ''} used`;
+      // Track session credits
+      if (type !== 'cached' && credits > 0) {
+        trackSessionCredits('searches', credits);
+      }
+      
+      // Get session summary for display
+      const sessionSummary = getSessionCreditSummary();
+      const sessionCredits = sessionSummary.sessionCreditsUsed;
+      
+      let text;
+      if (type === 'cached') {
+        text = `0 credits used (cached) • ${sessionCredits} this session`;
+      } else {
+        text = `${credits} credit${credits !== 1 ? 's' : ''} used • ${sessionCredits} this session`;
+      }
       
       // Log credit usage for tracking
       console.log(`[Lusha Credit Usage] ${text} - Type: ${type}`);
@@ -3214,9 +3327,114 @@ function testLushaHoverEffects() {
 }
 window.testLushaHoverEffects = testLushaHoverEffects;
 
+// Render usage bar with cached data (immediate display)
+function renderUsageBarWithData(cachedData) {
+  try {
+    const usage = cachedData.usage || {};
+    const headers = cachedData.headers || {};
+    
+    const toNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // Allow manual override if your plan credits are known (e.g., 600)
+    const configuredTotal = (function(){
+      const fromWindow = toNum(window.LUSHA_CREDITS_TOTAL);
+      if (fromWindow != null) return fromWindow;
+      try { const ls = toNum(localStorage.getItem('LUSHA_CREDITS_TOTAL')); if (ls != null) return ls; } catch(_) {}
+      // Default to 600 credits if not configured
+      return 600;
+    })();
+
+    // Deterministic pick helper (accepts 0 as valid)
+    const pick = (...vals) => {
+      for (const v of vals) { const n = toNum(v); if (n != null) return n; }
+      return null;
+    };
+
+    // Prefer true credits if present in payload
+    const creditsTotal = pick(
+      configuredTotal,
+      usage.total,
+      usage.totalCredits,
+      usage?.credits?.total,
+      usage?.credits?.limit,
+      usage?.plan?.totalCredits,
+      usage?.plan?.limit,
+      usage?.account?.credits?.total,
+      usage?.account?.credits?.limit
+    );
+    const creditsUsed = pick(
+      usage.used,
+      usage.usedCredits,
+      usage?.credits?.used,
+      usage?.account?.credits?.used
+    );
+
+    let label = 'Credits';
+    let limit;
+    let used;
+
+    // Hard code to always show Usage/600 format
+    limit = 600; // Your 600-credit plan
+    used = (creditsUsed != null && creditsUsed >= 0) ? creditsUsed : 0;
+    label = 'Credits';
+
+    const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
+
+    // Anchor usage bar in persistent footer (not wiped by pagination)
+    const resultsEl = document.getElementById('lusha-results');
+    if (!resultsEl) return;
+    let footer = document.getElementById('lusha-usage-footer');
+    if (!footer) {
+      footer = document.createElement('div');
+      footer.id = 'lusha-usage-footer';
+      footer.className = 'lusha-usage-footer';
+      resultsEl.appendChild(footer);
+    }
+
+    let wrap = document.getElementById('lusha-usage-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'lusha-usage-wrap';
+      wrap.className = 'lusha-usage-wrap';
+      wrap.innerHTML = `
+          <div id="lusha-usage-label">${label}</div>
+        <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
+        <div id="lusha-usage-text">–</div>
+      `;
+      footer.appendChild(wrap);
+    } else if (wrap.parentElement !== footer) {
+      // If it exists somewhere else, move it to footer
+      footer.appendChild(wrap);
+    }
+
+    const fill = document.getElementById('lusha-usage-fill');
+    const txt = document.getElementById('lusha-usage-text');
+    const lab = document.getElementById('lusha-usage-label');
+    if (fill) fill.style.width = pct + '%';
+    
+    const displayText = limit ? `${used}/${limit}` : `${used} used`;
+    console.log('[Lusha Usage] Cached display - used:', used, 'limit:', limit, 'displayText:', displayText, 'pct:', pct);
+    
+    if (txt) txt.textContent = displayText;
+    if (lab) lab.textContent = label;
+  } catch (e) {
+    console.warn('[Lusha Usage] Failed to render cached usage bar:', e);
+  }
+}
+
 // Fetch and render live Lusha usage bar (rate-limited server endpoint)
 async function renderUsageBar(){
   try {
+    // First, try to load cached usage data for immediate display
+    const cachedUsage = await loadCachedUsageData();
+    if (cachedUsage) {
+      console.log('[Lusha Usage] Using cached usage data for immediate display');
+      renderUsageBarWithData(cachedUsage);
+    }
+
     // Throttle to avoid exceeding Lusha's ~5/minute usage endpoint limit
     const now = Date.now();
     try {
@@ -3275,6 +3493,9 @@ async function renderUsageBar(){
     const usage = data && data.usage ? data.usage : {};
     const headers = data && data.headers ? data.headers : {};
     console.log('[Lusha Usage] Parsed usage:', usage, 'headers:', headers);
+    
+    // Cache the usage data for immediate display next time
+    await cacheUsageData({ usage, headers });
 
     const toNum = (v) => {
       const n = Number(v);
@@ -3330,42 +3551,7 @@ async function renderUsageBar(){
 
     const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : 0;
 
-    // Anchor usage bar in persistent footer (not wiped by pagination)
-    const resultsEl = document.getElementById('lusha-results');
-    if (!resultsEl) return;
-    let footer = document.getElementById('lusha-usage-footer');
-    if (!footer) {
-      footer = document.createElement('div');
-      footer.id = 'lusha-usage-footer';
-      footer.className = 'lusha-usage-footer';
-      resultsEl.appendChild(footer);
-    }
-
-    let wrap = document.getElementById('lusha-usage-wrap');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'lusha-usage-wrap';
-      wrap.className = 'lusha-usage-wrap';
-      wrap.innerHTML = `
-          <div id="lusha-usage-label">${label}</div>
-        <div class="lusha-usage-bar"><div class="lusha-usage-fill" id="lusha-usage-fill"></div></div>
-        <div id="lusha-usage-text">–</div>
-      `;
-      footer.appendChild(wrap);
-    } else if (wrap.parentElement !== footer) {
-      // If it exists somewhere else, move it to footer
-      footer.appendChild(wrap);
-    }
-
-    const fill = document.getElementById('lusha-usage-fill');
-    const txt = document.getElementById('lusha-usage-text');
-    const lab = document.getElementById('lusha-usage-label');
-    if (fill) fill.style.width = pct + '%';
-    
-    const displayText = limit ? `${used}/${limit}` : `${used} used`;
-    console.log('[Lusha Usage] Final display - used:', used, 'limit:', limit, 'displayText:', displayText, 'pct:', pct);
-    
-    if (txt) txt.textContent = displayText;
-    if (lab) lab.textContent = label;
+    // Use the same rendering logic as cached data
+    renderUsageBarWithData({ usage, headers });
   } catch(_) {}
 }
