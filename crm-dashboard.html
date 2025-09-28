@@ -1532,12 +1532,12 @@
                     <div class="page" id="task-detail-page" data-page="task-detail">
                         <div class="page-container">
                             <div class="page-header">
+                                <button class="back-btn back-btn--icon" id="task-detail-back-btn" aria-label="Back to Tasks">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                    <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                                  </svg>
+                                </button>
                                 <div class="page-title-section">
-                                    <button class="back-btn back-btn--icon" id="task-detail-back-btn" aria-label="Back to Tasks">
-                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
-                                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
-                                      </svg>
-                                    </button>
                                     <div class="contact-header-text">
                                         <h2 class="page-title" id="task-detail-title">Task Details</h2>
                                         <div class="contact-subtitle" id="task-detail-subtitle">Loading task...</div>
@@ -1545,7 +1545,19 @@
                                 </div>
                                 <div class="page-actions">
                                     <button class="btn-secondary" id="task-reschedule-btn">Reschedule</button>
-                                    <button class="btn-primary" id="task-complete-btn">Complete Task</button>
+                                    <div class="task-navigation">
+                                        <button class="btn-primary" id="task-complete-btn">Complete Task</button>
+                                        <button class="btn-icon" id="task-prev-btn" aria-label="Previous Task" title="Previous Task">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M15 18l-6-6 6-6"/>
+                                            </svg>
+                                        </button>
+                                        <button class="btn-icon" id="task-next-btn" aria-label="Next Task" title="Next Task">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M9 18l6-6-6-6"/>
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -1577,22 +1589,7 @@
                         <!-- Today's Tasks -->
                         <div class="widget-card">
                             <h4 class="widget-title">Today's Tasks</h4>
-                            <div class="tasks-list">
-                                <div class="task-item">
-                                    <div class="task-info">
-                                        <div class="task-name">Call Johnson Electric</div>
-                                        <div class="task-time">Due in 2 hours</div>
-                                    </div>
-                                    <span class="priority-badge high">High</span>
-                                </div>
-                                <div class="task-item">
-                                    <div class="task-info">
-                                        <div class="task-name">Send proposal to Metro</div>
-                                        <div class="task-time">Due today</div>
-                                    </div>
-                                    <span class="priority-badge medium">Medium</span>
-                                </div>
-                            </div>
+                            <div class="tasks-list"><!-- Populated by main.js loadTodaysTasks() --></div>
                         </div>
 
                         <!-- Energy News -->
