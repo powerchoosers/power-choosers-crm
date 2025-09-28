@@ -1981,6 +1981,28 @@
           return;
         }
 
+        // Check if we came from Task Detail page
+        if (window._accountNavigationSource === 'task-detail') {
+          try {
+            const restore = window.__taskDetailRestoreData || {};
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('task-detail');
+              // Restore task detail state
+              setTimeout(() => {
+                try {
+                  if (restore.taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+                    window.TaskDetail.open(restore.taskId, restore.source || 'dashboard');
+                  }
+                } catch(_) {}
+              }, 80);
+            }
+            // Clear navigation markers after successful navigation
+            window._accountNavigationSource = null;
+            window.__taskDetailRestoreData = null;
+          } catch (_) { /* noop */ }
+          return;
+        }
+
         // Check if we came from Accounts page
         if (window._accountNavigationSource === 'accounts') {
           try {

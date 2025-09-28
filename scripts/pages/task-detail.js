@@ -7,6 +7,7 @@
     taskType: null,
     contact: null,
     account: null,
+    navigating: false,
     widgets: {
       maps: null,
       energy: null,
@@ -17,6 +18,26 @@
   const els = {};
 
   // Helper functions
+  function getPriorityBackground(priority) {
+    const p = (priority || '').toLowerCase().trim();
+    switch(p) {
+      case 'low': return '#495057';
+      case 'medium': return 'rgba(255, 193, 7, 0.15)';
+      case 'high': return 'rgba(220, 53, 69, 0.15)';
+      default: return '#495057';
+    }
+  }
+
+  function getPriorityColor(priority) {
+    const p = (priority || '').toLowerCase().trim();
+    switch(p) {
+      case 'low': return '#e9ecef';
+      case 'medium': return '#ffc107';
+      case 'high': return '#dc3545';
+      default: return '#e9ecef';
+    }
+  }
+
   function escapeHtml(str) {
     if (!str) return '';
     const div = document.createElement('div');
@@ -51,17 +72,37 @@
     style.type = 'text/css';
     style.textContent = `
       /* Task Detail Page Layout */
+      #task-detail-page .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        width: 100%;
+        padding: 25px 25px 25px 25px;
+        margin: 0;
+        gap: 20px; /* Space between back button and title section */
+      }
+
+      #task-detail-page .page-title-section {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        flex: 0 0 auto;
+        justify-content: flex-start;
+        margin-left: 45px; /* Move the entire title section to the right */
+        margin-top: -10px; /* Move glyph and text up 10px total */
+      }
       #task-detail-page .page-content { 
         display: grid; 
         grid-template-columns: 450px 1fr; /* Left column narrow, right column flexible */
         grid-template-rows: 1fr; /* Make the row fill the available height */
-        column-gap: 25px; /* Explicit 25px gap between columns only */
+        column-gap: 0px; /* Remove column gap to eliminate visual space */
         row-gap: 25px;
-        padding: 0 25px; /* Remove top/bottom padding so columns scroll under header/footer */
+        padding: 0; /* No padding on parent - let children handle their own spacing */
         height: calc(100vh - 140px); /* Account for header height */
-        overflow: hidden; /* Columns will scroll independently */
+        overflow: hidden; /* Restore hidden overflow for proper scrolling */
         justify-items: stretch; /* ensure items fill their grid tracks */
         align-items: start;     /* align items to the top */
+        width: 100%; /* Ensure full width */
       }
       /* Override any global styles that might affect grid gap */
       #task-detail-page .page-content > * {
@@ -77,6 +118,8 @@
         overscroll-behavior: contain;
         padding-top: 25px;  /* 25px distance from header at top */
         padding-bottom: 25px; /* 25px breathing room at bottom under last card */
+        padding-right: 25px; /* 25px padding from cards to scrollbar */
+        padding-left: 25px; /* 25px distance from left edge to cards */
         /* Allow the left column to fully occupy its grid track (no artificial max width) */
         max-width: none;
         width: 100%;
@@ -90,8 +133,13 @@
         overflow-y: auto; /* independent scroll */
         overscroll-behavior: contain;
         padding-top: 25px; /* 25px distance from header at top */
+        padding-right: 25px; /* 25px padding from cards to scrollbar */
+        padding-left: 25px; /* 25px distance from left edge to contact info */
         margin-top: 0; /* Remove any extra top margin */
+        margin-right: 0; /* Remove any right margin */
+        margin-left: 0; /* Remove any left margin */
         align-items: stretch; /* Align to top */
+        width: 100%; /* Ensure full width */
       }
       /* Ensure first child in sidebar has no extra top margin */
       #task-detail-page .sidebar-content > *:first-child {
@@ -99,22 +147,26 @@
       }
       
       /* Task Action Cards */
-      #task-detail-page .task-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; }
+      #task-detail-page .task-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; box-shadow: var(--elevation-card); }
       #task-detail-page .task-card .section-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-md) 0; }
       #task-detail-page .task-card .form-row { margin: var(--spacing-md) 0; display: block; }
       #task-detail-page .task-card .actions { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-base); }
       
       /* Company Summary Card */
-      #task-detail-page .company-summary-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; }
+      #task-detail-page .company-summary-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; box-shadow: var(--elevation-card); }
       #task-detail-page .company-summary-header { display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); }
       #task-detail-page .company-logo { width: 32px; height: 32px; border-radius: var(--border-radius-sm); background: var(--bg-item); display: flex; align-items: center; justify-content: center; }
       #task-detail-page .company-logo img { width: 100%; height: 100%; object-fit: contain; border-radius: var(--border-radius-sm); }
       #task-detail-page .company-logo-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; color: var(--text-secondary); }
       #task-detail-page .company-name { font-weight: 600; color: var(--text-primary); }
+      #task-detail-page .company-details { margin: var(--spacing-sm) 0; display: flex; flex-direction: column; gap: 4px; }
+      #task-detail-page .company-detail-item { display: flex; align-items: center; gap: var(--spacing-sm); }
+      #task-detail-page .detail-label { color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; min-width: 60px; }
+      #task-detail-page .detail-value { color: var(--text-primary); font-size: 0.9rem; }
       #task-detail-page .company-description { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.4; }
       
       /* Contact Information Grid */
-      #task-detail-page .contact-info-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; }
+      #task-detail-page .contact-info-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; width: 100%; box-shadow: var(--elevation-card); }
       #task-detail-page .contact-info-section .section-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-base) 0; }
       #task-detail-page .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm) var(--spacing-md); }
       #task-detail-page .info-row { display: flex; flex-direction: column; gap: 4px; }
@@ -127,6 +179,10 @@
       #task-detail-page .call-row { display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); }
       #task-detail-page .call-number { color: var(--text-secondary); font-family: monospace; }
       
+      /* Activity Section */
+      #task-detail-page .activity-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; box-shadow: var(--elevation-card); }
+      #task-detail-page .activity-section .section-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); margin: 0 0 var(--spacing-base) 0; }
+      
       /* Activity Timeline */
       #task-detail-page .activity-section { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); padding: var(--spacing-base); margin: 0; }
       #task-detail-page .activity-timeline { display: flex; flex-direction: column; gap: var(--spacing-sm); }
@@ -136,6 +192,137 @@
       #task-detail-page .activity-title { font-weight: 600; color: var(--text-primary); font-size: 0.9rem; }
       #task-detail-page .activity-time { color: var(--text-secondary); font-size: 0.8rem; }
       #task-detail-page .activity-placeholder { text-align: center; padding: var(--spacing-lg) 0; color: var(--text-secondary); }
+      
+      /* Avatar Styles - Match People Page */
+      #task-detail-page .avatar-initials {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--orange-subtle);
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+        vertical-align: middle;
+      }
+      
+      /* Absolutely positioned avatar - positioned relative to title section */
+      #task-detail-page .contact-header-text {
+        position: relative;
+      }
+      
+      #task-detail-page .avatar-absolute {
+        position: absolute;
+        left: -50px;
+        top: 8px;
+        z-index: 1;
+      }
+      
+      /* Contact Details Container - normal flow, no flex */
+      #task-detail-page .contact-details-normal {
+        line-height: 1.4;
+        position: relative;
+        z-index: 0;
+      }
+      
+      /* Task Contact Info - Ensure proper alignment */
+      #task-detail-page .task-contact-info {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+      }
+      
+      /* Task Navigation Buttons */
+      #task-detail-page .task-navigation {
+        display: flex;
+        gap: 8px;
+        margin-left: auto;
+        margin-right: 0;
+      }
+      
+      /* Ensure page-actions uses flexbox for proper alignment */
+      #task-detail-page .page-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto;
+      }
+      
+      #task-detail-page .btn-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition-fast);
+      }
+      
+      #task-detail-page .btn-icon:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+        border-color: var(--grey-500);
+      }
+      
+      #task-detail-page .btn-icon:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      
+      #task-detail-page .btn-icon:disabled:hover {
+        background: var(--bg-item);
+        color: var(--text-secondary);
+        border-color: var(--border-light);
+      }
+      
+      /* Contact Link Styles */
+      #task-detail-page .contact-link {
+        color: var(--grey-400);
+        text-decoration: none;
+        cursor: pointer;
+        transition: var(--transition-fast);
+        font-weight: 400;
+        vertical-align: baseline;
+        display: inline;
+      }
+      
+      #task-detail-page .contact-link:hover {
+        color: var(--text-inverse);
+        text-decoration: none;
+      }
+      
+      #task-detail-page .contact-link:focus-visible {
+        outline: 2px solid var(--orange-primary);
+        outline-offset: 2px;
+        border-radius: 2px;
+      }
+      
+      /* Company Link Styles - Match Contact Detail */
+      #task-detail-page .company-link {
+        color: var(--grey-400);
+        text-decoration: none;
+        cursor: pointer;
+        transition: var(--transition-fast);
+        font-weight: 400;
+      }
+      
+      #task-detail-page .company-link:hover {
+        color: var(--text-inverse);
+        text-decoration: none;
+      }
+      
+      #task-detail-page .company-link:focus-visible {
+        outline: 2px solid var(--orange-primary);
+        outline-offset: 2px;
+        border-radius: 2px;
+      }
       
       /* Responsive adjustments */
       @media (max-width: 1200px) {
@@ -177,20 +364,61 @@
     if (els.rescheduleBtn) {
       els.rescheduleBtn.addEventListener('click', handleTaskReschedule);
     }
+    
+    // Task navigation buttons
+    const prevBtn = document.getElementById('task-prev-btn');
+    const nextBtn = document.getElementById('task-next-btn');
+    
+    if (prevBtn) {
+      prevBtn.addEventListener('click', (e) => { e.preventDefault(); navigateToAdjacentTask('prev'); });
+    }
+    
+    if (nextBtn) {
+      nextBtn.addEventListener('click', (e) => { e.preventDefault(); navigateToAdjacentTask('next'); });
+    }
   }
 
   function handleBackNavigation() {
     try {
-      const src = window._taskNavigationSource || (window._taskNavigation && window._taskNavigation.source) || '';
+      // Standardize navigation source detection to match account detail pattern
+      const src = window._taskNavigationSource || '';
       // Default action helper
       const nav = (page) => { if (window.crm && typeof window.crm.navigateToPage === 'function') { window.crm.navigateToPage(page); } };
 
       if (src === 'account-details') {
+        // Handle account details navigation with proper state restoration
+        const restore = window.__accountDetailsRestoreData || {};
         nav('account-details');
+        setTimeout(() => {
+          try { 
+            // Restore account details state if available
+            if (restore.accountId && window.showAccountDetail && typeof window.showAccountDetail === 'function') {
+              window.showAccountDetail(restore.accountId);
+            }
+            // Dispatch account details restore event
+            document.dispatchEvent(new CustomEvent('pc:account-details-restore', { detail: restore || {} }));
+            console.log('[Task Detail] Restored account details state:', restore);
+          } catch(_) {}
+        }, 80);
+        return;
+      }
+      if (src === 'task-detail') {
+        // Handle task detail navigation (when coming back from account detail)
+        const restore = window.__taskDetailRestoreData || {};
+        nav('task-detail');
+        setTimeout(() => {
+          try { 
+            // Restore task detail state if available
+            if (restore.taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+              window.TaskDetail.open(restore.taskId, restore.source || 'dashboard');
+            }
+            console.log('[Task Detail] Restored task detail state:', restore);
+          } catch(_) {}
+        }, 80);
         return;
       }
       if (src === 'accounts') {
-        const restore = window.__accountsRestoreData || (window.accountsModule && typeof window.accountsModule.getCurrentState==='function' ? window.accountsModule.getCurrentState() : null);
+        const restore = window._accountsReturn || window.__accountsRestoreData || (window.accountsModule && typeof window.accountsModule.getCurrentState==='function' ? window.accountsModule.getCurrentState() : null);
         nav('accounts');
         setTimeout(() => {
           try { window.accountsModule && typeof window.accountsModule.rebindDynamic==='function' && window.accountsModule.rebindDynamic(); } catch(_) {}
@@ -215,7 +443,32 @@
         }, 80);
         return;
       }
-      if (src === 'dashboard') { nav('dashboard'); return; }
+      if (src === 'dashboard') {
+        // Handle dashboard navigation with proper state restoration
+        const restore = window._dashboardReturn || { scroll: 0 };
+        nav('dashboard');
+        setTimeout(() => {
+          try { 
+            // Restore dashboard scroll position
+            if (restore.scroll && restore.scroll > 0) {
+              window.scrollTo(0, restore.scroll);
+            }
+            // Restore Today's Tasks widget state if available
+            if (restore.dashboardState && window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+              // Restore Today's Tasks pagination
+              if (restore.dashboardState.todaysTasksPage && window.crm.todaysTasksPagination) {
+                window.crm.todaysTasksPagination.currentPage = restore.dashboardState.todaysTasksPage;
+              }
+              // Reload Today's Tasks to reflect restored state
+              window.crm.loadTodaysTasks();
+            }
+            // Dispatch dashboard restore event
+            document.dispatchEvent(new CustomEvent('pc:dashboard-restore', { detail: restore || {} }));
+            console.log('[Task Detail] Restored dashboard state:', restore);
+          } catch(_) {}
+        }, 80);
+        return;
+      }
       if (src) { nav(src); return; }
       // Fallback: go to tasks
       nav('tasks');
@@ -281,13 +534,297 @@
       detail: { source: 'taskCompletion' } 
     }));
     
-    // Navigate back
-    handleBackNavigation();
+    // Navigate to next task instead of going back
+    try {
+      await navigateToAdjacentTask('next');
+    } catch (e) {
+      console.warn('Could not navigate to next task, falling back to previous page:', e);
+      // Fallback: navigate back if no next task available
+      handleBackNavigation();
+    }
   }
 
   function handleTaskReschedule() {
     // TODO: Implement reschedule functionality
     console.log('Reschedule task:', state.currentTask);
+  }
+
+  async function navigateToAdjacentTask(direction) {
+    if (!state.currentTask) return;
+    
+    // Prevent multiple rapid clicks
+    if (state.navigating) {
+      console.log('Navigation already in progress, ignoring click');
+      return;
+    }
+    
+    state.navigating = true;
+    
+    try {
+      // Get all tasks from the same source (localStorage + Firebase)
+      let allTasks = [];
+      
+      // Load from localStorage
+      try {
+        const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        allTasks = [...userTasks];
+      } catch (_) { allTasks = []; }
+      
+      // Load from Firebase
+      if (window.firebaseDB) {
+        try {
+          const snapshot = await window.firebaseDB.collection('tasks')
+            .orderBy('timestamp', 'desc')
+            .limit(200)
+            .get();
+          const firebaseTasks = snapshot.docs.map(doc => {
+            const data = doc.data() || {};
+            const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+            return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
+          });
+          
+          // Merge with localStorage (local takes precedence for duplicates)
+          const allTasksMap = new Map();
+          allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+          firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          allTasks = Array.from(allTasksMap.values());
+        } catch (e) {
+          console.warn('Could not load tasks from Firebase for navigation:', e);
+        }
+      }
+      
+      // Filter to today's and overdue pending tasks (same logic as Today's Tasks widget)
+      const today = new Date();
+      const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      const parseDateStrict = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+          if (dateStr.includes('/')) {
+            const [mm, dd, yyyy] = dateStr.split('/').map(n => parseInt(n, 10));
+            if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+          } else if (dateStr.includes('-')) {
+            const [yyyy, mm, dd] = dateStr.split('-').map(n => parseInt(n, 10));
+            if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+          }
+          const d = new Date(dateStr);
+          if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        } catch (_) { /* noop */ }
+        return null;
+      };
+      
+      const todaysTasks = allTasks.filter(task => {
+        if ((task.status || 'pending') !== 'pending') return false;
+        const d = parseDateStrict(task.dueDate);
+        if (!d) return false;
+        return d.getTime() <= localMidnight.getTime();
+      });
+      
+      // Sort by due date/time (earliest to latest)
+      todaysTasks.sort((a, b) => {
+        const da = parseDateStrict(a.dueDate);
+        const db = parseDateStrict(b.dueDate);
+        if (da && db) {
+          const dd = da - db;
+          if (dd !== 0) return dd;
+        } else if (da && !db) {
+          return -1;
+        } else if (!da && db) {
+          return 1;
+        }
+        
+        const parseTimeToMinutes = (timeStr) => {
+          if (!timeStr || typeof timeStr !== 'string') return NaN;
+          const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+          if (!m) return NaN;
+          let h = parseInt(m[1], 10);
+          const mins = parseInt(m[2], 10);
+          const ap = m[3].toUpperCase();
+          if (h === 12) h = 0;
+          if (ap === 'PM') h += 12;
+          return h * 60 + mins;
+        };
+        
+        const ta = parseTimeToMinutes(a.dueTime);
+        const tb = parseTimeToMinutes(b.dueTime);
+        const taValid = !isNaN(ta), tbValid = !isNaN(tb);
+        if (taValid && tbValid) {
+          const td = ta - tb; if (td !== 0) return td;
+        } else if (taValid && !tbValid) {
+          return -1;
+        } else if (!taValid && tbValid) {
+          return 1;
+        }
+        
+        return (a.createdAt || 0) - (b.createdAt || 0);
+      });
+      
+      // Find current task index
+      const currentIndex = todaysTasks.findIndex(task => task.id === state.currentTask.id);
+      if (currentIndex === -1) {
+        console.log('Current task not found in filtered list');
+        return;
+      }
+      
+      // Calculate next/previous index
+      let targetIndex;
+      if (direction === 'next') {
+        targetIndex = currentIndex + 1;
+      } else {
+        targetIndex = currentIndex - 1;
+      }
+      
+      // Check bounds - don't navigate if at the end
+      if (targetIndex < 0 || targetIndex >= todaysTasks.length) {
+        console.log(`Navigation ${direction} blocked: targetIndex ${targetIndex}, total tasks ${todaysTasks.length}`);
+        return;
+      }
+      
+      // Navigate to the target task
+      const targetTask = todaysTasks[targetIndex];
+      if (targetTask && targetTask.id) {
+        console.log(`Navigating ${direction} from task ${currentIndex} to task ${targetIndex}: ${targetTask.title}`);
+        // Load the target task data directly instead of calling TaskDetail.open
+        await loadTaskData(targetTask.id);
+      }
+      
+    } catch (error) {
+      console.error('Error navigating to adjacent task:', error);
+    } finally {
+      // Reset navigation flag after a short delay
+      setTimeout(() => {
+        state.navigating = false;
+      }, 500);
+    }
+  }
+
+  async function updateNavigationButtons() {
+    if (!state.currentTask) return;
+    
+    const prevBtn = document.getElementById('task-prev-btn');
+    const nextBtn = document.getElementById('task-next-btn');
+    
+    if (!prevBtn || !nextBtn) return;
+    
+    try {
+      // Get all tasks (same logic as navigation)
+      let allTasks = [];
+      
+      // Load from localStorage
+      try {
+        const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        allTasks = [...userTasks];
+      } catch (_) { allTasks = []; }
+      
+      // Load from Firebase
+      if (window.firebaseDB) {
+        try {
+          const snapshot = await window.firebaseDB.collection('tasks')
+            .orderBy('timestamp', 'desc')
+            .limit(200)
+            .get();
+          const firebaseTasks = snapshot.docs.map(doc => {
+            const data = doc.data() || {};
+            const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+            return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
+          });
+          
+          // Merge with localStorage
+          const allTasksMap = new Map();
+          allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+          firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          allTasks = Array.from(allTasksMap.values());
+        } catch (e) {
+          console.warn('Could not load tasks from Firebase for navigation buttons:', e);
+        }
+      }
+      
+      // Filter to today's and overdue pending tasks
+      const today = new Date();
+      const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      const parseDateStrict = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+          if (dateStr.includes('/')) {
+            const [mm, dd, yyyy] = dateStr.split('/').map(n => parseInt(n, 10));
+            if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+          } else if (dateStr.includes('-')) {
+            const [yyyy, mm, dd] = dateStr.split('-').map(n => parseInt(n, 10));
+            if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+          }
+          const d = new Date(dateStr);
+          if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        } catch (_) { /* noop */ }
+        return null;
+      };
+      
+      const todaysTasks = allTasks.filter(task => {
+        if ((task.status || 'pending') !== 'pending') return false;
+        const d = parseDateStrict(task.dueDate);
+        if (!d) return false;
+        return d.getTime() <= localMidnight.getTime();
+      });
+      
+      // Sort by due date/time (same logic as navigation)
+      todaysTasks.sort((a, b) => {
+        const da = parseDateStrict(a.dueDate);
+        const db = parseDateStrict(b.dueDate);
+        if (da && db) {
+          const dd = da - db;
+          if (dd !== 0) return dd;
+        } else if (da && !db) {
+          return -1;
+        } else if (!da && db) {
+          return 1;
+        }
+        
+        const parseTimeToMinutes = (timeStr) => {
+          if (!timeStr || typeof timeStr !== 'string') return NaN;
+          const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+          if (!m) return NaN;
+          let h = parseInt(m[1], 10);
+          const mins = parseInt(m[2], 10);
+          const ap = m[3].toUpperCase();
+          if (h === 12) h = 0;
+          if (ap === 'PM') h += 12;
+          return h * 60 + mins;
+        };
+        
+        const ta = parseTimeToMinutes(a.dueTime);
+        const tb = parseTimeToMinutes(b.dueTime);
+        const taValid = !isNaN(ta), tbValid = !isNaN(tb);
+        if (taValid && tbValid) {
+          const td = ta - tb; if (td !== 0) return td;
+        } else if (taValid && !tbValid) {
+          return -1;
+        } else if (!taValid && tbValid) {
+          return 1;
+        }
+        
+        return (a.createdAt || 0) - (b.createdAt || 0);
+      });
+      
+      // Find current task index
+      const currentIndex = todaysTasks.findIndex(task => task.id === state.currentTask.id);
+      
+      // Update button states
+      if (currentIndex === -1) {
+        // Current task not found in filtered list
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+      } else {
+        // Enable/disable based on position
+        prevBtn.disabled = currentIndex === 0;
+        nextBtn.disabled = currentIndex === todaysTasks.length - 1;
+      }
+      
+    } catch (error) {
+      console.error('Error updating navigation buttons:', error);
+      // Disable both buttons on error
+      prevBtn.disabled = true;
+      nextBtn.disabled = true;
+    }
   }
 
   async function loadTaskData(taskId) {
@@ -387,35 +924,96 @@
     if (els.subtitle) {
       const dueDate = state.currentTask.dueDate;
       const dueTime = state.currentTask.dueTime;
+      els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
+    }
+    
+    // For phone tasks, add contact name with avatar and company info underneath the title
+    if (state.taskType === 'phone-call') {
+      const contactName = state.currentTask.contact || '';
+      const accountName = state.currentTask.account || '';
+      const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
+        const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+        return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+      }) : null) || {};
+      const title = person.title || '';
+      const company = person.companyName || accountName;
       
-      // For phone tasks, add contact title and company info after due date
-      if (state.taskType === 'phone-call') {
-        const contactName = state.currentTask.contact || '';
-        const accountName = state.currentTask.account || '';
-        const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
-          const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
-          return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
-        }) : null) || {};
-        const title = person.title || '';
-        const company = person.companyName || accountName;
+      // Compute initials for avatar (same logic as people.js)
+      const initials = (() => {
+        const parts = String(contactName || '').trim().split(/\s+/).filter(Boolean);
+        const chars = parts.length > 1 ? [parts[0][0], parts[parts.length - 1][0]] : (parts[0] ? [parts[0][0]] : []);
+        const str = chars.join('').toUpperCase();
+        if (str) return str;
+        const e = String(person.email || '').trim();
+        return e ? e[0].toUpperCase() : '?';
+      })();
+      
+      // Update the main title to include clickable contact name
+      if (els.title && contactName) {
+        const contactId = person.id || '';
+        const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
+        els.title.innerHTML = `Call ${contactLinkHTML}`;
+      }
+      
+      // Create or update contact info element (no avatar here)
+      let contactInfoEl = document.getElementById('task-contact-info');
+      if (!contactInfoEl) {
+        contactInfoEl = document.createElement('div');
+        contactInfoEl.id = 'task-contact-info';
+        contactInfoEl.className = 'task-contact-info';
+        contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
         
-        let subtitle = `Due: ${dueDate} at ${dueTime}`;
-        if (title && company) {
-          subtitle += ` • ${title} at ${company}`;
-        } else if (title) {
-          subtitle += ` • ${title}`;
-        } else if (company) {
-          subtitle += ` • ${company}`;
+        // Insert between title and subtitle
+        const titleSection = document.querySelector('.contact-header-text');
+        const subtitle = document.getElementById('task-detail-subtitle');
+        if (titleSection && subtitle) {
+          titleSection.insertBefore(contactInfoEl, subtitle);
+        }
+      }
+      
+      // Create contact details content (no avatar here)
+      let contactDetailsHTML = '';
+      
+      if (title && company) {
+        const linkedAccount = findAssociatedAccount(person);
+        const accountId = linkedAccount?.id || '';
+        const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
+        contactDetailsHTML = `${title} at ${companyLink}`;
+      } else if (title) {
+        contactDetailsHTML = title;
+      } else if (company) {
+        const linkedAccount = findAssociatedAccount(person);
+        const accountId = linkedAccount?.id || '';
+        const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
+        contactDetailsHTML = companyLink;
+      }
+      
+      // Set the contact details content
+      contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
+      
+      // Add absolutely positioned avatar to the main title container
+      const titleSection = document.querySelector('.contact-header-text');
+      if (titleSection) {
+        // Remove any existing avatar
+        const existingAvatar = titleSection.querySelector('.avatar-initials');
+        if (existingAvatar) {
+          existingAvatar.remove();
         }
         
-        els.subtitle.textContent = subtitle;
-      } else {
-        els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
+        // Add the avatar positioned relative to the title section
+        const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true">${escapeHtml(initials)}</span>`;
+        titleSection.insertAdjacentHTML('beforeend', avatarHTML);
       }
     }
     
     // Render task-specific content (split layout similar to Apollo screenshot)
     renderTaskContent();
+    
+    // Add company link event handlers
+    setupCompanyLinkHandlers();
+    
+    // Add contact link event handlers
+    setupContactLinkHandlers();
     
     // Load widgets
     loadTaskWidgets();
@@ -429,6 +1027,57 @@
     try {
       if ((state.taskType||'') === 'phone-call') embedContactDetails();
     } catch (_) {}
+    
+    // Update navigation button states
+    updateNavigationButtons();
+  }
+
+  function setupCompanyLinkHandlers() {
+    // Add click handlers for company links
+    const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
+    companyLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const accountId = link.getAttribute('data-account-id');
+        const accountName = link.getAttribute('data-account-name');
+        
+        // Capture task detail state for back navigation
+        if (state.currentTask) {
+          window.__taskDetailRestoreData = {
+            taskId: state.currentTask.id,
+            source: window._taskNavigationSource || 'dashboard',
+            timestamp: Date.now()
+          };
+          // Set navigation source for account details
+          window._accountNavigationSource = 'task-detail';
+        }
+        
+        if (accountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          try {
+            window.AccountDetail.show(accountId);
+          } catch (error) {
+            console.error('Failed to navigate to account detail:', error);
+          }
+        } else if (accountName && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          // Fallback: try to find account by name
+          try {
+            if (typeof window.getAccountsData === 'function') {
+              const accounts = window.getAccountsData() || [];
+              const account = accounts.find(acc => {
+                const accName = (acc.accountName || acc.name || acc.companyName || '').toLowerCase().trim();
+                const searchName = accountName.toLowerCase().trim();
+                return accName === searchName || accName.includes(searchName) || searchName.includes(accName);
+              });
+              if (account) {
+                window.AccountDetail.show(account.id);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to find account by name:', error);
+          }
+        }
+      });
+    });
   }
 
   function renderTaskContent() {
@@ -480,6 +1129,12 @@
     
   // Get account information if available
     const linkedAccount = findAssociatedAccount(person) || null;
+    
+    // Get location data from both contact and account
+    const finalCity = city || linkedAccount?.city || linkedAccount?.locationCity || '';
+    const finalState = stateVal || linkedAccount?.state || linkedAccount?.locationState || '';
+    const finalIndustry = industry || linkedAccount?.industry || '';
+    
     const electricitySupplier = linkedAccount?.electricitySupplier || '';
     const annualUsage = linkedAccount?.annualUsage || '';
     const currentRate = linkedAccount?.currentRate || '';
@@ -546,7 +1201,17 @@
             <div class="company-logo">
               ${companyIconHTML}
             </div>
-            <div class="company-name">${escapeHtml(companyName || 'Unknown Company')}</div>
+            <div class="company-name">${companyName ? `<a href="#account-details" class="company-link" id="task-company-link" title="View account details" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName)}">${escapeHtml(companyName)}</a>` : 'Unknown Company'}</div>
+          </div>
+          <div class="company-details">
+            <div class="company-detail-item">
+              <span class="detail-label">Location:</span>
+              <span class="detail-value">${finalCity && finalState ? `${escapeHtml(finalCity)}, ${escapeHtml(finalState)}` : (finalCity ? escapeHtml(finalCity) : (finalState ? escapeHtml(finalState) : '--'))}</span>
+            </div>
+            <div class="company-detail-item">
+              <span class="detail-label">Industry:</span>
+              <span class="detail-value">${escapeHtml(finalIndustry) || '--'}</span>
+            </div>
           </div>
           <div class="company-description">
             ${companyDescriptionHTML}
@@ -569,7 +1234,7 @@
             </div>
             <div class="info-row">
               <div class="info-label">COMPANY</div>
-              <div class="info-value ${!companyName ? 'empty' : ''}">${escapeHtml(companyName) || '--'}</div>
+              <div class="info-value ${!companyName ? 'empty' : ''}">${companyName ? `<a href="#account-details" class="company-link" id="task-contact-company-link" title="View account details" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName)}">${escapeHtml(companyName)}</a>` : '--'}</div>
             </div>
             <div class="info-row">
               <div class="info-label">CITY</div>
@@ -720,7 +1385,7 @@
             </div>
             <div class="info-item">
               <label>Priority</label>
-              <div class="info-value priority-badge ${task.priority}">${task.priority}</div>
+              <div class="info-value priority-badge ${task.priority}" style="background: ${getPriorityBackground(task.priority)}; color: ${getPriorityColor(task.priority)};">${task.priority}</div>
             </div>
             <div class="info-item">
               <label>Status</label>
@@ -901,15 +1566,71 @@
     }
   }
 
+  // Setup contact link handlers
+  function setupContactLinkHandlers() {
+    // Handle contact link clicks in header
+    document.addEventListener('click', (e) => {
+      const contactLink = e.target.closest('.contact-link');
+      if (!contactLink) return;
+      
+      e.preventDefault();
+      
+      const contactId = contactLink.getAttribute('data-contact-id');
+      const contactName = contactLink.getAttribute('data-contact-name');
+      
+      if (contactId && window.ContactDetail) {
+        // Capture task detail state for back navigation
+        window.__taskDetailRestoreData = {
+          taskId: state.currentTask?.id,
+          taskType: state.currentTask?.type,
+          contact: state.currentTask?.contact,
+          account: state.currentTask?.account,
+          scroll: window.scrollY || 0,
+          timestamp: Date.now()
+        };
+        
+        // Set navigation source for back button
+        window._contactNavigationSource = 'task-detail';
+        window._contactNavigationContactId = contactId;
+        
+        // Navigate to contact detail
+        if (window.crm && typeof window.crm.navigateToPage === 'function') {
+          window.crm.navigateToPage('people');
+          
+          // Use retry pattern to ensure ContactDetail module is ready
+          requestAnimationFrame(() => {
+            let attempts = 0;
+            const maxAttempts = 25; // 2 seconds at 80ms intervals
+            
+            const tryShowContact = () => {
+              if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                window.ContactDetail.show(contactId);
+              } else if (attempts < maxAttempts) {
+                attempts++;
+                setTimeout(tryShowContact, 80);
+              } else {
+                console.warn('ContactDetail module not ready after 2 seconds');
+              }
+            };
+            
+            tryShowContact();
+          });
+        }
+      }
+    });
+  }
+
   // Public API
   window.TaskDetail = {
     open: async function(taskId, navigationSource = 'tasks') {
       try {
-        // Determine and store navigation source and return state (prefer CRM route state)
+        // CRITICAL: Capture navigation source BEFORE calling navigateToPage
+        // Standardize navigation source detection to match account detail pattern
         const crmPage = (window.crm && window.crm.currentPage) ? String(window.crm.currentPage) : '';
         const active = document.querySelector('.page.active');
         const domPage = active ? (active.getAttribute('data-page') || active.id || '').replace('-page','') : '';
         let src = navigationSource || crmPage || domPage || 'tasks';
+        
         // Normalize aliases
         const alias = {
           'account-detail': 'account-details',
@@ -918,22 +1639,40 @@
           'contact-details': 'people'
         };
         if (alias[src]) src = alias[src];
+        
+        // Use single, reliable navigation source pattern like account detail
         window._taskNavigationSource = src;
-        window._taskNavigation = { source: src, time: Date.now() };
 
-        // Capture per-page restore data
+        // Capture comprehensive per-page restore data
         if (src === 'accounts' && window.accountsModule && typeof window.accountsModule.getCurrentState==='function') {
-          window.__accountsRestoreData = window.accountsModule.getCurrentState();
+          // Add small delay to ensure DOM elements are ready
+          setTimeout(() => {
+            window.__accountsRestoreData = window.accountsModule.getCurrentState();
+          }, 50);
         } else if (src === 'people' && window.peopleModule && typeof window.peopleModule.getCurrentState==='function') {
           window.__peopleRestoreData = window.peopleModule.getCurrentState();
         } else if (src === 'tasks') {
-          // Basic scroll-only restore for Tasks page
-          window.__tasksRestoreData = { scroll: window.scrollY || 0 };
+          // Enhanced restore data for Tasks page
+          window.__tasksRestoreData = { 
+            scroll: window.scrollY || 0,
+            timestamp: Date.now()
+          };
           window.__tasksScrollY = window.scrollY || 0;
+        } else if (src === 'dashboard') {
+          // Dashboard state should already be captured in main.js
+          // Just ensure we have a fallback
+          if (!window._dashboardReturn) {
+            window._dashboardReturn = {
+              page: 'dashboard',
+              scroll: window.scrollY || 0,
+              timestamp: Date.now()
+            };
+          }
         }
+        
       } catch (_) { /* noop */ }
       
-      // Navigate to task detail page first
+      // Navigate to task detail page AFTER capturing navigation source
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
         window.crm.navigateToPage('task-detail');
       }

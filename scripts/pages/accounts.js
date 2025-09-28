@@ -49,7 +49,7 @@
         }
         
         // Re-render with restored state
-        render();
+        applyFilters();
         
         // Restore scroll position with multiple attempts
         const y = parseInt(detail.scroll || 0, 10);
@@ -145,7 +145,7 @@
           if (restore.sortColumn) state.sortColumn = restore.sortColumn;
           if (restore.sortDirection) state.sortDirection = restore.sortDirection;
           
-          render();
+          applyFilters();
           
           const y = parseInt(restore.scroll || 0, 10);
           if (y > 0) {
@@ -1796,7 +1796,7 @@
         // Add any account-specific filters here
       },
       searchTerm: els.quickSearch?.value || '',
-      selectedItems: getSelectedAccounts().map(a => a.id || a.accountId || a._id),
+      selectedItems: [], // TODO: Implement getSelectedAccounts function if needed
       sortColumn: state.sortColumn || '',
       sortDirection: state.sortDirection || 'asc',
       timestamp: Date.now()

@@ -475,6 +475,9 @@ class PowerChoosersCRM {
     }
 
     navigateToPage(pageName) {
+        // Update current page tracking
+        this.currentPage = pageName;
+        
         // Hide all pages
         document.querySelectorAll('.page').forEach(page => {
             page.classList.remove('active');
@@ -2813,6 +2816,32 @@ class PowerChoosersCRM {
         }
     }
 
+    getPriorityBackground(priority) {
+        console.log('🎨 BACKGROUND called with:', priority);
+        const p = (priority || '').toLowerCase().trim();
+        switch(p) {
+            case 'low': return '#495057';
+            case 'medium': return 'rgba(255, 193, 7, 0.15)';
+            case 'high': return 'rgba(220, 53, 69, 0.15)';
+            default: 
+                console.log('⚠️ DEFAULT background for priority:', priority);
+                return '#495057';
+        }
+    }
+
+    getPriorityColor(priority) {
+        console.log('🎨 COLOR called with:', priority);
+        const p = (priority || '').toLowerCase().trim();
+        switch(p) {
+            case 'low': return '#e9ecef';
+            case 'medium': return '#ffc107';
+            case 'high': return '#dc3545';
+            default: 
+                console.log('⚠️ DEFAULT color for priority:', priority);
+                return '#e9ecef';
+        }
+    }
+
     async loadTodaysTasks(skipFirebase = false) {
         const taskLists = Array.from(document.querySelectorAll('.tasks-list'));
         if (!taskLists.length) return;
@@ -2848,43 +2877,49 @@ class PowerChoosersCRM {
         // Today's local midnight
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        // Always load localStorage tasks first for immediate display
+        
+        // Load localStorage tasks first for immediate rendering
         let localTasks = [];
         try {
             localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
         } catch (_) { localTasks = []; }
 
-        // Render local tasks immediately to prevent flicker
+        // Always render immediately from localStorage cache first
         this.renderTodaysTasks(localTasks, parseDateStrict, parseTimeToMinutes, today);
 
-        // Then load Firebase tasks in background if not skipped
+        // If not skipping Firebase, fetch Firebase data in background and update
         if (!skipFirebase) {
-            let firebaseTasks = [];
             try {
                 if (window.firebaseDB) {
                     const snapshot = await window.firebaseDB.collection('tasks')
                         .orderBy('timestamp', 'desc')
                         .limit(200)
                         .get();
-                    firebaseTasks = snapshot.docs.map(doc => {
+                    const firebaseTasks = snapshot.docs.map(doc => {
                         const data = doc.data() || {};
                         const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-                        // Prefer the embedded id saved at creation time so it matches localStorage for dedupe
                         return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
                     });
+                    
+                    // Merge with localStorage (local takes precedence for duplicates)
+                    const allTasksMap = new Map();
+                    localTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+                    firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+                    const mergedTasks = Array.from(allTasksMap.values());
+                    
+                    // Save merged data back to localStorage cache for next refresh
+                    try {
+                        localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
+                    } catch (e) {
+                        console.warn('Could not save merged tasks to localStorage cache:', e);
+                    }
+                    
+                    // Re-render with complete merged data
+                    this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
                 }
             } catch (e) {
                 console.warn("Could not load tasks from Firebase for Today's Tasks widget:", e);
             }
-            
-            // Merge and re-render with Firebase data
-            const allTasksMap = new Map();
-            localTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-            firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
-            const mergedTasks = Array.from(allTasksMap.values());
-            
-            this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
         }
     }
     
@@ -2962,13 +2997,14 @@ class PowerChoosersCRM {
         } else {
             tasksHtml = pageTasks.map(task => {
                 const timeText = this.getTaskTimeText(task);
+                console.log('🔍 TASK DEBUG - Priority:', task.priority, 'Type:', typeof task.priority, 'Full task:', task);
                 return `
                     <div class="task-item" data-task-id="${task.id}" style="cursor: pointer;">
                         <div class="task-info">
                             <div class="task-name" style="color: var(--grey-400); font-weight: 400; transition: var(--transition-fast);">${this.escapeHtml(task.title)}</div>
                             <div class="task-time">${timeText}</div>
                         </div>
-                        <span class="priority-badge ${task.priority}">${task.priority}</span>
+                        <span class="priority-badge ${task.priority}" style="background: ${this.getPriorityBackground(task.priority)}; color: ${this.getPriorityColor(task.priority)};">${task.priority}</span>
                     </div>
                 `;
             }).join('');
@@ -3003,8 +3039,108 @@ class PowerChoosersCRM {
                 e.preventDefault();
                 const taskId = taskItem.getAttribute('data-task-id');
                 if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
-                    // Use the actual current page as the navigation source so the back button returns correctly
+                    // Capture comprehensive dashboard state before opening task detail
                     const current = (window.crm && window.crm.currentPage) ? window.crm.currentPage : (document.querySelector('.page.active')?.getAttribute('data-page') || 'dashboard');
+                    
+                    // Capture full dashboard state for proper back navigation
+                    if (current === 'dashboard') {
+                        try {
+                            window._dashboardReturn = {
+                                page: 'dashboard',
+                                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                timestamp: Date.now(),
+                                // Capture any dashboard-specific state (widget filters, etc.)
+                                dashboardState: {
+                                    todaysTasksPage: this.todaysTasksPagination?.currentPage || 1,
+                                    todaysTasksScroll: document.querySelector('.tasks-list')?.scrollTop || 0
+                                }
+                            };
+                            console.log('[Dashboard] Captured state for task detail navigation:', window._dashboardReturn);
+                        } catch (_) { /* noop */ }
+                    } else if (current === 'accounts') {
+                        // Capture accounts state for proper back navigation
+                        try {
+                            // Use the same comprehensive state capture pattern as accounts.js
+                            const accountsState = {
+                                page: 'accounts',
+                                currentPage: 1, // Default, will be overridden by module state if available
+                                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                searchTerm: '',
+                                sortColumn: '',
+                                sortDirection: '',
+                                filters: {},
+                                selectedItems: [],
+                                timestamp: Date.now()
+                            };
+                            
+                            // Try to get current accounts page state if available
+                            if (window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
+                                const moduleState = window.accountsModule.getCurrentState();
+                                Object.assign(accountsState, moduleState);
+                            }
+                            
+                            // Also try to get search term from DOM
+                            const quickSearch = document.getElementById('accounts-quick-search');
+                            if (quickSearch) {
+                                accountsState.searchTerm = quickSearch.value || '';
+                            }
+                            
+                            window._accountsReturn = accountsState;
+                            console.log('[Accounts] Captured state for task detail navigation:', window._accountsReturn);
+                        } catch (_) { /* noop */ }
+                    } else if (current === 'people') {
+                        // Capture people state for proper back navigation
+                        try {
+                            const peopleState = {
+                                page: 'people',
+                                currentPage: 1,
+                                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                searchTerm: '',
+                                sortColumn: '',
+                                sortDirection: '',
+                                filters: {},
+                                selectedItems: [],
+                                timestamp: Date.now()
+                            };
+                            
+                            // Try to get current people page state if available
+                            if (window.peopleModule && typeof window.peopleModule.getCurrentState === 'function') {
+                                const moduleState = window.peopleModule.getCurrentState();
+                                Object.assign(peopleState, moduleState);
+                            }
+                            
+                            // Also try to get search term from DOM
+                            const quickSearch = document.getElementById('people-quick-search');
+                            if (quickSearch) {
+                                peopleState.searchTerm = quickSearch.value || '';
+                            }
+                            
+                            window._peopleReturn = peopleState;
+                            console.log('[People] Captured state for task detail navigation:', window._peopleReturn);
+                        } catch (_) { /* noop */ }
+                    } else if (current === 'tasks') {
+                        // Capture tasks state for proper back navigation
+                        try {
+                            const tasksState = {
+                                page: 'tasks',
+                                currentPage: 1,
+                                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                filterMode: 'all',
+                                selectedItems: [],
+                                timestamp: Date.now()
+                            };
+                            
+                            // Try to get current tasks page state if available
+                            if (window.tasksModule && typeof window.tasksModule.getCurrentState === 'function') {
+                                const moduleState = window.tasksModule.getCurrentState();
+                                Object.assign(tasksState, moduleState);
+                            }
+                            
+                            window._tasksReturn = tasksState;
+                            console.log('[Tasks] Captured state for task detail navigation:', window._tasksReturn);
+                        } catch (_) { /* noop */ }
+                    }
+                    
                     window.TaskDetail.open(taskId, current);
                 }
             });
@@ -3028,6 +3164,8 @@ class PowerChoosersCRM {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 const action = btn.getAttribute('data-action');
+                const totalPages = Math.ceil(this.todaysTasksPagination.totalTasks / this.todaysTasksPagination.pageSize);
+                
                 if (action === 'prev' && this.todaysTasksPagination.currentPage > 1) {
                     this.todaysTasksPagination.currentPage--;
                     this.loadTodaysTasks();
@@ -3036,7 +3174,7 @@ class PowerChoosersCRM {
                     this.loadTodaysTasks();
                 }
             });
-          });
+            });
         });
     }
 

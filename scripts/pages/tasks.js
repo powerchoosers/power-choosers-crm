@@ -10,6 +10,27 @@
   };
   const els = {};
 
+  // Priority color helper functions
+  function getPriorityBackground(priority) {
+    const p = (priority || '').toLowerCase().trim();
+    switch(p) {
+      case 'low': return '#495057';
+      case 'medium': return 'rgba(255, 193, 7, 0.15)';
+      case 'high': return 'rgba(220, 53, 69, 0.15)';
+      default: return '#495057';
+    }
+  }
+
+  function getPriorityColor(priority) {
+    const p = (priority || '').toLowerCase().trim();
+    switch(p) {
+      case 'low': return '#e9ecef';
+      case 'medium': return '#ffc107';
+      case 'high': return '#dc3545';
+      default: return '#e9ecef';
+    }
+  }
+
   // Restore handler for back navigation from Task Detail
   if (!document._tasksRestoreBound) {
     document.addEventListener('pc:tasks-restore', (ev) => {
@@ -418,7 +439,7 @@
           </div>
         </td>
         <td><span class="type-badge ${type}">${type}</span></td>
-        <td><span class="priority-badge ${pr}">${pr}</span></td>
+        <td><span class="priority-badge ${pr}" style="background: ${getPriorityBackground(pr)}; color: ${getPriorityColor(pr)};">${pr}</span></td>
         <td>${due}</td>
         <td>${time}</td>
         <td><span class="status-badge ${status}">${status}</span></td>
