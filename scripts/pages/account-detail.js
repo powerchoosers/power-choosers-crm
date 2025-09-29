@@ -163,7 +163,7 @@
       .task-popover .tp-title { font-weight: 700; color: var(--text-primary); font-size: 1rem; }
       .task-popover .tp-body { display: flex; flex-direction: column; gap: 12px; max-height: min(70vh, 620px); overflow: auto; padding: 8px; }
       .task-popover .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .task-popover label { display: flex; align-items: center; gap: 8px; position: relative; }
+      .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); position: relative; }
       .task-popover .input-dark, .task-popover textarea.input-dark { width: 100%; }
       .task-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
       .task-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
@@ -173,9 +173,7 @@
 
       .dropdown-toolbar, .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
       .dropdown-toolbar .dropdown-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-      .dropdown-toolbar .dropdown-option { display: inline-flex; align-items: center; justify-content: center; padding: 8px 10px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .dropdown-toolbar .dropdown-option:hover { background: var(--bg-secondary); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
-      .dropdown-toolbar .dropdown-option.selected { background: var(--primary-700); color: #fff; }
+      /* Dropdown Option Styles - Using global styles from main.css */
 
       .calendar-toolbar header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
       .calendar-toolbar .month-label { font-weight: 600; }
@@ -3885,24 +3883,22 @@
       .task-popover .tp-title { font-weight: 700; color: var(--text-primary); font-size: 1rem; }
       .task-popover .tp-body { display: flex; flex-direction: column; gap: 12px; max-height: min(70vh, 620px); overflow: auto; padding: 8px; }
       .task-popover .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .task-popover label { display: flex; align-items: center; gap: 8px; position: relative; }
+      .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); position: relative; }
       .task-popover .input-dark, .task-popover textarea.input-dark { width: 100%; }
       .task-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
       .task-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
 
       /* Fixed positioning for dropdown arrows - no transform on hover */
-      .dropdown-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .dropdown-toggle-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .dropdown-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: var(--transition-fast); }
+      .dropdown-toggle-btn:hover { color: var(--text-primary); background: transparent; transform: translateY(-50%) !important; }
 
       /* Fixed positioning for calendar icon - no transform on hover */
-      .calendar-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .calendar-toggle-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .calendar-toggle-btn { position: absolute; right: 8px; top: 60%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: var(--transition-fast); }
+      .calendar-toggle-btn:hover { color: var(--text-primary); background: transparent; transform: translateY(-50%) !important; }
 
       .dropdown-toolbar, .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
       .dropdown-toolbar .dropdown-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-      .dropdown-toolbar .dropdown-option { display: inline-flex; align-items: center; justify-content: center; padding: 8px 10px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .dropdown-toolbar .dropdown-option:hover { background: var(--bg-secondary); border-color: var(--accent-color); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
-      .dropdown-toolbar .dropdown-option.selected { background: var(--primary-700); color: #fff; }
+      /* Dropdown Option Styles - Using global styles from main.css */
 
       .calendar-toolbar header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
       .calendar-toolbar .month-label { font-weight: 600; }
@@ -4145,10 +4141,11 @@
 
         const currentDay = new Date(year, month, day);
         if (currentDay.toDateString() === new Date().toDateString()) {
-          dayBtn.classList.add('today');
+          dayBtn.classList.add('calendar-day-today');
+          dayBtn.style.borderColor = 'var(--orange-primary)';
         }
         if (currentDay.toDateString() === nextBizDate.toDateString()) {
-          dayBtn.classList.add('selected');
+          dayBtn.classList.add('calendar-day-selected');
         }
 
         dayBtn.addEventListener('click', () => {

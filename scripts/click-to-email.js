@@ -113,6 +113,8 @@
       '.email-link',
       '#contact-detail-view .info-row[data-field="email"] .info-value-text',
       '#account-detail-view .info-value-wrap[data-field="email"] .info-value-text',
+      // Task detail page email elements
+      '#task-detail-page .email-text[data-email]',
       // Account contacts list
       '#account-contacts-list .contact-email',
       // People and Accounts tables generic cells (email-like text)

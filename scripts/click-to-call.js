@@ -808,6 +808,8 @@
       // Account detail view phone field
       '#account-detail-view .info-value-wrap[data-field="companyPhone"] .info-value-text',
       '#account-detail-view .info-value-wrap[data-field="phone"] .info-value-text',
+      // Task detail page phone elements
+      '#task-detail-page .phone-text[data-phone]',
       // Recent calls phone numbers
       '.rc-sub .phone-number'
     ];

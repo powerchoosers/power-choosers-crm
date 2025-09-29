@@ -1369,9 +1369,9 @@ button:hover:not(:disabled),
 .calendar-toggle-btn {
     position: absolute;
     right: 8px;
-    top: 70%;
+    top: 60%;
     transform: translateY(-50%);
-    background: none;
+    background: transparent;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
@@ -1387,16 +1387,17 @@ button:hover:not(:disabled),
 
 .calendar-toggle-btn:hover {
     color: var(--text-primary);
-    background: var(--bg-item);
+    background: transparent;
+    transform: translateY(-50%) !important;
 }
 
 /* === DROPDOWN TOGGLE BUTTONS === */
 .dropdown-toggle-btn {
     position: absolute;
     right: 8px;
-    top: 70%;
+    top: 50%;
     transform: translateY(-50%);
-    background: none;
+    background: transparent;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
@@ -1412,7 +1413,8 @@ button:hover:not(:disabled),
 
 .dropdown-toggle-btn:hover {
     color: var(--text-primary);
-    background: var(--bg-item);
+    background: transparent;
+    transform: translateY(-50%) !important;
 }
 
 .tp-body label {
@@ -1420,7 +1422,7 @@ button:hover:not(:disabled),
 }
 
 .calendar-toolbar {
-    background: var(--bg-item);
+    background: var(--bg-card);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     padding: 0; /* closed state: no padding to avoid end-of-animation jump */
@@ -1451,7 +1453,7 @@ button:hover:not(:disabled),
 /* === DROPDOWN TOOLBARS === */
 .type-toolbar,
 .priority-toolbar {
-    background: var(--bg-item);
+    background: var(--bg-card);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     padding: 0; /* closed state: no padding to avoid end-of-animation jump */
@@ -1517,6 +1519,32 @@ button:hover:not(:disabled),
 }
 
 .dropdown-option.selected {
+    background: var(--orange-primary);
+    border-color: var(--orange-primary);
+    color: var(--text-inverse);
+}
+
+/* Task Popover Dropdown Options - Higher specificity to override JS styles */
+.task-popover .dropdown-option {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: var(--transition-fast);
+    text-align: center;
+}
+
+.task-popover .dropdown-option:hover {
+    background: var(--grey-800);
+    border-color: var(--border-medium);
+    color: var(--text-inverse);
+}
+
+.task-popover .dropdown-option.selected {
     background: var(--orange-primary);
     border-color: var(--orange-primary);
     color: var(--text-inverse);
