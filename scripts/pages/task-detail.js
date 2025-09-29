@@ -967,7 +967,8 @@
         const titleSection = document.querySelector('.contact-header-text');
         const subtitle = document.getElementById('task-detail-subtitle');
         if (titleSection && subtitle) {
-          titleSection.insertBefore(contactInfoEl, subtitle);
+          // Insert the contact info element before the subtitle
+          subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
         }
       }
       
@@ -1030,6 +1031,11 @@
     
     // Update navigation button states
     updateNavigationButtons();
+    
+    // Process click-to-call and click-to-email elements
+    setTimeout(() => {
+      processClickToCallAndEmail();
+    }, 100);
   }
 
   function setupCompanyLinkHandlers() {
@@ -1119,6 +1125,7 @@
     }) : null) || {};
     
     // Get contact details for the sidebar
+    const contactId = person.id || person.contactId || '';
     const email = person.email || '';
     const city = person.city || person.locationCity || '';
     const stateVal = person.state || person.locationState || '';
@@ -1226,11 +1233,11 @@
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">EMAIL</div>
-              <div class="info-value ${!email ? 'empty' : ''}">${escapeHtml(email) || '--'}</div>
+              <div class="info-value ${!email ? 'empty' : ''}">${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(email)}</span>` : '--'}</div>
             </div>
             <div class="info-row">
               <div class="info-label">PHONE</div>
-              <div class="info-value ${!phones.length ? 'empty' : ''}">${phones.length ? escapeHtml(phones[0]) : '--'}</div>
+              <div class="info-value ${!phones.length ? 'empty' : ''}">${phones.length ? `<span class="phone-text" data-phone="${escapeHtml(phones[0])}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(phones[0])}</span>` : '--'}</div>
             </div>
             <div class="info-row">
               <div class="info-label">COMPANY</div>
@@ -1478,6 +1485,19 @@
     } catch(_) {}
   }
 
+  // Process click-to-call and click-to-email elements
+  function processClickToCallAndEmail() {
+    // Process phone numbers
+    if (window.ClickToCall && typeof window.ClickToCall.processSpecificPhoneElements === 'function') {
+      window.ClickToCall.processSpecificPhoneElements();
+    }
+    
+    // Process email addresses
+    if (window.ClickToEmail && typeof window.ClickToEmail.processSpecificEmailElements === 'function') {
+      window.ClickToEmail.processSpecificEmailElements();
+    }
+  }
+
   // Load recent activity for the task contact
   async function loadRecentActivityForTask() {
     const timelineEl = document.getElementById('task-activity-timeline');
@@ -1693,4 +1713,13 @@
   } else {
     window.TaskDetail.init();
   }
+
+  // Process click-to-call and click-to-email when task detail page loads
+  document.addEventListener('pc:page-loaded', function(e) {
+    if (e.detail && e.detail.page === 'task-detail') {
+      setTimeout(() => {
+        processClickToCallAndEmail();
+      }, 100);
+    }
+  });
 })();

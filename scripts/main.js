@@ -1089,6 +1089,22 @@ class PowerChoosersCRM {
             const rect = el.getBoundingClientRect();
             const gap = 8;
             const ttRect = tooltipEl.getBoundingClientRect();
+            // Ensure we have valid dimensions
+            if (ttRect.width === 0 || ttRect.height === 0) {
+                console.warn('[Tooltip] Tooltip has zero dimensions, retrying...');
+                // Force another reflow and try again
+                tooltipEl.offsetHeight;
+                const newTtRect = tooltipEl.getBoundingClientRect();
+                if (newTtRect.width === 0 || newTtRect.height === 0) {
+                    console.warn('[Tooltip] Tooltip still has zero dimensions, using fallback positioning');
+                    // Fallback: position above element without centering
+                    tooltipEl.style.left = `${rect.left}px`;
+                    tooltipEl.style.top = `${rect.top - 30}px`;
+                    tooltipEl.dataset.placement = 'top';
+                    return;
+                }
+            }
+            
             let left = Math.round(rect.left + (rect.width / 2) - (ttRect.width / 2));
             let top = Math.round(rect.top - ttRect.height - gap);
             // Keep in viewport
@@ -1116,7 +1132,13 @@ class PowerChoosersCRM {
             tooltipEl.classList.add('visible');
             // First paint to measure, then position and fade in
             requestAnimationFrame(() => {
+                // Temporarily make tooltip visible for accurate measurement
+                tooltipEl.style.visibility = 'visible';
+                tooltipEl.style.opacity = '0';
+                // Force a reflow to ensure the tooltip has been rendered with the text
+                tooltipEl.offsetHeight; // This forces a reflow
                 positionTooltip(el);
+                // Now make it fully visible
                 tooltipEl.style.visibility = 'visible';
                 tooltipEl.style.opacity = '1';
             });
@@ -2910,7 +2932,7 @@ class PowerChoosersCRM {
                     // Save merged data back to localStorage cache for next refresh
                     try {
                         localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
-                    } catch (e) {
+        } catch (e) {
                         console.warn('Could not save merged tasks to localStorage cache:', e);
                     }
                     

@@ -204,8 +204,8 @@
       .task-popover .tp-header { display:flex; align-items:center; justify-content:space-between; }
       .task-popover .close-btn { appearance:none; background:transparent; border:0; color: var(--text-secondary); font-size: 18px; line-height:1; padding: 2px 6px; border-radius: 6px; }
       .task-popover .close-btn:hover { background: var(--grey-700); color: var(--text-inverse); }
-      .task-popover .form-row { display: flex; gap: 12px; margin: 8px 0; flex-wrap: wrap; }
-      .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); flex: 1 1 48%; position: relative; }
+      .task-popover .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .task-popover label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-secondary); position: relative; }
       .task-popover label:has(.dropdown-toggle-btn) { z-index: 10; }
       .task-popover input.input-dark, .task-popover select.input-dark, .task-popover textarea.input-dark { width: 100%; padding: 10px 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; font-size: 0.9rem; font-family: inherit; height: 40px; transition: all 0.3s ease; }
       .task-popover label:has(.dropdown-toggle-btn) input.input-dark { padding-right: 48px; }
@@ -257,8 +257,40 @@
       .task-popover .dropdown-toggle-btn:hover {
         color: var(--text-primary);
         background: transparent;
+        transform: translateY(-15%) !important;
       }
       .task-popover .dropdown-toggle-btn svg {
+        display: block;
+        width: 20px;
+        height: 20px;
+      }
+      
+      /* Calendar Toggle Button Styles */
+      .task-popover .calendar-toggle-btn {
+        position: absolute;
+        right: 4px;
+        top: 60%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 4px;
+        transition: var(--transition-fast);
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+      }
+      .task-popover .calendar-toggle-btn:hover {
+        color: var(--text-primary);
+        background: transparent;
+        transform: translateY(-50%) !important;
+      }
+      .task-popover .calendar-toggle-btn svg {
         display: block;
         width: 20px;
         height: 20px;
@@ -309,27 +341,7 @@
         grid-template-rows: 1fr;
       }
       
-      /* Dropdown Option Styles */
-      .task-popover .dropdown-option {
-        background: var(--bg-item);
-        border: 1px solid var(--border-light);
-        border-radius: 6px;
-        color: var(--text-primary);
-        padding: 8px 12px;
-        font-size: 0.85rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        text-align: center;
-      }
-      .task-popover .dropdown-option:hover {
-        background: var(--bg-hover);
-        border-color: var(--grey-500);
-      }
-      .task-popover .dropdown-option.selected {
-        background: var(--orange-subtle);
-        border-color: var(--orange-subtle);
-        color: var(--text-inverse);
-      }
+      /* Dropdown Option Styles - Using global styles from main.css */
     `;
     document.head.appendChild(style);
   }
@@ -692,7 +704,7 @@
                 <!-- Calendar days will be populated by JavaScript -->
               </div>
             </div>
-            <div class="form-row">
+            <div class="form-row" style="grid-template-columns: 1fr;">
               <label>Notes
                 <textarea name="notes" class="input-dark" rows="3" placeholder="Add context (optional)"></textarea>
               </label>
@@ -923,8 +935,10 @@
     const priorityToolbar = pop.querySelector('#priority-toolbar');
     const priorityInput = pop.querySelector('input[name="priority"]');
     
-    let currentDate = new Date(nextBiz + 'T00:00:00');
-    let selectedDate = new Date(nextBiz + 'T00:00:00');
+    // Parse the ISO date string and create local date objects to avoid timezone issues
+    const [year, month, day] = nextBiz.split('-').map(Number);
+    let currentDate = new Date(year, month - 1, day);
+    let selectedDate = new Date(year, month - 1, day);
     
     // Format date for display
     function formatDateForDisplay(dateString) {
@@ -980,6 +994,7 @@
         }
         if (isToday) {
           dayElement.classList.add('calendar-day-today');
+          dayElement.style.borderColor = 'var(--orange-primary)';
         }
         
         dayElement.addEventListener('click', () => {
@@ -2526,6 +2541,36 @@
           // Clear the navigation source
           window._contactNavigationSource = null;
           window._contactNavigationAccountId = null;
+          return;
+        }
+        
+        // Check if we came from task detail page
+        if (window._contactNavigationSource === 'task-detail') {
+          // Clear phone widget context to prevent contact company info from leaking
+          clearPhoneWidgetContext();
+          
+          // Navigate back to task detail page
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('task-detail');
+            
+            // Restore task detail state if available
+            setTimeout(() => {
+              try {
+                if (window.__taskDetailRestoreData) {
+                  // Restore the specific task
+                  const taskId = window.__taskDetailRestoreData.taskId;
+                  if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+                    window.TaskDetail.open(taskId);
+                  }
+                  // Clear the restore data after use
+                  window.__taskDetailRestoreData = null;
+                }
+              } catch (_) {}
+            }, 100);
+          }
+          // Clear the navigation source
+          window._contactNavigationSource = null;
+          window._contactNavigationContactId = null;
           return;
         }
         
