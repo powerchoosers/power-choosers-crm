@@ -536,6 +536,8 @@
     
     // Navigate to next task instead of going back
     try {
+      // Small delay to ensure task status update has been processed
+      await new Promise(resolve => setTimeout(resolve, 100));
       await navigateToAdjacentTask('next');
     } catch (e) {
       console.warn('Could not navigate to next task, falling back to previous page:', e);
@@ -661,17 +663,25 @@
       
       // Find current task index
       const currentIndex = todaysTasks.findIndex(task => task.id === state.currentTask.id);
-      if (currentIndex === -1) {
-        console.log('Current task not found in filtered list');
-        return;
-      }
       
-      // Calculate next/previous index
+      // If current task not found (e.g., just completed), find the appropriate next task
       let targetIndex;
-      if (direction === 'next') {
-        targetIndex = currentIndex + 1;
+      if (currentIndex === -1) {
+        console.log('Current task not found in filtered list (likely just completed)');
+        if (direction === 'next') {
+          // For next navigation after completion, go to the first remaining task
+          targetIndex = 0;
+        } else {
+          // For previous navigation after completion, go to the last remaining task
+          targetIndex = todaysTasks.length - 1;
+        }
       } else {
-        targetIndex = currentIndex - 1;
+        // Calculate next/previous index normally
+        if (direction === 'next') {
+          targetIndex = currentIndex + 1;
+        } else {
+          targetIndex = currentIndex - 1;
+        }
       }
       
       // Check bounds - don't navigate if at the end
@@ -1147,6 +1157,7 @@
     const currentRate = linkedAccount?.currentRate || '';
     const contractEndDate = linkedAccount?.contractEndDate || '';
     const shortDescription = linkedAccount?.shortDescription || '';
+    const companyPhone = linkedAccount?.companyPhone || linkedAccount?.phone || linkedAccount?.primaryPhone || linkedAccount?.mainPhone || '';
 
     // Prepare company icon using global favicon helper
     const deriveDomain = (input) => {
@@ -1240,8 +1251,8 @@
               <div class="info-value ${!phones.length ? 'empty' : ''}">${phones.length ? `<span class="phone-text" data-phone="${escapeHtml(phones[0])}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(phones[0])}</span>` : '--'}</div>
             </div>
             <div class="info-row">
-              <div class="info-label">COMPANY</div>
-              <div class="info-value ${!companyName ? 'empty' : ''}">${companyName ? `<a href="#account-details" class="company-link" id="task-contact-company-link" title="View account details" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName)}">${escapeHtml(companyName)}</a>` : '--'}</div>
+              <div class="info-label">COMPANY PHONE</div>
+              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-company-name="${escapeHtml(companyName || '')}">${escapeHtml(companyPhone)}</span>` : '--'}</div>
             </div>
             <div class="info-row">
               <div class="info-label">CITY</div>

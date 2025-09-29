@@ -406,15 +406,15 @@ class PowerChoosersCRM {
               // Navigate to people page first
               if (window.crm && typeof window.crm.navigateToPage === 'function') {
                 window.crm.navigateToPage('people');
-                // Show the contact detail after a short delay to ensure page is loaded
+                // Show the contact detail after a longer delay to ensure page is fully loaded
                 setTimeout(() => {
                   if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                     window.ContactDetail.show(ref.id);
                   } else {
-                    // Retry mechanism in case ContactDetail isn't ready yet
+                    // Enhanced retry mechanism with longer intervals
                     let attempts = 0;
-                    const maxAttempts = 10;
-                    const retryInterval = 100;
+                    const maxAttempts = 15;
+                    const retryInterval = 150;
                     const retry = () => {
                       attempts++;
                       if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
@@ -427,7 +427,7 @@ class PowerChoosersCRM {
                     };
                     retry();
                   }
-                }, 100);
+                }, 200);
               }
             } catch (error) {
               console.error('Error navigating to contact detail:', error);

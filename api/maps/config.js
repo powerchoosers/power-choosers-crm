@@ -1,5 +1,9 @@
 // Vercel serverless function to provide Google Maps config without exposing secrets in source code
-export default async function handler(req, res) {
+const { cors } = require('./_cors');
+
+module.exports = async function handler(req, res) {
+  if (cors(req, res)) return;
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -19,7 +23,7 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(200).json({ apiKey: '', mapId: '' });
   }
-}
+};
 
 
 

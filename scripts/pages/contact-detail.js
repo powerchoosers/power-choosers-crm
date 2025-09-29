@@ -1555,11 +1555,23 @@
     
     // Force re-attachment of event handlers to ensure they work properly
     // This is especially important after contact creation when the page might not be fully initialized
-    setTimeout(() => {
+    // Use longer timeout and retry logic to ensure DOM is fully ready
+    const attachEventsWithRetry = () => {
       if (!state._contactDetailEventsAttached) {
-        attachContactDetailEvents();
+        // Check if critical DOM elements are ready
+        const addToListBtn = document.getElementById('add-contact-to-list');
+        const contactDetailView = document.getElementById('contact-detail-view');
+        
+        if (addToListBtn && contactDetailView && state.currentContact?.id) {
+          attachContactDetailEvents();
+        } else {
+          // Retry after a short delay if elements aren't ready
+          setTimeout(attachEventsWithRetry, 100);
+        }
       }
-    }, 50);
+    };
+    
+    setTimeout(attachEventsWithRetry, 200);
     // Preload notes content early for smooth Notes widget open
     try { preloadNotesForContact(contact.id); } catch (_) { /* noop */ }
     // Non-destructive: hide the existing table/list instead of replacing all HTML
@@ -1587,6 +1599,30 @@
     // Setup contact created listener for cases where new contacts are created from Account Details
     try {
       setupContactCreatedListener();
+    } catch (_) {}
+    
+    // Setup contact updated listener to re-attach event handlers after editing
+    try {
+      document.addEventListener('pc:contact-updated', (e) => {
+        // Re-attach event handlers after contact is updated
+        setTimeout(() => {
+          if (!state._contactDetailEventsAttached) {
+            attachContactDetailEvents();
+          }
+        }, 100);
+      });
+    } catch (_) {}
+    
+    // Setup contact loaded listener to ensure event handlers are attached
+    try {
+      document.addEventListener('pc:contact-loaded', (e) => {
+        // Re-attach event handlers when contact is loaded
+        setTimeout(() => {
+          if (!state._contactDetailEventsAttached) {
+            attachContactDetailEvents();
+          }
+        }, 100);
+      });
     } catch (_) {}
     
     // Add click handler to persist default phone when star button is clicked
@@ -2492,6 +2528,13 @@
     if (state._contactDetailEventsAttached) {
       return;
     }
+    
+    // Ensure we have a valid contact before attaching events
+    if (!state.currentContact?.id) {
+      console.warn('[ContactDetail] Cannot attach events: no contact ID available');
+      return;
+    }
+    
     state._contactDetailEventsAttached = true;
 
     // Listen for activity refresh events
@@ -2773,8 +2816,14 @@
 
     // Add-to-List button
     const addToListBtn = document.getElementById('add-contact-to-list');
-    if (addToListBtn && !addToListBtn._bound) {
-      addToListBtn.addEventListener('click', (e) => { 
+    if (addToListBtn) {
+      // Remove existing event listener if it exists
+      if (addToListBtn._bound) {
+        addToListBtn.removeEventListener('click', addToListBtn._clickHandler);
+      }
+      
+      // Create new event handler
+      addToListBtn._clickHandler = (e) => { 
         e.preventDefault(); 
         // Toggle behavior: close if already open
         if (document.getElementById('contact-lists-panel')) {
@@ -2782,14 +2831,22 @@
         } else {
           openContactListsPanel();
         }
-      });
+      };
+      
+      addToListBtn.addEventListener('click', addToListBtn._clickHandler);
       addToListBtn._bound = '1';
     }
 
     // Sequences button
     const addToSequencesBtn = document.getElementById('add-contact-to-sequences');
-    if (addToSequencesBtn && !addToSequencesBtn._bound) {
-      addToSequencesBtn.addEventListener('click', (e) => { 
+    if (addToSequencesBtn) {
+      // Remove existing event listener if it exists
+      if (addToSequencesBtn._bound) {
+        addToSequencesBtn.removeEventListener('click', addToSequencesBtn._clickHandler);
+      }
+      
+      // Create new event handler
+      addToSequencesBtn._clickHandler = (e) => { 
         e.preventDefault(); 
         // Toggle behavior: close if already open
         if (document.getElementById('contact-sequences-panel')) {
@@ -2797,7 +2854,9 @@
         } else {
           openContactSequencesPanel();
         }
-      });
+      };
+      
+      addToSequencesBtn.addEventListener('click', addToSequencesBtn._clickHandler);
       addToSequencesBtn._bound = '1';
     }
 
@@ -5136,6 +5195,16 @@ async function createContactSequenceThenAdd(name) {
 
   function openContactListsPanel() {
     if (document.getElementById('contact-lists-panel')) return;
+    
+    // Ensure we have a valid contact ID before proceeding
+    if (!state.currentContact?.id) {
+      console.warn('[ContactDetail] Cannot open lists panel: no contact ID available');
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Contact information not ready. Please try again.');
+      }
+      return;
+    }
+    
     injectContactListsStyles();
     const panel = document.createElement('div');
     panel.id = 'contact-lists-panel';
@@ -5414,13 +5483,15 @@ async function createContactSequenceThenAdd(name) {
   async function addCurrentContactToList(listId, listName) {
     try {
       let contactId = state.currentContact?.id;
-      // Fallback to contactId from URL or DOM if not present yet
+      
+      // Enhanced fallback chain for contact ID resolution
       if (!contactId) {
         try {
           const fromDom = document.querySelector('[data-contact-id]')?.getAttribute('data-contact-id');
           if (fromDom) contactId = fromDom;
         } catch(_) {}
       }
+      
       if (!contactId && typeof window.getPeopleData === 'function') {
         try {
           // If we have a single newly-created contact with matching name/company, attempt to resolve id
@@ -5430,19 +5501,29 @@ async function createContactSequenceThenAdd(name) {
           if (guess && guess.id) contactId = guess.id;
         } catch(_) {}
       }
+      
       if (!contactId) {
-        // Final fallback: wait briefly for newly created contact ID to propagate
+        // Enhanced fallback: wait longer and check multiple sources
         const start = Date.now();
-        while (!contactId && Date.now() - start < 1200) {
-          await new Promise(r => setTimeout(r, 120));
-          contactId = state.currentContact?.id || document.querySelector('[data-contact-id]')?.getAttribute('data-contact-id');
+        while (!contactId && Date.now() - start < 2000) {
+          await new Promise(r => setTimeout(r, 100));
+          contactId = state.currentContact?.id || 
+                     document.querySelector('[data-contact-id]')?.getAttribute('data-contact-id') ||
+                     document.querySelector('#contact-detail-header [data-contact-id]')?.getAttribute('data-contact-id');
         }
+        
         if (!contactId) {
-          console.warn('[ContactDetail] No contact ID available for list addition', {
+          console.warn('[ContactDetail] No contact ID available for list addition after extended wait', {
             contactId: contactId,
             stateContact: state.currentContact,
-            stateContactId: state.currentContact?.id
+            stateContactId: state.currentContact?.id,
+            domElements: document.querySelectorAll('[data-contact-id]').length
           });
+          
+          // Show user-friendly error message
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Contact information not ready. Please try again in a moment.');
+          }
           closeContactListsPanel();
           return;
         }
@@ -5702,6 +5783,13 @@ async function createContactSequenceThenAdd(name) {
             state.currentContact.id = id;
             state.currentContact = { ...state.currentContact, ...doc, id };
             
+            // Re-attach event handlers after contact creation
+            setTimeout(() => {
+              if (!state._contactDetailEventsAttached) {
+                attachContactDetailEvents();
+              }
+            }, 100);
+            
             // Update the DOM to reflect the new contact ID
             const contactIdEl = document.querySelector('[data-contact-id]');
             if (contactIdEl) {
@@ -5716,16 +5804,17 @@ async function createContactSequenceThenAdd(name) {
           }
         }
         
-        // If we're on the contact detail page and this is the contact we're currently viewing,
-        // re-initialize the page to ensure all event handlers are properly attached
-        if (id && state.currentContact?.id === id) {
-          console.log('[Contact Detail] Re-initializing page for contact:', id);
+        // If we're on the contact detail page, always re-attach event handlers
+        // This ensures add-to-list functionality works after contact creation
+        const isOnContactDetailPage = document.getElementById('contact-detail-view') !== null;
+        if (id && isOnContactDetailPage) {
+          console.log('[Contact Detail] Re-attaching event handlers for contact creation:', id);
           // Reset event attachment flag to force re-attachment
           state._contactDetailEventsAttached = false;
-          // Re-render the contact detail to ensure all elements are properly initialized
-          renderContactDetail();
-          // Re-attach event handlers
-          attachContactDetailEvents();
+          // Re-attach event handlers with proper timing
+          setTimeout(() => {
+            attachContactDetailEvents();
+          }, 100);
         }
       } catch(_) {}
     };
