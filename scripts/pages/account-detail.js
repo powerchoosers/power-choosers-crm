@@ -286,19 +286,6 @@
                                  data-company-name="${escapeHtml(state.currentAccount?.name || state.currentAccount?.accountName || '')}">${escapeHtml(phone)}</span>` : ''}
               </div>
             </div>
-            <div class="contact-actions">
-              ${phone ? `<button class="contact-quick-action-btn" data-action="call" data-contact-id="${contact.id}" title="Call ${escapeHtml(fullName)}">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                </svg>
-              </button>` : ''}
-              ${email ? `<button class="contact-quick-action-btn" data-action="email" data-contact-id="${contact.id}" title="Email ${escapeHtml(fullName)}">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                  <polyline points="22,6 12,13 2,6"/>
-                </svg>
-              </button>` : ''}
-            </div>
           </div>
         `;
       }).join('');
@@ -1947,12 +1934,26 @@
           try {
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('people');
-              // Ensure contact detail renders after page switches
+              // Ensure contact detail renders after page switches with longer delay
               setTimeout(() => {
                 if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                   window.ContactDetail.show(contactId);
+                } else {
+                  // Retry mechanism for account-detail navigation
+                  let attempts = 0;
+                  const maxAttempts = 10;
+                  const retryInterval = 100;
+                  const retry = () => {
+                    attempts++;
+                    if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                      window.ContactDetail.show(contactId);
+                    } else if (attempts < maxAttempts) {
+                      setTimeout(retry, retryInterval);
+                    }
+                  };
+                  retry();
                 }
-              }, 80);
+              }, 200);
             }
           } catch (_) { /* noop */ }
           return;
@@ -2361,18 +2362,33 @@
             console.log('Navigating to people page for contact:', contactId);
             window.crm.navigateToPage('people');
             
-            // Use requestAnimationFrame to ensure the page has started loading
+            // Use requestAnimationFrame with additional delay to ensure the page is fully loaded
             requestAnimationFrame(() => {
-              if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                console.log('Showing contact detail:', contactId);
-                try {
-                  window.ContactDetail.show(contactId);
-                } catch (error) {
-                  console.error('Error showing contact detail:', error);
+              setTimeout(() => {
+                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                  console.log('Showing contact detail:', contactId);
+                  try {
+                    window.ContactDetail.show(contactId);
+                  } catch (error) {
+                    console.error('Error showing contact detail:', error);
+                  }
+                } else {
+                  console.log('ContactDetail not available after navigation');
+                  // Retry mechanism for this navigation path too
+                  let attempts = 0;
+                  const maxAttempts = 8;
+                  const retryInterval = 150;
+                  const retry = () => {
+                    attempts++;
+                    if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                      window.ContactDetail.show(contactId);
+                    } else if (attempts < maxAttempts) {
+                      setTimeout(retry, retryInterval);
+                    }
+                  };
+                  retry();
                 }
-              } else {
-                console.log('ContactDetail not available after navigation');
-              }
+              }, 100);
             });
           } else {
             console.log('Navigation not available');
@@ -3274,6 +3290,13 @@
     // Require at least 10 digits
     const digitsOnly = cleaned.replace(/\D/g, '');
     if (digitsOnly.length < 10) return;
+    
+    // Remove existing click handler if it exists
+    if (el._pcClickBound && el._pcClickHandler) {
+      el.removeEventListener('click', el._pcClickHandler);
+      el._pcClickBound = false;
+    }
+    
     // Set pointer and tooltip
     try {
       el.style.cursor = 'pointer';
@@ -3290,9 +3313,9 @@
       el.removeAttribute('data-contact-id');
       el.removeAttribute('data-contact-name');
     } catch(_) {}
-    // Bind click only once
-    if (el._pcClickBound) return;
-    el.addEventListener('click', function(e){
+    
+    // Create new click handler
+    el._pcClickHandler = function(e){
       try { 
         e.preventDefault(); 
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
@@ -3370,7 +3393,10 @@
           window.Widgets.callNumber(callNum.replace(/\D/g,''), '', true, 'account-detail');
         }
       } catch(_) {}
-    });
+    };
+    
+    // Bind the new click handler
+    el.addEventListener('click', el._pcClickHandler);
     el._pcClickBound = true;
     el.classList.add('clickable-phone');
   }
