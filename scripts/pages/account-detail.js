@@ -3893,7 +3893,7 @@
       .dropdown-toggle-btn:hover { color: var(--text-primary); background: transparent; transform: translateY(-50%) !important; }
 
       /* Fixed positioning for calendar icon - no transform on hover */
-      .calendar-toggle-btn { position: absolute; right: 8px; top: 60%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: var(--transition-fast); }
+      .calendar-toggle-btn { position: absolute; right: 8px; top: 65%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: var(--transition-fast); }
       .calendar-toggle-btn:hover { color: var(--text-primary); background: transparent; transform: translateY(-50%) !important; }
 
       .dropdown-toolbar, .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }

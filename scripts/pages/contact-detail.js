@@ -269,7 +269,7 @@
       .task-popover .calendar-toggle-btn {
         position: absolute;
         right: 4px;
-        top: 60%;
+        top: 65%;
         transform: translateY(-50%);
         background: transparent;
         border: none;
