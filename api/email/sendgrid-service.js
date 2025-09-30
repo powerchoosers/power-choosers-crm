@@ -12,11 +12,66 @@ export class SendGridService {
   }
 
   /**
+   * Check if email should be suppressed
+   */
+  async checkSuppression(email) {
+    try {
+      const suppressionDoc = await db.collection('suppressions').doc(email).get();
+      
+      if (suppressionDoc.exists) {
+        const data = suppressionDoc.data();
+        console.log(`[SendGrid] Email suppressed: ${email} - ${data.reason}`);
+        return { suppressed: true, reason: data.reason };
+      }
+      
+      return { suppressed: false };
+    } catch (error) {
+      console.error(`[SendGrid] Error checking suppression for ${email}:`, error);
+      return { suppressed: false };
+    }
+  }
+
+  /**
    * Send a single email via SendGrid
    */
   async sendEmail(emailData) {
     try {
       const { to, subject, content, from, trackingId, _deliverability } = emailData;
+      
+      // Check if any recipients are suppressed
+      const recipients = Array.isArray(to) ? to : [to];
+      const suppressedEmails = [];
+      
+      for (const email of recipients) {
+        const suppression = await this.checkSuppression(email);
+        if (suppression.suppressed) {
+          suppressedEmails.push({ email, reason: suppression.reason });
+        }
+      }
+      
+      // If all recipients are suppressed, don't send
+      if (suppressedEmails.length === recipients.length) {
+        console.log(`[SendGrid] All recipients suppressed, skipping send`);
+        return {
+          success: false,
+          message: 'All recipients suppressed',
+          suppressed: suppressedEmails
+        };
+      }
+      
+      // Filter out suppressed emails
+      const allowedRecipients = recipients.filter(email => 
+        !suppressedEmails.some(s => s.email === email)
+      );
+      
+      if (allowedRecipients.length === 0) {
+        console.log(`[SendGrid] No valid recipients after filtering suppressed emails`);
+        return {
+          success: false,
+          message: 'No valid recipients',
+          suppressed: suppressedEmails
+        };
+      }
       
       // Get deliverability settings
       const deliverabilitySettings = _deliverability || {
@@ -29,9 +84,9 @@ export class SendGridService {
         signatureImageEnabled: true
       };
 
-      // Prepare email message
+      // Prepare email message with filtered recipients
       const msg = {
-        to: Array.isArray(to) ? to : [to],
+        to: allowedRecipients,
         from: {
           email: from || this.fromEmail,
           name: this.fromName
