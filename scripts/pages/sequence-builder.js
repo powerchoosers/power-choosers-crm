@@ -1205,6 +1205,7 @@
               ${labelMarkup}
             </div>
             <div class="spacer"></div>
+            <button class="icon-btn-sm settings-step" title="Email settings" aria-label="Email settings">${svgSettings()}</button>
             <button class="icon-btn-sm trash-step" title="Delete step" aria-label="Delete step">${svgTrash()}</button>
             <div class="step-status-toggle">
               <label class="toggle-switch" title="${step.paused ? 'Step is paused' : 'Step is active'}">
@@ -1215,6 +1216,7 @@
             </div>
           </div>
           <div class="step-body" ${expanded ? '' : 'hidden'}>
+            ${step.showSettings ? createEmailSettingsHTML(step.emailSettings || getDefaultEmailSettings(isAuto), step) : `
             <div class="step-tabs" role="tablist">
               <button class="tab ${editorActive ? 'active' : ''}" role="tab" data-tab="editor">Editor</button>
               <button class="tab ${previewActive ? 'active' : ''}" role="tab" data-tab="preview">Preview</button>
@@ -1284,6 +1286,7 @@
                 </div>
               </div>
             </div>
+            `}
           </div>
         </div>
       </div>`;
@@ -2027,6 +2030,9 @@
   function svgTrash() {
     return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>';
   }
+  function svgSettings() {
+    return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+  }
   function svgClock() {
     return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>';
   }
@@ -2097,6 +2103,475 @@
       _openDelayPopover = null;
     }
   }
+
+  function closeEmailSettings() {
+    // Find any step that's showing settings and close it
+    if (window.sequenceBuilder?.currentSequence?.steps) {
+      window.sequenceBuilder.currentSequence.steps.forEach(step => {
+        if (step.showSettings) {
+          step.showSettings = false;
+        }
+      });
+      render();
+    }
+  }
+
+  function getDefaultEmailSettings(isAuto) {
+    return {
+      content: {
+        includeSignature: true,
+        signatureImage: true,
+        customSignature: '',
+        aiGeneration: isAuto,
+        personalizationLevel: 'advanced'
+      },
+      deliverability: {
+        priorityHeaders: false,
+        listUnsubscribe: true,
+        bulkHeaders: false,
+        openTracking: true,
+        clickTracking: true
+      },
+      automation: {
+        sendTimeOptimization: isAuto,
+        timezoneAware: isAuto,
+        weekendSending: 'business-days',
+        autoPauseOnReply: true,
+        maxFollowups: 5
+      },
+      compliance: {
+        unsubscribeLink: true,
+        physicalAddress: true,
+        gdprCompliant: true,
+        spamScoreCheck: true
+      }
+    };
+  }
+
+  function createEmailSettingsHTML(settings, step) {
+    const isAuto = step.type === 'auto-email';
+    
+    // Inject CSS for email settings if not already injected
+    if (!document.querySelector('#email-settings-styles')) {
+      const style = document.createElement('style');
+      style.id = 'email-settings-styles';
+      style.textContent = `
+        .email-settings-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 24px;
+          margin-bottom: 24px;
+        }
+        
+        .email-settings-section {
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-light);
+          border-radius: 8px;
+          padding: 20px;
+        }
+        
+        .email-settings-section h4 {
+          margin: 0 0 16px 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--text-primary);
+          padding-bottom: 12px;
+          border-bottom: 1px solid var(--border-light);
+        }
+        
+        .email-settings .checkbox-group {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        
+        .email-settings .setting-item {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        
+        .email-settings .checkbox-label {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .email-settings .checkbox-label:hover .label-text {
+          color: var(--orange-primary);
+        }
+        
+        .email-settings .checkbox-label input[type="checkbox"] {
+          display: none;
+        }
+        
+        .email-settings .checkmark {
+          position: relative;
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          background: var(--grey-700);
+          border: 2px solid var(--grey-700);
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+        
+        .email-settings .checkbox-label input[type="checkbox"]:checked + .checkmark {
+          background: var(--orange-primary);
+          border-color: var(--orange-primary);
+        }
+        
+        .email-settings .checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+          content: '';
+          position: absolute;
+          left: 6px;
+          top: 2px;
+          width: 5px;
+          height: 10px;
+          border: solid white;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+        }
+        
+        .email-settings .label-text {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--text-primary);
+          transition: color 0.2s ease;
+        }
+        
+        .email-settings .setting-description {
+          font-size: 12px;
+          color: var(--text-secondary);
+          line-height: 1.4;
+          margin-left: 32px;
+        }
+        
+        .email-settings .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        
+        .email-settings .form-group label {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+        
+        .email-settings .form-group select,
+        .email-settings .form-group input {
+          padding: 8px 12px;
+          border: 1px solid var(--border-light);
+          border-radius: 6px;
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          font-size: 14px;
+          transition: all 0.2s ease;
+        }
+        
+        .email-settings .form-group select:focus,
+        .email-settings .form-group input:focus {
+          outline: none;
+          border-color: var(--orange-primary);
+          box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+        }
+        
+        .email-settings .btn-secondary,
+        .email-settings .btn-primary {
+          padding: 10px 20px;
+          border-radius: 6px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border: none;
+        }
+        
+        .email-settings .btn-secondary {
+          background: var(--bg-secondary);
+          color: var(--text-primary);
+          border: 1px solid var(--border-light);
+        }
+        
+        .email-settings .btn-secondary:hover {
+          background: var(--bg-primary);
+          border-color: var(--text-primary);
+        }
+        
+        .email-settings .btn-primary {
+          background: var(--orange-primary);
+          color: white;
+        }
+        
+        .email-settings .btn-primary:hover {
+          background: #e55a2b;
+          transform: translateY(-1px);
+        }
+        
+        @media (max-width: 768px) {
+          .email-settings-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    return `
+      <div class="step-tabs" role="tablist">
+        <button class="tab active" role="tab" data-tab="settings">Settings</button>
+        <div class="spacer"></div>
+      </div>
+      <div class="tab-panels">
+        <div class="tab-panel email-settings" data-tab="settings">
+          <div class="form-row">
+            <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: var(--text-primary);">Email Settings</h3>
+            <p style="margin: 0 0 24px 0; font-size: 14px; color: var(--text-secondary);">Configure deliverability and automation options for this email</p>
+          </div>
+          
+          <div class="email-settings-grid">
+            <!-- Content Settings -->
+            <div class="email-settings-section">
+              <h4>Content & Personalization</h4>
+              <div class="checkbox-group">
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.content.includeSignature ? 'checked' : ''} data-setting="content.includeSignature">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Include Signature</span>
+                  </label>
+                  <div class="setting-description">Add your email signature at the bottom of every email</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.content.signatureImage ? 'checked' : ''} data-setting="content.signatureImage">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Include Signature Image</span>
+                  </label>
+                  <div class="setting-description">Show your signature image/logo in the email</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.content.aiGeneration ? 'checked' : ''} data-setting="content.aiGeneration">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Use AI Generation</span>
+                  </label>
+                  <div class="setting-description">Let AI help write and personalize your email content</div>
+                </div>
+                <div class="form-group">
+                  <label>Personalization Level</label>
+                  <select data-setting="content.personalizationLevel">
+                    <option value="basic" ${settings.content.personalizationLevel === 'basic' ? 'selected' : ''}>Basic (name only)</option>
+                    <option value="advanced" ${settings.content.personalizationLevel === 'advanced' ? 'selected' : ''}>Advanced (name + company)</option>
+                    <option value="maximum" ${settings.content.personalizationLevel === 'maximum' ? 'selected' : ''}>Maximum (all data)</option>
+                  </select>
+                  <div class="setting-description" style="margin-left: 0;">Control how much contact data is used for personalization</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Deliverability Settings -->
+            <div class="email-settings-section">
+              <h4>Deliverability & Tracking</h4>
+              <div class="checkbox-group">
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.deliverability.priorityHeaders ? 'checked' : ''} data-setting="deliverability.priorityHeaders">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Priority Headers</span>
+                  </label>
+                  <div class="setting-description">Mark email as important in recipient's inbox</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.deliverability.listUnsubscribe ? 'checked' : ''} data-setting="deliverability.listUnsubscribe">
+                    <span class="checkmark"></span>
+                    <span class="label-text">List Unsubscribe Headers</span>
+                  </label>
+                  <div class="setting-description">Add one-click unsubscribe option for better deliverability</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.deliverability.bulkHeaders ? 'checked' : ''} data-setting="deliverability.bulkHeaders">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Bulk Email Headers</span>
+                  </label>
+                  <div class="setting-description">Mark as bulk email (can reduce spam score for mass sends)</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.deliverability.openTracking ? 'checked' : ''} data-setting="deliverability.openTracking">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Open Tracking</span>
+                  </label>
+                  <div class="setting-description">Track when recipients open your email</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.deliverability.clickTracking ? 'checked' : ''} data-setting="deliverability.clickTracking">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Click Tracking</span>
+                  </label>
+                  <div class="setting-description">Track when recipients click links in your email</div>
+                </div>
+              </div>
+            </div>
+
+          ${isAuto ? `
+            <!-- Automation Settings -->
+            <div class="email-settings-section">
+              <h4>Automation & Timing</h4>
+              <div class="checkbox-group">
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.automation.sendTimeOptimization ? 'checked' : ''} data-setting="automation.sendTimeOptimization">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Send Time Optimization</span>
+                  </label>
+                  <div class="setting-description">Automatically send at the best time for engagement</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.automation.timezoneAware ? 'checked' : ''} data-setting="automation.timezoneAware">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Timezone Awareness</span>
+                  </label>
+                  <div class="setting-description">Send emails based on recipient's local timezone</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.automation.autoPauseOnReply ? 'checked' : ''} data-setting="automation.autoPauseOnReply">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Auto-pause on Reply</span>
+                  </label>
+                  <div class="setting-description">Stop sequence when contact replies to any email</div>
+                </div>
+                <div class="form-group">
+                  <label>Weekend Sending</label>
+                  <select data-setting="automation.weekendSending">
+                    <option value="never" ${settings.automation.weekendSending === 'never' ? 'selected' : ''}>Never send on weekends</option>
+                    <option value="business-days" ${settings.automation.weekendSending === 'business-days' ? 'selected' : ''}>Business days only</option>
+                    <option value="always" ${settings.automation.weekendSending === 'always' ? 'selected' : ''}>Send on weekends</option>
+                  </select>
+                  <div class="setting-description" style="margin-left: 0;">Choose when emails can be sent during the week</div>
+                </div>
+                <div class="form-group">
+                  <label>Max Follow-ups</label>
+                  <input type="number" min="1" max="20" value="${settings.automation.maxFollowups}" data-setting="automation.maxFollowups">
+                  <div class="setting-description" style="margin-left: 0;">Maximum number of follow-up emails to send</div>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+            <!-- Compliance Settings -->
+            <div class="email-settings-section">
+              <h4>Compliance & Safety</h4>
+              <div class="checkbox-group">
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.compliance.unsubscribeLink ? 'checked' : ''} data-setting="compliance.unsubscribeLink">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Include Unsubscribe Link</span>
+                  </label>
+                  <div class="setting-description">Add unsubscribe link to footer (required for compliance)</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.compliance.physicalAddress ? 'checked' : ''} data-setting="compliance.physicalAddress">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Include Physical Address</span>
+                  </label>
+                  <div class="setting-description">Add your business address to email footer (CAN-SPAM requirement)</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.compliance.gdprCompliant ? 'checked' : ''} data-setting="compliance.gdprCompliant">
+                    <span class="checkmark"></span>
+                    <span class="label-text">GDPR Compliance</span>
+                  </label>
+                  <div class="setting-description">Follow GDPR regulations for EU contacts</div>
+                </div>
+                <div class="setting-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" ${settings.compliance.spamScoreCheck ? 'checked' : ''} data-setting="compliance.spamScoreCheck">
+                    <span class="checkmark"></span>
+                    <span class="label-text">Spam Score Check</span>
+                  </label>
+                  <div class="setting-description">Analyze email content for spam triggers before sending</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-light); display: flex; justify-content: flex-end; gap: 12px;">
+            <button class="btn-secondary" onclick="closeEmailSettings()">Cancel</button>
+            <button class="btn-primary" onclick="saveEmailSettings('${step.id}')">Save Settings</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function saveEmailSettings(stepId) {
+    // Find the step's settings panel
+    const stepCard = document.querySelector(`[data-id="${stepId}"]`);
+    if (!stepCard) return;
+
+    // Collect all settings from the form
+    const settings = {
+      content: {
+        includeSignature: stepCard.querySelector('[data-setting="content.includeSignature"]')?.checked || false,
+        signatureImage: stepCard.querySelector('[data-setting="content.signatureImage"]')?.checked || false,
+        customSignature: '',
+        aiGeneration: stepCard.querySelector('[data-setting="content.aiGeneration"]')?.checked || false,
+        personalizationLevel: stepCard.querySelector('[data-setting="content.personalizationLevel"]')?.value || 'advanced'
+      },
+      deliverability: {
+        priorityHeaders: stepCard.querySelector('[data-setting="deliverability.priorityHeaders"]')?.checked || false,
+        listUnsubscribe: stepCard.querySelector('[data-setting="deliverability.listUnsubscribe"]')?.checked || false,
+        bulkHeaders: stepCard.querySelector('[data-setting="deliverability.bulkHeaders"]')?.checked || false,
+        openTracking: stepCard.querySelector('[data-setting="deliverability.openTracking"]')?.checked || false,
+        clickTracking: stepCard.querySelector('[data-setting="deliverability.clickTracking"]')?.checked || false
+      },
+      automation: {
+        sendTimeOptimization: stepCard.querySelector('[data-setting="automation.sendTimeOptimization"]')?.checked || false,
+        timezoneAware: stepCard.querySelector('[data-setting="automation.timezoneAware"]')?.checked || false,
+        weekendSending: stepCard.querySelector('[data-setting="automation.weekendSending"]')?.value || 'business-days',
+        autoPauseOnReply: stepCard.querySelector('[data-setting="automation.autoPauseOnReply"]')?.checked || false,
+        maxFollowups: parseInt(stepCard.querySelector('[data-setting="automation.maxFollowups"]')?.value || '5')
+      },
+      compliance: {
+        unsubscribeLink: stepCard.querySelector('[data-setting="compliance.unsubscribeLink"]')?.checked || false,
+        physicalAddress: stepCard.querySelector('[data-setting="compliance.physicalAddress"]')?.checked || false,
+        gdprCompliant: stepCard.querySelector('[data-setting="compliance.gdprCompliant"]')?.checked || false,
+        spamScoreCheck: stepCard.querySelector('[data-setting="compliance.spamScoreCheck"]')?.checked || false
+      }
+    };
+
+    // Find the step and update its settings
+    const step = window.sequenceBuilder?.currentSequence?.steps?.find(s => s.id === stepId);
+    if (step) {
+      step.emailSettings = settings;
+      try {
+        scheduleStepSave(stepId);
+        console.log('[EmailSettings] Settings saved for step:', stepId, settings);
+      } catch (error) {
+        console.error('[EmailSettings] Error saving settings:', error);
+      }
+    }
+
+    closeEmailSettings();
+  }
+
+  // Make functions globally available
+  window.openEmailSettings = openEmailSettings;
+  window.closeEmailSettings = closeEmailSettings;
+  window.saveEmailSettings = saveEmailSettings;
 
   // Delete confirmation popover state (anchored under trash icon)
   let _openDeletePopover = null; // { el, cleanup }
@@ -2314,6 +2789,16 @@
     };
   }
   
+  function openEmailSettings(anchorEl, step) {
+    if (!anchorEl || !step) return;
+    closeEmailSettings();
+    
+    // Set the step to show settings instead of editor
+    step.showSettings = true;
+    step.collapsed = false; // Expand to show settings
+    render();
+  }
+
   function openDelayPopover(anchorEl, step) {
     if (!anchorEl || !step) return;
     closeDelayPopover();
@@ -2716,6 +3201,19 @@
         step.paused = !isActive;
         try { scheduleStepSave(step.id, true); } catch (_) { /* noop */ }
         render();
+      });
+    });
+
+    // Email settings (settings icon) – show settings popover
+    container.querySelectorAll('.step-card .settings-step').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = btn.closest('.step-card');
+        const id = card?.getAttribute('data-id');
+        const step = state.currentSequence.steps.find(s => s.id === id);
+        if (!step) return;
+        openEmailSettings(btn, step);
       });
     });
 
@@ -3958,8 +4456,202 @@
     }
   }
 
+  // Function to create tasks from sequence steps
+  function createTasksFromSequence(sequence, contactData) {
+    if (!sequence.steps || !Array.isArray(sequence.steps)) return [];
+    
+    const tasks = [];
+    let cumulativeDelay = 0;
+    
+    sequence.steps.forEach((step, index) => {
+      // Skip if step is paused
+      if (step.paused) return;
+      
+      // Calculate due date based on cumulative delay
+      const dueDate = new Date(Date.now() + cumulativeDelay * 60 * 1000);
+      cumulativeDelay += step.delayMinutes || 0;
+      
+      // Create task based on step type
+      let task = null;
+      
+      if (step.type === 'li-connect' || step.type === 'li-message' || step.type === 'li-view-profile' || step.type === 'li-interact-post') {
+        const typeLabels = {
+          'li-connect': 'linkedin-connect',
+          'li-message': 'linkedin-message', 
+          'li-view-profile': 'linkedin-view',
+          'li-interact-post': 'linkedin-interact'
+        };
+        
+        const taskTitles = {
+          'li-connect': 'Add on LinkedIn',
+          'li-message': 'Send a message on LinkedIn',
+          'li-view-profile': 'View LinkedIn profile', 
+          'li-interact-post': 'Interact with LinkedIn Post'
+        };
+        
+        task = {
+          id: `seq_${sequence.id}_${step.id}`,
+          title: step.data?.note || taskTitles[step.type] || 'LinkedIn task',
+          contact: contactData?.name || contactData?.contact || 'Contact',
+          account: contactData?.company || contactData?.account || 'Company',
+          type: typeLabels[step.type] || 'linkedin',
+          priority: step.data?.priority || 'medium',
+          dueDate: dueDate.toLocaleDateString(),
+          dueTime: dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          status: 'pending',
+          sequenceId: sequence.id,
+          stepId: step.id,
+          stepIndex: index,
+          isSequenceTask: true,
+          notes: step.data?.note || ''
+        };
+      } else if (step.type === 'phone-call') {
+        task = {
+          id: `seq_${sequence.id}_${step.id}`,
+          title: step.data?.note || 'Call contact',
+          contact: contactData?.name || contactData?.contact || 'Contact',
+          account: contactData?.company || contactData?.account || 'Company',
+          type: 'phone-call',
+          priority: step.data?.priority || 'medium',
+          dueDate: dueDate.toLocaleDateString(),
+          dueTime: dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          status: 'pending',
+          sequenceId: sequence.id,
+          stepId: step.id,
+          stepIndex: index,
+          isSequenceTask: true,
+          notes: step.data?.note || ''
+        };
+      } else if (step.type === 'auto-email' || step.type === 'manual-email') {
+        task = {
+          id: `seq_${sequence.id}_${step.id}`,
+          title: step.data?.note || 'Send email',
+          contact: contactData?.name || contactData?.contact || 'Contact',
+          account: contactData?.company || contactData?.account || 'Company',
+          type: step.type === 'auto-email' ? 'auto-email' : 'manual-email',
+          priority: step.data?.priority || 'medium',
+          dueDate: dueDate.toLocaleDateString(),
+          dueTime: dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          status: 'pending',
+          sequenceId: sequence.id,
+          stepId: step.id,
+          stepIndex: index,
+          isSequenceTask: true,
+          notes: step.data?.note || ''
+        };
+      }
+      
+      if (task) {
+        tasks.push(task);
+      }
+    });
+    
+    return tasks;
+  }
+
+  // Function to send email via SendGrid
+  async function sendEmailViaSendGrid(emailData) {
+    try {
+      const response = await fetch('/api/email/sendgrid-send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Email send failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      throw error;
+    }
+  }
+
+  // Function to start a sequence for a contact
+  async function startSequenceForContact(sequence, contactData) {
+    try {
+      // Create tasks from sequence steps
+      const tasks = createTasksFromSequence(sequence, contactData);
+      
+      if (tasks.length === 0) {
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast('No active steps found in sequence.');
+        }
+        return [];
+      }
+      
+      // Process email steps immediately (auto-email)
+      const emailTasks = tasks.filter(task => task.type === 'auto-email');
+      for (const emailTask of emailTasks) {
+        try {
+          // Find the corresponding step to get email content
+          const step = sequence.steps.find(s => s.id === emailTask.stepId);
+          if (step && step.emailContent) {
+            const emailData = {
+              to: contactData.email,
+              subject: step.emailContent.subject || 'Follow up',
+              html: step.emailContent.body || 'Hello, this is a follow up email.',
+              from: 'noreply@powerchoosers.com',
+              fromName: 'Power Choosers',
+              contactName: contactData.name,
+              companyName: contactData.company
+            };
+            
+            await sendEmailViaSendGrid(emailData);
+            console.log(`Email sent for task: ${emailTask.title}`);
+          }
+        } catch (error) {
+          console.error(`Failed to send email for task ${emailTask.title}:`, error);
+        }
+      }
+      
+      // Save tasks to localStorage
+      const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+      const newTasks = [...existingTasks, ...tasks];
+      localStorage.setItem('userTasks', JSON.stringify(newTasks));
+      
+      // Save tasks to Firebase if available
+      if (window.firebaseDB) {
+        const batch = window.firebaseDB.batch();
+        tasks.forEach(task => {
+          const taskRef = window.firebaseDB.collection('tasks').doc(task.id);
+          batch.set(taskRef, {
+            ...task,
+            timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+          });
+        });
+        await batch.commit();
+      }
+      
+      // Dispatch event to update tasks page
+      window.dispatchEvent(new CustomEvent('tasksUpdated', { 
+        detail: { source: 'sequenceStart', tasks: tasks } 
+      }));
+      
+      // Show success message
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast(`Sequence started! Created ${tasks.length} tasks. ${emailTasks.length} emails sent.`);
+      }
+      
+      return tasks;
+    } catch (error) {
+      console.error('Failed to start sequence:', error);
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Failed to start sequence. Please try again.');
+      }
+      return [];
+    }
+  }
+
   // Export API
   window.SequenceBuilder = {
-    show
+    show,
+    startSequenceForContact,
+    createTasksFromSequence
   };
 })();

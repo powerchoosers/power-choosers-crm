@@ -82,6 +82,54 @@
     return sequencesCol.doc(id).delete();
   }
 
+  // Function to start a sequence for a contact
+  async function startSequenceForContact(sequence) {
+    try {
+      // Prompt for contact information
+      const contactName = prompt('Enter contact name:');
+      if (!contactName) return;
+      
+      const contactCompany = prompt('Enter company name (optional):') || '';
+      const contactEmail = prompt('Enter email address:');
+      if (!contactEmail) {
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast('Email address is required to start sequence.');
+        }
+        return;
+      }
+      
+      const contactData = {
+        name: contactName,
+        company: contactCompany,
+        email: contactEmail,
+        contact: contactName,
+        account: contactCompany
+      };
+      
+      // Use SequenceBuilder to create tasks
+      if (window.SequenceBuilder && typeof window.SequenceBuilder.startSequenceForContact === 'function') {
+        const tasks = await window.SequenceBuilder.startSequenceForContact(sequence, contactData);
+        
+        if (tasks.length > 0) {
+          // Navigate to tasks page to show the created tasks
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('tasks');
+          }
+        }
+      } else {
+        console.warn('SequenceBuilder not available');
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast('Sequence builder not available');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to start sequence:', error);
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Failed to start sequence. Please try again.');
+      }
+    }
+  }
+
   function initDomRefs() {
     els.page = document.getElementById('sequences-page');
     if (!els.page) return false;
@@ -257,6 +305,9 @@
               try { window.crm.navigateToPage('sequence-builder'); } catch (e2) { /* noop */ }
             }
             break;
+          case 'start':
+            startSequenceForContact(it);
+            break;
           case 'duplicate': {
             const now = Date.now();
             const copy = { ...it, id: 'seq-' + Math.random().toString(36).slice(2), name: it.name + ' (Copy)', createdAt: now };
@@ -335,6 +386,7 @@
       `<td>
         <div class="qa-actions">
           <button type="button" class="seq-action btn-text" data-action="edit" data-id="${id}">Edit</button>
+          <button type="button" class="seq-action btn-text" data-action="start" data-id="${id}">Start</button>
           <button type="button" class="seq-action btn-text" data-action="duplicate" data-id="${id}">Duplicate</button>
           <button type="button" class="seq-action btn-text" data-action="delete" data-id="${id}">Delete</button>
         </div>

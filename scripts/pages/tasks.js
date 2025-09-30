@@ -204,9 +204,10 @@
         els.filterTabs.forEach(t=>t.classList.remove('active'));
         tab.classList.add('active');
         const label = (tab.textContent||'').trim().toLowerCase();
-        // New filter sections: All your tasks, Phone Tasks, Email Tasks, Overdue Tasks
+        // New filter sections: All your tasks, Phone Tasks, Email Tasks, LinkedIn Tasks, Overdue Tasks
         if(label.includes('phone')) state.filterMode='phone';
         else if(label.includes('email')) state.filterMode='email';
+        else if(label.includes('linkedin')) state.filterMode='linkedin';
         else if(label.includes('overdue')) state.filterMode='overdue';
         else state.filterMode='all';
         applyFilters();
@@ -347,6 +348,8 @@
       arr = arr.filter(r => /phone|call/i.test(String(r.type||'')));
     } else if(state.filterMode==='email') {
       arr = arr.filter(r => /email/i.test(String(r.type||'')));
+    } else if(state.filterMode==='linkedin') {
+      arr = arr.filter(r => /linkedin|li-/i.test(String(r.type||'')));
     } else if(state.filterMode==='overdue') {
       arr = arr.filter(r => {
         if((r.status||'pending') === 'completed') return false;
