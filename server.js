@@ -881,6 +881,34 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
     const referer = req.headers.referer || '';
 
+    // Get deliverability settings from localStorage (simulated - in production, get from database)
+    // For now, we'll use default settings that allow tracking
+    const deliverabilitySettings = {
+      enableTracking: true, // Default to enabled
+      includeBulkHeaders: false,
+      includeListUnsubscribe: false,
+      includePriorityHeaders: false,
+      forceGmailOnly: true,
+      useBrandedHtmlTemplate: false,
+      signatureImageEnabled: true
+    };
+
+    // If tracking is disabled, return pixel but don't track
+    if (!deliverabilitySettings.enableTracking) {
+      console.log('[Email] Tracking disabled by settings, returning pixel without tracking:', trackingId);
+      const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Content-Length': pixel.length,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      res.end(pixel);
+      return;
+    }
+
     // Detect common image proxy user agents (e.g., Gmail's GoogleImageProxy)
     const ua = String(userAgent).toLowerCase();
     const isGoogleProxy = ua.includes('googleimageproxy');
@@ -939,6 +967,7 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
     // Return a 1x1 transparent pixel with proper headers
     const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
     
+    // Set cache headers based on deliverability settings and proxy detection
     const headers = {
       'Content-Type': 'image/png',
       'Content-Length': pixel.length,

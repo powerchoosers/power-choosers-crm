@@ -1,10 +1,33 @@
 {
   "name": "power-choosers-crm",
   "version": "1.0.0",
-  "description": "Power Choosers CRM with Twilio integration",
+  "description": "Power Choosers CRM with automated email sequences",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'No build step required'",
+    "test": "echo 'No tests configured'"
+  },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
-    "firebase-admin": "^12.6.0",
-    "twilio": "^4.23.0"
-  }
+    "@sendgrid/mail": "^8.1.0",
+    "firebase-admin": "^12.0.0",
+    "bull": "^4.12.0",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "crm",
+    "email",
+    "automation",
+    "sendgrid",
+    "sequences"
+  ],
+  "author": "Power Choosers LLC",
+  "license": "MIT"
 }
