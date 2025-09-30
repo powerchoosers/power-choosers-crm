@@ -1,19 +1,39 @@
 const twilio = require('twilio');
 
-const allowCors = fn => async (req, res) => {
-  res.setHeader('Access-Control-Allow-Credentials', true)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  if (req.method === 'OPTIONS') return res.status(200).end()
-  return await fn(req, res)
-}
+// CORS utility
+function cors(req, res) {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://powerchoosers.com',
+    'https://www.powerchoosers.com',
+    'https://power-choosers-crm.vercel.app'
+  ];
+  
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Vary', 'Origin');
 
-module.exports = allowCors(async (req, res) => {
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-      return res.status(200).end();
+    res.status(204).end();
+    return true;
   }
+  
+  return false;
+}
+
+module.exports = async (req, res) => {
+  // Handle CORS
+  if (cors(req, res)) return;
   
   // Only allow GET requests
   if (req.method !== 'GET') {

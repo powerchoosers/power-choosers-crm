@@ -792,6 +792,7 @@
                                         <button class="filter-tab active">All your tasks</button>
                                         <button class="filter-tab">Phone Tasks</button>
                                         <button class="filter-tab">Email Tasks</button>
+                                        <button class="filter-tab">LinkedIn Tasks</button>
                                         <button class="filter-tab">Overdue Tasks</button>
                                     </div>
                                     <div class="filter-actions">
@@ -1353,7 +1354,7 @@
                                         </div>
                                     </div>
 
-                                    <!-- Deliverability & Tracking Section -->
+                                    <!-- Deliverability & Tracking Section (SendGrid Optimized) -->
                                     <div class="settings-section">
                                         <h3 class="settings-section-title">
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1362,73 +1363,134 @@
                                             Email Deliverability & Tracking
                                         </h3>
                                         <div class="settings-content">
-                                            <p class="section-desc">Defaults for deliverability. For cold outreach, keep things simple: no pixel, no bulk headers, Gmail API only, minimal template.</p>
+                                            <p class="section-desc">Global defaults for SendGrid email delivery. These settings apply to manual emails from the CRM. Sequence steps have their own independent settings.</p>
+                                            
                                             <div class="settings-group">
-                                                <h4 class="settings-group-title">Tracking</h4>
+                                                <h4 class="settings-group-title">SendGrid Service</h4>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
-                                                        <input type="checkbox" id="email-trk-enabled">
+                                                        <input type="checkbox" id="sendgrid-enabled" checked>
                                                         <span class="checkmark"></span>
-                                                        Enable read tracking pixel
+                                                        Enable SendGrid for email sending
                                                     </label>
-                                                    <div class="settings-hint">Adds a hidden 1×1 image to count opens. May trigger spam filters on cold emails and is often prefetched by Gmail.</div>
+                                                    <div class="settings-hint">Use Twilio SendGrid API for sending emails. Provides better deliverability, tracking, and automation features.</div>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="sandbox-mode">
+                                                        <span class="checkmark"></span>
+                                                        Sandbox Mode (Testing)
+                                                    </label>
+                                                    <div class="settings-hint">Enable sandbox mode for testing. Emails won't actually be sent, but SendGrid will validate and process them.</div>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label for="ip-pool-name">IP Pool Name (Optional)</label>
+                                                    <input type="text" id="ip-pool-name" class="settings-input" placeholder="Leave blank to use default">
+                                                    <div class="settings-hint">Specify a dedicated IP pool for sending. Only use if you have a dedicated IP setup with SendGrid.</div>
                                                 </div>
                                             </div>
+
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Tracking & Analytics</h4>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-trk-enabled" checked>
+                                                        <span class="checkmark"></span>
+                                                        Enable Open Tracking
+                                                    </label>
+                                                    <div class="settings-hint">Track when recipients open your emails using a hidden 1×1 pixel. Works with both Gmail proxy and real opens.</div>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-click-trk-enabled" checked>
+                                                        <span class="checkmark"></span>
+                                                        Enable Click Tracking
+                                                    </label>
+                                                    <div class="settings-hint">Track when recipients click links in your emails. Links are rewritten through SendGrid's tracking domain.</div>
+                                                </div>
+                                            </div>
+
                                             <div class="settings-group">
                                                 <h4 class="settings-group-title">Headers & Compliance</h4>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
-                                                        <input type="checkbox" id="email-bulk-headers">
+                                                        <input type="checkbox" id="email-list-unsub" checked>
                                                         <span class="checkmark"></span>
-                                                        Add "Precedence: bulk" header
+                                                        Add List-Unsubscribe Header
                                                     </label>
-                                                    <div class="settings-hint">Signals bulk mail to inbox providers. Use only for opt‑in newsletters, not one‑to‑one outreach.</div>
+                                                    <div class="settings-hint">Adds one-click unsubscribe header. Recommended by Gmail and improves deliverability for bulk sends.</div>
                                                 </div>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
-                                                        <input type="checkbox" id="email-list-unsub">
+                                                        <input type="checkbox" id="include-physical-address" checked>
                                                         <span class="checkmark"></span>
-                                                        Add List-Unsubscribe headers
+                                                        Include Physical Address
                                                     </label>
-                                                    <div class="settings-hint">Enables one‑click unsubscribe in email clients. Recommended for opt‑in lists; avoid for individual cold emails.</div>
+                                                    <div class="settings-hint">Add your business address to email footer. Required by CAN-SPAM law for commercial emails.</div>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="gdpr-compliant" checked>
+                                                        <span class="checkmark"></span>
+                                                        GDPR Compliance Mode
+                                                    </label>
+                                                    <div class="settings-hint">Enables GDPR-compliant handling of EU contacts. Includes consent tracking and data processing notices.</div>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="email-bulk-headers">
+                                                        <span class="checkmark"></span>
+                                                        Add "Precedence: bulk" Header
+                                                    </label>
+                                                    <div class="settings-hint">Signals bulk mail to inbox providers. Use only for newsletters; avoid for one-to-one outreach.</div>
                                                 </div>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
                                                         <input type="checkbox" id="email-priority-headers">
                                                         <span class="checkmark"></span>
-                                                        Add Priority/Importance headers
+                                                        Add Priority/Importance Headers
                                                     </label>
-                                                    <div class="settings-hint">Adds priority flags. These rarely help deliverability and can look artificial—leave off unless required.</div>
+                                                    <div class="settings-hint">Marks emails as high priority. Use sparingly—can look artificial and hurt deliverability if overused.</div>
                                                 </div>
                                             </div>
+
                                             <div class="settings-group">
-                                                <h4 class="settings-group-title">Sending Method</h4>
+                                                <h4 class="settings-group-title">Advanced SendGrid Options</h4>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
-                                                        <input type="checkbox" id="email-force-gmail" checked>
+                                                        <input type="checkbox" id="bypass-list-mgmt">
                                                         <span class="checkmark"></span>
-                                                        Force Gmail API only (disable fallback)
+                                                        Bypass List Management
                                                     </label>
-                                                    <div class="settings-hint">Sends only from your authenticated Gmail. Disables fallback sends (e.g., noreply@powerchoosers.com) that can hurt reputation.</div>
+                                                    <div class="settings-hint">Bypasses SendGrid's suppression lists. Only use for transactional emails like password resets. Not recommended for marketing.</div>
+                                                </div>
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="spam-score-check">
+                                                        <span class="checkmark"></span>
+                                                        Check Spam Score Before Sending
+                                                    </label>
+                                                    <div class="settings-hint">Analyze email content for spam triggers before sending. May slow down sends but improves deliverability.</div>
                                                 </div>
                                             </div>
+
                                             <div class="settings-group">
-                                                <h4 class="settings-group-title">Template Style</h4>
+                                                <h4 class="settings-group-title">Template & Content</h4>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
                                                         <input type="checkbox" id="email-branded-html">
                                                         <span class="checkmark"></span>
-                                                        Use branded HTML template
+                                                        Use Branded HTML Template
                                                     </label>
-                                                    <div class="settings-hint">Styled HTML looks like a campaign. For cold outreach, keep this off and send a minimal email.</div>
+                                                    <div class="settings-hint">Sends styled HTML emails with branding. For cold outreach, keep this off for a more personal look.</div>
                                                 </div>
                                                 <div class="settings-field">
                                                     <label class="checkbox-label">
-                                                        <input type="checkbox" id="email-sig-image-enabled">
+                                                        <input type="checkbox" id="email-sig-image-enabled" checked>
                                                         <span class="checkmark"></span>
-                                                        Include image in signature
+                                                        Include Image in Signature
                                                     </label>
-                                                    <div class="settings-hint">Images make signatures look polished but can increase spam risk. Prefer text‑only for first‑touch emails.</div>
+                                                    <div class="settings-hint">Shows your signature image/logo. Makes emails look professional but adds an image load.</div>
                                                 </div>
                                             </div>
                                         </div>
