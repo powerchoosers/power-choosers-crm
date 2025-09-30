@@ -10,13 +10,23 @@ class SettingsPage {
                     image: null
                 },
                 emailDeliverability: {
-                    enableTracking: false,
+                    // SendGrid Settings
+                    enableTracking: true,
+                    enableClickTracking: true,
                     includeBulkHeaders: false,
-                    includeListUnsubscribe: false,
+                    includeListUnsubscribe: true,
                     includePriorityHeaders: false,
-                    forceGmailOnly: true,
                     useBrandedHtmlTemplate: false,
-                    signatureImageEnabled: false
+                    signatureImageEnabled: true,
+                    // SendGrid specific
+                    sendgridEnabled: true,
+                    bypassListManagement: false,
+                    sandboxMode: false,
+                    ipPoolName: '',
+                    // Compliance
+                    includePhysicalAddress: true,
+                    gdprCompliant: true,
+                    spamScoreCheck: false
                 },
                 geminiPrompts: {
                     greeting: '',
@@ -107,15 +117,22 @@ class SettingsPage {
             }
         });
 
-        // Deliverability & Tracking toggles
+        // Deliverability & Tracking toggles (SendGrid optimized)
         const deliverabilityFields = [
             'email-trk-enabled',
+            'email-click-trk-enabled',
             'email-bulk-headers',
             'email-list-unsub',
             'email-priority-headers',
-            'email-force-gmail',
             'email-branded-html',
-            'email-sig-image-enabled'
+            'email-sig-image-enabled',
+            'sendgrid-enabled',
+            'bypass-list-mgmt',
+            'sandbox-mode',
+            'ip-pool-name',
+            'include-physical-address',
+            'gdpr-compliant',
+            'spam-score-check'
         ];
         deliverabilityFields.forEach(id => {
             const el = document.getElementById(id);
@@ -124,12 +141,19 @@ class SettingsPage {
                 const v = el.type === 'checkbox' ? !!el.checked : el.value;
                 switch(id){
                     case 'email-trk-enabled': this.state.settings.emailDeliverability.enableTracking = v; break;
+                    case 'email-click-trk-enabled': this.state.settings.emailDeliverability.enableClickTracking = v; break;
                     case 'email-bulk-headers': this.state.settings.emailDeliverability.includeBulkHeaders = v; break;
                     case 'email-list-unsub': this.state.settings.emailDeliverability.includeListUnsubscribe = v; break;
                     case 'email-priority-headers': this.state.settings.emailDeliverability.includePriorityHeaders = v; break;
-                    case 'email-force-gmail': this.state.settings.emailDeliverability.forceGmailOnly = v; break;
                     case 'email-branded-html': this.state.settings.emailDeliverability.useBrandedHtmlTemplate = v; break;
                     case 'email-sig-image-enabled': this.state.settings.emailDeliverability.signatureImageEnabled = v; break;
+                    case 'sendgrid-enabled': this.state.settings.emailDeliverability.sendgridEnabled = v; break;
+                    case 'bypass-list-mgmt': this.state.settings.emailDeliverability.bypassListManagement = v; break;
+                    case 'sandbox-mode': this.state.settings.emailDeliverability.sandboxMode = v; break;
+                    case 'ip-pool-name': this.state.settings.emailDeliverability.ipPoolName = v; break;
+                    case 'include-physical-address': this.state.settings.emailDeliverability.includePhysicalAddress = v; break;
+                    case 'gdpr-compliant': this.state.settings.emailDeliverability.gdprCompliant = v; break;
+                    case 'spam-score-check': this.state.settings.emailDeliverability.spamScoreCheck = v; break;
                 }
                 this.markDirty();
             });
@@ -245,22 +269,46 @@ class SettingsPage {
             defaultView.value = this.state.settings.general.defaultView;
         }
 
-        // Render deliverability settings
+        // Render deliverability settings (SendGrid optimized)
         const d = this.state.settings.emailDeliverability || {};
+        
+        // Tracking
         const trk = document.getElementById('email-trk-enabled');
         if (trk) trk.checked = !!d.enableTracking;
+        const clickTrk = document.getElementById('email-click-trk-enabled');
+        if (clickTrk) clickTrk.checked = !!d.enableClickTracking;
+        
+        // Headers
         const bulk = document.getElementById('email-bulk-headers');
         if (bulk) bulk.checked = !!d.includeBulkHeaders;
         const unsub = document.getElementById('email-list-unsub');
         if (unsub) unsub.checked = !!d.includeListUnsubscribe;
         const pri = document.getElementById('email-priority-headers');
         if (pri) pri.checked = !!d.includePriorityHeaders;
-        const gm = document.getElementById('email-force-gmail');
-        if (gm) gm.checked = !!d.forceGmailOnly;
+        
+        // Content
         const html = document.getElementById('email-branded-html');
         if (html) html.checked = !!d.useBrandedHtmlTemplate;
         const sigimg = document.getElementById('email-sig-image-enabled');
         if (sigimg) sigimg.checked = !!d.signatureImageEnabled;
+        
+        // SendGrid specific
+        const sgEnabled = document.getElementById('sendgrid-enabled');
+        if (sgEnabled) sgEnabled.checked = !!d.sendgridEnabled;
+        const bypassList = document.getElementById('bypass-list-mgmt');
+        if (bypassList) bypassList.checked = !!d.bypassListManagement;
+        const sandbox = document.getElementById('sandbox-mode');
+        if (sandbox) sandbox.checked = !!d.sandboxMode;
+        const ipPool = document.getElementById('ip-pool-name');
+        if (ipPool) ipPool.value = d.ipPoolName || '';
+        
+        // Compliance
+        const physAddr = document.getElementById('include-physical-address');
+        if (physAddr) physAddr.checked = !!d.includePhysicalAddress;
+        const gdpr = document.getElementById('gdpr-compliant');
+        if (gdpr) gdpr.checked = !!d.gdprCompliant;
+        const spam = document.getElementById('spam-score-check');
+        if (spam) spam.checked = !!d.spamScoreCheck;
 
         this.updateSaveButton();
     }
