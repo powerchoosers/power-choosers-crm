@@ -221,8 +221,8 @@ class PowerChoosersCRM {
               
               // Close modal after navigation is initiated
               setTimeout(() => {
-                try { form.reset(); } catch (_) { /* noop */ }
-                close();
+            try { form.reset(); } catch (_) { /* noop */ }
+            close();
               }, 100); // Small delay to ensure navigation starts
               
             } catch (e) {
@@ -354,7 +354,7 @@ class PowerChoosersCRM {
             if (data.workDirectPhone) { try { normalized.workDirectPhone = this.normalizePhone(data.workDirectPhone); } catch(_) { normalized.workDirectPhone = data.workDirectPhone; } }
             if (data.otherPhone) { try { normalized.otherPhone = this.normalizePhone(data.otherPhone); } catch(_) { normalized.otherPhone = data.otherPhone; } }
 
-          const doc = {
+            const doc = {
               // Known contact fields
               firstName: data.firstName || '',
               lastName: data.lastName || '',
@@ -2363,13 +2363,13 @@ class PowerChoosersCRM {
                                     const bestMatch = duplicates[0];
                                     if (bestMatch.similarity.score >= 0.8) {
                                         // Queue merge; defer user decision to end-of-import summary
-                                        existingRecord = { 
-                                            ref: db.collection('contacts').doc(bestMatch.contact.id),
-                                            data: () => bestMatch.contact
-                                        };
+                                            existingRecord = { 
+                                                ref: db.collection('contacts').doc(bestMatch.contact.id),
+                                                data: () => bestMatch.contact
+                                            };
                                         queuedContactMerges.push({ existingRecord, incoming: doc, similarity: bestMatch.similarity });
                                         // Skip immediate update for this row
-                                        return;
+                                            return;
                                     }
                                 }
                             }
@@ -2521,7 +2521,7 @@ class PowerChoosersCRM {
                     } catch(e) { failed++; }
                 }
             }
-
+            
             // Show results
             if (progressDiv) progressDiv.hidden = true;
             if (resultsDiv) {
