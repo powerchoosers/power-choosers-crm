@@ -731,16 +731,19 @@ class EmailTrackingManager {
     }
 
     /**
-     * Save an email record to Firebase (for Gmail API emails)
+     * Save an email record to Firebase (for SendGrid and Gmail emails)
      */
     async saveEmailRecord(emailData) {
         try {
-            const { id, to, subject, content, from, gmailMessageId, sentAt, sentVia } = emailData;
+            const { id, to, subject, content, from, sendgridMessageId, gmailMessageId, sentAt, sentVia, provider } = emailData;
             
-            // Use the provided tracking ID or generate a new one
-            const trackingId = id || `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            // Determine provider (default to sendgrid)
+            const emailProvider = provider || sentVia || 'sendgrid';
             
-            // Create email record
+            // Use the provided tracking ID or generate a new one based on provider
+            const trackingId = id || `${emailProvider === 'gmail' || emailProvider === 'gmail_api' ? 'gmail' : 'sendgrid'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Create email record with provider-specific fields
             const emailRecord = {
                 id: trackingId,
                 to: Array.isArray(to) ? to : [to],
@@ -754,13 +757,21 @@ class EmailTrackingManager {
                 openCount: 0,
                 replyCount: 0,
                 status: 'sent',
-                gmailMessageId: gmailMessageId, // Store Gmail's message ID
-                sentVia: sentVia || 'gmail_api' // Mark as sent via Gmail API
+                provider: emailProvider, // Track email provider (sendgrid or gmail)
+                sentVia: emailProvider
             };
+            
+            // Add provider-specific message IDs (only if they exist)
+            if (sendgridMessageId) {
+                emailRecord.sendgridMessageId = sendgridMessageId;
+            }
+            if (gmailMessageId) {
+                emailRecord.gmailMessageId = gmailMessageId;
+            }
 
             // Save to Firebase
             await this.db.collection('emails').doc(trackingId).set(emailRecord);
-            console.log('[EmailTracking] Gmail email record saved:', trackingId);
+            console.log(`[EmailTracking] ${emailProvider} email record saved:`, trackingId);
             
             return { success: true, trackingId };
         } catch (error) {
