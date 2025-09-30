@@ -1,4 +1,7 @@
 {
+  "buildCommand": "echo 'No build step required'",
+  "outputDirectory": ".",
+  "installCommand": "npm install",
   "crons": [
     {
       "path": "/api/email/automation-cron",
