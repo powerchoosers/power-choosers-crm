@@ -103,12 +103,20 @@ class EmailManager {
 
     // Load emails (placeholder for now)
     async loadEmails() {
-        console.log('[EmailManager] Loading emails...');
-        // This is a placeholder - in a real implementation, this would fetch emails from Gmail API
-        // For now, we'll just show the empty state
-        setTimeout(() => {
-            this.updateAuthenticationUI();
-        }, 1000);
+        console.log('[EmailManager] Loading emails from tracking system...');
+        try {
+            // Load emails from the tracking system (sent emails)
+            if (window.emailTrackingManager) {
+                const emails = await window.emailTrackingManager.getSentEmails();
+                this.renderEmails(emails);
+            } else {
+                console.warn('[EmailManager] Email tracking manager not available');
+                this.showEmptyState();
+            }
+        } catch (error) {
+            console.error('[EmailManager] Error loading emails:', error);
+            this.showEmptyState();
+        }
     }
 
     // Refresh emails
@@ -2249,13 +2257,10 @@ class EmailManager {
     }
 
     async checkAuthentication() {
-        // With GIS, we do not have persistent auth state; check for a token
-        if (!this.accessToken) {
-            this.isAuthenticated = false;
-            this.showAuthPrompt();
-            return;
-        }
+        // SendGrid doesn't require client-side authentication
+        // The API key is handled server-side
         this.isAuthenticated = true;
+        return true;
     }
 
     showAuthPrompt() {
@@ -2274,11 +2279,11 @@ class EmailManager {
                     <path fill="#c62828" d="M3,12.298V16.2l10,7.5V11.2L9.876,8.859C9.132,8.301,8.228,8,7.298,8h0C4.924,8,3,9.924,3,12.298z"></path>
                     <path fill="#fbc02d" d="M45,12.298V16.2l-10,7.5V11.2l3.124-2.341C38.868,8.301,39.772,8,40.702,8h0 C43.076,8,45,9.924,45,12.298z"></path>
                 </svg>
-                <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600; color: var(--text-primary);">Connect Gmail</h3>
-                <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5; max-width: 400px;">Sign in with Google to pull your inbox into Power Choosers.</p>
+                <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600; color: var(--text-primary);">Email Ready</h3>
+                <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5; max-width: 400px;">Your emails are sent via SendGrid. Click "Compose" to start writing.</p>
                 <div style="display:flex; gap:12px; margin-top: 8px;">
-                    <button class="gmail-signin-btn" onclick="window.emailManager?.authenticate()">
-                      Sign In
+                    <button class="gmail-signin-btn" onclick="window.emailManager?.loadEmails()">
+                      Load Emails
                     </button>
                 </div>
             </div>
@@ -4459,96 +4464,48 @@ class EmailManager {
         });
     }
 
-    async sendEmailViaGmail(emailData) {
+    async sendEmailViaSendGrid(emailData) {
         try {
-            if (!this.accessToken) {
-                await this.authenticate();
-            }
-
             const { to, subject, content, _deliverability } = emailData;
             
-            // Get current user's email address
-            const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (!profileResponse.ok) {
-                throw new Error(`Failed to get user profile: ${profileResponse.statusText}`);
-            }
-            
-            const profile = await profileResponse.json();
-            const fromEmail = profile.emailAddress;
-            
             // Generate unique tracking ID for this email
-            const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            // Conditionally inject tracking pixel
-            let contentWithTracking = content;
-            if (_deliverability?.enableTracking) {
-                const baseUrl = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-                const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
-                const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-                if (!/\/api\/email\/track\//.test(contentWithTracking)) {
-                    contentWithTracking = contentWithTracking + trackingPixel;
-                }
-            }
+            // Prepare email data for SendGrid
+            const emailPayload = {
+                to: to,
+                subject: subject,
+                content: content,
+                trackingId: trackingId,
+                _deliverability: _deliverability
+            };
             
-            // Create email message in Gmail format with conditional headers
-            const recipients = Array.isArray(to) ? to.join(', ') : to;
-            const emailLines = [
-                `To: ${recipients}`,
-                `From: ${fromEmail}`,
-                `Subject: ${subject}`,
-                'MIME-Version: 1.0',
-                'Content-Type: text/html; charset=utf-8',
-                'X-Mailer: Power Choosers CRM',
-                ...(_deliverability?.includePriorityHeaders ? ['X-Priority: 3','X-MSMail-Priority: Normal','Importance: Normal'] : []),
-                ...(_deliverability?.includeListUnsubscribe ? ['List-Unsubscribe: <mailto:unsubscribe@powerchoosers.com>','List-Unsubscribe-Post: List-Unsubscribe=One-Click'] : []),
-                'X-Auto-Response-Suppress: All',
-                ...(_deliverability?.includeBulkHeaders ? ['Precedence: bulk'] : []),
-                '',
-                contentWithTracking
-            ];
-
-            const emailString = emailLines.join('\r\n');
-            const encodedEmail = btoa(emailString)
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=+$/, '');
-
-            // Send via Gmail API
-            const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+            // Send via SendGrid API
+            const response = await fetch(`${window.API_BASE_URL}/api/email/sendgrid-send`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    raw: encodedEmail
-                })
+                body: JSON.stringify(emailPayload)
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Gmail API error: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-
-            const result = await response.json();
-            console.log('[Gmail] Email sent successfully:', result);
             
-            // Also store the email in our tracking system so it appears in Sent section
-            if (window.emailTrackingManager) {
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to send email via SendGrid');
+            }
+            
+            const result = await response.json();
+            console.log('[SendGrid] Email sent successfully:', result);
+            
+            // Store email record for tracking
+            if (window.emailTrackingManager && result.trackingId) {
                 const trackingEmailData = {
-                    id: trackingId, // Use the tracking ID we generated
+                    id: result.trackingId,
                     to: emailData.to,
                     subject: emailData.subject,
-                    content: contentWithTracking, // Use content with tracking pixel
-                    from: fromEmail,
-                    gmailMessageId: result.id,
-                    sentVia: 'gmail_api',
+                    content: content,
+                    from: 'Lewis Patterson <noreply@powerchoosers.com>',
+                    sentVia: 'sendgrid',
                     sentAt: new Date().toISOString(),
                     opens: [],
                     replies: [],
@@ -4559,20 +4516,20 @@ class EmailManager {
                 
                 try {
                     await window.emailTrackingManager.saveEmailRecord(trackingEmailData);
-                    console.log('[Gmail] Email record saved to tracking system');
+                    console.log('[SendGrid] Email record saved to tracking system');
                 } catch (trackingError) {
-                    console.warn('[Gmail] Failed to save email record:', trackingError);
+                    console.warn('[SendGrid] Failed to save email record:', trackingError);
                 }
             }
             
             return {
                 success: true,
-                messageId: result.id,
-                message: 'Email sent successfully via Gmail API'
+                messageId: result.trackingId,
+                message: 'Email sent successfully via SendGrid'
             };
 
         } catch (error) {
-            console.error('[Gmail] Send error:', error);
+            console.error('[SendGrid] Send error:', error);
             throw error;
         }
     }
@@ -4631,37 +4588,15 @@ class EmailManager {
                 content: contentWithSignature
             };
 
-            // Try Gmail API first, fallback to email tracking manager
+            // Send via SendGrid
             let result;
             try {
-                console.log('[EmailManager] Auth check:', { 
-                    isAuthenticated: this.isAuthenticated, 
-                    hasAccessToken: !!this.accessToken,
-                    accessTokenLength: this.accessToken?.length 
-                });
-                
-                if (this.isAuthenticated && this.accessToken) {
-                    result = await this.sendEmailViaGmail({ ...emailData, _deliverability: deliver });
-                    console.log('[EmailManager] Email sent via Gmail API');
-                } else {
-                    if (deliver.forceGmailOnly !== false) throw new Error('Gmail API not authenticated');
-                    throw new Error('Gmail API not authenticated (fallback allowed)');
-                }
-            } catch (gmailError) {
-                console.warn('[EmailManager] Gmail API failed:', gmailError);
-                
-                // Fallback to email tracking manager if allowed
-                if (window.emailTrackingManager && deliver.forceGmailOnly === false) {
-                    const trackingEmailData = {
-                        ...emailData,
-                        from: 'noreply@powerchoosers.com',
-                        _deliverability: deliver
-                    };
-                    result = await window.emailTrackingManager.sendEmail(trackingEmailData);
-                    console.log('[EmailManager] Email sent via tracking manager (simulation mode)');
-                } else {
-                    throw new Error('No email sending method available');
-                }
+                console.log('[EmailManager] Sending via SendGrid...');
+                result = await this.sendEmailViaSendGrid({ ...emailData, _deliverability: deliver });
+                console.log('[EmailManager] Email sent via SendGrid');
+            } catch (sendGridError) {
+                console.error('[EmailManager] SendGrid failed:', sendGridError);
+                throw new Error(`Failed to send email: ${sendGridError.message}`);
             }
             
             // Close compose window on success
