@@ -495,6 +495,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/tx-price' ||
     pathname === '/api/gemini-email' ||
     pathname === '/api/email/send' ||
+    pathname === '/api/email/sendgrid-send' ||
     pathname.startsWith('/api/email/track/') ||
     pathname === '/api/email/webhook' ||
     pathname === '/api/email/stats' ||
@@ -564,6 +565,9 @@ const server = http.createServer(async (req, res) => {
   // Email tracking routes
   if (pathname === '/api/email/send') {
     return handleApiSendEmail(req, res);
+  }
+  if (pathname === '/api/email/sendgrid-send') {
+    return handleApiSendGridSend(req, res);
   }
   if (pathname.startsWith('/api/email/track/')) {
     return handleApiEmailTrack(req, res, parsedUrl);
@@ -1146,6 +1150,79 @@ async function handleApiEmailStats(req, res, parsedUrl) {
     console.error('[Email] Stats error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to fetch email stats', message: error.message }));
+  }
+}
+
+// SendGrid email sending handler
+async function handleApiSendGridSend(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(req);
+    const { to, subject, content, from, _deliverability } = body;
+
+    if (!to || !subject || !content) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing required fields: to, subject, content' }));
+      return;
+    }
+
+    // Generate unique tracking ID
+    const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create tracking pixel URL - handle both local and Vercel deployment
+    const protocol = req.headers['x-forwarded-proto'] || (req.connection.encrypted ? 'https' : 'http');
+    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+    const trackingPixelUrl = `${protocol}://${host}/api/email/track/${trackingId}`;
+    
+    // Inject tracking pixel into email content
+    const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
+    const emailContent = content + trackingPixel;
+
+    // Prepare email data for SendGrid
+    const emailData = {
+      to,
+      subject,
+      content: emailContent,
+      from: from || process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
+      trackingId,
+      _deliverability: _deliverability || {
+        enableTracking: true,
+        includeBulkHeaders: false,
+        includeListUnsubscribe: false,
+        includePriorityHeaders: false,
+        forceGmailOnly: false,
+        useBrandedHtmlTemplate: false,
+        signatureImageEnabled: true
+      }
+    };
+
+    console.log('[SendGrid] Sending email:', { to, subject, trackingId });
+
+    // Import and use SendGrid service
+    const { SendGridService } = await import('./api/email/sendgrid-service.js');
+    const sendGridService = new SendGridService();
+    const result = await sendGridService.sendEmail(emailData);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: true, 
+      trackingId: result.trackingId,
+      messageId: result.messageId,
+      message: 'Email sent successfully via SendGrid'
+    }));
+
+  } catch (error) {
+    console.error('[SendGrid] Send error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      error: 'Failed to send email', 
+      message: error.message 
+    }));
   }
 }
 
