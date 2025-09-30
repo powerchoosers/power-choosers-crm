@@ -2393,42 +2393,44 @@ class EmailManager {
     }
 
     async loadEmails() {
-        // Handle sent folder differently - load from Firebase tracking data
+        // Handle sent folder - load from Firebase tracking data
         if (this.currentFolder === 'sent') {
             await this.loadSentEmails();
             return;
         }
 
-        // For other folders, use Gmail API
-        if (!this.isAuthenticated || !this.accessToken) {
-            this.showAuthPrompt();
-            return;
-        }
-
+        // For inbox and other folders, use SendGrid data from Firebase
         this.showLoading();
 
         try {
-            const query = this.buildQuery();
-            const base = 'https://gmail.googleapis.com/gmail/v1/users/me';
-            const listUrl = `${base}/messages?maxResults=50&q=${encodeURIComponent(query)}`;
-            const headers = { Authorization: `Bearer ${this.accessToken}` };
-
-            const listResp = await fetch(listUrl, { headers });
-            if (!listResp.ok) throw new Error(`Gmail list failed: ${listResp.status}`);
-            const listJson = await listResp.json();
-
-            if (Array.isArray(listJson.messages) && listJson.messages.length) {
-                const emailPromises = listJson.messages.map(async (msg) => {
-                    const url = `${base}/messages/${encodeURIComponent(msg.id)}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`;
-                    const r = await fetch(url, { headers });
-                    if (!r.ok) return null;
-                    return r.json();
-                });
-                const emailResults = (await Promise.all(emailPromises)).filter(Boolean);
-                this.emails = emailResults.map(result => this.parseEmailData(result));
+            if (window.emailTrackingManager) {
+                console.log('[EmailManager] Loading emails from SendGrid data...');
+                
+                // Load all emails from Firebase (both sent and received)
+                const allEmails = await window.emailTrackingManager.getAllEmails();
+                console.log('[EmailManager] Retrieved all emails:', allEmails.length);
+                
+                // Filter by folder
+                let filteredEmails = allEmails;
+                if (this.currentFolder === 'inbox') {
+                    // For inbox, show emails that were sent TO us (not by us)
+                    filteredEmails = allEmails.filter(email => 
+                        email.to && email.to.includes(process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com')
+                    );
+                } else if (this.currentFolder === 'sent') {
+                    // For sent, show emails we sent
+                    filteredEmails = allEmails.filter(email => 
+                        email.from && email.from.includes(process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com')
+                    );
+                }
+                
+                this.emails = filteredEmails.map(email => this.parseSentEmailData(email));
+                console.log('[EmailManager] Parsed emails for', this.currentFolder, ':', this.emails.length);
                 this.renderEmails();
                 this.updateFolderCounts();
+                this.hideLoading();
             } else {
+                console.warn('[EmailManager] Email tracking manager not available');
                 this.emails = [];
                 this.showEmptyState();
             }
