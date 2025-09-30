@@ -4505,13 +4505,10 @@ class EmailManager {
                     subject: emailData.subject,
                     content: content,
                     from: 'Lewis Patterson <noreply@powerchoosers.com>',
+                    provider: 'sendgrid',
                     sentVia: 'sendgrid',
-                    sentAt: new Date().toISOString(),
-                    opens: [],
-                    replies: [],
-                    openCount: 0,
-                    replyCount: 0,
-                    status: 'sent'
+                    sendgridMessageId: result.messageId, // SendGrid's x-message-id
+                    sentAt: new Date().toISOString()
                 };
                 
                 try {
