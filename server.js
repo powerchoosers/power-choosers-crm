@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+require('dotenv').config(); // Load environment variables from .env file
 // SendGrid removed - using Gmail API via frontend
 
 // MIME types for different file extensions
@@ -498,6 +499,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/email/sendgrid-send' ||
     pathname.startsWith('/api/email/track/') ||
     pathname === '/api/email/webhook' ||
+    pathname === '/api/email/sendgrid-webhook' ||
     pathname === '/api/email/stats' ||
     pathname === '/api/recording'
   )) {
@@ -580,6 +582,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/email/webhook') {
     return handleApiEmailWebhook(req, res);
+  }
+  if (pathname === '/api/email/sendgrid-webhook') {
+    return handleApiSendGridWebhook(req, res);
   }
   if (pathname === '/api/email/stats') {
     return handleApiEmailStats(req, res, parsedUrl);
@@ -1276,5 +1281,32 @@ async function handleApiRecording(req, res, parsedUrl) {
     console.error('[Server] /api/recording proxy error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to proxy recording', message: error.message }));
+  }
+}
+
+// SendGrid webhook handler
+async function handleApiSendGridWebhook(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    // Proxy to Vercel deployment
+    const body = await readJsonBody(req);
+    const response = await fetch(`${API_BASE_URL}/api/email/sendgrid-webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    const result = await response.text();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(result);
+  } catch (error) {
+    console.error('[SendGrid Webhook] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
   }
 }

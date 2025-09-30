@@ -383,6 +383,44 @@ class EmailTrackingManager {
     }
 
     /**
+     * Get all emails (both sent and received) from Firebase
+     */
+    async getAllEmails() {
+        try {
+            if (!this.db) {
+                console.warn('[EmailTracking] Firebase not initialized');
+                return this.getDemoSentEmails();
+            }
+
+            // Fetch all emails from Firebase
+            const snapshot = await this.db.collection('emails')
+                .orderBy('sentAt', 'desc')
+                .limit(200)
+                .get();
+
+            const emails = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                emails.push({
+                    id: doc.id,
+                    ...data
+                });
+            });
+
+            // If no emails in database, return demo data
+            if (emails.length === 0) {
+                return this.getDemoSentEmails();
+            }
+
+            return emails;
+
+        } catch (error) {
+            console.error('[EmailTracking] Get all emails error:', error);
+            return this.getDemoSentEmails();
+        }
+    }
+
+    /**
      * Get demo sent emails for demonstration
      */
     getDemoSentEmails() {
