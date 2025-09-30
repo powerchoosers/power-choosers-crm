@@ -686,9 +686,9 @@ class EmailManager {
                         mode = 'standard';
                     }
                 } catch(_) {}
-                if (mode === 'html') {
-                    // Switch to HTML mode and set raw HTML
-                    if (!this._isHtmlMode) this.toggleHtmlMode(compose);
+            if (mode === 'html') {
+                // Switch to HTML mode and set raw HTML
+                if (!this._isHtmlMode) this.toggleHtmlMode(compose);
                 }
                 // Warm intro adjustment
                 if ((prompt || '').toLowerCase().includes('warm intro')) {
@@ -697,8 +697,8 @@ class EmailManager {
                 // Replace variables with actual values before inserting
                 html = this.replaceVariablesInHtml(html, enrichedRecipient);
                 if (mode === 'html') {
-                    editor.textContent = html; // raw source in HTML mode
-                    if (status) status.textContent = 'Inserted HTML into editor.';
+                editor.textContent = html; // raw source in HTML mode
+                if (status) status.textContent = 'Inserted HTML into editor.';
                 }
             } else {
                 // Insert styled HTML into rich editor
@@ -4488,12 +4488,12 @@ class EmailManager {
                 },
                 body: JSON.stringify(emailPayload)
             });
-            
+
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Failed to send email via SendGrid');
             }
-            
+
             const result = await response.json();
             console.log('[SendGrid] Email sent successfully:', result);
             
