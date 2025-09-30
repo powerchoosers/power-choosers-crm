@@ -43,6 +43,7 @@ class SettingsPage {
         this.setupEventListeners();
         injectModernStyles();
         this.renderSettings();
+        setupCollapseFunctionality();
     }
 
     setupEventListeners() {
@@ -509,8 +510,8 @@ function injectModernStyles() {
     style.textContent = `
         /* Modern Settings Page Styles - Scoped to #settings-page */
         #settings-page .settings-sections {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+			display: grid;
+			grid-template-columns: 1fr;
             gap: 24px;
             margin-bottom: 32px;
         }
@@ -537,7 +538,7 @@ function injectModernStyles() {
             left: 0;
             right: 0;
             height: 3px;
-            background: linear-gradient(90deg, var(--orange-primary) 0%, #ff8c42 100%);
+            background: var(--border-light);
         }
         
         #settings-page .settings-section-title {
@@ -551,6 +552,48 @@ function injectModernStyles() {
             font-size: 18px;
             font-weight: 600;
             color: var(--text-primary);
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+        
+        #settings-page .settings-section-title:hover {
+            background: linear-gradient(135deg, var(--bg-container) 0%, var(--bg-secondary) 100%);
+        }
+        
+        #settings-page .settings-section-title .collapse-btn {
+            width: 24px;
+            height: 24px;
+            border: 1px solid var(--border-light);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            margin-right: 8px;
+        }
+        
+        #settings-page .settings-section-title .collapse-btn:hover {
+            background: var(--bg-primary);
+            color: #ffffff;
+            border-color: #ffffff;
+        }
+        
+        #settings-page .settings-section-title .collapse-btn svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+        
+        #settings-page .settings-section.collapsed .settings-section-title .collapse-btn svg {
+            transform: rotate(-90deg);
+        }
+        
+        #settings-page .settings-section.collapsed .settings-content {
+            display: none;
         }
         
         #settings-page .settings-section-title svg {
@@ -605,7 +648,7 @@ function injectModernStyles() {
             align-items: center;
             gap: 8px;
             padding-bottom: 8px;
-            border-bottom: 2px solid var(--orange-primary);
+            border-bottom: 2px solid var(--border-light);
             position: relative;
         }
         
@@ -616,7 +659,7 @@ function injectModernStyles() {
             left: 0;
             width: 30px;
             height: 2px;
-            background: var(--orange-primary);
+            background: var(--border-light);
         }
         
         #settings-page .settings-field {
@@ -654,8 +697,8 @@ function injectModernStyles() {
         
         #settings-page .settings-textarea:focus {
             outline: none;
-            border-color: var(--orange-primary);
-            box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
             transform: translateY(-1px);
         }
         
@@ -674,8 +717,8 @@ function injectModernStyles() {
         
         #settings-page .settings-select:focus {
             outline: none;
-            border-color: var(--orange-primary);
-            box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
             transform: translateY(-1px);
         }
         
@@ -696,9 +739,9 @@ function injectModernStyles() {
         
         #settings-page .checkbox-label:hover {
             background: var(--bg-secondary);
-            border-color: var(--orange-primary);
+            border-color: #ffffff;
             transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(255, 140, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
         }
         
         #settings-page .checkmark {
@@ -802,8 +845,8 @@ function injectModernStyles() {
         
         #settings-page .settings-input:focus {
             outline: none;
-            border-color: var(--orange-primary);
-            box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.1);
             transform: translateY(-1px);
         }
         
@@ -984,6 +1027,7 @@ function injectModernStyles() {
     // Update section titles and add voicemail section
     updateSectionTitles();
     addVoicemailSection();
+    addCollapseButtons();
 }
 
 function updateSectionTitles() {
@@ -1055,6 +1099,70 @@ function addVoicemailSection() {
     
     // Initialize voicemail functionality
     initVoicemailRecording();
+}
+
+function addCollapseButtons() {
+    // Add collapse buttons to all section titles
+    const sectionTitles = document.querySelectorAll('#settings-page .settings-section-title');
+    sectionTitles.forEach(title => {
+        // Check if collapse button already exists
+        if (title.querySelector('.collapse-btn')) return;
+        
+        // Create collapse button
+        const collapseBtn = document.createElement('button');
+        collapseBtn.className = 'collapse-btn';
+        collapseBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        `;
+        collapseBtn.setAttribute('aria-label', 'Collapse section');
+        
+        // Insert at the beginning of the title
+        title.insertBefore(collapseBtn, title.firstChild);
+    });
+}
+
+function setupCollapseFunctionality() {
+    // Add collapse/expand functionality to all sections
+    const sections = document.querySelectorAll('#settings-page .settings-section');
+    sections.forEach(section => {
+        const title = section.querySelector('.settings-section-title');
+        const collapseBtn = section.querySelector('.collapse-btn');
+        
+        if (title && collapseBtn) {
+            // Make the entire title clickable
+            title.addEventListener('click', () => {
+                toggleSectionCollapse(section);
+            });
+            
+            // Prevent button click from bubbling to title
+            collapseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleSectionCollapse(section);
+            });
+        }
+    });
+}
+
+function toggleSectionCollapse(section) {
+    const isCollapsed = section.classList.contains('collapsed');
+    
+    if (isCollapsed) {
+        // Expand
+        section.classList.remove('collapsed');
+        const collapseBtn = section.querySelector('.collapse-btn');
+        if (collapseBtn) {
+            collapseBtn.setAttribute('aria-label', 'Collapse section');
+        }
+    } else {
+        // Collapse
+        section.classList.add('collapsed');
+        const collapseBtn = section.querySelector('.collapse-btn');
+        if (collapseBtn) {
+            collapseBtn.setAttribute('aria-label', 'Expand section');
+        }
+    }
 }
 
 function initVoicemailRecording() {
