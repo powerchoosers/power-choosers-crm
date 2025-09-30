@@ -323,6 +323,7 @@ ${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist
 export default async function handler(req, res) {
   if (cors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  
   try {
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) return res.status(400).json({ error: 'Missing GEMINI_API_KEY' });
@@ -330,8 +331,8 @@ export default async function handler(req, res) {
     const { prompt, mode = 'standard', recipient = null, to = '', style = 'auto', subjectStyle = 'auto', subjectSeed = '' } = req.body || {};
     const sys = buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed });
 
-    // Google Generative Language API (Gemini 1.5 Pro)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
+    // Google Generative Language API (Gemini 2.0 Flash Experimental - latest model)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
     const body = {
       contents: [
         {
@@ -356,6 +357,7 @@ export default async function handler(req, res) {
     const data = await resp.json();
     if (!resp.ok) {
       const msg = data?.error?.message || 'Gemini API error';
+      console.error('[Gemini] API error:', msg, data);
       return res.status(resp.status).json({ error: msg });
     }
 

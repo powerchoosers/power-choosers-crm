@@ -34,16 +34,19 @@ async function handleApiGeminiEmail(req, res) {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   if (req.method !== 'POST') { res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' })); return; }
   
-  // Proxy to Vercel deployment since local server doesn't have API key
+  // Proxy to Vercel deployment
   try {
     const body = await readJsonBody(req);
     const proxyUrl = `${API_BASE_URL}/api/gemini-email`;
+    
+    console.log('[Gemini Email] Proxying to:', proxyUrl);
     
     const response = await fetch(proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
+    
     // Attempt to parse JSON; if not JSON, forward raw text body
     const raw = await response.text();
     let payload;
@@ -52,6 +55,9 @@ async function handleApiGeminiEmail(req, res) {
     } catch (_) {
       payload = { error: 'Upstream responded with non-JSON', body: raw };
     }
+    
+    console.log('[Gemini Email] Response status:', response.status);
+    
     res.writeHead(response.status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(payload));
   } catch (error) {
