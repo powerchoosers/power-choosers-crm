@@ -122,8 +122,14 @@
         // Mark the exact time of the user click to prove a fresh gesture
         try { window.Widgets._lastClickToCallAt = Date.now(); } catch(_) {}
         
-        // Set proper call context before making the call
-        setCallContextFromCurrentPage(phoneElement, contactName);
+        // Only set context if it wasn't already set by a page-specific handler
+        // (e.g., handleCompanyPhoneClick in contact-detail.js)
+        if (!window._pcPhoneContextSetByPage) {
+          // Set proper call context before making the call
+          setCallContextFromCurrentPage(phoneElement, contactName);
+        } else {
+          console.debug('[ClickToCall] Skipping context setting - already set by page handler');
+        }
         
         // Always auto-trigger for click-to-call, but mark it as a user-initiated click
         console.debug('[ClickToCall] User clicked phone number - auto-triggering call');
@@ -211,6 +217,10 @@
     const phoneAccountId = phoneElement.getAttribute('data-account-id');
     const phoneContactName = phoneElement.getAttribute('data-contact-name');
     const phoneCompanyName = phoneElement.getAttribute('data-company-name');
+    const phoneCity = phoneElement.getAttribute('data-city');
+    const phoneState = phoneElement.getAttribute('data-state');
+    const phoneDomain = phoneElement.getAttribute('data-domain');
+    const phoneLogoUrl = phoneElement.getAttribute('data-logo-url');
 
     if (phoneContactId) context.contactId = phoneContactId;
     if (phoneAccountId) context.accountId = phoneAccountId;
@@ -222,6 +232,10 @@
       context.company = phoneCompanyName;
       context.accountName = phoneCompanyName;
     }
+    if (phoneCity) context.city = phoneCity;
+    if (phoneState) context.state = phoneState;
+    if (phoneDomain) context.domain = phoneDomain;
+    if (phoneLogoUrl) context.logoUrl = phoneLogoUrl;
 
     // If we didn't get context from the phone element, try to extract from table row
     if (!context.contactId || !context.accountId) {

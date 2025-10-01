@@ -274,13 +274,40 @@
             window._contactNavigationListId = state.listId;
             window._contactNavigationListName = state.listName;
             
-            // Navigate via existing people route to ensure modules are bound, then open detail immediately
+            // Navigate via existing people route to ensure modules are bound, then open detail with retry mechanism
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('people');
+              
+              // Use requestAnimationFrame with additional delay to ensure the page is fully loaded
               requestAnimationFrame(() => {
-                if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                  window.ContactDetail.show(contactId);
-                }
+                setTimeout(() => {
+                  if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                    console.log('[List Detail] Showing contact detail:', contactId);
+                    try {
+                      window.ContactDetail.show(contactId);
+                    } catch (error) {
+                      console.error('[List Detail] Error showing contact detail:', error);
+                    }
+                  } else {
+                    console.log('[List Detail] ContactDetail not available, using retry mechanism');
+                    // Retry mechanism to ensure ContactDetail module is ready
+                    let attempts = 0;
+                    const maxAttempts = 15;
+                    const retryInterval = 150;
+                    const retry = () => {
+                      attempts++;
+                      if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                        console.log('[List Detail] ContactDetail ready after', attempts, 'attempts');
+                        window.ContactDetail.show(contactId);
+                      } else if (attempts < maxAttempts) {
+                        setTimeout(retry, retryInterval);
+                      } else {
+                        console.error('[List Detail] ContactDetail not available after', maxAttempts, 'attempts');
+                      }
+                    };
+                    retry();
+                  }
+                }, 200);
               });
             }
           }
