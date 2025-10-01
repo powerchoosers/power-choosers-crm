@@ -2444,6 +2444,13 @@
       console.log('[Contact Detail] Setting company phone context:', contextPayload);
       window.Widgets.setCallContext(contextPayload);
       
+      // Mark that we've set a specific context to prevent generic click-to-call from overriding
+      try {
+        window._pcPhoneContextSetByPage = true;
+        // Clear the flag after a short delay to allow the click event to use it
+        setTimeout(() => { window._pcPhoneContextSetByPage = false; }, 100);
+      } catch(_) {}
+      
     } catch (error) {
       console.error('[Contact Detail] Error setting company phone context:', error);
     }
@@ -2501,10 +2508,48 @@
         }
       }
       
+      // Resolve the associated account to get additional context
+      const linkedAccount = findAssociatedAccount(contact);
+      let city = '';
+      let stateValue = '';
+      let domain = '';
+      let logoUrl = '';
+      
+      if (linkedAccount) {
+        city = linkedAccount.city || linkedAccount.locationCity || '';
+        stateValue = linkedAccount.state || linkedAccount.locationState || '';
+        logoUrl = linkedAccount.logoUrl || '';
+        
+        // Extract domain from account
+        const domainRaw = linkedAccount.domain || linkedAccount.website || linkedAccount.site || '';
+        if (domainRaw) {
+          try {
+            domain = String(domainRaw).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').trim();
+          } catch(_) {}
+        }
+      }
+      
+      // Fallback to contact's account fields if no linked account found
+      if (!city) city = contact.accountCity || contact.accountLocationCity || contact.city || contact.locationCity || '';
+      if (!stateValue) stateValue = contact.accountState || contact.accountLocationState || contact.state || contact.locationState || '';
+      if (!logoUrl) logoUrl = contact.accountLogoUrl || '';
+      if (!domain) {
+        const domainRaw = contact.accountDomain || contact.accountWebsite || contact.website || '';
+        if (domainRaw) {
+          try {
+            domain = String(domainRaw).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').trim();
+          } catch(_) {}
+        }
+      }
+      
       dataAttributes = `data-contact-id="${contactId || ''}" 
                        data-account-id="${accountId || ''}" 
                        data-contact-name="${escapeHtml(contactName)}" 
-                       data-company-name="${escapeHtml(companyName)}"`;
+                       data-company-name="${escapeHtml(companyName)}"
+                       data-city="${escapeHtml(city)}"
+                       data-state="${escapeHtml(stateValue)}"
+                       data-domain="${escapeHtml(domain)}"
+                       data-logo-url="${escapeHtml(logoUrl)}"`;
     }
     
     return `

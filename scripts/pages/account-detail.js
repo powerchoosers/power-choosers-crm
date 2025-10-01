@@ -498,7 +498,11 @@
                                  data-account-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}" 
                                  data-company-name="${escapeHtml(a.name || a.accountName || a.companyName || '')}"
                                  data-contact-id=""
-                                 data-contact-name="">${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
+                                 data-contact-name=""
+                                 data-city="${escapeHtml(city)}"
+                                 data-state="${escapeHtml(stateVal)}"
+                                 data-domain="${escapeHtml(domain.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''))}"
+                                 data-logo-url="${escapeHtml(a.logoUrl || '')}">${escapeHtml(phone) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">CITY</div><div class="info-value-wrap" data-field="city"><span class="info-value-text">${escapeHtml(city) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">STATE</div><div class="info-value-wrap" data-field="state"><span class="info-value-text">${escapeHtml(stateVal) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
             <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value-wrap" data-field="industry"><span class="info-value-text">${escapeHtml(industry) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
@@ -3183,6 +3187,20 @@
     console.log('[Account Detail] Saving to Firebase:', { field, toSave });
     await saveField(field, toSave);
     updateFieldText(wrap, toSave);
+    
+    // If phone field was updated, refresh all click-to-call bindings with the new number
+    if (field === 'phone' || field === 'companyPhone' || field === 'primaryPhone' || field === 'mainPhone') {
+      try {
+        // Give the UI a moment to update, then reprocess all phone elements
+        setTimeout(() => {
+          if (window.ClickToCall && typeof window.ClickToCall.processSpecificPhoneElements === 'function') {
+            console.log('[Account Detail] Refreshing click-to-call bindings after phone update');
+            window.ClickToCall.processSpecificPhoneElements();
+          }
+        }, 100);
+      } catch (_) { /* noop */ }
+    }
+    
     // Notify other pages (e.g., Accounts list) about immediate account changes
     try {
       const id = state.currentAccount?.id;
@@ -3228,6 +3246,19 @@
         if (state.currentAccount) {
           state.currentAccount[field] = value;
         }
+        
+        // Also update the global accounts cache to ensure click-to-call uses fresh data
+        try {
+          if (typeof window.getAccountsData === 'function' && accountId) {
+            const accounts = window.getAccountsData();
+            const idx = accounts.findIndex(a => a.id === accountId);
+            if (idx !== -1) {
+              accounts[idx][field] = value;
+              accounts[idx].updatedAt = new Date();
+              console.log('[Account Detail] Updated global accounts cache:', field, '=', value);
+            }
+          }
+        } catch (_) { /* noop */ }
         
         window.crm?.showToast && window.crm.showToast('Saved');
       }
@@ -3291,11 +3322,13 @@
     const digitsOnly = cleaned.replace(/\D/g, '');
     if (digitsOnly.length < 10) return;
     
-    // Remove existing click handler if it exists
-    if (el._pcClickBound && el._pcClickHandler) {
-      el.removeEventListener('click', el._pcClickHandler);
-      el._pcClickBound = false;
+    // Remove ALL existing click handlers by cloning the element (most reliable way)
+    const clone = el.cloneNode(true);
+    if (el.parentNode) {
+      el.parentNode.replaceChild(clone, el);
     }
+    // Update our reference to point to the new cloned element
+    el = clone;
     
     // Set pointer and tooltip
     try {
@@ -3312,16 +3345,22 @@
       // Explicitly remove contact attributes to prevent contact lookup
       el.removeAttribute('data-contact-id');
       el.removeAttribute('data-contact-name');
+      
+      console.log('[Account Detail] Phone click binding updated with new number:', displayPhone);
     } catch(_) {}
     
-    // Create new click handler
+    // Create new click handler (using closure to capture current phone number)
+    const callNum = digitsOnly.length === 10 ? `+1${digitsOnly}` : (cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`);
+    console.log('[Account Detail] Creating click handler with phone number:', callNum);
+    
     el._pcClickHandler = function(e){
       try { 
         e.preventDefault(); 
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         else e.stopPropagation(); 
       } catch(_) {}
-      const callNum = digitsOnly.length === 10 ? `+1${digitsOnly}` : (cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`);
+      
+      console.log('[Account Detail] Phone clicked, calling:', callNum);
       // Set call context explicitly to company mode
       try {
         if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
@@ -3385,12 +3424,28 @@
             isCompanyPhone: true
           };
           
+          console.log('[Account Detail] Setting call context with phone:', callNum);
           window.Widgets.setCallContext(callContext);
+          
+          // Mark that we've set a specific context to prevent generic click-to-call from overriding
+          try {
+            window._pcPhoneContextSetByPage = true;
+            // Clear the flag after a short delay to allow the click event to use it
+            setTimeout(() => { window._pcPhoneContextSetByPage = false; }, 100);
+          } catch(_) {}
         }
       } catch(_) {}
       try {
         if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
-          window.Widgets.callNumber(callNum.replace(/\D/g,''), '', true, 'account-detail');
+          // Mark the exact time of the user click to prove a fresh gesture
+          try { window.Widgets._lastClickToCallAt = Date.now(); } catch(_) {}
+          
+          console.log('[Account Detail] Calling Widgets.callNumber with:', callNum);
+          // Use 'click-to-call' source to ensure auto-trigger works
+          window.Widgets.callNumber(callNum.replace(/\D/g,''), '', true, 'click-to-call');
+        } else {
+          console.log('[Account Detail] Falling back to tel: link');
+          window.open(`tel:${encodeURIComponent(callNum)}`);
         }
       } catch(_) {}
     };
@@ -3399,6 +3454,7 @@
     el.addEventListener('click', el._pcClickHandler);
     el._pcClickBound = true;
     el.classList.add('clickable-phone');
+    console.log('[Account Detail] Click handler attached to phone element');
   }
 
   // Ensure default action buttons (edit/copy/delete) exist after editing lifecycle
