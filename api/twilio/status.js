@@ -137,19 +137,8 @@ export default async function handler(req, res) {
         }
         await startDualIfNeeded();
 
-        // Log to Firestore (best-effort)
-        try {
-            const { db } = require('../_firebase');
-            if (db) {
-                await db.collection('twilio_webhooks').add({
-                    type: 'status',
-                    ts: new Date().toISOString(),
-                    event: CallStatus,
-                    body,
-                    host: req.headers.host || null
-                });
-            }
-        } catch (_) {}
+        // [REMOVED] Webhook telemetry logging - was causing excessive Firestore writes (~10-15 per call)
+        // Only essential call data is now logged to /api/calls collection on 'completed' status
         
         // Handle different call statuses
         switch (CallStatus) {
@@ -182,48 +171,53 @@ export default async function handler(req, res) {
                 console.log(`  ℹ️ Status: ${CallStatus}`);
         }
         
-        // Upsert into central /api/calls so the UI stays in sync
+        // Upsert into central /api/calls ONLY on completed status to reduce Firestore writes
+        // Previously wrote on every status change (initiated, ringing, in-progress, etc.) = ~8-10 writes per call
+        // Now only writes once when call completes = ~1 write per call (88% reduction)
         try {
+            if (CallStatus === 'completed') {
                 const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
-            // Derive targetPhone and businessPhone for better UI mapping
-            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-            const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
-              .split(',').map(norm).filter(Boolean);
-            const to10 = norm(To);
-            const from10 = norm(From);
-            const isBiz = (p) => !!p && envBiz.includes(p);
-            const businessPhone = isBiz(to10) ? To : (isBiz(from10) ? From : (envBiz[0] || ''));
-            const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
+                // Derive targetPhone and businessPhone for better UI mapping
+                const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+                const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+                  .split(',').map(norm).filter(Boolean);
+                const to10 = norm(To);
+                const from10 = norm(From);
+                const isBiz = (p) => !!p && envBiz.includes(p);
+                const businessPhone = isBiz(to10) ? To : (isBiz(from10) ? From : (envBiz[0] || ''));
+                const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
 
-            const body = {
-                callSid: CallSid,
-                to: To,
-                from: From,
-                status: CallStatus,
-                duration: parseInt((Duration || CallDuration || '0'), 10),
-                targetPhone: targetPhone || undefined,
-                businessPhone: businessPhone || undefined
-            };
-            if (RecordingUrl) {
-                body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
-            }
-            await fetch(`${base}/api/calls`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            }).catch(() => {});
-            
-            // Auto-trigger transcription for completed calls with recordings
-            if (CallStatus === 'completed' && RecordingUrl) {
-                console.log(`[Status] Auto-triggering transcription for completed call: ${CallSid}`);
-                // Trigger transcription in background (don't wait for response)
-                fetch(`${base}/api/process-call`, {
+                const body = {
+                    callSid: CallSid,
+                    to: To,
+                    from: From,
+                    status: CallStatus,
+                    duration: parseInt((Duration || CallDuration || '0'), 10),
+                    targetPhone: targetPhone || undefined,
+                    businessPhone: businessPhone || undefined
+                };
+                if (RecordingUrl) {
+                    body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
+                }
+                await fetch(`${base}/api/calls`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ callSid: CallSid })
-                }).catch(err => {
-                    console.warn(`[Status] Failed to trigger transcription for ${CallSid}:`, err?.message);
-                });
+                    body: JSON.stringify(body)
+                }).catch(() => {});
+            }
+                
+                // Auto-trigger transcription for completed calls with recordings
+                if (RecordingUrl) {
+                    console.log(`[Status] Auto-triggering transcription for completed call: ${CallSid}`);
+                    // Trigger transcription in background (don't wait for response)
+                    fetch(`${base}/api/process-call`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ callSid: CallSid })
+                    }).catch(err => {
+                        console.warn(`[Status] Failed to trigger transcription for ${CallSid}:`, err?.message);
+                    });
+                }
             }
         } catch (e) {
             console.warn('[Status] Failed posting to /api/calls:', e?.message);
