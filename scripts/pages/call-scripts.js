@@ -429,10 +429,17 @@
     hook: {
       text: 'Good {{day.part}}, is this {{contact.first_name}}?',
       responses: [
-        { label: 'Yes, this is', next: 'main_script_start' },
-        { label: 'Speaking', next: 'main_script_start' },
+        { label: 'Yes, this is', next: 'awesome_told_to_speak' },
+        { label: 'Speaking', next: 'awesome_told_to_speak' },
         { label: "Who's calling?", next: 'main_script_start' },
         { label: 'Gatekeeper / not the right person', next: 'gatekeeper_intro' }
+      ]
+    },
+    awesome_told_to_speak: {
+      text: 'Awesome I was actually told to speak with you — do you have a quick minute?',
+      responses: [
+        { label: 'Yes', next: 'main_script_start' },
+        { label: 'What is this about?', next: 'main_script_start' }
       ]
     },
     main_script_start: {
