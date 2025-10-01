@@ -2588,15 +2588,22 @@
           businessPhone: biz
         };
 
-        phoneLog('[Phone] POST /api/calls', { base, payload });
+        // [OPTIMIZATION] Only write to /api/calls on 'completed' status to reduce Firestore commits
+        // Twilio status webhooks already track call lifecycle (initiated, ringing, in-progress, etc.)
+        // Frontend only needs to write final call record with CRM context (accountId, contactId, etc.)
+        if (status === 'completed') {
+          phoneLog('[Phone] POST /api/calls (completed status only)', { base, payload });
 
-        const resp = await fetch(`${base}/api/calls`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        let respJson = null; try { respJson = await resp.json(); } catch(_) {}
-        phoneLog('[Phone] /api/calls response', { status: resp.status, ok: resp.ok, body: respJson });
+          const resp = await fetch(`${base}/api/calls`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          let respJson = null; try { respJson = await resp.json(); } catch(_) {}
+          phoneLog('[Phone] /api/calls response', { status: resp.status, ok: resp.ok, body: respJson });
+        } else {
+          phoneLog('[Phone] Skipping /api/calls POST (status:', status, ') - only writes on completed to reduce Firestore costs');
+        }
         
         // Refresh calls page only if it's actually visible, and avoid background refresh while in a live call
         const isCallsPageActive = () => {

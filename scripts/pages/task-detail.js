@@ -64,6 +64,36 @@
     } catch (_) { return null; }
   }
 
+  // Find account by ID or name for account tasks
+  function findAccountByIdOrName(accountId, accountName) {
+    try {
+      if (typeof window.getAccountsData !== 'function') return null;
+      const accounts = window.getAccountsData() || [];
+      
+      // Try by ID first
+      if (accountId) {
+        const found = accounts.find(a => a.id === accountId);
+        if (found) return found;
+      }
+      
+      // Fallback to name matching
+      if (accountName) {
+        const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+        const key = norm(accountName);
+        return accounts.find(a => norm(a.accountName || a.name || a.companyName) === key) || null;
+      }
+      
+      return null;
+    } catch (_) { return null; }
+  }
+
+  // Determine if this is an account task (vs contact task)
+  function isAccountTask(task) {
+    if (!task) return false;
+    // Account task has account but no contact, or has explicit accountId
+    return task.account && (!task.contact || task.contact.trim() === '');
+  }
+
   function injectTaskDetailStyles(){
     const id = 'task-detail-inline-styles';
     if (document.getElementById(id)) return;
@@ -322,6 +352,157 @@
         outline: 2px solid var(--orange-primary);
         outline-offset: 2px;
         border-radius: 2px;
+      }
+      
+      /* Account Task Styles */
+      #task-detail-page .contacts-list-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-base);
+        margin: 0;
+        box-shadow: var(--elevation-card);
+      }
+      
+      #task-detail-page .section-header-with-action {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--spacing-md);
+      }
+      
+      #task-detail-page .btn-icon-add {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition-fast);
+      }
+      
+      #task-detail-page .btn-icon-add:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+        border-color: var(--grey-500);
+      }
+      
+      #task-detail-page .contacts-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-sm);
+      }
+      
+      #task-detail-page .contact-item {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+        padding: var(--spacing-sm);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius);
+        background: var(--bg-item);
+        transition: var(--transition-fast);
+      }
+      
+      #task-detail-page .contact-item:hover {
+        background: var(--bg-hover);
+        border-color: var(--grey-500);
+      }
+      
+      #task-detail-page .contact-avatar {
+        flex-shrink: 0;
+      }
+      
+      #task-detail-page .avatar-circle-small {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--orange-subtle);
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+      }
+      
+      #task-detail-page .contact-info {
+        flex: 1;
+        min-width: 0;
+      }
+      
+      #task-detail-page .contact-name {
+        font-weight: 500;
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        margin-bottom: 2px;
+      }
+      
+      #task-detail-page .contact-details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+      }
+      
+      #task-detail-page .contact-title,
+      #task-detail-page .contact-email,
+      #task-detail-page .contact-phone {
+        color: var(--text-secondary);
+      }
+      
+      #task-detail-page .contacts-placeholder {
+        text-align: center;
+        padding: var(--spacing-lg);
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+      }
+      
+      #task-detail-page .company-summary-section {
+        margin-top: var(--spacing-base);
+        padding-top: var(--spacing-base);
+        border-top: 1px solid var(--border-light);
+      }
+      
+      #task-detail-page .company-summary-text {
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-top: 8px;
+      }
+      
+      #task-detail-page .website-link {
+        color: var(--grey-400);
+        text-decoration: none;
+        cursor: pointer;
+        transition: var(--transition-fast);
+        font-weight: 400;
+      }
+      
+      #task-detail-page .website-link:hover {
+        color: var(--text-inverse);
+        text-decoration: none;
+      }
+      
+      /* Company Favicon in Header */
+      #task-detail-page .company-favicon-header {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      #task-detail-page .company-favicon-header img {
+        max-width: 40px;
+        max-height: 40px;
+        object-fit: contain;
       }
       
       /* Responsive adjustments */
@@ -937,83 +1118,159 @@
       els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
     }
     
-    // For phone tasks, add contact name with avatar and company info underneath the title
+    // For phone tasks, add header info based on task type
     if (state.taskType === 'phone-call') {
-      const contactName = state.currentTask.contact || '';
-      const accountName = state.currentTask.account || '';
-      const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
-        const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
-        return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
-      }) : null) || {};
-      const title = person.title || '';
-      const company = person.companyName || accountName;
-      
-      // Compute initials for avatar (same logic as people.js)
-      const initials = (() => {
-        const parts = String(contactName || '').trim().split(/\s+/).filter(Boolean);
-        const chars = parts.length > 1 ? [parts[0][0], parts[parts.length - 1][0]] : (parts[0] ? [parts[0][0]] : []);
-        const str = chars.join('').toUpperCase();
-        if (str) return str;
-        const e = String(person.email || '').trim();
-        return e ? e[0].toUpperCase() : '?';
-      })();
-      
-      // Update the main title to include clickable contact name
-      if (els.title && contactName) {
-        const contactId = person.id || '';
-        const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
-        els.title.innerHTML = `Call ${contactLinkHTML}`;
-      }
-      
-      // Create or update contact info element (no avatar here)
-      let contactInfoEl = document.getElementById('task-contact-info');
-      if (!contactInfoEl) {
-        contactInfoEl = document.createElement('div');
-        contactInfoEl.id = 'task-contact-info';
-        contactInfoEl.className = 'task-contact-info';
-        contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
+      // Check if this is an account task or contact task
+      if (isAccountTask(state.currentTask)) {
+        // Account task header
+        const accountName = state.currentTask.account || '';
+        const accountId = state.currentTask.accountId || '';
+        const account = findAccountByIdOrName(accountId, accountName);
         
-        // Insert between title and subtitle
+        // Prepare company icon/favicon
+        const deriveDomain = (input) => {
+          try {
+            if (!input) return '';
+            let s = String(input).trim();
+            if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+            if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+            return '';
+          } catch(_) { return ''; }
+        };
+        const domain = account?.domain ? String(account.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(account?.website || '');
+        const logoUrl = account?.logoUrl || '';
+        const companyIconSize = 40; // Larger icon for header
+        let companyIconHTML = '';
+        try {
+          if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+            companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: companyIconSize });
+          }
+        } catch(_) { /* noop */ }
+        
+        // Update title with company name link
+        if (els.title && accountName) {
+          const companyLinkHTML = `<a href="#account-details" class="company-link" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(accountName)}">${escapeHtml(accountName)}</a>`;
+          els.title.innerHTML = `Call ${companyLinkHTML}`;
+        }
+        
+        // Add company icon/favicon to header
         const titleSection = document.querySelector('.contact-header-text');
-        const subtitle = document.getElementById('task-detail-subtitle');
-        if (titleSection && subtitle) {
-          // Insert the contact info element before the subtitle
-          subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
-        }
-      }
-      
-      // Create contact details content (no avatar here)
-      let contactDetailsHTML = '';
-      
-      if (title && company) {
-        const linkedAccount = findAssociatedAccount(person);
-        const accountId = linkedAccount?.id || '';
-        const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
-        contactDetailsHTML = `${title} at ${companyLink}`;
-      } else if (title) {
-        contactDetailsHTML = title;
-      } else if (company) {
-        const linkedAccount = findAssociatedAccount(person);
-        const accountId = linkedAccount?.id || '';
-        const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
-        contactDetailsHTML = companyLink;
-      }
-      
-      // Set the contact details content
-      contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
-      
-      // Add absolutely positioned avatar to the main title container
-      const titleSection = document.querySelector('.contact-header-text');
-      if (titleSection) {
-        // Remove any existing avatar
-        const existingAvatar = titleSection.querySelector('.avatar-initials');
-        if (existingAvatar) {
-          existingAvatar.remove();
+        if (titleSection) {
+          // Remove any existing avatar/icon
+          const existingAvatar = titleSection.querySelector('.avatar-initials, .company-favicon-header');
+          if (existingAvatar) {
+            existingAvatar.remove();
+          }
+          
+          // If no icon HTML generated, create a fallback with first letter
+          if (!companyIconHTML) {
+            const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
+            companyIconHTML = `<div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 18px; color: var(--text-secondary);">${fallbackLetter}</div>`;
+          }
+          
+          // Add company favicon positioned like the avatar
+          const faviconWrapper = `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${companyIconHTML}</div>`;
+          titleSection.insertAdjacentHTML('beforeend', faviconWrapper);
         }
         
-        // Add the avatar positioned relative to the title section
-        const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true">${escapeHtml(initials)}</span>`;
-        titleSection.insertAdjacentHTML('beforeend', avatarHTML);
+        // Add location info under title
+        let contactInfoEl = document.getElementById('task-contact-info');
+        if (!contactInfoEl) {
+          contactInfoEl = document.createElement('div');
+          contactInfoEl.id = 'task-contact-info';
+          contactInfoEl.className = 'task-contact-info';
+          contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
+          
+          const titleSection = document.querySelector('.contact-header-text');
+          const subtitle = document.getElementById('task-detail-subtitle');
+          if (titleSection && subtitle) {
+            subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
+          }
+        }
+        
+        const city = account?.city || account?.locationCity || '';
+        const stateVal = account?.state || account?.locationState || '';
+        const locationHTML = city && stateVal ? `${escapeHtml(city)}, ${escapeHtml(stateVal)}` : (city || stateVal || '');
+        contactInfoEl.innerHTML = `<div class="contact-details-normal">${locationHTML}</div>`;
+        
+      } else {
+        // Contact task header (existing logic)
+        const contactName = state.currentTask.contact || '';
+        const accountName = state.currentTask.account || '';
+        const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
+          const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+          return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+        }) : null) || {};
+        const title = person.title || '';
+        const company = person.companyName || accountName;
+        
+        // Compute initials for avatar (same logic as people.js)
+        const initials = (() => {
+          const parts = String(contactName || '').trim().split(/\s+/).filter(Boolean);
+          const chars = parts.length > 1 ? [parts[0][0], parts[parts.length - 1][0]] : (parts[0] ? [parts[0][0]] : []);
+          const str = chars.join('').toUpperCase();
+          if (str) return str;
+          const e = String(person.email || '').trim();
+          return e ? e[0].toUpperCase() : '?';
+        })();
+        
+        // Update the main title to include clickable contact name
+        if (els.title && contactName) {
+          const contactId = person.id || '';
+          const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
+          els.title.innerHTML = `Call ${contactLinkHTML}`;
+        }
+        
+        // Create or update contact info element (no avatar here)
+        let contactInfoEl = document.getElementById('task-contact-info');
+        if (!contactInfoEl) {
+          contactInfoEl = document.createElement('div');
+          contactInfoEl.id = 'task-contact-info';
+          contactInfoEl.className = 'task-contact-info';
+          contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
+          
+          // Insert between title and subtitle
+          const titleSection = document.querySelector('.contact-header-text');
+          const subtitle = document.getElementById('task-detail-subtitle');
+          if (titleSection && subtitle) {
+            // Insert the contact info element before the subtitle
+            subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
+          }
+        }
+        
+        // Create contact details content (no avatar here)
+        let contactDetailsHTML = '';
+        
+        if (title && company) {
+          const linkedAccount = findAssociatedAccount(person);
+          const accountId = linkedAccount?.id || '';
+          const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
+          contactDetailsHTML = `${title} at ${companyLink}`;
+        } else if (title) {
+          contactDetailsHTML = title;
+        } else if (company) {
+          const linkedAccount = findAssociatedAccount(person);
+          const accountId = linkedAccount?.id || '';
+          const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
+          contactDetailsHTML = companyLink;
+        }
+        
+        // Set the contact details content
+        contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
+        
+        // Add absolutely positioned avatar to the main title container
+        const titleSection = document.querySelector('.contact-header-text');
+        if (titleSection) {
+          // Remove any existing avatar
+          const existingAvatar = titleSection.querySelector('.avatar-initials');
+          if (existingAvatar) {
+            existingAvatar.remove();
+          }
+          
+          // Add the avatar positioned relative to the title section
+          const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true">${escapeHtml(initials)}</span>`;
+          titleSection.insertAdjacentHTML('beforeend', avatarHTML);
+        }
       }
     }
     
@@ -1104,25 +1361,209 @@
     
     let contentHtml = '';
     
-    switch (taskType) {
-      case 'phone-call':
-        contentHtml = renderCallTaskContent(task);
-        break;
-      case 'manual-email':
-      case 'auto-email':
-        contentHtml = renderEmailTaskContent(task);
-        break;
-      case 'li-connect':
-      case 'li-message':
-      case 'li-view-profile':
-      case 'li-interact-post':
-        contentHtml = renderLinkedInTaskContent(task);
-        break;
-      default:
-        contentHtml = renderGenericTaskContent(task);
+    // Check if this is an account task
+    if (isAccountTask(task)) {
+      contentHtml = renderAccountTaskContent(task);
+    } else {
+      // Contact task - use existing logic
+      switch (taskType) {
+        case 'phone-call':
+          contentHtml = renderCallTaskContent(task);
+          break;
+        case 'manual-email':
+        case 'auto-email':
+          contentHtml = renderEmailTaskContent(task);
+          break;
+        case 'li-connect':
+        case 'li-message':
+        case 'li-view-profile':
+        case 'li-interact-post':
+          contentHtml = renderLinkedInTaskContent(task);
+          break;
+        default:
+          contentHtml = renderGenericTaskContent(task);
+      }
     }
     
     els.content.innerHTML = contentHtml;
+  }
+
+  function renderAccountTaskContent(task) {
+    // Get account information
+    const accountName = task.account || '';
+    const accountId = task.accountId || '';
+    
+    // Load the account data
+    const account = findAccountByIdOrName(accountId, accountName);
+    
+    if (!account) {
+      return `<div class="task-content"><div class="empty">Account not found: ${escapeHtml(accountName)}</div></div>`;
+    }
+    
+    // Get account fields
+    const companyPhone = account.companyPhone || account.phone || account.primaryPhone || account.mainPhone || '';
+    const industry = account.industry || '';
+    const employees = account.employees || '';
+    const shortDescription = account.shortDescription || '';
+    const city = account.city || account.locationCity || '';
+    const stateVal = account.state || account.locationState || '';
+    const website = account.website || '';
+    
+    // Energy & contract fields
+    const electricitySupplier = account.electricitySupplier || '';
+    const annualUsage = account.annualUsage || '';
+    const currentRate = account.currentRate || '';
+    const contractEndDate = account.contractEndDate || '';
+    
+    // Prepare company icon using global favicon helper
+    const deriveDomain = (input) => {
+      try {
+        if (!input) return '';
+        let s = String(input).trim();
+        if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+        if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+        return '';
+      } catch(_) { return ''; }
+    };
+    const domain = account.domain ? String(account.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(website);
+    const logoUrl = account.logoUrl || '';
+    let companyIconHTML = '';
+    try {
+      if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+        companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+      }
+    } catch(_) { /* noop */ }
+    if (!companyIconHTML) {
+      if (window.__pcAccountsIcon) companyIconHTML = window.__pcAccountsIcon();
+      else companyIconHTML = `<div class="company-logo-fallback">${accountName ? accountName.charAt(0).toUpperCase() : 'C'}</div>`;
+    }
+    
+    // Render contacts list
+    const contactsListHTML = renderAccountContacts(account);
+    
+    return `
+      <div class="main-content">
+        <!-- Log Call Card (for phone tasks) -->
+        ${task.type === 'phone-call' ? `
+        <div class="task-card" id="call-log-card">
+          <h3 class="section-title">Log call</h3>
+          <div class="call-list">
+            ${companyPhone ? `<div class="call-row"><button class="btn-secondary" data-call="${companyPhone}">Call</button><span class="call-number">${companyPhone}</span></div>` : '<div class="empty">No company phone number on file</div>'}
+          </div>
+          <div class="form-row">
+            <label>Call purpose</label>
+            <select class="input-dark" id="call-purpose">
+              <option value="Prospecting Call" selected>Prospecting Call</option>
+              <option value="Discovery">Discovery</option>
+              <option value="Follow-up">Follow-up</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Notes</label>
+            <textarea class="input-dark" id="call-notes" rows="3" placeholder="Add call notes..."></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn-primary" id="log-complete-call">Log call & complete task</button>
+            <button class="btn-secondary" id="schedule-meeting">Schedule a meeting</button>
+          </div>
+        </div>
+        ` : ''}
+        
+        <!-- Contacts List Card -->
+        <div class="task-card contacts-list-card">
+          <div class="section-header-with-action">
+            <h3 class="section-title">Contacts</h3>
+            <button class="btn-icon-add" id="add-contact-btn" title="Add contact" aria-label="Add new contact">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="contacts-list" id="account-contacts-list">
+            ${contactsListHTML}
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-content">
+        <!-- Account Information -->
+        <div class="contact-info-section">
+          <h3 class="section-title">Account Information</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <div class="info-label">COMPANY PHONE</div>
+              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-account-id="${escapeHtml(account.id || '')}" data-company-name="${escapeHtml(accountName || '')}">${escapeHtml(companyPhone)}</span>` : '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">INDUSTRY</div>
+              <div class="info-value ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">EMPLOYEES</div>
+              <div class="info-value ${!employees ? 'empty' : ''}">${escapeHtml(employees) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">WEBSITE</div>
+              <div class="info-value ${!website ? 'empty' : ''}">${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer" class="website-link">${escapeHtml(website)}</a>` : '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CITY</div>
+              <div class="info-value ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">STATE</div>
+              <div class="info-value ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</div>
+            </div>
+          </div>
+          ${shortDescription ? `
+          <div class="company-summary-section">
+            <div class="info-label">COMPANY SUMMARY</div>
+            <div class="company-summary-text">${escapeHtml(shortDescription)}</div>
+          </div>
+          ` : ''}
+        </div>
+        
+        <!-- Energy & Contract Details -->
+        <div class="contact-info-section">
+          <h3 class="section-title">Energy & Contract</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <div class="info-label">ELECTRICITY SUPPLIER</div>
+              <div class="info-value ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">ANNUAL USAGE</div>
+              <div class="info-value ${!annualUsage ? 'empty' : ''}">${escapeHtml(annualUsage) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CURRENT RATE</div>
+              <div class="info-value ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CONTRACT END</div>
+              <div class="info-value ${!contractEndDate ? 'empty' : ''}">${escapeHtml(contractEndDate) || '--'}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="activity-section">
+          <h3 class="section-title">Recent Activity</h3>
+          <div class="activity-timeline" id="task-activity-timeline">
+            <div class="activity-placeholder">
+              <div class="placeholder-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 1v6m0 6v6"/>
+                </svg>
+              </div>
+              <div class="placeholder-text">No recent activity</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderCallTaskContent(task) {
@@ -1594,6 +2035,66 @@
         return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`;
       default:
         return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>`;
+    }
+  }
+
+  // Render contacts list for account tasks
+  function renderAccountContacts(account) {
+    if (!account || !window.getPeopleData) {
+      return '<div class="contacts-placeholder">No contacts found</div>';
+    }
+
+    try {
+      const allContacts = window.getPeopleData() || [];
+      const accountName = account.accountName || account.name || account.companyName;
+      
+      // Find contacts associated with this account
+      const associatedContacts = allContacts.filter(contact => {
+        // Check if contact has accountId matching this account
+        if (contact.accountId === account.id) return true;
+        
+        // Check if contact's company name matches this account name
+        const contactCompany = contact.companyName || contact.accountName || '';
+        return contactCompany.toLowerCase().trim() === accountName.toLowerCase().trim();
+      });
+
+      if (associatedContacts.length === 0) {
+        return '<div class="contacts-placeholder">No contacts found for this account</div>';
+      }
+
+      return associatedContacts.map(contact => {
+        const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unknown Contact';
+        const title = contact.title || '';
+        const email = contact.email || '';
+        const phone = contact.workDirectPhone || contact.mobile || contact.otherPhone || '';
+        
+        // Compute initials for avatar
+        const parts = fullName.trim().split(/\s+/);
+        const initials = parts.length >= 2 
+          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+          : (parts[0] ? parts[0][0].toUpperCase() : '?');
+        
+        return `
+          <div class="contact-item" data-contact-id="${contact.id}">
+            <div class="contact-avatar">
+              <div class="avatar-circle-small" aria-hidden="true">${initials}</div>
+            </div>
+            <div class="contact-info">
+              <div class="contact-name">
+                <a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contact.id)}" data-contact-name="${escapeHtml(fullName)}">${escapeHtml(fullName)}</a>
+              </div>
+              <div class="contact-details">
+                ${title ? `<span class="contact-title">${escapeHtml(title)}</span>` : ''}
+                ${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(fullName)}" data-contact-id="${escapeHtml(contact.id || '')}">${escapeHtml(email)}</span>` : ''}
+                ${phone ? `<span class="phone-text" data-phone="${escapeHtml(phone)}" data-contact-name="${escapeHtml(fullName)}" data-contact-id="${escapeHtml(contact.id || '')}">${escapeHtml(phone)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (error) {
+      console.error('Error rendering account contacts:', error);
+      return '<div class="contacts-placeholder">Error loading contacts</div>';
     }
   }
 
