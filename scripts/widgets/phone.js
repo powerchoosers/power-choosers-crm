@@ -805,44 +805,40 @@
 
   async function resolvePhoneMeta(number) {
     const digits = (number || '').replace(/\D/g, '');
-    const meta = { number, name: '', account: '', title: '', city: '', state: '', domain: '', callerIdImage: null };
+    const meta = { number, name: '', account: '', title: '', city: '', state: '', domain: '', logoUrl: '', contactId: null, accountId: null, callerIdImage: null };
     try {
       // App-provided resolver if available
       if (window.crm && typeof window.crm.resolvePhoneMeta === 'function') {
         const out = await Promise.resolve(window.crm.resolvePhoneMeta(digits));
         if (out && typeof out === 'object') return { ...meta, ...out };
       }
-      // Try CRM search endpoint first (free, no Twilio credits)
+      // Try a generic public search endpoint if the app exposes one
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (base) {
-        try {
-          const r1 = await fetch(`${base}/api/search?phone=${encodeURIComponent(digits)}`).catch(() => null);
-          if (r1 && r1.ok) {
-            const j = await r1.json().catch(() => ({}));
-            if (j && j.found && (j.contact || j.account)) {
-              const c = j.contact || {};
-              const a = j.account || {};
-              console.debug('[Phone Widget] Found in CRM:', { contact: c, account: a });
-              return {
-                ...meta,
-                name: c.name || '',
-                account: a.name || c.company || '',
-                company: a.name || c.company || '',
-                title: c.title || '',
-                city: c.city || a.city || '',
-                state: c.state || a.state || '',
-                domain: c.domain || a.domain || '',
-                logoUrl: c.logoUrl || a.logoUrl || ''
-              };
-            }
+        // Try contacts first
+        const r1 = await fetch(`${base}/api/search?phone=${encodeURIComponent(digits)}`).catch(() => null);
+        if (r1 && r1.ok) {
+          const j = await r1.json().catch(() => ({}));
+          if (j && (j.contact || j.account)) {
+            const c = j.contact || {};
+            const a = j.account || {};
+            return {
+              ...meta,
+              name: c.name || '',
+              account: a.name || c.account || '',
+              title: c.title || '',
+              city: c.city || a.city || '',
+              state: c.state || a.state || '',
+              domain: c.domain || a.domain || '',
+              logoUrl: a.logoUrl || '',
+              contactId: c.id || c.contactId || null,
+              accountId: a.id || a.accountId || null
+            };
           }
-        } catch (error) {
-          console.warn('[Phone Widget] CRM search failed:', error);
         }
         
-        // If no CRM match found, try Twilio caller ID lookup (costs $0.01)
-        if (!meta.name && !meta.account) {
-          console.debug('[Phone Widget] No CRM match found, trying Twilio lookup');
+        // If no contact found, try Twilio caller ID lookup
+        if (!meta.name) {
           try {
             const callerLookup = await fetch(`${base}/api/twilio/caller-lookup`, {
               method: 'POST',
@@ -866,14 +862,11 @@
                   meta.carrierName = data.carrier.name;
                   meta.carrierType = data.carrier.type;
                 }
-                console.debug('[Phone Widget] Twilio lookup result:', data);
               }
             }
           } catch (lookupError) {
-            console.warn('[Phone Widget] Twilio caller ID lookup failed:', lookupError);
+            console.warn('[Phone] Caller ID lookup failed:', lookupError);
           }
-        } else {
-          console.debug('[Phone Widget] Skipping Twilio lookup - CRM match found');
         }
       }
     } catch (_) {}
@@ -2070,8 +2063,43 @@
         const value = input.value || '';
         if (!value.trim()) {
           try { clearContactDisplay(); } catch(_) {}
+          // Also clear the context when input is cleared
+          currentCallContext = {
+            number: '',
+            name: '',
+            company: '',
+            accountId: null,
+            accountName: null,
+            contactId: null,
+            contactName: '',
+            city: '',
+            state: '',
+            domain: '',
+            logoUrl: '',
+            isCompanyPhone: false,
+            isActive: false
+          };
         }
-        // no-op: do not auto-resolve contacts here
+        // When user starts typing a new number, clear stale context from previous calls
+        // This ensures manual entry doesn't show old company info
+        if (value.trim() && currentCallContext.isActive === false) {
+          console.debug('[Phone] User typing new number - clearing stale context');
+          currentCallContext = {
+            number: '',
+            name: '',
+            company: '',
+            accountId: null,
+            accountName: null,
+            contactId: null,
+            contactName: '',
+            city: '',
+            state: '',
+            domain: '',
+            logoUrl: '',
+            isCompanyPhone: false,
+            isActive: false
+          };
+        }
       });
     }
 
@@ -2206,8 +2234,11 @@
                 // In company mode, prefer account context only to avoid contact contamination
                 city: currentCallContext.isCompanyPhone ? (currentCallContext.city || '') : (currentCallContext.city || meta.city),
                 state: currentCallContext.isCompanyPhone ? (currentCallContext.state || '') : (currentCallContext.state || meta.state),
+                // Always preserve domain from context - needed for favicon fallback
                 domain: currentCallContext.domain || meta.domain,
-                logoUrl: currentCallContext.logoUrl || meta.logoUrl
+                // Preserve logoUrl from context even if empty - prevents favicon from being cleared
+                // Only use meta.logoUrl if currentCallContext doesn't have domain for fallback
+                logoUrl: (currentCallContext.logoUrl !== undefined) ? currentCallContext.logoUrl : meta.logoUrl
               })
             };
             setContactDisplay(mergedMeta, number);
@@ -2767,18 +2798,71 @@
       // update UI with normalized value and enrich title from People data
       if (input) { input.value = normalized.value; }
       enrichTitleFromPhone(normalized.value);
-      // Immediately reveal early contact display with whatever metadata we have (no suggested contact resolution)
-      try {
-        const earlyMeta = { 
-          name: (currentCallContext && currentCallContext.name) || '', 
-          account: (currentCallContext && currentCallContext.company) || '', 
-          domain: (currentCallContext && currentCallContext.domain) || '',
-          city: (currentCallContext && currentCallContext.city) || '',
-          state: (currentCallContext && currentCallContext.state) || '',
-          isCompanyPhone: !!(currentCallContext && currentCallContext.isCompanyPhone)
-        };
-        setContactDisplay(earlyMeta, normalized.value);
-      } catch(_) {}
+      
+      // Check if this is a manual call (no existing context) or a click-to-call (has context)
+      // IMPORTANT: Only consider it existing context if it's ACTIVE (fresh from click-to-call)
+      // Stale context from previous calls (isActive=false) should be treated as no context
+      const hasExistingContext = !!(currentCallContext && currentCallContext.isActive && (
+        currentCallContext.accountId || 
+        currentCallContext.contactId || 
+        currentCallContext.company || 
+        currentCallContext.name
+      ));
+      
+      // Only resolve metadata if this is truly a manual entry (no active context from click-to-call)
+      if (!hasExistingContext) {
+        try {
+          console.debug('[Phone] Manual call - resolving phone metadata for:', normalized.value);
+          const freshMeta = await resolvePhoneMeta(normalized.value).catch(() => ({}));
+          
+          // Update current call context with fresh data from CRM/Twilio
+          currentCallContext = {
+            number: normalized.value,
+            name: freshMeta.name || normalized.value,
+            company: freshMeta.account || '',
+            accountId: freshMeta.accountId || null,
+            accountName: freshMeta.account || null,
+            contactId: freshMeta.contactId || null,
+            contactName: freshMeta.name || '',
+            city: freshMeta.city || '',
+            state: freshMeta.state || '',
+            domain: freshMeta.domain || '',
+            logoUrl: freshMeta.logoUrl || '',
+            isCompanyPhone: !!(freshMeta.account && !freshMeta.contactId),
+            isActive: true
+          };
+          
+          console.debug('[Phone] Manual call context resolved:', currentCallContext);
+          setContactDisplay(currentCallContext, normalized.value);
+        } catch(metaError) {
+          console.warn('[Phone] Failed to resolve phone metadata:', metaError);
+          // Fallback to minimal context if resolution fails
+          const earlyMeta = { 
+            name: normalized.value,
+            account: '', 
+            domain: '',
+            city: '',
+            state: '',
+            isCompanyPhone: false
+          };
+          setContactDisplay(earlyMeta, normalized.value);
+        }
+      } else {
+        // Click-to-call scenario - use existing context
+        console.debug('[Phone] Click-to-call detected - using existing context:', currentCallContext);
+        try {
+          const earlyMeta = { 
+            name: (currentCallContext && currentCallContext.name) || '', 
+            account: (currentCallContext && currentCallContext.company) || '', 
+            domain: (currentCallContext && currentCallContext.domain) || '',
+            city: (currentCallContext && currentCallContext.city) || '',
+            state: (currentCallContext && currentCallContext.state) || '',
+            logoUrl: (currentCallContext && currentCallContext.logoUrl) || '',
+            isCompanyPhone: !!(currentCallContext && currentCallContext.isCompanyPhone)
+          };
+          setContactDisplay(earlyMeta, normalized.value);
+        } catch(_) {}
+      }
       // Immediately switch button to Hang Up and mark call-in-progress so user can cancel immediately
       isCallInProgress = true;
       setInCallUI(true);
@@ -3183,76 +3267,26 @@
     }
     window.lastCallNumberTime = now;
     
-    // Handle context differently for manual calls vs click-to-call
-    let nextContext;
-    
-    if (isClickToCall) {
-      // For click-to-call, preserve existing context (company phone context from clicked element)
-      const hasAccountCtx = !!(currentCallContext && (currentCallContext.accountId || currentCallContext.accountName || currentCallContext.company));
-      const hasContactCtx = !!(currentCallContext && (currentCallContext.contactId || currentCallContext.contactName));
-      const isCompanyCall = !!(currentCallContext && (currentCallContext.isCompanyPhone || (hasAccountCtx && !hasContactCtx)));
-      
-      nextContext = {
-        number: number,
-        name: isCompanyCall ? (currentCallContext.company || currentCallContext.accountName || '') : (contactName || currentCallContext.name || ''),
-        company: currentCallContext.company || currentCallContext.accountName || contactCompany || '',
-        accountId: currentCallContext.accountId || null,
-        accountName: currentCallContext.accountName || null,
-        contactId: isCompanyCall ? null : (currentCallContext.contactId || null),
-        contactName: isCompanyCall ? '' : (contactName || currentCallContext.contactName || ''),
-        city: currentCallContext.city || '',
-        state: currentCallContext.state || '',
-        domain: currentCallContext.domain || '',
-        logoUrl: currentCallContext.logoUrl || '',
-        isCompanyPhone: isCompanyCall,
-        isActive: !!autoTrigger || !!currentCallContext.isActive
-      };
-    } else {
-      // For manual calls, try to resolve from CRM first, then fall back to Twilio
-      console.debug('[Phone Widget] Manual call detected - resolving phone metadata from CRM');
-      try {
-        const meta = await resolvePhoneMeta(number);
-        console.debug('[Phone Widget] Resolved metadata:', meta);
-        
-        // Determine if this is a company call based on resolved data
-        const isCompanyCall = !!(meta.account && !meta.name);
-        
-        nextContext = {
-          number: number,
-          name: isCompanyCall ? (meta.account || meta.company || '') : (meta.name || number),
-          company: meta.account || meta.company || '',
-          accountId: null, // We don't have account ID from phone lookup
-          accountName: meta.account || '',
-          contactId: isCompanyCall ? null : null, // We don't have contact ID from phone lookup
-          contactName: isCompanyCall ? '' : (meta.name || ''),
-          city: meta.city || '',
-          state: meta.state || '',
-          domain: meta.domain || '',
-          logoUrl: meta.logoUrl || '',
-          isCompanyPhone: isCompanyCall,
-          isActive: !!autoTrigger
-        };
-      } catch (error) {
-        console.warn('[Phone Widget] Failed to resolve phone metadata:', error);
-        // Fallback to minimal context
-        nextContext = {
-          number: number,
-          name: number,
-          company: '',
-          accountId: null,
-          accountName: null,
-          contactId: null,
-          contactName: '',
-          city: '',
-          state: '',
-          domain: '',
-          logoUrl: '',
-          isCompanyPhone: false,
-          isActive: !!autoTrigger
-        };
-      }
-    }
-    
+    // Overwrite context deterministically based on explicit page context
+    // Infer company-mode if explicit flag or account context is present (and no contact)
+    const hasAccountCtx = !!(currentCallContext && (currentCallContext.accountId || currentCallContext.accountName || currentCallContext.company));
+    const hasContactCtx = !!(currentCallContext && (currentCallContext.contactId || currentCallContext.contactName));
+    const isCompanyCall = !!(currentCallContext && (currentCallContext.isCompanyPhone || (hasAccountCtx && !hasContactCtx)));
+    const nextContext = {
+      number: number,
+      name: isCompanyCall ? (currentCallContext.company || currentCallContext.accountName || '') : (contactName || currentCallContext.name || ''),
+      company: currentCallContext.company || currentCallContext.accountName || contactCompany || '',
+      accountId: currentCallContext.accountId || null,
+      accountName: currentCallContext.accountName || null,
+      contactId: isCompanyCall ? null : (currentCallContext.contactId || null),
+      contactName: isCompanyCall ? '' : (contactName || currentCallContext.contactName || ''),
+      city: currentCallContext.city || '',
+      state: currentCallContext.state || '',
+      domain: currentCallContext.domain || '',
+      logoUrl: currentCallContext.logoUrl || '',
+      isCompanyPhone: isCompanyCall,
+      isActive: !!autoTrigger || !!currentCallContext.isActive
+    };
     currentCallContext = nextContext;
     
     console.debug('[Phone Widget] Call context set in callNumber:', currentCallContext);
