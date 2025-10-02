@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-require('dotenv').config(); // Load environment variables from .env file
+// require('dotenv').config(); // Load environment variables from .env file - temporarily disabled
 // SendGrid removed - using Gmail API via frontend
 
 // MIME types for different file extensions
@@ -1310,3 +1310,182 @@ async function handleApiSendGridWebhook(req, res) {
     res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
   }
 }
+
+// SendGrid inbound email handler
+async function handleApiInboundEmail(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Credentials': 'true'
+    });
+    res.end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    // Proxy to Vercel deployment
+    const body = await readJsonBody(req);
+    const response = await fetch(`${API_BASE_URL}/api/email/inbound-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    const result = await response.text();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(result);
+  } catch (error) {
+    console.error('[Inbound Email] Proxy error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  }
+}
+
+// Main server function
+const server = http.createServer(async (req, res) => {
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
+  
+  // Set CORS headers for all responses
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+  
+  try {
+    // API Routes
+    if (pathname.startsWith('/api/')) {
+      // Gemini Email API
+      if (pathname === '/api/gemini-email') {
+        await handleApiGeminiEmail(req, res);
+        return;
+      }
+      
+      // Twilio API endpoints
+      if (pathname === '/api/twilio/token') {
+        await handleApiTwilioToken(req, res, parsedUrl);
+        return;
+      }
+      
+      if (pathname === '/api/twilio/voice') {
+        await handleApiTwilioVoice(req, res, parsedUrl);
+        return;
+      }
+      
+      if (pathname === '/api/twilio/call') {
+        await handleApiTwilioCall(req, res, parsedUrl);
+        return;
+      }
+      
+      if (pathname === '/api/twilio/conversational-intelligence-webhook') {
+        await handleApiTwilioConversationalIntelligenceWebhook(req, res, parsedUrl);
+        return;
+      }
+      
+      if (pathname === '/api/twilio/language-webhook') {
+        await handleApiTwilioLanguageWebhook(req, res, parsedUrl);
+        return;
+      }
+      
+      if (pathname === '/api/twilio/voice-intelligence') {
+        await handleApiTwilioVoiceIntelligence(req, res, parsedUrl);
+        return;
+      }
+      
+      if (pathname === '/api/recording') {
+        await handleApiRecording(req, res, parsedUrl);
+        return;
+      }
+      
+      // SendGrid API endpoints
+      if (pathname === '/api/email/sendgrid-send') {
+        await handleApiSendGridSend(req, res);
+        return;
+      }
+      
+      if (pathname === '/api/email/sendgrid-webhook') {
+        await handleApiSendGridWebhook(req, res);
+        return;
+      }
+      
+      if (pathname === '/api/email/inbound-email') {
+        await handleApiInboundEmail(req, res);
+        return;
+      }
+      
+      // If no API route matches, return 404
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API endpoint not found' }));
+      return;
+    }
+    
+    // Static file serving
+    let filePath = pathname === '/' ? '/crm-dashboard.html' : pathname;
+    filePath = path.join(__dirname, filePath);
+    
+    // Security check - prevent directory traversal
+    if (!filePath.startsWith(__dirname)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Forbidden');
+      return;
+    }
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('File not found');
+      return;
+    }
+    
+    // Get file extension and set content type
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    
+    // Read and serve file
+    const fileContent = fs.readFileSync(filePath);
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(fileContent);
+    
+  } catch (error) {
+    console.error('[Server] Error:', error);
+    res.writeHead(500, { 'Content-Type': 'text/plain' });
+    res.end('Internal Server Error');
+  }
+});
+
+// Start server
+server.listen(PORT, () => {
+  console.log(`[Server] Power Choosers CRM server running at http://localhost:${PORT}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('[Server] SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('[Server] Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('[Server] SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('[Server] Server closed');
+    process.exit(0);
+  });
+});
