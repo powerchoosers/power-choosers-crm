@@ -2098,6 +2098,16 @@
       document.addEventListener('callEnded', onAnyContactCallActivity, false);
       document.addEventListener('pc:recent-calls-refresh', onAnyContactCallActivity, false);
       document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
+      
+      // Listen for completed calls to refresh recent calls
+      document.addEventListener('pc:call-completed', (event) => {
+        const callData = event.detail;
+        if (callData && callData.contactId === state.currentContact?.id) {
+          // Use debounced refresh to prevent freeze
+          onAnyContactCallActivity();
+        }
+      });
+      
       // Track scroll state to defer refresh
       try{
         if (els.mainContent && !els.mainContent._rcScrollBound){
@@ -2136,11 +2146,31 @@
       }
     } catch(_) {}
     
+    // [OPTIMIZATION] Debounce refresh to prevent freeze on hangup
+    // Cancel any pending refresh and schedule a new one
+    if (state._rcRefreshDebounceTimer) {
+      clearTimeout(state._rcRefreshDebounceTimer);
+    }
+    
+    // [OPTIMIZATION] Only refresh if this page is visible
+    const contactPage = document.getElementById('contact-detail-page');
+    const isVisible = contactPage && contactPage.style.display !== 'none' && !contactPage.hidden;
+    
+    if (!isVisible) {
+      console.debug('[Contact Detail] Page not visible, skipping refresh to prevent freeze');
+      return;
+    }
+    
     try{ const list = document.getElementById('contact-recent-calls-list'); const hasOpen = (state._rcOpenIds && state._rcOpenIds.size>0); if(list && !hasOpen) { /* could show spinner */ } }catch(_){ }
-    // Add a small delay to allow webhooks to update call data before first refresh
-    setTimeout(() => {
+    
+    // Debounce refresh by 1.5 seconds to allow:
+    // 1. User to continue working without UI freeze
+    // 2. Webhooks to update call data
+    // 3. Multiple rapid events to be collapsed into one refresh
+    state._rcRefreshDebounceTimer = setTimeout(() => {
       safeReloadContactRecentCallsWithRetries();
-    }, 1000); // 1 second delay to allow webhooks to process
+      state._rcRefreshDebounceTimer = null;
+    }, 1500); // 1.5 second debounce (increased from 1s to prevent freeze)
   }
   
   function onLiveCallDurationUpdate(e) {

@@ -773,10 +773,8 @@
       document.addEventListener('pc:call-updated', (event) => {
         const callData = event.detail;
         if (callData && callData.accountId === state.currentAccount?.id) {
-          // Refresh recent calls when a call for this account is updated
-          setTimeout(() => {
-            loadRecentCallsForAccount();
-          }, 1000); // Small delay to ensure data is saved
+          // Use debounced refresh to prevent freeze
+          onAnyAccountCallActivity();
         }
       });
       
@@ -784,10 +782,17 @@
       document.addEventListener('pc:call-created', (event) => {
         const callData = event.detail;
         if (callData && callData.accountId === state.currentAccount?.id) {
-          // Refresh recent calls when a new call is created for this account
-          setTimeout(() => {
-            loadRecentCallsForAccount();
-          }, 1000); // Small delay to ensure data is saved
+          // Use debounced refresh to prevent freeze
+          onAnyAccountCallActivity();
+        }
+      });
+      
+      // Listen for completed calls to refresh recent calls
+      document.addEventListener('pc:call-completed', (event) => {
+        const callData = event.detail;
+        if (callData && callData.accountId === state.currentAccount?.id) {
+          // Use debounced refresh to prevent freeze
+          onAnyAccountCallActivity();
         }
       });
       // Track scrolling state to avoid animations/jank during scroll
@@ -832,16 +837,36 @@
       }
     } catch(_) {}
     
+    // [OPTIMIZATION] Debounce refresh to prevent freeze on hangup
+    // Cancel any pending refresh and schedule a new one
+    if (state._arcRefreshDebounceTimer) {
+      clearTimeout(state._arcRefreshDebounceTimer);
+    }
+    
+    // [OPTIMIZATION] Only refresh if this page is visible
+    const accountPage = document.getElementById('account-details-page');
+    const isVisible = accountPage && accountPage.style.display !== 'none' && !accountPage.hidden;
+    
+    if (!isVisible) {
+      console.debug('[Account Detail] Page not visible, skipping refresh to prevent freeze');
+      return;
+    }
+    
     // If user is viewing any details panels, avoid showing loading overlay; refresh silently
     try {
       const list = document.getElementById('account-recent-calls-list');
       const hasOpen = (state._arcOpenIds && state._arcOpenIds.size > 0);
       if (list && !hasOpen) arcSetLoading(list);
     } catch(_) {}
-    // Add a small delay to allow webhooks to update call data before first refresh
-    setTimeout(() => {
+    
+    // Debounce refresh by 1.5 seconds to allow:
+    // 1. User to continue working without UI freeze
+    // 2. Webhooks to update call data
+    // 3. Multiple rapid events to be collapsed into one refresh
+    state._arcRefreshDebounceTimer = setTimeout(() => {
       safeReloadAccountRecentCallsWithRetries();
-    }, 1000); // 1 second delay to allow webhooks to process
+      state._arcRefreshDebounceTimer = null;
+    }, 1500); // 1.5 second debounce (increased from 1s to prevent freeze)
   }
   
   function onLiveCallDurationUpdate(e) {
