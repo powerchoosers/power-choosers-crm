@@ -2408,6 +2408,17 @@
         setMapsConfig();
       })();
     </script>
+    <script>
+      // Development cache-busting: append timestamp to script URLs to force reload
+      (function(){
+        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (isDev) {
+          const cacheBuster = '?v=' + Date.now();
+          window.__PC_CACHE_BUSTER = cacheBuster;
+          console.log('[Dev] Cache busting enabled:', cacheBuster);
+        }
+      })();
+    </script>
     <script src="scripts/shared-ci-processor.js"></script>
     <script src="scripts/pages/contact-detail.js"></script>
     <script src="scripts/pages/account-detail.js"></script>

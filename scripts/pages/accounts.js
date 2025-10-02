@@ -1453,7 +1453,17 @@
 
   // ===== Bulk actions bar (Step 2) =====
   function showBulkActionsBar() { updateBulkActionsBar(true); }
-  function hideBulkActionsBar() { const bar = els.page.querySelector('#accounts-bulk-actions'); if (bar && bar.parentNode) bar.parentNode.removeChild(bar); }
+  function hideBulkActionsBar() { 
+    const bar = els.page.querySelector('#accounts-bulk-actions'); 
+    if (bar) {
+      // Add exit animation
+      bar.classList.remove('--show');
+      // Remove from DOM after animation completes
+      setTimeout(() => {
+        if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+      }, 200);
+    }
+  }
 
   function updateBulkActionsBar(forceShow = false) {
     if (!els.tableContainer) { return; }
@@ -1483,6 +1493,10 @@
       container.id = 'accounts-bulk-actions';
       container.className = 'bulk-actions-modal';
       els.tableContainer.appendChild(container);
+      // Add animation class after a brief delay to trigger the animation
+      setTimeout(() => {
+        container.classList.add('--show');
+      }, 10);
     }
     container.innerHTML = html;
 

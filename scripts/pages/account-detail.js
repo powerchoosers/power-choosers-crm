@@ -757,6 +757,9 @@
       .transcript-speaker { font-weight:600; font-size:12px; color:var(--text-primary); }
       .transcript-time { font-size:11px; color:var(--text-secondary); }
       .transcript-text { font-size:13px; line-height:1.5; color:var(--text-primary); word-wrap:break-word; }
+      /* Activity items spacing for account detail */
+      #account-detail-view .activity-item { margin-bottom: 12px; }
+      #account-detail-view .activity-item:last-child { margin-bottom: 0; }
     `;
     document.head.appendChild(style);
   }
@@ -2420,41 +2423,32 @@
           window._contactNavigationSource = 'account-details';
           window._contactNavigationAccountId = state.currentAccount?.id;
           
-          // Navigate to people page first, then show contact detail
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
-            console.log('Navigating to people page for contact:', contactId);
+            // Pre-hide the people page table to prevent flicker before contact detail loads
+            const peoplePage = document.getElementById('people-page');
+            const tableContainer = peoplePage?.querySelector('.table-container');
+            if (tableContainer) {
+              tableContainer.classList.add('hidden');
+            }
+            
+            // Navigate to people page and immediately show contact in one smooth motion
             window.crm.navigateToPage('people');
             
-            // Use requestAnimationFrame with additional delay to ensure the page is fully loaded
+            // Use requestAnimationFrame for smoother transition - show contact immediately on next frame
             requestAnimationFrame(() => {
-              setTimeout(() => {
+              let attempts = 0;
+              const maxAttempts = 15;
+              const retryInterval = 50; // Faster retry
+              const retry = () => {
+                attempts++;
                 if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                  console.log('Showing contact detail:', contactId);
-                  try {
-                    window.ContactDetail.show(contactId);
-                  } catch (error) {
-                    console.error('Error showing contact detail:', error);
-                  }
-                } else {
-                  console.log('ContactDetail not available after navigation');
-                  // Retry mechanism for this navigation path too
-                  let attempts = 0;
-                  const maxAttempts = 8;
-                  const retryInterval = 150;
-                  const retry = () => {
-                    attempts++;
-                    if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                      window.ContactDetail.show(contactId);
-                    } else if (attempts < maxAttempts) {
-                      setTimeout(retry, retryInterval);
-                    }
-                  };
-                  retry();
+                  window.ContactDetail.show(contactId);
+                } else if (attempts < maxAttempts) {
+                  setTimeout(retry, retryInterval);
                 }
-              }, 100);
+              };
+              retry();
             });
-          } else {
-            console.log('Navigation not available');
           }
         }
       });
