@@ -1,7 +1,7 @@
 const twilio = require('twilio');
 const cors = require('../_cors');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     cors(req, res);
     
     if (req.method !== 'POST') {
@@ -15,10 +15,21 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Phone number required' });
         }
         
+        // Check for Twilio credentials
+        if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+            console.error('[Caller Lookup] Missing Twilio credentials');
+            return res.status(500).json({ 
+                error: 'Twilio credentials not configured',
+                details: 'TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN missing'
+            });
+        }
+        
         const client = twilio(
             process.env.TWILIO_ACCOUNT_SID,
             process.env.TWILIO_AUTH_TOKEN
         );
+        
+        console.log('[Caller Lookup] Looking up:', phoneNumber);
         
         // Use Twilio Lookup API to get caller information
         const lookup = await client.lookups.v1.phoneNumbers(phoneNumber)
@@ -52,9 +63,18 @@ export default async function handler(req, res) {
             });
         }
         
+        if (error.code === 20003) {
+            return res.status(401).json({ 
+                error: 'Authentication failed',
+                code: 'AUTH_ERROR',
+                details: 'Check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN'
+            });
+        }
+        
         res.status(500).json({ 
             error: 'Failed to lookup caller information',
-            details: error.message 
+            details: error.message,
+            code: error.code || 'UNKNOWN'
         });
     }
-}
+};

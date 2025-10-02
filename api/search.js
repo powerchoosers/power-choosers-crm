@@ -13,7 +13,7 @@ function norm10(v) {
   }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   cors(req, res);
   
   if (req.method !== 'GET') {
@@ -23,6 +23,8 @@ export default async function handler(req, res) {
   try {
     const urlObj = new URL(req.url, `http://${req.headers.host}`);
     const phoneNumber = urlObj.searchParams.get('phone');
+    
+    console.log('[Search] Incoming request for phone:', phoneNumber);
     
     if (!phoneNumber) {
       return res.status(400).json({ error: 'Phone number required' });
@@ -34,14 +36,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid phone number' });
     }
     
+    console.log('[Search] Normalized search digits:', searchDigits);
+    
     // Search in Firestore if available
+    if (!db) {
+      console.error('[Search] Firestore not initialized - check Firebase credentials');
+      return res.status(500).json({ 
+        error: 'Database not available',
+        details: 'Firestore not initialized - check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY'
+      });
+    }
+    
     if (db) {
       let contactResult = null;
       let accountResult = null;
       
       // Search contacts
       try {
+        console.log('[Search] Searching contacts collection...');
         const contactsSnap = await db.collection('people').get();
+        console.log('[Search] Found', contactsSnap.docs.length, 'contacts to search');
         
         for (const doc of contactsSnap.docs) {
           const data = doc.data();
@@ -50,6 +64,7 @@ export default async function handler(req, res) {
           const other = norm10(data.otherPhone || '');
           
           if (mobile === searchDigits || work === searchDigits || other === searchDigits) {
+            console.log('[Search] Found matching contact:', doc.id, data.name);
             contactResult = {
               id: doc.id,
               contactId: doc.id,
@@ -70,19 +85,26 @@ export default async function handler(req, res) {
             break;
           }
         }
+        
+        if (!contactResult) {
+          console.log('[Search] No matching contact found');
+        }
       } catch (e) {
         console.error('[Search] Error searching contacts:', e.message);
       }
       
       // Search accounts (company phones)
       try {
+        console.log('[Search] Searching accounts collection...');
         const accountsSnap = await db.collection('accounts').get();
+        console.log('[Search] Found', accountsSnap.docs.length, 'accounts to search');
         
         for (const doc of accountsSnap.docs) {
           const data = doc.data();
           const companyPhone = norm10(data.companyPhone || data.phone || '');
           
           if (companyPhone === searchDigits) {
+            console.log('[Search] Found matching account:', doc.id, data.name);
             accountResult = {
               id: doc.id,
               accountId: doc.id,
@@ -96,12 +118,17 @@ export default async function handler(req, res) {
             break;
           }
         }
+        
+        if (!accountResult) {
+          console.log('[Search] No matching account found');
+        }
       } catch (e) {
         console.error('[Search] Error searching accounts:', e.message);
       }
       
       // Return results
       if (contactResult) {
+        console.log('[Search] Returning contact result');
         return res.status(200).json({
           success: true,
           contact: contactResult,
@@ -110,6 +137,7 @@ export default async function handler(req, res) {
       }
       
       if (accountResult) {
+        console.log('[Search] Returning account result');
         return res.status(200).json({
           success: true,
           contact: null,
@@ -117,6 +145,7 @@ export default async function handler(req, res) {
         });
       }
       
+      console.log('[Search] No results found - returning 404');
       return res.status(404).json({
         success: false,
         error: 'Phone number not found in CRM'
@@ -124,6 +153,7 @@ export default async function handler(req, res) {
     }
     
     // No Firestore - return not found
+    console.log('[Search] Firestore not available - returning 404');
     return res.status(404).json({
       success: false,
       error: 'Phone number not found in CRM'
@@ -131,6 +161,7 @@ export default async function handler(req, res) {
     
   } catch (error) {
     console.error('[Search] Error:', error);
+    console.error('[Search] Error stack:', error.stack);
     return res.status(500).json({ 
       error: 'Search failed',
       details: error.message 
