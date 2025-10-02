@@ -1,5 +1,5 @@
 // CORS utility for Vercel API endpoints
-export function cors(req, res) {
+function cors(req, res) {
   // Set CORS headers
   const origin = req.headers.origin;
   const allowedOrigins = [
@@ -29,3 +29,5 @@ export function cors(req, res) {
   
   return false;
 }
+
+module.exports = cors;
