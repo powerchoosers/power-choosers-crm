@@ -2731,6 +2731,40 @@
           return;
         }
         
+        // Check if we came from dashboard activities
+        if (window._dashboardNavigationSource === 'activities') {
+          // Clear phone widget context to prevent contact company info from leaking
+          clearPhoneWidgetContext();
+          
+          // Navigate back to dashboard and restore pagination state
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('dashboard');
+            
+            // Restore dashboard pagination state
+            setTimeout(() => {
+              try {
+                const restore = window._dashboardReturn || {};
+                if (window.ActivityManager && restore.page !== undefined) {
+                  // Restore the specific page
+                  window.ActivityManager.goToPage('home-activity-timeline', 'global', restore.page);
+                  
+                  // Restore scroll position
+                  if (restore.scroll !== undefined) {
+                    window.scrollTo(0, restore.scroll);
+                  }
+                }
+                
+                // Clear navigation markers AFTER successful navigation and restore
+                window._dashboardNavigationSource = null;
+                window._dashboardReturn = null;
+              } catch (error) {
+                console.warn('Error restoring dashboard state:', error);
+              }
+            }, 100);
+          }
+          return;
+        }
+        
         // Check if we came from people page
         if (window._contactNavigationSource === 'people') {
           // Clear phone widget context to prevent contact company info from leaking

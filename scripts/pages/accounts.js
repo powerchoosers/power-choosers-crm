@@ -1006,64 +1006,15 @@
       /* Slight vertical nudge for AI icon to center with label */
       #accounts-bulk-actions #bulk-ai svg { transform: translateY(2px); }
 
-      /* Bulk delete confirmation popover, centered with pointer */
-      .bulk-delete-popover {
-        position: fixed;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 960;
-        min-width: 320px;
-        max-width: 520px;
-        background: var(--bg-card);
-        color: var(--text-primary);
-        border: 1px solid var(--border-light);
-        border-radius: var(--border-radius);
-        box-shadow: var(--elevation-card);
-        padding: var(--spacing-md);
+      /* Delete confirmation popover - now using global delete-popover class */
+      .delete-popover {
+        background: var(--bg-container) !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border-light) !important;
       }
-      .bulk-delete-popover .bulk-delete-message { font-weight: 600; margin-bottom: 8px; }
-      .bulk-delete-popover .bulk-delete-note { font-size: 12px; opacity: .85; margin-bottom: 12px; }
-      .bulk-delete-popover .bulk-delete-actions { display: flex; gap: var(--spacing-sm); justify-content: flex-end; }
-      .bulk-delete-popover .btn-text {
-        height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm);
-        background: transparent; color: var(--text-secondary);
-        border: 1px solid transparent;
-      }
-      .bulk-delete-popover .btn-text:hover { background: var(--grey-700); border-color: var(--border-light); color: var(--text-inverse); }
-      .bulk-delete-popover .btn-danger {
-        height: 32px; padding: 0 12px; border-radius: var(--border-radius-sm);
-        background: var(--red-muted);
-        color: var(--text-inverse);
-        border: 1px solid var(--red-subtle);
-        font-weight: 600;
-        display: inline-flex; align-items: center; gap: 6px;
-      }
-      .bulk-delete-popover .btn-danger:hover { filter: brightness(1.05); }
-      /* Pointer arrow: position controlled by --arrow-left in px, relative to popover's left */
-      .bulk-delete-popover::before {
-        content: '';
-        position: absolute;
-        top: -8px;
-        left: var(--arrow-left, 50%);
-        transform: translateX(-50%);
-        width: 0; height: 0;
-        border-left: 8px solid transparent;
-        border-right: 8px solid transparent;
-        border-bottom: 8px solid var(--bg-card);
-        z-index: -1;
-      }
-      .bulk-delete-popover::after {
-        content: '';
-        position: absolute;
-        top: -9px;
-        left: var(--arrow-left, 50%);
-        transform: translateX(-50%);
-        width: 0; height: 0;
-        border-left: 9px solid transparent;
-        border-right: 9px solid transparent;
-        border-bottom: 9px solid var(--border-light);
-        z-index: -2;
+      .delete-popover::before,
+      .delete-popover::after {
+        background: var(--bg-container) !important;
       }
     `;
     document.head.appendChild(style);
@@ -1580,33 +1531,35 @@
     backdrop.style.zIndex = '955';
     document.body.appendChild(backdrop);
 
-    // Popover content (centered)
     const pop = document.createElement('div');
     pop.id = 'accounts-delete-popover';
-    pop.className = 'bulk-delete-popover';
+    pop.className = 'delete-popover';
     pop.setAttribute('role', 'dialog');
-    pop.setAttribute('aria-label', 'Confirm delete accounts');
+    pop.setAttribute('aria-label', 'Confirm delete');
+    pop.dataset.placement = 'bottom';
     pop.innerHTML = `
-      <div class="bulk-delete-message">Delete ${state.selected.size} ${state.selected.size === 1 ? 'account' : 'accounts'}?</div>
-      <div class="bulk-delete-note">This action cannot be undone.</div>
-      <div class="bulk-delete-actions">
-        <button class="btn-text" id="acct-del-cancel">Cancel</button>
-        <button class="btn-danger" id="acct-del-confirm">${svgIcon('delete')}<span>Delete</span></button>
-      </div>`;
-
-    // Add to body to allow centered fixed positioning
+      <div class="delete-popover-inner">
+        <div class="delete-title">Delete ${state.selected.size} ${state.selected.size === 1 ? 'account' : 'accounts'}?</div>
+        <div class="btn-row">
+          <button type="button" id="acct-del-cancel" class="btn-text">Cancel</button>
+          <button type="button" id="acct-del-confirm" class="btn-danger">${svgIcon('delete')}<span>Delete</span></button>
+        </div>
+      </div>
+    `;
     document.body.appendChild(pop);
 
-    // Compute pointer position to point towards the Delete button
-    try {
-      const btnRect = delBtn ? delBtn.getBoundingClientRect() : null;
-      const popRect = pop.getBoundingClientRect();
-      if (btnRect && popRect && popRect.width > 0) {
-        const btnCenterX = btnRect.left + btnRect.width / 2;
-        const leftWithinPop = Math.max(12, Math.min(popRect.width - 12, btnCenterX - popRect.left));
-        pop.style.setProperty('--arrow-left', leftWithinPop + 'px');
-      }
-    } catch (_) { /* noop */ }
+    // Position under the delete button and center horizontally to its center
+    const anchorRect = (delBtn || bar).getBoundingClientRect();
+    const preferredLeft = anchorRect.left + (anchorRect.width / 2) - (pop.offsetWidth / 2);
+    const clampedLeft = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, preferredLeft));
+    const top = anchorRect.bottom + 8; // fixed, viewport coords
+    pop.style.top = `${Math.round(top)}px`;
+    pop.style.left = `${Math.round(clampedLeft)}px`;
+    // Arrow: center to the button's center within the popover, clamped to popover width
+    const rawArrowLeft = (anchorRect.left + (anchorRect.width / 2)) - clampedLeft;
+    const maxArrow = Math.max(0, pop.offsetWidth - 12);
+    const clampedArrow = Math.max(12, Math.min(maxArrow, rawArrowLeft));
+    pop.style.setProperty('--arrow-left', `${Math.round(clampedArrow)}px`);
 
     const cancel = pop.querySelector('#acct-del-cancel');
     const confirm = pop.querySelector('#acct-del-confirm');

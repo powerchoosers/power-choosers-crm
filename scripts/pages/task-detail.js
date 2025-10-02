@@ -135,7 +135,10 @@
         width: 100%; /* Ensure full width */
       }
       /* Override any global styles that might affect grid gap */
-      #task-detail-page .page-content > * {
+      #task-detail-page .page-content > .main-content {
+        margin: 0 !important;
+      }
+      #task-detail-page .page-content > .sidebar-content {
         margin: 0 !important;
       }
       #task-detail-page .main-content { 
@@ -153,6 +156,8 @@
         /* Allow the left column to fully occupy its grid track (no artificial max width) */
         max-width: none;
         width: 100%;
+        border-right: 1px solid var(--border-light); /* Vertical divider */
+        margin-right: 25px; /* Spacing from the border to right column content */
       }
       #task-detail-page .sidebar-content { 
         display: flex; 
@@ -661,22 +666,30 @@
   async function handleTaskComplete() {
     if (!state.currentTask) return;
     
-    // Mark task as completed
-    state.currentTask.status = 'completed';
+    // Get updated notes from the form
+    const callNotesEl = document.getElementById('call-notes');
+    const updatedNotes = callNotesEl ? callNotesEl.value.trim() : '';
+    const finalNotes = updatedNotes || state.currentTask.notes || '';
     
-    // Update in localStorage
-    try {
-      const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-      const taskIndex = userTasks.findIndex(t => t.id === state.currentTask.id);
-      if (taskIndex !== -1) {
-        userTasks[taskIndex].status = 'completed';
-        localStorage.setItem('userTasks', JSON.stringify(userTasks));
+    // Save notes to recent activities if there are any
+    if (finalNotes) {
+      try {
+        await saveTaskNotesToRecentActivity(state.currentTask, finalNotes);
+      } catch (e) {
+        console.warn('Could not save notes to recent activity:', e);
       }
-    } catch (e) {
-      console.warn('Could not update task status in localStorage:', e);
     }
     
-    // Update in Firebase
+    // Remove from localStorage completely
+    try {
+      const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+      const filteredTasks = userTasks.filter(t => t.id !== state.currentTask.id);
+      localStorage.setItem('userTasks', JSON.stringify(filteredTasks));
+    } catch (e) {
+      console.warn('Could not remove task from localStorage:', e);
+    }
+    
+    // Delete from Firebase completely
     try {
       if (window.firebaseDB) {
         const snapshot = await window.firebaseDB.collection('tasks')
@@ -686,14 +699,11 @@
         
         if (!snapshot.empty) {
           const doc = snapshot.docs[0];
-          await doc.ref.update({
-            status: 'completed',
-            completedAt: new Date()
-          });
+          await doc.ref.delete();
         }
       }
     } catch (e) {
-      console.warn('Could not update task status in Firebase:', e);
+      console.warn('Could not delete task from Firebase:', e);
     }
     
     // Show success message
@@ -717,7 +727,7 @@
     
     // Navigate to next task instead of going back
     try {
-      // Small delay to ensure task status update has been processed
+      // Small delay to ensure task deletion has been processed
       await new Promise(resolve => setTimeout(resolve, 100));
       await navigateToAdjacentTask('next');
     } catch (e) {
@@ -730,6 +740,37 @@
   function handleTaskReschedule() {
     // TODO: Implement reschedule functionality
     console.log('Reschedule task:', state.currentTask);
+  }
+
+  // Save task notes to recent activities
+  async function saveTaskNotesToRecentActivity(task, notes) {
+    if (!notes || !window.firebaseDB) return;
+    
+    try {
+      const activityData = {
+        type: 'task_completed',
+        title: `Task completed: ${task.title}`,
+        description: notes,
+        entityType: isAccountTask(task) ? 'account' : 'contact',
+        entityId: isAccountTask(task) ? (task.accountId || '') : (task.contactId || ''),
+        entityName: isAccountTask(task) ? (task.account || '') : (task.contact || ''),
+        taskType: task.type,
+        taskPriority: task.priority,
+        completedAt: new Date(),
+        createdAt: new Date(),
+        userId: window.currentUser?.uid || 'anonymous'
+      };
+      
+      // Save to Firebase activities collection
+      await window.firebaseDB.collection('activities').add({
+        ...activityData,
+        timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+      });
+      
+      console.log('Task notes saved to recent activities:', activityData);
+    } catch (error) {
+      console.error('Error saving task notes to recent activities:', error);
+    }
   }
 
   async function navigateToAdjacentTask(direction) {
@@ -1303,6 +1344,33 @@
     setTimeout(() => {
       processClickToCallAndEmail();
     }, 100);
+    
+    // Add event listener for "Log call & complete task" button
+    const logCompleteBtn = document.getElementById('log-complete-call');
+    if (logCompleteBtn) {
+      logCompleteBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        // Get notes from the form
+        const callNotesEl = document.getElementById('call-notes');
+        const callPurposeEl = document.getElementById('call-purpose');
+        
+        if (callNotesEl) {
+          const formNotes = callNotesEl.value.trim();
+          const purpose = callPurposeEl ? callPurposeEl.value : 'Prospecting Call';
+          
+          // Update task notes with form data
+          if (formNotes) {
+            state.currentTask.notes = `${purpose}: ${formNotes}`;
+          } else if (purpose !== 'Prospecting Call') {
+            state.currentTask.notes = `Call purpose: ${purpose}`;
+          }
+        }
+        
+        // Complete the task
+        await handleTaskComplete();
+      });
+    }
   }
 
   function setupCompanyLinkHandlers() {
@@ -1460,7 +1528,7 @@
           </div>
           <div class="form-row">
             <label>Notes</label>
-            <textarea class="input-dark" id="call-notes" rows="3" placeholder="Add call notes..."></textarea>
+            <textarea class="input-dark" id="call-notes" rows="3" placeholder="Add call notes...">${task.notes ? escapeHtml(task.notes) : ''}</textarea>
           </div>
           <div class="actions">
             <button class="btn-primary" id="log-complete-call">Log call & complete task</button>
@@ -1646,7 +1714,7 @@
           </div>
           <div class="form-row">
             <label>Notes</label>
-            <textarea class="input-dark" id="call-notes" rows="3" placeholder="Add call notes..."></textarea>
+            <textarea class="input-dark" id="call-notes" rows="3" placeholder="Add call notes...">${task.notes ? escapeHtml(task.notes) : ''}</textarea>
           </div>
           <div class="actions">
             <button class="btn-primary" id="log-complete-call">Log call & complete task</button>
@@ -1966,54 +2034,38 @@
     }
     
     try {
-      // For now, show a placeholder. In a real implementation, you would fetch activity data
-      // from various sources (calls, emails, tasks, etc.)
-      const activities = [
-        {
-          type: 'call',
-          title: 'Phone call completed',
-          time: '2 hours ago',
-          icon: 'phone'
-        },
-        {
-          type: 'task',
-          title: 'Follow-up task created',
-          time: '1 day ago',
-          icon: 'task'
-        },
-        {
-          type: 'email',
-          title: 'Email sent',
-          time: '3 days ago',
-          icon: 'email'
+      // Use ActivityManager to load real activities for the contact
+      if (window.ActivityManager) {
+        // Find the contact ID from the contact name
+        const contactId = findContactIdByName(contactName);
+        if (contactId) {
+          await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId);
+        } else {
+          // Show empty state if contact not found
+          timelineEl.innerHTML = `
+            <div class="activity-placeholder">
+              <div class="placeholder-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1v6m0 6v6"/>
+                </svg>
+              </div>
+              <div class="placeholder-text">No recent activity</div>
+            </div>
+          `;
         }
-      ];
-      
-      if (!activities.length) {
+      } else {
+        // Show empty state if ActivityManager not available
         timelineEl.innerHTML = `
           <div class="activity-placeholder">
+            <div class="placeholder-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1v6m0 6v6"/>
+              </svg>
+            </div>
             <div class="placeholder-text">No recent activity</div>
           </div>
         `;
-        return;
       }
-      
-      // Render activities
-      const activitiesHtml = activities.map(activity => {
-        const iconSvg = getActivityIcon(activity.icon);
-        
-        return `
-          <div class="activity-item">
-            <div class="activity-icon">${iconSvg}</div>
-            <div class="activity-content">
-              <div class="activity-title">${escapeHtml(activity.title)}</div>
-              <div class="activity-time">${escapeHtml(activity.time)}</div>
-            </div>
-          </div>
-        `;
-      }).join('');
-      
-      timelineEl.innerHTML = activitiesHtml;
     } catch (error) {
       console.error('Error loading recent activity:', error);
       timelineEl.innerHTML = `
@@ -2021,6 +2073,23 @@
           <div class="placeholder-text">Error loading activity</div>
         </div>
       `;
+    }
+  }
+  
+  // Helper function to find contact ID by name
+  function findContactIdByName(contactName) {
+    if (!contactName || !window.getPeopleData) return null;
+    
+    try {
+      const contacts = window.getPeopleData() || [];
+      const contact = contacts.find(c => {
+        const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ');
+        return fullName === contactName || c.name === contactName || c.firstName === contactName;
+      });
+      return contact ? contact.id : null;
+    } catch (error) {
+      console.error('Error finding contact by name:', error);
+      return null;
     }
   }
   
