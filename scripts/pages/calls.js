@@ -1697,12 +1697,12 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         return n ? `+1 (${n.slice(0,3)}) ${n.slice(3,6)}-${n.slice(6)}` : '';
       }catch(_){ return ''; }
     })();
-    const hasContact = !!(r.contactName && r.contactName.trim());
+    const hasContact = !!(r.contactName && typeof r.contactName === 'string' && r.contactName.trim());
     let displayNameRaw = '';
     
     if (hasContact) {
       displayNameRaw = r.contactName;
-    } else if (r.company && r.company.trim()) {
+    } else if (r.company && typeof r.company === 'string' && r.company.trim()) {
       // If no contact name but we have a company, show "Unknown" instead of company name
       // This indicates we need to find the actual contact for this company
       displayNameRaw = 'Unknown';
@@ -2946,7 +2946,17 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
 
   // Bulk actions bar (refined)
   function showBulkBar(){ updateBulkBar(true); }
-  function hideBulkBar(){ const bar = els.page ? els.page.querySelector('#calls-bulk-actions') : document.getElementById('calls-bulk-actions'); if(bar&&bar.parentNode) bar.parentNode.removeChild(bar); }
+  function hideBulkBar(){ 
+    const bar = els.page ? els.page.querySelector('#calls-bulk-actions') : document.getElementById('calls-bulk-actions'); 
+    if(bar) {
+      // Add exit animation
+      bar.classList.remove('--show');
+      // Remove from DOM after animation completes
+      setTimeout(() => {
+        if(bar && bar.parentNode) bar.parentNode.removeChild(bar);
+      }, 200);
+    }
+  }
   function updateBulkBar(force=false){
     if(!els.container) return;
     const count = state.selected.size;
@@ -2970,6 +2980,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       container.id = 'calls-bulk-actions';
       container.className = 'bulk-actions-modal';
       els.container.appendChild(container);
+      // Add animation class after a brief delay to trigger the animation
+      setTimeout(() => {
+        container.classList.add('--show');
+      }, 10);
     }
     container.innerHTML = html;
     // Wire events

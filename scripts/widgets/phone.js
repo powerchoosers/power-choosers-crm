@@ -223,11 +223,8 @@
         state.device.on('incoming', async (conn) => {
           console.debug('[TwilioRTC] Incoming call:', conn);
 
-          // Ensure the phone widget is open so UI updates work
-          if (!document.getElementById(WIDGET_ID)) {
-            try { openPhone(); } catch (_) {}
-          }
-          const cardForIncoming = document.getElementById(WIDGET_ID);
+          // [FIX] Do NOT open widget yet - only show toast notification
+          // Widget will open when user clicks "Answer" on the toast
 
           // Set input/output devices before accepting the call
           if (state.device.audio) {
@@ -280,17 +277,28 @@
 
             // Show enhanced toast notification for incoming call
             if (window.ToastManager) {
-                const callData = {
-                    callerName: meta.name,
-                    callerNumber: number,
-                    company: meta.account,
+                console.debug('[TwilioRTC] Toast notification data:', {
+                    name: meta.name,
+                    account: meta.account,
                     title: meta.title,
                     city: meta.city,
                     state: meta.state,
-                    callerIdImage: meta.domain ? makeFavicon(meta.domain) : null,
-                    carrierName: meta.carrierName,
-                    carrierType: meta.carrierType,
-                    nationalFormat: meta.nationalFormat,
+                    domain: meta.domain,
+                    logoUrl: meta.logoUrl
+                });
+                
+                const callData = {
+                    callerName: meta.name || '',
+                    callerNumber: number,
+                    company: meta.account || '',
+                    title: meta.title || '',
+                    city: meta.city || '',
+                    state: meta.state || '',
+                    // Use logoUrl if available, otherwise generate favicon from domain
+                    callerIdImage: meta.logoUrl || (meta.domain ? makeFavicon(meta.domain) : null),
+                    carrierName: meta.carrierName || '',
+                    carrierType: meta.carrierType || '',
+                    nationalFormat: meta.nationalFormat || number,
                     connection: conn
                 };
                 
@@ -342,11 +350,7 @@
                   isCompanyPhone: false,
                   isActive: false 
                 };
-                // Remove incoming notification if present
-                try {
-                  const n = document.getElementById(CALL_NOTIFY_ID);
-                  if (n) n.remove();
-                } catch(_) {}
+                // Toast notification auto-removed by ToastManager
                 // Set cooldowns to prevent any auto-trigger or quick redial
                 lastCallCompleted = Date.now();
                 lastCalledNumber = number;
@@ -364,26 +368,8 @@
               });
             } catch(_) {}
 
-            // Pre-populate UI while ringing: show Hang Up to allow declining, and show number/name
-            try {
-              if (!document.getElementById(WIDGET_ID)) openPhone();
-              const card0 = document.getElementById(WIDGET_ID);
-              if (card0) {
-                const btn0 = card0.querySelector('.call-btn-start');
-                if (btn0) {
-                  btn0.textContent = 'Hang Up';
-                  btn0.classList.remove('btn-primary');
-                  btn0.classList.add('btn-danger');
-                }
-                const input0 = card0.querySelector('.phone-display');
-                if (input0) {
-                  console.debug('[Phone] Setting ringing input to caller number:', number);
-                  input0.value = number;
-                }
-                // Replace input with contact display next to dialpad (this will also mark in-call and animate)
-                setContactDisplay(meta, number);
-              }
-            } catch(_) {}
+            // [FIX] Do NOT pre-populate UI while ringing - widget stays closed until user answers
+            // Toast notification handles the ringing state visually
 
             const accept = async () => {
               try {
@@ -419,7 +405,7 @@
                       const titleGone = cardGone.querySelector('.widget-title');
                       if (titleGone) titleGone.innerHTML = 'Phone';
                     }
-                    try { const n = document.getElementById(CALL_NOTIFY_ID); if (n) n.remove(); } catch(_) {}
+                    // Toast notification auto-removed by ToastManager
                     return;
                   }
                 } catch(_) {}
@@ -457,7 +443,25 @@
                   const el = document.getElementById(WIDGET_ID);
                   if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'in-call', callSid: incomingCallSid } }));
                 } catch(_) {}
-                currentCallContext = { number: number, name: meta?.name || '', isActive: true };
+                
+                // Set full call context for incoming call (now that it's accepted)
+                currentCallContext = {
+                  number: number,
+                  name: meta?.name || '',
+                  company: meta?.account || '',
+                  accountId: meta?.accountId || null,
+                  accountName: meta?.account || null,
+                  contactId: meta?.contactId || null,
+                  contactName: meta?.name || '',
+                  city: meta?.city || '',
+                  state: meta?.state || '',
+                  domain: meta?.domain || '',
+                  logoUrl: meta?.logoUrl || '',
+                  isCompanyPhone: !!(meta?.account && !meta?.contactId),
+                  isActive: true
+                };
+                console.debug('[Phone] Incoming call context set on accept:', currentCallContext);
+                
                 // Start live timer banner
                 startLiveCallTimer(document.getElementById(WIDGET_ID), incomingCallSid);
                 const card = document.getElementById(WIDGET_ID);
@@ -487,7 +491,7 @@
                   console.warn('[TwilioRTC] updateCallStatus not available - skipping status update');
                 }
 
-                conn.on('disconnect', async () => {
+                conn.on('disconnect', () => {
                   console.debug('[Phone] Call disconnected');
                   const callEndTime = Date.now();
                   const duration = Math.floor((callEndTime - callStartTime) / 1000);
@@ -558,16 +562,9 @@
                       window.currentServerCallSid = null;
                   }
                   
-                  // Release the input device to avoid the red recording symbol
-                  // According to Twilio best practices
-                  if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
-                    try {
-                      await TwilioRTC.state.device.audio.unsetInputDevice();
-                      console.debug('[Phone] Audio input device released');
-                    } catch (e) {
-                      console.warn('[Phone] Failed to release audio input device:', e);
-                    }
-                  }
+                  // [REMOVED] Audio device release - was causing UI freeze on hangup
+                  // Browser will automatically release microphone when tab closes/refreshes
+                  // Trade-off: Red recording dot may linger in tab until refresh (minor UX issue vs major freeze issue)
                 });
 
                 conn.on('error', (error) => {
@@ -624,24 +621,7 @@
               }
             };
 
-            // Show notification
-            showIncomingNotification({
-              number,
-              meta,
-              onClick: accept,
-              onClose: () => { 
-                // Add missed call notification when user dismisses
-                if (window.Notifications && typeof window.Notifications.addMissedCall === 'function') {
-                  window.Notifications.addMissedCall(number, meta?.name || meta?.account);
-                }
-              }
-            });
-
-            // Optional: auto-dismiss notification after 25s (typical ring window)
-            setTimeout(() => {
-              const n = document.getElementById(CALL_NOTIFY_ID);
-              if (n && !isCallInProgress) { try { n.remove(); } catch(_) {} }
-            }, 25000);
+            // Old notification system removed - using ToastManager (shown above at line ~282-300)
           } catch (e) {
             console.error('[TwilioRTC] Incoming notification error:', e);
           }
@@ -776,32 +756,7 @@
   })();
 
   const WIDGET_ID = 'phone-widget';
-  const CALL_NOTIFY_ID = 'incoming-call-notification';
-
-  // Inject minimal styles for incoming call notification (distinct from regular toasts)
-  function ensureCallNotifyStyles() {
-    if (document.getElementById('call-notify-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'call-notify-styles';
-    style.textContent = `
-      .call-notify {
-        position: fixed; z-index: 99999; right: 16px; top: 72px; max-width: 420px;
-        background: linear-gradient(135deg, #0d5, #0aa); color: #fff; border-radius: 10px;
-        box-shadow: 0 10px 28px rgba(0,0,0,0.25); padding: 14px 16px; display: flex; gap: 12px;
-        align-items: center; cursor: pointer; border: 2px solid rgba(255,255,255,0.15);
-        transition: transform .18s ease, opacity .18s ease; opacity: 0; transform: translateY(-8px);
-      }
-      .call-notify.show { opacity: 1; transform: translateY(0); }
-      .call-notify .call-avatar { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 8px; background:#fff2; display:flex; align-items:center; justify-content:center; font-weight:700; }
-      .call-notify .call-meta { flex: 1 1 auto; min-width: 0; }
-      .call-notify .call-title { font-size: 15px; font-weight: 700; line-height: 1.25; margin: 0; }
-      .call-notify .call-sub { font-size: 12px; opacity: 0.9; line-height: 1.25; margin-top: 2px; }
-      .call-notify .call-number { font-size: 13px; font-weight: 600; opacity: .95; }
-      .call-notify .call-close { flex: 0 0 auto; background:#fff2; color:#fff; border: none; border-radius:6px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
-      .call-notify:hover { box-shadow: 0 14px 34px rgba(0,0,0,0.3); }
-    `;
-    document.head.appendChild(style);
-  }
+  // OLD: const CALL_NOTIFY_ID = 'incoming-call-notification'; - REMOVED (using ToastManager now)
 
   async function resolvePhoneMeta(number) {
     const digits = (number || '').replace(/\D/g, '');
@@ -816,13 +771,15 @@
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (base) {
         // Try contacts first
+        console.debug('[Phone] Searching CRM for phone:', digits);
         const r1 = await fetch(`${base}/api/search?phone=${encodeURIComponent(digits)}`).catch(() => null);
         if (r1 && r1.ok) {
           const j = await r1.json().catch(() => ({}));
+          console.debug('[Phone] CRM search response:', j);
           if (j && (j.contact || j.account)) {
             const c = j.contact || {};
             const a = j.account || {};
-            return {
+            const resolved = {
               ...meta,
               name: c.name || '',
               account: a.name || c.account || '',
@@ -834,7 +791,11 @@
               contactId: c.id || c.contactId || null,
               accountId: a.id || a.accountId || null
             };
+            console.debug('[Phone] Resolved metadata from CRM:', resolved);
+            return resolved;
           }
+        } else {
+          console.debug('[Phone] CRM search failed or returned no results');
         }
         
         // If no contact found, try Twilio caller ID lookup
@@ -886,9 +847,8 @@
     const img = tempDiv.querySelector('.company-favicon');
     return img ? img.src : '';
   }
-  // Fallback to old system
-  const src = `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent('https://' + d)}`;
-  return src;
+  // Return empty string instead of old system to prevent flickering
+  return '';
   }
 
   // Inject minimal styles for the in-call contact display that replaces the input
@@ -1137,53 +1097,8 @@
     } catch (_) {}
   }
 
-  function computeTopForNotification() {
-    try {
-      const panel = document.getElementById('widget-panel');
-      if (panel) {
-        const r = panel.getBoundingClientRect();
-        return Math.max(56, Math.round(r.top + 12));
-      }
-      const header = document.querySelector('#topbar, .topbar, .pc-topbar, header, .header, .navbar');
-      if (header) {
-        const r2 = header.getBoundingClientRect();
-        return Math.max(56, Math.round(r2.bottom + 12));
-      }
-    } catch(_) {}
-    return 72; // default under top bar
-  }
-
-  function showIncomingNotification(opts) {
-    ensureCallNotifyStyles();
-    const { number, meta, onClick, onClose } = opts;
-    const el = document.createElement('div');
-    el.className = 'call-notify';
-    el.id = CALL_NOTIFY_ID;
-    el.style.top = computeTopForNotification() + 'px';
-
-    const nameLine = meta?.name || meta?.account || 'Incoming call';
-    const subLine = [meta?.account && meta?.name ? meta.account : '', meta?.title].filter(Boolean).join(' • ');
-    const locLine = [meta?.city, meta?.state].filter(Boolean).join(', ');
-    const favicon = makeFavicon(meta?.domain);
-
-    el.innerHTML = `
-      <div class="call-avatar">${favicon ? `<img src="${favicon}" alt="" style="width:24px;height:24px;border-radius:50%;background:var(--bg-card,#383f46);padding:3px;box-sizing:border-box;object-fit:cover;">` : '📞'}</div>
-      <div class="call-meta">
-        <div class="call-title">${nameLine}</div>
-        <div class="call-sub">${[locLine, meta?.account && !meta?.name ? meta.account : ''].filter(Boolean).join(' • ')}</div>
-        <div class="call-number">${number}</div>
-      </div>
-      <button class="call-close" title="Dismiss" aria-label="Dismiss">×</button>
-    `;
-
-    const closeBtn = el.querySelector('.call-close');
-    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); try { el.remove(); } catch(_) {} onClose && onClose(); });
-    el.addEventListener('click', () => { try { el.remove(); } catch(_) {} onClick && onClick(); });
-
-    document.body.appendChild(el);
-    requestAnimationFrame(() => el.classList.add('show'));
-    return el;
-  }
+  // OLD NOTIFICATION SYSTEM - REMOVED (Using new ToastManager instead)
+  // The old green/orange gradient notification has been replaced with the new toast system
 
   // Current call context
   let currentCallContext = {
@@ -2250,7 +2165,7 @@
           try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
         });
         
-        currentCall.on('disconnect', async () => {
+        currentCall.on('disconnect', () => {
           console.debug('[Phone] Call disconnected');
           const callEndTime = Date.now();
           const duration = Math.floor((callEndTime - callStartTime) / 1000);
@@ -2325,16 +2240,9 @@
             } catch(_) { /* ignore */ }
           }
           
-          // Release the input device to avoid the red recording symbol
-          // According to Twilio best practices
-          if (TwilioRTC.state.device && TwilioRTC.state.device.audio) {
-            try {
-              await TwilioRTC.state.device.audio.unsetInputDevice();
-              console.debug('[Phone] Audio input device released');
-            } catch (e) {
-              console.warn('[Phone] Failed to release audio input device:', e);
-            }
-          }
+          // [REMOVED] Audio device release - was causing UI freeze on hangup
+          // Browser will automatically release microphone when tab closes/refreshes
+          // Trade-off: Red recording dot may linger in tab until refresh (minor UX issue vs major freeze issue)
           
           // Don't clear call context yet - keep it for proper attribution
           // Context will be cleared when call actually ends
@@ -2868,7 +2776,19 @@
           };
           
           console.debug('[Phone] Manual call context resolved:', currentCallContext);
-          setContactDisplay(currentCallContext, normalized.value);
+          
+          // Build meta object for setContactDisplay (expects meta.account, not meta.company)
+          const displayMeta = {
+            name: freshMeta.name || '',
+            account: freshMeta.account || '',
+            company: freshMeta.account || '',
+            title: freshMeta.title || '',
+            city: freshMeta.city || '',
+            state: freshMeta.state || '',
+            domain: freshMeta.domain || '',
+            logoUrl: freshMeta.logoUrl || ''
+          };
+          setContactDisplay(displayMeta, normalized.value);
         } catch(metaError) {
           console.warn('[Phone] Failed to resolve phone metadata:', metaError);
           // Fallback to minimal context if resolution fails

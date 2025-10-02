@@ -2,6 +2,15 @@
 
 // Contact Detail page module: displays individual contact information Apollo-style
 (function () {
+  // Clean up previous module instance if it exists (for hot reload support)
+  if (window.ContactDetail && window.ContactDetail._cleanup) {
+    try {
+      window.ContactDetail._cleanup();
+    } catch(e) {
+      console.warn('[ContactDetail] Cleanup error:', e);
+    }
+  }
+
   const state = {
     currentContact: null,
     activities: [],
@@ -13,6 +22,9 @@
   };
 
   const els = {};
+  
+  // Track event listeners for cleanup
+  const eventListeners = [];
 
   function initDomRefs() {
     els.page = document.getElementById('people-page');
@@ -186,6 +198,9 @@
       .transcript-speaker { font-weight:600; font-size:12px; color:var(--text-primary); }
       .transcript-time { font-size:11px; color:var(--text-secondary); }
       .transcript-text { font-size:13px; line-height:1.5; color:var(--text-primary); word-wrap:break-word; }
+      /* Activity items spacing for contact detail */
+      #contact-detail-view .activity-item { margin-bottom: 12px; }
+      #contact-detail-view .activity-item:last-child { margin-bottom: 0; }
     `;
     document.head.appendChild(style);
   }
@@ -1537,15 +1552,22 @@
     // This implements the AI-suggested approach for Contact Detail company phone calls
     try {
       const contactDetailView = document.getElementById('contact-detail-view');
-      if (contactDetailView && !contactDetailView._companyPhoneHandlerAdded) {
-        contactDetailView._companyPhoneHandlerAdded = true;
-        contactDetailView.addEventListener('click', (e) => {
-          // Check if clicking on a company phone number using the exact AI-suggested selector
-          const phoneElement = e.target.closest('#contact-detail-view .info-row[data-field="companyPhone"] .info-value-text');
-          if (phoneElement && window.Widgets && typeof window.Widgets.setCallContext === 'function') {
-            handleCompanyPhoneClick(phoneElement, contact);
-          }
-        });
+      if (contactDetailView) {
+        // Reset flag to allow reattachment after module reload
+        contactDetailView._companyPhoneHandlerAdded = false;
+        
+        if (!contactDetailView._companyPhoneHandlerAdded) {
+          contactDetailView._companyPhoneHandlerAdded = true;
+          const companyPhoneHandler = (e) => {
+            // Check if clicking on a company phone number using the exact AI-suggested selector
+            const phoneElement = e.target.closest('#contact-detail-view .info-row[data-field="companyPhone"] .info-value-text');
+            if (phoneElement && window.Widgets && typeof window.Widgets.setCallContext === 'function') {
+              handleCompanyPhoneClick(phoneElement, contact);
+            }
+          };
+          contactDetailView.addEventListener('click', companyPhoneHandler);
+          eventListeners.push({ type: 'click', handler: companyPhoneHandler, target: contactDetailView });
+        }
       }
     } catch(_) {}
     
@@ -2599,10 +2621,8 @@
   }
 
   function attachContactDetailEvents() {
-    // Prevent multiple calls to this function for the same contact
-    if (state._contactDetailEventsAttached) {
-      return;
-    }
+    // Reset flag to allow reattachment after module reload
+    state._contactDetailEventsAttached = false;
     
     // Ensure we have a valid contact before attaching events
     if (!state.currentContact?.id) {
@@ -2613,7 +2633,7 @@
     state._contactDetailEventsAttached = true;
 
     // Listen for activity refresh events
-    document.addEventListener('pc:activities-refresh', (e) => {
+    const activityRefreshHandler = (e) => {
       const { entityType, entityId } = e.detail || {};
       if (entityType === 'contact' && entityId === state.currentContact?.id) {
         // Refresh contact activities
@@ -2622,7 +2642,9 @@
           activityManager.renderActivities('contact-activity-timeline', 'contact', entityId);
         }
       }
-    });
+    };
+    document.addEventListener('pc:activities-refresh', activityRefreshHandler);
+    eventListeners.push({ type: 'pc:activities-refresh', handler: activityRefreshHandler, target: document });
 
     // Back button: use a single delegated listener so it binds once and works across rerenders
     if (!document._pcBackButtonDelegated) {
@@ -5980,13 +6002,44 @@ async function createContactSequenceThenAdd(name) {
     return isNaN(d.getTime()) ? null : d;
   }
 
+  // Cleanup function to remove event listeners and reset state
+  function cleanup() {
+    console.log('[ContactDetail] Cleaning up module...');
+    
+    // Remove all tracked event listeners
+    eventListeners.forEach(({ type, handler, target }) => {
+      try {
+        target.removeEventListener(type, handler);
+      } catch(e) {
+        console.warn('[ContactDetail] Error removing listener:', e);
+      }
+    });
+    eventListeners.length = 0;
+    
+    // Reset global flags
+    try {
+      document._pcBackButtonDelegated = false;
+      const contactDetailView = document.getElementById('contact-detail-view');
+      if (contactDetailView) {
+        contactDetailView._companyPhoneHandlerAdded = false;
+      }
+    } catch(e) {}
+    
+    // Reset state flags
+    state._contactDetailEventsAttached = false;
+    
+    console.log('[ContactDetail] Cleanup complete');
+  }
+
   // Export functions for use by people.js
   window.ContactDetail = {
     show: showContactDetail,
     setupEnergyUpdateListener: setupEnergyUpdateListener,
     setupContactCreatedListener: setupContactCreatedListener,
     // Expose internal state for widgets to read linked account id
-    state: state
+    state: state,
+    // Expose cleanup function for hot reload support
+    _cleanup: cleanup
   };
 
 })();

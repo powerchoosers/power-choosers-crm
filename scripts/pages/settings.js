@@ -48,8 +48,8 @@ class SettingsPage {
         this.init();
     }
 
-    init() {
-        this.loadSettings();
+    async init() {
+        await this.loadSettings();
         this.setupEventListeners();
         injectModernStyles();
         this.renderSettings();
@@ -60,7 +60,7 @@ class SettingsPage {
         // Save settings button
         const saveBtn = document.getElementById('save-settings-btn');
         if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.saveSettings());
+            saveBtn.addEventListener('click', async () => await this.saveSettings());
         }
 
         // Email signature text
@@ -169,21 +169,56 @@ class SettingsPage {
         });
     }
 
-    loadSettings() {
-        // Load settings from localStorage or API
-        const savedSettings = localStorage.getItem('crm-settings');
-        if (savedSettings) {
-            try {
-                this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
-            } catch (error) {
-                console.error('Error loading settings:', error);
+    async loadSettings() {
+        try {
+            // First try to load from Firebase
+            if (window.firebaseDB) {
+                const settingsDoc = await window.firebaseDB.collection('settings').doc('user-settings').get();
+                if (settingsDoc.exists) {
+                    const firebaseSettings = settingsDoc.data();
+                    this.state.settings = { ...this.state.settings, ...firebaseSettings };
+                    console.log('[Settings] Loaded from Firebase');
+                    return;
+                }
+            }
+            
+            // Fallback to localStorage if Firebase not available or no data
+            const savedSettings = localStorage.getItem('crm-settings');
+            if (savedSettings) {
+                try {
+                    this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
+                    console.log('[Settings] Loaded from localStorage');
+                } catch (error) {
+                    console.error('Error loading settings from localStorage:', error);
+                }
+            }
+        } catch (error) {
+            console.error('[Settings] Error loading settings:', error);
+            // Fallback to localStorage on error
+            const savedSettings = localStorage.getItem('crm-settings');
+            if (savedSettings) {
+                try {
+                    this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
+                } catch (parseError) {
+                    console.error('Error parsing localStorage settings:', parseError);
+                }
             }
         }
     }
 
-    saveSettings() {
+    async saveSettings() {
         try {
-            // Save to localStorage (placeholder - will be replaced with API call)
+            // Save to Firebase first
+            if (window.firebaseDB) {
+                await window.firebaseDB.collection('settings').doc('user-settings').set({
+                    ...this.state.settings,
+                    lastUpdated: new Date().toISOString(),
+                    updatedBy: 'user'
+                });
+                console.log('[Settings] Saved to Firebase');
+            }
+            
+            // Also save to localStorage as backup
             localStorage.setItem('crm-settings', JSON.stringify(this.state.settings));
             
             // Show success message
@@ -200,9 +235,21 @@ class SettingsPage {
             }));
             
         } catch (error) {
-            console.error('Error saving settings:', error);
-            if (window.showToast) {
-                window.showToast('Error saving settings. Please try again.', 'error');
+            console.error('[Settings] Error saving settings:', error);
+            
+            // Fallback to localStorage only if Firebase fails
+            try {
+                localStorage.setItem('crm-settings', JSON.stringify(this.state.settings));
+                console.log('[Settings] Saved to localStorage as fallback');
+                
+                if (window.showToast) {
+                    window.showToast('Settings saved locally (Firebase unavailable)', 'warning');
+                }
+            } catch (localError) {
+                console.error('[Settings] Error saving to localStorage:', localError);
+                if (window.showToast) {
+                    window.showToast('Error saving settings. Please try again.', 'error');
+                }
             }
         }
     }
@@ -210,6 +257,33 @@ class SettingsPage {
     markDirty() {
         this.state.isDirty = true;
         this.updateSaveButton();
+    }
+
+    // Static method to get current settings (for use by other modules)
+    static getSettings() {
+        if (window.SettingsPage && window.SettingsPage.instance) {
+            return window.SettingsPage.instance.state.settings;
+        }
+        
+        // Fallback to localStorage if SettingsPage not available
+        const savedSettings = localStorage.getItem('crm-settings');
+        if (savedSettings) {
+            try {
+                return JSON.parse(savedSettings);
+            } catch (error) {
+                console.error('Error parsing settings:', error);
+            }
+        }
+        
+        return null;
+    }
+
+    // Static method to get specific setting value
+    static getSetting(path) {
+        const settings = this.getSettings();
+        if (!settings) return null;
+        
+        return path.split('.').reduce((obj, key) => obj?.[key], settings);
     }
 
     updateSaveButton() {
@@ -1387,10 +1461,11 @@ function initVoicemailRecording() {
 }
 
 // Initialize settings page when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Only initialize if we're on the settings page
     if (document.getElementById('settings-page')) {
         window.SettingsPage = new SettingsPage();
+        window.SettingsPage.instance = window.SettingsPage;
     }
 });
 

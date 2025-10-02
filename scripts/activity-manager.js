@@ -713,15 +713,15 @@ class ActivityManager {
       
       return `
         <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${clickAttributes}>
-          <div class="activity-icon">
-            ${this.getActivityIcon(activity.type)}
-          </div>
-          <div class="activity-content">
-            <div class="activity-title">${this.escapeHtml(titleWithEntity)}</div>
-            <div class="activity-description">${this.escapeHtml(activity.description)}</div>
-            <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
-          </div>
+        <div class="activity-icon">
+          ${this.getActivityIcon(activity.type)}
         </div>
+        <div class="activity-content">
+            <div class="activity-title">${this.escapeHtml(titleWithEntity)}</div>
+          <div class="activity-description">${this.escapeHtml(activity.description)}</div>
+          <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
+        </div>
+      </div>
       `;
     }).join('');
   }
