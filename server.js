@@ -500,6 +500,7 @@ const server = http.createServer(async (req, res) => {
     pathname.startsWith('/api/email/track/') ||
     pathname === '/api/email/webhook' ||
     pathname === '/api/email/sendgrid-webhook' ||
+    pathname === '/api/email/inbound-email' ||
     pathname === '/api/email/stats' ||
     pathname === '/api/recording'
   )) {
@@ -585,6 +586,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/email/sendgrid-webhook') {
     return handleApiSendGridWebhook(req, res);
+  }
+  if (pathname === '/api/email/inbound-email') {
+    return handleApiInboundEmail(req, res);
   }
   if (pathname === '/api/email/stats') {
     return handleApiEmailStats(req, res, parsedUrl);
@@ -1349,143 +1353,3 @@ async function handleApiInboundEmail(req, res) {
   }
 }
 
-// Main server function
-const server = http.createServer(async (req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
-  
-  // Set CORS headers for all responses
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-  
-  try {
-    // API Routes
-    if (pathname.startsWith('/api/')) {
-      // Gemini Email API
-      if (pathname === '/api/gemini-email') {
-        await handleApiGeminiEmail(req, res);
-        return;
-      }
-      
-      // Twilio API endpoints
-      if (pathname === '/api/twilio/token') {
-        await handleApiTwilioToken(req, res, parsedUrl);
-        return;
-      }
-      
-      if (pathname === '/api/twilio/voice') {
-        await handleApiTwilioVoice(req, res, parsedUrl);
-        return;
-      }
-      
-      if (pathname === '/api/twilio/call') {
-        await handleApiTwilioCall(req, res, parsedUrl);
-        return;
-      }
-      
-      if (pathname === '/api/twilio/conversational-intelligence-webhook') {
-        await handleApiTwilioConversationalIntelligenceWebhook(req, res, parsedUrl);
-        return;
-      }
-      
-      if (pathname === '/api/twilio/language-webhook') {
-        await handleApiTwilioLanguageWebhook(req, res, parsedUrl);
-        return;
-      }
-      
-      if (pathname === '/api/twilio/voice-intelligence') {
-        await handleApiTwilioVoiceIntelligence(req, res, parsedUrl);
-        return;
-      }
-      
-      if (pathname === '/api/recording') {
-        await handleApiRecording(req, res, parsedUrl);
-        return;
-      }
-      
-      // SendGrid API endpoints
-      if (pathname === '/api/email/sendgrid-send') {
-        await handleApiSendGridSend(req, res);
-        return;
-      }
-      
-      if (pathname === '/api/email/sendgrid-webhook') {
-        await handleApiSendGridWebhook(req, res);
-        return;
-      }
-      
-      if (pathname === '/api/email/inbound-email') {
-        await handleApiInboundEmail(req, res);
-        return;
-      }
-      
-      // If no API route matches, return 404
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'API endpoint not found' }));
-      return;
-    }
-    
-    // Static file serving
-    let filePath = pathname === '/' ? '/crm-dashboard.html' : pathname;
-    filePath = path.join(__dirname, filePath);
-    
-    // Security check - prevent directory traversal
-    if (!filePath.startsWith(__dirname)) {
-      res.writeHead(403, { 'Content-Type': 'text/plain' });
-      res.end('Forbidden');
-      return;
-    }
-    
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('File not found');
-      return;
-    }
-    
-    // Get file extension and set content type
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-    
-    // Read and serve file
-    const fileContent = fs.readFileSync(filePath);
-    res.writeHead(200, { 'Content-Type': contentType });
-    res.end(fileContent);
-    
-  } catch (error) {
-    console.error('[Server] Error:', error);
-    res.writeHead(500, { 'Content-Type': 'text/plain' });
-    res.end('Internal Server Error');
-  }
-});
-
-// Start server
-server.listen(PORT, () => {
-  console.log(`[Server] Power Choosers CRM server running at http://localhost:${PORT}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('[Server] SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('[Server] Server closed');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('[Server] SIGINT received, shutting down gracefully');
-  server.close(() => {
-    console.log('[Server] Server closed');
-    process.exit(0);
-  });
-});
