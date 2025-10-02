@@ -16,10 +16,10 @@ class PowerChoosersCRM {
 
         // Listen for activity refresh events
         document.addEventListener('pc:activities-refresh', (e) => {
-            const { entityType } = e.detail || {};
+            const { entityType, entityId, forceRefresh } = e.detail || {};
             if (entityType === 'global') {
                 // Refresh home activities
-                this.loadHomeActivities();
+                this.loadHomeActivities(forceRefresh);
             }
         });
     }
@@ -469,6 +469,9 @@ class PowerChoosersCRM {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 const targetPage = item.getAttribute('data-page');
+                
+                // No special handling needed for Client Management - it has its own page now
+                
                 this.navigateToPage(targetPage);
             });
         });
@@ -570,6 +573,15 @@ class PowerChoosersCRM {
                 // Ensure lists overview module is initialized
                 if (window.ListsOverview && typeof window.ListsOverview.refreshCounts === 'function') {
                     window.ListsOverview.refreshCounts();
+                }
+            }, 50);
+        }
+        
+        // Client Management page - initialize client management dashboard
+        if (pageName === 'client-management') {
+            setTimeout(() => {
+                if (window.ClientManagement && typeof window.ClientManagement.show === 'function') {
+                    window.ClientManagement.show();
                 }
             }, 50);
         }
@@ -3330,11 +3342,24 @@ class PowerChoosersCRM {
         }
     }
     
-    loadHomeActivities() {
+    loadHomeActivities(forceRefresh = false) {
         if (!window.ActivityManager) return;
         
+        // Check if we already have activities loaded and don't need to refresh
+        if (!forceRefresh && document.getElementById('home-activity-timeline')?.children.length > 0) {
+            // Activities are already loaded, just setup pagination
+            this.setupHomeActivityPagination();
+            return;
+        }
+        
         // Load global activities for home page
-        window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+        if (forceRefresh) {
+            // Clear cache and force refresh
+            window.ActivityManager.clearCache('global');
+            window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+        } else {
+            window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+        }
         
         // Setup pagination
         this.setupHomeActivityPagination();
@@ -3356,17 +3381,29 @@ class PowerChoosersCRM {
             if (totalPages > 1) {
                 paginationEl.style.display = 'flex';
                 
-                // Use unified pagination component
-                if (this.createPagination) {
-                    this.createPagination(
-                        window.ActivityManager.currentPage + 1, 
-                        totalPages, 
-                        (page) => {
-                            window.ActivityManager.goToPage(page - 1, 'home-activity-timeline', 'global');
-                            updatePagination();
-                        }, 
-                        paginationEl.id
-                    );
+                // Setup pagination buttons
+                const prevBtn = document.getElementById('home-activity-prev');
+                const nextBtn = document.getElementById('home-activity-next');
+                const infoEl = document.getElementById('home-activity-info');
+                
+                if (prevBtn) {
+                    prevBtn.disabled = window.ActivityManager.currentPage === 0;
+                    prevBtn.onclick = () => {
+                        window.ActivityManager.previousPage('home-activity-timeline', 'global');
+                        updatePagination();
+                    };
+                }
+                
+                if (nextBtn) {
+                    nextBtn.disabled = window.ActivityManager.currentPage >= totalPages - 1;
+                    nextBtn.onclick = () => {
+                        window.ActivityManager.nextPage('home-activity-timeline', 'global');
+                        updatePagination();
+                    };
+                }
+                
+                if (infoEl) {
+                    infoEl.textContent = `${window.ActivityManager.currentPage + 1} of ${totalPages}`;
                 }
             } else {
                 paginationEl.style.display = 'none';

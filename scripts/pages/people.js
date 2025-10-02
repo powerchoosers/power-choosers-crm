@@ -3126,7 +3126,14 @@
       els.positionBulkBarHandler = null;
     }
     const bar = els.page.querySelector('#people-bulk-actions');
-    if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+    if (bar) {
+      // Add exit animation
+      bar.classList.remove('--show');
+      // Remove from DOM after animation completes
+      setTimeout(() => {
+        if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+      }, 200);
+    }
   }
 
   // Build a list of selected contact objects by id
@@ -3227,7 +3234,14 @@
   function closeBulkDeleteConfirm() {
     const pop = document.getElementById('people-delete-popover');
     const backdrop = document.getElementById('people-delete-backdrop');
-    if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+    if (pop) {
+      // Add exit animation
+      pop.classList.add('--hide');
+      // Remove from DOM after animation completes
+      setTimeout(() => {
+        if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+      }, 150);
+    }
     if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
     if (_onDelKeydown) { document.removeEventListener('keydown', _onDelKeydown); _onDelKeydown = null; }
     if (_onDelOutside) { document.removeEventListener('mousedown', _onDelOutside, true); _onDelOutside = null; }
@@ -3257,8 +3271,8 @@
       <div class="delete-popover-inner">
         <div class="delete-title">Delete ${state.selected.size} ${state.selected.size===1?'contact':'contacts'}?</div>
         <div class="btn-row">
-          <button type="button" id="del-cancel" class="btn-cancel">Cancel</button>
-          <button type="button" id="del-confirm" class="btn-danger">Delete</button>
+          <button type="button" id="del-cancel" class="btn-text">Cancel</button>
+          <button type="button" id="del-confirm" class="btn-danger">${svgIcon('delete')}<span>Delete</span></button>
         </div>
       </div>
     `;
@@ -3422,6 +3436,10 @@
       container.id = 'people-bulk-actions';
       container.className = 'bulk-actions-modal';
       els.tableContainer.appendChild(container);
+      // Add animation class after a brief delay to trigger the animation
+      setTimeout(() => {
+        container.classList.add('--show');
+      }, 10);
     }
     container.innerHTML = html;
 

@@ -842,7 +842,7 @@
         </div>
         <div class="body">
           <div class="btn-row">
-            <button type="button" class="btn-cancel">Cancel</button>
+            <button type="button" class="btn-text">Cancel</button>
             <button type="button" class="btn-danger btn-confirm">Delete</button>
           </div>
         </div>
@@ -854,7 +854,7 @@
     });
     overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     setTimeout(() => {
-      const cancel = overlay.querySelector('.btn-cancel');
+      const cancel = overlay.querySelector('.btn-text');
       const confirm = overlay.querySelector('.btn-confirm');
       if (cancel) cancel.addEventListener('click', () => close());
       if (confirm) confirm.addEventListener('click', () => { try { onConfirm && onConfirm(); } catch (_) {} close(); });

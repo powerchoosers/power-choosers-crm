@@ -101,14 +101,27 @@ class EmailManager {
         }
     }
 
-    // Load emails (placeholder for now)
+    // Load emails (both sent and received)
     async loadEmails() {
         console.log('[EmailManager] Loading emails from tracking system...');
         try {
-            // Load emails from the tracking system (sent emails)
+            // Load emails from the tracking system (both sent and received)
             if (window.emailTrackingManager) {
-                const emails = await window.emailTrackingManager.getSentEmails();
-                this.renderEmails(emails);
+                if (this.currentFolder === 'sent') {
+                    const emails = await window.emailTrackingManager.getSentEmails();
+                    this.renderEmails(emails);
+                } else if (this.currentFolder === 'inbox') {
+                    // For inbox, get all emails and filter for received ones
+                    const allEmails = await window.emailTrackingManager.getAllEmails();
+                    const receivedEmails = allEmails.filter(email => 
+                        email.emailType === 'received' || email.provider === 'sendgrid_inbound'
+                    );
+                    this.renderEmails(receivedEmails);
+                } else {
+                    // For all emails, get conversation threads
+                    const threads = await window.emailTrackingManager.getConversationThreads();
+                    this.renderConversationThreads(threads);
+                }
             } else {
                 console.warn('[EmailManager] Email tracking manager not available');
                 this.showEmptyState();
@@ -123,6 +136,104 @@ class EmailManager {
     async refreshEmails() {
         console.log('[EmailManager] Refreshing emails...');
         this.loadEmails();
+    }
+
+    // Render conversation threads
+    renderConversationThreads(threads) {
+        const container = document.getElementById('emails-list');
+        if (!container) return;
+
+        if (threads.length === 0) {
+            this.showEmptyState();
+            return;
+        }
+
+        console.log('[EmailManager] Rendering conversation threads:', threads.length);
+
+        container.innerHTML = threads.map(thread => {
+            const latestEmail = thread.emails[thread.emails.length - 1];
+            const participants = thread.participants.join(', ');
+            const lastActivity = this.formatDate(thread.lastActivity);
+            
+            return `
+                <div class="email-item conversation-thread" data-thread-id="${thread.threadId}">
+                    <div class="email-item-header">
+                        <div class="email-item-participants">${participants}</div>
+                        <div class="email-item-time">${lastActivity}</div>
+                    </div>
+                    <div class="email-item-subject">${latestEmail.subject || 'No Subject'}</div>
+                    <div class="email-item-preview">${this.getEmailPreview(latestEmail)}</div>
+                    <div class="email-item-meta">
+                        <span class="email-count">${thread.emailCount} message${thread.emailCount !== 1 ? 's' : ''}</span>
+                        <span class="email-type ${latestEmail.emailType}">${latestEmail.emailType}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers for conversation threads
+        this.attachConversationEvents();
+    }
+
+    // Attach events to conversation threads
+    attachConversationEvents() {
+        const threads = document.querySelectorAll('.conversation-thread');
+        threads.forEach(thread => {
+            thread.addEventListener('click', () => {
+                const threadId = thread.dataset.threadId;
+                this.openConversationThread(threadId);
+            });
+        });
+    }
+
+    // Open conversation thread
+    async openConversationThread(threadId) {
+        try {
+            const emails = await window.emailTrackingManager.getEmailsByThread(threadId);
+            this.renderConversationEmails(emails);
+        } catch (error) {
+            console.error('[EmailManager] Error opening conversation thread:', error);
+            window.crm?.showToast('Error loading conversation', 'error');
+        }
+    }
+
+    // Render emails within a conversation thread
+    renderConversationEmails(emails) {
+        const container = document.getElementById('emails-list');
+        if (!container) return;
+
+        console.log('[EmailManager] Rendering conversation emails:', emails.length);
+
+        container.innerHTML = emails.map(email => {
+            const isReceived = email.emailType === 'received';
+            const time = this.formatDate(email.timestamp);
+            
+            return `
+                <div class="email-item conversation-email ${isReceived ? 'received' : 'sent'}" data-email-id="${email.id}">
+                    <div class="email-item-header">
+                        <div class="email-item-from">${isReceived ? email.from : 'You'}</div>
+                        <div class="email-item-time">${time}</div>
+                    </div>
+                    <div class="email-item-subject">${email.subject || 'No Subject'}</div>
+                    <div class="email-item-preview">${this.getEmailPreview(email)}</div>
+                    <div class="email-item-meta">
+                        <span class="email-type ${email.emailType}">${email.emailType}</span>
+                        ${isReceived ? '<span class="new-badge">New</span>' : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers for individual emails
+        this.attachEmailEvents();
+    }
+
+    // Get email preview text
+    getEmailPreview(email) {
+        const text = email.text || email.html || email.content || '';
+        // Strip HTML tags and get first 100 characters
+        const plainText = text.replace(/<[^>]*>/g, '').trim();
+        return plainText.length > 100 ? plainText.substring(0, 100) + '...' : plainText;
     }
 
     // Open compose window

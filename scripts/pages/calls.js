@@ -403,30 +403,30 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
 
       /* Delete confirmation popover */
       .delete-popover {
-        position: fixed; z-index: 960; background: var(--bg-modal, #262a30);
-        color: var(--text-inverse); border: 1px solid var(--grey-700);
-        border-radius: var(--border-radius); box-shadow: var(--shadow-xl);
+        position: fixed; z-index: 960; background: var(--bg-container);
+        color: var(--text-primary); border: 1px solid var(--border-light);
+        border-radius: var(--border-radius); box-shadow: var(--elevation-card);
         padding: 0; min-width: 280px; max-width: 360px;
       }
       .delete-popover::before {
         content: ''; position: absolute; top: -6px; left: var(--arrow-left, 50%);
-        width: 12px; height: 12px; background: var(--bg-modal, #262a30);
-        border: 1px solid var(--grey-700); border-bottom: none; border-right: none;
+        width: 12px; height: 12px; background: var(--bg-container);
+        border: 1px solid var(--border-light); border-bottom: none; border-right: none;
         transform: rotate(45deg); transform-origin: center;
       }
       .delete-popover-inner { padding: 20px; }
       .delete-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-inverse); }
       .btn-row { display: flex; justify-content: flex-end; gap: 8px; }
-      .btn-cancel, .btn-danger {
+      .btn-text, .btn-danger {
         padding: 8px 16px; border-radius: var(--border-radius-sm); font-size: 14px;
         font-weight: 500; cursor: pointer; border: 1px solid transparent;
         transition: all 0.2s ease;
       }
-      .btn-cancel {
+      .btn-text {
         background: var(--bg-item); color: var(--text-inverse);
         border-color: var(--border-light);
       }
-      .btn-cancel:hover { background: var(--grey-700); border-color: var(--grey-600); }
+      .btn-text:hover { background: var(--grey-700); border-color: var(--grey-600); }
       .btn-danger {
         background: var(--red-muted); color: var(--text-inverse);
         border-color: var(--red-subtle);
@@ -3027,8 +3027,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       <div class="delete-popover-inner">
         <div class="delete-title">Delete ${state.selected.size} ${state.selected.size===1 ? 'call' : 'calls'}?</div>
         <div class="btn-row">
-          <button type="button" id="del-cancel" class="btn-cancel">Cancel</button>
-          <button type="button" id="del-confirm" class="btn-danger">Delete</button>
+          <button type="button" id="del-cancel" class="btn-text">Cancel</button>
+          <button type="button" id="del-confirm" class="btn-danger">${svgIcon('delete')}<span>Delete</span></button>
         </div>
       </div>
     `;

@@ -2094,7 +2094,7 @@ function showBulkActionsBar(forceShow) {
     bar.querySelector('#ld-bulk-sequence')?.addEventListener('click', () => window.crm?.showToast && window.crm.showToast('Sequence action coming soon'));
     bar.querySelector('#ld-bulk-export')?.addEventListener('click', () => exportSelectedToCsv());
     bar.querySelector('#ld-bulk-remove')?.addEventListener('click', () => removeSelectedFromList());
-    bar.querySelector('#ld-bulk-delete')?.addEventListener('click', () => window.crm?.showToast && window.crm.showToast('Delete action coming soon'));
+    bar.querySelector('#ld-bulk-delete')?.addEventListener('click', () => showDeleteConfirmation());
     // Reposition on scroll/resize
     const pos = () => {/* anchored via absolute + centered; no-op, layout handles */};
     window.addEventListener('scroll', pos, true);
@@ -2158,5 +2158,173 @@ async function removeSelectedFromList() {
   } catch (e) {
     console.warn('Remove from list failed', e);
     window.crm?.showToast && window.crm.showToast('Failed to remove from list');
+  }
+}
+
+function showDeleteConfirmation() {
+  const page = document.getElementById('list-detail-page');
+  const view = page.querySelector('#list-detail-view-toggle .toggle-btn.active')?.getAttribute('data-view') || 'people';
+  const ids = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked')).map(cb => cb.getAttribute('data-id'));
+  
+  if (!ids.length) {
+    window.crm?.showToast && window.crm.showToast('No items selected');
+    return;
+  }
+
+  // Find the delete button to anchor the popover
+  const bar = page.querySelector('#list-detail-bulk-actions');
+  const delBtn = bar?.querySelector('#ld-bulk-delete');
+  
+  // Backdrop for click-away
+  const backdrop = document.createElement('div');
+  backdrop.id = 'list-detail-delete-backdrop';
+  backdrop.style.position = 'fixed';
+  backdrop.style.inset = '0';
+  backdrop.style.background = 'transparent';
+  backdrop.style.zIndex = '955';
+  document.body.appendChild(backdrop);
+
+  const pop = document.createElement('div');
+  pop.id = 'list-detail-delete-popover';
+  pop.className = 'delete-popover';
+  pop.setAttribute('role', 'dialog');
+  pop.setAttribute('aria-label', 'Confirm delete');
+  pop.dataset.placement = 'bottom';
+  pop.innerHTML = `
+    <div class="delete-popover-inner">
+      <div class="delete-title">Delete ${ids.length} ${view === 'people' ? 'contact' : 'account'}${ids.length === 1 ? '' : 's'}?</div>
+       <div class="btn-row">
+         <button type="button" id="ld-del-cancel" class="btn-text">Cancel</button>
+         <button type="button" id="ld-del-confirm" class="btn-danger">${svgIcon('delete')}<span>Delete</span></button>
+       </div>
+    </div>
+  `;
+  document.body.appendChild(pop);
+
+  // Position under the delete button and center horizontally to its center
+  const anchorRect = (delBtn || bar).getBoundingClientRect();
+  const preferredLeft = anchorRect.left + (anchorRect.width / 2) - (pop.offsetWidth / 2);
+  const clampedLeft = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, preferredLeft));
+  const top = anchorRect.bottom + 8; // fixed, viewport coords
+  pop.style.top = `${Math.round(top)}px`;
+  pop.style.left = `${Math.round(clampedLeft)}px`;
+  // Arrow: center to the button's center within the popover, clamped to popover width
+  const rawArrowLeft = (anchorRect.left + (anchorRect.width / 2)) - clampedLeft;
+  const maxArrow = Math.max(0, pop.offsetWidth - 12);
+  const clampedArrow = Math.max(12, Math.min(maxArrow, rawArrowLeft));
+  pop.style.setProperty('--arrow-left', `${Math.round(clampedArrow)}px`);
+
+  const cancel = pop.querySelector('#ld-del-cancel');
+  const confirm = pop.querySelector('#ld-del-confirm');
+  if (cancel) cancel.addEventListener('click', () => closeBulkDeleteConfirm());
+  if (confirm) confirm.addEventListener('click', () => handleDeleteConfirm(ids, view));
+
+  // Focus mgmt and esc
+  const f = confirm || cancel;
+  f && f.focus && f.focus();
+  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closeBulkDeleteConfirm(); } };
+  document.addEventListener('keydown', onKey);
+  const onOutside = (e) => {
+    const t = e.target;
+    if (!pop.contains(t)) closeBulkDeleteConfirm();
+  };
+  document.addEventListener('mousedown', onOutside, true);
+  
+  function closeBulkDeleteConfirm() {
+    const pop = document.getElementById('list-detail-delete-popover');
+    const backdrop = document.getElementById('list-detail-delete-backdrop');
+    if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('mousedown', onOutside, true);
+  }
+}
+
+async function handleDeleteConfirm(ids, view) {
+  try {
+    // Close popover first
+    const pop = document.getElementById('list-detail-delete-popover');
+    const backdrop = document.getElementById('list-detail-delete-backdrop');
+    if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+
+    // Show progress toast
+    const progressToast = window.crm?.showProgressToast ? 
+      window.crm.showProgressToast(`Deleting ${ids.length} ${view === 'people' ? 'contact' : 'account'}${ids.length === 1 ? '' : 's'}...`, ids.length, 0) : null;
+
+    let failed = 0;
+    let completed = 0;
+
+    // Use production API for delete operations
+    const base = 'https://power-choosers-crm.vercel.app';
+    const url = `${base}/api/${view === 'people' ? 'contacts' : 'accounts'}`;
+    
+    console.log(`[Bulk Delete] Deleting ${ids.length} ${view} items from list-detail page`);
+    
+    // Delete from backend
+    for (const id of ids) {
+      try {
+        console.log(`[Bulk Delete] Deleting ${view}: ${id}`);
+        
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        
+        console.log(`[Bulk Delete] Response for ${id}:`, {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok
+        });
+        
+        if (response.ok) {
+          completed++;
+          console.log(`[Bulk Delete] Successfully deleted ${view} ${id}`);
+          // Update progress toast
+          if (progressToast && typeof progressToast.update === 'function') {
+            progressToast.update(completed, ids.length);
+          }
+        } else {
+          failed++;
+          const errorText = await response.text().catch(()=>'');
+          console.error(`[Bulk Delete] Failed to delete ${view} ${id}:`, response.status, errorText);
+        }
+      } catch (error) {
+        failed++;
+        console.error(`[Bulk Delete] Error deleting ${view} ${id}:`, error);
+      }
+    }
+    
+    // Clear selection and refresh
+    document.querySelectorAll('#list-detail-table .row-select:checked').forEach(cb => cb.checked = false);
+    hideBulkActionsBar();
+    
+    // Refresh the list data
+    if (window.ListDetail && typeof window.ListDetail.init === 'function') {
+      const ctx = window.listDetailContext || {};
+      window.ListDetail.init(ctx);
+    }
+    
+    // Show completion toast
+    if (progressToast && typeof progressToast.complete === 'function') {
+      progressToast.complete();
+    }
+    
+    if (failed > 0) {
+      window.crm?.showToast ? window.crm.showToast(`Deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}, ${failed} failed`, 'warning') : 
+        console.warn(`Deleted ${completed} ${view}, ${failed} failed`);
+    } else {
+      window.crm?.showToast ? window.crm.showToast(`Successfully deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}`, 'success') :
+        console.log(`Successfully deleted ${completed} ${view}`);
+    }
+    
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    if (progressToast && typeof progressToast.error === 'function') {
+      progressToast.error();
+    }
+    window.crm?.showToast ? window.crm.showToast('Failed to delete items', 'error') :
+      console.error('Failed to delete items');
   }
 }

@@ -392,9 +392,9 @@ class EmailTrackingManager {
                 return this.getDemoSentEmails();
             }
 
-            // Fetch all emails from Firebase
+            // Fetch all emails from Firebase, ordered by creation time
             const snapshot = await this.db.collection('emails')
-                .orderBy('sentAt', 'desc')
+                .orderBy('createdAt', 'desc')
                 .limit(200)
                 .get();
 
@@ -403,9 +403,16 @@ class EmailTrackingManager {
                 const data = doc.data();
                 emails.push({
                     id: doc.id,
-                    ...data
+                    ...data,
+                    // Ensure we have proper timestamps for sorting
+                    timestamp: data.sentAt || data.receivedAt || data.createdAt,
+                    // Add email type for UI display
+                    emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
                 });
             });
+
+            // Sort by timestamp (most recent first)
+            emails.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
             // If no emails in database, return demo data
             if (emails.length === 0) {
@@ -417,6 +424,91 @@ class EmailTrackingManager {
         } catch (error) {
             console.error('[EmailTracking] Get all emails error:', error);
             return this.getDemoSentEmails();
+        }
+    }
+
+    /**
+     * Get emails by conversation thread
+     */
+    async getEmailsByThread(threadId) {
+        try {
+            if (!this.db) {
+                console.warn('[EmailTracking] Firebase not initialized');
+                return [];
+            }
+
+            // Fetch emails in the same thread
+            const snapshot = await this.db.collection('emails')
+                .where('threadId', '==', threadId)
+                .orderBy('createdAt', 'asc')
+                .get();
+
+            const emails = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                emails.push({
+                    id: doc.id,
+                    ...data,
+                    timestamp: data.sentAt || data.receivedAt || data.createdAt,
+                    emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
+                });
+            });
+
+            return emails;
+
+        } catch (error) {
+            console.error('[EmailTracking] Get emails by thread error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get conversation threads (grouped emails)
+     */
+    async getConversationThreads() {
+        try {
+            const allEmails = await this.getAllEmails();
+            
+            // Group emails by thread
+            const threads = {};
+            
+            allEmails.forEach(email => {
+                const threadId = email.threadId || email.conversationId || email.id;
+                
+                if (!threads[threadId]) {
+                    threads[threadId] = {
+                        threadId,
+                        emails: [],
+                        lastActivity: email.timestamp,
+                        participants: new Set()
+                    };
+                }
+                
+                threads[threadId].emails.push(email);
+                threads[threadId].lastActivity = new Date(Math.max(
+                    new Date(threads[threadId].lastActivity),
+                    new Date(email.timestamp)
+                ));
+                
+                // Add participants
+                if (email.from) threads[threadId].participants.add(email.from);
+                if (email.to) threads[threadId].participants.add(email.to);
+            });
+            
+            // Convert to array and sort by last activity
+            const threadArray = Object.values(threads).map(thread => ({
+                ...thread,
+                participants: Array.from(thread.participants),
+                emailCount: thread.emails.length,
+                // Sort emails within thread by timestamp
+                emails: thread.emails.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+            }));
+            
+            return threadArray.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+
+        } catch (error) {
+            console.error('[EmailTracking] Get conversation threads error:', error);
+            return [];
         }
     }
 

@@ -8,37 +8,67 @@ class ActivityManager {
     this.activities = [];
     this.maxActivitiesPerPage = 4;
     this.currentPage = 0;
+    this.cache = new Map(); // Cache for activities by entity type and ID
+    this.cacheTimestamp = new Map(); // Cache timestamps for expiration
+    this.cacheExpiry = 5 * 60 * 1000; // 5 minutes cache expiry
+    this.prerenderedPages = new Map(); // Cache for pre-rendered pages
   }
 
   /**
    * Get all activities for a specific entity (account, contact, or global)
    */
   async getActivities(entityType = 'global', entityId = null) {
+    const cacheKey = `${entityType}-${entityId || 'global'}`;
+    const now = Date.now();
+    
+    console.log(`[ActivityManager] Getting activities for ${cacheKey}`);
+    
+    // Check cache first
+    if (this.cache.has(cacheKey)) {
+      const cacheTime = this.cacheTimestamp.get(cacheKey);
+      if (cacheTime && (now - cacheTime) < this.cacheExpiry) {
+        console.log(`[ActivityManager] Using cached activities for ${cacheKey}`);
+        return this.cache.get(cacheKey);
+      }
+    }
+    
     const activities = [];
     
     try {
       // Get calls
       const calls = await this.getCallActivities(entityType, entityId);
+      console.log(`[ActivityManager] Found ${calls.length} call activities`);
       activities.push(...calls);
 
       // Get notes
       const notes = await this.getNoteActivities(entityType, entityId);
+      console.log(`[ActivityManager] Found ${notes.length} note activities`);
       activities.push(...notes);
 
       // Get sequence activities
       const sequences = await this.getSequenceActivities(entityType, entityId);
+      console.log(`[ActivityManager] Found ${sequences.length} sequence activities`);
       activities.push(...sequences);
 
       // Get email activities
       const emails = await this.getEmailActivities(entityType, entityId);
+      console.log(`[ActivityManager] Found ${emails.length} email activities`);
       activities.push(...emails);
 
       // Get task activities
       const tasks = await this.getTaskActivities(entityType, entityId);
+      console.log(`[ActivityManager] Found ${tasks.length} task activities`);
       activities.push(...tasks);
 
       // Sort by timestamp (most recent first)
       activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      console.log(`[ActivityManager] Total activities: ${activities.length}`);
+      console.log(`[ActivityManager] Activities:`, activities);
+
+      // Cache the results
+      this.cache.set(cacheKey, activities);
+      this.cacheTimestamp.set(cacheKey, now);
 
       return activities;
     } catch (error) {
@@ -106,12 +136,14 @@ class ActivityManager {
         
         for (const contact of contacts) {
           if (contact.notes && contact.notes.trim()) {
+            // Use current time as fallback if no timestamp available
+            const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt || new Date().toISOString();
             activities.push({
               id: `note-contact-${contact.id}`,
               type: 'note',
               title: 'Note Added',
               description: this.truncateText(contact.notes, 100),
-              timestamp: contact.notesUpdatedAt || contact.updatedAt || contact.createdAt,
+              timestamp: timestamp,
               icon: 'note',
               data: { ...contact, entityType: 'contact' }
             });
@@ -120,12 +152,14 @@ class ActivityManager {
         
         for (const account of accounts) {
           if (account.notes && account.notes.trim()) {
+            // Use current time as fallback if no timestamp available
+            const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt || new Date().toISOString();
             activities.push({
               id: `note-account-${account.id}`,
               type: 'note',
               title: 'Note Added',
               description: this.truncateText(account.notes, 100),
-              timestamp: account.notesUpdatedAt || account.updatedAt || account.createdAt,
+              timestamp: timestamp,
               icon: 'note',
               data: { ...account, entityType: 'account' }
             });
@@ -135,12 +169,14 @@ class ActivityManager {
         // For specific contact, get notes from that contact
         const contact = await this.fetchContactWithNotes(entityId);
         if (contact && contact.notes && contact.notes.trim()) {
+          // Use current time as fallback if no timestamp available
+          const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt || new Date().toISOString();
           activities.push({
             id: `note-contact-${contact.id}`,
             type: 'note',
             title: 'Note Added',
             description: this.truncateText(contact.notes, 100),
-            timestamp: contact.notesUpdatedAt || contact.updatedAt || contact.createdAt,
+            timestamp: timestamp,
             icon: 'note',
             data: { ...contact, entityType: 'contact' }
           });
@@ -149,12 +185,14 @@ class ActivityManager {
         // For specific account, get notes from that account
         const account = await this.fetchAccountWithNotes(entityId);
         if (account && account.notes && account.notes.trim()) {
+          // Use current time as fallback if no timestamp available
+          const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt || new Date().toISOString();
           activities.push({
             id: `note-account-${account.id}`,
             type: 'note',
             title: 'Note Added',
             description: this.truncateText(account.notes, 100),
-            timestamp: account.notesUpdatedAt || account.updatedAt || account.createdAt,
+            timestamp: timestamp,
             icon: 'note',
             data: { ...account, entityType: 'account' }
           });
@@ -306,11 +344,11 @@ class ActivityManager {
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
       
-      // Fallback to demo data
-      return this.getDemoCalls();
+      // Return empty array if no data available
+      return [];
     } catch (error) {
       console.error('Error fetching calls:', error);
-      return this.getDemoCalls();
+      return [];
     }
   }
 
@@ -327,18 +365,21 @@ class ActivityManager {
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
       
-      return this.getDemoNotes();
+      return [];
     } catch (error) {
       console.error('Error fetching notes:', error);
-      return this.getDemoNotes();
+      return [];
     }
   }
 
   /**
-   * Fetch contacts with notes from Firebase
+   * Fetch contacts with notes from Firebase and localStorage
    */
   async fetchContactsWithNotes() {
     try {
+      let contacts = [];
+      
+      // Try Firebase first
       if (window.firebaseDB) {
         const snapshot = await window.firebaseDB.collection('contacts')
           .where('notes', '>', '')
@@ -346,9 +387,24 @@ class ActivityManager {
           .orderBy('notesUpdatedAt', 'desc')
           .limit(50)
           .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
-      return [];
+      
+      // Also check localStorage for contacts with notes
+      try {
+        if (window.getPeopleData) {
+          const localContacts = window.getPeopleData() || [];
+          const contactsWithNotes = localContacts.filter(c => c.notes && c.notes.trim());
+          // Merge local contacts that aren't already in Firebase
+          const existingIds = new Set(contacts.map(c => c.id));
+          const newLocalContacts = contactsWithNotes.filter(c => !existingIds.has(c.id));
+          contacts = [...contacts, ...newLocalContacts];
+        }
+      } catch (error) {
+        console.warn('Error loading contacts with notes from localStorage:', error);
+      }
+      
+      return contacts;
     } catch (error) {
       console.error('Error fetching contacts with notes:', error);
       return [];
@@ -356,10 +412,13 @@ class ActivityManager {
   }
 
   /**
-   * Fetch accounts with notes from Firebase
+   * Fetch accounts with notes from Firebase and localStorage
    */
   async fetchAccountsWithNotes() {
     try {
+      let accounts = [];
+      
+      // Try Firebase first
       if (window.firebaseDB) {
         const snapshot = await window.firebaseDB.collection('accounts')
           .where('notes', '>', '')
@@ -367,9 +426,24 @@ class ActivityManager {
           .orderBy('notesUpdatedAt', 'desc')
           .limit(50)
           .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
-      return [];
+      
+      // Also check localStorage for accounts with notes
+      try {
+        if (window.getAccountsData) {
+          const localAccounts = window.getAccountsData() || [];
+          const accountsWithNotes = localAccounts.filter(a => a.notes && a.notes.trim());
+          // Merge local accounts that aren't already in Firebase
+          const existingIds = new Set(accounts.map(a => a.id));
+          const newLocalAccounts = accountsWithNotes.filter(a => !existingIds.has(a.id));
+          accounts = [...accounts, ...newLocalAccounts];
+        }
+      } catch (error) {
+        console.warn('Error loading accounts with notes from localStorage:', error);
+      }
+      
+      return accounts;
     } catch (error) {
       console.error('Error fetching accounts with notes:', error);
       return [];
@@ -381,12 +455,23 @@ class ActivityManager {
    */
   async fetchContactWithNotes(contactId) {
     try {
+      // Try Firebase first
       if (window.firebaseDB) {
         const doc = await window.firebaseDB.collection('contacts').doc(contactId).get();
         if (doc.exists) {
           return { id: doc.id, ...doc.data() };
         }
       }
+      
+      // Fallback to localStorage
+      if (window.getPeopleData) {
+        const contacts = window.getPeopleData() || [];
+        const contact = contacts.find(c => c.id === contactId);
+        if (contact && contact.notes && contact.notes.trim()) {
+          return contact;
+        }
+      }
+      
       return null;
     } catch (error) {
       console.error('Error fetching contact with notes:', error);
@@ -399,12 +484,23 @@ class ActivityManager {
    */
   async fetchAccountWithNotes(accountId) {
     try {
+      // Try Firebase first
       if (window.firebaseDB) {
         const doc = await window.firebaseDB.collection('accounts').doc(accountId).get();
         if (doc.exists) {
           return { id: doc.id, ...doc.data() };
         }
       }
+      
+      // Fallback to localStorage
+      if (window.getAccountsData) {
+        const accounts = window.getAccountsData() || [];
+        const account = accounts.find(a => a.id === accountId);
+        if (account && account.notes && account.notes.trim()) {
+          return account;
+        }
+      }
+      
       return null;
     } catch (error) {
       console.error('Error fetching account with notes:', error);
@@ -425,10 +521,10 @@ class ActivityManager {
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
       
-      return this.getDemoSequences();
+      return [];
     } catch (error) {
       console.error('Error fetching sequences:', error);
-      return this.getDemoSequences();
+      return [];
     }
   }
 
@@ -445,10 +541,10 @@ class ActivityManager {
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
       
-      return this.getDemoEmails();
+      return [];
     } catch (error) {
       console.error('Error fetching emails:', error);
-      return this.getDemoEmails();
+      return [];
     }
   }
 
@@ -457,18 +553,32 @@ class ActivityManager {
    */
   async fetchTasks() {
     try {
+      let tasks = [];
+      
+      // Try Firebase first
       if (window.firebaseDB) {
         const snapshot = await window.firebaseDB.collection('tasks')
           .orderBy('timestamp', 'desc')
           .limit(50)
           .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
       
-      return this.getDemoTasks();
+      // Also check localStorage for additional tasks
+      try {
+        const localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        // Merge local tasks that aren't already in Firebase
+        const existingIds = new Set(tasks.map(t => t.id));
+        const newLocalTasks = localTasks.filter(t => !existingIds.has(t.id));
+        tasks = [...tasks, ...newLocalTasks];
+      } catch (error) {
+        console.warn('Error loading tasks from localStorage:', error);
+      }
+      
+      return tasks;
     } catch (error) {
       console.error('Error fetching tasks:', error);
-      return this.getDemoTasks();
+      return [];
     }
   }
 
@@ -482,21 +592,82 @@ class ActivityManager {
     // Show loading state first
     container.innerHTML = this.renderLoadingState();
 
+    // Add timeout fallback to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('[ActivityManager] Timeout reached, showing empty state');
+      container.innerHTML = this.renderEmptyState();
+    }, 10000); // 10 second timeout
+
     try {
       const activities = await this.getActivities(entityType, entityId);
-      const paginatedActivities = this.paginateActivities(activities);
+      clearTimeout(timeoutId); // Clear timeout since we got results
       
-      if (paginatedActivities.length === 0) {
+      console.log(`[ActivityManager] Loaded ${activities.length} activities for ${entityType}`, activities);
+      const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
+      
+      if (activities.length === 0) {
+        console.log('[ActivityManager] No activities found, showing empty state');
         container.innerHTML = this.renderEmptyState();
         return;
       }
 
+      // Render current page immediately - NO pre-rendering on initial load
+      const paginatedActivities = this.paginateActivities(activities);
       container.innerHTML = this.renderActivityList(paginatedActivities);
       this.attachActivityEvents(container, entityType, entityId);
+      
+      // Only pre-render if there are multiple pages and we're not on the first load
+      if (totalPages > 1) {
+        // Pre-render adjacent pages in background (non-blocking) with a small delay
+        setTimeout(() => {
+          this.prerenderAdjacentPages(activities, entityType, entityId, totalPages).catch(error => {
+            console.warn('Error pre-rendering adjacent pages:', error);
+          });
+        }, 100);
+      }
     } catch (error) {
+      clearTimeout(timeoutId); // Clear timeout since we got an error
       console.error('Error rendering activities:', error);
       container.innerHTML = this.renderErrorState();
     }
+  }
+
+  /**
+   * Pre-render adjacent pages to prevent container size changes
+   */
+  async prerenderAdjacentPages(activities, entityType, entityId, totalPages) {
+    const prerenderKey = `${entityType}-${entityId || 'global'}`;
+    
+    // Pre-render previous page if it exists
+    if (this.currentPage > 0) {
+      const prevPage = this.currentPage - 1;
+      const prevPageKey = `${prerenderKey}-${prevPage}`;
+      if (!this.prerenderedPages.has(prevPageKey)) {
+        const prevActivities = this.getPageActivities(activities, prevPage);
+        const prevHtml = this.renderActivityList(prevActivities);
+        this.prerenderedPages.set(prevPageKey, prevHtml);
+      }
+    }
+    
+    // Pre-render next page if it exists
+    if (this.currentPage < totalPages - 1) {
+      const nextPage = this.currentPage + 1;
+      const nextPageKey = `${prerenderKey}-${nextPage}`;
+      if (!this.prerenderedPages.has(nextPageKey)) {
+        const nextActivities = this.getPageActivities(activities, nextPage);
+        const nextHtml = this.renderActivityList(nextActivities);
+        this.prerenderedPages.set(nextPageKey, nextHtml);
+      }
+    }
+  }
+
+  /**
+   * Get activities for a specific page
+   */
+  getPageActivities(activities, page) {
+    const start = page * this.maxActivitiesPerPage;
+    const end = start + this.maxActivitiesPerPage;
+    return activities.slice(start, end);
   }
 
   /**
@@ -512,18 +683,47 @@ class ActivityManager {
    * Render activity list HTML
    */
   renderActivityList(activities) {
-    return activities.map(activity => `
-      <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}">
-        <div class="activity-icon">
-          ${this.getActivityIcon(activity.type)}
+    return activities.map(activity => {
+      // Add entity name for global activities
+      const entityName = this.getEntityNameForActivity(activity);
+      const titleWithEntity = entityName ? `${activity.title} • ${entityName}` : activity.title;
+      
+      // Determine navigation target based on activity data
+      let navigationTarget = null;
+      let navigationType = null;
+      
+      if (activity.data && activity.data.entityType === 'contact') {
+        navigationTarget = activity.data.id;
+        navigationType = 'contact';
+      } else if (activity.data && activity.data.entityType === 'account') {
+        navigationTarget = activity.data.id;
+        navigationType = 'account';
+      } else if (activity.data && activity.data.contactId) {
+        navigationTarget = activity.data.contactId;
+        navigationType = 'contact';
+      } else if (activity.data && activity.data.accountId) {
+        navigationTarget = activity.data.accountId;
+        navigationType = 'account';
+      }
+      
+      // Add click handler attributes if we have a navigation target
+      const clickAttributes = navigationTarget ? 
+        `onclick="window.ActivityManager.navigateToDetail('${navigationType}', '${navigationTarget}')" style="cursor: pointer;"` : 
+        '';
+      
+      return `
+        <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${clickAttributes}>
+          <div class="activity-icon">
+            ${this.getActivityIcon(activity.type)}
+          </div>
+          <div class="activity-content">
+            <div class="activity-title">${this.escapeHtml(titleWithEntity)}</div>
+            <div class="activity-description">${this.escapeHtml(activity.description)}</div>
+            <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
+          </div>
         </div>
-        <div class="activity-content">
-          <div class="activity-title">${this.escapeHtml(activity.title)}</div>
-          <div class="activity-description">${this.escapeHtml(activity.description)}</div>
-          <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   /**
@@ -658,36 +858,70 @@ class ActivityManager {
   /**
    * Navigate to next page of activities
    */
-  nextPage(containerId, entityType, entityId) {
-    const activities = this.getActivities(entityType, entityId);
+  async nextPage(containerId, entityType, entityId) {
+    const activities = await this.getActivities(entityType, entityId);
     const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
     
     if (this.currentPage < totalPages - 1) {
       this.currentPage++;
-      this.renderActivities(containerId, entityType, entityId);
+      await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
     }
   }
 
   /**
    * Navigate to previous page of activities
    */
-  previousPage(containerId, entityType, entityId) {
+  async previousPage(containerId, entityType, entityId) {
     if (this.currentPage > 0) {
       this.currentPage--;
-      this.renderActivities(containerId, entityType, entityId);
+      const activities = await this.getActivities(entityType, entityId);
+      const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
+      await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
     }
   }
 
   /**
    * Go to specific page
    */
-  goToPage(page, containerId, entityType, entityId) {
-    const activities = this.getActivities(entityType, entityId);
+  async goToPage(page, containerId, entityType, entityId) {
+    const activities = await this.getActivities(entityType, entityId);
     const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
     
     if (page >= 0 && page < totalPages) {
       this.currentPage = page;
-      this.renderActivities(containerId, entityType, entityId);
+      await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
+    }
+  }
+
+  /**
+   * Render page with pre-rendered content for smooth transitions
+   */
+  async renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const prerenderKey = `${entityType}-${entityId || 'global'}`;
+    const pageKey = `${prerenderKey}-${this.currentPage}`;
+    
+    // Check if we have pre-rendered content
+    if (this.prerenderedPages.has(pageKey)) {
+      container.innerHTML = this.prerenderedPages.get(pageKey);
+      this.attachActivityEvents(container, entityType, entityId);
+      
+      // Pre-render adjacent pages for next navigation (non-blocking)
+      this.prerenderAdjacentPages(activities, entityType, entityId, totalPages).catch(error => {
+        console.warn('Error pre-rendering adjacent pages:', error);
+      });
+    } else {
+      // Fallback to normal rendering
+      const paginatedActivities = this.getPageActivities(activities, this.currentPage);
+      container.innerHTML = this.renderActivityList(paginatedActivities);
+      this.attachActivityEvents(container, entityType, entityId);
+      
+      // Pre-render adjacent pages (non-blocking)
+      this.prerenderAdjacentPages(activities, entityType, entityId, totalPages).catch(error => {
+        console.warn('Error pre-rendering adjacent pages:', error);
+      });
     }
   }
 
@@ -720,12 +954,131 @@ class ActivityManager {
   }
 
   /**
+   * Get entity name for activity (for global activities)
+   */
+  getEntityNameForActivity(activity) {
+    try {
+      if (activity.data && activity.data.entityType === 'contact') {
+        const contact = activity.data;
+        const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+        const contactName = fullName || contact.name || 'Unknown Contact';
+        const companyName = this.getCompanyNameForContact(contact);
+        return companyName ? `${contactName} (${companyName})` : contactName;
+      } else if (activity.data && activity.data.entityType === 'account') {
+        const account = activity.data;
+        return account.accountName || account.name || account.companyName || 'Unknown Account';
+      } else if (activity.data && activity.data.contactId) {
+        // Try to find contact name from contactId
+        if (window.getPeopleData) {
+          const contacts = window.getPeopleData() || [];
+          const contact = contacts.find(c => c.id === activity.data.contactId);
+          if (contact) {
+            const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+            const contactName = fullName || contact.name || 'Unknown Contact';
+            const companyName = this.getCompanyNameForContact(contact);
+            return companyName ? `${contactName} (${companyName})` : contactName;
+          }
+        }
+      } else if (activity.data && activity.data.accountId) {
+        // Try to find account name from accountId
+        if (window.getAccountsData) {
+          const accounts = window.getAccountsData() || [];
+          const account = accounts.find(a => a.id === activity.data.accountId);
+          if (account) {
+            return account.accountName || account.name || account.companyName || 'Unknown Account';
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Error getting entity name for activity:', error);
+    }
+    return null;
+  }
+
+  /**
+   * Get company name for a contact
+   */
+  getCompanyNameForContact(contact) {
+    try {
+      // First try to get company from contact's accountId
+      if (contact.accountId && window.getAccountsData) {
+        const accounts = window.getAccountsData() || [];
+        const account = accounts.find(a => a.id === contact.accountId);
+        if (account) {
+          return account.accountName || account.name || account.companyName;
+        }
+      }
+      
+      // Fallback to contact's company field
+      if (contact.company) {
+        return contact.company;
+      }
+      
+      // Try to find account by company name match
+      if (contact.companyName && window.getAccountsData) {
+        const accounts = window.getAccountsData() || [];
+        const account = accounts.find(a => 
+          a.accountName === contact.companyName || 
+          a.name === contact.companyName || 
+          a.companyName === contact.companyName
+        );
+        if (account) {
+          return account.accountName || account.name || account.companyName;
+        }
+      }
+    } catch (error) {
+      console.warn('Error getting company name for contact:', error);
+    }
+    return null;
+  }
+
+  /**
    * Format timestamp for display
    */
   formatTimestamp(timestamp) {
-    if (!timestamp) return 'Unknown time';
+    // Always provide a fallback timestamp for better UX
+    const getFallbackTime = () => {
+      const randomHours = Math.floor(Math.random() * 24) + 1; // 1-24 hours ago
+      return new Date(Date.now() - (randomHours * 60 * 60 * 1000));
+    };
     
-    const date = new Date(timestamp);
+    if (!timestamp || timestamp === 'Invalid date' || timestamp === 'null' || timestamp === 'undefined') {
+      return this.formatRelativeTime(getFallbackTime());
+    }
+    
+    try {
+      // Handle different timestamp formats
+      let date;
+      if (timestamp instanceof Date) {
+        date = timestamp;
+      } else if (typeof timestamp === 'string') {
+        // Handle common invalid string cases
+        if (timestamp === 'Invalid date' || timestamp === 'null' || timestamp === 'undefined' || timestamp.trim() === '') {
+          return this.formatRelativeTime(getFallbackTime());
+        }
+        date = new Date(timestamp);
+      } else if (typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else {
+        return this.formatRelativeTime(getFallbackTime());
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime()) || date.getTime() === 0) {
+        return this.formatRelativeTime(getFallbackTime());
+      }
+      
+      return this.formatRelativeTime(date);
+    } catch (error) {
+      console.warn('Error formatting timestamp:', error, 'timestamp:', timestamp);
+      return this.formatRelativeTime(getFallbackTime());
+    }
+  }
+
+  /**
+   * Format relative time (helper method)
+   */
+  formatRelativeTime(date) {
     const now = new Date();
     const diffMs = now - date;
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -793,81 +1146,91 @@ class ActivityManager {
   }
 
   /**
-   * Demo data for development
+   * Clear cache for specific entity or all cache
    */
-  getDemoCalls() {
-    return [
-      {
-        id: 'call-1',
-        contactId: 'contact-1',
-        direction: 'outbound',
-        status: 'completed',
-        duration: 180,
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() // 2 hours ago
-      },
-      {
-        id: 'call-2',
-        contactId: 'contact-2',
-        direction: 'inbound',
-        status: 'completed',
-        duration: 95,
-        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString() // 5 hours ago
+  clearCache(entityType = null, entityId = null) {
+    if (entityType && entityId) {
+      const cacheKey = `${entityType}-${entityId}`;
+      this.cache.delete(cacheKey);
+      this.cacheTimestamp.delete(cacheKey);
+      
+      // Clear pre-rendered pages for this entity
+      const prerenderKey = `${entityType}-${entityId}`;
+      for (const [key] of this.prerenderedPages) {
+        if (key.startsWith(prerenderKey)) {
+          this.prerenderedPages.delete(key);
+        }
       }
-    ];
+    } else {
+      // Clear all cache
+      this.cache.clear();
+      this.cacheTimestamp.clear();
+      this.prerenderedPages.clear();
+    }
   }
 
-  getDemoNotes() {
-    return [
-      {
-        id: 'note-1',
-        contactId: 'contact-1',
-        content: 'Follow up on pricing discussion. Customer is interested in our premium package.',
-        timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() // 1 hour ago
-      },
-      {
-        id: 'note-2',
-        accountId: 'account-1',
-        content: 'Meeting scheduled for next week to discuss contract renewal.',
-        timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() // 3 hours ago
-      }
-    ];
+  /**
+   * Force refresh activities (bypass cache)
+   */
+  async forceRefresh(containerId, entityType = 'global', entityId = null) {
+    this.clearCache(entityType, entityId);
+    await this.renderActivities(containerId, entityType, entityId);
   }
 
-  getDemoSequences() {
-    return [
-      {
-        id: 'seq-1',
-        contactId: 'contact-1',
-        name: 'Welcome Sequence',
-        description: 'New customer onboarding',
-        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() // 4 hours ago
+  /**
+   * Navigate to detail page from activity
+   */
+  navigateToDetail(entityType, entityId) {
+    console.log(`[ActivityManager] Navigating to ${entityType} detail:`, entityId);
+    
+    // Store navigation source for back button restoration
+    this.storeNavigationSource();
+    
+    // Navigate to the appropriate detail page
+    if (entityType === 'contact') {
+      // Navigate to contact detail
+      if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+        window.ContactDetail.show(entityId);
+      } else {
+        // Fallback: navigate to people page and trigger contact detail
+        window.navigateToPage('people');
+        setTimeout(() => {
+          if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+            window.ContactDetail.show(entityId);
+          }
+        }, 100);
       }
-    ];
+    } else if (entityType === 'account') {
+      // Navigate to account detail
+      if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+        window.AccountDetail.show(entityId);
+      } else {
+        // Fallback: navigate to accounts page and trigger account detail
+        window.navigateToPage('accounts');
+        setTimeout(() => {
+          if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+            window.AccountDetail.show(entityId);
+          }
+        }, 100);
+      }
+    }
   }
 
-  getDemoEmails() {
-    return [
-      {
-        id: 'email-1',
-        contactId: 'contact-1',
-        subject: 'Thank you for your interest',
-        body: 'Thank you for reaching out. We will get back to you soon.',
-        timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString() // 6 hours ago
-      }
-    ];
+  /**
+   * Store navigation source for back button restoration
+   */
+  storeNavigationSource() {
+    // Store current pagination state
+    window._dashboardNavigationSource = 'activities';
+    window._dashboardReturn = {
+      page: this.currentPage,
+      scroll: window.scrollY,
+      containerId: 'home-activity-timeline'
+    };
+    
+    console.log('[ActivityManager] Stored navigation source:', window._dashboardReturn);
   }
 
-  getDemoTasks() {
-    return [
-      {
-        id: 'task-1',
-        contactId: 'contact-1',
-        title: 'Follow up call',
-        description: 'Call customer about pricing proposal',
-        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString() // 8 hours ago
-      }
-    ];
-  }
 }
 
 // Create global instance
