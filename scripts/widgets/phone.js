@@ -513,7 +513,7 @@
                   console.debug('[Phone] Posting final status with context before clearing it');
                   updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
                   currentCall = null;
-                  // Notify detail pages to refresh recent calls immediately after hangup
+                  // [OPTIMIZATION] Debounced event dispatch - pages will handle debouncing to prevent freeze
                   try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
                   
                   // Stop live timer and restore banner
@@ -2276,7 +2276,7 @@
           console.debug('[Phone] Posting final status with context before clearing it');
           updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
           currentCall = null;
-          // Notify detail pages to refresh recent calls immediately after hangup
+          // [OPTIMIZATION] Debounced event dispatch - pages will handle debouncing to prevent freeze
           try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
           
           // Stop live timer and restore banner
@@ -2543,7 +2543,8 @@
     let statusUpdateTimeout = null;
     const debouncedStatusUpdates = new Map();
     
-    async function updateCallStatus(phoneNumber, status, startTime, duration = 0, callId = null, fromNumber = null, callType = 'outgoing') {
+    // [OPTIMIZATION] Made non-async to prevent any blocking - all operations are fire-and-forget
+    function updateCallStatus(phoneNumber, status, startTime, duration = 0, callId = null, fromNumber = null, callType = 'outgoing') {
       try {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         if (!base) return;
@@ -2593,20 +2594,40 @@
         // Twilio status webhooks already track call lifecycle (initiated, ringing, in-progress, etc.)
         // Frontend only needs to write final call record with CRM context (accountId, contactId, etc.)
         if (status === 'completed') {
-          phoneLog('[Phone] POST /api/calls (completed status only)', { base, payload });
+          phoneLog('[Phone] POST /api/calls (completed status only) - FIRE AND FORGET', { base, payload });
 
-          const resp = await fetch(`${base}/api/calls`, {
+          // [CRITICAL FIX] Fire-and-forget to prevent UI freeze/blocking
+          // Don't await - let it run in background so user can navigate immediately
+          fetch(`${base}/api/calls`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
+          }).then(resp => resp.json()).then(respJson => {
+            phoneLog('[Phone] /api/calls response (background)', { status: 'success', body: respJson });
+          }).catch(err => {
+            phoneLog('[Phone] /api/calls error (non-blocking)', err);
           });
-          let respJson = null; try { respJson = await resp.json(); } catch(_) {}
-          phoneLog('[Phone] /api/calls response', { status: resp.status, ok: resp.ok, body: respJson });
         } else {
           phoneLog('[Phone] Skipping /api/calls POST (status:', status, ') - only writes on completed to reduce Firestore costs');
         }
         
-        // Refresh calls page only if it's actually visible, and avoid background refresh while in a live call
+        // Trigger refresh for Account Detail and Contact Detail pages when call completes
+        if (status === 'completed') {
+          try {
+            // Dispatch custom event to trigger recent calls refresh on detail pages
+            document.dispatchEvent(new CustomEvent('pc:call-completed', { 
+              detail: { 
+                callSid: callSid,
+                accountId: currentCallContext.accountId,
+                contactId: currentCallContext.contactId,
+                phoneNumber: phoneNumber
+              } 
+            }));
+            phoneLog('[Phone] Dispatched pc:call-completed event for page refresh');
+          } catch(_) {}
+        }
+        
+        // [OPTIMIZATION] Refresh calls page only if visible - use same debounce strategy
         const isCallsPageActive = () => {
           try {
             const el = document.getElementById('calls-page');
@@ -2617,14 +2638,20 @@
         };
         const refreshCallsIfActive = (label) => {
           if (isCallInProgress) return; // do not refresh during live call
-          if (!isCallsPageActive()) return;
+          if (!isCallsPageActive()) {
+            phoneLog(`[Phone] Skipping calls page refresh - not visible`);
+            return;
+          }
           if (window.callsModule && typeof window.callsModule.loadData === 'function') {
-            try { window.callsModule.loadData(); } catch(_) {}
-            phoneLog(`[Phone] Refreshed calls page data (${label})`);
+            // Schedule in next tick to avoid blocking current execution
+            setTimeout(() => {
+              try { window.callsModule.loadData(); } catch(_) {}
+              phoneLog(`[Phone] Refreshed calls page data (${label})`);
+            }, 0);
           }
         };
-        // Single short follow-up refresh only (remove 15s/30s background timers)
-        setTimeout(() => refreshCallsIfActive('t+1s'), 1000);
+        // Debounced refresh with 1.5s delay (same as detail pages)
+        setTimeout(() => refreshCallsIfActive('t+1.5s'), 1500);
         
       } catch (error) {
         console.error('[Phone] Failed to update call status:', error);
@@ -2858,18 +2885,18 @@
       } else {
         // Click-to-call scenario - use existing context
         console.debug('[Phone] Click-to-call detected - using existing context:', currentCallContext);
-        try {
-          const earlyMeta = { 
-            name: (currentCallContext && currentCallContext.name) || '', 
-            account: (currentCallContext && currentCallContext.company) || '', 
-            domain: (currentCallContext && currentCallContext.domain) || '',
-            city: (currentCallContext && currentCallContext.city) || '',
-            state: (currentCallContext && currentCallContext.state) || '',
+      try {
+        const earlyMeta = { 
+          name: (currentCallContext && currentCallContext.name) || '', 
+          account: (currentCallContext && currentCallContext.company) || '', 
+          domain: (currentCallContext && currentCallContext.domain) || '',
+          city: (currentCallContext && currentCallContext.city) || '',
+          state: (currentCallContext && currentCallContext.state) || '',
             logoUrl: (currentCallContext && currentCallContext.logoUrl) || '',
-            isCompanyPhone: !!(currentCallContext && currentCallContext.isCompanyPhone)
-          };
-          setContactDisplay(earlyMeta, normalized.value);
-        } catch(_) {}
+          isCompanyPhone: !!(currentCallContext && currentCallContext.isCompanyPhone)
+        };
+        setContactDisplay(earlyMeta, normalized.value);
+      } catch(_) {}
       }
       // Immediately switch button to Hang Up and mark call-in-progress so user can cancel immediately
       isCallInProgress = true;
