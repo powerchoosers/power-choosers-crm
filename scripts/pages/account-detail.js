@@ -140,6 +140,155 @@
         display: block;
         pointer-events: none;
       }
+      
+      /* Contact item hover styling */
+      .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: var(--border-radius);
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-bottom: 8px;
+      }
+      .contact-item:last-child {
+        margin-bottom: 0;
+      }
+      .contact-item:hover {
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .contact-item .contact-avatar {
+        flex-shrink: 0;
+      }
+      .contact-item .contact-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .contact-item .contact-name {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+      }
+      .contact-item .contact-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      
+      /* Contact info container for email and phone on same line */
+      .contact-item .contact-contact-info {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .contact-item .contact-title,
+      .contact-item .contact-email,
+      .contact-item .contact-phone {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      
+      /* Phone number clickable area - match text width */
+      .contact-item .contact-phone {
+        display: inline-block;
+        cursor: pointer;
+        transition: color 0.2s ease;
+        max-width: fit-content;
+        width: auto;
+      }
+      .contact-item .contact-phone:hover {
+        color: var(--text-inverse);
+        text-decoration: none;
+      }
+      
+      /* Email clickable area - match text width */
+      .contact-item .contact-email {
+        display: inline-block;
+        cursor: pointer;
+        transition: color 0.2s ease;
+        max-width: fit-content;
+        width: auto;
+      }
+      .contact-item .contact-email:hover {
+        color: var(--text-inverse);
+        text-decoration: none;
+      }
+      
+      /* Contact separator styling */
+      .contact-item .contact-separator {
+        color: var(--text-secondary);
+        font-size: 12px;
+        user-select: none;
+      }
+      
+      /* Contacts pagination styling - match accounts page unified pagination */
+      .contacts-header-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .contacts-pager {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .contacts-page-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: var(--text-secondary);
+      }
+      .contacts-page-btn:hover:not(:disabled) {
+        background: var(--bg-secondary);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        color: var(--text-primary);
+      }
+      .contacts-page-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .contacts-page-btn svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+      }
+      .contacts-page-info {
+        width: 40px;
+        height: 32px;
+        border-radius: 6px;
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .contacts-page-info:hover {
+        background: var(--bg-secondary);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -242,7 +391,7 @@
     document.head.appendChild(style);
   }
 
-  function renderAccountContacts(account) {
+  function renderAccountContacts(account, page = 1, pageSize = 4) {
     if (!account || !window.getPeopleData) {
       return '<div class="contacts-placeholder">No contacts found</div>';
     }
@@ -265,7 +414,21 @@
         return '<div class="contacts-placeholder">No contacts found for this account</div>';
       }
 
-      return associatedContacts.map(contact => {
+      // Store all contacts in state for pagination
+      state._allContacts = associatedContacts;
+      state._contactsPage = page;
+      state._contactsPageSize = pageSize;
+
+      // Calculate pagination
+      const totalPages = Math.ceil(associatedContacts.length / pageSize);
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const pageContacts = associatedContacts.slice(startIndex, endIndex);
+
+      // Don't update pagination here - DOM elements don't exist yet
+      // Will be updated after DOM insertion
+
+      return pageContacts.map(contact => {
         const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unknown Contact';
         const title = contact.title || '';
         const email = contact.email || '';
@@ -279,13 +442,20 @@
             <div class="contact-info">
               <div class="contact-name">${escapeHtml(fullName)}</div>
               <div class="contact-details">
-                ${title ? `<span class="contact-title">${escapeHtml(title)}</span>` : ''}
-                ${email ? `<span class="contact-email">${escapeHtml(email)}</span>` : ''}
-                ${phone ? `<span class="contact-phone" 
+                ${title ? `<div class="contact-title">${escapeHtml(title)}</div>` : ''}
+                ${email && phone ? 
+                  `<div class="contact-contact-info"><span class="contact-email">${escapeHtml(email)}</span><span class="contact-separator"> • </span><span class="contact-phone" 
                                  data-contact-id="${contact.id}" 
                                  data-account-id="${state.currentAccount?.id || ''}" 
                                  data-contact-name="${escapeHtml(fullName)}" 
-                                 data-company-name="${escapeHtml(state.currentAccount?.name || state.currentAccount?.accountName || '')}">${escapeHtml(phone)}</span>` : ''}
+                                 data-company-name="${escapeHtml(state.currentAccount?.name || state.currentAccount?.accountName || '')}">${escapeHtml(phone)}</span></div>` :
+                  email ? `<div class="contact-contact-info"><span class="contact-email">${escapeHtml(email)}</span></div>` :
+                  phone ? `<div class="contact-contact-info"><span class="contact-phone" 
+                                 data-contact-id="${contact.id}" 
+                                 data-account-id="${state.currentAccount?.id || ''}" 
+                                 data-contact-name="${escapeHtml(fullName)}" 
+                                 data-company-name="${escapeHtml(state.currentAccount?.name || state.currentAccount?.accountName || '')}">${escapeHtml(phone)}</span></div>` : ''
+                }
               </div>
             </div>
           </div>
@@ -294,6 +464,69 @@
     } catch (error) {
       console.error('Error rendering account contacts:', error);
       return '<div class="contacts-placeholder">Error loading contacts</div>';
+    }
+  }
+
+  function updateContactsPagination(currentPage, totalPages) {
+    const pager = document.getElementById('contacts-pager');
+    const prevBtn = document.getElementById('contacts-prev');
+    const nextBtn = document.getElementById('contacts-next');
+    const infoEl = document.getElementById('contacts-info');
+
+    if (!pager || !prevBtn || !nextBtn || !infoEl) return;
+
+    // Show pagination if there are more than 4 contacts
+    if (totalPages > 1) {
+      pager.style.display = 'flex';
+    } else {
+      pager.style.display = 'none';
+      return;
+    }
+
+    // Update page info - show just the current page number
+    infoEl.textContent = currentPage.toString();
+
+    // Update button states
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+  }
+
+  function bindContactsPagination() {
+    const prevBtn = document.getElementById('contacts-prev');
+    const nextBtn = document.getElementById('contacts-next');
+
+    if (prevBtn && !prevBtn._bound) {
+      prevBtn.addEventListener('click', () => {
+        if (state._contactsPage > 1) {
+          const newPage = state._contactsPage - 1;
+          const contactsList = document.getElementById('account-contacts-list');
+          if (contactsList && state.currentAccount) {
+            contactsList.innerHTML = renderAccountContacts(state.currentAccount, newPage, state._contactsPageSize);
+            bindContactItemEvents();
+            // Update pagination controls after page change
+            const totalPages = Math.ceil((state._allContacts || []).length / state._contactsPageSize);
+            updateContactsPagination(newPage, totalPages);
+          }
+        }
+      });
+      prevBtn._bound = true;
+    }
+
+    if (nextBtn && !nextBtn._bound) {
+      nextBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil((state._allContacts || []).length / state._contactsPageSize);
+        if (state._contactsPage < totalPages) {
+          const newPage = state._contactsPage + 1;
+          const contactsList = document.getElementById('account-contacts-list');
+          if (contactsList && state.currentAccount) {
+            contactsList.innerHTML = renderAccountContacts(state.currentAccount, newPage, state._contactsPageSize);
+            bindContactItemEvents();
+            // Update pagination controls after page change
+            updateContactsPagination(newPage, totalPages);
+          }
+        }
+      });
+      nextBtn._bound = true;
     }
   }
 
@@ -416,6 +649,13 @@
                 </div>
                 <div class="contact-subtitle">${industry ? escapeHtml(industry) : ''}</div>
               </div>
+              <button class="quick-action-btn website-header-btn" data-action="website" title="Visit website" aria-label="Visit website">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+              </button>
               <button class="quick-action-btn linkedin-header-btn" data-action="linkedin">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
@@ -547,12 +787,23 @@
         <div class="contact-info-section">
           <div class="section-header">
             <h3 class="section-title">Contacts</h3>
-            <button class="widget-item add-contact-btn" id="add-contact-to-account" title="Add Contact" aria-label="Add Contact">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
+            <div class="contacts-header-controls">
+              <div class="contacts-pager" id="contacts-pager" style="display:none">
+                <button class="contacts-page-btn" id="contacts-prev" aria-label="Previous page">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
+                </button>
+                <div class="contacts-page-info" id="contacts-info">1</div>
+                <button class="contacts-page-btn" id="contacts-next" aria-label="Next page">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"/></svg>
+                </button>
+              </div>
+              <button class="widget-item add-contact-btn" id="add-contact-to-account" title="Add Contact" aria-label="Add Contact">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="contacts-list" id="account-contacts-list">
             ${renderAccountContacts(a)}
@@ -619,6 +870,12 @@
 
     attachAccountDetailEvents();
     startAccountRecentCallsLiveHooks();
+    
+    // Update contacts pagination after DOM is inserted
+    if (state._allContacts && state._allContacts.length > 4) {
+      const totalPages = Math.ceil(state._allContacts.length / state._contactsPageSize);
+      updateContactsPagination(state._contactsPage, totalPages);
+    }
     
           // Add periodic refresh to ensure eye icons update when recordings are ready
           let refreshInterval = null;
@@ -2260,6 +2517,11 @@
     }
 
     // Quick actions
+    const headerWebsiteBtn = document.querySelector('.website-header-btn');
+    if (headerWebsiteBtn) {
+      headerWebsiteBtn.addEventListener('click', () => handleQuickAction('website'));
+    }
+    
     const headerLinkedInBtn = document.querySelector('.linkedin-header-btn');
     if (headerLinkedInBtn) {
       headerLinkedInBtn.addEventListener('click', () => handleQuickAction('linkedin'));
@@ -2397,6 +2659,9 @@
 
     // Bind contact item events
     bindContactItemEvents();
+    
+    // Bind contacts pagination
+    bindContactsPagination();
   }
 
   function bindContactItemEvents() {

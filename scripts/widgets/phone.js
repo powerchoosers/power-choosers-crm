@@ -64,6 +64,30 @@
     } catch (_) {}
   }
 
+  // Call Processing Web Worker
+  let callWorker = null;
+  try {
+    callWorker = new Worker('/scripts/call-worker.js');
+    callWorker.onmessage = (e) => {
+      const { type, data } = e.data;
+      if (type === 'CALL_LOGGED') {
+        console.log('[Phone] Call logged in background:', data);
+        // Trigger page refresh after call is logged
+        try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number: data.phoneNumber } })); } catch(_) {}
+      }
+    };
+    callWorker.onerror = (error) => {
+      console.error('[Phone] Call worker error:', error);
+    };
+    // Initialize worker with API base URL
+    callWorker.postMessage({
+      type: 'SET_API_BASE_URL',
+      data: { apiBaseUrl: window.API_BASE_URL || window.location.origin }
+    });
+  } catch (error) {
+    console.warn('[Phone] Web Worker not supported, falling back to main thread:', error);
+  }
+
   // Twilio Device state management
   const TwilioRTC = (function() {
     const state = { 
@@ -493,34 +517,47 @@
 
                 conn.on('disconnect', () => {
                   console.debug('[Phone] Call disconnected');
-                  const callEndTime = Date.now();
-                  const duration = Math.floor((callEndTime - callStartTime) / 1000);
-                  // Notify widgets that the call ended
-                  try {
-                    document.dispatchEvent(new CustomEvent('callEnded', { detail: { callSid: incomingCallSid || callId, duration } }));
-                    const el = document.getElementById(WIDGET_ID);
-                    if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'idle', callSid: incomingCallSid || callId } }));
-                  } catch(_) {}
                   
-                  // IMMEDIATELY set cooldown and clear context to prevent auto-redial
+                  // [WEB WORKER FIX] Only set critical flags immediately - everything else goes to worker
                   const disconnectTime = Date.now();
                   lastCallCompleted = disconnectTime;
                   lastCalledNumber = number;
                   isCallInProgress = false;
-                  autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3s for better UX
+                  autoTriggerBlockUntil = Date.now() + 3000;
                   
-                  // Clear ALL Twilio state to prevent ghost connections
+                  // Clear critical state immediately
                   TwilioRTC.state.connection = null;
                   TwilioRTC.state.pendingIncoming = null;
-                  
-                  // Update call with final status and duration using Twilio CallSid if available
-                  console.debug('[Phone] Posting final status with context before clearing it');
-                  updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
                   currentCall = null;
-                  // [OPTIMIZATION] Debounced event dispatch - pages will handle debouncing to prevent freeze
-                  try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
                   
-                  // Stop live timer and restore banner
+                  // [WEB WORKER] Send call completion to background worker
+                  if (callWorker) {
+                    const callEndTime = Date.now();
+                    const duration = Math.floor((callEndTime - callStartTime) / 1000);
+                    
+                    callWorker.postMessage({
+                      type: 'CALL_COMPLETED',
+                      data: {
+                        phoneNumber: number,
+                        startTime: callStartTime,
+                        duration: duration,
+                        callSid: incomingCallSid || callId,
+                        fromNumber: number,
+                        callType: 'incoming'
+                      }
+                    });
+                  } else {
+                    // Fallback to main thread if worker not available
+                    console.warn('[Phone] Web Worker not available, using fallback');
+                    setTimeout(() => {
+                      const callEndTime = Date.now();
+                      const duration = Math.floor((callEndTime - callStartTime) / 1000);
+                      updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
+                      try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
+                    }, 0);
+                  }
+                  
+                  // Immediate UI cleanup (non-blocking)
                   const widget = document.getElementById(WIDGET_ID);
                   stopLiveCallTimer(widget);
                   
@@ -1444,19 +1481,27 @@
   // Normalize a dialed number to E.164.
   // Rules:
   // - Accept letters (convert via T9), punctuation, spaces.
+  // Enhanced phone number normalization with extension support
   // - If it starts with '+', keep country code and digits.
   // - If 10 digits, assume US and prefix +1.
   // - If 11 digits starting with 1, normalize to +1##########.
   // - Otherwise, if digits 8-15 long without '+', prefix '+' and validate.
-  // Returns { ok: boolean, value: string }
+  // - Extensions are preserved but not used for calling (Twilio doesn't support extensions in dialing)
+  // Returns { ok: boolean, value: string, extension: string }
   function normalizeDialedNumber(raw) {
     let s = (raw || '').trim();
-    if (!s) return { ok: false, value: '' };
-    // map letters to digits
-    s = s.replace(/[A-Za-z]/g, (c) => letterToDigit(c) || '');
-    const hasPlus = s.startsWith('+');
-    const digits = s.replace(/\D/g, '');
+    if (!s) return { ok: false, value: '', extension: '' };
+    
+    // Parse phone number and extension
+    const parsed = parsePhoneWithExtension(s);
+    if (!parsed.number) return { ok: false, value: '', extension: '' };
+    
+    // map letters to digits for the main number
+    let number = parsed.number.replace(/[A-Za-z]/g, (c) => letterToDigit(c) || '');
+    const hasPlus = number.startsWith('+');
+    const digits = number.replace(/\D/g, '');
     let e164 = '';
+    
     if (hasPlus) {
       e164 = '+' + digits;
     } else if (digits.length === 11 && digits.startsWith('1')) {
@@ -1467,10 +1512,43 @@
       // Assume user included country code without '+'
       e164 = '+' + digits;
     } else {
-      return { ok: false, value: '' };
+      return { ok: false, value: '', extension: parsed.extension || '' };
     }
-    if (/^\+\d{8,15}$/.test(e164)) return { ok: true, value: e164 };
-    return { ok: false, value: '' };
+    
+    if (/^\+\d{8,15}$/.test(e164)) {
+      return { ok: true, value: e164, extension: parsed.extension || '' };
+    }
+    return { ok: false, value: '', extension: parsed.extension || '' };
+  }
+
+  // Parse phone number and extension from various formats
+  function parsePhoneWithExtension(input) {
+    const raw = (input || '').toString().trim();
+    if (!raw) return { number: '', extension: '' };
+    
+    // Common extension patterns
+    const extensionPatterns = [
+      /ext\.?\s*(\d+)/i,
+      /extension\s*(\d+)/i,
+      /x\.?\s*(\d+)/i,
+      /#\s*(\d+)/i,
+      /\s+(\d{3,6})\s*$/  // 3-6 digits at the end (common extension length)
+    ];
+    
+    let number = raw;
+    let extension = '';
+    
+    // Try to find extension using various patterns
+    for (const pattern of extensionPatterns) {
+      const match = number.match(pattern);
+      if (match) {
+        extension = match[1];
+        number = number.replace(pattern, '').trim();
+        break;
+      }
+    }
+    
+    return { number, extension };
   }
 
   function getBusinessNumber() {
@@ -1775,11 +1853,11 @@
         hook: { text: 'Good {{day.part}}, is this {{contact.first_name}}?', responses: [ { label: 'Yes, this is', next: 'awesome_told_to_speak' }, { label: 'Speaking', next: 'awesome_told_to_speak' }, { label: "Who's calling?", next: 'main_script_start' }, { label: 'Not me', next: 'gatekeeper_intro' } ] },
         awesome_told_to_speak: { text: 'Awesome I was actually told to speak with you — do you have a quick minute?', responses: [ { label: 'Yes', next: 'main_script_start' }, { label: 'What is this about?', next: 'main_script_start' } ] },
         main_script_start: { text: "Perfect — So, my name is Lewis with PowerChoosers.com, and — I understand you're responsible for electricity agreements and contracts for {{account.name}}. Is that still accurate?", responses: [ { label: "Yes, that's me / I handle that", next: 'pathA' }, { label: 'That would be someone else / not the right person', next: 'gatekeeper_intro' } ] },
-        gatekeeper_intro: { text: 'Good {{day.part}}. I am needin\' to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?', responses: [ { label: "What's this about?", next: 'gatekeeper_whats_about' }, { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' } ] },
+        gatekeeper_intro: { text: 'Good {{day.part}}. I\'m actually needin\' to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?', responses: [ { label: "What's this about?", next: 'gatekeeper_whats_about' }, { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' } ] },
         gatekeeper_whats_about: { text: 'My name is Lewis with PowerChoosers.com and I am looking to speak with someone about the future electricity agreements for {{account.name}}. Who would be the best person for that?', responses: [ { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' }, { label: 'I can help you', next: 'pathA' } ] },
         transfer_dialing: { text: 'Connecting... Ringing...', responses: [ { label: 'Call connected', next: 'hook' }, { label: 'Not connected', next: 'voicemail' } ] },
         voicemail: { text: 'Good {{day.part}}, this is Lewis. Please call me back at 817-663-0380. I also sent a short email explaining why I am reaching out today. Thank you and have a great day.', responses: [ { label: 'End call / start new call', next: 'start' } ] },
-        pathA: { text: "Got it. now {{contact.first_name}}, I work directly with NRG, TXU, APG & E —  and rates are about to go up for every supplier next year... <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>", responses: [ { label: "It's tough / struggling", next: 'discovery' }, { label: 'Have not renewed / contract not up yet', next: 'pathA_not_renewed' }, { label: 'Locked in / just renewed', next: 'pathA_locked_in' }, { label: 'Shopping around / looking at options', next: 'pathA_shopping' }, { label: 'Have someone handling it / work with broker', next: 'pathA_broker' }, { label: "Haven't thought about it / what rate increase?", next: 'pathA_unaware' } ] },
+        pathA: { text: "Got it. now {{contact.first_name}}, I work directly with NRG, TXU, APG & E — and they've all let us know in advance that rates are about to go up next year... <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>", responses: [ { label: "It's tough / struggling", next: 'discovery' }, { label: 'Have not renewed / contract not up yet', next: 'pathA_not_renewed' }, { label: 'Locked in / just renewed', next: 'pathA_locked_in' }, { label: 'Shopping around / looking at options', next: 'pathA_shopping' }, { label: 'Have someone handling it / work with broker', next: 'pathA_broker' }, { label: "Haven't thought about it / what rate increase?", next: 'pathA_unaware' } ] },
         pathA_not_renewed: { text: "Makes sense — when it comes to getting the best price, it's pretty easy to renew at the wrong time and end up overpaying. When does your contract expire? Do you know who your supplier is? <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take. <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>", responses: [ { label: 'Yes — schedule health check', next: 'schedule_health_check' }, { label: 'Send me details by email', next: 'send_details_email' } ] },
         discovery: { text: 'Great — let me grab a few details for {{account.name}} so we can give you an accurate baseline.', responses: [ { label: 'Continue', next: 'schedule_health_check' } ] },
         schedule_health_check: { text: "Perfect — I’ll set up a quick energy health check. What works best for you, {{contact.first_name}} — a 10-minute call today or tomorrow? I’ll bring ERCOT forward pricing so you can see it live for {{account.name}}.", responses: [ { label: 'Book on calendar', next: 'start' }, { label: 'Text me times', next: 'start' } ] },
@@ -2025,8 +2103,8 @@
     if (scriptsToggle && !scriptsToggle._bound) { scriptsToggle.addEventListener('click', () => toggleMiniScripts(card)); scriptsToggle._bound = true; }
     let currentCall = null;
 
-    async function placeBrowserCall(number) {
-      console.debug('[Phone] Attempting browser call to:', number);
+    async function placeBrowserCall(number, extension = '') {
+      console.debug('[Phone] Attempting browser call to:', number, extension ? `ext. ${extension}` : '');
       
       try {
         const device = await TwilioRTC.ensureDevice();
@@ -2113,8 +2191,9 @@
         const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
         let twilioCallSid = null;
         
-        // Log initial call
-        await logCall(number, 'browser', callId);
+        // Log initial call with extension info
+        const callNumber = extension ? `${number} ext. ${extension}` : number;
+        await logCall(callNumber, 'browser', callId);
         
         // Handle call events
         currentCall.on('accept', async () => {
@@ -2167,34 +2246,47 @@
         
         currentCall.on('disconnect', () => {
           console.debug('[Phone] Call disconnected');
-          const callEndTime = Date.now();
-          const duration = Math.floor((callEndTime - callStartTime) / 1000);
-          // Notify widgets that the call ended
-          try {
-            document.dispatchEvent(new CustomEvent('callEnded', { detail: { callSid: twilioCallSid || callId, duration } }));
-            const el = document.getElementById(WIDGET_ID);
-            if (el) el.dispatchEvent(new CustomEvent('callStateChanged', { detail: { state: 'idle', callSid: twilioCallSid || callId } }));
-          } catch(_) {}
           
-          // IMMEDIATELY set cooldown and clear context to prevent auto-redial
+          // [WEB WORKER FIX] Only set critical flags immediately - everything else goes to worker
           const disconnectTime = Date.now();
           lastCallCompleted = disconnectTime;
           lastCalledNumber = number;
           isCallInProgress = false;
-          autoTriggerBlockUntil = Date.now() + 3000; // Reduced to 3s for better UX
+          autoTriggerBlockUntil = Date.now() + 3000;
           
-          // Clear ALL Twilio state to prevent ghost connections
+          // Clear critical state immediately
           TwilioRTC.state.connection = null;
           TwilioRTC.state.pendingIncoming = null;
-          
-          // Update call with final status and duration using Twilio CallSid if available
-          console.debug('[Phone] Posting final status with context before clearing it');
-          updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
           currentCall = null;
-          // [OPTIMIZATION] Debounced event dispatch - pages will handle debouncing to prevent freeze
-          try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
           
-          // Stop live timer and restore banner
+          // [WEB WORKER] Send call completion to background worker
+          if (callWorker) {
+            const callEndTime = Date.now();
+            const duration = Math.floor((callEndTime - callStartTime) / 1000);
+            
+            callWorker.postMessage({
+              type: 'CALL_COMPLETED',
+              data: {
+                phoneNumber: number,
+                startTime: callStartTime,
+                duration: duration,
+                callSid: twilioCallSid || callId,
+                fromNumber: null,
+                callType: 'outgoing'
+              }
+            });
+          } else {
+            // Fallback to main thread if worker not available
+            console.warn('[Phone] Web Worker not available, using fallback');
+            setTimeout(() => {
+              const callEndTime = Date.now();
+              const duration = Math.floor((callEndTime - callStartTime) / 1000);
+              updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
+              try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
+            }, 0);
+          }
+          
+          // Immediate UI cleanup (non-blocking)
           const widget = document.getElementById(WIDGET_ID);
           stopLiveCallTimer(widget);
           
@@ -2739,7 +2831,11 @@
       setInCallUI(true);
       try { if (callBtn) callBtn.disabled = false; } catch(_) {}
       // update UI with normalized value and enrich title from People data
-      if (input) { input.value = normalized.value; }
+      if (input) { 
+        // Show the full number with extension in the input field
+        const displayValue = normalized.extension ? `${normalized.value} ext. ${normalized.extension}` : normalized.value;
+        input.value = displayValue;
+      }
       enrichTitleFromPhone(normalized.value);
       
       // Check if this is a manual call (no existing context) or a click-to-call (has context)
@@ -2866,7 +2962,7 @@
               console.debug('[Phone] Aborting: user canceled after permission but before placing call');
               return;
             }
-            const call = await placeBrowserCall(normalized.value);
+            const call = await placeBrowserCall(normalized.value, normalized.extension);
             console.debug('[Phone] Browser call successful, no fallback needed');
             // Note: initial call logging is already done in placeBrowserCall()
             return; // Exit early - browser call succeeded

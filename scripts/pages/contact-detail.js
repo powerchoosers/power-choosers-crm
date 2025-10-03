@@ -1418,48 +1418,112 @@
   }
 
   // Normalize phone numbers to E.164 when possible.
+  // Enhanced phone number parsing with extension support
   // Examples:
   //  - "9728342317" => "+19728342317"
   //  - "972-834-2317" => "+19728342317"
   //  - "+1 (972) 834-2317" => "+19728342317"
+  //  - "+1 337-233-0464 ext 10117" => "+13372330464 ext 10117"
   //  - "+447911123456" stays as "+447911123456"
   function normalizePhone(input) {
     const raw = (input || '').toString().trim();
     if (!raw) return '';
-    // If already in +<digits> form, keep plus and digits only
-    if (/^\+/.test(raw)) {
-      const cleaned = '+' + raw.replace(/[^\d]/g, '');
-      return cleaned;
+    
+    // Parse phone number and extension
+    const parsed = parsePhoneWithExtension(raw);
+    if (!parsed.number) return '';
+    
+    // Format the number part
+    let formattedNumber = '';
+    if (/^\+/.test(parsed.number)) {
+      formattedNumber = parsed.number;
+    } else {
+      const digits = parsed.number.replace(/[^\d]/g, '');
+      if (digits.length === 11 && digits.startsWith('1')) {
+        formattedNumber = '+' + digits;
+      } else if (digits.length === 10) {
+        formattedNumber = '+1' + digits;
+      } else if (digits.length >= 8) {
+        formattedNumber = '+' + digits;
+      } else {
+        return raw; // too short; leave as typed
+      }
     }
-    const digits = raw.replace(/[^\d]/g, '');
-    if (!digits) return '';
-    // US default. If 11 and starts with 1, or exactly 10, format as +1XXXXXXXXXX
-    if (digits.length === 11 && digits.startsWith('1')) {
-      return '+' + digits;
+    
+    // Add extension if present
+    if (parsed.extension) {
+      return `${formattedNumber} ext ${parsed.extension}`;
     }
-    if (digits.length === 10) {
-      return '+1' + digits;
-    }
-    // If looks like international without + (e.g., 4479...), we can't infer reliably; return as-is digits
-    // Prepend + if at least 8 digits (heuristic) to help API; otherwise return original raw
-    if (digits.length >= 8) return '+' + digits;
-    return raw; // too short; leave as typed
+    
+    return formattedNumber;
   }
 
-  // Format phone numbers for display
+  // Parse phone number and extension from various formats
+  function parsePhoneWithExtension(input) {
+    const raw = (input || '').toString().trim();
+    if (!raw) return { number: '', extension: '' };
+    
+    // Common extension patterns
+    const extensionPatterns = [
+      /ext\.?\s*(\d+)/i,
+      /extension\s*(\d+)/i,
+      /x\.?\s*(\d+)/i,
+      /#\s*(\d+)/i,
+      /\s+(\d{3,6})\s*$/  // 3-6 digits at the end (common extension length)
+    ];
+    
+    let number = raw;
+    let extension = '';
+    
+    // Try to find extension using various patterns
+    for (const pattern of extensionPatterns) {
+      const match = number.match(pattern);
+      if (match) {
+        extension = match[1];
+        number = number.replace(pattern, '').trim();
+        break;
+      }
+    }
+    
+    return { number, extension };
+  }
+
+  // Format phone numbers for display with extension support
   function formatPhoneForDisplay(phone) {
     if (!phone) return '';
-    const cleaned = phone.replace(/\D/g, '');
+    
+    // Parse phone number and extension
+    const parsed = parsePhoneWithExtension(phone);
+    if (!parsed.number) return phone;
+    
+    // Format the main number
+    let formattedNumber = '';
+    const cleaned = parsed.number.replace(/\D/g, '');
+    
     // Always display US numbers with +1 prefix
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      return `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    } else if (/^\+/.test(String(parsed.number))) {
+      // International number - keep as-is but clean up formatting
+      const digits = parsed.number.replace(/\D/g, '');
+      if (digits.length >= 8) {
+        formattedNumber = parsed.number;
+      } else {
+        formattedNumber = parsed.number;
+      }
+    } else {
+      // Fallback: return original if we can't format
+      formattedNumber = parsed.number;
     }
-    if (cleaned.length === 10) {
-      return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    
+    // Add extension if present
+    if (parsed.extension) {
+      return `${formattedNumber} ext. ${parsed.extension}`;
     }
-    // If the input already starts with + and is not US length, leave as-is
-    if (/^\+/.test(String(phone))) return String(phone);
-    return phone; // Fallback: return as-is
+    
+    return formattedNumber;
   }
 
   function showContactDetail(contactId, tempContact) {
@@ -1829,7 +1893,7 @@
 
     // Header (styled same as page header)
     const headerHtml = `
-      <div id="contact-detail-header" class="page-header">
+      <div id="contact-detail-header" class="page-header" data-contact-id="${contact.id || ''}">
         <div class="page-title-section">
           <div class="contact-header-info">
             <button class="back-btn back-btn--icon" id="back-to-people" aria-label="Back to People" title="Back to People">
@@ -1850,6 +1914,13 @@
                 </div>
                 <div class="contact-subtitle">${title ? escapeHtml(title) : ''}${title && company ? ' at ' : ''}${company ? `<a href="#account-details" class="company-link" id="contact-company-link" title="View account details" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>` : ''}</div>
               </div>
+              <button class="quick-action-btn website-header-btn" data-action="website" title="Visit website" aria-label="Visit website">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+              </button>
               <button class="quick-action-btn linkedin-header-btn" data-action="linkedin">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
@@ -1930,7 +2001,7 @@
       </div>`;
 
     const bodyHtml = `
-      <div id="contact-detail-view" class="contact-detail">
+      <div id="contact-detail-view" class="contact-detail" data-contact-id="${contact.id || ''}">
         <div class="contact-info-section">
           <h3 class="section-title">Contact Information</h3>
           <div class="info-grid">
@@ -2088,7 +2159,15 @@
       }
     });
     
-    try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
+    // Process click-to-call for phone numbers with a slight delay to ensure DOM is ready
+    setTimeout(() => {
+      try { 
+        console.debug('[Contact Detail] Processing click-to-call for phone numbers');
+        window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); 
+      } catch (e) { 
+        console.warn('[Contact Detail] Click-to-call processing failed:', e);
+      }
+    }, 100);
     
     // Load activities
     loadContactActivities();
@@ -3131,6 +3210,13 @@
               tempDiv.innerHTML = newPhoneRow;
               const newRow = tempDiv.firstElementChild;
               phoneRow.parentElement.replaceChild(newRow, phoneRow);
+              
+              // Process click-to-call for the new phone row
+              setTimeout(() => {
+                try { 
+                  window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); 
+                } catch (_) {}
+              }, 50);
             }
           } finally {
             // Release lock after a brief cooldown
@@ -3171,6 +3257,13 @@
                 temp.innerHTML = newPhoneRow;
                 const newEl = temp.firstElementChild;
                 phoneRow.parentElement.replaceChild(newEl, phoneRow);
+                
+                // Process click-to-call for the new phone row
+                setTimeout(() => {
+                  try { 
+                    window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); 
+                  } catch (_) {}
+                }, 50);
               }
             });
             return;
@@ -3533,7 +3626,7 @@
     input.dataset.selectedField = phoneOptions[0].field;
     input.placeholder = 'Enter phone number';
     
-    // Add real-time formatting as user types
+    // Add real-time formatting as user types (with extension support)
     input.addEventListener('input', (e) => {
       const cursorPos = e.target.selectionStart;
       const rawValue = e.target.value;
@@ -3669,6 +3762,13 @@
       tempDiv.innerHTML = newPhoneRow;
       const newRow = tempDiv.firstElementChild;
       phoneRow.parentElement.replaceChild(newRow, phoneRow);
+      
+      // Process click-to-call for the new phone row
+      setTimeout(() => {
+        try { 
+          window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); 
+        } catch (_) {}
+      }, 50);
     }
     // Clear preferred override after re-render so subsequent loads use normal priority
     setTimeout(() => { state.preferredPhoneField = ''; }, 0);
@@ -5744,16 +5844,47 @@ async function createContactSequenceThenAdd(name) {
           } catch (e) { /* noop */ }
         }
         break;
-      case 'linkedin':
+      case 'website':
         const contact = state.currentContact;
         if (contact) {
+          // Get website from contact's company or account
+          let website = contact.website || contact.companyWebsite || contact.accountWebsite;
+          
+          // If no website on contact, try to get from linked account
+          if (!website && contact.accountId) {
+            try {
+              const linkedAccount = findAssociatedAccount(contact);
+              if (linkedAccount) {
+                website = linkedAccount.website || linkedAccount.domain;
+              }
+            } catch (e) { /* noop */ }
+          }
+          
+          if (website) {
+            // Ensure URL has protocol
+            let url = website;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              url = 'https://' + url;
+            }
+            try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
+          } else {
+            // Show message if no website available
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast('No website available for this contact');
+            }
+          }
+        }
+        break;
+      case 'linkedin':
+        const contactLinkedIn = state.currentContact;
+        if (contactLinkedIn) {
           // If contact has a LinkedIn URL, use it directly
-          if (contact.linkedin) {
-            try { window.open(contact.linkedin, '_blank', 'noopener'); } catch (e) { /* noop */ }
+          if (contactLinkedIn.linkedin) {
+            try { window.open(contactLinkedIn.linkedin, '_blank', 'noopener'); } catch (e) { /* noop */ }
           } else {
             // Fallback to search if no LinkedIn URL
-            const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name;
-            const company = contact.companyName || '';
+            const fullName = [contactLinkedIn.firstName, contactLinkedIn.lastName].filter(Boolean).join(' ') || contactLinkedIn.name;
+            const company = contactLinkedIn.companyName || '';
             const query = encodeURIComponent([fullName, company].filter(Boolean).join(' '));
             const url = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
             try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }

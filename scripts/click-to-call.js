@@ -6,42 +6,114 @@
 
   function formatPhoneForDisplay(phone) {
     if (!phone) return '';
-    const cleaned = phone.replace(/\D/g, '');
+    
+    // Parse phone number and extension
+    const parsed = parsePhoneWithExtension(phone);
+    if (!parsed.number) return phone;
+    
+    // Format the main number
+    let formattedNumber = '';
+    const cleaned = parsed.number.replace(/\D/g, '');
+    
     // Always display US numbers with +1 prefix
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      return `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    } else if (/^\+/.test(String(parsed.number))) {
+      // International number - keep as-is
+      formattedNumber = parsed.number;
+    } else {
+      // Fallback: return original if we can't format
+      formattedNumber = parsed.number;
     }
-    if (cleaned.length === 10) {
-      return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    
+    // Add extension if present
+    if (parsed.extension) {
+      return `${formattedNumber} ext. ${parsed.extension}`;
     }
-    // If the input already starts with + and is not US length, leave as-is
-    if (/^\+/.test(String(phone))) return String(phone);
-    return phone; // Fallback: return as-is
+    
+    return formattedNumber;
+  }
+
+  // Parse phone number and extension from various formats
+  function parsePhoneWithExtension(input) {
+    const raw = (input || '').toString().trim();
+    if (!raw) return { number: '', extension: '' };
+    
+    // Common extension patterns
+    const extensionPatterns = [
+      /ext\.?\s*(\d+)/i,
+      /extension\s*(\d+)/i,
+      /x\.?\s*(\d+)/i,
+      /#\s*(\d+)/i,
+      /\s+(\d{3,6})\s*$/  // 3-6 digits at the end (common extension length)
+    ];
+    
+    let number = raw;
+    let extension = '';
+    
+    // Try to find extension using various patterns
+    for (const pattern of extensionPatterns) {
+      const match = number.match(pattern);
+      if (match) {
+        extension = match[1];
+        number = number.replace(pattern, '').trim();
+        break;
+      }
+    }
+    
+    return { number, extension };
   }
 
   function isValidPhoneNumber(text) {
-    if (!text || typeof text !== 'string') return false;
+    if (!text || typeof text !== 'string') {
+      console.debug('[ClickToCall] isValidPhoneNumber: Invalid input', text);
+      return false;
+    }
     
-    // Clean the text
-    const cleaned = text.replace(/\D/g, '');
+    // Parse phone number and extension
+    const parsed = parsePhoneWithExtension(text);
+    console.debug('[ClickToCall] isValidPhoneNumber: Parsed', { text, parsed });
     
-    // Must be 10 or 11 digits (US format)
-    if (cleaned.length !== 10 && cleaned.length !== 11) return false;
-    if (cleaned.length === 11 && !cleaned.startsWith('1')) return false;
+    if (!parsed.number) {
+      console.debug('[ClickToCall] isValidPhoneNumber: No number found');
+      return false;
+    }
     
-    // Check if it looks like a phone number pattern
-    const phonePattern = /^[\+]?[1]?[\-\.\s]?\(?([0-9]{3})\)?[\-\.\s]?([0-9]{3})[\-\.\s]?([0-9]{4})$/;
-    return phonePattern.test(text.trim());
+    // Clean the main number (without extension)
+    const cleaned = parsed.number.replace(/\D/g, '');
+    console.debug('[ClickToCall] isValidPhoneNumber: Cleaned number', cleaned);
+    
+    // Must be 10 or 11 digits (US format) or international
+    if (cleaned.length < 8 || cleaned.length > 15) {
+      console.debug('[ClickToCall] isValidPhoneNumber: Invalid length', cleaned.length);
+      return false;
+    }
+    if (cleaned.length === 11 && !cleaned.startsWith('1')) {
+      console.debug('[ClickToCall] isValidPhoneNumber: Invalid 11-digit format');
+      return false;
+    }
+    
+    // Check if it looks like a phone number pattern (with or without extension)
+    const phonePattern = /^[\+]?[1]?[\-\.\s]?\(?([0-9]{3})\)?[\-\.\s]?([0-9]{3})[\-\.\s]?([0-9]{4})(\s+ext\.?\s*\d+)?$/i;
+    const isValid = phonePattern.test(text.trim());
+    console.debug('[ClickToCall] isValidPhoneNumber: Pattern test', { text: text.trim(), isValid });
+    return isValid;
   }
 
   function makePhoneClickable(phoneElement, phone, contactName = '') {
     if (!phoneElement || !phone) return;
     
-    // Clean phone for calling
-    const cleanPhone = phone.replace(/\D/g, '');
+    // Parse phone number and extension
+    const parsed = parsePhoneWithExtension(phone);
+    if (!parsed.number) return;
+    
+    // Clean phone number for calling (without extension)
+    const cleanPhone = parsed.number.replace(/\D/g, '');
     if (cleanPhone.length < 10) return; // Skip invalid numbers
     
-    // Format for display
+    // Format for display (with extension if present)
     const displayPhone = formatPhoneForDisplay(phone);
     
     // Add subtle hover styling without changing base color
@@ -841,6 +913,7 @@
   }
 
   function processSpecificPhoneElements() {
+    console.debug('[ClickToCall] Processing specific phone elements');
     // Only target very specific phone number containers
     const specificSelectors = [
       'td[data-field="companyPhone"]',
@@ -865,14 +938,24 @@
     ];
     
     specificSelectors.forEach(selector => {
-      document.querySelectorAll(selector).forEach(element => {
+      const elements = document.querySelectorAll(selector);
+      console.debug(`[ClickToCall] Found ${elements.length} elements for selector: ${selector}`);
+      
+      elements.forEach(element => {
         // Skip phone widget input field to prevent interference
         if (element.closest('#phone-widget') || element.classList.contains('phone-display')) {
           return;
         }
 
         const text = (element.textContent || '').trim();
-        if (!isValidPhoneNumber(text)) return;
+        console.debug(`[ClickToCall] Checking element with text: "${text}"`);
+        
+        if (!isValidPhoneNumber(text)) {
+          console.debug(`[ClickToCall] Invalid phone number: "${text}"`);
+          return;
+        }
+        
+        console.debug(`[ClickToCall] Valid phone number found: "${text}"`);
 
         // Build tooltip text with strong preference for explicit data attributes
         const displayPhone = formatPhoneForDisplay(text);
@@ -983,7 +1066,14 @@
   window.ClickToCall = {
     init: initClickToCall,
     processTablePhoneNumbers: processTablePhoneNumbers,
-    processSpecificPhoneElements: processSpecificPhoneElements
+    processSpecificPhoneElements: processSpecificPhoneElements,
+    // Debug function to test phone number validation
+    testPhoneNumber: function(text) {
+      console.log('Testing phone number:', text);
+      console.log('isValidPhoneNumber result:', isValidPhoneNumber(text));
+      console.log('parsePhoneWithExtension result:', parsePhoneWithExtension(text));
+      console.log('formatPhoneForDisplay result:', formatPhoneForDisplay(text));
+    }
   };
 
 })();
