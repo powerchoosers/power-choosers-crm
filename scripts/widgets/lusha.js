@@ -1596,25 +1596,234 @@
 
   async function enrichExistingContact(contact){
     try {
-      let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
-      const requestId = window.__lushaLastRequestId;
-      const id = contact.id || contact.contactId;
-      if (!requestId || !id) return;
-      const resp = await fetch(`${base}/api/lusha/enrich`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, contactIds: [id] })
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      const enriched = (data.contacts && data.contacts[0]) || null;
-      if (enriched) {
-        // Track session credits for enrichments
-        trackSessionCredits('enrichments', 1);
-        // Update CRM contact by email match
-        await addContactToCRM(Object.assign({}, contact, enriched));
+      console.log('[Lusha Enrich] Starting enrichment for contact:', contact);
+      
+      // Check if contact already has enriched data in cache
+      const hasEmails = Array.isArray(contact.emails) && contact.emails.length > 0;
+      const hasPhones = Array.isArray(contact.phones) && contact.phones.length > 0;
+      
+      console.log('[Lusha Enrich] Contact has cached data - Emails:', hasEmails, 'Phones:', hasPhones);
+      
+      let enriched = null;
+      
+      // If contact already has enriched data from cache, use it directly
+      if (hasEmails || hasPhones) {
+        console.log('[Lusha Enrich] Using cached enriched data from contact object');
+        enriched = {
+          id: contact.id || contact.contactId,
+          firstName: contact.firstName || '',
+          lastName: contact.lastName || '',
+          jobTitle: contact.jobTitle || contact.title || '',
+          emails: contact.emails || [],
+          phones: contact.phones || [],
+          linkedin: contact.linkedin || '',
+          location: contact.location || ''
+        };
+        
+        // Show success toast
+        window.crm?.showToast && window.crm.showToast('Using cached enrichment data...');
+      } else {
+        // No cached data, need to call API
+        console.log('[Lusha Enrich] No cached data, calling API for fresh enrichment');
+        
+        let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+        const requestId = window.__lushaLastRequestId;
+        const id = contact.id || contact.contactId;
+        
+        console.log('[Lusha Enrich] RequestId:', requestId, 'ContactId:', id);
+        
+        if (!id) {
+          console.warn('[Lusha Enrich] Missing contact ID');
+          window.crm?.showToast && window.crm.showToast('Cannot enrich: Missing contact ID');
+          return;
+        }
+        
+        // Show loading toast
+        window.crm?.showToast && window.crm.showToast('Enriching contact...');
+        
+        console.log('[Lusha Enrich] Making API call to:', `${base}/api/lusha/enrich`);
+        
+        // Build request body - if no requestId (cached search), send company context for fresh enrich
+        const requestBody = { contactIds: [id] };
+        
+        if (requestId) {
+          requestBody.requestId = requestId;
+        } else {
+          // For cached searches without requestId, include company context for direct enrich
+          if (lastCompanyResult) {
+            requestBody.company = {
+              domain: lastCompanyResult.domain,
+              name: lastCompanyResult.name
+            };
+          }
+          // Include contact name/title to help backend find the right record
+          if (contact.firstName && contact.lastName) {
+            requestBody.name = `${contact.firstName} ${contact.lastName}`.trim();
+          }
+          if (contact.jobTitle || contact.title) {
+            requestBody.title = contact.jobTitle || contact.title;
+          }
+        }
+        
+        console.log('[Lusha Enrich] Request body:', requestBody);
+        
+        const resp = await fetch(`${base}/api/lusha/enrich`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+        
+        console.log('[Lusha Enrich] API response status:', resp.status);
+        
+        if (!resp.ok) {
+          const errorText = await resp.text();
+          console.error('[Lusha Enrich] API error:', errorText);
+          throw new Error(`HTTP ${resp.status}: ${errorText}`);
+        }
+        
+        const data = await resp.json();
+        console.log('[Lusha Enrich] API response data:', data);
+        
+        enriched = (data.contacts && data.contacts[0]) || null;
+        
+        if (!enriched) {
+          console.warn('[Lusha Enrich] No enriched data returned from API');
+          window.crm?.showToast && window.crm.showToast('No enrichment data available from API');
+          return;
+        }
       }
-    } catch(e) { console.warn('Enrich contact failed', e); }
+      
+      console.log('[Lusha Enrich] Enriched data to use:', enriched);
+      
+      // Track session credits for enrichments
+      trackSessionCredits('enrichments', 1);
+      
+      // Find and update existing contact in CRM
+      const db = window.firebaseDB;
+      if (!db) {
+        console.error('[Lusha Enrich] Firestore not initialized');
+        window.crm?.showToast && window.crm.showToast('Database not available');
+        return;
+      }
+      
+      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+      const fullName = contact.firstName && contact.lastName ? `${contact.firstName} ${contact.lastName}`.trim() : '';
+      let existingId = null;
+      
+      console.log('[Lusha Enrich] Searching for existing contact - Email:', email, 'Name:', fullName);
+      
+      // Try to find existing contact by email first
+      if (email) {
+        try {
+          const snap = await db.collection('contacts').where('email','==',email).limit(1).get();
+          if (snap && snap.docs && snap.docs[0]) {
+            existingId = snap.docs[0].id;
+            console.log('[Lusha Enrich] Found contact by email:', existingId);
+          }
+        } catch(e){
+          console.error('[Lusha Enrich] Error searching by email:', e);
+        }
+      }
+      
+      // If no email match, try name-based matching
+      if (!existingId && fullName) {
+        try {
+          const snap = await db.collection('contacts').where('name','==',fullName).limit(1).get();
+          if (snap && snap.docs && snap.docs[0]) {
+            existingId = snap.docs[0].id;
+            console.log('[Lusha Enrich] Found contact by name:', existingId);
+          }
+        } catch(e){
+          console.error('[Lusha Enrich] Error searching by name:', e);
+        }
+      }
+      
+      if (!existingId) {
+        console.warn('[Lusha Enrich] Could not find existing contact to update');
+        window.crm?.showToast && window.crm.showToast('Could not find existing contact to enrich');
+        return;
+      }
+      
+      // Update existing contact with enriched data
+      const updatePayload = {
+        updatedAt: new Date()
+      };
+      
+      // Add enriched email data
+      if (enriched.emails && enriched.emails.length > 0) {
+        updatePayload.email = enriched.emails[0].address || '';
+      }
+      
+      // Add enriched phone data
+      if (enriched.phones && enriched.phones.length > 0) {
+        updatePayload.phone = enriched.phones[0].number || '';
+        // Use the selectPhone helper to properly map phone types to CRM fields
+        const mobileNum = selectPhone(enriched, 'mobile');
+        const workNum = selectPhone(enriched, 'direct') || selectPhone(enriched, 'work');
+        const otherNum = selectPhone(enriched, 'other');
+        
+        if (mobileNum) updatePayload.mobile = mobileNum;
+        if (workNum) updatePayload.workDirectPhone = workNum;
+        if (otherNum) updatePayload.otherPhone = otherNum;
+        
+        console.log('[Lusha Enrich] Mapped phones - Mobile:', mobileNum, 'Work:', workNum, 'Other:', otherNum);
+      }
+      
+      // Add LinkedIn if available
+      if (enriched.linkedin) {
+        updatePayload.linkedin = enriched.linkedin;
+      }
+      
+      // Add job title if available
+      if (enriched.jobTitle) {
+        updatePayload.jobTitle = enriched.jobTitle;
+      }
+      
+      console.log('[Lusha Enrich] Update payload:', updatePayload);
+      
+      // Update the contact
+      await window.PCSaves.updateContact(existingId, updatePayload);
+      console.log('[Lusha Enrich] Contact enriched successfully:', existingId);
+      window.crm?.showToast && window.crm.showToast('Contact enriched successfully');
+      
+      // Refresh the contact details page if we're viewing that contact
+      try {
+        if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+          const currentContactId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact._id;
+          if (currentContactId === existingId) {
+            // We're viewing the contact that was just enriched, refresh the page
+            console.log('[Lusha Enrich] Refreshing contact details page after enrichment');
+            window.ContactDetail.renderContactDetail();
+            
+            // Also trigger a custom event to ensure all components refresh
+            const refreshEvent = new CustomEvent('pc:contact-enriched', {
+              detail: { contactId: existingId, enrichedData: enriched }
+            });
+            document.dispatchEvent(refreshEvent);
+            console.log('[Lusha Enrich] Dispatched pc:contact-enriched event');
+          }
+        }
+        
+        // Also check if we're on account details page and refresh that too
+        if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+          console.log('[Lusha Enrich] Refreshing account details page after contact enrichment');
+          window.AccountDetail.renderAccountDetail();
+          
+          // Trigger account refresh event
+          const accountRefreshEvent = new CustomEvent('pc:account-refresh', {
+            detail: { accountId: window.AccountDetail.state.currentAccount.id }
+          });
+          document.dispatchEvent(accountRefreshEvent);
+          console.log('[Lusha Enrich] Dispatched pc:account-refresh event');
+        }
+      } catch(refreshError) {
+        console.warn('[Lusha Enrich] Failed to refresh pages:', refreshError);
+      }
+      
+    } catch(e) { 
+      console.error('[Lusha Enrich] Failed:', e);
+      window.crm?.showToast && window.crm.showToast('Failed to enrich contact: ' + (e.message || 'Unknown error'));
+    }
   }
 
   async function revealForContact(contact, which, container){
@@ -1867,14 +2076,35 @@
     try {
       const db = window.firebaseDB;
       if (!db) return;
-      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+      
       let contactExists = false;
-      try {
-        if (email) {
+      
+      // Check by email first
+      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
+      if (email) {
+        try {
           const s = await db.collection('contacts').where('email','==',email).limit(1).get();
           contactExists = !!(s && s.docs && s.docs[0]);
-        }
-      } catch(_){}
+        } catch(_){}
+      }
+      
+      // If no email match, try name-based matching
+      if (!contactExists && contact.firstName && contact.lastName) {
+        try {
+          const fullName = `${contact.firstName} ${contact.lastName}`.trim();
+          const s = await db.collection('contacts').where('name','==',fullName).limit(1).get();
+          contactExists = !!(s && s.docs && s.docs[0]);
+        } catch(_){}
+      }
+      
+      // If still no match, try phone-based matching
+      if (!contactExists && contact.phone) {
+        try {
+          const s = await db.collection('contacts').where('phone','==',contact.phone).limit(1).get();
+          contactExists = !!(s && s.docs && s.docs[0]);
+        } catch(_){}
+      }
+      
       const addBtn = containerEl.querySelector('[data-action="add-contact"]');
       const enrichBtn = containerEl.querySelector('[data-action="enrich-contact"]');
       if (enrichBtn) enrichBtn.style.display = contactExists ? '' : 'none';

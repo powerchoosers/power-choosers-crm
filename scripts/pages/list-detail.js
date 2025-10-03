@@ -130,8 +130,7 @@
     els.contactSearch = qs('list-detail-contact-search');
     els.contactsBtn = qs('list-detail-contacts-btn');
 
-    // View toggle
-    els.viewToggle = qs('list-detail-view-toggle');
+    // View toggle removed - list detail shows only one type
 
     // Filter fields
     els.pTitle = qs('list-detail-filter-title');
@@ -208,6 +207,38 @@
     // Back button
     if (els.backBtn) {
       els.backBtn.addEventListener('click', () => {
+        // Check if we came from lists page
+        if (window._listDetailNavigationSource === 'lists') {
+          try {
+            const restore = window._listDetailReturn || {};
+            console.log('[ListDetail] Back button: Returning to lists page with restore data:', restore);
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('lists');
+              
+              // Dispatch event to restore lists page state
+              setTimeout(() => {
+                try {
+                  const ev = new CustomEvent('pc:lists-restore', { detail: {
+                    page: restore.page,
+                    scroll: restore.scroll,
+                    filters: restore.filters,
+                    searchTerm: restore.searchTerm,
+                    selectedItems: restore.selectedItems,
+                    timestamp: Date.now()
+                  }});
+                  document.dispatchEvent(ev);
+                  console.log('[ListDetail] Back button: Dispatched pc:lists-restore event');
+                } catch(_) {}
+              }, 60);
+            }
+            // Clear navigation markers after successful navigation
+            window._listDetailNavigationSource = null;
+            window._listDetailReturn = null;
+          } catch (_) { /* noop */ }
+          return;
+        }
+        
+        // Default: just navigate to lists
         if (window.crm && typeof window.crm.navigateToPage === 'function') {
           window.crm.navigateToPage('lists');
         }
@@ -224,25 +255,8 @@
       els.quickSearch.addEventListener('input', () => applyFilters());
     }
 
-    // View toggle
-    if (els.viewToggle) {
-      els.viewToggle.addEventListener('click', (e) => {
-        if (e.target.matches('.toggle-btn')) {
-          const newView = e.target.getAttribute('data-view');
-          if (newView && newView !== state.view) {
-            state.view = newView;
-            updateViewToggle();
-            renderTableHead();
-            applyFilters();
-            // Reset selection across view switch
-            hideBulkActionsBar();
-            if (state.view === 'people') state.selectedAccounts.clear();
-            else state.selectedPeople.clear();
-            updateHeaderSelectAll();
-          }
-        }
-      });
-    }
+    // View toggle removed - list detail now shows only the list's designated type (people or accounts)
+    // The list kind is determined when opening the list from the overview page
 
     // Toggle filters panel
     if (els.toggleBtn && els.filterPanel) {
@@ -729,15 +743,7 @@
     if (els.pHasPhone) els.pHasPhone.addEventListener('change', () => { state.flags.hasPhone = !!els.pHasPhone.checked; applyFilters(); });
   }
 
-  function updateViewToggle() {
-    if (!els.viewToggle) return;
-    els.viewToggle.querySelectorAll('.toggle-btn').forEach(b => {
-      const v = b.getAttribute('data-view');
-      const active = v === state.view;
-      b.classList.toggle('active', active);
-      b.setAttribute('aria-selected', active ? 'true' : 'false');
-    });
-  }
+  // updateViewToggle function removed - no longer needed since list detail shows only one type
 
   async function loadDataOnce() {
     if (state.loadedPeople && state.loadedAccounts) return;
@@ -1016,10 +1022,13 @@
         if (e.target && e.target.classList && e.target.classList.contains('row-select')) {
           const id = e.target.getAttribute('data-id');
           const checked = !!e.target.checked;
+          console.log('[ListDetail] Checkbox changed:', { id, checked, view: state.view });
           if (state.view === 'people') {
             if (checked) state.selectedPeople.add(id); else state.selectedPeople.delete(id);
+            console.log('[ListDetail] Selected people count:', state.selectedPeople.size);
           } else {
             if (checked) state.selectedAccounts.add(id); else state.selectedAccounts.delete(id);
+            console.log('[ListDetail] Selected accounts count:', state.selectedAccounts.size);
           }
           updateHeaderSelectAll();
           renderRowSelectionHighlights();
@@ -1452,8 +1461,7 @@
       els.detailTitle.textContent = state.listName || 'List Details';
     }
 
-    // Update view toggle
-    updateViewToggle();
+    // View toggle removed - list detail shows only one type
 
     attachEvents();
     injectListDetailBulkStyles();
@@ -1708,6 +1716,43 @@
     },
     _clearChips: (kind) => {
       try { state.chips[kind] = []; } catch (_) {}
+    },
+    _getState: () => {
+      try { return state; } catch (_) { return {}; }
+    },
+    _testBulkBar: () => {
+      // Test function to diagnose bulk actions bar
+      const page = document.getElementById('list-detail-page');
+      const container = page?.querySelector('.table-container');
+      const checkboxes = document.querySelectorAll('#list-detail-table .row-select');
+      const checkedCount = document.querySelectorAll('#list-detail-table .row-select:checked').length;
+      const bar = page?.querySelector('#list-detail-bulk-actions');
+      
+      const report = {
+        pageFound: !!page,
+        containerFound: !!container,
+        totalCheckboxes: checkboxes.length,
+        checkedCheckboxes: checkedCount,
+        barExists: !!bar,
+        barVisible: bar ? (bar.offsetParent !== null) : false,
+        selectedPeopleCount: state.selectedPeople.size,
+        selectedAccountsCount: state.selectedAccounts.size,
+        currentView: state.view,
+        tbodyBound: !!els._tbodyBound
+      };
+      
+      alert(JSON.stringify(report, null, 2));
+      
+      // Force show bar for testing
+      if (checkedCount > 0) {
+        showBulkActionsBar(true);
+        setTimeout(() => {
+          const barAfter = page?.querySelector('#list-detail-bulk-actions');
+          alert('After forcing show: Bar exists = ' + !!barAfter);
+        }, 100);
+      }
+      
+      return report;
     }
   };
 
@@ -2069,15 +2114,24 @@ function injectListDetailBulkStyles() {
 }
 
 function showBulkActionsBar(forceShow) {
+  console.log('[Bulk Actions] showBulkActionsBar called', { forceShow });
   const page = document.getElementById('list-detail-page');
   const container = page?.querySelector('.table-container');
+  console.log('[Bulk Actions] Container found:', !!container);
   if (!container) return;
-  const set = (page && page.querySelector('#list-detail-view-toggle .toggle-btn.active')?.getAttribute('data-view')) === 'accounts' ? 'accounts' : 'people';
-  const count = set === 'people' ? (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('people') : document.querySelectorAll('#list-detail-table .row-select:checked').length) : (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('accounts') : document.querySelectorAll('#list-detail-table .row-select:checked').length);
+  // Use state.view instead of removed toggle button
+  const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
+  const count = view === 'people' ? (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('people') : document.querySelectorAll('#list-detail-table .row-select:checked').length) : (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('accounts') : document.querySelectorAll('#list-detail-table .row-select:checked').length);
+  console.log('[Bulk Actions] View:', view, 'Count:', count, 'Should show:', !!forceShow || count > 0);
   const shouldShow = !!forceShow || count > 0;
   let bar = page.querySelector('#list-detail-bulk-actions');
-  if (!shouldShow) { if (bar && bar.parentNode) bar.parentNode.removeChild(bar); return; }
+  if (!shouldShow) { 
+    console.log('[Bulk Actions] Hiding bar');
+    if (bar && bar.parentNode) bar.parentNode.removeChild(bar); 
+    return; 
+  }
   if (!bar) {
+    console.log('[Bulk Actions] Creating new bar');
     bar = document.createElement('div');
     bar.id = 'list-detail-bulk-actions';
     bar.className = 'bulk-actions-modal';
@@ -2090,6 +2144,7 @@ function showBulkActionsBar(forceShow) {
       <button type="button" class="action-btn-sm danger" id="ld-bulk-delete">Delete</button>
     </div>`;
     container.appendChild(bar);
+    console.log('[Bulk Actions] Bar appended to container');
     // Bind actions
     bar.querySelector('#ld-bulk-sequence')?.addEventListener('click', () => window.crm?.showToast && window.crm.showToast('Sequence action coming soon'));
     bar.querySelector('#ld-bulk-export')?.addEventListener('click', () => exportSelectedToCsv());
@@ -2100,6 +2155,7 @@ function showBulkActionsBar(forceShow) {
     window.addEventListener('scroll', pos, true);
     window.addEventListener('resize', pos, true);
   } else {
+    console.log('[Bulk Actions] Updating existing bar count');
     const span = bar.querySelector('#ld-selected-count'); if (span) span.textContent = String(count);
   }
 }
@@ -2113,7 +2169,8 @@ function hideBulkActionsBar() {
 
 function exportSelectedToCsv() {
   try {
-    const view = document.querySelector('#list-detail-view-toggle .toggle-btn.active')?.getAttribute('data-view') || 'people';
+    // Use state.view instead of removed toggle button
+    const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
     const rows = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked')).map(cb => cb.getAttribute('data-id'));
     if (!rows.length) { window.crm?.showToast && window.crm.showToast('No rows selected'); return; }
     // Build CSV from state.filtered subset
@@ -2133,7 +2190,8 @@ async function removeSelectedFromList() {
     const page = document.getElementById('list-detail-page');
     const listId = window.listDetailContext?.listId;
     if (!listId || !window.firebaseDB) { window.crm?.showToast && window.crm.showToast('Cannot remove from list'); return; }
-    const view = page.querySelector('#list-detail-view-toggle .toggle-btn.active')?.getAttribute('data-view') || 'people';
+    // Use state.view instead of removed toggle button
+    const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
     const ids = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked')).map(cb => cb.getAttribute('data-id'));
     if (!ids.length) return;
     const col = window.firebaseDB.collection('lists').doc(listId).collection('members');
@@ -2163,7 +2221,8 @@ async function removeSelectedFromList() {
 
 function showDeleteConfirmation() {
   const page = document.getElementById('list-detail-page');
-  const view = page.querySelector('#list-detail-view-toggle .toggle-btn.active')?.getAttribute('data-view') || 'people';
+  // Use state.view instead of removed toggle button
+  const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
   const ids = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked')).map(cb => cb.getAttribute('data-id'));
   
   if (!ids.length) {

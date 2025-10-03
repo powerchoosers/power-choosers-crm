@@ -19,7 +19,7 @@
     els.page = document.getElementById('lists-page');
     if (!els.page) return false;
 
-    els.switchBtn = qs('lists-switch-btn');
+    // els.switchBtn removed - now using toggle button
     els.pageContent = els.page.querySelector('.page-content');
     els.emptyState = qs('lists-empty-state');
 
@@ -195,7 +195,7 @@
     }
 
     closeCreatePopover();
-    render();
+    applyFilters();
   }
 
   function closeCreatePopover() {
@@ -209,9 +209,24 @@
   let removeDeleteHandler = null;
 
   function attachEvents() {
-    if (els.switchBtn) {
-      els.switchBtn.addEventListener('click', () => {
-        state.kind = state.kind === 'people' ? 'accounts' : 'people';
+    // View toggle (replaces switch button)
+    const viewToggle = qs('lists-view-toggle');
+    if (viewToggle) {
+      viewToggle.addEventListener('click', (e) => {
+        const btn = e.target.closest('button.toggle-btn');
+        if (!btn) return;
+        const newView = btn.getAttribute('data-view');
+        if (!newView || newView === state.kind) return;
+        
+        // Update active styles
+        viewToggle.querySelectorAll('.toggle-btn').forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        
+        // Update state and reload
+        state.kind = newView;
         try { localStorage.setItem(STORAGE_KEY, state.kind); } catch {}
         ensureLoadedThenRender();
       });
@@ -223,6 +238,66 @@
     if (els.createFirstBtn) {
       els.createFirstBtn.addEventListener('click', () => openCreatePopover('empty'));
     }
+
+    // Filter toggle button (like people page)
+    const toggleBtn = qs('toggle-lists-filters');
+    const filterPanel = qs('lists-filters');
+    if (toggleBtn && filterPanel) {
+      toggleBtn.addEventListener('click', () => {
+        const isHidden = filterPanel.hasAttribute('hidden');
+        if (isHidden) {
+          filterPanel.removeAttribute('hidden');
+          // Add show class after a small delay to ensure the element is visible
+          setTimeout(() => {
+            filterPanel.classList.add('show');
+          }, 10);
+          if (toggleBtn.querySelector('.filter-text')) {
+            toggleBtn.querySelector('.filter-text').textContent = 'Hide Filters';
+          }
+        } else {
+          // Remove show class first, then hide after animation
+          filterPanel.classList.remove('show');
+          setTimeout(() => {
+            filterPanel.setAttribute('hidden', '');
+          }, 300); // Match the CSS transition duration
+          if (toggleBtn.querySelector('.filter-text')) {
+            toggleBtn.querySelector('.filter-text').textContent = 'Show Filters';
+          }
+        }
+      });
+    }
+
+    // Filter inputs
+    const nameFilter = qs('lists-filter-name');
+    const typeFilter = qs('lists-filter-type');
+    const ownerFilter = qs('lists-filter-owner');
+    const applyBtn = qs('lists-apply-filters');
+    const clearBtn = qs('lists-clear-filters');
+
+    if (nameFilter) nameFilter.addEventListener('input', applyFilters);
+    if (typeFilter) typeFilter.addEventListener('change', applyFilters);
+    if (ownerFilter) ownerFilter.addEventListener('input', applyFilters);
+    if (applyBtn) applyBtn.addEventListener('click', applyFilters);
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (nameFilter) nameFilter.value = '';
+        if (typeFilter) typeFilter.value = '';
+        if (ownerFilter) ownerFilter.value = '';
+        applyFilters();
+      });
+    }
+  }
+
+  function updateToggleState() {
+    const viewToggle = qs('lists-view-toggle');
+    if (!viewToggle) return;
+    
+    viewToggle.querySelectorAll('.toggle-btn').forEach(b => {
+      const view = b.getAttribute('data-view');
+      const active = view === state.kind;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
   }
 
   async function ensureLoadedThenRender() {
@@ -231,8 +306,8 @@
     } else if (state.kind === 'accounts' && !state.loadedAccounts) {
       await loadLists('accounts');
     }
-    render();
-    updateSwitchLabel();
+    applyFilters();
+    updateToggleState();
   }
 
   async function loadLists(kind) {
@@ -334,8 +409,40 @@
     }
   }
 
-  function render() {
-    const items = state.kind === 'people' ? state.peopleLists : state.accountLists;
+  function applyFilters() {
+    const nameFilter = qs('lists-filter-name')?.value?.toLowerCase() || '';
+    const typeFilter = qs('lists-filter-type')?.value || '';
+    const ownerFilter = qs('lists-filter-owner')?.value?.toLowerCase() || '';
+    
+    let items = state.kind === 'people' ? state.peopleLists : state.accountLists;
+    
+    // Apply filters
+    items = items.filter(item => {
+      const name = (item.name || '').toLowerCase();
+      const kind = item.kind || item.type || '';
+      const owner = (item.createdBy || item.owner || '').toLowerCase();
+      
+      return (!nameFilter || name.includes(nameFilter)) &&
+             (!typeFilter || kind === typeFilter) &&
+             (!ownerFilter || owner.includes(ownerFilter));
+    });
+    
+    // Update filter badge
+    const filterBadge = qs('lists-filter-count');
+    if (filterBadge) {
+      const activeFilters = [nameFilter, typeFilter, ownerFilter].filter(f => f).length;
+      if (activeFilters > 0) {
+        filterBadge.textContent = activeFilters;
+        filterBadge.hidden = false;
+      } else {
+        filterBadge.hidden = true;
+      }
+    }
+    
+    renderFilteredItems(items);
+  }
+
+  function renderFilteredItems(items) {
     const hasAny = Array.isArray(items) && items.length > 0;
     const isLoading = state.kind === 'people' ? !state.loadedPeople : !state.loadedAccounts;
 
@@ -460,6 +567,14 @@
               accounts: cache?.accounts instanceof Set ? cache.accounts.size : (Array.isArray(cache?.accounts) ? cache.accounts.length : 0)
             });
           } catch (_) {}
+          
+          // Store navigation state for back button functionality
+          try {
+            window._listDetailNavigationSource = 'lists';
+            window._listDetailReturn = getCurrentState();
+            console.log('[ListsOverview] Stored navigation state for back button:', window._listDetailReturn);
+          } catch (_) {}
+          
           // Store context for the list detail page
           window.listDetailContext = {
             listId: id,
@@ -487,17 +602,17 @@
     });
   }
 
-  function updateSwitchLabel() {
-    if (!els.switchBtn) return;
-    if (state.kind === 'people') {
-      els.switchBtn.textContent = 'Switch to company lists';
-      els.switchBtn.setAttribute('aria-label', 'Switch to company lists');
-      els.switchBtn.setAttribute('title', 'Switch to company lists');
-    } else {
-      els.switchBtn.textContent = 'Switch to people list';
-      els.switchBtn.setAttribute('aria-label', 'Switch to people list');
-      els.switchBtn.setAttribute('title', 'Switch to people list');
-    }
+  function updateToggleState() {
+    const viewToggle = qs('lists-view-toggle');
+    if (!viewToggle) return;
+    
+    // Update active state based on current kind
+    viewToggle.querySelectorAll('.toggle-btn').forEach(btn => {
+      const view = btn.getAttribute('data-view');
+      const active = view === state.kind;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
   }
 
   function escapeHtml(s) {
@@ -612,7 +727,7 @@
         }
         
         // Re-render the page
-        render();
+        applyFilters();
         
         // Show success message
         if (window.crm && window.crm.showToast) {
@@ -726,7 +841,7 @@
     }
 
     closeDeleteModal();
-    render();
+    applyFilters();
 
     // Show success toast if available
     if (window.crm && typeof window.crm.showToast === 'function') {
@@ -749,9 +864,71 @@
     if (console.timeEnd) console.timeEnd('[ListsOverview] refreshCounts');
   }
 
+  // Navigation state tracking for back button functionality
+  function getCurrentState() {
+    return {
+      page: 'lists',
+      scroll: window.scrollY || 0,
+      currentPage: 1, // Lists don't have pagination, but keeping for consistency
+      filters: {
+        name: qs('lists-filter-name')?.value || '',
+        type: qs('lists-filter-type')?.value || '',
+        owner: qs('lists-filter-owner')?.value || ''
+      },
+      searchTerm: qs('lists-quick-search')?.value || '',
+      selectedItems: [], // Lists don't have selection, but keeping for consistency
+      sortColumn: '',
+      sortDirection: 'asc',
+      timestamp: Date.now()
+    };
+  }
+
+  // Listen for restore event from back button navigation
+  if (!document._listsRestoreBound) {
+    document.addEventListener('pc:lists-restore', (ev) => {
+      try {
+        const detail = ev && ev.detail ? ev.detail : {};
+        console.log('[ListsOverview] Restoring state from back button:', detail);
+        
+        // Restore search term
+        if (detail.searchTerm && qs('lists-quick-search')) {
+          qs('lists-quick-search').value = detail.searchTerm;
+        }
+        
+        // Restore filters
+        if (detail.filters) {
+          if (detail.filters.name && qs('lists-filter-name')) {
+            qs('lists-filter-name').value = detail.filters.name;
+          }
+          if (detail.filters.type && qs('lists-filter-type')) {
+            qs('lists-filter-type').value = detail.filters.type;
+          }
+          if (detail.filters.owner && qs('lists-filter-owner')) {
+            qs('lists-filter-owner').value = detail.filters.owner;
+          }
+        }
+        
+        // Re-apply filters with restored state
+        applyFilters();
+        
+        // Restore scroll position
+        const y = parseInt(detail.scroll || 0, 10);
+        setTimeout(() => {
+          try { window.scrollTo(0, y); } catch (_) {}
+        }, 100);
+        
+        console.log('[ListsOverview] State restored successfully');
+      } catch (e) { 
+        console.error('[ListsOverview] Error restoring state:', e);
+      }
+    });
+    document._listsRestoreBound = true;
+  }
+
   // Expose API for other modules
   window.ListsOverview = {
-    refreshCounts: refreshCounts
+    refreshCounts: refreshCounts,
+    getCurrentState: getCurrentState
   };
 
   // Initialize
@@ -761,8 +938,8 @@
     if (saved === 'people' || saved === 'accounts') state.kind = saved; // persist selection
   } catch {}
   attachEvents();
-  updateSwitchLabel();
-  render(); // Show loading state immediately
+  updateToggleState();
+  applyFilters(); // Show loading state immediately
   ensureLoadedThenRender();
   startLiveListsListeners();
 })();

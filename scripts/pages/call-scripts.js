@@ -452,7 +452,7 @@
       ]
     },
     gatekeeper_intro: {
-      text: 'Good {{day.part}}. I am needin\' to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?',
+      text: 'Good {{day.part}}. I\'m actually needin\' to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?',
       responses: [
         { label: "What's this about?", next: 'gatekeeper_whats_about' },
         { label: "I'll connect you", next: 'transfer_dialing' },
@@ -474,7 +474,7 @@
       ]
     },
     pathA: {
-      text: "Got it. now {{contact.first_name}}, I work directly with NRG, TXU, APG & E —  and rates are about to go up for every supplier next year... <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>",
+      text: "Got it. now {{contact.first_name}}, I work directly with NRG, TXU, APG & E — and they've all let us know in advance that rates are about to go up next year... <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>",
       responses: [
         { label: "It's tough / struggling", next: 'pathA_struggling' },
         { label: 'Have not renewed / contract not up yet', next: 'pathA_not_renewed' },
