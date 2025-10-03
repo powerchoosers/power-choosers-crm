@@ -1,5 +1,6 @@
 // API endpoint for sending emails via SendGrid (replaces Gmail API)
-import { cors } from '../_cors';
+// Use default import because ../_cors exports CommonJS (module.exports = cors)
+import cors from '../_cors';
 import SendGridService from './sendgrid-service.js';
 
 export default async function handler(req, res) {
@@ -16,8 +17,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields: to, subject, content' });
     }
 
-    // Generate unique tracking ID
-    const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique tracking ID (prefix with sendgrid_ for consistency)
+    const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Prepare email data
     const emailData = {

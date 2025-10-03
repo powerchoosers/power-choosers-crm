@@ -3893,6 +3893,70 @@ html, body {
     margin-bottom: var(--spacing-md);
 }
 
+/* View toggle button (People/Accounts) */
+.view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: 2px;
+}
+
+.view-toggle .toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 16px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.view-toggle .toggle-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.view-toggle .toggle-btn.active {
+    background: var(--orange-subtle);
+    color: var(--text-inverse);
+}
+
+.view-toggle .toggle-btn.active:hover {
+    background: #e55a2b;
+}
+
+/* Filter tab styling (also used for toggle buttons) */
+.filter-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 16px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.filter-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.filter-tab.active {
+    background: var(--orange-subtle);
+    color: var(--text-inverse);
+}
+
+.filter-tab.active:hover {
+    background: #e55a2b;
+}
+
 .filter-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5287,6 +5351,30 @@ html, body {
     /* Keep content visually inside the container */
     padding-bottom: 0;
     overflow: hidden; /* prevent page-content from spilling outside */
+}
+
+/* Lists page header positioning for filter panel */
+#lists-page .page-header {
+    position: relative;
+}
+
+/* Lists filter panel (like people page) */
+#lists-filters {
+    position: absolute;
+    top: calc(100% - 17px);
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    transform: translateY(-10px);
+    opacity: 0;
+    visibility: hidden;
+    transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#lists-filters.show {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
 }
 
 #lists-page .page-content {

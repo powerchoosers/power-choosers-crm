@@ -11,8 +11,9 @@
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.0",
-    "firebase-admin": "^12.0.0",
     "bull": "^4.12.0",
+    "dotenv": "^17.2.3",
+    "firebase-admin": "^12.0.0",
     "node-cron": "^3.0.3",
     "twilio": "^4.19.0"
   },
