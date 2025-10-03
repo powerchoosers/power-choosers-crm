@@ -28,10 +28,18 @@ const corsHeaders = {
   'Access-Control-Allow-Credentials': 'true'
 };
 
+export const config = { api: { bodyParser: false } };
+
 export default async function handler(req, res) {
+  // Set basic CORS headers (not required for SendGrid, but harmless)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Vary', 'Origin');
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return res.status(200).json({ message: 'CORS preflight successful' });
+    return res.status(200).end();
   }
 
   // Only allow POST requests

@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-// require('dotenv').config(); // Load environment variables from .env file - temporarily disabled
+require('dotenv').config(); // Load environment variables from .env file
 // SendGrid removed - using Gmail API via frontend
 
 // MIME types for different file extensions
