@@ -3,9 +3,9 @@
  * MINIMAL VERSION FOR DEBUGGING
  */
 
-const config = { api: { bodyParser: false } };
+export const config = { api: { bodyParser: false } };
 
-async function handler(req, res) {
+export default async function handler(req, res) {
   console.log('[InboundEmail] Received webhook from SendGrid');
   console.log('[InboundEmail] Headers:', req.headers);
   console.log('[InboundEmail] Method:', req.method);
@@ -14,5 +14,3 @@ async function handler(req, res) {
   // Minimal response - just return 200 OK
   res.status(200).send('OK');
 }
-
-module.exports = { config, handler };
