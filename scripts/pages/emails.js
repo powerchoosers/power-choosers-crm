@@ -4578,15 +4578,10 @@ class EmailManager {
 
     async sendEmailViaSendGrid(emailData) {
         try {
-            console.log('🔍 [DEBUG] Starting SendGrid email send...');
-            console.log('🔍 [DEBUG] API_BASE_URL:', window.API_BASE_URL);
-            console.log('🔍 [DEBUG] Email data:', emailData);
-            
             const { to, subject, content, _deliverability } = emailData;
             
             // Generate unique tracking ID for this email
             const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            console.log('🔍 [DEBUG] Generated tracking ID:', trackingId);
             
             // Prepare email data for SendGrid
             const emailPayload = {
@@ -4597,9 +4592,6 @@ class EmailManager {
                 _deliverability: _deliverability
             };
             
-            console.log('🔍 [DEBUG] Sending to:', `${window.API_BASE_URL}/api/email/sendgrid-send`);
-            console.log('🔍 [DEBUG] Payload:', emailPayload);
-            
             // Send via SendGrid API
             const response = await fetch(`${window.API_BASE_URL}/api/email/sendgrid-send`, {
                 method: 'POST',
@@ -4608,14 +4600,9 @@ class EmailManager {
                 },
                 body: JSON.stringify(emailPayload)
             });
-            
-            console.log('🔍 [DEBUG] Response status:', response.status);
-            console.log('🔍 [DEBUG] Response ok:', response.ok);
 
             if (!response.ok) {
-                console.log('🔍 [DEBUG] Response not ok, getting error data...');
                 const errorData = await response.json();
-                console.log('🔍 [DEBUG] Error data:', errorData);
                 throw new Error(errorData.error || 'Failed to send email via SendGrid');
             }
 
