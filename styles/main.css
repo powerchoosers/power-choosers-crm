@@ -699,6 +699,22 @@ button:hover:not(:disabled),
     color: var(--text-inverse); 
 }
 .delete-popover .btn-text:focus-visible { outline: 2px solid var(--orange-muted); outline-offset: 2px; }
+.delete-popover .btn-cancel {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.delete-popover .btn-cancel:hover { 
+    background: var(--grey-700); 
+    border-color: var(--border-light); 
+    color: var(--text-inverse); 
+}
+.delete-popover .btn-cancel:focus-visible { outline: 2px solid var(--orange-muted); outline-offset: 2px; }
 .delete-popover .btn-danger {
     height: 32px;
     padding: 0 12px;
@@ -7209,17 +7225,21 @@ html, body {
 }
 
 .pagination-btn {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    color: var(--text-inverse);
+    border-radius: var(--border-radius-sm);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: var(--transition-fast);
+    width: auto;
+    height: auto;
+    min-width: 32px;
+    min-height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: var(--bg-item);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
 }
 
 .pagination-btn:hover:not(:disabled) {
@@ -7227,7 +7247,11 @@ html, body {
     border-color: var(--accent-color);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    color: var(--text-primary);
+}
+
+.pagination-btn.active {
+    background: var(--bg-item);
+    border-color: var(--border-light);
 }
 
 .pagination-btn:disabled {
@@ -7321,7 +7345,57 @@ html, body {
     color: #dc3545;
 }
 
-/* === ACTIVITY ICONS === */
+/* === ACTIVITY LAYOUT === */
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+/* === ACTIVITY ENTITY AVATARS === */
+.activity-entity-avatar {
+    flex-shrink: 0;
+    margin-right: var(--spacing-xs);
+}
+
+.activity-entity-avatar-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    /* Removed border as requested */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.activity-entity-avatar-circle.contact-avatar {
+    background: var(--orange-subtle);
+    color: white;
+}
+
+.activity-entity-avatar-circle.company-avatar {
+    background: var(--grey-600);
+    color: var(--text-primary);
+    padding: 2px;
+}
+
+.activity-entity-avatar-circle.default-avatar {
+    background: var(--grey-500);
+    color: var(--text-secondary);
+}
+
+.activity-entity-avatar-circle svg {
+    width: 12px;
+    height: 12px;
+    stroke: currentColor;
+    fill: none;
+}
+
+/* === ACTIVITY ICONS (MOVED TO RIGHT) === */
 .activity-icon {
     width: 32px;
     height: 32px;
@@ -7332,9 +7406,40 @@ html, body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    margin-right: var(--spacing-sm);
+    margin-left: auto; /* Push to right side */
     color: var(--text-secondary);
     transition: all 0.2s ease;
+}
+
+/* Activity type specific colors - consistent white icons with white borders */
+.activity-icon--call {
+    background: transparent;
+    border: 1px solid white;
+    color: white;
+}
+
+.activity-icon--email {
+    background: transparent;
+    border: 1px solid white;
+    color: white;
+}
+
+.activity-icon--note {
+    background: transparent;
+    border: 1px solid white;
+    color: white;
+}
+
+.activity-icon--task {
+    background: transparent;
+    border: 1px solid white;
+    color: white;
+}
+
+.activity-icon--sequence {
+    background: transparent;
+    border: 1px solid white;
+    color: white;
 }
 
 .activity-item:hover .activity-icon {
@@ -7360,6 +7465,14 @@ html, body {
     color: var(--text-primary);
     margin-bottom: 2px;
     font-size: 0.9rem;
+    line-height: 1.2;
+}
+
+.activity-entity {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+    font-weight: 500;
 }
 
 .activity-description {
@@ -10065,6 +10178,7 @@ margin-bottom: var(--spacing-md);
     display: flex;
     justify-content: flex-end;
     align-items: center;
+    gap: var(--spacing-sm);
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid var(--border-light);
@@ -10100,6 +10214,33 @@ margin-bottom: var(--spacing-md);
     height: 16px;
     stroke: currentColor;
     fill: none;
+}
+
+.activity-pagination-btn.page-btn {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    color: var(--text-inverse);
+    border-radius: var(--border-radius-sm);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: var(--transition-fast);
+    width: auto;
+    height: auto;
+    min-width: 32px;
+    min-height: 32px;
+}
+
+.activity-pagination-btn.page-btn:hover:not(:disabled) {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.activity-pagination-btn.page-btn.active {
+    background: var(--bg-item);
+    border-color: var(--border-light);
 }
 
 .activity-pagination-info {

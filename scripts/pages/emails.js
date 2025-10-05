@@ -36,7 +36,6 @@ class EmailManager {
         
         this.init();
         this.setupEmailTrackingListeners();
-        this.setupTestButton();
         this.setupEventListeners();
     }
 
@@ -5199,65 +5198,6 @@ class EmailManager {
         console.log('[EmailManager] Email replied notification received - UI will update via real-time listener');
     }
 
-    setupTestButton() {
-        const testButton = document.getElementById('test-email-tracking-btn');
-        if (testButton) {
-            testButton.addEventListener('click', async () => {
-                try {
-                    testButton.disabled = true;
-                    testButton.textContent = 'Testing...';
-                    
-                    if (window.emailTrackingManager) {
-                        await window.emailTrackingManager.testEmailTracking();
-                        window.crm?.showToast('Test email sent! Watch for tracking notifications.');
-                        
-                        // Switch to sent folder to see the email
-                        this.switchFolder('sent');
-                    } else {
-                        window.crm?.showToast('Email tracking manager not initialized');
-                    }
-                } catch (error) {
-                    console.error('[EmailManager] Test error:', error);
-                    window.crm?.showToast('Test failed: ' + error.message);
-                } finally {
-                    testButton.disabled = false;
-                    testButton.textContent = 'Test Tracking';
-                }
-            });
-        }
-
-        // Add a test button to simulate email opens
-        const simulateOpenButton = document.createElement('button');
-        simulateOpenButton.textContent = 'Test Email Open';
-        simulateOpenButton.style.cssText = 'position: fixed; top: 50px; right: 10px; z-index: 9999; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;';
-        simulateOpenButton.onclick = async () => {
-            await this.simulateEmailOpen();
-        };
-        document.body.appendChild(simulateOpenButton);
-    }
-
-    async simulateEmailOpen() {
-        try {
-            // Get the most recent email from the current list
-            if (this.emails && this.emails.length > 0) {
-                const mostRecentEmail = this.emails[0];
-                if (window.emailTrackingManager) {
-                    await window.emailTrackingManager.simulateEmailOpen(mostRecentEmail.id);
-                    window.crm?.showToast('Email open simulated! Check the eyeball icon.');
-                    
-                    // Real-time listener will automatically update the UI
-                    console.log('[EmailManager] Email open simulated - UI will update via real-time listener');
-                } else {
-                    window.crm?.showToast('Email tracking manager not initialized');
-                }
-            } else {
-                window.crm?.showToast('No emails found to simulate open');
-            }
-        } catch (error) {
-            console.error('[EmailManager] Simulate open error:', error);
-            window.crm?.showToast('Failed to simulate email open: ' + error.message);
-        }
-    }
 
 }
 

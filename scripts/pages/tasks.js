@@ -420,9 +420,57 @@
     if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
     paginate(); updateBulkBar(); }
 
+  // Update task titles to descriptive format
+  function updateTaskTitle(task) {
+    // Normalize task type first
+    const normalizedType = normalizeTaskType(task.type);
+    
+    // Always update titles to use proper action-oriented format based on task type
+    if (normalizedType && (task.contact || task.account)) {
+      // Use the shared buildTaskTitle function if available
+      if (window.crm && typeof window.crm.buildTaskTitle === 'function') {
+        return window.crm.buildTaskTitle(normalizedType, task.contact || '', task.account || '');
+      } else {
+        // Fallback to manual mapping
+        const typeMap = {
+          'phone-call': 'Call',
+          'manual-email': 'Email',
+          'auto-email': 'Email',
+          'li-connect': 'Add on LinkedIn',
+          'li-message': 'Send a message on LinkedIn',
+          'li-view-profile': 'View LinkedIn profile',
+          'li-interact-post': 'Interact with LinkedIn Post',
+          'custom-task': 'Custom Task for',
+          'follow-up': 'Follow-up with',
+          'demo': 'Demo for'
+        };
+        const action = typeMap[normalizedType] || 'Task for';
+        const name = task.contact || task.account || 'contact';
+        return `${action} ${name}`;
+      }
+    }
+    return task.title;
+  }
+
+  // Normalize task type to standard format
+  function normalizeTaskType(type) {
+    const s = String(type || '').toLowerCase().trim();
+    if (s === 'phone call' || s === 'phone' || s === 'call') return 'phone-call';
+    if (s === 'manual email' || s === 'email' || s === 'manual-email') return 'manual-email';
+    if (s === 'auto email' || s === 'automatic email' || s === 'auto-email') return 'auto-email';
+    if (s === 'follow up' || s === 'follow-up') return 'follow-up';
+    if (s === 'custom task' || s === 'custom-task' || s === 'task') return 'custom-task';
+    if (s === 'demo') return 'demo';
+    if (s === 'li-connect' || s === 'linkedin-connect' || s === 'linkedin - send connection request') return 'li-connect';
+    if (s === 'li-message' || s === 'linkedin-message' || s === 'linkedin - send message') return 'li-message';
+    if (s === 'li-view-profile' || s === 'linkedin-view' || s === 'linkedin - view profile') return 'li-view-profile';
+    if (s === 'li-interact-post' || s === 'linkedin-interact' || s === 'linkedin - interact with post') return 'li-interact-post';
+    return type || 'custom-task';
+  }
+
   function rowHtml(r){
     const id = escapeHtml(r.id);
-    const title = escapeHtml(r.title);
+    const title = escapeHtml(updateTaskTitle(r));
     const name = escapeHtml(r.contact || '');
     const account = escapeHtml(r.account || '');
     const type = escapeHtml(r.type || '');

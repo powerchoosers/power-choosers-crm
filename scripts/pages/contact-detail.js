@@ -1488,6 +1488,79 @@
     return { number, extension };
   }
 
+  // Check if user is currently typing an extension
+  function isTypingExtension(value, cursorPos) {
+    const text = (value || '').toLowerCase();
+    const cursor = cursorPos || 0;
+    
+    // Check if cursor is after common extension keywords
+    const extensionKeywords = ['ext', 'extension', 'x', '#'];
+    for (const keyword of extensionKeywords) {
+      const keywordPos = text.lastIndexOf(keyword, cursor - 1);
+      if (keywordPos !== -1 && keywordPos + keyword.length <= cursor) {
+        return true;
+      }
+    }
+    
+    // Check if we're at the end and typing digits after a space (common extension pattern)
+    const trimmed = value.trim();
+    const lastSpace = trimmed.lastIndexOf(' ');
+    if (lastSpace !== -1 && cursor > lastSpace) {
+      const afterSpace = trimmed.substring(lastSpace + 1);
+      // If we have 3+ digits after the last space, likely an extension
+      if (/^\d{3,}$/.test(afterSpace)) {
+        return true;
+      }
+    }
+    
+    // Check if we have a complete phone number and user is adding more digits
+    const digits = value.replace(/\D/g, '');
+    if (digits.length >= 10) {
+      // If we have 10+ digits and user is still typing, might be extension
+      const phonePart = value.substring(0, value.lastIndexOf(digits[digits.length - 1]) + 1);
+      const remaining = value.substring(phonePart.length).trim();
+      
+      // If there's remaining text that looks like an extension
+      if (remaining && /^[\s]*[\d]+$/.test(remaining)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  // Format phone number for input (less aggressive than display formatting)
+  function formatPhoneNumberForInput(value) {
+    if (!value) return '';
+    
+    // Parse to separate number and extension
+    const parsed = parsePhoneWithExtension(value);
+    if (!parsed.number) return value;
+    
+    // Format only the main number part
+    const cleaned = parsed.number.replace(/\D/g, '');
+    let formattedNumber = '';
+    
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    } else if (cleaned.length >= 8) {
+      // For international numbers, just clean up formatting
+      formattedNumber = parsed.number;
+    } else {
+      // Too short, return as-is
+      return value;
+    }
+    
+    // Add extension back if present
+    if (parsed.extension) {
+      return `${formattedNumber} ext. ${parsed.extension}`;
+    }
+    
+    return formattedNumber;
+  }
+
   // Format phone numbers for display with extension support
   function formatPhoneForDisplay(phone) {
     if (!phone) return '';
@@ -1742,6 +1815,23 @@
   }
 
   function findContactById(contactId) {
+    console.log('[ContactDetail] findContactById called with:', contactId);
+    console.log('[ContactDetail] Prefetched contact available:', !!window._prefetchedContactForDetail);
+    
+    // Use prefetched contact if provided by navigation source (avoids extra hops)
+    try {
+      if (window._prefetchedContactForDetail && window._prefetchedContactForDetail.id === contactId) {
+        const c = window._prefetchedContactForDetail;
+        window._prefetchedContactForDetail = null; // consume
+        console.log('[ContactDetail] Using prefetched contact data:', c);
+        return c;
+      } else if (window._prefetchedContactForDetail) {
+        console.log('[ContactDetail] Prefetched contact ID mismatch. Prefetched:', window._prefetchedContactForDetail.id, 'Looking for:', contactId);
+      }
+    } catch (error) {
+      console.error('[ContactDetail] Error with prefetched contact:', error);
+    }
+    
     // Access people.js data if available
     if (window.getPeopleData) {
       const peopleData = window.getPeopleData();
@@ -2713,12 +2803,12 @@
 
     // Listen for activity refresh events
     const activityRefreshHandler = (e) => {
-      const { entityType, entityId } = e.detail || {};
+      const { entityType, entityId, forceRefresh } = e.detail || {};
       if (entityType === 'contact' && entityId === state.currentContact?.id) {
         // Refresh contact activities
         if (window.ActivityManager) {
-          const activityManager = new window.ActivityManager();
-          activityManager.renderActivities('contact-activity-timeline', 'contact', entityId);
+          const activityManager = window.ActivityManager; // use singleton
+          activityManager.renderActivities('contact-activity-timeline', 'contact', entityId, forceRefresh);
         }
       }
     };
@@ -3624,13 +3714,20 @@
     input.value = phoneOptions[0].value;
     input.dataset.selectedType = phoneOptions[0].type;
     input.dataset.selectedField = phoneOptions[0].field;
-    input.placeholder = 'Enter phone number';
+    input.placeholder = 'Enter phone number (e.g., 337-233-0464 ext 10117)';
     
-    // Add real-time formatting as user types (with extension support)
+    // Add smart real-time formatting that allows extension typing
     input.addEventListener('input', (e) => {
       const cursorPos = e.target.selectionStart;
       const rawValue = e.target.value;
-      const formatted = formatPhoneForDisplay(rawValue);
+      
+      // Don't format if user is typing an extension
+      if (isTypingExtension(rawValue, cursorPos)) {
+        return; // Allow free typing for extensions
+      }
+      
+      // Only format the main phone number part
+      const formatted = formatPhoneNumberForInput(rawValue);
       if (formatted !== rawValue) {
         e.target.value = formatted;
         // Try to maintain cursor position after formatting
@@ -3643,7 +3740,16 @@
     const inputWrap = document.createElement('div');
     inputWrap.className = 'phone-input-wrap';
     inputWrap.style.position = 'relative'; // Ensure relative positioning for dropdown
+    
+    // Add helper text for extension input
+    const helperText = document.createElement('div');
+    helperText.className = 'phone-input-helper';
+    helperText.style.fontSize = '0.75rem';
+    helperText.style.color = 'var(--text-secondary)';
+    helperText.style.marginTop = '4px';
+    helperText.textContent = 'Tip: Add "ext 12345" or "x 12345" for extensions';
     inputWrap.appendChild(input);
+    inputWrap.appendChild(helperText);
     inputWrap.appendChild(dropdown);
     console.log('[Contact Detail] Created input wrapper and appended dropdown');
     
@@ -5427,15 +5533,6 @@ async function createContactSequenceThenAdd(name) {
   function openContactListsPanel() {
     if (document.getElementById('contact-lists-panel')) return;
     
-    // Ensure we have a valid contact ID before proceeding
-    if (!state.currentContact?.id) {
-      console.warn('[ContactDetail] Cannot open lists panel: no contact ID available');
-      if (window.crm && typeof window.crm.showToast === 'function') {
-        window.crm.showToast('Contact information not ready. Please try again.');
-      }
-      return;
-    }
-    
     injectContactListsStyles();
     const panel = document.createElement('div');
     panel.id = 'contact-lists-panel';
@@ -5517,9 +5614,17 @@ async function createContactSequenceThenAdd(name) {
         state.currentContact.id = window.ContactDetail.state.currentContact.id;
       }
     } catch(_) {}
-    // Load lists and memberships
-    Promise.resolve(populateContactListsPanel(panel.querySelector('#contact-lists-body')))
-      .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch(_) {} });
+    // Load lists and memberships after ensuring we have a resolvable contact id
+    (async () => {
+      const ok = await resolveCurrentContactIdWithRetry(2000);
+      if (!ok) {
+        try { window.crm && window.crm.showToast && window.crm.showToast('Contact information not ready. Please try again.'); } catch(_) {}
+        closeContactListsPanel();
+        return;
+      }
+      Promise.resolve(populateContactListsPanel(panel.querySelector('#contact-lists-body')))
+        .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch(_) {} });
+    })();
 
     // Close button
     panel.querySelector('#contact-lists-close')?.addEventListener('click', () => closeContactListsPanel());
@@ -5569,6 +5674,60 @@ async function createContactSequenceThenAdd(name) {
         addCurrentContactToList(id, name);
       }
     }
+  }
+
+  // Resolve the current contact id with retries and multiple sources
+  async function resolveCurrentContactIdWithRetry(timeoutMs = 2000) {
+    const started = Date.now();
+    const tryResolveOnce = () => {
+      // 1) state
+      let id = state.currentContact && state.currentContact.id;
+      if (id) return id;
+      // 2) DOM data attributes
+      try {
+        id = document.querySelector('#contact-detail-header')?.getAttribute('data-contact-id') || id;
+        id = document.querySelector('#contact-detail-view')?.getAttribute('data-contact-id') || id;
+      } catch(_) {}
+      if (id) return id;
+      // 3) module singleton
+      try { id = window.ContactDetail?.state?.currentContact?.id || id; } catch(_) {}
+      if (id) return id;
+      // 4) people cache best-effort match (name + account)
+      try {
+        const c = state.currentContact || {};
+        const full = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+        const people = (typeof window.getPeopleData === 'function') ? (window.getPeopleData() || []) : [];
+        if (full && people.length) {
+          const guessed = people.find(p => {
+            const pf = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
+            const nameMatch = pf && full && pf.toLowerCase().trim() === full.toLowerCase().trim();
+            const acctMatch = (p.accountId || '') === (c.accountId || '');
+            return nameMatch && acctMatch;
+          });
+          if (guessed && guessed.id) return guessed.id;
+        }
+      } catch(_) {}
+      return '';
+    };
+
+    // Immediate attempt
+    let resolved = tryResolveOnce();
+    if (resolved) {
+      try { if (!state.currentContact) state.currentContact = {}; state.currentContact.id = resolved; } catch(_) {}
+      return true;
+    }
+
+    // Retry loop
+    const interval = 80;
+    while (Date.now() - started < timeoutMs) {
+      await new Promise(r => setTimeout(r, interval));
+      resolved = tryResolveOnce();
+      if (resolved) {
+        try { if (!state.currentContact) state.currentContact = {}; state.currentContact.id = resolved; } catch(_) {}
+        return true;
+      }
+    }
+    return false;
   }
 
   async function populateContactListsPanel(container) {
@@ -5787,21 +5946,15 @@ async function createContactSequenceThenAdd(name) {
         }
       }
       window.crm?.showToast && window.crm.showToast(`Added to "${listName}"`);
-      // Optimistically mark the list as selected in the panel without full refresh
-      try {
-        const body = document.getElementById('contact-lists-body');
-        const item = body && body.querySelector(`.list-item[data-id="${CSS.escape(listId)}"]`);
-        if (item) {
-          item.setAttribute('data-member-id', 'temp');
-          const check = item.querySelector('.list-check');
-          if (check) check.textContent = '✓';
-        }
-      } catch (_) { /* noop */ }
     } catch (err) {
       console.warn('Add to list failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to add to list');
     } finally {
-      closeContactListsPanel();
+      // Reload panel data to show updated state
+      const body = document.getElementById('contact-lists-body');
+      if (body) {
+        populateContactListsPanel(body);
+      }
     }
   }
 
@@ -5816,7 +5969,11 @@ async function createContactSequenceThenAdd(name) {
       console.warn('Remove from list failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to remove from list');
     } finally {
-      closeContactListsPanel();
+      // Reload panel data to show updated state
+      const body = document.getElementById('contact-lists-body');
+      if (body) {
+        populateContactListsPanel(body);
+      }
     }
   }
 
@@ -6167,10 +6324,19 @@ async function createContactSequenceThenAdd(name) {
     show: showContactDetail,
     setupEnergyUpdateListener: setupEnergyUpdateListener,
     setupContactCreatedListener: setupContactCreatedListener,
-    // Expose internal state for widgets to read linked account id
-    state: state,
-    // Expose cleanup function for hot reload support
-    _cleanup: cleanup
-  };
+  // Expose internal state for widgets to read linked account id
+  state: state,
+  // Expose cleanup function for hot reload support
+  _cleanup: cleanup
+};
+
+// Debug function to test phone input functionality
+window.testPhoneInput = function(value, cursorPos = 0) {
+  console.log('Testing phone input:', { value, cursorPos });
+  console.log('isTypingExtension:', isTypingExtension(value, cursorPos));
+  console.log('parsePhoneWithExtension:', parsePhoneWithExtension(value));
+  console.log('formatPhoneNumberForInput:', formatPhoneNumberForInput(value));
+  console.log('formatPhoneForDisplay:', formatPhoneForDisplay(value));
+};
 
 })();

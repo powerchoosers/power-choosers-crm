@@ -8,11 +8,22 @@ class PowerChoosersCRM {
         this.init();
         
         // Load home activities on initial load if we're on the dashboard
-        setTimeout(() => {
+        // Use the same logic as pagination to ensure it works
+        const loadActivities = () => {
             if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
-                this.loadHomeActivities();
+                console.log('[CRM] Loading home activities...');
+                // Use the same method as pagination - direct ActivityManager call
+                window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+            } else {
+                console.log('[CRM] ActivityManager not ready or not on dashboard, retrying...');
+                setTimeout(loadActivities, 200);
             }
-        }, 100);
+        };
+        
+        // Try immediately and also with delays
+        setTimeout(loadActivities, 50);
+        setTimeout(loadActivities, 200);
+        setTimeout(loadActivities, 500);
 
         // Listen for activity refresh events
         document.addEventListener('pc:activities-refresh', (e) => {
@@ -377,9 +388,27 @@ class PowerChoosersCRM {
               updatedAt: now,
             };
 
-          // If adding from Account Details, link the contact to the current account immediately
+          // If adding from Account Details or Task Detail, link the contact to the current account immediately
           try {
-            const accountId = window.AccountDetail?.state?.currentAccount?.id;
+            let accountId = window.AccountDetail?.state?.currentAccount?.id;
+            
+            // If not from Account Detail, check if we're from Task Detail with an account
+            if (!accountId && window.TaskDetail?.state?.currentTask) {
+              const task = window.TaskDetail.state.currentTask;
+              if (task.accountId) {
+                accountId = task.accountId;
+              } else if (task.account) {
+                // Try to find account by name
+                const accounts = window.getAccountsData?.() || [];
+                const account = accounts.find(a => 
+                  (a.accountName || a.name || a.companyName) === task.account
+                );
+                if (account) {
+                  accountId = account.id;
+                }
+              }
+            }
+            
             if (accountId) {
               doc.accountId = accountId;
             }
@@ -3031,11 +3060,12 @@ class PowerChoosersCRM {
         } else {
             tasksHtml = pageTasks.map(task => {
                 const timeText = this.getTaskTimeText(task);
+                const displayTitle = this.updateTaskTitle(task);
                 console.log('🔍 TASK DEBUG - Priority:', task.priority, 'Type:', typeof task.priority, 'Full task:', task);
                 return `
                     <div class="task-item" data-task-id="${task.id}" style="cursor: pointer;">
                         <div class="task-info">
-                            <div class="task-name" style="color: var(--grey-400); font-weight: 400; transition: var(--transition-fast);">${this.escapeHtml(task.title)}</div>
+                            <div class="task-name" style="color: var(--grey-400); font-weight: 400; transition: var(--transition-fast);">${this.escapeHtml(displayTitle)}</div>
                             <div class="task-time">${timeText}</div>
                         </div>
                         <span class="priority-badge ${task.priority}" style="background: ${this.getPriorityBackground(task.priority)}; color: ${this.getPriorityColor(task.priority)};">${task.priority}</span>
@@ -3270,6 +3300,34 @@ class PowerChoosersCRM {
         return `${action} ${name}`;
     }
 
+    // Update task titles to descriptive format
+    updateTaskTitle(task) {
+        // Normalize task type first
+        const normalizedType = this.normalizeTaskType(task.type);
+        
+        // Always update titles to use proper action-oriented format based on task type
+        if (normalizedType && (task.contact || task.account)) {
+            return this.buildTaskTitle(normalizedType, task.contact || '', task.account || '');
+        }
+        return task.title;
+    }
+
+    // Normalize task type to standard format
+    normalizeTaskType(type) {
+        const s = String(type || '').toLowerCase().trim();
+        if (s === 'phone call' || s === 'phone' || s === 'call') return 'phone-call';
+        if (s === 'manual email' || s === 'email' || s === 'manual-email') return 'manual-email';
+        if (s === 'auto email' || s === 'automatic email' || s === 'auto-email') return 'auto-email';
+        if (s === 'follow up' || s === 'follow-up') return 'follow-up';
+        if (s === 'custom task' || s === 'custom-task' || s === 'task') return 'custom-task';
+        if (s === 'demo') return 'demo';
+        if (s === 'li-connect' || s === 'linkedin-connect' || s === 'linkedin - send connection request') return 'li-connect';
+        if (s === 'li-message' || s === 'linkedin-message' || s === 'linkedin - send message') return 'li-message';
+        if (s === 'li-view-profile' || s === 'linkedin-view' || s === 'linkedin - view profile') return 'li-view-profile';
+        if (s === 'li-interact-post' || s === 'linkedin-interact' || s === 'linkedin - interact with post') return 'li-interact-post';
+        return type || 'custom-task';
+    }
+
     async loadEnergyNews() {
         const newsList = document.querySelector('.news-list');
         const lastRef = document.getElementById('news-last-refreshed');
@@ -3402,8 +3460,11 @@ class PowerChoosersCRM {
                     };
                 }
                 
-                if (infoEl) {
-                    infoEl.textContent = `${window.ActivityManager.currentPage + 1} of ${totalPages}`;
+                // Update page button
+                const pageButton = document.getElementById('home-activity-page');
+                if (pageButton) {
+                    pageButton.textContent = window.ActivityManager.currentPage + 1;
+                    pageButton.classList.toggle('active', true);
                 }
             } else {
                 paginationEl.style.display = 'none';

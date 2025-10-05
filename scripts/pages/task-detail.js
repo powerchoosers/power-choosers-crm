@@ -1516,7 +1516,7 @@
         <div class="task-card" id="call-log-card">
           <h3 class="section-title">Log call</h3>
           <div class="call-list">
-            ${companyPhone ? `<div class="call-row"><button class="btn-secondary" data-call="${companyPhone}">Call</button><span class="call-number">${companyPhone}</span></div>` : '<div class="empty">No company phone number on file</div>'}
+            ${companyPhone ? `<div class="call-row"><button class="btn-secondary phone-text" data-phone="${escapeHtml(companyPhone)}" data-account-id="${escapeHtml(account.id || '')}" data-account-name="${escapeHtml(accountName || '')}" data-logo-url="${escapeHtml(logoUrl || '')}" data-is-company-phone="true" data-city="${escapeHtml(city || '')}" data-state="${escapeHtml(stateVal || '')}" data-domain="${escapeHtml(domain || '')}" data-call="${companyPhone}">Call</button><span class="call-number phone-text" data-phone="${escapeHtml(companyPhone)}" data-account-id="${escapeHtml(account.id || '')}" data-account-name="${escapeHtml(accountName || '')}" data-logo-url="${escapeHtml(logoUrl || '')}" data-is-company-phone="true" data-city="${escapeHtml(city || '')}" data-state="${escapeHtml(stateVal || '')}" data-domain="${escapeHtml(domain || '')}">${escapeHtml(companyPhone)}</span></div>` : '<div class="empty">No company phone number on file</div>'}
           </div>
           <div class="form-row">
             <label>Call purpose</label>
@@ -1561,7 +1561,7 @@
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">COMPANY PHONE</div>
-              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-account-id="${escapeHtml(account.id || '')}" data-company-name="${escapeHtml(accountName || '')}">${escapeHtml(companyPhone)}</span>` : '--'}</div>
+              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-account-id="${escapeHtml(account.id || '')}" data-account-name="${escapeHtml(accountName || '')}" data-logo-url="${escapeHtml(logoUrl || '')}" data-is-company-phone="true" data-city="${escapeHtml(city || '')}" data-state="${escapeHtml(stateVal || '')}" data-domain="${escapeHtml(domain || '')}">${escapeHtml(companyPhone)}</span>` : '--'}</div>
             </div>
             <div class="info-row">
               <div class="info-label">INDUSTRY</div>
@@ -1994,7 +1994,7 @@
             <h3 class="section-title">Contact information</h3>
             <div class="info-grid">
               <div class="info-row"><div class="info-label">EMAIL</div><div class="info-value">${email||'--'}</div></div>
-              <div class="info-row"><div class="info-label">PHONE</div><div class="info-value">${primaryPhone||'--'}</div></div>
+              <div class="info-row"><div class="info-label">PHONE</div><div class="info-value">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' '))}" data-contact-id="${escapeHtml(contact.id || '')}" data-account-id="${escapeHtml(contact.accountId || contact.account_id || '')}" data-account-name="${escapeHtml(company)}" data-logo-url="${escapeHtml(contact.logoUrl || '')}" data-city="${escapeHtml(city)}" data-state="${escapeHtml(stateVal)}" data-domain="${escapeHtml(contact.domain || '')}">${escapeHtml(primaryPhone)}</span>` : '--'}</div></div>
               <div class="info-row"><div class="info-label">COMPANY</div><div class="info-value">${company||'--'}</div></div>
               <div class="info-row"><div class="info-label">CITY</div><div class="info-value">${city||'--'}</div></div>
               <div class="info-row"><div class="info-label">STATE</div><div class="info-value">${stateVal||'--'}</div></div>
@@ -2144,18 +2144,18 @@
           : (parts[0] ? parts[0][0].toUpperCase() : '?');
         
         return `
-          <div class="contact-item" data-contact-id="${contact.id}">
+          <div class="contact-item contact-link" data-contact-id="${escapeHtml(contact.id)}" data-contact-name="${escapeHtml(fullName)}" style="cursor: pointer;">
             <div class="contact-avatar">
               <div class="avatar-circle-small" aria-hidden="true">${initials}</div>
             </div>
             <div class="contact-info">
               <div class="contact-name">
-                <a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contact.id)}" data-contact-name="${escapeHtml(fullName)}">${escapeHtml(fullName)}</a>
+                <span class="contact-name-text">${escapeHtml(fullName)}</span>
               </div>
               <div class="contact-details">
                 ${title ? `<span class="contact-title">${escapeHtml(title)}</span>` : ''}
                 ${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(fullName)}" data-contact-id="${escapeHtml(contact.id || '')}">${escapeHtml(email)}</span>` : ''}
-                ${phone ? `<span class="phone-text" data-phone="${escapeHtml(phone)}" data-contact-name="${escapeHtml(fullName)}" data-contact-id="${escapeHtml(contact.id || '')}">${escapeHtml(phone)}</span>` : ''}
+                ${phone ? `<span class="phone-text" data-phone="${escapeHtml(phone)}" data-contact-name="${escapeHtml(fullName)}" data-contact-id="${escapeHtml(contact.id || '')}" data-account-id="${escapeHtml(account.id || '')}" data-account-name="${escapeHtml(accountName || '')}" data-logo-url="${escapeHtml(account.logoUrl || '')}" data-city="${escapeHtml(account.city || account.locationCity || '')}" data-state="${escapeHtml(account.state || account.locationState || '')}" data-domain="${escapeHtml(account.domain || '')}">${escapeHtml(phone)}</span>` : ''}
               </div>
             </div>
           </div>
@@ -2169,6 +2169,10 @@
 
   // Setup contact link handlers
   function setupContactLinkHandlers() {
+    // Prevent duplicate event listeners
+    if (state._contactHandlersSetup) return;
+    state._contactHandlersSetup = true;
+
     // Handle contact link clicks in header
     document.addEventListener('click', (e) => {
       const contactLink = e.target.closest('.contact-link');
@@ -2201,7 +2205,7 @@
           // Use retry pattern to ensure ContactDetail module is ready
           requestAnimationFrame(() => {
             let attempts = 0;
-            const maxAttempts = 25; // 2 seconds at 80ms intervals
+            const maxAttempts = 15; // 1.2 seconds at 80ms intervals (faster)
             
             const tryShowContact = () => {
               if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
@@ -2210,12 +2214,94 @@
                 attempts++;
                 setTimeout(tryShowContact, 80);
               } else {
-                console.warn('ContactDetail module not ready after 2 seconds');
+                console.warn('ContactDetail module not ready after 1.2 seconds');
               }
             };
             
             tryShowContact();
           });
+        }
+      }
+    });
+
+    // Handle add contact button clicks
+    document.addEventListener('click', (e) => {
+      const addContactBtn = e.target.closest('#add-contact-btn');
+      if (!addContactBtn) return;
+      
+      e.preventDefault();
+      openAddContactModal();
+    });
+  }
+
+  // Open add contact modal with prefilled account information
+  function openAddContactModal() {
+    // Use the main CRM's modal opening function to ensure proper event binding
+    if (window.crm && typeof window.crm.createAddContactModal === 'function') {
+      // Pre-fill the company name and industry before opening the modal
+      const modal = document.getElementById('modal-add-contact');
+      if (modal && state.currentTask) {
+        // Get account information from the current task
+        const accountName = state.currentTask.account || '';
+        const accountId = state.currentTask.accountId || '';
+        
+        // Find the account data to get industry
+        const account = findAccountByIdOrName(accountId, accountName);
+        const industry = account?.industry || '';
+        
+        // Pre-fill company name
+        const companyInput = modal.querySelector('input[name="companyName"]');
+        if (companyInput && accountName) {
+          companyInput.value = accountName;
+        }
+        
+        // Pre-fill industry
+        const industryInput = modal.querySelector('input[name="industry"]');
+        if (industryInput && industry) {
+          industryInput.value = industry;
+        }
+        
+        // Set navigation context so after creating the contact we return here
+        try {
+          window._contactNavigationSource = 'task-detail';
+          window._taskNavigationSource = 'task-detail';
+          window.__taskDetailRestoreData = {
+            taskId: state.currentTask?.id,
+            taskType: state.currentTask?.type,
+            contact: state.currentTask?.contact,
+            account: state.currentTask?.account,
+            scroll: window.scrollY || 0,
+            timestamp: Date.now()
+          };
+        } catch (_) {}
+      }
+      
+      // Open the modal using the proper function
+      window.crm.createAddContactModal();
+    } else {
+      console.error('CRM createAddContactModal function not available');
+    }
+  }
+
+  // Setup contact creation listener to refresh contacts list
+  function setupContactCreationListener() {
+    // Prevent duplicate event listeners
+    if (state._contactCreationListenerSetup) return;
+    state._contactCreationListenerSetup = true;
+
+    document.addEventListener('pc:contact-created', (e) => {
+      if (state.currentTask && isAccountTask(state.currentTask)) {
+        // Refresh the contacts list for account tasks
+        const contactsList = document.getElementById('account-contacts-list');
+        if (contactsList) {
+          // Get the account data
+          const accountName = state.currentTask.account || '';
+          const accountId = state.currentTask.accountId || '';
+          const account = findAccountByIdOrName(accountId, accountName);
+          
+          if (account) {
+            contactsList.innerHTML = renderAccountContacts(account);
+          }
         }
       }
     });
@@ -2285,6 +2371,8 @@
     init: function() {
       if (!initDomRefs()) return;
       attachEvents();
+      setupContactLinkHandlers();
+      setupContactCreationListener();
     }
   };
 
