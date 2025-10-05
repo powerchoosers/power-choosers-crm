@@ -572,6 +572,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/email/sendgrid-send') {
     return handleApiSendGridSend(req, res);
   }
+  if (pathname === '/api/email/sendgrid-test') {
+    return handleApiSendGridTest(req, res);
+  }
   if (pathname.startsWith('/api/email/track/')) {
     return handleApiEmailTrack(req, res, parsedUrl);
   }
@@ -1170,6 +1173,21 @@ async function handleApiSendGridSend(req, res) {
     return;
   }
 
+  // Environment variable validation as recommended by Twilio AI
+  if (!process.env.SENDGRID_API_KEY) {
+    console.error('[SendGrid] Missing SENDGRID_API_KEY environment variable');
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'SendGrid API key not configured' }));
+    return;
+  }
+
+  // Log environment status (masked for security)
+  console.log('[SendGrid] Environment check:', {
+    hasApiKey: !!process.env.SENDGRID_API_KEY,
+    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
+    fromName: process.env.SENDGRID_FROM_NAME || 'Power Choosers CRM'
+  });
+
   try {
     const body = await readJsonBody(req);
     const { to, subject, content, from, _deliverability } = body;
@@ -1212,6 +1230,17 @@ async function handleApiSendGridSend(req, res) {
 
     console.log('[SendGrid] Sending email:', { to, subject, trackingId });
 
+    // Log payload details as recommended by Twilio AI
+    console.log('[SendGrid] Email payload:', {
+      to: emailData.to,
+      subject: emailData.subject,
+      from: emailData.from,
+      trackingId: emailData.trackingId,
+      contentLength: emailData.content ? emailData.content.length : 0,
+      hasTrackingPixel: emailData.content ? emailData.content.includes('<img') : false,
+      deliverabilitySettings: emailData._deliverability
+    });
+
     // Import and use SendGrid service
     const { SendGridService } = await import('./api/email/sendgrid-service.js');
     const sendGridService = new SendGridService();
@@ -1230,6 +1259,56 @@ async function handleApiSendGridSend(req, res) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Failed to send email', 
+      message: error.message 
+    }));
+  }
+}
+
+// SendGrid test endpoint for minimal payload testing
+async function handleApiSendGridTest(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    // Minimal test payload as recommended by Twilio AI
+    const testEmailData = {
+      to: 'test@example.com', // Replace with a verified test email
+      subject: 'SendGrid Test Email',
+      content: '<p>This is a test email to verify SendGrid integration.</p>',
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
+      trackingId: `test_${Date.now()}`,
+      _deliverability: {
+        enableTracking: false, // Disable tracking for test
+        includeBulkHeaders: false,
+        includeListUnsubscribe: false,
+        includePriorityHeaders: false,
+        forceGmailOnly: false,
+        useBrandedHtmlTemplate: false,
+        signatureImageEnabled: false
+      }
+    };
+
+    console.log('[SendGrid] Test email payload:', testEmailData);
+
+    const { SendGridService } = await import('./api/email/sendgrid-service.js');
+    const sendGridService = new SendGridService();
+    const result = await sendGridService.sendEmail(testEmailData);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: true, 
+      message: 'Test email sent successfully',
+      result: result
+    }));
+
+  } catch (error) {
+    console.error('[SendGrid] Test email error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      error: 'Test email failed', 
       message: error.message 
     }));
   }
