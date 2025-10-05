@@ -2525,12 +2525,12 @@ class EmailManager {
                 if (this.currentFolder === 'inbox') {
                     // For inbox, show emails that were sent TO us (not by us)
                     filteredEmails = allEmails.filter(email => 
-                        email.to && email.to.includes(process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com')
+                        email.to && email.to.includes('noreply@powerchoosers.com')
                     );
                 } else if (this.currentFolder === 'sent') {
                     // For sent, show emails we sent
                     filteredEmails = allEmails.filter(email => 
-                        email.from && email.from.includes(process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com')
+                        email.from && email.from.includes('noreply@powerchoosers.com')
                     );
                 }
                 
