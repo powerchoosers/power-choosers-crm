@@ -5,6 +5,7 @@
 
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } = require('firebase/firestore');
+const formidable = require('formidable');
 
 // Firebase configuration
 const firebaseConfig = {
@@ -50,10 +51,26 @@ async function handler(req, res) {
   try {
     console.log('[InboundEmail] Received webhook from SendGrid');
     console.log('[InboundEmail] Headers:', req.headers);
-    console.log('[InboundEmail] Body:', req.body);
+
+    // Parse multipart/form-data using formidable
+    const form = new formidable.IncomingForm();
+    
+    const [fields, files] = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) {
+          console.error('[InboundEmail] Form parse error:', err);
+          reject(err);
+        } else {
+          resolve([fields, files]);
+        }
+      });
+    });
+
+    console.log('[InboundEmail] Parsed fields:', fields);
+    console.log('[InboundEmail] Parsed files:', files);
 
     // Parse the incoming email data from SendGrid
-    const emailData = parseSendGridWebhook(req.body);
+    const emailData = parseSendGridWebhook(fields);
     
     if (!emailData) {
       console.error('[InboundEmail] Failed to parse email data');
