@@ -147,7 +147,27 @@ export class SendGridService {
       };
 
     } catch (error) {
+      // Enhanced error logging as recommended by Twilio AI
       console.error('[SendGrid] Email send error:', error);
+      
+      // Log detailed SendGrid API error information
+      if (error.response && error.response.body && error.response.body.errors) {
+        console.error('[SendGrid] API Error Details:', error.response.body.errors);
+        console.error('[SendGrid] Status Code:', error.response.status);
+        console.error('[SendGrid] Response Headers:', error.response.headers);
+      } else {
+        console.error('[SendGrid] Full Error Object:', JSON.stringify(error, null, 2));
+      }
+      
+      // Log the email data that failed (without sensitive content)
+      console.error('[SendGrid] Failed Email Data:', {
+        to: emailData.to,
+        subject: emailData.subject,
+        from: emailData.from,
+        trackingId: emailData.trackingId,
+        contentLength: emailData.content ? emailData.content.length : 0
+      });
+      
       throw new Error(`Failed to send email: ${error.message}`);
     }
   }
