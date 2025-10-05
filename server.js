@@ -4,7 +4,12 @@ const path = require('path');
 const url = require('url');
 
 // Load environment variables from .env file for localhost development
-require('dotenv').config();
+try {
+  require('dotenv').config();
+  console.log('[Server] dotenv loaded successfully');
+} catch (error) {
+  console.log('[Server] dotenv not available, using system environment variables');
+}
 
 // Log environment variable status at startup (as recommended by Twilio AI)
 console.log('[Server] Environment check:', {
