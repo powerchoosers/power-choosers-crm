@@ -3,8 +3,8 @@
  * Handles incoming emails from SendGrid Inbound Parse Webhook
  */
 
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+const { initializeApp } = require('firebase/app');
+const { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } = require('firebase/firestore');
 
 // Firebase configuration
 const firebaseConfig = {
@@ -28,9 +28,9 @@ const corsHeaders = {
   'Access-Control-Allow-Credentials': 'true'
 };
 
-export const config = { api: { bodyParser: false } };
+const config = { api: { bodyParser: false } };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Set basic CORS headers (not required for SendGrid, but harmless)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -295,3 +295,5 @@ async function matchToConversation(emailData) {
     return null;
   }
 }
+
+module.exports = { config, handler };
