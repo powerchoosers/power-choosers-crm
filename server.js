@@ -2,8 +2,18 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-// require('dotenv').config(); // Load environment variables from .env file - temporarily disabled
-// SendGrid removed - using Gmail API via frontend
+
+// Load environment variables from .env file for localhost development
+require('dotenv').config();
+
+// Log environment variable status at startup (as recommended by Twilio AI)
+console.log('[Server] Environment check:', {
+  hasSendGridApiKey: !!process.env.SENDGRID_API_KEY,
+  hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+  hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+  nodeEnv: process.env.NODE_ENV || 'development',
+  port: process.env.PORT || 3000
+});
 
 // MIME types for different file extensions
 const mimeTypes = {
