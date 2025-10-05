@@ -2525,7 +2525,7 @@ class EmailManager {
                 if (this.currentFolder === 'inbox') {
                     // For inbox, show emails that were sent TO us (not by us)
                     filteredEmails = allEmails.filter(email => 
-                        email.to && email.to.includes('noreply@powerchoosers.com')
+                        email.to && (email.to.includes('noreply@powerchoosers.com') || email.to.includes('l.patterson@inbound.powerchoosers.com'))
                     );
                 } else if (this.currentFolder === 'sent') {
                     // For sent, show emails we sent
