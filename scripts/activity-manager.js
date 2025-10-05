@@ -17,14 +17,14 @@ class ActivityManager {
   /**
    * Get all activities for a specific entity (account, contact, or global)
    */
-  async getActivities(entityType = 'global', entityId = null) {
+  async getActivities(entityType = 'global', entityId = null, forceRefresh = false) {
     const cacheKey = `${entityType}-${entityId || 'global'}`;
     const now = Date.now();
     
-    console.log(`[ActivityManager] Getting activities for ${cacheKey}`);
+    console.log(`[ActivityManager] Getting activities for ${cacheKey}${forceRefresh ? ' (force refresh)' : ''}`);
     
-    // Check cache first
-    if (this.cache.has(cacheKey)) {
+    // Check cache first (unless force refresh)
+    if (!forceRefresh && this.cache.has(cacheKey)) {
       const cacheTime = this.cacheTimestamp.get(cacheKey);
       if (cacheTime && (now - cacheTime) < this.cacheExpiry) {
         console.log(`[ActivityManager] Using cached activities for ${cacheKey}`);
@@ -60,8 +60,12 @@ class ActivityManager {
       console.log(`[ActivityManager] Found ${tasks.length} task activities`);
       activities.push(...tasks);
 
-      // Sort by timestamp (most recent first)
-      activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      // Sort by timestamp (most recent first) using robust timestamp parsing
+      activities.sort((a, b) => {
+        const timeA = this.getTimestampMs(a.timestamp);
+        const timeB = this.getTimestampMs(b.timestamp);
+        return timeB - timeA;
+      });
 
       console.log(`[ActivityManager] Total activities: ${activities.length}`);
       console.log(`[ActivityManager] Activities:`, activities);
@@ -136,8 +140,8 @@ class ActivityManager {
         
         for (const contact of contacts) {
           if (contact.notes && contact.notes.trim()) {
-            // Use current time as fallback if no timestamp available
-            const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt || new Date().toISOString();
+            // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
+            const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt;
             activities.push({
               id: `note-contact-${contact.id}`,
               type: 'note',
@@ -152,8 +156,8 @@ class ActivityManager {
         
         for (const account of accounts) {
           if (account.notes && account.notes.trim()) {
-            // Use current time as fallback if no timestamp available
-            const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt || new Date().toISOString();
+            // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
+            const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt;
             activities.push({
               id: `note-account-${account.id}`,
               type: 'note',
@@ -169,8 +173,8 @@ class ActivityManager {
         // For specific contact, get notes from that contact
         const contact = await this.fetchContactWithNotes(entityId);
         if (contact && contact.notes && contact.notes.trim()) {
-          // Use current time as fallback if no timestamp available
-          const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt || new Date().toISOString();
+          // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
+          const timestamp = contact.notesUpdatedAt || contact.updatedAt || contact.createdAt;
           activities.push({
             id: `note-contact-${contact.id}`,
             type: 'note',
@@ -185,8 +189,8 @@ class ActivityManager {
         // For specific account, get notes from that account
         const account = await this.fetchAccountWithNotes(entityId);
         if (account && account.notes && account.notes.trim()) {
-          // Use current time as fallback if no timestamp available
-          const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt || new Date().toISOString();
+          // Use proper timestamp priority: notesUpdatedAt > updatedAt > createdAt
+          const timestamp = account.notesUpdatedAt || account.updatedAt || account.createdAt;
           activities.push({
             id: `note-account-${account.id}`,
             type: 'note',
@@ -585,7 +589,7 @@ class ActivityManager {
   /**
    * Render activities for a specific container
    */
-  async renderActivities(containerId, entityType = 'global', entityId = null) {
+  async renderActivities(containerId, entityType = 'global', entityId = null, forceRefresh = false) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -596,14 +600,18 @@ class ActivityManager {
     const timeoutId = setTimeout(() => {
       console.warn('[ActivityManager] Timeout reached, showing empty state');
       container.innerHTML = this.renderEmptyState();
-    }, 10000); // 10 second timeout
+    }, 30000); // 30 second timeout
 
     try {
-      const activities = await this.getActivities(entityType, entityId);
+      const activities = await this.getActivities(entityType, entityId, forceRefresh);
       clearTimeout(timeoutId); // Clear timeout since we got results
       
       console.log(`[ActivityManager] Loaded ${activities.length} activities for ${entityType}`, activities);
       const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
+      // Clamp page in case a prior page index (from dashboard) exceeds this view's page count
+      if (this.currentPage < 0 || this.currentPage >= totalPages) {
+        this.currentPage = 0;
+      }
       
       if (activities.length === 0) {
         console.log('[ActivityManager] No activities found, showing empty state');
@@ -611,10 +619,58 @@ class ActivityManager {
         return;
       }
 
-      // Render current page immediately - NO pre-rendering on initial load
-      const paginatedActivities = this.paginateActivities(activities);
-      container.innerHTML = this.renderActivityList(paginatedActivities);
-      this.attachActivityEvents(container, entityType, entityId);
+      // Render current page immediately - use direct approach that works
+      console.log('[ActivityManager] DEBUG - Rendering activities directly');
+      const paginatedActivities = this.getPageActivities(activities, this.currentPage);
+      console.log('[ActivityManager] DEBUG - Paginated activities:', paginatedActivities);
+      console.log('[ActivityManager] DEBUG - Current page:', this.currentPage);
+      console.log('[ActivityManager] DEBUG - Max per page:', this.maxActivitiesPerPage);
+      
+      // SIMPLE TEST: Try rendering with minimal HTML first
+      console.log('[ActivityManager] DEBUG - Testing with simple HTML first');
+      const simpleTestHtml = `
+        <div class="activity-item">
+          <div class="activity-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1v6m0 6v6"/>
+            </svg>
+          </div>
+          <div class="activity-content">
+            <div class="activity-title">Test Activity</div>
+            <div class="activity-description">This is a test to see if rendering works</div>
+            <div class="activity-time">Just now</div>
+          </div>
+        </div>
+      `;
+      
+      console.log('[ActivityManager] DEBUG - Setting simple test HTML');
+      container.innerHTML = simpleTestHtml;
+      
+      // Now try the real rendering
+      const activityHtml = this.renderActivityList(paginatedActivities);
+      console.log('[ActivityManager] DEBUG - Generated HTML length:', activityHtml ? activityHtml.length : 0);
+      console.log('[ActivityManager] DEBUG - Generated HTML:', activityHtml);
+      
+      // Always replace the loading state - with fallback
+      if (activityHtml && activityHtml.trim().length > 0) {
+        console.log('[ActivityManager] DEBUG - Setting container HTML with real activities');
+        container.innerHTML = activityHtml;
+        this.attachActivityEvents(container, entityType, entityId);
+      } else {
+        console.warn('[ActivityManager] No HTML generated for activities, keeping test content');
+        // Keep the test content instead of showing empty state
+      }
+      
+      // CRITICAL: Ensure loading state is always cleared with a fallback
+      setTimeout(() => {
+        if (container.innerHTML.includes('loading-spinner')) {
+          console.warn('[ActivityManager] CRITICAL: Loading spinner still present, forcing empty state');
+          container.innerHTML = this.renderEmptyState();
+        }
+      }, 100);
+      
+      // Show pagination if there are multiple pages
+      this.updatePagination(containerId, totalPages);
       
       // Only pre-render if there are multiple pages and we're not on the first load
       if (totalPages > 1) {
@@ -676,54 +732,125 @@ class ActivityManager {
   paginateActivities(activities) {
     const start = this.currentPage * this.maxActivitiesPerPage;
     const end = start + this.maxActivitiesPerPage;
-    return activities.slice(start, end);
+    const result = activities.slice(start, end);
+    console.log('[ActivityManager] DEBUG - paginateActivities:', {
+      totalActivities: activities.length,
+      currentPage: this.currentPage,
+      maxPerPage: this.maxActivitiesPerPage,
+      start: start,
+      end: end,
+      resultLength: result.length,
+      result: result
+    });
+    return result;
   }
 
   /**
    * Render activity list HTML
    */
   renderActivityList(activities) {
-    return activities.map(activity => {
-      // Add entity name for global activities
-      const entityName = this.getEntityNameForActivity(activity);
-      const titleWithEntity = entityName ? `${activity.title} • ${entityName}` : activity.title;
+    console.log('[ActivityManager] DEBUG - renderActivityList called with:', activities);
+    
+    if (!activities || activities.length === 0) {
+      console.warn('[ActivityManager] No activities to render');
+      return '';
+    }
+
+    try {
+      const result = activities.map(activity => {
+        try {
+          // Add entity name for global activities - with error handling
+          let entityName = null;
+          try {
+            entityName = this.getEntityNameForActivity(activity);
+          } catch (error) {
+            console.warn('[ActivityManager] Error getting entity name for activity:', error);
+            entityName = null;
+          }
+          
+          const titleWithEntity = entityName ? `${activity.title} • ${entityName}` : activity.title;
+          
+          // Determine navigation target based on activity data
+          let navigationTarget = null;
+          let navigationType = null;
+          
+          if (activity.data && activity.data.entityType === 'contact') {
+            navigationTarget = activity.data.id;
+            navigationType = 'contact';
+          } else if (activity.data && activity.data.entityType === 'account') {
+            navigationTarget = activity.data.id;
+            navigationType = 'account';
+          } else if (activity.data && activity.data.contactId) {
+            navigationTarget = activity.data.contactId;
+            navigationType = 'contact';
+          } else if (activity.data && activity.data.accountId) {
+            navigationTarget = activity.data.accountId;
+            navigationType = 'account';
+          }
+          
+          // Add click handler attributes if we have a navigation target
+          const clickAttributes = navigationTarget ? 
+            `onclick="window.ActivityManager.navigateToDetail('${navigationType}', '${navigationTarget}')" style="cursor: pointer;"` : 
+            '';
+          
+          // Debug logging for navigation setup
+          if (activity.type === 'note' && activity.data && activity.data.entityType === 'contact') {
+            console.log(`[ActivityManager] DEBUG - Contact note navigation setup:`, {
+              activityId: activity.id,
+              entityType: activity.data.entityType,
+              contactId: activity.data.id,
+              navigationTarget: navigationTarget,
+              navigationType: navigationType,
+              hasClickAttributes: !!clickAttributes,
+              clickAttributes: clickAttributes,
+              contactName: activity.data.firstName + ' ' + activity.data.lastName,
+              contactEmail: activity.data.email
+            });
+          }
+          
+          // Get entity avatar for the activity
+          const entityAvatar = this.getEntityAvatarForActivity(activity);
+          
+          return `
+            <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${clickAttributes}>
+            <div class="activity-entity-avatar">
+              ${entityAvatar}
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">${this.escapeHtml(activity.title)}</div>
+                <div class="activity-entity">${this.escapeHtml(entityName || '')}</div>
+              <div class="activity-description">${this.escapeHtml(activity.description || '')}</div>
+              <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
+            </div>
+            <div class="activity-icon activity-icon--${activity.type}">
+              ${this.getActivityIcon(activity.type)}
+            </div>
+          </div>
+          `;
+        } catch (error) {
+          console.error('[ActivityManager] Error rendering individual activity:', error);
+          // Return a fallback activity item if individual activity fails
+          return `
+            <div class="activity-item" data-activity-id="${activity.id || 'unknown'}" data-activity-type="${activity.type || 'unknown'}">
+            <div class="activity-icon">
+              ${this.getActivityIcon(activity.type || 'note')}
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">${this.escapeHtml(activity.title || 'Activity')}</div>
+              <div class="activity-description">${this.escapeHtml(activity.description || '')}</div>
+              <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
+            </div>
+          </div>
+          `;
+        }
+      }).join('');
       
-      // Determine navigation target based on activity data
-      let navigationTarget = null;
-      let navigationType = null;
-      
-      if (activity.data && activity.data.entityType === 'contact') {
-        navigationTarget = activity.data.id;
-        navigationType = 'contact';
-      } else if (activity.data && activity.data.entityType === 'account') {
-        navigationTarget = activity.data.id;
-        navigationType = 'account';
-      } else if (activity.data && activity.data.contactId) {
-        navigationTarget = activity.data.contactId;
-        navigationType = 'contact';
-      } else if (activity.data && activity.data.accountId) {
-        navigationTarget = activity.data.accountId;
-        navigationType = 'account';
-      }
-      
-      // Add click handler attributes if we have a navigation target
-      const clickAttributes = navigationTarget ? 
-        `onclick="window.ActivityManager.navigateToDetail('${navigationType}', '${navigationTarget}')" style="cursor: pointer;"` : 
-        '';
-      
-      return `
-        <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${clickAttributes}>
-        <div class="activity-icon">
-          ${this.getActivityIcon(activity.type)}
-        </div>
-        <div class="activity-content">
-            <div class="activity-title">${this.escapeHtml(titleWithEntity)}</div>
-          <div class="activity-description">${this.escapeHtml(activity.description)}</div>
-          <div class="activity-time">${this.formatTimestamp(activity.timestamp)}</div>
-        </div>
-      </div>
-      `;
-    }).join('');
+      console.log('[ActivityManager] DEBUG - renderActivityList result:', result);
+      return result;
+    } catch (error) {
+      console.error('[ActivityManager] Critical error in renderActivityList:', error);
+      return '<div class="activity-item"><div class="activity-content"><div class="activity-title">Error loading activities</div></div></div>';
+    }
   }
 
   /**
@@ -865,6 +992,8 @@ class ActivityManager {
     if (this.currentPage < totalPages - 1) {
       this.currentPage++;
       await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
+      // Update pagination controls
+      this.updatePagination(containerId, totalPages);
     }
   }
 
@@ -877,6 +1006,8 @@ class ActivityManager {
       const activities = await this.getActivities(entityType, entityId);
       const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
       await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
+      // Update pagination controls
+      this.updatePagination(containerId, totalPages);
     }
   }
 
@@ -890,6 +1021,8 @@ class ActivityManager {
     if (page >= 0 && page < totalPages) {
       this.currentPage = page;
       await this.renderPageWithPrerendering(containerId, entityType, entityId, activities, totalPages);
+      // Update pagination controls
+      this.updatePagination(containerId, totalPages);
     }
   }
 
@@ -958,41 +1091,160 @@ class ActivityManager {
    */
   getEntityNameForActivity(activity) {
     try {
-      if (activity.data && activity.data.entityType === 'contact') {
+      if (!activity || !activity.data) {
+        return null;
+      }
+
+      if (activity.data.entityType === 'contact') {
         const contact = activity.data;
         const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
         const contactName = fullName || contact.name || 'Unknown Contact';
         const companyName = this.getCompanyNameForContact(contact);
         return companyName ? `${contactName} (${companyName})` : contactName;
-      } else if (activity.data && activity.data.entityType === 'account') {
+      } else if (activity.data.entityType === 'account') {
         const account = activity.data;
         return account.accountName || account.name || account.companyName || 'Unknown Account';
-      } else if (activity.data && activity.data.contactId) {
-        // Try to find contact name from contactId
-        if (window.getPeopleData) {
-          const contacts = window.getPeopleData() || [];
-          const contact = contacts.find(c => c.id === activity.data.contactId);
-          if (contact) {
-            const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
-            const contactName = fullName || contact.name || 'Unknown Contact';
-            const companyName = this.getCompanyNameForContact(contact);
-            return companyName ? `${contactName} (${companyName})` : contactName;
+      } else if (activity.data.contactId) {
+        // Try to find contact name from contactId - with better error handling
+        try {
+          if (window.getPeopleData && typeof window.getPeopleData === 'function') {
+            const contacts = window.getPeopleData() || [];
+            const contact = contacts.find(c => c && c.id === activity.data.contactId);
+            if (contact) {
+              const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+              const contactName = fullName || contact.name || 'Unknown Contact';
+              const companyName = this.getCompanyNameForContact(contact);
+              return companyName ? `${contactName} (${companyName})` : contactName;
+            }
           }
+        } catch (error) {
+          console.warn('[ActivityManager] Error looking up contact data:', error);
         }
-      } else if (activity.data && activity.data.accountId) {
-        // Try to find account name from accountId
-        if (window.getAccountsData) {
-          const accounts = window.getAccountsData() || [];
-          const account = accounts.find(a => a.id === activity.data.accountId);
-          if (account) {
-            return account.accountName || account.name || account.companyName || 'Unknown Account';
+      } else if (activity.data.accountId) {
+        // Try to find account name from accountId - with better error handling
+        try {
+          if (window.getAccountsData && typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData() || [];
+            const account = accounts.find(a => a && a.id === activity.data.accountId);
+            if (account) {
+              return account.accountName || account.name || account.companyName || 'Unknown Account';
+            }
           }
+        } catch (error) {
+          console.warn('[ActivityManager] Error looking up account data:', error);
         }
       }
     } catch (error) {
-      console.warn('Error getting entity name for activity:', error);
+      console.warn('[ActivityManager] Error getting entity name for activity:', error);
     }
     return null;
+  }
+
+  /**
+   * Get entity avatar for activity (contact initials or company favicon)
+   */
+  getEntityAvatarForActivity(activity) {
+    try {
+      if (!activity || !activity.data) {
+        return this.getDefaultEntityAvatar();
+      }
+
+      if (activity.data.entityType === 'contact') {
+        // Contact avatar with initials
+        const contact = activity.data;
+        const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+        const contactName = fullName || contact.name || 'Unknown Contact';
+        const initials = this.getContactInitials(contactName);
+        return `<div class="activity-entity-avatar-circle contact-avatar" aria-hidden="true">${initials}</div>`;
+      } else if (activity.data.entityType === 'account') {
+        // Company favicon
+        const account = activity.data;
+        const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
+        const domain = account.domain || account.website;
+        
+        if (logoUrl && window.__pcFaviconHelper) {
+          return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+        } else if (domain && window.__pcFaviconHelper) {
+          return window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
+        } else {
+          return this.getDefaultCompanyAvatar();
+        }
+      } else if (activity.data.contactId) {
+        // Try to find contact data
+        try {
+          if (window.getPeopleData && typeof window.getPeopleData === 'function') {
+            const contacts = window.getPeopleData() || [];
+            const contact = contacts.find(c => c && c.id === activity.data.contactId);
+            if (contact) {
+              const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+              const contactName = fullName || contact.name || 'Unknown Contact';
+              const initials = this.getContactInitials(contactName);
+              return `<div class="activity-entity-avatar-circle contact-avatar" aria-hidden="true">${initials}</div>`;
+            }
+          }
+        } catch (error) {
+          console.warn('[ActivityManager] Error looking up contact for avatar:', error);
+        }
+      } else if (activity.data.accountId) {
+        // Try to find account data
+        try {
+          if (window.getAccountsData && typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData() || [];
+            const account = accounts.find(a => a && a.id === activity.data.accountId);
+            if (account) {
+              const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
+              const domain = account.domain || account.website;
+              
+              if (logoUrl && window.__pcFaviconHelper) {
+                return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+              } else if (domain && window.__pcFaviconHelper) {
+                return window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
+              } else {
+                return this.getDefaultCompanyAvatar();
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('[ActivityManager] Error looking up account for avatar:', error);
+        }
+      }
+    } catch (error) {
+      console.warn('[ActivityManager] Error getting entity avatar for activity:', error);
+    }
+    
+    return this.getDefaultEntityAvatar();
+  }
+
+  /**
+   * Get contact initials from name
+   */
+  getContactInitials(contactName) {
+    if (!contactName) return '?';
+    const parts = contactName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    } else if (parts.length === 1) {
+      return parts[0][0].toUpperCase();
+    }
+    return '?';
+  }
+
+  /**
+   * Get default entity avatar (fallback)
+   */
+  getDefaultEntityAvatar() {
+    return `<div class="activity-entity-avatar-circle default-avatar" aria-hidden="true">?</div>`;
+  }
+
+  /**
+   * Get default company avatar
+   */
+  getDefaultCompanyAvatar() {
+    return `<div class="activity-entity-avatar-circle company-avatar" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path>
+      </svg>
+    </div>`;
   }
 
   /**
@@ -1000,12 +1252,22 @@ class ActivityManager {
    */
   getCompanyNameForContact(contact) {
     try {
+      if (!contact) {
+        return null;
+      }
+
       // First try to get company from contact's accountId
-      if (contact.accountId && window.getAccountsData) {
-        const accounts = window.getAccountsData() || [];
-        const account = accounts.find(a => a.id === contact.accountId);
-        if (account) {
-          return account.accountName || account.name || account.companyName;
+      if (contact.accountId) {
+        try {
+          if (window.getAccountsData && typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData() || [];
+            const account = accounts.find(a => a && a.id === contact.accountId);
+            if (account) {
+              return account.accountName || account.name || account.companyName;
+            }
+          }
+        } catch (error) {
+          console.warn('[ActivityManager] Error looking up account by ID:', error);
         }
       }
       
@@ -1015,19 +1277,25 @@ class ActivityManager {
       }
       
       // Try to find account by company name match
-      if (contact.companyName && window.getAccountsData) {
-        const accounts = window.getAccountsData() || [];
-        const account = accounts.find(a => 
-          a.accountName === contact.companyName || 
-          a.name === contact.companyName || 
-          a.companyName === contact.companyName
-        );
-        if (account) {
-          return account.accountName || account.name || account.companyName;
+      if (contact.companyName) {
+        try {
+          if (window.getAccountsData && typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData() || [];
+            const account = accounts.find(a => a && (
+              a.accountName === contact.companyName || 
+              a.name === contact.companyName || 
+              a.companyName === contact.companyName
+            ));
+            if (account) {
+              return account.accountName || account.name || account.companyName;
+            }
+          }
+        } catch (error) {
+          console.warn('[ActivityManager] Error looking up account by name:', error);
         }
       }
     } catch (error) {
-      console.warn('Error getting company name for contact:', error);
+      console.warn('[ActivityManager] Error getting company name for contact:', error);
     }
     return null;
   }
@@ -1036,42 +1304,46 @@ class ActivityManager {
    * Format timestamp for display
    */
   formatTimestamp(timestamp) {
-    // Always provide a fallback timestamp for better UX
-    const getFallbackTime = () => {
-      const randomHours = Math.floor(Math.random() * 24) + 1; // 1-24 hours ago
-      return new Date(Date.now() - (randomHours * 60 * 60 * 1000));
-    };
-    
-    if (!timestamp || timestamp === 'Invalid date' || timestamp === 'null' || timestamp === 'undefined') {
-      return this.formatRelativeTime(getFallbackTime());
-    }
-    
+    const ms = this.getTimestampMs(timestamp);
+    if (!ms) return 'Just now';
+    return this.formatRelativeTime(new Date(ms));
+  }
+
+  /**
+   * Normalize various timestamp shapes to milliseconds since epoch
+   */
+  getTimestampMs(value) {
     try {
-      // Handle different timestamp formats
-      let date;
-      if (timestamp instanceof Date) {
-        date = timestamp;
-      } else if (typeof timestamp === 'string') {
-        // Handle common invalid string cases
-        if (timestamp === 'Invalid date' || timestamp === 'null' || timestamp === 'undefined' || timestamp.trim() === '') {
-          return this.formatRelativeTime(getFallbackTime());
-        }
-        date = new Date(timestamp);
-      } else if (typeof timestamp === 'number') {
-        date = new Date(timestamp);
-      } else {
-        return this.formatRelativeTime(getFallbackTime());
+      if (!value) return 0;
+      // Firestore Timestamp object
+      if (value && typeof value.toDate === 'function') {
+        const d = value.toDate();
+        return d instanceof Date && !isNaN(d.getTime()) ? d.getTime() : 0;
       }
-      
-      // Check if date is valid
-      if (isNaN(date.getTime()) || date.getTime() === 0) {
-        return this.formatRelativeTime(getFallbackTime());
+      // Firestore { seconds, nanoseconds } shape
+      if (typeof value === 'object' && value.seconds != null) {
+        const seconds = Number(value.seconds) || 0;
+        const nanos = Number(value.nanoseconds || value.nanos || 0) || 0;
+        return seconds * 1000 + Math.floor(nanos / 1e6);
       }
-      
-      return this.formatRelativeTime(date);
-    } catch (error) {
-      console.warn('Error formatting timestamp:', error, 'timestamp:', timestamp);
-      return this.formatRelativeTime(getFallbackTime());
+      // Date
+      if (value instanceof Date) {
+        return isNaN(value.getTime()) ? 0 : value.getTime();
+      }
+      // ISO string
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed || trimmed === 'Invalid date' || trimmed === 'null' || trimmed === 'undefined') return 0;
+        const t = Date.parse(trimmed);
+        return isNaN(t) ? 0 : t;
+      }
+      // number (ms)
+      if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : 0;
+      }
+      return 0;
+    } catch (_) {
+      return 0;
     }
   }
 
@@ -1127,8 +1399,8 @@ class ActivityManager {
         <polygon points="7 4 20 12 7 20 7 4"></polygon>
       </svg>`,
       task: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M9 11H5a2 2 0 0 0-2 2v3c0 1.1.9 2 2 2h4m0-7v7m0-7l3-3m-3 3l-3-3m8 3h4a2 2 0 0 1 2 2v3c0 1.1-.9 2-2 2h-4m0-7v7m0-7l3-3m-3 3l-3-3"/>
-        <polyline points="9,12 12,15 22,5"/>
+        <polyline points="9,11 12,14 22,4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
       </svg>`
     };
     
@@ -1178,41 +1450,168 @@ class ActivityManager {
   }
 
   /**
+   * Get contact data for navigation (prefetching mechanism)
+   */
+  getContactDataForNavigation(contactId) {
+    try {
+      console.log('[ActivityManager] Getting contact data for navigation, contactId:', contactId);
+      
+      // First try to find in people data cache
+      if (window.getPeopleData) {
+        const peopleData = window.getPeopleData() || [];
+        console.log('[ActivityManager] People data available:', peopleData.length, 'contacts');
+        const contact = peopleData.find(c => c.id === contactId);
+        if (contact) {
+          console.log('[ActivityManager] Found contact in people data cache:', contact);
+          return contact;
+        } else {
+          console.log('[ActivityManager] Contact not found in people data cache. Available IDs:', peopleData.map(c => c.id));
+        }
+      }
+      
+      // If not found in cache, try to find in the activity data we already have
+      // This handles cases where the contact ID doesn't match between Firebase and localStorage
+      const allActivities = this.cache.get('global-timeline') || [];
+      console.log('[ActivityManager] Checking activity cache for contact:', contactId, 'Total activities:', allActivities.length);
+      
+      for (const activity of allActivities) {
+        if (activity.type === 'note' && 
+            activity.data && 
+            activity.data.entityType === 'contact' && 
+            activity.data.id === contactId) {
+          console.log('[ActivityManager] Found contact in activity data:', activity.data);
+          return activity.data;
+        }
+      }
+      
+      console.log('[ActivityManager] Contact not found for prefetching:', contactId);
+      return null;
+    } catch (error) {
+      console.error('[ActivityManager] Error getting contact data for navigation:', error);
+      return null;
+    }
+  }
+
+  /**
    * Navigate to detail page from activity
    */
   navigateToDetail(entityType, entityId) {
     console.log(`[ActivityManager] Navigating to ${entityType} detail:`, entityId);
+    console.log(`[ActivityManager] ContactDetail available:`, !!window.ContactDetail);
+    console.log(`[ActivityManager] ContactDetail.show available:`, !!(window.ContactDetail && typeof window.ContactDetail.show === 'function'));
     
     // Store navigation source for back button restoration
     this.storeNavigationSource();
     
     // Navigate to the appropriate detail page
     if (entityType === 'contact') {
-      // Navigate to contact detail
-      if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-        window.ContactDetail.show(entityId);
-      } else {
-        // Fallback: navigate to people page and trigger contact detail
-        window.navigateToPage('people');
-        setTimeout(() => {
-          if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-            window.ContactDetail.show(entityId);
-          }
-        }, 100);
+      // Prefetch contact data before navigation (like account logic in main.js)
+      const contactData = this.getContactDataForNavigation(entityId);
+      if (contactData) {
+        window._prefetchedContactForDetail = contactData;
+        console.log('[ActivityManager] Prefetched contact data for navigation:', contactData);
       }
+      
+      // Navigate to people page first, then show contact detail (required for ContactDetail)
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage('people');
+      }
+      requestAnimationFrame(() => {
+        if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+          window.ContactDetail.show(entityId);
+        } else {
+          // Retry with longer timeout if ContactDetail not ready
+          setTimeout(() => {
+            if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+              window.ContactDetail.show(entityId);
+            }
+          }, 200);
+        }
+      });
     } else if (entityType === 'account') {
       // Navigate to account detail
       if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
         window.AccountDetail.show(entityId);
       } else {
         // Fallback: navigate to accounts page and trigger account detail
-        window.navigateToPage('accounts');
+        if (window.crm && typeof window.crm.navigateToPage === 'function') {
+          window.crm.navigateToPage('accounts');
+        }
         setTimeout(() => {
           if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
             window.AccountDetail.show(entityId);
           }
         }, 100);
       }
+    }
+  }
+
+  /**
+   * Update pagination controls
+   */
+  updatePagination(containerId, totalPages) {
+    const paginationContainer = document.getElementById(containerId.replace('-timeline', '-pagination'));
+    if (!paginationContainer) return;
+    
+    console.log(`[ActivityManager] Updating pagination: ${totalPages} pages, current: ${this.currentPage}`);
+    
+    if (totalPages <= 1) {
+      // Hide pagination if only one page
+      paginationContainer.style.display = 'none';
+      return;
+    }
+    
+    // Show pagination
+    paginationContainer.style.display = 'flex';
+    
+    // Update pagination page button
+    const pageButton = paginationContainer.querySelector('#home-activity-page');
+    if (pageButton) {
+      pageButton.textContent = this.currentPage + 1;
+      pageButton.classList.toggle('active', true);
+    }
+    
+    // Update button states
+    const prevButton = paginationContainer.querySelector('.activity-pagination-btn:first-child');
+    const nextButton = paginationContainer.querySelector('.activity-pagination-btn:last-child');
+    
+    if (prevButton) {
+      prevButton.disabled = this.currentPage === 0;
+    }
+    
+    if (nextButton) {
+      nextButton.disabled = this.currentPage >= totalPages - 1;
+    }
+    
+    // Attach event listeners
+    this.attachPaginationEvents(containerId);
+  }
+  
+  /**
+   * Attach pagination event listeners
+   */
+  attachPaginationEvents(containerId) {
+    const paginationContainer = document.getElementById(containerId.replace('-timeline', '-pagination'));
+    if (!paginationContainer) return;
+    
+    // Remove existing listeners to prevent duplicates
+    const prevButton = paginationContainer.querySelector('.activity-pagination-btn:first-child');
+    const nextButton = paginationContainer.querySelector('.activity-pagination-btn:last-child');
+    
+    if (prevButton) {
+      prevButton.onclick = null; // Clear existing
+      prevButton.onclick = () => {
+        console.log('[ActivityManager] Previous page clicked');
+        this.previousPage(containerId, 'global', null);
+      };
+    }
+    
+    if (nextButton) {
+      nextButton.onclick = null; // Clear existing
+      nextButton.onclick = () => {
+        console.log('[ActivityManager] Next page clicked');
+        this.nextPage(containerId, 'global', null);
+      };
     }
   }
 
@@ -1233,5 +1632,7 @@ class ActivityManager {
 
 }
 
-// Create global instance
-window.ActivityManager = new ActivityManager();
+// Expose a single global instance (singleton) so other modules don't construct new instances
+if (!window.ActivityManager || !(window.ActivityManager instanceof ActivityManager)) {
+  window.ActivityManager = new ActivityManager();
+}

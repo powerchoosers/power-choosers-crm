@@ -48,8 +48,21 @@
           console.log('[Accounts] Restored sort direction:', detail.sortDirection);
         }
         
-        // Re-render with restored state
-        applyFilters();
+        // Re-render with restored state - but only if data is loaded
+        if (state.data && state.data.length > 0) {
+          applyFilters();
+        } else {
+          // If data isn't loaded yet, wait for it and then apply filters
+          const checkDataAndApply = () => {
+            if (state.data && state.data.length > 0) {
+              applyFilters();
+            } else {
+              // Retry after a short delay
+              setTimeout(checkDataAndApply, 100);
+            }
+          };
+          setTimeout(checkDataAndApply, 100);
+        }
         
         // Restore scroll position with multiple attempts
         const y = parseInt(detail.scroll || 0, 10);
@@ -145,7 +158,21 @@
           if (restore.sortColumn) state.sortColumn = restore.sortColumn;
           if (restore.sortDirection) state.sortDirection = restore.sortDirection;
           
-          applyFilters();
+          // Only apply filters if data is loaded
+          if (state.data && state.data.length > 0) {
+            applyFilters();
+          } else {
+            // If data isn't loaded yet, wait for it and then apply filters
+            const checkDataAndApply = () => {
+              if (state.data && state.data.length > 0) {
+                applyFilters();
+              } else {
+                // Retry after a short delay
+                setTimeout(checkDataAndApply, 100);
+              }
+            };
+            setTimeout(checkDataAndApply, 100);
+          }
           
           const y = parseInt(restore.scroll || 0, 10);
           if (y > 0) {
@@ -776,6 +803,14 @@
   function normalize(s) { return (s || '').toString().trim().toLowerCase(); }
 
   function applyFilters() {
+    // Safety check: ensure state.data exists and is an array
+    if (!state.data || !Array.isArray(state.data)) {
+      console.warn('[Accounts] applyFilters called but state.data is not ready:', state.data);
+      state.filtered = [];
+      render();
+      return;
+    }
+
     const q = normalize(els.quickSearch ? els.quickSearch.value : '');
 
     const nameQ = normalize(els.fName ? els.fName.value : '');

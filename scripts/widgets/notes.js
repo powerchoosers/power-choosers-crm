@@ -158,7 +158,11 @@
       try {
         const collection = entityType === 'account' ? 'accounts' : 'contacts';
         const ref = db.collection(collection).doc(currentId);
-        const payload = { notes: text, notesUpdatedAt: fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now() };
+        const payload = { 
+          notes: text, 
+          notesUpdatedAt: fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : new Date().toISOString(),
+          updatedAt: fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : new Date().toISOString()
+        };
         await ref.set(payload, { merge: true });
         lastRemoteText = text;
         const ts = new Date();
@@ -169,22 +173,24 @@
         // Trigger activity refresh for the current entity
         try {
           if (window.ActivityManager) {
-            const activityManager = new window.ActivityManager();
+            // Clear cache first to ensure fresh data
+            window.ActivityManager.clearCache();
+            
             // Refresh activities for the current entity
             if (entityType === 'contact' && currentContactId) {
-              // Trigger contact activity refresh
+              // Trigger contact activity refresh with force refresh
               document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
-                detail: { entityType: 'contact', entityId: currentContactId } 
+                detail: { entityType: 'contact', entityId: currentContactId, forceRefresh: true } 
               }));
             } else if (entityType === 'account' && currentAccountId) {
-              // Trigger account activity refresh
+              // Trigger account activity refresh with force refresh
               document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
-                detail: { entityType: 'account', entityId: currentAccountId } 
+                detail: { entityType: 'account', entityId: currentAccountId, forceRefresh: true } 
               }));
             }
-            // Also refresh global activities
+            // Also refresh global activities with force refresh
             document.dispatchEvent(new CustomEvent('pc:activities-refresh', { 
-              detail: { entityType: 'global' } 
+              detail: { entityType: 'global', forceRefresh: true } 
             }));
           }
         } catch (e) {

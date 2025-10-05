@@ -4183,7 +4183,11 @@
       console.warn('Add to list failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to add to list');
     } finally {
-      closeAccountListsPanel();
+      // Reload panel data to show updated state
+      const body = document.getElementById('account-lists-body');
+      if (body) {
+        populateAccountListsPanel(body);
+      }
     }
   }
 
@@ -4210,7 +4214,11 @@
       console.warn('Remove from list failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to remove from list');
     } finally {
-      closeAccountListsPanel();
+      // Reload panel data to show updated state
+      const body = document.getElementById('account-lists-body');
+      if (body) {
+        populateAccountListsPanel(body);
+      }
     }
   }
 
