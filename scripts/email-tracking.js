@@ -401,14 +401,30 @@ class EmailTrackingManager {
             const emails = [];
             snapshot.forEach(doc => {
                 const data = doc.data();
-                emails.push({
+                const email = {
                     id: doc.id,
                     ...data,
                     // Ensure we have proper timestamps for sorting
                     timestamp: data.sentAt || data.receivedAt || data.createdAt,
                     // Add email type for UI display
                     emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
+                };
+                
+                // Debug: Log email data to see what fields are available
+                console.log('[EmailTracking] Retrieved email:', {
+                    id: email.id,
+                    type: email.type,
+                    provider: email.provider,
+                    emailType: email.emailType,
+                    hasText: !!email.text,
+                    hasHtml: !!email.html,
+                    hasContent: !!email.content,
+                    hasSnippet: !!email.snippet,
+                    textPreview: email.text ? email.text.substring(0, 50) + '...' : 'No text',
+                    htmlPreview: email.html ? email.html.substring(0, 50) + '...' : 'No html'
                 });
+                
+                emails.push(email);
             });
 
             // Sort by timestamp (most recent first)
