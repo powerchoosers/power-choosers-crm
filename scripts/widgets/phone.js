@@ -2094,6 +2094,27 @@
             isActive: false
           };
         }
+        
+        // Also clear context if user is typing a different number than what's in context
+        if (value.trim() && currentCallContext.isActive && currentCallContext.number && 
+            currentCallContext.number !== value.trim()) {
+          console.debug('[Phone] User typing different number - clearing existing context');
+          currentCallContext = {
+            number: '',
+            name: '',
+            company: '',
+            accountId: null,
+            accountName: null,
+            contactId: null,
+            contactName: '',
+            city: '',
+            state: '',
+            domain: '',
+            logoUrl: '',
+            isCompanyPhone: false,
+            isActive: false
+          };
+        }
       });
     }
 
@@ -2839,14 +2860,35 @@
       enrichTitleFromPhone(normalized.value);
       
       // Check if this is a manual call (no existing context) or a click-to-call (has context)
-      // IMPORTANT: Only consider it existing context if it's ACTIVE (fresh from click-to-call)
-      // Stale context from previous calls (isActive=false) should be treated as no context
-      const hasExistingContext = !!(currentCallContext && currentCallContext.isActive && (
+      // IMPORTANT: Only consider it existing context if it's ACTIVE AND matches the current number
+      // If the context is from a different number, treat it as stale and clear it
+      const hasExistingContext = !!(currentCallContext && currentCallContext.isActive && 
+        currentCallContext.number === normalized.value && (
         currentCallContext.accountId || 
         currentCallContext.contactId || 
         currentCallContext.company || 
         currentCallContext.name
       ));
+      
+      // If context exists but is for a different number, clear it first
+      if (currentCallContext && currentCallContext.isActive && currentCallContext.number !== normalized.value) {
+        console.debug('[Phone] Clearing context for different number - old:', currentCallContext.number, 'new:', normalized.value);
+        currentCallContext = {
+          number: '',
+          name: '',
+          company: '',
+          accountId: null,
+          accountName: null,
+          contactId: null,
+          contactName: '',
+          city: '',
+          state: '',
+          domain: '',
+          logoUrl: '',
+          isCompanyPhone: false,
+          isActive: false
+        };
+      }
       
       // Only resolve metadata if this is truly a manual entry (no active context from click-to-call)
       if (!hasExistingContext) {
