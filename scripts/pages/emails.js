@@ -2525,12 +2525,12 @@ class EmailManager {
                 if (this.currentFolder === 'inbox') {
                     // For inbox, show emails that were sent TO us (not by us)
                     filteredEmails = allEmails.filter(email => 
-                        email.to && (email.to.includes('noreply@powerchoosers.com') || email.to.includes('l.patterson@inbound.powerchoosers.com'))
+                        email.emailType === 'received' || email.provider === 'sendgrid_inbound'
                     );
                 } else if (this.currentFolder === 'sent') {
                     // For sent, show emails we sent
                     filteredEmails = allEmails.filter(email => 
-                        email.from && email.from.includes('noreply@powerchoosers.com')
+                        email.emailType === 'sent' || (email.from && email.from.includes('noreply@powerchoosers.com'))
                     );
                 }
                 
@@ -4812,7 +4812,7 @@ class EmailManager {
                 </div>
                 <div class="email-viewer-body">
                     <div class="email-content">
-                        ${email.content || email.snippet || 'No content available'}
+                        ${email.html || email.text || email.content || email.snippet || 'No content available'}
                     </div>
                     ${this.renderTrackingIcons(email)}
                 </div>
