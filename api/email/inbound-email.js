@@ -5,7 +5,7 @@
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import formidable from 'formidable';
+const formidable = require('formidable');
 
 // Firebase configuration - using your existing variables
 const firebaseConfig = {
