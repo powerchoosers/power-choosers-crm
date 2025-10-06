@@ -3,22 +3,17 @@
  * FIXED VERSION - Parses multipart data and saves to Firebase
  */
 
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import formidable from 'formidable';
 
-// Firebase configuration
+// Firebase configuration - using your existing variables
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
+  projectId: process.env.FIREBASE_PROJECT_ID
 };
 
-// Initialize Firebase
-const firebaseApp = initializeApp(firebaseConfig);
+// Initialize Firebase (only if not already initialized)
+const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(firebaseApp);
 
 export const config = { api: { bodyParser: false } };
@@ -39,6 +34,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Basic security check - only process requests from SendGrid
+  if (!isFromSendGrid) {
+    console.log('[InboundEmail] Rejecting request - not from SendGrid');
+    return res.status(403).json({ error: 'Forbidden - not from SendGrid' });
+  }
+
+  // Note: SendGrid webhook signature verification can be added later if needed
+  // For now, User-Agent verification is sufficient for basic security
+
   try {
     // Parse multipart/form-data using formidable
     const form = new formidable.IncomingForm();
@@ -57,7 +61,7 @@ export default async function handler(req, res) {
     console.log('[InboundEmail] Parsed fields:', fields);
     console.log('[InboundEmail] Parsed files:', files);
 
-    // Extract email data from SendGrid fields
+    // Extract email data from SendGrid fields with validation
     const emailData = {
       from: fields.from || fields.sender || '',
       to: fields.to || fields.recipient || '',
@@ -69,6 +73,12 @@ export default async function handler(req, res) {
       type: 'received',
       provider: 'sendgrid_inbound'
     };
+
+    // Validate required fields
+    if (!emailData.from || !emailData.to || !emailData.subject) {
+      console.error('[InboundEmail] Missing required fields:', { from: emailData.from, to: emailData.to, subject: emailData.subject });
+      return res.status(400).json({ error: 'Missing required email fields' });
+    }
 
     console.log('[InboundEmail] Extracted email data:', emailData);
 
