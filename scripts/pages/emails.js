@@ -2612,6 +2612,11 @@ class EmailManager {
             to: Array.isArray(emailData.to) ? emailData.to.join(', ') : emailData.to,
             subject: emailData.subject,
             snippet: this.stripHtml(emailData.originalContent || emailData.content || ''),
+            // PRESERVE CONTENT FIELDS for SendGrid inbound emails
+            text: emailData.text,
+            html: emailData.html,
+            content: emailData.content,
+            originalContent: emailData.originalContent,
             date: dateObj, // Pass Date object instead of string
             timestamp: dateObj.getTime(),
             // Tracking data
@@ -2622,6 +2627,10 @@ class EmailManager {
             status: emailData.status || 'sent',
             // Mark as sent email for UI rendering
             isSentEmail: true,
+            // Provider and type information
+            provider: emailData.provider,
+            type: emailData.type,
+            emailType: emailData.emailType,
             // Gmail API specific data
             sentVia: emailData.sentVia || 'simulation',
             gmailMessageId: emailData.gmailMessageId
@@ -2632,6 +2641,36 @@ class EmailManager {
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
         return tmp.textContent || tmp.innerText || '';
+    }
+
+    getEmailPreview(email) {
+        // Try to get preview from various content fields
+        let preview = '';
+        
+        // Priority order: snippet, text, html (stripped), content
+        if (email.snippet && email.snippet.trim()) {
+            preview = email.snippet;
+        } else if (email.text && email.text.trim()) {
+            preview = email.text;
+        } else if (email.html && email.html.trim()) {
+            preview = this.stripHtml(email.html);
+        } else if (email.content && email.content.trim()) {
+            preview = this.stripHtml(email.content);
+        } else if (email.originalContent && email.originalContent.trim()) {
+            preview = this.stripHtml(email.originalContent);
+        }
+        
+        // Clean up the preview
+        if (preview) {
+            // Remove extra whitespace and newlines
+            preview = preview.replace(/\s+/g, ' ').trim();
+            // Limit length to reasonable preview size
+            if (preview.length > 100) {
+                preview = preview.substring(0, 100) + '...';
+            }
+        }
+        
+        return preview || 'No preview available';
     }
 
     renderTrackingIcons(email) {
@@ -2736,8 +2775,8 @@ class EmailManager {
                 </button>
                         <div class="email-item-sender">${this.extractName(email.from || 'Unknown')}</div>
                 <div class="email-item-content">
-                            <div class="email-item-subject">${email.subject || 'No Subject'}</div>
-                            <div class="email-item-preview">${email.snippet || 'No preview available'}</div>
+                            <div class="email-item-subject">${Array.isArray(email.subject) ? email.subject[0] : (email.subject || 'No Subject')}</div>
+                            <div class="email-item-preview">${this.getEmailPreview(email)}</div>
                 </div>
                 <div class="email-item-meta">
                     <div class="email-item-time">${this.formatDate(email.date)}</div>
@@ -2795,6 +2834,17 @@ class EmailManager {
 
     extractName(fromHeader) {
         if (!fromHeader) return 'Unknown';
+        
+        // Handle arrays (from SendGrid inbound emails)
+        if (Array.isArray(fromHeader)) {
+            fromHeader = fromHeader[0] || 'Unknown';
+        }
+        
+        // Ensure it's a string
+        if (typeof fromHeader !== 'string') {
+            return 'Unknown';
+        }
+        
         const match = fromHeader.match(/^(.+?)\s*<.+>$/);
         return match ? match[1].replace(/"/g, '') : fromHeader.split('@')[0];
     }
@@ -4811,28 +4861,8 @@ class EmailManager {
                     </div>
                 </div>
                 <div class="email-viewer-body">
-                    <div class="email-content">
-                        ${(() => {
-                            // Debug: Log the email object to see what fields are available
-                            console.log('[EmailViewer] Email object:', email);
-                            console.log('[EmailViewer] Available fields:', {
-                                html: email.html,
-                                text: email.text,
-                                content: email.content,
-                                snippet: email.snippet,
-                                allKeys: Object.keys(email)
-                            });
-                            
-                            // Try to get content with debugging
-                            const content = email.html || email.text || email.content || email.snippet;
-                            console.log('[EmailViewer] Selected content:', content);
-                            
-                            // Force enable debug logs for this session
-                            localStorage.setItem('pc-debug-logs', 'true');
-                            window.PC_DEBUG = true;
-                            
-                            return content || 'No content available';
-                        })()}
+                    <div class="email-content" id="email-content-${email.id}">
+                        <!-- Content will be injected via JavaScript -->
                     </div>
                     ${this.renderTrackingIcons(email)}
                 </div>
@@ -4927,12 +4957,57 @@ class EmailManager {
         // Add modal to page
         document.body.appendChild(modal);
 
+        // PROPERLY INJECT HTML CONTENT (Fix for HTML rendering)
+        this.injectEmailContent(modal, email);
+
         // Bind events
         this.bindEmailViewerEvents(modal, email);
 
         // Show modal
         setTimeout(() => modal.classList.add('show'), 10);
     }
+
+    injectEmailContent(modal, email) {
+        // Get the email content container
+        const contentContainer = modal.querySelector(`#email-content-${email.id}`);
+        if (!contentContainer) return;
+
+        // Get the best available content
+        const htmlContent = email.html || email.bodyHtml || email.content;
+        const textContent = email.text || email.bodyText || email.snippet;
+
+        // If we have HTML content, render it properly using innerHTML
+        if (htmlContent && htmlContent.trim()) {
+            // DECODE QUOTED-PRINTABLE CONTENT (fix for =20 artifacts)
+            const decodedHtml = this.decodeQuotedPrintable(htmlContent);
+            
+            // Use innerHTML to properly render HTML content
+            contentContainer.innerHTML = decodedHtml;
+        } else if (textContent && textContent.trim()) {
+            // Fallback to text content with line breaks
+            const decodedText = this.decodeQuotedPrintable(textContent);
+            contentContainer.innerHTML = decodedText.replace(/\n/g, '<br>');
+        } else {
+            contentContainer.innerHTML = 'No content available';
+        }
+    }
+
+    decodeQuotedPrintable(content) {
+        if (!content) return '';
+        
+        // Decode quoted-printable encoding (fixes =20 artifacts)
+        return content
+            .replace(/=\r?\n/g, '') // Remove soft line breaks
+            .replace(/=([0-9A-F]{2})/g, (match, hex) => {
+                return String.fromCharCode(parseInt(hex, 16));
+            })
+            .replace(/=20/g, ' ') // Replace =20 with spaces
+            .replace(/=3D/g, '=') // Replace =3D with equals
+            .replace(/=0A/g, '\n') // Replace =0A with newlines
+            .replace(/=0D/g, '\r') // Replace =0D with carriage returns
+            .trim();
+    }
+
 
     bindEmailViewerEvents(modal, email) {
         // Close button
@@ -5008,9 +5083,15 @@ class EmailManager {
         const composeSection = modal.querySelector('.email-viewer-compose');
         const bodySection = modal.querySelector('.email-viewer-body');
         
-        // Hide body, show compose
+        // Hide body, show compose with proper styling
         bodySection.style.display = 'none';
         composeSection.style.display = 'block';
+        composeSection.classList.add('show');
+        
+        // Ensure compose section has solid background
+        composeSection.style.background = 'var(--bg-card)';
+        composeSection.style.opacity = '1';
+        composeSection.style.visibility = 'visible';
         
         // Set up compose data based on type
         const toInput = modal.querySelector('#modal-compose-to');
@@ -5042,6 +5123,7 @@ class EmailManager {
         // Show body, hide compose
         bodySection.style.display = 'block';
         composeSection.style.display = 'none';
+        composeSection.classList.remove('show');
     }
 
     initializeModalEditorToolbar(modal) {
