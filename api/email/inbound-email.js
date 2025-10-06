@@ -96,9 +96,9 @@ export default async function handler(req, res) {
 
     // Extract email data from SendGrid fields with validation
     const emailData = {
-      from: fields.from || fields.sender || '',
-      to: fields.to || fields.recipient || '',
-      subject: fields.subject || '',
+      from: Array.isArray(fields.from) ? fields.from[0] : (fields.from || fields.sender || ''),
+      to: Array.isArray(fields.to) ? fields.to[0] : (fields.to || fields.recipient || ''),
+      subject: Array.isArray(fields.subject) ? fields.subject[0] : (fields.subject || ''),
       text: fields.text || fields.text_plain || '',
       html: fields.html || fields.text_html || '',
       messageId: fields.message_id || fields['Message-ID'] || '',
@@ -106,6 +106,23 @@ export default async function handler(req, res) {
       type: 'received',
       provider: 'sendgrid_inbound'
     };
+
+    // Extract text and html content from the raw email if not found in fields
+    if (!emailData.text && !emailData.html && fields.email && fields.email[0]) {
+      const rawEmail = fields.email[0];
+      
+      // Extract text content from multipart email
+      const textMatch = rawEmail.match(/Content-Type: text\/plain[^]*?\r\n\r\n([^]*?)(?=\r\n--|$)/);
+      if (textMatch) {
+        emailData.text = textMatch[1].trim();
+      }
+      
+      // Extract html content from multipart email
+      const htmlMatch = rawEmail.match(/Content-Type: text\/html[^]*?\r\n\r\n([^]*?)(?=\r\n--|$)/);
+      if (htmlMatch) {
+        emailData.html = htmlMatch[1].trim();
+      }
+    }
 
     // Validate required fields
     if (!emailData.from || !emailData.to || !emailData.subject) {
