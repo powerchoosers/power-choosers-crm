@@ -4,7 +4,7 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import formidable from 'formidable';
 
 // Firebase configuration
@@ -18,8 +18,8 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
 export const config = { api: { bodyParser: false } };
 
@@ -72,22 +72,31 @@ export default async function handler(req, res) {
 
     console.log('[InboundEmail] Extracted email data:', emailData);
 
-    // Save to Firebase
-    const emailDoc = {
-      ...emailData,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    const docRef = await addDoc(collection(db, 'emails'), emailDoc);
-    console.log('[InboundEmail] Email saved to Firebase with ID:', docRef.id);
+    // Save to Firebase with proper error handling
+    try {
+      const emailDoc = {
+        ...emailData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      const docRef = await addDoc(collection(db, 'emails'), emailDoc);
+      console.log('[InboundEmail] Email saved to Firebase with ID:', docRef.id);
 
-    // Return success response
-    return res.status(200).json({ 
-      success: true, 
-      emailId: docRef.id,
-      message: 'Email processed successfully' 
-    });
+      // Return success response
+      return res.status(200).json({ 
+        success: true, 
+        emailId: docRef.id,
+        message: 'Email processed successfully' 
+      });
+    } catch (firebaseError) {
+      console.error('[InboundEmail] Error saving to Firestore:', firebaseError);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to save email to database',
+        message: firebaseError.message 
+      });
+    }
 
   } catch (error) {
     console.error('[InboundEmail] Error processing webhook:', error);
