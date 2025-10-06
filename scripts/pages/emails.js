@@ -4827,6 +4827,10 @@ class EmailManager {
                             const content = email.html || email.text || email.content || email.snippet;
                             console.log('[EmailViewer] Selected content:', content);
                             
+                            // Force enable debug logs for this session
+                            localStorage.setItem('pc-debug-logs', 'true');
+                            window.PC_DEBUG = true;
+                            
                             return content || 'No content available';
                         })()}
                     </div>

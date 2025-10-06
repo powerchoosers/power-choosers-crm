@@ -410,6 +410,10 @@ class EmailTrackingManager {
                     emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
                 };
                 
+                // Force enable debug logs for this session
+                localStorage.setItem('pc-debug-logs', 'true');
+                window.PC_DEBUG = true;
+                
                 // Debug: Log email data to see what fields are available
                 console.log('[EmailTracking] Retrieved email:', {
                     id: email.id,
