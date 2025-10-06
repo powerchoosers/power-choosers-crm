@@ -143,12 +143,12 @@ export default async function handler(req, res) {
       const docRef = await addDoc(collection(db, 'emails'), emailDoc);
       console.log('[InboundEmail] Email saved to Firebase with ID:', docRef.id);
 
-      // Return success response
-      return res.status(200).json({ 
-        success: true, 
+    // Return success response
+    return res.status(200).json({ 
+      success: true, 
         emailId: docRef.id,
-        message: 'Email processed successfully' 
-      });
+      message: 'Email processed successfully' 
+    });
     } catch (firebaseError) {
       console.error('[InboundEmail] Error saving to Firestore:', firebaseError);
       return res.status(500).json({ 
