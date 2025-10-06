@@ -4812,7 +4812,23 @@ class EmailManager {
                 </div>
                 <div class="email-viewer-body">
                     <div class="email-content">
-                        ${email.html || email.text || email.content || email.snippet || 'No content available'}
+                        ${(() => {
+                            // Debug: Log the email object to see what fields are available
+                            console.log('[EmailViewer] Email object:', email);
+                            console.log('[EmailViewer] Available fields:', {
+                                html: email.html,
+                                text: email.text,
+                                content: email.content,
+                                snippet: email.snippet,
+                                allKeys: Object.keys(email)
+                            });
+                            
+                            // Try to get content with debugging
+                            const content = email.html || email.text || email.content || email.snippet;
+                            console.log('[EmailViewer] Selected content:', content);
+                            
+                            return content || 'No content available';
+                        })()}
                     </div>
                     ${this.renderTrackingIcons(email)}
                 </div>
