@@ -19,6 +19,303 @@
 
 /* Apollo-inspired layout with consistent 25px spacing and grey theme */
 
+/* === EMAIL VIEWER MODAL STYLING === */
+.email-viewer-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-container); /* Solid background like compose editor */
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    /* REMOVE BACKDROP BLUR - ensure no blurring effects */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.email-viewer-modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.email-viewer-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    box-shadow: var(--elevation-card);
+    max-width: 90vw;
+    max-height: 90vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.email-viewer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-card);
+}
+
+.email-viewer-title h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.email-viewer-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.email-viewer-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.email-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px; /* Increased from 32px */
+    height: 40px; /* Increased from 32px */
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-item);
+    color: var(--text-primary); /* Changed from text-secondary for better visibility */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 16px; /* Ensure icons are visible */
+}
+
+.email-action-btn:hover {
+    background: var(--grey-700);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+}
+
+.email-action-btn.starred {
+    background: var(--yellow-subtle);
+    color: white;
+    border-color: var(--yellow-subtle);
+}
+
+.email-viewer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: var(--bg-card);
+}
+
+/* === EMAIL COMPOSE SECTION STYLING === */
+.email-viewer-compose {
+    display: none;
+    flex: 1;
+    background: var(--bg-card); /* Solid background - no transparency */
+    border-top: 1px solid var(--border-light);
+}
+
+.email-viewer-compose.show {
+    display: block;
+}
+
+.compose-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-card);
+}
+
+.compose-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.compose-form {
+    padding: 20px;
+    background: var(--bg-card);
+}
+
+.compose-field {
+    margin-bottom: 16px;
+}
+
+.compose-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.compose-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.compose-input:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
+}
+
+.compose-body {
+    min-height: 200px;
+    padding: 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.compose-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-card);
+}
+
+.compose-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.compose-btn {
+    padding: 10px 20px;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.compose-btn:hover {
+    background: var(--grey-700);
+    border-color: var(--border-medium);
+}
+
+.compose-btn.primary {
+    background: var(--orange-subtle);
+    color: white;
+    border-color: var(--orange-subtle);
+}
+
+.compose-btn.primary:hover {
+    background: #e67e22;
+    border-color: #e67e22;
+}
+
+/* Ensure no blur effects on any email viewer elements */
+.email-viewer-modal * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+}
+
+/* === EMAIL CONTENT STYLING === */
+.email-content {
+    /* Ensure HTML emails render properly */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.6;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    /* Reset to allow email styles to take precedence */
+    all: initial;
+    font-family: inherit;
+    color: inherit;
+    background: inherit;
+}
+
+/* CRITICAL: Preserve email HTML styling by avoiding global overrides */
+.email-content * {
+    max-width: 100%;
+    box-sizing: border-box;
+    /* Allow email styles to override global styles */
+    font-family: inherit;
+}
+
+/* Preserve email formatting - minimal overrides only */
+.email-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.email-content table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/* REMOVED: Global link styling that was overriding email buttons */
+/* .email-content a {
+    color: var(--blue-subtle);
+    text-decoration: underline;
+} */
+
+/* REMOVED: Global hover styling that was interfering with email buttons */
+/* .email-content a:hover {
+    color: var(--orange-primary);
+} */
+
+/* Ensure buttons and interactive elements work */
+.email-content button {
+    cursor: pointer;
+}
+
+/* Preserve email background colors and styling */
+.email-content div,
+.email-content span,
+.email-content p {
+    /* Allow inherited styles from email HTML */
+}
+
+/* Preserve email button styling */
+.email-content a[style*="background"],
+.email-content button[style*="background"] {
+    /* Preserve inline styles from email */
+}
+
+/* Ensure email tables maintain their layout */
+.email-content table td,
+.email-content table th {
+    /* Preserve table cell styling from email */
+}
+
 /* === CSS VARIABLES === */
 :root {
     /* Grey Color Scheme - Primary Theme */
