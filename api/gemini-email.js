@@ -30,7 +30,7 @@ function cors(req, res) {
   return false;
 }
 
-function buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed }) {
+function buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed, isManualPrompt = false, contextCompleteness = 0 }) {
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
   const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
@@ -157,7 +157,15 @@ CONTEXT AWARENESS:
     • Briefly outline what the health check covers: current bill/supplier/rate review, contract end month/year (Month YYYY only), quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating insight, and recommended next steps.
     • Offer two specific time windows and include exactly one short question CTA.
 - For "proposal delivery with next steps": Reference the proposal and outline clear next steps
-- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person`;
+- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person
+
+${isManualPrompt ? `MANUAL PROMPT MODE (More Creative Freedom):
+- This is a manual prompt from the user, so be more flexible with the structure
+- Focus on the user's specific request and intent rather than rigid templates
+- Allow more natural, conversational flow while maintaining professionalism
+- Use the available context data to personalize, but don't force it if it doesn't fit naturally
+- Be more creative with the approach while still following basic email best practices
+- Context completeness: ${contextCompleteness}% - use available data appropriately` : ''}`;
 
   const recipientContext = `Recipient/context signals (use selectively; do not reveal sensitive specifics):
 - Name: ${name || 'Unknown'} (${firstName || 'Unknown'})
@@ -328,8 +336,8 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) return res.status(400).json({ error: 'Missing GEMINI_API_KEY' });
 
-    const { prompt, mode = 'standard', recipient = null, to = '', style = 'auto', subjectStyle = 'auto', subjectSeed = '' } = req.body || {};
-    const sys = buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed });
+    const { prompt, mode = 'standard', recipient = null, to = '', style = 'auto', subjectStyle = 'auto', subjectSeed = '', isManualPrompt = false, contextCompleteness = 0 } = req.body || {};
+    const sys = buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed, isManualPrompt, contextCompleteness });
 
     // Google Generative Language API (Gemini 2.0 Flash Experimental - latest model)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
