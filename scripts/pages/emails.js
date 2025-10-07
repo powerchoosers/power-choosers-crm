@@ -653,6 +653,17 @@ class EmailManager {
                 }
             } catch(_) { /* noop */ }
 
+            // Validate context data before generation
+            const contextValidation = this.validateContextData(enrichedRecipient, prompt);
+            if (!contextValidation.isValid) {
+                console.warn('[AI] Context validation failed:', contextValidation.issues);
+                // Continue with generation but log the issues
+            }
+
+            // Detect if this is a manual prompt for more freedom
+            const isManual = this.isManualPrompt(prompt);
+            console.log(`[AI] Prompt type: ${isManual ? 'Manual' : 'AI-generated'}`);
+
             // Add style randomization hints for variation
             const styleOptions = ['hook_question','value_bullets','proof_point','risk_focus','timeline_focus'];
             const randomStyle = styleOptions[Math.floor(Math.random() * styleOptions.length)];
@@ -660,7 +671,17 @@ class EmailManager {
             const randomSubj = subjStyles[Math.floor(Math.random() * subjStyles.length)];
             const subjectSeed = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 
-            const payload = { prompt, mode, recipient: enrichedRecipient, to: toInput?.value || '', style: randomStyle, subjectStyle: randomSubj, subjectSeed };
+            const payload = { 
+                prompt, 
+                mode, 
+                recipient: enrichedRecipient, 
+                to: toInput?.value || '', 
+                style: randomStyle, 
+                subjectStyle: randomSubj, 
+                subjectSeed,
+                isManualPrompt: isManual,
+                contextCompleteness: contextValidation.completeness
+            };
             let res;
             try {
                 res = await fetch(genUrl, {
@@ -3245,6 +3266,17 @@ class EmailManager {
                 setTimeout(() => this.cleanZeroWidthSpans(editor), 0);
             }
         });
+
+        // Fix enter key double spacing issue
+        editor?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                // Insert single line break instead of allowing double spacing
+                document.execCommand('insertHTML', false, '<br>');
+                // Clean up any extra spacing that might be added
+                setTimeout(() => this.cleanZeroWidthSpans(editor), 0);
+            }
+        });
         const toolbar = composeWindow.querySelector('.editor-toolbar');
         const formattingBar = composeWindow.querySelector('.formatting-bar');
         const linkBar = composeWindow.querySelector('.link-bar');
@@ -5306,6 +5338,130 @@ class EmailManager {
 
         // Real-time listener will automatically update the UI
         console.log('[EmailManager] Email replied notification received - UI will update via real-time listener');
+    }
+
+    /**
+     * Validate context data before AI generation
+     * @param {Object} recipient - The recipient data
+     * @param {string} prompt - The user prompt
+     * @returns {Object} Validation result with isValid flag and issues array
+     */
+    validateContextData(recipient, prompt) {
+        const issues = [];
+        let score = 0;
+        const maxScore = 10;
+
+        // Check if recipient exists
+        if (!recipient) {
+            issues.push('No recipient data available');
+            return { isValid: false, issues, score: 0, maxScore };
+        }
+
+        // Basic recipient info (2 points)
+        if (recipient.name || recipient.fullName) {
+            score += 1;
+        } else {
+            issues.push('Missing recipient name');
+        }
+
+        if (recipient.email) {
+            score += 1;
+        } else {
+            issues.push('Missing recipient email');
+        }
+
+        // Company info (2 points)
+        if (recipient.company || recipient.account?.name) {
+            score += 1;
+        } else {
+            issues.push('Missing company information');
+        }
+
+        if (recipient.title || recipient.job) {
+            score += 1;
+        } else {
+            issues.push('Missing job title');
+        }
+
+        // Energy contract details (3 points)
+        if (recipient.energy) {
+            if (recipient.energy.supplier) {
+                score += 1;
+            } else {
+                issues.push('Missing energy supplier');
+            }
+
+            if (recipient.energy.contractEnd) {
+                score += 1;
+            } else {
+                issues.push('Missing contract end date');
+            }
+
+            if (recipient.energy.currentRate) {
+                score += 1;
+            } else {
+                issues.push('Missing current rate');
+            }
+        } else {
+            issues.push('No energy contract data available');
+        }
+
+        // Notes and context (2 points)
+        if (recipient.notes && recipient.notes.trim()) {
+            score += 1;
+        } else {
+            issues.push('No notes available for personalization');
+        }
+
+        if (recipient.transcript && recipient.transcript.trim()) {
+            score += 1;
+        } else {
+            issues.push('No call transcript available');
+        }
+
+        // Account context (1 point)
+        if (recipient.account && (recipient.account.industry || recipient.account.city)) {
+            score += 1;
+        } else {
+            issues.push('Limited account context available');
+        }
+
+        const isValid = score >= 5; // Require at least 50% context completeness
+
+        console.log(`[ContextValidation] Score: ${score}/${maxScore}, Valid: ${isValid}`);
+        if (issues.length > 0) {
+            console.log('[ContextValidation] Issues:', issues);
+        }
+
+        return {
+            isValid,
+            issues,
+            score,
+            maxScore,
+            completeness: Math.round((score / maxScore) * 100)
+        };
+    }
+
+    /**
+     * Detect if prompt is manual vs AI-generated
+     * @param {string} prompt - The user prompt
+     * @returns {boolean} True if manual prompt
+     */
+    isManualPrompt(prompt) {
+        if (!prompt || prompt.length < 20) return false;
+        
+        // Manual prompts are typically longer and more conversational
+        const manualIndicators = [
+            prompt.length > 100,
+            /^(hi|hello|hey)/i.test(prompt.trim()),
+            /^(i want|i need|please)/i.test(prompt.trim()),
+            /^(can you|could you|would you)/i.test(prompt.trim()),
+            prompt.includes('?'),
+            prompt.includes('!'),
+            prompt.split(' ').length > 15
+        ];
+        
+        return manualIndicators.filter(Boolean).length >= 2;
     }
 
 
