@@ -49,7 +49,15 @@
   function getPrimaryPhoneData(contact) {
     if (!contact) return { value: '', type: 'mobile', field: 'mobile' };
     
-    // Priority: Mobile > Work Direct > Other
+    // Check if a preferred phone field is set on the contact (from contact-detail.js)
+    try {
+      const pref = (contact && contact.preferredPhoneField) ? String(contact.preferredPhoneField).trim() : '';
+      if (pref === 'mobile' && contact.mobile) return { value: contact.mobile, type: 'mobile', field: 'mobile' };
+      if (pref === 'workDirectPhone' && contact.workDirectPhone) return { value: contact.workDirectPhone, type: 'work direct', field: 'workDirectPhone' };
+      if (pref === 'otherPhone' && contact.otherPhone) return { value: contact.otherPhone, type: 'other', field: 'otherPhone' };
+    } catch(_) {}
+    
+    // Priority fallback: Mobile > Work Direct > Other
     if (contact.mobile) {
       return { value: contact.mobile, type: 'mobile', field: 'mobile' };
     }
@@ -1790,7 +1798,7 @@
             </div>
             <div class="info-row">
               <div class="info-label">${phoneType.toUpperCase()}</div>
-              <div class="info-value ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div>
+              <div class="info-value ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div>
             </div>
             <div class="info-row">
               <div class="info-label">COMPANY PHONE</div>
@@ -2028,7 +2036,7 @@
             <h3 class="section-title">Contact information</h3>
             <div class="info-grid">
               <div class="info-row"><div class="info-label">EMAIL</div><div class="info-value">${email||'--'}</div></div>
-              <div class="info-row"><div class="info-label">${phoneType.toUpperCase()}</div><div class="info-value">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' '))}" data-contact-id="${escapeHtml(contact.id || '')}" data-account-id="${escapeHtml(contact.accountId || contact.account_id || '')}" data-account-name="${escapeHtml(company)}" data-logo-url="${escapeHtml(contact.logoUrl || '')}" data-city="${escapeHtml(city)}" data-state="${escapeHtml(stateVal)}" data-domain="${escapeHtml(contact.domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div></div>
+              <div class="info-row"><div class="info-label">${phoneType.toUpperCase()}</div><div class="info-value">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' '))}" data-contact-id="${escapeHtml(contact.id || '')}" data-account-id="${escapeHtml(contact.accountId || contact.account_id || '')}" data-account-name="${escapeHtml(company)}" data-company-name="${escapeHtml(company)}" data-logo-url="${escapeHtml(contact.logoUrl || '')}" data-city="${escapeHtml(city)}" data-state="${escapeHtml(stateVal)}" data-domain="${escapeHtml(contact.domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div></div>
               <div class="info-row"><div class="info-label">COMPANY</div><div class="info-value">${company||'--'}</div></div>
               <div class="info-row"><div class="info-label">CITY</div><div class="info-value">${city||'--'}</div></div>
               <div class="info-row"><div class="info-label">STATE</div><div class="info-value">${stateVal||'--'}</div></div>
@@ -2037,6 +2045,72 @@
           </div>`;
       }
     } catch(_) {}
+  }
+
+  // Handle contact phone clicks with proper contact context (same as contact-detail.js)
+  function handleContactPhoneClick(phoneElement, person) {
+    try {
+      console.log('[Task Detail] Contact phone clicked, setting contact context');
+      
+      // Get the phone type from the data attribute
+      const phoneType = phoneElement.getAttribute('data-phone-type') || 'mobile';
+      
+      // Get the associated account to include logo and domain
+      const linkedAccount = findAssociatedAccount(person);
+      
+      // Get domain from account if available
+      const deriveDomain = (input) => {
+        try {
+          if (!input) return '';
+          let s = String(input).trim();
+          if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+          if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+          return '';
+        } catch(_) { return ''; }
+      };
+      const domain = linkedAccount?.domain ? String(linkedAccount.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(linkedAccount?.website || '');
+      
+      // Build contact context for contact phone calls
+      const contextPayload = {
+        contactId: person.id || person.contactId || person._id || '',
+        contactName: person.name || [person.firstName, person.lastName].filter(Boolean).join(' ') || '',
+        accountId: person.accountId || person.account_id || linkedAccount?.id || '',
+        accountName: person.companyName || person.company || person.account || '',
+        company: person.companyName || person.company || person.account || '',
+        name: person.name || [person.firstName, person.lastName].filter(Boolean).join(' ') || '', // Contact name as primary
+        city: person.city || person.locationCity || '',
+        state: person.state || person.locationState || '',
+        domain: domain || person.domain || '',
+        logoUrl: linkedAccount?.logoUrl || person.logoUrl || '',
+        isCompanyPhone: false, // This is a contact phone call
+        phoneType: phoneType, // Include the phone type (mobile, work direct, other)
+        suggestedContactId: person.id || person.contactId || person._id || '',
+        suggestedContactName: person.name || [person.firstName, person.lastName].filter(Boolean).join(' ') || ''
+      };
+      
+      console.log('[Task Detail] Setting contact phone context:', contextPayload);
+      
+      // Set the context in the phone widget
+      if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
+        window.Widgets.setCallContext(contextPayload);
+        
+        // Also trigger contact display to show the contact info
+        if (window.Widgets && typeof window.Widgets.setContactDisplay === 'function') {
+          try {
+            window.Widgets.setContactDisplay(contextPayload, '');
+          } catch(_) {}
+        }
+      }
+      
+      // Mark that we've set a specific context to prevent generic click-to-call from overriding
+      try {
+        window._pcPhoneContextSetByPage = true;
+        setTimeout(() => { window._pcPhoneContextSetByPage = false; }, 1000);
+      } catch(_) {}
+      
+    } catch (error) {
+      console.error('[Task Detail] Error setting contact phone context:', error);
+    }
   }
 
   // Process click-to-call and click-to-email elements
@@ -2201,6 +2275,50 @@
     }
   }
 
+  // Setup phone click handlers for contact phones (capture-phase to win race vs ClickToCall)
+  function setupPhoneClickHandlers() {
+    // Prevent duplicate event listeners
+    if (state._phoneHandlersSetup) return;
+    state._phoneHandlersSetup = true;
+
+    // Helper: resolve person from current task contact name
+    function resolvePerson() {
+      const contactName = state.currentTask?.contact || '';
+      const people = (typeof window.getPeopleData === 'function') ? (window.getPeopleData() || []) : [];
+      return people.find(p => {
+        const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+        return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+      }) || null;
+    }
+
+    // Target any contact phone span within task detail that declares a phone type
+    function findContactPhoneTarget(evtTarget) {
+      return evtTarget.closest('#task-detail-page .phone-text[data-phone-type]');
+    }
+
+    // Capture-phase mousedown sets the guard before ClickToCall runs
+    document.addEventListener('mousedown', (e) => {
+      const phoneElement = findContactPhoneTarget(e.target);
+      if (!phoneElement) return;
+      try { window._pcPhoneContextSetByPage = true; } catch(_) {}
+      const person = resolvePerson();
+      if (person && person.id) {
+        // Set context early so ClickToCall sees the guard and skips its own context
+        handleContactPhoneClick(phoneElement, person);
+      }
+    }, true);
+
+    // Capture-phase click as a backup to ensure context is set
+    document.addEventListener('click', (e) => {
+      const phoneElement = findContactPhoneTarget(e.target);
+      if (!phoneElement) return;
+      const person = resolvePerson();
+      if (person && person.id) {
+        handleContactPhoneClick(phoneElement, person);
+      }
+    }, true);
+  }
+
   // Setup contact link handlers
   function setupContactLinkHandlers() {
     // Prevent duplicate event listeners
@@ -2339,6 +2457,20 @@
         }
       }
     });
+
+    // Listen for contact updates (e.g., when preferred phone field changes on contact-detail page)
+    document.addEventListener('pc:contact-updated', (e) => {
+      if (state.currentTask && !isAccountTask(state.currentTask)) {
+        // Re-render the task page to reflect updated contact information
+        console.log('[Task Detail] Contact updated, refreshing task detail page');
+        renderTaskPage();
+        
+        // Re-process click-to-call to ensure context is updated
+        setTimeout(() => {
+          processClickToCallAndEmail();
+        }, 100);
+      }
+    });
   }
 
   // Public API
@@ -2406,6 +2538,7 @@
       if (!initDomRefs()) return;
       attachEvents();
       setupContactLinkHandlers();
+      setupPhoneClickHandlers();
       setupContactCreationListener();
     }
   };
