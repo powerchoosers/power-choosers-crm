@@ -44,4 +44,4 @@ try {
   console.warn('[Firebase] Admin SDK not available:', e && e.message);
 }
 
-module.exports = { admin, db };
+export { admin, db };
