@@ -54,6 +54,9 @@ class SettingsPage {
         injectModernStyles();
         this.renderSettings();
         setupCollapseFunctionality();
+        
+        // Convert existing data URL signatures to hosted URLs
+        await this.convertDataUrlSignature();
     }
 
     setupEventListeners() {
@@ -78,9 +81,13 @@ class SettingsPage {
         // Email signature image upload
         const uploadBtn = document.getElementById('upload-signature-image');
         const imageInput = document.getElementById('email-signature-image');
+        const convertBtn = document.getElementById('convert-signature-image');
         if (uploadBtn && imageInput) {
             uploadBtn.addEventListener('click', () => imageInput.click());
             imageInput.addEventListener('change', (e) => this.handleImageUpload(e));
+        }
+        if (convertBtn) {
+            convertBtn.addEventListener('click', async () => await this.convertDataUrlSignature());
         }
 
         // Gemini prompts
@@ -487,7 +494,7 @@ class SettingsPage {
         `).join('');
     }
 
-    handleImageUpload(event) {
+    async handleImageUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
 
@@ -507,15 +514,95 @@ class SettingsPage {
             return;
         }
 
-        // Create preview
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            // Store the image data then re-render the signature section
-            this.state.settings.emailSignature.image = e.target.result;
-            this.markDirty();
-            this.renderSignatureSection();
-        };
-        reader.readAsDataURL(file);
+        try {
+            // Show uploading state
+            if (window.showToast) {
+                window.showToast('Uploading signature image...', 'info');
+            }
+
+            // Upload to image hosting service
+            const imageUrl = await this.uploadSignatureImage(file);
+            
+            if (imageUrl) {
+                // Store the hosted image URL
+                this.state.settings.emailSignature.image = imageUrl;
+                this.markDirty();
+                this.renderSignatureSection();
+                
+                if (window.showToast) {
+                    window.showToast('Signature image uploaded successfully!', 'success');
+                }
+            } else {
+                throw new Error('Failed to upload image');
+            }
+        } catch (error) {
+            console.error('[Signature] Upload error:', error);
+            if (window.showToast) {
+                window.showToast('Failed to upload signature image. Please try again.', 'error');
+            }
+        }
+    }
+
+    async uploadSignatureImage(file) {
+        try {
+            // Option 1: Upload to your Vercel server (recommended)
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('type', 'signature');
+
+            const response = await fetch(`${window.API_BASE_URL}/api/upload/signature-image`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result.imageUrl;
+
+        } catch (error) {
+            console.error('[Signature] Upload failed:', error);
+            
+            // Fallback: Use a free image hosting service
+            return await this.uploadToImgur(file);
+        }
+    }
+
+    async uploadToImgur(file) {
+        try {
+            // Convert to base64 for Imgur API
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            const response = await fetch('https://api.imgur.com/3/image', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Client-ID 546c25a59c58ad7', // Public Imgur client ID
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    image: base64,
+                    type: 'base64'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Imgur upload failed');
+            }
+
+            const result = await response.json();
+            return result.data.link;
+
+        } catch (error) {
+            console.error('[Signature] Imgur upload failed:', error);
+            throw error;
+        }
     }
 
     removeSignatureImage() {
@@ -526,6 +613,44 @@ class SettingsPage {
         }
         this.markDirty();
         this.renderSignatureSection();
+    }
+
+    // Convert existing data URL signatures to hosted URLs
+    async convertDataUrlSignature() {
+        const signature = this.state.settings.emailSignature;
+        if (!signature.image || !signature.image.startsWith('data:')) {
+            return; // Not a data URL, no conversion needed
+        }
+
+        try {
+            console.log('[Signature] Converting data URL to hosted URL...');
+            
+            // Convert data URL to file
+            const base64Data = signature.image.split(',')[1];
+            const mimeType = signature.image.split(',')[0].split(':')[1].split(';')[0];
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            
+            const byteArray = new Uint8Array(byteNumbers);
+            const file = new File([byteArray], 'signature.png', { type: mimeType });
+            
+            // Upload the converted file
+            const hostedUrl = await this.uploadSignatureImage(file);
+            
+            if (hostedUrl) {
+                this.state.settings.emailSignature.image = hostedUrl;
+                this.markDirty();
+                this.renderSignatureSection();
+                console.log('[Signature] Successfully converted to hosted URL:', hostedUrl);
+            }
+            
+        } catch (error) {
+            console.error('[Signature] Failed to convert data URL:', error);
+        }
     }
 
     showAddPhoneModal() {
