@@ -45,6 +45,23 @@
     return div.innerHTML;
   }
 
+  // Get primary phone data with type information (same logic as contact-detail.js)
+  function getPrimaryPhoneData(contact) {
+    if (!contact) return { value: '', type: 'mobile', field: 'mobile' };
+    
+    // Priority: Mobile > Work Direct > Other
+    if (contact.mobile) {
+      return { value: contact.mobile, type: 'mobile', field: 'mobile' };
+    }
+    if (contact.workDirectPhone) {
+      return { value: contact.workDirectPhone, type: 'work direct', field: 'workDirectPhone' };
+    }
+    if (contact.otherPhone) {
+      return { value: contact.otherPhone, type: 'other', field: 'otherPhone' };
+    }
+    return { value: '', type: 'mobile', field: 'mobile' };
+  }
+
   // Find the associated account for this contact (by id or normalized company name)
   function findAssociatedAccount(contact) {
     try {
@@ -1695,6 +1712,9 @@
     const locationPart = city && stateVal ? ` • Located in ${escapeHtml(city)}, ${escapeHtml(stateVal)}` : (city ? ` • Located in ${escapeHtml(city)}` : (stateVal ? ` • Located in ${escapeHtml(stateVal)}` : ''));
     const companyDescriptionHTML = shortDescription ? escapeHtml(shortDescription) : `${industry ? `Industry: ${escapeHtml(industry)}` : ''}${locationPart}`;
 
+    // Get primary phone data with type information
+    const phoneData = getPrimaryPhoneData(person);
+    const { value: primaryPhone, type: phoneType } = phoneData;
     const phones = [person.mobile, person.workDirectPhone, person.otherPhone].filter(Boolean);
     const phoneList = phones.map(ph=>`<div class="call-row"><button class="btn-secondary" data-call="${ph}">Call</button><span class="call-number">${ph}</span></div>`).join('') || '<div class="empty">No phone numbers on file</div>';
 
@@ -1756,12 +1776,12 @@
               <div class="info-value ${!email ? 'empty' : ''}">${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(email)}</span>` : '--'}</div>
             </div>
             <div class="info-row">
-              <div class="info-label">PHONE</div>
-              <div class="info-value ${!phones.length ? 'empty' : ''}">${phones.length ? `<span class="phone-text" data-phone="${escapeHtml(phones[0])}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(phones[0])}</span>` : '--'}</div>
+              <div class="info-label">${phoneType.toUpperCase()}</div>
+              <div class="info-value ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div>
             </div>
             <div class="info-row">
               <div class="info-label">COMPANY PHONE</div>
-              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-company-name="${escapeHtml(companyName || '')}">${escapeHtml(companyPhone)}</span>` : '--'}</div>
+              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-is-company-phone="true">${escapeHtml(companyPhone)}</span>` : '--'}</div>
             </div>
             <div class="info-row">
               <div class="info-label">CITY</div>
@@ -1984,7 +2004,8 @@
       } else {
         // Fallback: richer inline summary mirroring contact detail info grid
         const email = contact.email || '';
-        const primaryPhone = contact.workDirectPhone || contact.mobile || contact.otherPhone || '';
+        const phoneData = getPrimaryPhoneData(contact);
+        const { value: primaryPhone, type: phoneType } = phoneData;
         const city = contact.city || contact.locationCity || '';
         const stateVal = contact.state || contact.locationState || '';
         const industry = contact.industry || contact.companyIndustry || '';
@@ -1994,7 +2015,7 @@
             <h3 class="section-title">Contact information</h3>
             <div class="info-grid">
               <div class="info-row"><div class="info-label">EMAIL</div><div class="info-value">${email||'--'}</div></div>
-              <div class="info-row"><div class="info-label">PHONE</div><div class="info-value">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' '))}" data-contact-id="${escapeHtml(contact.id || '')}" data-account-id="${escapeHtml(contact.accountId || contact.account_id || '')}" data-account-name="${escapeHtml(company)}" data-logo-url="${escapeHtml(contact.logoUrl || '')}" data-city="${escapeHtml(city)}" data-state="${escapeHtml(stateVal)}" data-domain="${escapeHtml(contact.domain || '')}">${escapeHtml(primaryPhone)}</span>` : '--'}</div></div>
+              <div class="info-row"><div class="info-label">${phoneType.toUpperCase()}</div><div class="info-value">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' '))}" data-contact-id="${escapeHtml(contact.id || '')}" data-account-id="${escapeHtml(contact.accountId || contact.account_id || '')}" data-account-name="${escapeHtml(company)}" data-logo-url="${escapeHtml(contact.logoUrl || '')}" data-city="${escapeHtml(city)}" data-state="${escapeHtml(stateVal)}" data-domain="${escapeHtml(contact.domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div></div>
               <div class="info-row"><div class="info-label">COMPANY</div><div class="info-value">${company||'--'}</div></div>
               <div class="info-row"><div class="info-label">CITY</div><div class="info-value">${city||'--'}</div></div>
               <div class="info-row"><div class="info-label">STATE</div><div class="info-value">${stateVal||'--'}</div></div>
