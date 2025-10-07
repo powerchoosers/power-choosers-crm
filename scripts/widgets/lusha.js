@@ -1433,18 +1433,34 @@
       if (!db) throw new Error('Firestore not initialized');
       const domain = contact.fqdn || (contact.companyDomain) || (lastCompanyResult && lastCompanyResult.domain) || '';
       const companyName = contact.company || contact.companyName || (lastCompanyResult && (lastCompanyResult.name || lastCompanyResult.companyName)) || '';
-      // Check by domain then name
+      // Use current page context instead of searching by domain/name
       let existingId = null;
-      try {
-        if (domain) {
-          const s1 = await db.collection('accounts').where('domain','==',domain).limit(1).get();
-          if (s1 && s1.docs && s1.docs[0]) existingId = s1.docs[0].id;
-        }
-        if (!existingId && companyName) {
-          const s2 = await db.collection('accounts').where('accountName','==',companyName).limit(1).get();
-          if (s2 && s2.docs && s2.docs[0]) existingId = s2.docs[0].id;
-        }
-      } catch(_){}
+      
+      // Try to get current account ID from page context
+      if (currentEntityType === 'account' && currentAccountId) {
+        existingId = currentAccountId;
+        console.log('[Lusha Account] Using current account ID from page context:', existingId);
+      }
+      
+      // Fallback: try to get from AccountDetail state
+      if (!existingId && window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+        existingId = window.AccountDetail.state.currentAccount.id || window.AccountDetail.state.currentAccount.accountId;
+        console.log('[Lusha Account] Using account ID from AccountDetail state:', existingId);
+      }
+      
+      // Final fallback: search by domain/name (for cases where we're not on a specific account page)
+      if (!existingId) {
+        try {
+          if (domain) {
+            const s1 = await db.collection('accounts').where('domain','==',domain).limit(1).get();
+            if (s1 && s1.docs && s1.docs[0]) existingId = s1.docs[0].id;
+          }
+          if (!existingId && companyName) {
+            const s2 = await db.collection('accounts').where('accountName','==',companyName).limit(1).get();
+            if (s2 && s2.docs && s2.docs[0]) existingId = s2.docs[0].id;
+          }
+        } catch(_){}
+      }
       // Build payload by including ONLY non-empty values from Lusha to avoid overwriting
       // existing CRM fields with blanks (e.g., phone when not provided by API)
       const candidateFields = {
@@ -1706,41 +1722,35 @@
         return;
       }
       
-      const email = contact.email || (Array.isArray(contact.emails) && contact.emails[0] && contact.emails[0].address) || '';
-      const fullName = contact.firstName && contact.lastName ? `${contact.firstName} ${contact.lastName}`.trim() : '';
+      // Use current page context instead of searching by email/name
       let existingId = null;
       
-      console.log('[Lusha Enrich] Searching for existing contact - Email:', email, 'Name:', fullName);
-      
-      // Try to find existing contact by email first
-      if (email) {
+      // Try to get current contact ID from page context
+      if (currentEntityType === 'contact' && currentContactId) {
+        existingId = currentContactId;
+        console.log('[Lusha Enrich] Using current contact ID from page context:', existingId);
+      } else if (currentEntityType === 'account' && currentAccountId) {
+        // For account context, we need to find the most relevant contact
         try {
-          const snap = await db.collection('contacts').where('email','==',email).limit(1).get();
+          const snap = await db.collection('contacts').where('accountId','==',currentAccountId).limit(1).get();
           if (snap && snap.docs && snap.docs[0]) {
             existingId = snap.docs[0].id;
-            console.log('[Lusha Enrich] Found contact by email:', existingId);
+            console.log('[Lusha Enrich] Found contact for account:', existingId);
           }
         } catch(e){
-          console.error('[Lusha Enrich] Error searching by email:', e);
+          console.error('[Lusha Enrich] Error finding contact for account:', e);
         }
       }
       
-      // If no email match, try name-based matching
-      if (!existingId && fullName) {
-        try {
-          const snap = await db.collection('contacts').where('name','==',fullName).limit(1).get();
-          if (snap && snap.docs && snap.docs[0]) {
-            existingId = snap.docs[0].id;
-            console.log('[Lusha Enrich] Found contact by name:', existingId);
-          }
-        } catch(e){
-          console.error('[Lusha Enrich] Error searching by name:', e);
-        }
+      // Fallback: try to get from ContactDetail state
+      if (!existingId && window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+        existingId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact.contactId;
+        console.log('[Lusha Enrich] Using contact ID from ContactDetail state:', existingId);
       }
       
       if (!existingId) {
-        console.warn('[Lusha Enrich] Could not find existing contact to update');
-        window.crm?.showToast && window.crm.showToast('Could not find existing contact to enrich');
+        console.warn('[Lusha Enrich] Could not find existing contact to update - no current contact context');
+        window.crm?.showToast && window.crm.showToast('Could not find existing contact to enrich - please ensure you are on a contact page');
         return;
       }
       
@@ -1791,6 +1801,12 @@
         if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
           const currentContactId = window.ContactDetail.state.currentContact.id || window.ContactDetail.state.currentContact._id;
           if (currentContactId === existingId) {
+            // Update the current contact data immediately with enriched data
+            window.ContactDetail.state.currentContact = {
+              ...window.ContactDetail.state.currentContact,
+              ...updatePayload
+            };
+            
             // We're viewing the contact that was just enriched, refresh the page
             console.log('[Lusha Enrich] Refreshing contact details page after enrichment');
             window.ContactDetail.renderContactDetail();
@@ -1816,6 +1832,20 @@
           document.dispatchEvent(accountRefreshEvent);
           console.log('[Lusha Enrich] Dispatched pc:account-refresh event');
         }
+        
+        // Also refresh any other pages that might be showing this contact
+        try {
+          // Trigger a general contact update event for other components
+          const generalUpdateEvent = new CustomEvent('pc:contact-updated', {
+            detail: { 
+              contactId: existingId, 
+              changes: updatePayload,
+              source: 'lusha-enrichment'
+            }
+          });
+          document.dispatchEvent(generalUpdateEvent);
+          console.log('[Lusha Enrich] Dispatched pc:contact-updated event');
+        } catch (_) { /* noop */ }
       } catch(refreshError) {
         console.warn('[Lusha Enrich] Failed to refresh pages:', refreshError);
       }
