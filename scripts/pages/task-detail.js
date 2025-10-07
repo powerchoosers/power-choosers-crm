@@ -1272,6 +1272,8 @@
           return e ? e[0].toUpperCase() : '?';
         })();
         
+        console.log('Contact task - Contact name:', contactName, 'Initials:', initials);
+        
         // Update the main title to include clickable contact name
         if (els.title && contactName) {
           const contactId = person.id || '';
@@ -1317,18 +1319,29 @@
         contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
         
         // Add absolutely positioned avatar to the main title container
-        const titleSection = document.querySelector('.contact-header-text');
-        if (titleSection) {
-          // Remove any existing avatar
-          const existingAvatar = titleSection.querySelector('.avatar-initials');
-          if (existingAvatar) {
-            existingAvatar.remove();
+        // Use a small delay to ensure DOM is ready
+        setTimeout(() => {
+          const titleSection = document.querySelector('.contact-header-text');
+          console.log('Contact task - Title section found:', !!titleSection, 'Initials:', initials);
+          if (titleSection) {
+            // Remove any existing avatar
+            const existingAvatar = titleSection.querySelector('.avatar-initials');
+            if (existingAvatar) {
+              console.log('Removing existing avatar');
+              existingAvatar.remove();
+            }
+            
+            // Ensure we have valid initials
+            const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
+            
+            // Add the avatar positioned relative to the title section
+            const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true">${escapeHtml(finalInitials)}</span>`;
+            console.log('Adding avatar HTML:', avatarHTML);
+            titleSection.insertAdjacentHTML('beforeend', avatarHTML);
+          } else {
+            console.log('Contact task - No title section found');
           }
-          
-          // Add the avatar positioned relative to the title section
-          const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true">${escapeHtml(initials)}</span>`;
-          titleSection.insertAdjacentHTML('beforeend', avatarHTML);
-        }
+        }, 50);
       }
     }
     
