@@ -8,6 +8,46 @@
   };
 
   const els = {};
+  
+  // Track event listeners for cleanup
+  const eventListeners = [];
+
+  // Set up event delegation for account detail buttons on stable parent
+  // This runs once and handles all button clicks regardless of DOM replacement
+  function setupEventDelegation() {
+    // Only set up once
+    if (document._pcAccountDetailDelegated) return;
+    
+    console.log('[AccountDetail] Setting up event delegation on document');
+    
+    const delegatedClickHandler = (e) => {
+      // Check if click is on "Add to list" button
+      const addToListBtn = e.target.closest('#add-account-to-list');
+      if (addToListBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[AccountDetail] Add to list clicked via delegation');
+        
+        // Toggle behavior: close if already open
+        if (document.getElementById('account-lists-panel')) {
+          closeAccountListsPanel();
+        } else {
+          openAccountListsPanel();
+        }
+        return;
+      }
+    };
+    
+    // Attach to document with capture phase to catch events early
+    document.addEventListener('click', delegatedClickHandler, true);
+    eventListeners.push({ type: 'click', handler: delegatedClickHandler, target: document });
+    
+    document._pcAccountDetailDelegated = true;
+    console.log('[AccountDetail] Event delegation set up successfully');
+  }
+  
+  // Initialize event delegation immediately
+  setupEventDelegation();
 
   // ==== Date helpers for Energy & Contract fields ====
   function parseDateFlexible(s){
@@ -2565,20 +2605,10 @@
       header._nameBound = '1';
     }
 
-    // Header list/task buttons (mirror Contact Detail styles and behavior)
-    const addToListBtn = document.getElementById('add-account-to-list');
-    if (addToListBtn && !addToListBtn._bound) {
-      addToListBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        // Toggle behavior: close if already open
-        if (document.getElementById('account-lists-panel')) {
-          closeAccountListsPanel();
-        } else {
-          openAccountListsPanel();
-        }
-      });
-      addToListBtn._bound = '1';
-    }
+    // NOTE: "Add to List" button now uses event delegation
+    // Event listener is attached at module initialization on document level
+    // This eliminates race conditions when DOM is replaced during account navigation
+    // See setupEventDelegation() for implementation
 
     const taskBtn = document.getElementById('open-account-task-popover');
     if (taskBtn && !taskBtn._bound) {

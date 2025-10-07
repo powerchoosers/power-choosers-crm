@@ -32,6 +32,59 @@
     return !!els.page && !!els.mainContent;
   }
 
+  // Set up event delegation for contact detail buttons on stable parent
+  // This runs once and handles all button clicks regardless of DOM replacement
+  function setupEventDelegation() {
+    // Only set up once
+    if (document._pcContactDetailDelegated) return;
+    
+    console.log('[ContactDetail] Setting up event delegation on document');
+    
+    const delegatedClickHandler = (e) => {
+      // Check if click is on "Add to list" button
+      const addToListBtn = e.target.closest('#add-contact-to-list');
+      if (addToListBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[ContactDetail] Add to list clicked via delegation');
+        
+        // Toggle behavior: close if already open
+        if (document.getElementById('contact-lists-panel')) {
+          closeContactListsPanel();
+        } else {
+          openContactListsPanel();
+        }
+        return;
+      }
+      
+      // Check if click is on "Add to sequences" button
+      const addToSequencesBtn = e.target.closest('#add-contact-to-sequences');
+      if (addToSequencesBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[ContactDetail] Add to sequences clicked via delegation');
+        
+        // Toggle behavior: close if already open
+        if (document.getElementById('contact-sequences-panel')) {
+          closeContactSequencesPanel();
+        } else {
+          openContactSequencesPanel();
+        }
+        return;
+      }
+    };
+    
+    // Attach to document with capture phase to catch events early
+    document.addEventListener('click', delegatedClickHandler, true);
+    eventListeners.push({ type: 'click', handler: delegatedClickHandler, target: document });
+    
+    document._pcContactDetailDelegated = true;
+    console.log('[ContactDetail] Event delegation set up successfully');
+  }
+  
+  // Initialize event delegation immediately
+  setupEventDelegation();
+
   // Save a Contact field from the contact detail page
   async function saveField(field, value) {
     const db = window.firebaseDB;
@@ -1682,14 +1735,16 @@
     try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch(_) {}
     
     // Enable the "Add to list" button now that contact is fully loaded
-    setTimeout(() => {
+    // Using requestAnimationFrame for smoother UI update (runs on next paint)
+    requestAnimationFrame(() => {
       const addToListBtn = document.getElementById('add-contact-to-list');
       if (addToListBtn) {
         addToListBtn.removeAttribute('disabled');
         addToListBtn.style.opacity = '1';
         addToListBtn.title = 'Add to list';
+        console.log('[ContactDetail] Add to list button enabled');
       }
-    }, 100);
+    });
     
     // Clear phone widget context completely when opening contact detail page
     // This prevents any previous contact/company info from leaking into future calls
@@ -1736,25 +1791,13 @@
     // This avoids stale guards after navigating to other pages (e.g., account details)
     state._contactDetailEventsAttached = false;
     
-    // Force re-attachment of event handlers to ensure they work properly
-    // This is especially important after contact creation when the page might not be fully initialized
-    // Use longer timeout and retry logic to ensure DOM is fully ready
-    const attachEventsWithRetry = () => {
-      if (!state._contactDetailEventsAttached) {
-        // Check if critical DOM elements are ready
-        const addToListBtn = document.getElementById('add-contact-to-list');
-        const contactDetailView = document.getElementById('contact-detail-view');
-        
-        if (addToListBtn && contactDetailView && state.currentContact?.id) {
-          attachContactDetailEvents();
-        } else {
-          // Retry after a short delay if elements aren't ready
-          setTimeout(attachEventsWithRetry, 100);
-        }
+    // Attach contact detail events after DOM is ready
+    // Using requestAnimationFrame ensures DOM is painted before attaching events
+    requestAnimationFrame(() => {
+      if (!state._contactDetailEventsAttached && state.currentContact?.id) {
+        attachContactDetailEvents();
       }
-    };
-    
-    setTimeout(attachEventsWithRetry, 200);
+    });
     // Preload notes content early for smooth Notes widget open
     try { preloadNotesForContact(contact.id); } catch (_) { /* noop */ }
     // Non-destructive: hide the existing table/list instead of replacing all HTML
@@ -3187,51 +3230,10 @@
       compLink._bound = '1';
     }
 
-    // Add-to-List button
-    const addToListBtn = document.getElementById('add-contact-to-list');
-    if (addToListBtn) {
-      // Remove existing event listener if it exists
-      if (addToListBtn._bound) {
-        addToListBtn.removeEventListener('click', addToListBtn._clickHandler);
-      }
-      
-      // Create new event handler
-      addToListBtn._clickHandler = (e) => { 
-        e.preventDefault(); 
-        // Toggle behavior: close if already open
-        if (document.getElementById('contact-lists-panel')) {
-          closeContactListsPanel();
-        } else {
-          openContactListsPanel();
-        }
-      };
-      
-      addToListBtn.addEventListener('click', addToListBtn._clickHandler);
-      addToListBtn._bound = '1';
-    }
-
-    // Sequences button
-    const addToSequencesBtn = document.getElementById('add-contact-to-sequences');
-    if (addToSequencesBtn) {
-      // Remove existing event listener if it exists
-      if (addToSequencesBtn._bound) {
-        addToSequencesBtn.removeEventListener('click', addToSequencesBtn._clickHandler);
-      }
-      
-      // Create new event handler
-      addToSequencesBtn._clickHandler = (e) => { 
-        e.preventDefault(); 
-        // Toggle behavior: close if already open
-        if (document.getElementById('contact-sequences-panel')) {
-          closeContactSequencesPanel();
-        } else {
-          openContactSequencesPanel();
-        }
-      };
-      
-      addToSequencesBtn.addEventListener('click', addToSequencesBtn._clickHandler);
-      addToSequencesBtn._bound = '1';
-    }
+    // NOTE: "Add to List" and "Add to Sequences" buttons now use event delegation
+    // Event listeners are attached at module initialization on document level
+    // This eliminates race conditions when DOM is replaced during contact navigation
+    // See setupEventDelegation() for implementation
 
     // Tasks button (opens inline task popover)
     const tasksBtn = document.getElementById('open-contact-task-popover');
