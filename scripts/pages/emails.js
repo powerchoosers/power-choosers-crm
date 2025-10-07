@@ -4700,7 +4700,15 @@ class EmailManager {
         
         const to = toInput?.value?.trim() || '';
         const subject = subjectInput?.value?.trim() || '';
-        const body = bodyInput?.innerHTML || '';
+        
+        // Detect HTML mode and extract content appropriately
+        const isHtmlMode = bodyInput?.getAttribute('data-mode') === 'html';
+        const body = isHtmlMode ? 
+            (bodyInput?.textContent || '') :  // HTML mode: get raw HTML code
+            (bodyInput?.innerHTML || '');     // Text mode: get rendered HTML
+        
+        console.log('[EmailManager] Email mode:', isHtmlMode ? 'HTML' : 'Text');
+        console.log('[EmailManager] Content preview:', body.substring(0, 100) + '...');
         
         if (!to) {
             window.crm?.showToast('Please enter recipients');
