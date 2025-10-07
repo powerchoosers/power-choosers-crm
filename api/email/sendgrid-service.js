@@ -7,39 +7,30 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 export class SendGridService {
   constructor() {
-    console.log('[SendGridService] Constructor started');
     this.fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com';
     this.fromName = process.env.SENDGRID_FROM_NAME || 'Power Choosers CRM';
-    console.log('[SendGridService] Constructor completed:', { fromEmail: this.fromEmail, fromName: this.fromName });
   }
 
   /**
    * Check if email should be suppressed
    */
   async checkSuppression(email) {
-    console.log('[SendGridService] checkSuppression started for:', email);
-    console.log('[SendGridService] db object:', db);
-    
     try {
       if (!db) {
-        console.log('[SendGridService] db is null, skipping suppression check');
         return { suppressed: false };
       }
       
-      console.log('[SendGridService] Querying Firebase for suppression:', email);
       const suppressionDoc = await db.collection('suppressions').doc(email).get();
-      console.log('[SendGridService] Firebase query result:', { exists: suppressionDoc.exists });
       
       if (suppressionDoc.exists) {
         const data = suppressionDoc.data();
-        console.log(`[SendGridService] Email suppressed: ${email} - ${data.reason}`);
+        console.log(`[SendGrid] Email suppressed: ${email} - ${data.reason}`);
         return { suppressed: true, reason: data.reason };
       }
       
-      console.log('[SendGridService] Email not suppressed:', email);
       return { suppressed: false };
     } catch (error) {
-      console.error(`[SendGridService] Error checking suppression for ${email}:`, error);
+      console.error(`[SendGrid] Error checking suppression for ${email}:`, error);
       return { suppressed: false };
     }
   }
@@ -48,31 +39,23 @@ export class SendGridService {
    * Send a single email via SendGrid
    */
   async sendEmail(emailData) {
-    console.log('[SendGridService] sendEmail method started');
-    console.log('[SendGridService] Email data received:', { to: emailData.to, subject: emailData.subject, trackingId: emailData.trackingId });
-    
     try {
       const { to, subject, content, from, trackingId, _deliverability } = emailData;
       
       // Check if any recipients are suppressed
       const recipients = Array.isArray(to) ? to : [to];
-      console.log('[SendGridService] Recipients to check:', recipients);
       const suppressedEmails = [];
       
       for (const email of recipients) {
-        console.log('[SendGridService] Checking suppression for:', email);
         const suppression = await this.checkSuppression(email);
-        console.log('[SendGridService] Suppression result:', suppression);
         if (suppression.suppressed) {
           suppressedEmails.push({ email, reason: suppression.reason });
         }
       }
       
-      console.log('[SendGridService] Suppression check completed:', { suppressedEmails, totalRecipients: recipients.length });
-      
       // If all recipients are suppressed, don't send
       if (suppressedEmails.length === recipients.length) {
-        console.log(`[SendGridService] All recipients suppressed, skipping send`);
+        console.log(`[SendGrid] All recipients suppressed, skipping send`);
         return {
           success: false,
           message: 'All recipients suppressed',
@@ -85,10 +68,8 @@ export class SendGridService {
         !suppressedEmails.some(s => s.email === email)
       );
       
-      console.log('[SendGridService] Allowed recipients after filtering:', allowedRecipients);
-      
       if (allowedRecipients.length === 0) {
-        console.log(`[SendGridService] No valid recipients after filtering suppressed emails`);
+        console.log(`[SendGrid] No valid recipients after filtering suppressed emails`);
         return {
           success: false,
           message: 'No valid recipients',
@@ -108,6 +89,10 @@ export class SendGridService {
       };
 
       // Prepare email message with filtered recipients
+      // Generate both HTML and text versions for maximum compatibility
+      const htmlContent = content;
+      const textContent = this.stripHtml(content);
+      
       const msg = {
         to: allowedRecipients,
         from: {
@@ -115,8 +100,8 @@ export class SendGridService {
           name: this.fromName
         },
         subject: subject,
-        html: content,
-        text: this.stripHtml(content),
+        html: htmlContent,
+        text: textContent,
         trackingSettings: {
           clickTracking: { enable: deliverabilitySettings.enableTracking },
           openTracking: { enable: deliverabilitySettings.enableTracking }
@@ -149,16 +134,7 @@ export class SendGridService {
       }
 
       // Send email via SendGrid
-      console.log('[SendGridService] About to call sgMail.send() with message:', {
-        to: msg.to,
-        from: msg.from,
-        subject: msg.subject,
-        contentLength: msg.html ? msg.html.length : 0
-      });
-      
       const response = await sgMail.send(msg);
-      console.log('[SendGridService] SendGrid API call completed successfully');
-      console.log('[SendGridService] SendGrid response:', response);
       
       console.log('[SendGrid] Email sent successfully:', {
         to: to,
