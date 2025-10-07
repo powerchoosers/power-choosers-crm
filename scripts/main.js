@@ -3630,7 +3630,7 @@ window.getEmailSignature = function() {
             const settings = JSON.parse(savedSettings);
             const signature = settings.emailSignature;
             if (signature && (signature.text || signature.image)) {
-                let signatureHtml = '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
+                let signatureHtml = '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
                 
                 if (signature.text) {
                     const textHtml = signature.text.replace(/\n/g, '<br>');
@@ -3689,12 +3689,18 @@ function injectEmailSignature() {
     // Get signature and add to body if it exists
     const signature = window.getEmailSignature ? window.getEmailSignature() : '';
     if (signature) {
+        // Create a non-editable guard element that sits immediately BEFORE the signature
+        // This gives us a stable insertion point for new lines and prevents the caret from
+        // jumping into or past the signature block in contenteditable behaviors.
+        const guard = '<div data-signature-guard="true" contenteditable="false" style="display:block;height:0;line-height:0;margin:0;padding:0;border:0;"></div>';
         // If body is empty, just add signature
         if (!currentContent.trim()) {
-            bodyInput.innerHTML = '<p><br></p>' + signature;
+            bodyInput.innerHTML = '<p><br></p>' + guard + signature;
         } else {
             // Add signature to end of existing content
-            bodyInput.innerHTML = currentContent + signature;
+            // Avoid duplicate guard/signature insertion
+            const alreadyHasGuard = currentContent.indexOf('data-signature-guard="true"') !== -1;
+            bodyInput.innerHTML = currentContent + (alreadyHasGuard ? '' : guard) + signature;
         }
 
         // Move cursor to before the signature
@@ -3716,7 +3722,7 @@ function injectEmailSignature() {
                 console.log('[Signature] Settings from localStorage:', signatureData);
 
                 if (signatureData && (signatureData.text || signatureData.image)) {
-                    let signatureHtml = '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
+                    let signatureHtml = '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
 
                     if (signatureData.text) {
                         const textHtml = signatureData.text.replace(/\n/g, '<br>');
@@ -3729,11 +3735,13 @@ function injectEmailSignature() {
 
                     signatureHtml += '</div>';
 
-                    // Add signature to body
+                    // Add signature to body with guard before it
+                    const guard = '<div data-signature-guard="true" contenteditable="false" style="display:block;height:0;line-height:0;margin:0;padding:0;border:0;"></div>';
                     if (!currentContent.trim()) {
-                        bodyInput.innerHTML = '<p><br></p>' + signatureHtml;
+                        bodyInput.innerHTML = '<p><br></p>' + guard + signatureHtml;
                     } else {
-                        bodyInput.innerHTML = currentContent + signatureHtml;
+                        const alreadyHasGuard = currentContent.indexOf('data-signature-guard="true"') !== -1;
+                        bodyInput.innerHTML = currentContent + (alreadyHasGuard ? '' : guard) + signatureHtml;
                     }
 
                     console.log('[Signature] Added signature from localStorage');

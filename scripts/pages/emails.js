@@ -56,6 +56,58 @@ class EmailManager {
                 this.sendEmail();
             });
         }
+
+        // Enter key handler for email composition
+        this.setupComposeEnterKeyHandler();
+    }
+
+    // Setup enter key handler for email composition
+    setupComposeEnterKeyHandler() {
+        // Use event delegation to handle dynamically created compose windows
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const editor = document.querySelector('.body-input');
+                if (editor && editor.contains(e.target)) {
+                    console.log('[Enter] Enter key pressed in email editor');
+                    e.preventDefault();
+                    
+                    // Check if cursor is at or near signature boundary
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        
+                        // Find if we're near the signature
+                        const isNearSignature = this.isCursorNearSignature(editor, range);
+                        if (isNearSignature) {
+                            // Don't allow editing into signature area
+                            console.log('[Enter] Cursor near signature - preventing edit');
+                            return;
+                        }
+                    }
+                    
+                    // Simple approach: just insert a line break
+                    try {
+                        document.execCommand('insertHTML', false, '<br>');
+                        console.log('[Enter] Line break inserted via execCommand');
+                    } catch (error) {
+                        console.error('[Enter] execCommand failed:', error);
+                        // Try alternative approach
+                        try {
+                            const br = document.createElement('br');
+                            const range = selection.getRangeAt(0);
+                            range.insertNode(br);
+                            range.setStartAfter(br);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            console.log('[Enter] Line break inserted via DOM manipulation');
+                        } catch (fallbackError) {
+                            console.error('[Enter] DOM manipulation also failed:', fallbackError);
+                        }
+                    }
+                }
+            }
+        });
     }
 
     // Update authentication UI
@@ -3267,14 +3319,46 @@ class EmailManager {
             }
         });
 
-        // Fix enter key double spacing issue
+        // Fix enter key double spacing issue and signature boundary
         editor?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
+                console.log('[Enter] Enter key pressed');
                 e.preventDefault();
-                // Insert single line break instead of allowing double spacing
-                document.execCommand('insertHTML', false, '<br>');
-                // Clean up any extra spacing that might be added
-                setTimeout(() => this.cleanZeroWidthSpans(editor), 0);
+                
+                // Check if cursor is at or near signature boundary
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    
+                    // Find if we're near the signature
+                    const isNearSignature = this.isCursorNearSignature(editor, range);
+                    if (isNearSignature) {
+                        // Don't allow editing into signature area
+                        console.log('[Enter] Cursor near signature - preventing edit');
+                        return;
+                    }
+                }
+                
+                // Simple approach: just insert a line break
+                try {
+                    document.execCommand('insertHTML', false, '<br>');
+                    console.log('[Enter] Line break inserted via execCommand');
+                } catch (error) {
+                    console.error('[Enter] execCommand failed:', error);
+                    // Try alternative approach
+                    try {
+                        const br = document.createElement('br');
+                        const range = selection.getRangeAt(0);
+                        range.insertNode(br);
+                        range.setStartAfter(br);
+                        range.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        console.log('[Enter] Line break inserted via DOM manipulation');
+                    } catch (fallbackError) {
+                        console.error('[Enter] DOM manipulation also failed:', fallbackError);
+                    }
+                }
             }
         });
         const toolbar = composeWindow.querySelector('.editor-toolbar');
@@ -5464,6 +5548,147 @@ class EmailManager {
         return manualIndicators.filter(Boolean).length >= 2;
     }
 
+    /**
+     * Check if cursor is near the signature boundary
+     * @param {HTMLElement} editor - The email editor element
+     * @param {Range} range - The current selection range
+     * @returns {boolean} True if cursor is near signature
+     */
+    isCursorNearSignature(editor, range) {
+        try {
+            // Look for signature boundary markers
+            const signatureMarkers = [
+                'margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;',
+                'border-top: 1px solid #e0e0e0;',
+                'alt="Signature"'
+            ];
+            
+            // Get the HTML content and find signature position
+            const html = editor.innerHTML;
+            let signatureStart = -1;
+            
+            for (const marker of signatureMarkers) {
+                const pos = html.indexOf(marker);
+                if (pos !== -1) {
+                    signatureStart = pos;
+                    break;
+                }
+            }
+            
+            if (signatureStart === -1) {
+                return false; // No signature found
+            }
+            
+            // Get the current cursor position in the HTML
+            const walker = document.createTreeWalker(
+                editor,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            
+            let currentPos = 0;
+            let node;
+            let cursorPos = 0;
+            
+            while (node = walker.nextNode()) {
+                const nodeLength = node.textContent.length;
+                if (range.startContainer === node) {
+                    cursorPos = currentPos + range.startOffset;
+                    break;
+                }
+                currentPos += nodeLength;
+            }
+            
+            // Check if cursor is within 50 characters of signature start
+            const distanceFromSignature = signatureStart - cursorPos;
+            return distanceFromSignature < 50 && distanceFromSignature > -10;
+            
+        } catch (error) {
+            console.warn('[Signature] Error checking cursor position:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Insert a single line break without double spacing
+     * @param {HTMLElement} editor - The email editor element
+     */
+    insertSingleLineBreak(editor) {
+        try {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) {
+                console.warn('[Enter] No selection found');
+                return;
+            }
+            
+            const range = selection.getRangeAt(0);
+            console.log('[Enter] Inserting line break at position:', range.startOffset);
+            
+            // Simple approach: just insert a line break
+            const br = document.createElement('br');
+            range.insertNode(br);
+            
+            // Move cursor after the line break
+            const newRange = document.createRange();
+            newRange.setStartAfter(br);
+            newRange.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+            
+            console.log('[Enter] Line break inserted successfully');
+            
+            // Clean up any extra spacing
+            setTimeout(() => this.cleanZeroWidthSpans(editor), 0);
+            
+        } catch (error) {
+            console.warn('[Enter] Error inserting line break:', error);
+            // Fallback: try execCommand
+            try {
+                document.execCommand('insertHTML', false, '<br>');
+                console.log('[Enter] Fallback line break inserted');
+            } catch (fallbackError) {
+                console.error('[Enter] Fallback also failed:', fallbackError);
+            }
+        }
+    }
+
+    /**
+     * Check if cursor is at the end of a block element
+     * @param {Node} container - The container node
+     * @param {Range} range - The selection range
+     * @returns {boolean} True if at end of block
+     */
+    isAtEndOfBlockElement(container, range) {
+        try {
+            // Check if we're in a text node at the end of a block element
+            if (container.nodeType === Node.TEXT_NODE) {
+                const textLength = container.textContent.length;
+                const isAtEnd = range.startOffset === textLength;
+                
+                // Check if parent is a block element
+                const parent = container.parentElement;
+                if (parent && ['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(parent.tagName)) {
+                    return isAtEnd;
+                }
+            }
+            
+            // Check if we're at the end of a block element
+            if (container.nodeType === Node.ELEMENT_NODE) {
+                const element = container;
+                if (['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(element.tagName)) {
+                    const childCount = element.childNodes.length;
+                    return range.startOffset === childCount;
+                }
+            }
+            
+            return false;
+        } catch (error) {
+            console.warn('[Enter] Error checking block element:', error);
+            return false;
+        }
+    }
+
 
 }
 
@@ -5537,6 +5762,74 @@ if (document.readyState === 'loading') {
 
 // Export for global access
 window.emailManager = emailManager;
+
+// Global enter key handler for email composition  
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        const editor = document.querySelector('.body-input');
+        if (editor && editor.contains(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            // Get selection
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            
+            const range = selection.getRangeAt(0);
+            const container = range.startContainer;
+            
+            // Check if we're inside signature - if so, block
+            let node = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
+            while (node && node !== editor) {
+                if (node.getAttribute && node.getAttribute('data-signature') === 'true') {
+                    return; // Don't allow editing in signature
+                }
+                node = node.parentElement;
+            }
+            
+            // Use a simple approach: just insert a single <br> tag
+            const br = document.createElement('br');
+            range.deleteContents();
+            range.insertNode(br);
+            range.setStartAfter(br);
+            range.setEndAfter(br);
+            range.collapse(true);
+            
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // Prevent any additional browser processing
+            return false;
+        }
+    }
+}, true); // Use capture phase to intercept before other handlers
+
+
+// Prevent cursor from moving into signature area on click
+document.addEventListener('click', (e) => {
+    const editor = document.querySelector('.body-input');
+    if (editor && editor.contains(e.target)) {
+        // Check if click was on or inside signature
+        let node = e.target;
+        while (node && node !== editor) {
+            if (node.getAttribute && node.getAttribute('data-signature') === 'true') {
+                console.log('[Click] Clicked inside signature - moving cursor before it');
+                e.preventDefault();
+                
+                // Move cursor to just before the signature
+                const range = document.createRange();
+                const selection = window.getSelection();
+                range.setStartBefore(node);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+            node = node.parentElement;
+        }
+    }
+});
 
 // Global helper to open compose with a prefilled recipient (sitewide)
 // Usage: window.EmailCompose.openTo('someone@company.com', 'Optional Name')
