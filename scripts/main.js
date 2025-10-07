@@ -104,7 +104,7 @@ class PowerChoosersCRM {
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           const data = {};
-          form.querySelectorAll('input').forEach(inp => { data[inp.name] = (inp.value || '').trim(); });
+          form.querySelectorAll('input, textarea').forEach(inp => { data[inp.name] = (inp.value || '').trim(); });
 
           // Sanitize if available
           if (window.escapeHtml) {
@@ -343,7 +343,7 @@ class PowerChoosersCRM {
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           const data = {};
-          form.querySelectorAll('input').forEach(inp => { data[inp.name] = (inp.value || '').trim(); });
+          form.querySelectorAll('input, textarea').forEach(inp => { data[inp.name] = (inp.value || '').trim(); });
 
           // Sanitize if available
           if (window.escapeHtml) {
