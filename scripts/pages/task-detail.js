@@ -250,7 +250,7 @@
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background: var(--orange-subtle);
+        background: var(--orange-subtle, #ff6b35);
         color: #fff;
         font-weight: 600;
         letter-spacing: 0.5px;
@@ -443,7 +443,7 @@
         width: 32px;
         height: 32px;
         border-radius: 50%;
-        background: var(--orange-subtle);
+        background: var(--orange-subtle, #ff6b35);
         color: #fff;
         font-weight: 600;
         letter-spacing: 0.5px;
