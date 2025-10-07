@@ -3968,6 +3968,44 @@
 
   function openAccountListsPanel() {
     if (document.getElementById('account-lists-panel')) return;
+    
+    // Comprehensive validation: ensure account detail page is fully ready
+    const isAccountDetailReady = () => {
+      // Check if critical DOM elements exist
+      const header = document.getElementById('account-detail-header');
+      const view = document.getElementById('account-detail-view');
+      const addToListBtn = document.getElementById('add-account-to-list');
+      
+      if (!header || !view || !addToListBtn) return false;
+      
+      // Check if state has account ID
+      if (!state.currentAccount?.id) return false;
+      
+      // All validations passed
+      return true;
+    };
+    
+    // If not ready, show loading state and retry
+    if (!isAccountDetailReady()) {
+      console.log('[AccountDetail] Account detail not fully ready, showing loading state');
+      // Show a brief loading message to the user
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Loading account information...');
+      }
+      
+      // Retry after a short delay
+      setTimeout(() => {
+        if (isAccountDetailReady()) {
+          openAccountListsPanel(); // Recursive call when ready
+        } else {
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Account information not ready. Please try again.');
+          }
+        }
+      }, 200);
+      return;
+    }
+    
     injectAccountListsStyles();
     const panel = document.createElement('div');
     panel.id = 'account-lists-panel';

@@ -1681,6 +1681,16 @@
     // Broadcast that contact detail is loaded so dependent widgets can rebind
     try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch(_) {}
     
+    // Enable the "Add to list" button now that contact is fully loaded
+    setTimeout(() => {
+      const addToListBtn = document.getElementById('add-contact-to-list');
+      if (addToListBtn) {
+        addToListBtn.removeAttribute('disabled');
+        addToListBtn.style.opacity = '1';
+        addToListBtn.title = 'Add to list';
+      }
+    }, 100);
+    
     // Clear phone widget context completely when opening contact detail page
     // This prevents any previous contact/company info from leaking into future calls
     clearPhoneWidgetContext();
@@ -1692,6 +1702,7 @@
       if (contactDetailView) {
         // Reset flag to allow reattachment after module reload
         contactDetailView._companyPhoneHandlerAdded = false;
+        contactDetailView._contactPhoneHandlerAdded = false;
         
         if (!contactDetailView._companyPhoneHandlerAdded) {
           contactDetailView._companyPhoneHandlerAdded = true;
@@ -1704,6 +1715,19 @@
           };
           contactDetailView.addEventListener('click', companyPhoneHandler);
           eventListeners.push({ type: 'click', handler: companyPhoneHandler, target: contactDetailView });
+        }
+        
+        if (!contactDetailView._contactPhoneHandlerAdded) {
+          contactDetailView._contactPhoneHandlerAdded = true;
+          const contactPhoneHandler = (e) => {
+            // Check if clicking on a contact phone number
+            const phoneElement = e.target.closest('#contact-detail-view .info-row[data-field="phone"] .info-value-text');
+            if (phoneElement && window.Widgets && typeof window.Widgets.setCallContext === 'function') {
+              handleContactPhoneClick(phoneElement, contact);
+            }
+          };
+          contactDetailView.addEventListener('click', contactPhoneHandler);
+          eventListeners.push({ type: 'click', handler: contactPhoneHandler, target: contactDetailView });
         }
       }
     } catch(_) {}
@@ -2020,7 +2044,7 @@
               </button>
               <span class="header-action-divider" aria-hidden="true"></span>
               <div class="list-seq-group">
-                <button class="quick-action-btn list-header-btn" id="add-contact-to-list" title="Add to list" aria-label="Add to list" aria-haspopup="dialog">
+                <button class="quick-action-btn list-header-btn" id="add-contact-to-list" title="Loading contact..." aria-label="Add to list" aria-haspopup="dialog" disabled style="opacity: 0.6;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <circle cx="4" cy="6" r="1"></circle>
                     <circle cx="4" cy="12" r="1"></circle>
@@ -2674,6 +2698,55 @@
       
     } catch (error) {
       console.error('[Contact Detail] Error setting company phone context:', error);
+    }
+  }
+
+  // Handle contact phone clicks with proper contact context
+  function handleContactPhoneClick(phoneElement, contact) {
+    try {
+      console.log('[Contact Detail] Contact phone clicked, setting contact context');
+      
+      // Get the phone type from the data attribute
+      const phoneType = phoneElement.closest('.info-row')?.getAttribute('data-phone-type') || 'mobile';
+      
+      // Build contact context for contact phone calls
+      const contextPayload = {
+        contactId: contact.id || contact.contactId || contact._id || '',
+        contactName: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '',
+        accountId: contact.accountId || contact.account_id || '',
+        accountName: contact.companyName || contact.company || contact.account || '',
+        company: contact.companyName || contact.company || contact.account || '',
+        name: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '', // Contact name as primary
+        city: contact.city || contact.locationCity || '',
+        state: contact.state || contact.locationState || '',
+        domain: contact.domain || '',
+        logoUrl: contact.logoUrl || '',
+        isCompanyPhone: false, // This is a contact phone call
+        phoneType: phoneType, // Include the phone type (mobile, work direct, other)
+        suggestedContactId: contact.id || contact.contactId || contact._id || '',
+        suggestedContactName: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || ''
+      };
+      
+      // Set the context in the phone widget
+      if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
+        window.Widgets.setCallContext(contextPayload);
+        
+        // Also trigger contact display to show the contact info
+        if (window.Widgets && typeof window.Widgets.setContactDisplay === 'function') {
+          try {
+            window.Widgets.setContactDisplay(contextPayload, '');
+          } catch(_) {}
+        }
+      }
+      
+      // Mark that we've set a specific context to prevent generic click-to-call from overriding
+      try {
+        window._pcPhoneContextSetByPage = true;
+        setTimeout(() => { window._pcPhoneContextSetByPage = false; }, 1000);
+      } catch(_) {}
+      
+    } catch (error) {
+      console.error('[Contact Detail] Error setting contact phone context:', error);
     }
   }
 
@@ -5533,6 +5606,56 @@ async function createContactSequenceThenAdd(name) {
   function openContactListsPanel() {
     if (document.getElementById('contact-lists-panel')) return;
     
+    // Comprehensive validation: ensure contact detail page is fully ready
+    const isContactDetailReady = () => {
+      // Check if critical DOM elements exist
+      const header = document.getElementById('contact-detail-header');
+      const view = document.getElementById('contact-detail-view');
+      const addToListBtn = document.getElementById('add-contact-to-list');
+      
+      if (!header || !view || !addToListBtn) return false;
+      
+      // Check if data-contact-id attributes are set
+      const headerId = header.getAttribute('data-contact-id');
+      const viewId = view.getAttribute('data-contact-id');
+      
+      if (!headerId || !viewId) return false;
+      
+      // Check if state has contact ID
+      if (!state.currentContact?.id) return false;
+      
+      // All validations passed
+      return true;
+    };
+    
+    // If not ready, show loading state and retry
+    if (!isContactDetailReady()) {
+      console.log('[ContactDetail] Contact detail not fully ready, showing loading state');
+      // Show a brief loading message to the user
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Loading contact information...');
+      }
+      
+      // Retry after a short delay
+      setTimeout(() => {
+        if (isContactDetailReady()) {
+          openContactListsPanel(); // Recursive call when ready
+        } else {
+          // Still not ready, try the async resolution
+          resolveCurrentContactIdWithRetry(3000).then(success => {
+            if (success && isContactDetailReady()) {
+              openContactListsPanel(); // Recursive call when ready
+            } else {
+              if (window.crm && typeof window.crm.showToast === 'function') {
+                window.crm.showToast('Contact information not ready. Please try again.');
+              }
+            }
+          });
+        }
+      }, 200);
+      return;
+    }
+    
     injectContactListsStyles();
     const panel = document.createElement('div');
     panel.id = 'contact-lists-panel';
@@ -5607,24 +5730,9 @@ async function createContactSequenceThenAdd(name) {
     // Mark trigger expanded
     try { document.getElementById('add-contact-to-list')?.setAttribute('aria-expanded', 'true'); } catch(_) {}
 
-    // Ensure currentContact has a stable id before loading memberships
-    try {
-      const id = state.currentContact && state.currentContact.id;
-      if (!id && window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
-        state.currentContact.id = window.ContactDetail.state.currentContact.id;
-      }
-    } catch(_) {}
-    // Load lists and memberships after ensuring we have a resolvable contact id
-    (async () => {
-      const ok = await resolveCurrentContactIdWithRetry(2000);
-      if (!ok) {
-        try { window.crm && window.crm.showToast && window.crm.showToast('Contact information not ready. Please try again.'); } catch(_) {}
-        closeContactListsPanel();
-        return;
-      }
-      Promise.resolve(populateContactListsPanel(panel.querySelector('#contact-lists-body')))
-        .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch(_) {} });
-    })();
+    // Load lists and memberships immediately since we've already validated everything is ready
+    Promise.resolve(populateContactListsPanel(panel.querySelector('#contact-lists-body')))
+      .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch(_) {} });
 
     // Close button
     panel.querySelector('#contact-lists-close')?.addEventListener('click', () => closeContactListsPanel());
@@ -5677,7 +5785,7 @@ async function createContactSequenceThenAdd(name) {
   }
 
   // Resolve the current contact id with retries and multiple sources
-  async function resolveCurrentContactIdWithRetry(timeoutMs = 2000) {
+  async function resolveCurrentContactIdWithRetry(timeoutMs = 4000) {
     const started = Date.now();
     const tryResolveOnce = () => {
       // 1) state
@@ -5717,8 +5825,8 @@ async function createContactSequenceThenAdd(name) {
       return true;
     }
 
-    // Retry loop
-    const interval = 80;
+    // Retry loop with longer timeout and more frequent checks
+    const interval = 60; // Check every 60ms instead of 80ms
     while (Date.now() - started < timeoutMs) {
       await new Promise(r => setTimeout(r, interval));
       resolved = tryResolveOnce();
