@@ -297,24 +297,21 @@
     cursor: pointer;
 }
 
-/* Preserve email background colors and styling */
+/* Disabled: Preserve email background colors and styling
 .email-content div,
 .email-content span,
-.email-content p {
-    /* Allow inherited styles from email HTML */
-}
+.email-content p { }
+*/
 
-/* Preserve email button styling */
+/* Disabled: Preserve email button styling
 .email-content a[style*="background"],
-.email-content button[style*="background"] {
-    /* Preserve inline styles from email */
-}
+.email-content button[style*="background"] { }
+*/
 
-/* Ensure email tables maintain their layout */
+/* Disabled: Ensure email tables maintain their layout
 .email-content table td,
-.email-content table th {
-    /* Preserve table cell styling from email */
-}
+.email-content table th { }
+*/
 
 /* === CSS VARIABLES === */
 :root {
@@ -14987,6 +14984,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 
 /* Use same close button styles as notes widget */
 /* .widget-card .maps-close inherits from .notes-close - no additional styles needed */
+
 
 /* Responsive Design */
 @media (max-width: 768px) {
