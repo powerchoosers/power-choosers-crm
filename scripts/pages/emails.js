@@ -2662,10 +2662,12 @@ class EmailManager {
     }
 
     parseSentEmailData(emailData) {
-        // Fix date formatting issue - pass the actual Date object instead of string
+        // Fix date formatting issue - handle both sent and received emails
         let dateObj = null;
         try {
-            dateObj = new Date(emailData.sentAt);
+            // Try multiple date fields (sentAt for sent, receivedAt for received, createdAt as fallback)
+            const dateSource = emailData.sentAt || emailData.receivedAt || emailData.createdAt || emailData.timestamp;
+            dateObj = new Date(dateSource);
             if (isNaN(dateObj.getTime())) {
                 dateObj = new Date(); // Fallback to current time
             }
