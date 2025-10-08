@@ -520,8 +520,22 @@ class SettingsPage {
                 window.showToast('Uploading signature image...', 'info');
             }
 
-            // Upload to image hosting service
-            const imageUrl = await this.uploadSignatureImage(file);
+            // Convert file to base64 and upload as JSON
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            const response = await fetch(`${window.API_BASE_URL}/api/upload/signature-image`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64, type: 'signature' })
+            });
+
+            if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
+            const { imageUrl } = await response.json();
             
             if (imageUrl) {
                 // Store the hosted image URL
@@ -552,7 +566,8 @@ class SettingsPage {
 
             const response = await fetch(`${window.API_BASE_URL}/api/upload/signature-image`, {
                 method: 'POST',
-                body: formData
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result.split(',')[1]); r.onerror = reject; r.readAsDataURL(file); }), type: 'signature' })
             });
 
             if (!response.ok) {
