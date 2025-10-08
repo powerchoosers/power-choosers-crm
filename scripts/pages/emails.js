@@ -5067,10 +5067,16 @@ class EmailManager {
 
         // If we have HTML content, render it properly using innerHTML
         if (htmlContent && htmlContent.trim()) {
-            // DECODE QUOTED-PRINTABLE CONTENT (fix for =20 artifacts)
-            const decodedHtml = this.decodeQuotedPrintable(htmlContent);
-            
-            // Use innerHTML to properly render HTML content
+            // Decode quoted-printable artifacts and clean malformed attribute encodings
+            let decodedHtml = this.decodeQuotedPrintable(htmlContent);
+            // Fix common quoted-printable mis-encodings in attributes (href/src)
+            decodedHtml = decodedHtml
+                .replace(/href=3D"/gi, 'href="')
+                .replace(/src=3D"/gi, 'src="')
+                .replace(/\shref="3D/gi, ' href="')
+                .replace(/\ssrc="3D/gi, ' src="')
+                .replace(/=3D/gi, '=');
+
             contentContainer.innerHTML = decodedHtml;
         } else if (textContent && textContent.trim()) {
             // Fallback to text content with line breaks
