@@ -2273,6 +2273,8 @@ class EmailManager {
     updateUI() {
         // Always load emails - no need for auth prompt since we use tracking system
         this.loadEmails();
+        // Update folder counts after a brief delay to let data load
+        setTimeout(() => this.updateFolderCounts(), 1000);
     }
 
     saveAuthState() {
@@ -2541,6 +2543,11 @@ class EmailManager {
                 console.log('[EmailManager] Loading emails from SendGrid data...');
                 
                 if (this.currentFolder === 'threads') {
+                    // Clear previous emails to prevent showing stale data
+                    this.emails = [];
+                    const emailList = document.getElementById('email-list');
+                    if (emailList) emailList.innerHTML = '';
+                    
                     // Load conversation threads and render thread list
                     const threads = await window.emailTrackingManager.getConversationThreads();
                     console.log('[EmailManager] Retrieved threads:', threads.length);
@@ -2553,42 +2560,44 @@ class EmailManager {
                     const allEmails = await window.emailTrackingManager.getAllEmails();
                     console.log('[EmailManager] Retrieved all emails:', allEmails.length);
                     
-                    // DEBUG: Log first 3 emails to see field structure
-                    allEmails.slice(0, 3).forEach((email, idx) => {
-                        console.log(`[EmailManager DEBUG] Email ${idx}:`, {
-                            id: email.id,
-                            type: email.type,
-                            emailType: email.emailType,
-                            provider: email.provider,
-                            isSentEmail: email.isSentEmail,
-                            from: email.from,
-                            to: email.to
-                        });
-                    });
-                    
                     // Filter by folder
                     let filteredEmails = allEmails;
                     if (this.currentFolder === 'inbox') {
+                        // Show only received emails
                         filteredEmails = allEmails.filter(email => {
-                            // Check explicit received type
-                            if (email.emailType === 'received' || email.provider === 'sendgrid_inbound') {
-                                return true;
-                            }
-                            // Exclude sent emails
-                            if (email.emailType === 'sent' || email.isSentEmail) {
+                            if (email.emailType === 'sent' || email.isSentEmail || email.type === 'sent') {
                                 return false;
                             }
-                            // Check if email is from external sender (not from @powerchoosers.com)
-                            const fromAddress = Array.isArray(email.from) ? email.from[0] : email.from;
-                            if (fromAddress && typeof fromAddress === 'string' && !fromAddress.includes('noreply@powerchoosers.com')) {
-                                return true;
-                            }
-                            // Default: exclude
-                            return false;
+                            return true;
                         });
-                    } else if (this.currentFolder === 'sent') {
+                    } else if (this.currentFolder === 'starred') {
+                        // Show only starred emails
+                        filteredEmails = allEmails.filter(email => email.starred === true);
+                    } else if (this.currentFolder === 'important') {
+                        // Show only important emails
+                        filteredEmails = allEmails.filter(email => email.important === true);
+                    } else if (this.currentFolder === 'drafts') {
+                        // Show only draft emails
+                        filteredEmails = allEmails.filter(email => email.status === 'draft');
+                    } else if (this.currentFolder === 'spam') {
+                        // Show only spam emails
                         filteredEmails = allEmails.filter(email => 
-                            email.emailType === 'sent' || (email.from && email.from.includes('noreply@powerchoosers.com'))
+                            (email.labels && email.labels.includes('SPAM')) || email.isSpam === true
+                        );
+                    } else if (this.currentFolder === 'trash') {
+                        // Show only trashed emails
+                        filteredEmails = allEmails.filter(email => 
+                            (email.labels && email.labels.includes('TRASH')) || email.isDeleted === true
+                        );
+                    } else if (this.currentFolder === 'scheduled') {
+                        // Show only scheduled emails
+                        filteredEmails = allEmails.filter(email => 
+                            (email.labels && email.labels.includes('SCHEDULED')) || email.scheduledAt
+                        );
+                    } else if (this.currentFolder === 'sent') {
+                        // This is handled separately in loadEmails, but add fallback
+                        filteredEmails = allEmails.filter(email => 
+                            email.emailType === 'sent' || email.isSentEmail || email.type === 'sent'
                         );
                     }
                     
@@ -3016,23 +3025,36 @@ class EmailManager {
         document.getElementById('mark-read-btn')?.toggleAttribute('disabled', !hasSelection);
     }
 
-    updateFolderCounts() {
-        // This would typically come from the API, but for now we'll use placeholder logic
-        const counts = {
-            inbox: this.emails.filter(e => e.labels && e.labels.includes('INBOX')).length,
-            starred: this.emails.filter(e => e.starred).length,
-            important: this.emails.filter(e => e.important).length,
-            sent: this.emails.filter(e => e.isSentEmail).length, // Count sent emails
-            drafts: 0, // Would need separate API call
-            scheduled: 0,
-            spam: 0,
-            trash: 0
-        };
+    async updateFolderCounts() {
+        try {
+            if (!window.emailTrackingManager) return;
+            
+            // Load ALL emails to get accurate counts
+            const allEmails = await window.emailTrackingManager.getAllEmails();
+            
+            const counts = {
+                inbox: allEmails.filter(e => {
+                    if (e.emailType === 'sent' || e.isSentEmail || e.type === 'sent') return false;
+                    return true;
+                }).length,
+                starred: allEmails.filter(e => e.starred === true).length,
+                important: allEmails.filter(e => e.important === true).length,
+                sent: allEmails.filter(e => e.emailType === 'sent' || e.isSentEmail || e.type === 'sent').length,
+                drafts: allEmails.filter(e => e.status === 'draft').length,
+                scheduled: allEmails.filter(e => (e.labels && e.labels.includes('SCHEDULED')) || e.scheduledAt).length,
+                spam: allEmails.filter(e => (e.labels && e.labels.includes('SPAM')) || e.isSpam === true).length,
+                trash: allEmails.filter(e => (e.labels && e.labels.includes('TRASH')) || e.isDeleted === true).length
+            };
 
-        Object.entries(counts).forEach(([folder, count]) => {
-            const countElement = document.getElementById(`${folder}-count`);
-            if (countElement) countElement.textContent = count;
-        });
+            Object.entries(counts).forEach(([folder, count]) => {
+                const countElement = document.getElementById(`${folder}-count`);
+                if (countElement) countElement.textContent = count;
+            });
+            
+            console.log('[EmailManager] Folder counts updated:', counts);
+        } catch (error) {
+            console.error('[EmailManager] Error updating folder counts:', error);
+        }
     }
 
     async toggleStar(emailId) {
