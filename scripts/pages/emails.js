@@ -2553,12 +2553,39 @@ class EmailManager {
                     const allEmails = await window.emailTrackingManager.getAllEmails();
                     console.log('[EmailManager] Retrieved all emails:', allEmails.length);
                     
+                    // DEBUG: Log first 3 emails to see field structure
+                    allEmails.slice(0, 3).forEach((email, idx) => {
+                        console.log(`[EmailManager DEBUG] Email ${idx}:`, {
+                            id: email.id,
+                            type: email.type,
+                            emailType: email.emailType,
+                            provider: email.provider,
+                            isSentEmail: email.isSentEmail,
+                            from: email.from,
+                            to: email.to
+                        });
+                    });
+                    
                     // Filter by folder
                     let filteredEmails = allEmails;
                     if (this.currentFolder === 'inbox') {
-                        filteredEmails = allEmails.filter(email => 
-                            email.emailType === 'received' || email.provider === 'sendgrid_inbound'
-                        );
+                        filteredEmails = allEmails.filter(email => {
+                            // Check explicit received type
+                            if (email.emailType === 'received' || email.provider === 'sendgrid_inbound') {
+                                return true;
+                            }
+                            // Exclude sent emails
+                            if (email.emailType === 'sent' || email.isSentEmail) {
+                                return false;
+                            }
+                            // Check if email is from external sender (not from @powerchoosers.com)
+                            const fromAddress = Array.isArray(email.from) ? email.from[0] : email.from;
+                            if (fromAddress && typeof fromAddress === 'string' && !fromAddress.includes('noreply@powerchoosers.com')) {
+                                return true;
+                            }
+                            // Default: exclude
+                            return false;
+                        });
                     } else if (this.currentFolder === 'sent') {
                         filteredEmails = allEmails.filter(email => 
                             email.emailType === 'sent' || (email.from && email.from.includes('noreply@powerchoosers.com'))
@@ -5061,9 +5088,9 @@ class EmailManager {
         const contentContainer = modal.querySelector(`#email-content-${email.id}`);
         if (!contentContainer) return;
 
-        // Get the best available content
-        const htmlContent = email.html || email.bodyHtml || email.content;
-        const textContent = email.text || email.bodyText || email.snippet;
+        // Get the best available content (handle arrays)
+        const htmlContent = Array.isArray(email.html) ? email.html[0] : (email.html || email.bodyHtml || email.content);
+        const textContent = Array.isArray(email.text) ? email.text[0] : (email.text || email.bodyText || email.snippet);
 
         // If we have HTML content, render it properly using innerHTML
         if (htmlContent && htmlContent.trim()) {
