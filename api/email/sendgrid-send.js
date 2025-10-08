@@ -15,8 +15,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Missing SendGrid API key' });
   }
 
-  try {
-    const { to, subject, content, from, _deliverability } = req.body;
+          try {
+            const { to, subject, content, from, _deliverability, threadId, inReplyTo, references } = req.body;
 
     if (!to || !subject || !content) {
       return res.status(400).json({ error: 'Missing required fields: to, subject, content' });
@@ -26,12 +26,15 @@ export default async function handler(req, res) {
     const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Prepare email data
-    const emailData = {
+            const emailData = {
       to,
       subject,
       content,
       from: from || process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
       trackingId,
+              threadId: threadId || undefined,
+              inReplyTo: inReplyTo || undefined,
+              references: Array.isArray(references) ? references : (references ? [references] : undefined),
       _deliverability: _deliverability || {
         enableTracking: true,
         includeBulkHeaders: false,

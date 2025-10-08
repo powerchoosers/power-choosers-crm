@@ -38,9 +38,9 @@ export class SendGridService {
   /**
    * Send a single email via SendGrid
    */
-  async sendEmail(emailData) {
+          async sendEmail(emailData) {
     try {
-      const { to, subject, content, from, trackingId, _deliverability } = emailData;
+              const { to, subject, content, from, trackingId, _deliverability, inReplyTo, references, threadId } = emailData;
       
       // Check if any recipients are suppressed
       const recipients = Array.isArray(to) ? to : [to];
@@ -93,7 +93,7 @@ export class SendGridService {
       const htmlContent = content;
       const textContent = this.stripHtml(content);
       
-      const msg = {
+              const msg = {
         to: allowedRecipients,
         from: {
           email: from || this.fromEmail,
@@ -107,6 +107,14 @@ export class SendGridService {
           openTracking: { enable: deliverabilitySettings.enableTracking }
         }
       };
+
+              // Threading headers
+              if (inReplyTo) {
+                msg.headers = { ...(msg.headers || {}), 'In-Reply-To': inReplyTo };
+              }
+              if (references && references.length) {
+                msg.headers = { ...(msg.headers || {}), 'References': references.join(' ') };
+              }
 
       // Add custom headers based on deliverability settings
       if (deliverabilitySettings.includePriorityHeaders) {
@@ -144,8 +152,8 @@ export class SendGridService {
       });
 
       // Store email record in Firebase if tracking is enabled
-      if (deliverabilitySettings.enableTracking && trackingId && db) {
-        await this.storeEmailRecord(emailData, response[0].headers['x-message-id']);
+              if (deliverabilitySettings.enableTracking && trackingId && db) {
+                await this.storeEmailRecord({ ...emailData, threadId }, response[0].headers['x-message-id']);
       }
 
       return {
@@ -220,6 +228,9 @@ export class SendGridService {
         from: emailData.from || this.fromEmail,
         sentAt: new Date().toISOString(),
         messageId: messageId,
+                threadId: emailData.threadId || null,
+                inReplyTo: emailData.inReplyTo || null,
+                references: emailData.references || [],
         opens: [],
         replies: [],
         openCount: 0,
