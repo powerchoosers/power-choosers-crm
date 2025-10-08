@@ -8,7 +8,7 @@ import cors from '../_cors';
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '5mb', // Allow up to 5MB for signature images
+      sizeLimit: '5mb',
     },
   },
 };
@@ -21,9 +21,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // For now, we'll use Imgur as the image hosting service
-    // This is a simple solution that works immediately
-    const { image, type } = req.body;
+    // Expect JSON { image: <base64>, type: 'signature' }
+    const { image, type } = req.body || {};
 
     if (!image) {
       return res.status(400).json({ error: 'No image provided' });
@@ -40,10 +39,7 @@ export default async function handler(req, res) {
         'Authorization': 'Client-ID 546c25a59c58ad7', // Public Imgur client ID
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        image: image,
-        type: 'base64'
-      })
+      body: JSON.stringify({ image, type: 'base64' })
     });
 
     if (!imgurResponse.ok) {
