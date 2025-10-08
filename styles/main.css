@@ -11275,6 +11275,97 @@ th.drag-over::after {
     display: flex;
 }
 
+/* === SMOOTH ICON ANIMATIONS === */
+/* Fade-in with scale-up for all icons - GPU accelerated */
+
+/* Company favicons - initial hidden state */
+.company-favicon {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 300ms ease-out, transform 300ms ease-out;
+    will-change: opacity, transform;
+}
+
+/* Company favicons - loaded/visible state */
+.company-favicon.icon-loaded {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Contact avatar circles - initial hidden state */
+.contact-avatar .avatar-circle,
+.name-cell__wrap .avatar-circle,
+.activity-entity-avatar-circle {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 300ms ease-out, transform 300ms ease-out;
+    will-change: opacity, transform;
+}
+
+/* Contact avatar circles - visible state */
+.contact-avatar .avatar-circle.icon-loaded,
+.name-cell__wrap .avatar-circle.icon-loaded,
+.activity-entity-avatar-circle.icon-loaded {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* SVG icons in buttons and UI elements */
+.qa-btn svg,
+.action-btn svg,
+.toolbar-btn svg,
+.search-btn svg,
+.call-btn svg,
+.pc-modal__close svg,
+.nav-item svg,
+button svg,
+.toast-icon svg {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 300ms ease-out, transform 300ms ease-out;
+    will-change: opacity, transform;
+}
+
+/* SVG icons - loaded state */
+.qa-btn svg.icon-loaded,
+.action-btn svg.icon-loaded,
+.toolbar-btn svg.icon-loaded,
+.search-btn svg.icon-loaded,
+.call-btn svg.icon-loaded,
+.pc-modal__close svg.icon-loaded,
+.nav-item svg.icon-loaded,
+button svg.icon-loaded,
+.toast-icon svg.icon-loaded {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Logo in top bar */
+.logo {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 300ms ease-out, transform 300ms ease-out;
+    will-change: opacity, transform;
+}
+
+.logo.icon-loaded {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Fallback icons (building SVG for companies) */
+.company-favicon--fallback {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 300ms ease-out, transform 300ms ease-out;
+    will-change: opacity, transform;
+}
+
+.company-favicon--fallback.icon-loaded {
+    opacity: 1;
+    transform: scale(1);
+}
+
 /* === VARIABLES MODAL === */
 .vars-modal {
     width: 720px;

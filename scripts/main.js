@@ -55,6 +55,14 @@ class PowerChoosersCRM {
       const firstInput = modal.querySelector('input,button,select,textarea,[tabindex]:not([tabindex="-1"])');
       if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
       else if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+      
+      // Setup parent company autocomplete
+      const searchInput = modal.querySelector('#parent-company-search');
+      const dropdown = modal.querySelector('#parent-company-dropdown');
+      const hiddenId = modal.querySelector('#parent-company-id');
+      if (searchInput && dropdown && hiddenId && window.AccountDetail && typeof window.AccountDetail.setupParentCompanyAutocomplete === 'function') {
+        window.AccountDetail.setupParentCompanyAutocomplete(searchInput, dropdown, hiddenId);
+      }
     }, 0);
 
     // Focus trap within dialog
@@ -153,6 +161,8 @@ class PowerChoosersCRM {
               squareFootage: data.squareFootage || '',
               occupancyPct: data.occupancyPct || '',
               employees: data.employees || '',
+              parentCompanyId: data.parentCompanyId || '',
+              parentCompanyName: data.parentCompanyName || '',
               shortDescription: data.shortDescription || '',
               electricitySupplier: data.electricitySupplier || '',
               benefits: data.benefits || '',
@@ -3616,6 +3626,126 @@ window.__pcFaviconHelper = {
         }
     }
 };
+
+// Global icon animation system - adds 'icon-loaded' class for smooth fade-in
+window.__pcIconAnimator = {
+    init: function() {
+        // Observe all images (favicons, logos) and add loaded class
+        this.observeImages();
+        // Observe all SVG icons and add loaded class
+        this.observeSVGs();
+        // Observe all avatar circles
+        this.observeAvatars();
+    },
+    
+    observeImages: function() {
+        // Get all favicon images currently in DOM
+        const loadImage = (img) => {
+            if (img.complete && img.naturalWidth > 0) {
+                // Already loaded
+                requestAnimationFrame(() => img.classList.add('icon-loaded'));
+            } else {
+                // Wait for load
+                img.addEventListener('load', () => {
+                    requestAnimationFrame(() => img.classList.add('icon-loaded'));
+                }, { once: true });
+                // Handle error - still show with animation
+                img.addEventListener('error', () => {
+                    requestAnimationFrame(() => img.classList.add('icon-loaded'));
+                }, { once: true });
+            }
+        };
+        
+        // Load existing images
+        document.querySelectorAll('.company-favicon, .logo').forEach(loadImage);
+        
+        // Watch for new images with MutationObserver
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1) { // Element node
+                        if (node.matches && node.matches('.company-favicon, .logo')) {
+                            loadImage(node);
+                        }
+                        // Check children
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll('.company-favicon, .logo').forEach(loadImage);
+                        }
+                    }
+                });
+            });
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+    },
+    
+    observeSVGs: function() {
+        // Add loaded class to SVGs after a frame
+        const loadSVG = (svg) => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => svg.classList.add('icon-loaded'));
+            });
+        };
+        
+        // Load existing SVGs
+        document.querySelectorAll('button svg, .qa-btn svg, .action-btn svg, .toolbar-btn svg, .search-btn svg, .call-btn svg, .pc-modal__close svg, .nav-item svg, .toast-icon svg').forEach(loadSVG);
+        
+        // Watch for new SVGs
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1) {
+                        if (node.tagName === 'svg') {
+                            loadSVG(node);
+                        }
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll('svg').forEach(loadSVG);
+                        }
+                    }
+                });
+            });
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+    },
+    
+    observeAvatars: function() {
+        // Add loaded class to avatar circles
+        const loadAvatar = (avatar) => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => avatar.classList.add('icon-loaded'));
+            });
+        };
+        
+        // Load existing avatars
+        document.querySelectorAll('.avatar-circle, .activity-entity-avatar-circle').forEach(loadAvatar);
+        
+        // Watch for new avatars
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1) {
+                        if (node.matches && node.matches('.avatar-circle, .activity-entity-avatar-circle')) {
+                            loadAvatar(node);
+                        }
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll('.avatar-circle, .activity-entity-avatar-circle').forEach(loadAvatar);
+                        }
+                    }
+                });
+            });
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+};
+
+// Initialize on DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => window.__pcIconAnimator.init());
+} else {
+    window.__pcIconAnimator.init();
+}
 
 // Global email signature helper function
 window.getEmailSignature = function() {

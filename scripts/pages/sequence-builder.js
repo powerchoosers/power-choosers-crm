@@ -2106,8 +2106,8 @@
 
   function closeEmailSettings() {
     // Find any step that's showing settings and close it
-    if (window.sequenceBuilder?.currentSequence?.steps) {
-      window.sequenceBuilder.currentSequence.steps.forEach(step => {
+    if (state.currentSequence?.steps) {
+      state.currentSequence.steps.forEach(step => {
         if (step.showSettings) {
           step.showSettings = false;
         }
@@ -2791,6 +2791,8 @@
   
   function openEmailSettings(anchorEl, step) {
     if (!anchorEl || !step) return;
+    
+    // Close any other open settings first
     closeEmailSettings();
     
     // Set the step to show settings instead of editor
@@ -3213,7 +3215,13 @@
         const id = card?.getAttribute('data-id');
         const step = state.currentSequence.steps.find(s => s.id === id);
         if (!step) return;
-        openEmailSettings(btn, step);
+        
+        // Toggle: if settings are already shown, close them; otherwise open
+        if (step.showSettings) {
+          closeEmailSettings();
+        } else {
+          openEmailSettings(btn, step);
+        }
       });
     });
 

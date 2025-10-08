@@ -145,8 +145,14 @@
       phoneElement.removeAttribute('title');
     }
     
-    // Update display text if needed
-    if (phoneElement.textContent.trim() !== displayPhone) {
+    // Update display text only if needed to prevent flickering
+    // Check if the current text is already formatted correctly
+    const currentText = phoneElement.textContent.trim();
+    const normalizedCurrent = currentText.replace(/\s+/g, '').replace(/[^\d+]/g, '');
+    const normalizedDisplay = displayPhone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
+    
+    // Only update if the phone numbers are actually different (not just formatting)
+    if (normalizedCurrent !== normalizedDisplay && currentText !== displayPhone) {
       phoneElement.textContent = displayPhone;
     }
     
