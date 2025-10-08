@@ -117,38 +117,12 @@ class EmailManager {
         const emailList = document.getElementById('email-list');
 
         if (emailLoading) {
-            // Check if user is already authenticated
-            const isAuthenticated = localStorage.getItem('gmail-authenticated') === 'true';
-
-            if (isAuthenticated) {
-                // User is authenticated, hide loading and show empty state
-                emailLoading.style.display = 'none';
-                if (emailEmpty) {
-                    emailEmpty.style.display = 'block';
-                    emailEmpty.innerHTML = `
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                            <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                        <h3>No emails found</h3>
-                        <p>Your inbox is empty or emails haven't loaded yet.</p>
-                        <button class="btn-primary" onclick="window.emailManager?.refreshEmails()">Refresh</button>
-                    `;
-                }
-            } else {
-                // User not authenticated, show login prompt
-                emailLoading.innerHTML = `
-                    <div class="email-auth-prompt">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                            <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                        <h3>Connect to Gmail</h3>
-                        <p>Sign in to Gmail to view and send emails from your CRM.</p>
-                        <button class="btn-primary" onclick="window.emailManager?.authenticateGmail()">Connect Gmail</button>
-                    </div>
-                `;
-            }
+            // Always show loading state initially - emails will load from tracking system
+            emailLoading.innerHTML = `
+                <div class="loading-spinner"></div>
+                <h3>Loading emails...</h3>
+                <p>Fetching your emails from the tracking system.</p>
+            `;
         }
     }
 
@@ -255,6 +229,7 @@ class EmailManager {
 
         console.log('[EmailManager] Rendering conversation emails:', emails.length);
 
+        // Stack messages (oldest → newest), with a compact header and content preview
         container.innerHTML = emails.map(email => {
             const isReceived = email.emailType === 'received';
             const time = this.formatDate(email.timestamp);
@@ -2296,10 +2271,8 @@ class EmailManager {
     }
 
     updateUI() {
-        // Only show auth prompt if not authenticated
-        if (!this.isAuthenticated) {
-            this.showAuthPrompt();
-        }
+        // Always load emails - no need for auth prompt since we use tracking system
+        this.loadEmails();
     }
 
     saveAuthState() {
@@ -2447,30 +2420,8 @@ class EmailManager {
     }
 
     showAuthPrompt() {
-        const emailList = document.getElementById('email-list');
-        if (!emailList) return;
-
-        // Check if we're on a secure context (HTTPS or localhost)
-        const isSecure = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
-        
-        emailList.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; min-height: 400px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 48 48" style="margin-bottom: 8px;">
-                    <path fill="#4caf50" d="M45,16.2l-5,2.75l-5,4.75L35,40h7c1.657,0,3-1.343,3-3V16.2z"></path>
-                    <path fill="#1e88e5" d="M3,16.2l3.614,1.71L13,23.7V40H6c-1.657,0-3-1.343-3-3V16.2z"></path>
-                    <polygon fill="#e53935" points="35,11.2 24,19.45 13,11.2 12,17 13,23.7 24,31.95 35,23.7 36,17"></polygon>
-                    <path fill="#c62828" d="M3,12.298V16.2l10,7.5V11.2L9.876,8.859C9.132,8.301,8.228,8,7.298,8h0C4.924,8,3,9.924,3,12.298z"></path>
-                    <path fill="#fbc02d" d="M45,12.298V16.2l-10,7.5V11.2l3.124-2.341C38.868,8.301,39.772,8,40.702,8h0 C43.076,8,45,9.924,45,12.298z"></path>
-                </svg>
-                <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600; color: var(--text-primary);">Email Ready</h3>
-                <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5; max-width: 400px;">Your emails are sent via SendGrid. Click "Compose" to start writing.</p>
-                <div style="display:flex; gap:12px; margin-top: 8px;">
-                    <button class="gmail-signin-btn" onclick="window.emailManager?.loadEmails()">
-                      Load Emails
-                    </button>
-                </div>
-            </div>
-        `;
+        // Don't show the "Email Ready" screen - just load emails automatically
+        this.loadEmails();
     }
 
     async authenticate() {
@@ -2589,29 +2540,37 @@ class EmailManager {
             if (window.emailTrackingManager) {
                 console.log('[EmailManager] Loading emails from SendGrid data...');
                 
-                // Load all emails from Firebase (both sent and received)
-                const allEmails = await window.emailTrackingManager.getAllEmails();
-                console.log('[EmailManager] Retrieved all emails:', allEmails.length);
-                
-                // Filter by folder
-                let filteredEmails = allEmails;
-                if (this.currentFolder === 'inbox') {
-                    // For inbox, show emails that were sent TO us (not by us)
-                    filteredEmails = allEmails.filter(email => 
-                        email.emailType === 'received' || email.provider === 'sendgrid_inbound'
-                    );
-                } else if (this.currentFolder === 'sent') {
-                    // For sent, show emails we sent
-                    filteredEmails = allEmails.filter(email => 
-                        email.emailType === 'sent' || (email.from && email.from.includes('noreply@powerchoosers.com'))
-                    );
+                if (this.currentFolder === 'threads') {
+                    // Load conversation threads and render thread list
+                    const threads = await window.emailTrackingManager.getConversationThreads();
+                    console.log('[EmailManager] Retrieved threads:', threads.length);
+                    this.renderConversationThreads(threads);
+                    const countEl = document.getElementById('threads-count');
+                    if (countEl) countEl.textContent = String(threads.length);
+                    this.hideLoading();
+                } else {
+                    // Load all emails then filter
+                    const allEmails = await window.emailTrackingManager.getAllEmails();
+                    console.log('[EmailManager] Retrieved all emails:', allEmails.length);
+                    
+                    // Filter by folder
+                    let filteredEmails = allEmails;
+                    if (this.currentFolder === 'inbox') {
+                        filteredEmails = allEmails.filter(email => 
+                            email.emailType === 'received' || email.provider === 'sendgrid_inbound'
+                        );
+                    } else if (this.currentFolder === 'sent') {
+                        filteredEmails = allEmails.filter(email => 
+                            email.emailType === 'sent' || (email.from && email.from.includes('noreply@powerchoosers.com'))
+                        );
+                    }
+                    
+                    this.emails = filteredEmails.map(email => this.parseSentEmailData(email));
+                    console.log('[EmailManager] Parsed emails for', this.currentFolder, ':', this.emails.length);
+                    this.renderEmails();
+                    this.updateFolderCounts();
+                    this.hideLoading();
                 }
-                
-                this.emails = filteredEmails.map(email => this.parseSentEmailData(email));
-                console.log('[EmailManager] Parsed emails for', this.currentFolder, ':', this.emails.length);
-                this.renderEmails();
-                this.updateFolderCounts();
-                this.hideLoading();
             } else {
                 console.warn('[EmailManager] Email tracking manager not available');
                 this.emails = [];
@@ -4744,7 +4703,7 @@ class EmailManager {
 
     async sendEmailViaSendGrid(emailData) {
         try {
-            const { to, subject, content, _deliverability } = emailData;
+            const { to, subject, content, _deliverability, threadId, inReplyTo, references } = emailData;
             
             // Generate unique tracking ID for this email
             const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -4755,6 +4714,9 @@ class EmailManager {
                 subject: subject,
                 content: content,
                 trackingId: trackingId,
+                threadId: threadId,
+                inReplyTo: inReplyTo,
+                references: references,
                 _deliverability: _deliverability
             };
             
@@ -4786,7 +4748,10 @@ class EmailManager {
                     provider: 'sendgrid',
                     sentVia: 'sendgrid',
                     sendgridMessageId: result.messageId, // SendGrid's x-message-id
-                    sentAt: new Date().toISOString()
+                    sentAt: new Date().toISOString(),
+                    threadId: threadId || null,
+                    inReplyTo: inReplyTo || null,
+                    references: Array.isArray(references) ? references : (references ? [references] : [])
                 };
                 
                 try {
@@ -5296,14 +5261,22 @@ class EmailManager {
         const subjectInput = modal.querySelector('#modal-compose-subject');
         const contentEditor = modal.querySelector('#modal-compose-content');
         
+        // Threading metadata
+        const threadId = originalEmail.threadId || originalEmail.messageId || null;
+        const inReplyTo = originalEmail.messageId || null;
+        const references = Array.isArray(originalEmail.references) ? originalEmail.references.concat(inReplyTo || []).filter(Boolean) : (inReplyTo ? [inReplyTo] : []);
+
         const emailData = {
             to: toInput.value,
             subject: subjectInput.value,
-            content: contentEditor.innerHTML
+            content: contentEditor.innerHTML,
+            threadId,
+            inReplyTo,
+            references
         };
         
-        // Send email using existing sendEmail method
-        this.sendEmail(emailData).then(() => {
+        // Send email via SendGrid directly with threading
+        this.sendEmailViaSendGrid({ ...emailData, _deliverability: (window.SettingsPage && window.SettingsPage.getSettings ? (window.SettingsPage.getSettings().emailDeliverability||{}) : {}) }).then(() => {
             window.crm?.showToast('Reply sent successfully!');
             this.hideComposeInModal(modal);
         }).catch(error => {
@@ -5715,10 +5688,9 @@ function initEmailsPage() {
     // Update UI based on authentication state
     emailManager.updateAuthenticationUI();
 
-    // Load emails if authenticated
-    if (isAuthenticated) {
-        emailManager.loadEmails();
-    }
+    // Always load emails from tracking system (regardless of Gmail auth)
+    // The tracking system handles both sent and received emails
+    emailManager.loadEmails();
 
     // Debug helper: run search and force open suggestions under To field
     window.debugComposeAutocomplete = async function(query = '') {

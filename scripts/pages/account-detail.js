@@ -2192,12 +2192,12 @@
   function attachAccountDetailEvents() {
     // Listen for activity refresh events
     document.addEventListener('pc:activities-refresh', (e) => {
-      const { entityType, entityId } = e.detail || {};
+      const { entityType, entityId, forceRefresh } = e.detail || {};
       if (entityType === 'account' && entityId === state.currentAccount?.id) {
         // Refresh account activities
         if (window.ActivityManager) {
-          const activityManager = new window.ActivityManager();
-          activityManager.renderActivities('account-activity-timeline', 'account', entityId);
+          const activityManager = window.ActivityManager; // use singleton
+          activityManager.renderActivities('account-activity-timeline', 'account', entityId, forceRefresh);
         }
       }
     });
