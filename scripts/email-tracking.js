@@ -330,7 +330,7 @@ class EmailTrackingManager {
             // If callback is provided, set up real-time listener
             if (callback) {
                 return this.db.collection('emails')
-                    .orderBy('sentAt', 'desc')
+                    .orderBy('createdAt', 'desc')
                     .limit(100)
                     .onSnapshot((snapshot) => {
                         const emails = [];
@@ -356,7 +356,7 @@ class EmailTrackingManager {
 
             // One-time fetch
             const snapshot = await this.db.collection('emails')
-                .orderBy('sentAt', 'desc')
+                .orderBy('createdAt', 'desc')
                 .limit(100)
                 .get();
 
