@@ -410,33 +410,8 @@ class EmailTrackingManager {
                     emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
                 };
                 
-                // COMPREHENSIVE DEBUG: Log complete email data from Firebase
-                console.log('=== EMAIL TRACKING DEBUG ===');
-                console.log('[EmailTracking] Complete email object from Firebase:', email);
-                console.log('[EmailTracking] Email ID:', email.id);
-                console.log('[EmailTracking] Email type:', email.type);
-                console.log('[EmailTracking] Email provider:', email.provider);
-                console.log('[EmailTracking] Email emailType:', email.emailType);
-                console.log('[EmailTracking] All Firebase keys:', Object.keys(email));
-                
-                // Check each content field individually
-                console.log('[EmailTracking] Content field analysis:');
-                console.log('  - email.html:', email.html, '(type:', typeof email.html, ', length:', email.html ? email.html.length : 0, ')');
-                console.log('  - email.text:', email.text, '(type:', typeof email.text, ', length:', email.text ? email.text.length : 0, ')');
-                console.log('  - email.content:', email.content, '(type:', typeof email.content, ', length:', email.content ? email.content.length : 0, ')');
-                console.log('  - email.snippet:', email.snippet, '(type:', typeof email.snippet, ', length:', email.snippet ? email.snippet.length : 0, ')');
-                console.log('  - email.body:', email.body, '(type:', typeof email.body, ', length:', email.body ? email.body.length : 0, ')');
-                console.log('  - email.bodyText:', email.bodyText, '(type:', typeof email.bodyText, ', length:', email.bodyText ? email.bodyText.length : 0, ')');
-                console.log('  - email.bodyHtml:', email.bodyHtml, '(type:', typeof email.bodyHtml, ', length:', email.bodyHtml ? email.bodyHtml.length : 0, ')');
-                
-                // Show preview of content if available
-                if (email.html) {
-                    console.log('[EmailTracking] HTML preview:', email.html.substring(0, 100) + '...');
-                }
-                if (email.text) {
-                    console.log('[EmailTracking] Text preview:', email.text.substring(0, 100) + '...');
-                }
-                console.log('=== END EMAIL TRACKING DEBUG ===');
+                // Basic debug logging (reduced from excessive logging)
+                console.log('[EmailTracking] Email loaded:', email.id, 'type:', email.emailType, 'provider:', email.provider);
                 
                 emails.push(email);
             });
