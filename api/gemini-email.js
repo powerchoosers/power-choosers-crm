@@ -31,293 +31,112 @@ function cors(req, res) {
 }
 
 function buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed }) {
+  // Extract recipient data
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
   const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
-  const email = r.email || '';
   const company = r.company || r.accountName || '';
   const job = r.title || r.job || r.role || '';
   const industry = r.industry || '';
-  const linkedin = r.linkedin || '';
   const energy = r.energy || {};
-  const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 2000);
-  const usage = energy.usage || '';
-  const supplier = energy.supplier || '';
-  const contractEnd = energy.contractEnd || '';
-  const currentRate = energy.currentRate || '';
-  const sqftRaw = r.squareFootage || r.square_footage || '';
-  // Format helper: convert any date-like string to "Month YYYY"
+  const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
+  const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
+  
+  // Format contract end date to Month YYYY
   const toMonthYear = (val) => {
     const s = String(val || '').trim();
     if (!s) return '';
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const d = new Date(s);
     if (!isNaN(d.getTime())) return `${months[d.getMonth()]} ${d.getFullYear()}`;
-    const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); // MM/DD/YYYY
-    if (m1) { const m = Math.max(1, Math.min(12, parseInt(m1[1], 10))); return `${months[m - 1]} ${m1[3]}`; }
-    const m2 = s.match(/^(\d{4})[\-](\d{1,2})[\-](\d{1,2})$/); // YYYY-MM-DD
-    if (m2) { const m = Math.max(1, Math.min(12, parseInt(m2[2], 10))); return `${months[m - 1]} ${m2[1]}`; }
-    const m3 = s.match(/^(\d{1,2})[\/\-](\d{4})$/); // MM/YYYY
-    if (m3) { const m = Math.max(1, Math.min(12, parseInt(m3[1], 10))); return `${months[m - 1]} ${m3[2]}`; }
-    const m4 = s.match(/([A-Za-z]+)\s+(\d{4})/); // Month YYYY
-    if (m4) return `${m4[1]} ${m4[2]}`;
-    const y = s.match(/(19\d{2}|20\d{2})/);
-    if (y) return y[1];
-    return s;
+    const m = s.match(/(\d{1,2})[\/\-].*?(\d{4})/);
+    return m ? `${months[Math.min(12, Math.max(1, parseInt(m[1])))-1]} ${m[2]}` : s;
   };
-  const contractEndLabel = toMonthYear(contractEnd);
-  const sqftNum = Number(String(sqftRaw).replace(/[^0-9.]/g, ''));
-  let facilityScale = '';
-  if (!isNaN(sqftNum) && sqftNum > 0) {
-    if (sqftNum < 20000) facilityScale = 'small facility';
-    else if (sqftNum < 100000) facilityScale = 'mid-sized facility';
-    else facilityScale = 'large facility';
-  }
-
-  // Notes from contact or associated account
-  const notes = [r.notes, r.account?.notes].filter(Boolean).join(' \n').slice(0, 800);
   
-  // Extract colleague information from notes
-  let colleagueInfo = null;
-  if (notes) {
-    // Look for patterns like "spoke with [name]", "talked to [name]", "met with [name]", etc.
-    const colleaguePatterns = [
-      /spoke with ([A-Za-z\s]+)/i,
-      /talked to ([A-Za-z\s]+)/i,
-      /met with ([A-Za-z\s]+)/i,
-      /connected with ([A-Za-z\s]+)/i,
-      /called ([A-Za-z\s]+)/i
-    ];
-    
-    for (const pattern of colleaguePatterns) {
-      const match = notes.match(pattern);
-      if (match && match[1]) {
-        colleagueInfo = {
-          name: match[1].trim(),
-          found: true
-        };
-        break;
-      }
-    }
-  }
+  const contractEndLabel = toMonthYear(energy.contractEnd || '');
+  
+  // Detect email type
+  const promptLower = String(prompt || '').toLowerCase();
+  const isEnergyHealthCheck = /energy.*health.*check/i.test(promptLower);
+  const isInvoiceRequest = /invoice.*request|send.*invoice/i.test(promptLower);
+  const isColdEmail = /cold.*email|could.*not.*reach/i.test(promptLower);
+  
+  // Build simplified system prompt
+  const identity = `You are Power Choosers' email assistant. Create a ${mode === 'html' ? 'structured' : 'concise'} professional email.
 
-  // Determine if the user prompt is requesting a cold email template
-  const isColdPrompt = /cold\s+email|could\s+not\s+reach\s+by\s+phone/i.test(String(prompt || ''));
-  // Determine if the user prompt is requesting an Energy Health Check template
-  const isEhcPrompt = /energy\s+health\s+check/i.test(String(prompt || ''));
-  // Determine if the user prompt is requesting a Standard Invoice Request
-  const isInvoicePrompt = /standard\s+invoice\s+request|invoice\s+request/i.test(String(prompt || ''));
+WHO WE ARE: Power Choosers helps companies save on electricity and natural gas by competitively sourcing from 100+ suppliers, negotiating contracts, and managing renewals.`;
 
-  // Common industry pain points. Pick 1 (max 2) that best fits context.
-  const painPoints = [
-    'billing issues or invoice complexity',
-    'high TDU/delivery charges relative to energy',
-    'confusing or unfavorable contract terms (bandwidth, swing, pass-throughs)',
-    'above-market current rate / renewal risk',
-    'rising market costs driven by data centers/population growth',
-    'high load/operational intensity for manufacturers or large facilities (>20k sf)'
-  ];
-
-  const companyOverview = [
-    'Power Choosers is an energy procurement and management partner.',
-    'We competitively source from 100+ electricity and natural gas suppliers, negotiate agreements, and manage renewals.',
-    'Services include: energy procurement, contract negotiation/renewals, bill management/reporting, and efficiency/sustainability guidance.'
-  ].join(' ');
-
-  const common = `You are Power Choosers' email assistant. Draft a clear, concise, and friendly ${mode === 'html' ? 'HTML' : 'plain text'} outbound email.
-
-CRITICAL RULES (ZERO TOLERANCE FOR VIOLATIONS):
-- NEVER duplicate any sentence, phrase, or call-to-action within the same email
-- NEVER repeat the same information in different words
-- NEVER use the same phrase twice anywhere in the email
-- Each sentence must add unique value to the email
-- Include exactly ONE clear call-to-action
-- End with "Best regards," followed immediately by the sender name on the next line with no blank line between them
-- Keep tone professional and helpful
-- Personalize with known recipient context when appropriate
-- Avoid hallucinations; if unsure, keep it generic
-- Do not include handlebars-like placeholders (e.g., {{first_name}}). Use natural text
-- NEVER end sentences with incomplete phrases like "improving your?" or "discuss your?" - always complete the thought
-- Before sending, mentally check: "Have I used any phrase or sentence twice?" If yes, rewrite
-
-PERSONAL TOUCH REQUIREMENT:
-- After "Hi [Name]," always include a personal paragraph about the current time/season
-- Be aware of the current day of the week and upcoming/recent holidays
-- Examples: "I hope you're having a great start to the week" (Monday), "I hope you're having a productive week" (Tuesday-Thursday), "I hope you're having a great Friday" (Friday), "I hope you're having a wonderful holiday season" (near Christmas), "I hope you're having a great start to the new year" (January), etc.
-- Keep it natural and warm, not generic
-
-CONTEXT AWARENESS:
-- For "warm intro after a call": Reference the previous conversation naturally, don't repeat the same phrase twice
-- For "follow-up with tailored value props": Focus on specific benefits relevant to their industry/company size
-- For "schedule an energy health check":
-    • Never reference speaking with a colleague; do not include that phrasing in this email type.
-    • Use notes to infer relationship stage:
-      – If notes indicate we already spoke (e.g., "spoke with", "talked to", "met", "called"), write as a warm follow‑up.
-      – Otherwise treat as a cold intro and briefly explain what an Energy Health Check is and why companies need one.
-    • Briefly outline what the health check covers: current bill/supplier/rate review, contract end month/year (Month YYYY only), quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating insight, and recommended next steps.
-    • Offer two specific time windows and include exactly one short question CTA.
-- For "proposal delivery with next steps": Reference the proposal and outline clear next steps
-- For "cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. In the second paragraph, start with "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" - do NOT say "following up on our call" or reference any conversation with this specific person`;
-
-  const recipientContext = `Recipient/context signals (use selectively; do not reveal sensitive specifics):
-- Name: ${name || 'Unknown'} (${firstName || 'Unknown'})
-- Company: ${company || 'Unknown'}
-- Title/Role: ${job || 'Unknown'}
+  const recipientContext = `RECIPIENT:
+- Name: ${firstName || 'there'} (${company || 'Unknown Company'})
+- Role: ${job || 'Unknown'}
 - Industry: ${industry || 'Unknown'}
-- Facility: ${facilityScale || 'Unknown scale'} (do NOT mention exact square footage)
-- Energy (if relevant): usage=${usage || 'n/a'}; supplier=${supplier || 'n/a'}; currentRate=${currentRate || 'n/a'}; contractEnd=${contractEndLabel || 'n/a'}
-- LinkedIn: ${linkedin || 'n/a'}
-- Notes (free text, optional): ${notes || 'n/a'}
-- Colleague contact: ${colleagueInfo?.found ? colleagueInfo.name : 'none found'}
-- Transcript (top priority; summarize and use insights, do not quote sensitive specifics): ${transcript ? (transcript.slice(0, 600) + (transcript.length > 600 ? '…' : '')) : 'n/a'}`;
+${energy.supplier ? `- Current Supplier: ${energy.supplier}` : ''}
+${energy.currentRate ? `- Current Rate: ${energy.currentRate}/kWh` : ''}
+${contractEndLabel ? `- Contract Ends: ${contractEndLabel}` : ''}
+${transcript ? `- Recent Call Notes: ${transcript}` : ''}
+${notes ? `- Additional Context: ${notes}` : ''}`;
 
-  const bizContext = `About Power Choosers (for positioning only): ${companyOverview}`;
+  const emailTypeInstructions = (() => {
+    if (isEnergyHealthCheck) {
+      return `EMAIL TYPE: Energy Health Check Invitation
+STRUCTURE:
+- Greeting + warm intro (reference day/season)
+- Explain what Energy Health Check is (1-2 sentences): review of current bill/supplier/rate, contract end, usage estimate, projected savings, supplier rating
+- Offer 2 specific time slots
+- ONE clear CTA question`;
+    }
+    
+    if (isInvoiceRequest) {
+      return `EMAIL TYPE: Invoice Request Follow-up
+STRUCTURE:
+- Greeting + warm reminder
+- Explain why we need invoice (3 bullet points):
+  • ESID(s)
+  • Contract End Date
+  • Service Address
+- ONE time-bounded CTA (today or EOD)`;
+    }
+    
+    if (isColdEmail) {
+      return `EMAIL TYPE: Cold Email (Never Spoke Before)
+STRUCTURE:
+- Greeting + warm intro (reference day/season)
+- Paragraph 1: Pattern-interrupt hook with specific pain point or opportunity
+- Paragraph 2: "I recently spoke with [colleague name] at ${company || 'your company'} and wanted to connect with you as well" + value prop
+- ONE clear CTA`;
+    }
+    
+    return `EMAIL TYPE: ${promptLower.includes('follow') ? 'Follow-up' : promptLower.includes('warm') ? 'Warm Intro' : 'General Outreach'}
+STRUCTURE:
+- Greeting + personalized intro (reference day/season, call transcript if available)
+- 1-2 short paragraphs (1-2 sentences each)
+- Include relevant energy details naturally if available
+- ONE clear CTA`;
+  })();
 
-  const priorityDirectives = `Content PRIORITY order (use what is present, skip what isn't):
-1) TOP PRIORITY: Call transcript insights (summarize, do not quote sensitive specifics)
-2) Energy contract details (supplier, rate, contract end Month YYYY, usage)
-3) Notes content (what was discussed or pain points)
-4) Title/role for relevance
-5) Account city/state (do not use contact's city/state)
-Ensure the opening hook uses the highest available priority data. If transcript exists, derive the hook from it.`;
+  const qualityRules = `QUALITY REQUIREMENTS:
+✓ Length: 70-110 words total
+✓ Greeting: Use "${firstName || 'there'}," then add season/day awareness ("I hope you're having a productive week")
+✓ NO duplicate phrases or repeated information
+✓ ONE call-to-action only
+✓ Reference energy data naturally if provided (${energy.supplier ? `supplier ${energy.supplier}` : ''}${energy.currentRate ? `, rate ${energy.currentRate}` : ''}${contractEndLabel ? `, contract ends ${contractEndLabel}` : ''})
+✓ Use transcript insights if available
+✓ Subject line: Under 50 chars, include ${firstName ? 'recipient name' : 'company name'}, be specific
+✓ Dates: Month YYYY only (never exact day)
+✓ Closing: "Best regards," then sender name on next line (no blank line between)
+✓ NO placeholders like {{name}} - use actual names`;
 
-  const subjectGuidelines = `Subject line requirements:
-- The FIRST LINE must begin with "Subject:" followed by the subject text.
-- Keep it tight: aim under ~50 characters; make it specific.
-- Prefer including ${firstName ? 'the recipient\'s first name' : 'the company name'} and/or the company name (e.g., "${firstName || 'Name'} — energy options for ${company || 'your facilities'}").
-- When applicable, hint the chosen pain point in the subject (e.g., "${company || 'Your accounts'} — simplify bills" or "${firstName || 'Team'} — renewal timing")
-- For other email types: Experiment with different approaches - questions, value props, time-sensitive offers, industry-specific benefits, etc.`
-    + (isColdPrompt
-      ? `\n- For "cold email to a lead I could not reach by phone": Consider a pattern-interrupt subject or a specific pain point (e.g., renewal risk, above-market rate) and you may include reference to speaking with their colleague if appropriate.`
-      : '')
-    + (isInvoicePrompt
-      ? `\n- For "Standard Invoice Request": Make the ask clear and helpful (e.g., "Invoice copy for quick review" or "Last bill to start your Energy Health Check").`
-      : '');
+  const outputFormat = mode === 'html'
+    ? `OUTPUT FORMAT:
+Subject: [Your subject line here]
 
-  const subjectVariety = `Subject VARIETY directives (strict):
-- SUBJECT_STYLE: ${subjectStyle || 'auto'}; SUBJECT_SEED: ${subjectSeed || 'auto'}.
-- Maintain high variation across runs. If auto, pick by seed.
-- Allowed styles (choose one): question, curiosity, metric, time_sensitive, pain_point, proof_point.
-- Keep under ~50 chars; avoid spammy words; vary structure/wording across runs.`;
+[Body content as plain text paragraphs - the frontend will style it with cards, buttons, and icons]`
+    : `OUTPUT FORMAT:
+Subject: [Your subject line here]
 
-  const brevityGuidelines = `Brevity and style requirements:
-- Total body length target: ~70–110 words max (be concise).
-- Use short sentences and plain words. Cut filler and hedging.
-- Prefer active voice and verbs over adjectives.
-- Keep one value prop tightly aligned to the hook.`;
+[Body as plain text paragraphs]`;
 
-  const bodyGuidelines = `Body requirements (STRICT ADHERENCE):
-- Structure: 2 very short paragraphs (1–2 sentences each) + a single-line CTA.
-- NEVER duplicate any sentence, phrase, or information within the email
-- Each sentence must add unique value - no repetition
-- Include exactly ONE call-to-action
-- Reflect the recipient's title/company/industry when helpful.
-- You may allude to scale (e.g., multi-site or large facility) but do NOT state exact square footage.
-- Mention one or two of our offerings most relevant to this contact (procurement, renewals/contracting, bill management, or efficiency) without overloading the email.
-- Keep it skimmable and client-friendly.
- - Avoid opening with generic statements (e.g., "we work with 100+ suppliers"). Lead with the most relevant point for the reader.`;
-
-  const variationDirectives = `Variation directives:
-- STYLE seed (hint, may be "auto"): ${style || 'auto'}; SUBJECT seed: ${subjectStyle || 'auto'}.
-- If STYLE is "auto", pick one style at random each time:
-  • hook_question: open with a sharp question that ties to a transcript insight or pain point
-  • value_bullets: second paragraph uses 2–3 bullet points (HTML <ul><li>…</li></ul>; plain text use •) for benefits or steps
-  • proof_point: include one brief proof point (e.g., recent result, supplier count) without sounding generic
-  • risk_focus: highlight one timely risk (renewal timing, above‑market rate) tied to their situation
-  • timeline_focus: emphasize timing (e.g., contract end Month YYYY) and next steps
-- If SUBJECT is "auto", vary subject types between: question, outcome‑oriented, time‑sensitive, pain‑point specific.
-- Avoid repeating the same opening or subject phrasing across runs.
-- If transcript provided, derive the HOOK from the transcript first (top priority), then supplement with notes and energy fields.`;
-
-  const specificHandling = `SPECIFIC PROMPT HANDLING:
-  - "Warm intro after a call": Reference the call once (what we discussed), then propose specific next steps and suggest two time windows for a follow-up. Keep it concise.
-  - "Follow-up with tailored value props": Assume a few days/weeks have passed. Recap in one line, then highlight 1–2 tailored benefits tied to their industry/facility scale or known data. Optionally include one brief proof point. End with a light CTA to keep the lead warm.
-  - "Schedule an energy health check":
-    • Never include any mention of speaking with a colleague (that belongs only to the cold-call-not-reached template).
-    • Structure STRICTLY:
-      – Paragraph 1: One concise sentence that explains what an Energy Health Check is and why it matters for this recipient. If notes indicate warm context, reference the prior call in a few words; if cold, tie to a single relevant pain point.
-      – Paragraph 2: One concise sentence listing what the review covers: current bill/supplier/rate review, contract end Month YYYY, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, and recommended next steps.
-      – CTA line: Exactly one short question offering two specific time windows (e.g., "Does Tue 10–12 or Thu 2–4 work?").
-  - "Proposal delivery with next steps": Provide a crisp summary of the options (supplier/term/rate/est. annual cost/notable terms), selection guidance, and 2–3 clear next steps. CTA: short call to review/confirm.
-  - "Cold email to a lead I could not reach by phone": This is a COLD email to someone you have NEVER spoken with. Structure: 1) Pattern‑interrupt hook using one concrete pain point or timely risk for their industry (no generic claims), 2) "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + tightly aligned value prop, 3) ONE call‑to‑action. If energy data is known (supplier/currentRate/contractEnd), include a single short clause referencing it naturally in paragraph 1 or paragraph 2 (e.g., "with ${supplier || 'your supplier'} at ${currentRate || '$/kWh'}, contract ends ${contractEndLabel || 'Month YYYY'}"). NEVER say "following up on our call" with this person.
-  - "Standard Invoice Request": Warm follow‑up after they agreed to send their invoice. If energy contract details exist, you MUST briefly include them in paragraph 1 in a single, natural clause (e.g., "with ${supplier || 'your supplier'}, ~${usage || 'your annual'} kWh, at ${currentRate || '$/kWh'} and a contract ending ${contractEndLabel || 'Month YYYY'}"). Do NOT list numbers aggressively; keep it one short clause. If unknown, tie to one relevant pain point instead. Structure: Paragraph 1 (one sentence): polite reminder + why sending the invoice helps us start immediately (mention we'll review for discrepancies/extra charges and run a free Energy Health Check). Paragraph 2 (bullet list): "We use your invoice to:" with exactly 3 bullets — ESID(s), Contract End Date (Month YYYY only), Service Address. CTA line: one short, time‑bounded ask to send the bill today or by EOD (e.g., "Could you send the latest invoice today or by EOD so my team can get started right away?"). Keep it helpful, not salesy.`;
-
-  const energyGuidelines = `If energy contract details exist, weave them in briefly (do not over-explain):
-- Supplier: mention by name (e.g., "with ${supplier || 'your supplier'}").
-- Contract end: reference month and year only (no day), e.g., "before ${contractEndLabel || 'your renewal window'}".
-- Current rate: you may reference the rate succinctly if provided (normalize like 0.089 → $0.089/kWh), e.g., "at ${currentRate || 'your current'} $/kWh".
-- Usage: reference qualitatively (e.g., "your usage profile" or "annual usage") without exact precision if it feels too granular.
-- Do NOT mention exact square footage; keep scale abstract (e.g., "large facility").`;
-
-  const dateGuidelines = `Date redaction policy:
-- If you mention dates (e.g., a contract end date), state only Month and Year (e.g., "April 2026"). Do NOT include an exact day.`;
-
-  const painPointGuidelines = `Choose ONE primary pain-point as the HOOK for the opening line. Consider the industry and signals above. Examples: ${painPoints.join('; ')}. Use at most one supporting pain-point if it adds clarity.`;
-
-  const notesGuidelines = `If notes are present, incorporate a relevant reference in one line (e.g., recent call context or initiative) — keep it natural and non-repetitive.`;
-
-  const outputStyle = mode === 'html'
-    ? `Formatting contract: Output must be exactly two parts.
-1) First line: Subject: ...
-2) Then one blank line, then the BODY as a minimal HTML fragment (no <html>/<head>/<body>). Use <p> for paragraphs.`
-    : `Formatting contract: Output must be exactly two parts.
-1) First line: Subject: ...
-2) Then one blank line, then the BODY as plain text (no code fences).`;
-
-  const baseChecklist = `FINAL CHECKLIST (MANDATORY VERIFICATION):
-- Complete all sentences - no incomplete thoughts
-- NO duplicate content anywhere in the email - check every sentence
-- NO repeated phrases or similar wording
-- Exactly one call-to-action
-- Proper signature formatting with no blank line before sender name
-- Each sentence adds unique value to the email
-- Personal touch included after greeting (day/season awareness)`;
-
-  const coldChecklist = `
-- Cold email specifics:
-  • Do NOT reference any prior conversation with this person.
-  • In paragraph 1, use a concrete pain point or timely risk as a pattern‑interrupt hook (avoid generic claims).
-  • In paragraph 2, include: "I recently spoke with ${colleagueInfo?.found ? colleagueInfo.name : 'a colleague'} at ${company || 'your company'} and wanted to connect with you as well" + a tightly aligned value prop.
-  • Subject may reference the colleague or a specific risk/pain point.
-  • Include exactly ONE call-to-action, no duplicates.`;
-
-  const ehcChecklist = `
-- Energy Health Check specifics:
-  • Paragraph 1 must explain what an Energy Health Check is and why it matters to this recipient (tie to one relevant pain point if cold, or lightly reference prior call if warm).
-  • Paragraph 2 must list what the review covers in one concise sentence: current bill/supplier/rate, contract end Month YYYY, quick usage estimate, Energy Health Score, projected costs at our sell rate vs. current, supplier BBB rating, recommended next steps.
-  • CTA line must be a single short question offering two specific time windows (e.g., Tue 10–12 or Thu 2–4).`;
-
-  const invoiceChecklist = `
-- Standard Invoice Request specifics:
-  • Paragraph 1: one-sentence warm reminder referencing the prior agreement to share the invoice and why it helps us start immediately. If supplier/current rate/usage/contract end are known, include them in a single short clause (Month YYYY for contract end only).
-  • Paragraph 2: include a short bullet list under "We use your invoice to:" with exactly these items: ESID(s), Contract End Date (Month YYYY), Service Address.
-  • CTA line: one short, time-bounded ask to send the invoice today or by EOD so the team can begin immediately (polite urgency, not salesy).
-  • No duplicate "We use your invoice to:" lines anywhere.`;
-
-  const instructions = `User prompt: ${prompt || 'Draft a friendly outreach email.'}
-
-${baseChecklist}${isColdPrompt ? coldChecklist : ''}${isEhcPrompt ? ehcChecklist : ''}${isInvoicePrompt ? invoiceChecklist : ''}
-
-- Read the entire email once more to catch any duplication`;
-
-  return [
-    common,
-    recipientContext,
-    bizContext,
-    subjectVariety,
-    priorityDirectives,
-    dateGuidelines,
-    brevityGuidelines,
-    painPointGuidelines,
-    energyGuidelines,
-    notesGuidelines,
-    subjectGuidelines,
-    bodyGuidelines,
-    variationDirectives,
-    specificHandling,
-    outputStyle,
-    instructions
-  ].join('\n\n');
+  return [identity, recipientContext, emailTypeInstructions, qualityRules, outputFormat, `\nUSER REQUEST: ${prompt || 'Draft outreach email'}`].join('\n\n');
 }
 
 export default async function handler(req, res) {
