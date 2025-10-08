@@ -2619,8 +2619,20 @@ class EmailManager {
                 }
             } else {
                 console.warn('[EmailManager] Email tracking manager not available');
-                this.emails = [];
-                this.showEmptyState();
+                // Retry with exponential backoff up to ~2s
+                const start = Date.now();
+                const tryLater = async () => {
+                    if (window.emailTrackingManager || Date.now() - start > 2000) {
+                        if (window.emailTrackingManager) {
+                            return this.loadEmails();
+                        }
+                        this.emails = [];
+                        this.showEmptyState();
+                        return;
+                    }
+                    setTimeout(tryLater, 160);
+                };
+                await tryLater();
             }
         } catch (error) {
             console.error('Error loading emails:', error);
