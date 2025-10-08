@@ -5077,7 +5077,9 @@ class EmailManager {
                 .replace(/\ssrc="3D/gi, ' src="')
                 .replace(/=3D/gi, '=');
 
-            contentContainer.innerHTML = decodedHtml;
+			// Sanitize: remove head/meta/script/link/base and upgrade insecure asset URLs
+			decodedHtml = this.sanitizeEmailHtml(decodedHtml);
+			contentContainer.innerHTML = decodedHtml;
         } else if (textContent && textContent.trim()) {
             // Fallback to text content with line breaks
             const decodedText = this.decodeQuotedPrintable(textContent);
@@ -5102,6 +5104,25 @@ class EmailManager {
             .replace(/=0D/g, '\r') // Replace =0D with carriage returns
             .trim();
     }
+
+	// Remove unsafe/invalid head markup and normalize asset URLs
+	sanitizeEmailHtml(html) {
+		try {
+			// Drop head and its children to avoid meta parsing errors
+			html = html.replace(/<head[\s\S]*?>[\s\S]*?<\/head>/gi, '');
+			// Remove meta, script, link, base tags anywhere
+			html = html.replace(/<\s*(meta|script|link|base)[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, '');
+			html = html.replace(/<\s*(meta|script|link|base)[^>]*>/gi, '');
+			// Upgrade insecure src/href to https
+			html = html.replace(/(\s(?:src|href)=")http:\/\//gi, '$1https://');
+			// Prevent navigation JS URLs
+			html = html.replace(/href="javascript:[^"]*"/gi, 'href="#"');
+			return html;
+		} catch (e) {
+			console.warn('[EmailSanitize] Failed to sanitize HTML', e);
+			return html;
+		}
+	}
 
 
     bindEmailViewerEvents(modal, email) {
