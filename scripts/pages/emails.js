@@ -165,7 +165,8 @@ class EmailManager {
 
     // Render conversation threads
     renderConversationThreads(threads) {
-        const container = document.getElementById('emails-list');
+        const container = document.getElementById('email-list');
+        const emailCount = document.getElementById('email-count');
         if (!container) return;
 
         if (threads.length === 0) {
@@ -174,6 +175,10 @@ class EmailManager {
         }
 
         console.log('[EmailManager] Rendering conversation threads:', threads.length);
+
+        if (emailCount) {
+            emailCount.textContent = `${threads.length} email${threads.length !== 1 ? 's' : ''}`;
+        }
 
         container.innerHTML = threads.map(thread => {
             const latestEmail = thread.emails[thread.emails.length - 1];
@@ -224,10 +229,15 @@ class EmailManager {
 
     // Render emails within a conversation thread
     renderConversationEmails(emails) {
-        const container = document.getElementById('emails-list');
+        const container = document.getElementById('email-list');
+        const emailCount = document.getElementById('email-count');
         if (!container) return;
 
         console.log('[EmailManager] Rendering conversation emails:', emails.length);
+
+        if (emailCount) {
+            emailCount.textContent = `${emails.length} email${emails.length !== 1 ? 's' : ''}`;
+        }
 
         // Stack messages (oldest → newest), with a compact header and content preview
         container.innerHTML = emails.map(email => {
@@ -2676,6 +2686,18 @@ class EmailManager {
             dateObj = new Date(); // Fallback to current time
         }
 
+        // Determine if this is a sent or received email
+        const inferredIsSent = (
+            emailData.emailType === 'sent' ||
+            emailData.type === 'sent' ||
+            emailData.isSentEmail === true ||
+            (typeof emailData.from === 'string' && emailData.from.includes('noreply@powerchoosers.com')) ||
+            emailData.provider === 'sendgrid_outbound'
+        );
+
+        const computedEmailType = inferredIsSent ? 'sent' : (emailData.emailType || 'received');
+        const computedStatus = inferredIsSent ? 'sent' : (emailData.status || 'received');
+
         return {
             id: emailData.id,
             from: emailData.from,
@@ -2694,13 +2716,13 @@ class EmailManager {
             replyCount: emailData.replyCount || 0,
             lastOpened: emailData.lastOpened,
             lastReplied: emailData.lastReplied,
-            status: emailData.status || 'sent',
-            // Mark as sent email for UI rendering
-            isSentEmail: true,
+            status: computedStatus,
+            // Sent vs received computed for UI rendering
+            isSentEmail: inferredIsSent,
             // Provider and type information
             provider: emailData.provider,
             type: emailData.type,
-            emailType: emailData.emailType,
+            emailType: computedEmailType,
             // Gmail API specific data
             sentVia: emailData.sentVia || 'simulation',
             gmailMessageId: emailData.gmailMessageId
