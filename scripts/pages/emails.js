@@ -723,6 +723,9 @@ class EmailManager {
             const randomSubj = subjStyles[Math.floor(Math.random() * subjStyles.length)];
             const subjectSeed = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 
+            // Get sender name from settings
+            const senderName = (window.SettingsPage?.getSettings?.()?.general?.agentName) || 'Lewis Patterson';
+            
             const payload = { 
                 prompt, 
                 mode, 
@@ -732,7 +735,8 @@ class EmailManager {
                 subjectStyle: randomSubj, 
                 subjectSeed,
                 isManualPrompt: isManual,
-                contextCompleteness: contextValidation.completeness
+                contextCompleteness: contextValidation.completeness,
+                senderName: senderName
             };
             let res;
             try {
@@ -1400,12 +1404,12 @@ class EmailManager {
             const hasStructuredHtml = /<table[^>]*>/i.test(raw) || /<div[^>]*style=/i.test(raw);
             
             if (hasStructuredHtml) {
-                // Sonar generated full HTML - just wrap with branding
+                // Sonar generated full HTML - use raw body without additional greeting parsing
                 console.log('[AI] Detected Sonar-generated HTML, wrapping with branding');
-                const sonarHtml = body.trim();
+                // Use body directly, which already contains the greeting from Sonar
                 return {
                     subject,
-                    html: this.wrapSonarHtmlWithBranding(sonarHtml, recipient, subject)
+                    html: this.wrapSonarHtmlWithBranding(body.trim(), recipient, subject)
                 };
             }
             
