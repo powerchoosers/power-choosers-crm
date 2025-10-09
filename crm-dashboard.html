@@ -2148,6 +2148,13 @@
                         <label>Employees<input type="number" name="employees" class="input-dark" /></label>
                     </div>
                     <div class="form-row">
+                        <label style="position: relative;">Parent Company
+                            <input type="text" name="parentCompanyName" class="input-dark" id="parent-company-search" placeholder="Search for parent company..." autocomplete="off" />
+                            <input type="hidden" name="parentCompanyId" id="parent-company-id" />
+                            <div id="parent-company-dropdown" class="parent-company-dropdown" style="display: none;"></div>
+                        </label>
+                    </div>
+                    <div class="form-row">
                         <label>Short Description<textarea name="shortDescription" class="input-dark" rows="3"></textarea></label>
                     </div>
                     <div class="form-row">
