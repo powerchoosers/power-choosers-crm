@@ -1126,6 +1126,10 @@ class EmailManager {
         // Build HTML paragraphs from body
         let paras = body.split(/\n\n/).map(p => p.trim()).filter(Boolean);
 
+        // Remove citation markers like [1], [2], [3] from body
+        body = body.replace(/\[\d+\]/g, '');
+        paras = body.split(/\n\n/).map(p => p.trim()).filter(Boolean);
+
         // Remove duplicate name at start of first content paragraph (fixes "Hi Patrick, Patrick, I hope..." bug)
         if (paras.length > 0 && firstName) {
             const firstPara = paras[0];
@@ -2018,25 +2022,25 @@ class EmailManager {
         return `
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
     <tr>
-        <td style="background:#3498db; padding:20px; border-radius:6px; text-align:center;">
-            <h2 style="color:#ffffff; font-size:20px; margin:0; font-weight:600;">📎 Invoice Request</h2>
+        <td style="background:#ffffff; padding:20px; border-radius:6px; text-align:center; border:1px solid #e5e7eb;">
+            <h2 style="color:#3498db; font-size:20px; margin:0; font-weight:600;">📎 Invoice Request</h2>
         </td>
     </tr>
 </table>
 
-<div style="background:#fff8e1; border-left:4px solid #f39c12; padding:15px; border-radius:4px; margin:15px 0;">
-    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
-        ${this.escapeHtml(data.reminder_text || 'We need your latest invoice to complete your energy analysis.')}
+<div style="text-align:left; margin:15px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0 0 15px 0;">
+        ${this.escapeHtml(data.intro_paragraph || 'We need your latest invoice to complete your energy analysis.')}
     </p>
 </div>
 
 <div style="background:#f8f9fa; padding:20px; border-radius:6px; margin:15px 0;">
-    <h3 style="color:#2c3e50; font-size:18px; margin:0 0 15px 0;">✓ What We'll Review</h3>
-    ${checklist.map(item => 
-        `<div style="padding:10px; margin:8px 0; background:#ffffff; border-radius:4px; border:2px solid #ecf0f1;">
-            <p style="color:#1f2937; font-size:14px; margin:0;">☐ ${this.escapeHtml(item)}</p>
-        </div>`
-    ).join('')}
+    <h3 style="color:#2c3e50; font-size:18px; margin:0 0 15px 0; text-align:center;">✓ What We'll Review</h3>
+    <div style="padding-left:20px;">
+        ${checklist.map(item => 
+            `<p style="color:#1f2937; font-size:14px; line-height:1.8; margin:8px 0;">• ${this.escapeHtml(item)}</p>`
+        ).join('')}
+    </div>
 </div>
 
 <table width="100%" cellpadding="15" cellspacing="0" border="0" style="background:#ffe5e5; border-radius:6px; margin:15px 0;">
@@ -2593,18 +2597,10 @@ ${sections.map((section, idx) => {
             // Remove any sender.name chips entirely; we'll use sender.first_name
             editor.querySelectorAll('.var-chip[data-var="sender.name"]').forEach(el => el.remove());
 
-            // Determine sender first name chip (if exists) to reuse; otherwise create one
-            let senderChip = editor.querySelector('.var-chip[data-var="sender.first_name"]');
-            if (senderChip) {
-                senderChip = senderChip.cloneNode(true);
-            } else {
-                senderChip = document.createElement('span');
-                senderChip.className = 'var-chip';
-                senderChip.setAttribute('data-var', 'sender.first_name');
-                senderChip.setAttribute('data-token', '{{sender.first_name}}');
-                senderChip.setAttribute('contenteditable', 'false');
-                senderChip.textContent = 'sender first name';
-            }
+            // Get actual sender name from settings (not a variable chip)
+            const settings = (window.SettingsPage?.getSettings?.()) || {};
+            const senderName = settings?.general?.agentName || 'Lewis Patterson';
+            const senderFirstName = senderName.split(' ')[0] || senderName;
 
             // Trim trailing blank paragraphs before appending closing (SKIP signature div)
             let last = editor.lastElementChild;
@@ -2629,11 +2625,11 @@ ${sections.map((section, idx) => {
                 }
             }
 
-            // Append a clean closing block at the end on a tight stack: closing + name
+            // Append a clean closing block at the end with actual sender name (no variable chip)
             const pCloseName = document.createElement('p');
             pCloseName.appendChild(document.createTextNode('Best regards,'));
             pCloseName.appendChild(document.createElement('br'));
-            pCloseName.appendChild(senderChip);
+            pCloseName.appendChild(document.createTextNode(senderFirstName));
             editor.appendChild(pCloseName);
 
             // Remove empty paragraphs and collapse extra blanks (leave natural spacing to CSS)
