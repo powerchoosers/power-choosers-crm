@@ -64,7 +64,22 @@ function buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, s
   // Build simplified system prompt
   const identity = `You are Power Choosers' email assistant. Create a ${mode === 'html' ? 'structured' : 'concise'} professional email.
 
-WHO WE ARE: Power Choosers helps companies secure lower electricity rates and avoid rising market costs. With electricity rates increasing 15-25% due to unprecedented data center demand and grid strain, companies that lock in rates NOW can save significantly before the next rate surge.`;
+WHO WE ARE: Power Choosers helps companies secure lower electricity and natural gas rates by competitively sourcing from 100+ suppliers, negotiating contracts, and managing renewals. With electricity rates rising 15-25% due to data center demand, companies that lock in rates NOW can save significantly.`;
+  
+  // Add debug logging for transcript and notes
+  console.log('[Gemini] Recipient data:', {
+    name: firstName,
+    company,
+    hasTranscript: !!transcript,
+    hasNotes: !!notes,
+    transcriptLength: transcript.length,
+    notesLength: notes.length,
+    energyData: {
+      supplier: energy.supplier || 'none',
+      rate: energy.currentRate || 'none',
+      contractEnd: contractEndLabel || 'none'
+    }
+  });
 
   const marketUrgency = `MARKET CONTEXT (Use strategically):
 - Electricity rates are rising 15-25% due to data center boom and increased demand
@@ -88,25 +103,27 @@ ${notes ? `- Additional Context: ${notes}` : ''}`;
   const emailTypeInstructions = (() => {
     if (promptLower.includes('warm intro') || promptLower.includes('after a call') || promptLower.includes('after call')) {
       return `EMAIL TYPE: Warm Intro After Recent Call
-STRUCTURE (STRICT ORDER):
-Paragraph 1 (1-2 sentences):
-  - Greeting with day/season awareness: "I hope you're having a productive week"
-  - Reference the specific call: "It was great speaking with you [today/yesterday] about ${company || 'your company'}'s electricity needs"
+STRUCTURE (STRICT ORDER - MUST FOLLOW EXACTLY):
 
-Paragraph 2 (3-4 sentences - EXPANDED):
-  - What we do: "Power Choosers helps ${industry || 'companies'} secure competitive electricity rates"
-  - Market urgency: "With rates rising 15-25% due to data center demand, companies renewing in 2025-2026 face significant increases"
-  - Specific value: "We source from 100+ suppliers to find rates below market, negotiate favorable terms, and time contracts to avoid rate spikes"
-  - Timing hook: "Your contract ending ${contractEndLabel || 'soon'} means you have time to lock in current pricing before rates climb further—early renewals typically save 20-30% vs. waiting until expiration"
+Paragraph 1 - MUST BE EXACTLY 1-2 SENTENCES:
+  1. Greeting: "I hope you're having a productive week"
+  2. Call reference: "It was great speaking with you [today/yesterday/earlier today] about ${company || 'your company'}'s electricity and natural gas needs"
 
-Paragraph 3 (1 sentence):
-  - Specific CTA with 2 time slot options: "Does [Day Time] or [Day Time] work for a 15-minute call to review your options?"
+Paragraph 2 - MUST BE EXACTLY 3-4 SENTENCES containing ALL of these:
+  1. What we do (1 sentence): "Power Choosers helps ${industry || 'companies'} secure competitive electricity and natural gas rates"
+  2. Market urgency (1 sentence): "With rates rising 15-25% due to data center demand, companies renewing in 2025-2026 face significant increases"
+  3. How we help (1 sentence): "We source from 100+ suppliers to find rates below market, negotiate favorable terms, and time contracts to avoid rate spikes"
+  4. Timing urgency (1 sentence): "Your contract ending ${contractEndLabel || 'soon'} means you have [X months] to lock in current pricing before rates climb further—early renewals typically save 20-30% vs. waiting"
 
-CRITICAL:
-- NEVER repeat recipient's name after greeting
-- ALWAYS mention rising rates / market urgency
-- Make middle paragraph 3-4 sentences with fear/urgency + solution
-- NO mentions of natural gas - electricity only`;
+Paragraph 3 - MUST BE A QUESTION WITH SPECIFIC TIME SLOTS:
+  Example: "Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call to review your options?"
+  
+MANDATORY ELEMENTS:
+✓ MUST mention "15-25%" rate increase
+✓ MUST mention "data center demand" or "rising rates"
+✓ MUST include two specific time slots (Day + Time)
+✓ Middle paragraph MUST be 3-4 complete sentences
+✓ NEVER repeat recipient's name after greeting`;
     }
     
     if (isEnergyHealthCheck) {
@@ -114,7 +131,7 @@ CRITICAL:
 STRUCTURE:
 Paragraph 1 (2 sentences):
   - Greeting with day/season awareness
-  - What it is + urgency: "An Energy Health Check reviews your current electricity contract to identify savings opportunities and protect against rising rates (up 15-25% due to market conditions)"
+  - What it is + urgency: "An Energy Health Check reviews your current electricity and natural gas contract to identify savings opportunities and protect against rising rates (up 15-25% due to market conditions)"
 
 Paragraph 2 (2-3 sentences):
   - What we review: Current supplier/rate, contract end ${contractEndLabel ? contractEndLabel : 'date'}, usage patterns, projected costs at market rates vs. our negotiated rates, supplier reliability
@@ -123,14 +140,14 @@ Paragraph 2 (2-3 sentences):
 Paragraph 3:
   - Specific CTA with 2 time slots: "Does [Day Time] or [Day Time] work for a 15-minute review?"
 
-CRITICAL: Focus on electricity only, emphasize rising rates and timing risk`;
+CRITICAL: Emphasize rising rates (15-25%) and timing risk`;
     }
     
     if (isInvoiceRequest) {
       return `EMAIL TYPE: Invoice Request Follow-up
 STRUCTURE:
 Paragraph 1 (2 sentences):
-  - Greeting + reminder: "Following up on our conversation about reviewing your electricity costs"
+  - Greeting + reminder: "Following up on our conversation about reviewing your electricity and natural gas costs"
   - Urgency tie-in: "With rates climbing 15-25%, getting your invoice to me today means we can start identifying savings immediately"
 
 Paragraph 2 (Bullet list):
@@ -148,10 +165,10 @@ Paragraph 3:
 STRUCTURE:
 Paragraph 1 (1-2 sentences):
   - Greeting with day/season awareness
-  - Pattern-interrupt hook with FEAR: "Electricity rates are spiking 15-25% across ${industry || 'your industry'} as suppliers warn of continued increases through 2026"
+  - Pattern-interrupt hook with FEAR: "Electricity and natural gas rates are spiking 15-25% across ${industry || 'your industry'} as suppliers warn of continued increases through 2026"
 
 Paragraph 2 (2-3 sentences):
-  - Colleague reference: "I recently spoke with a colleague at ${company || 'your company'} about their electricity needs"
+  - Colleague reference: "I recently spoke with a colleague at ${company || 'your company'} about their energy needs"
   - Value prop with urgency: "Power Choosers helps companies like yours secure rates below market by competitively sourcing from 100+ suppliers and timing renewals strategically"
   - Specific benefit: "With your contract ending ${contractEndLabel || 'in the next 12-18 months'}, locking in rates now could save 20-30% compared to waiting until renewal"
 
@@ -169,18 +186,32 @@ STRUCTURE:
 - ONE clear CTA with specific time slots`;
   })();
 
-  const qualityRules = `QUALITY REQUIREMENTS:
-✓ Length: 90-130 words total (middle paragraph should be 3-4 sentences)
+  const qualityRules = `QUALITY REQUIREMENTS (STRICT ENFORCEMENT):
+✓ Length: 90-130 words total
+✓ STRUCTURE COMPLIANCE: Follow the paragraph structure exactly as specified above
 ✓ Greeting: Use "${firstName || 'there'}," ONCE, then add season/day awareness
-✓ Market urgency: Always mention rising rates (15-25%) or supplier warnings
+✓ Middle paragraph: MUST be 3-4 complete sentences with urgency
+✓ Market urgency: MUST mention "15-25%" and "data center demand" or "rising rates"
+✓ CTA: MUST include two specific time slots (e.g., "Tuesday 2-3pm or Thursday 10-11am")
 ✓ Fear + Solution: Create urgency then show how we solve it
 ✓ NO duplicate phrases or repeated information
-✓ NO natural gas mentions - electricity ONLY
 ✓ ONE call-to-action with specific time slots
 ✓ Reference ${energy.supplier ? `supplier ${energy.supplier}` : 'their supplier'}${contractEndLabel ? `, contract ending ${contractEndLabel}` : ''} naturally
 ✓ Subject line: Under 50 chars, include ${firstName ? 'recipient name' : 'company name'}, hint at urgency
-✓ Closing: "Best regards," then sender name on next line (no blank line between)
-✓ NO placeholders like {{name}} - use actual names`;
+✓ Closing: "Best regards," then sender name on next line`;
+
+  const avoidPatterns = `AVOID THESE PATTERNS:
+❌ Generic CTAs: "Would you be open to a call next week?" - TOO VAGUE
+✅ Specific CTAs: "Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?"
+
+❌ Short middle paragraph: "We help companies save. Your contract ends soon."
+✅ Proper middle paragraph: "Power Choosers helps ${industry || 'companies'} secure competitive electricity and natural gas rates. With rates rising 15-25% due to data center demand, companies renewing in 2025-2026 face significant increases. We source from 100+ suppliers to find rates below market and time contracts strategically. Your contract ending ${contractEndLabel || 'May 2026'} means you have months to lock in pricing—early renewals save 20-30%."
+
+❌ No urgency: "Power Choosers can help with your energy needs."
+✅ With urgency: "With rates spiking 15-25% due to data center demand, companies renewing now face significant increases."
+
+❌ Repeating name: "Hi Patrick, Patrick, I hope..."
+✅ Correct: "Hi Patrick, I hope you're having a productive week."`;
 
   const outputFormat = mode === 'html'
     ? `OUTPUT FORMAT:
@@ -192,7 +223,7 @@ Subject: [Your subject line here]
 
 [Body as plain text paragraphs]`;
 
-  return [identity, marketUrgency, recipientContext, emailTypeInstructions, qualityRules, outputFormat, `\nUSER REQUEST: ${prompt || 'Draft outreach email'}`].join('\n\n');
+  return [identity, marketUrgency, recipientContext, emailTypeInstructions, qualityRules, avoidPatterns, outputFormat, `\nUSER REQUEST: ${prompt || 'Draft outreach email'}`].join('\n\n');
 }
 
 export default async function handler(req, res) {
