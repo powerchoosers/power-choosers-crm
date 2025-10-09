@@ -2813,11 +2813,31 @@ class PowerChoosersCRM {
         }
     }
 
+    // Parse phone number with extension
+    // Extracts extension patterns like "ext. 123", "extension 456", "x789"
+    parsePhoneWithExtension(input) {
+        if (!input) return { number: '', extension: '' };
+        let str = String(input).trim();
+        
+        // Match extension patterns: ext, ext., extension, x
+        const extMatch = str.match(/\b(?:ext\.?|extension|x)\s*(\d+)\s*$/i);
+        let extension = '';
+        if (extMatch) {
+            extension = extMatch[1];
+            str = str.slice(0, extMatch.index).trim();
+        }
+        
+        // Extract digits from the main number
+        const digits = str.replace(/[^\d]/g, '');
+        
+        return { number: digits, extension };
+    }
+
     // Normalize phone numbers imported from CSV
     // - Remove Excel leading apostrophe prefix '123...
     // - Unwrap Excel formula-like wrappers ="+1 234..." => +1 234...
     // - Strip zero-width/invisible characters
-    // - Format as +1XXXXXXXXXX for US numbers
+    // - Format as +1 (XXX) XXX-XXXX for US numbers
     normalizePhone(value) {
         try {
             let v = String(value == null ? '' : value).trim();
@@ -2831,24 +2851,32 @@ class PowerChoosersCRM {
             
             if (!v) return '';
             
-            // If already in +<digits> form, keep plus and digits only
-            if (/^\+/.test(v)) {
-                const cleaned = '+' + v.replace(/[^\d]/g, '');
-                return cleaned;
-            }
+            // Parse number and extension
+            const parsed = this.parsePhoneWithExtension(v);
+            const digits = parsed.number;
+            const ext = parsed.extension;
             
-            const digits = v.replace(/[^\d]/g, '');
             if (!digits) return '';
             
-            // US default. If 11 and starts with 1, or exactly 10, format as +1XXXXXXXXXX
+            // Format US numbers as +1 (XXX) XXX-XXXX
+            let formatted = '';
             if (digits.length === 11 && digits.startsWith('1')) {
-                return '+' + digits;
+                // 11 digits starting with 1
+                formatted = `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 11)}`;
             } else if (digits.length === 10) {
-                return '+1' + digits;
+                // 10 digits (US number without country code)
+                formatted = `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+            } else {
+                // Non-US or other format - return with + prefix
+                formatted = '+' + digits;
             }
             
-            // For other lengths, just return the digits with + prefix
-            return '+' + digits;
+            // Append extension if present
+            if (ext) {
+                formatted += ` ext. ${ext}`;
+            }
+            
+            return formatted;
         } catch (_) {
             return value;
         }

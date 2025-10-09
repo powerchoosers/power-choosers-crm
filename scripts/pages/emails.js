@@ -1380,7 +1380,8 @@ class EmailManager {
         }).join('');
 
         // Add a single standardized closing (first name only)
-        const senderFirst = (mode === 'html') ? 'Power Choosers' : '{{sender.first_name}}';
+        const agentName = (window.SettingsPage?.getSettings?.()?.general?.agentName) || 'Power Choosers';
+        const senderFirst = (mode === 'html') ? agentName : agentName;
         const closingHtml = `<p style="margin: 0 0 16px 0;">Best regards,</p><p style="margin: 0 0 16px 0;">${senderFirst}</p>`;
 
         const contentHtml = [`<p style="margin: 0 0 16px 0;">${this.escapeHtml(greeting)}</p>`, paraHtml, closingHtml]
@@ -1388,7 +1389,20 @@ class EmailManager {
             .join('');
 
         if (mode === 'html') {
-            // Check if this is a rich HTML email with structured content
+            // Check if Sonar generated rich HTML (tables, structured content)
+            const hasStructuredHtml = /<table[^>]*>/i.test(raw) || /<div[^>]*style=/i.test(raw);
+            
+            if (hasStructuredHtml) {
+                // Sonar generated full HTML - just wrap with branding
+                console.log('[AI] Detected Sonar-generated HTML, wrapping with branding');
+                const sonarHtml = body.trim();
+                return {
+                    subject,
+                    html: this.wrapSonarHtmlWithBranding(sonarHtml, recipient, subject)
+                };
+            }
+            
+            // Check if this is a rich HTML email with structured content (fallback to old system)
             const richHtml = this.buildRichHtmlEmail(contentHtml, subject, recipient, body);
             if (richHtml) {
                 return { subject, html: richHtml };
@@ -1707,6 +1721,70 @@ class EmailManager {
             const hex = Math.round(x).toString(16);
             return hex.length === 1 ? '0' + hex : hex;
         }).join('');
+    }
+
+    // Wrap Sonar-generated HTML with Power Choosers branding (header/footer)
+    wrapSonarHtmlWithBranding(sonarGeneratedHtml, recipient, subject) {
+        const company = recipient?.company || recipient?.accountName || 'Your Company';
+        const logoUrl = 'https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png';
+        const safeSubject = this.escapeHtml(subject || 'Energy Solutions');
+        
+        // Get signature from settings
+        const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+        const signatureHtml = signature ? `<div style="margin-top: 10px;">${signature}</div>` : '';
+        
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${safeSubject}</title>
+  <meta http-equiv="x-ua-compatible" content="ie=edge" />
+</head>
+<body style="margin:0; padding:0; background-color:#f8fafc; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  <center role="presentation" style="width:100%; background-color:#f8fafc; padding:20px 0;">
+    <div style="max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.08); overflow:hidden;">
+      
+      <!-- Power Choosers Header -->
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); text-align:center;">
+        <tr>
+          <td style="padding:28px 24px;">
+            <img src="${logoUrl}" alt="Power Choosers" width="450" style="max-width:100%; height:auto; display:block; margin:0 auto 8px;">
+            <div style="font-size:14px; font-weight:500; color:#ffffff; opacity:0.9;">Your Energy Partner</div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Sonar-Generated Content -->
+      <div style="padding:32px 24px;">
+        ${sonarGeneratedHtml}
+      </div>
+
+      <!-- Power Choosers Footer with Signature -->
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff;">
+        <tr>
+          <td style="padding:20px 24px; text-align:center;">
+            <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 24px; border-top:1px solid rgba(255,255,255,0.2);">
+            <div style="color:#ffffff; font-size:14px; line-height:1.4;">
+              <strong>Lewis Patterson</strong><br>
+              Energy Strategist<br>
+              817-663-0380<br>
+              Fort Worth, Texas
+            </div>
+            ${signatureHtml}
+          </td>
+        </tr>
+      </table>
+      
+    </div>
+  </center>
+  <div style="display:none; max-height:0; overflow:hidden;">&nbsp;</div>
+</body>
+</html>`;
     }
 
     // Strengthen generic subjects with name/company and energy details; vary patterns slightly
