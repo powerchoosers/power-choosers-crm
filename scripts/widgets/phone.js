@@ -331,10 +331,40 @@
                 TwilioRTC.state.pendingIncoming.toastId = toastId;
             }
 
+            // Show browser notification for incoming call (so user sees it on other tabs)
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const notificationTitle = meta.name || 'Incoming Call';
+                const notificationBody = meta.name ? 
+                    `${meta.nationalFormat || number}${meta.title ? ` (${meta.title})` : ''}${meta.account ? ` at ${meta.account}` : ''}` :
+                    meta.nationalFormat || number;
+                
+                const browserNotification = new Notification(notificationTitle, {
+                    body: notificationBody,
+                    icon: 'https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png',
+                    tag: 'incoming-call',
+                    requireInteraction: true // Keep notification visible until user interacts
+                });
+
+                // Close browser notification when user answers via toast
+                browserNotification.onclick = () => {
+                    browserNotification.close();
+                    // Focus the CRM window
+                    window.focus();
+                };
+            }
+
             // If the caller hangs up (cancels) before we accept, immediately clean up UI/state
             try {
               conn.on('cancel', () => {
                 console.debug('[TwilioRTC] Incoming call canceled by remote - cleaning up UI');
+                
+                // Add missed call notification to badge
+                if (window.Notifications && typeof window.Notifications.addMissedCall === 'function') {
+                    const callerName = meta?.name || '';
+                    const callerNumber = number || '';
+                    window.Notifications.addMissedCall(callerNumber, callerName);
+                }
+                
                 // Clear pending state
                 TwilioRTC.state.pendingIncoming = null;
                 // Ensure any lingering connection reference is cleared
@@ -724,6 +754,14 @@
         
         try { console.debug('[TwilioRTC] Device ready with token refresh enabled'); } catch(_) {}
         state.ready = true;
+        
+        // Request browser notification permission for incoming calls
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().then(permission => {
+            console.log('[Phone] Notification permission:', permission);
+          });
+        }
+        
         return state.device;
       } finally {
         state.connecting = false;

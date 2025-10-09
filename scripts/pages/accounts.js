@@ -1124,19 +1124,8 @@
     const industry = safe(a.industry);
     const domain = safe(a.domain || a.website || a.site);
     const phone = safe(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone);
-    // Normalize to E.164 for data attributes and actions
-    const phoneE164 = (() => {
-      try {
-        let v = String(phone || '').trim();
-        if (!v) return '';
-        if (/^\+/.test(v)) return '+' + v.replace(/[^\d]/g, '');
-        const digits = v.replace(/[^\d]/g, '');
-        if (!digits) return '';
-        if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
-        if (digits.length === 10) return '+1' + digits;
-        return '+' + digits;
-      } catch (_) { return phone; }
-    })();
+    // Phone is already in formatted display format from database (+1 (214) 879-1555)
+    // No need to convert to E.164 - phone widget extracts digits as needed
     const contractEnd = formatDateOrNA(a.contractEndDate, a.contractEnd, a.contract_end_date);
     const sqftNum = a.squareFootage ?? a.sqft ?? a.square_feet;
     const sqft = (typeof sqftNum === 'number' && isFinite(sqftNum)) ? sqftNum.toLocaleString() : safe(sqftNum);
@@ -1177,7 +1166,7 @@
       name: `<td class="name-cell"><a href="#account-details" class="acct-link" data-id="${aid}" title="View account details"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 32 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : '') : '')}<span class="name-text account-name">${escapeHtml(name || 'Unknown Account')}</span></span></a></td>`,
       industry: `<td>${escapeHtml(industry)}</td>`,
       domain: `<td>${escapeHtml(domain)}</td>`,
-      companyPhone: `<td data-field="companyPhone" class="phone-cell click-to-call" data-phone="${escapeHtml(phoneE164)}" data-name="${escapeHtml(name)}">${escapeHtml(formatPhoneForDisplay(phone))}</td>`,
+      companyPhone: `<td data-field="companyPhone" class="phone-cell click-to-call" data-phone="${escapeHtml(phone)}" data-name="${escapeHtml(name)}">${escapeHtml(formatPhoneForDisplay(phone))}</td>`,
       contractEnd: `<td>${escapeHtml(contractEnd)}</td>`,
       electricitySupplier: `<td>${escapeHtml(electricitySupplier)}</td>`,
       benefits: `<td>${escapeHtml(benefits)}</td>`,
@@ -1187,7 +1176,7 @@
       employees: `<td>${escapeHtml(employees)}</td>`,
       location: `<td>${location}</td>`,
       actions: `<td class="qa-cell"><div class="qa-actions">
-        <button type="button" class="qa-btn" data-action="call" data-id="${aid}" data-phone="${escapeHtml(phoneE164)}" aria-label="Call" title="Call">${svgIcon('call')}</button>
+        <button type="button" class="qa-btn" data-action="call" data-id="${aid}" data-phone="${escapeHtml(phone)}" aria-label="Call" title="Call">${svgIcon('call')}</button>
         <button type="button" class="qa-btn" data-action="addlist" data-id="${aid}" aria-label="Add to list" title="Add to list">${svgIcon('addlist')}</button>
         <button type="button" class="qa-btn" data-action="ai" data-id="${aid}" aria-label="Research with AI" title="Research with AI">${svgIcon('ai')}</button>
         <button type="button" class="qa-btn" data-action="linkedin" data-id="${aid}" data-linkedin="${escapeHtml(linkedin)}" data-name="${escapeHtml(name)}" aria-label="LinkedIn page" title="LinkedIn page">${svgIcon('linkedin')}</button>

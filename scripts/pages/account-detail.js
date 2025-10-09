@@ -3750,28 +3750,72 @@
     }
   }
 
-  // Normalize phone number to E.164 format
+  // Parse phone number and extension from various formats
+  function parsePhoneWithExtension(input) {
+    const raw = (input || '').toString().trim();
+    if (!raw) return { number: '', extension: '' };
+    
+    // Common extension patterns
+    const extensionPatterns = [
+      /ext\.?\s*(\d+)/i,
+      /extension\s*(\d+)/i,
+      /x\.?\s*(\d+)/i,
+      /#\s*(\d+)/i,
+      /\s+(\d{3,6})\s*$/  // 3-6 digits at the end (common extension length)
+    ];
+    
+    let number = raw;
+    let extension = '';
+    
+    // Try to find extension using various patterns
+    for (const pattern of extensionPatterns) {
+      const match = number.match(pattern);
+      if (match) {
+        extension = match[1];
+        number = number.replace(pattern, '').trim();
+        break;
+      }
+    }
+    
+    return { number, extension };
+  }
+
+  // Normalize phone number to formatted display format (not E.164)
+  // Returns formatted like: +1 (214) 879-1555 or +1 (214) 879-1555 ext. 123
   function normalizePhone(input) {
     const raw = (input || '').toString().trim();
     if (!raw) return '';
-    // If already in +<digits> form, keep plus and digits only
-    if (/^\+/.test(raw)) {
-      const cleaned = '+' + raw.replace(/[^\d]/g, '');
-      return cleaned;
+    
+    // Parse phone number and extension
+    const parsed = parsePhoneWithExtension(raw);
+    if (!parsed.number) return '';
+    
+    // Format the main number
+    let formattedNumber = '';
+    const cleaned = parsed.number.replace(/\D/g, '');
+    
+    // Always display US numbers with +1 prefix and formatting
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    } else if (/^\+/.test(String(parsed.number))) {
+      // International number - keep as-is
+      formattedNumber = parsed.number;
+    } else if (cleaned.length >= 8) {
+      // International without +, add it
+      formattedNumber = '+' + cleaned;
+    } else {
+      // Fallback: return original if we can't format
+      return raw;
     }
-    const digits = raw.replace(/[^\d]/g, '');
-    if (!digits) return '';
-    // US default. If 11 and starts with 1, or exactly 10, format as +1XXXXXXXXXX
-    if (digits.length === 11 && digits.startsWith('1')) {
-      return '+' + digits;
+    
+    // Add extension if present
+    if (parsed.extension) {
+      return `${formattedNumber} ext. ${parsed.extension}`;
     }
-    if (digits.length === 10) {
-      return '+1' + digits;
-    }
-    // If looks like international without + (e.g., 4479...), we can't infer reliably; return as-is digits
-    // Prepend + if at least 8 digits (heuristic) to help API; otherwise return original raw
-    if (digits.length >= 8) return '+' + digits;
-    return raw; // too short; leave as typed
+    
+    return formattedNumber;
   }
 
   // Commit the edit to Firestore and update UI
