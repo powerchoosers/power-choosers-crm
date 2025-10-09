@@ -231,11 +231,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   
   try {
+    // Anchor 'today' server-side to help models avoid past dates in CTAs
+    const today = new Date();
+    const todayLabel = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) return res.status(400).json({ error: 'Missing GEMINI_API_KEY' });
 
     const { prompt, mode = 'standard', recipient = null, to = '', style = 'auto', subjectStyle = 'auto', subjectSeed = '' } = req.body || {};
-    const sys = buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed });
+    const sys = [
+      `TODAY: ${todayLabel}. If you suggest times, they MUST be in the future relative to this date. Never propose past months/years. Prefer this/next week windows.`,
+      buildSystemPrompt({ mode, recipient, to, prompt, style, subjectStyle, subjectSeed })
+    ].join('\n\n');
 
     // Google Generative Language API (Gemini 2.0 Flash Experimental - latest model)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
