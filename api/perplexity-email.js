@@ -365,17 +365,26 @@ If you mention a specific month/year, it MUST be ${currentYear} or later.
     // Parse JSON response for HTML mode
     if (mode === 'html' && content) {
       try {
+        console.log('[Perplexity] Raw content from Sonar (first 500 chars):', content.substring(0, 500));
         const jsonResponse = JSON.parse(content);
+        console.log('[Perplexity] Parsed JSON keys:', Object.keys(jsonResponse));
+        console.log('[Perplexity] hero_section length:', jsonResponse.hero_section?.length || 0);
+        console.log('[Perplexity] cost_comparison_html length:', jsonResponse.cost_comparison_html?.length || 0);
+        console.log('[Perplexity] benefits_section_html length:', jsonResponse.benefits_section_html?.length || 0);
+        console.log('[Perplexity] cta_html length:', jsonResponse.cta_html?.length || 0);
+        
         const hasTags = (s) => /<[a-z][\s\S]*>/i.test(s || '');
         const escapeHtml = (str) => String(str || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
         
         // Assemble HTML from JSON fields
         let hero = jsonResponse.hero_section;
         if (!hasTags(hero)) {
+          console.log('[Perplexity] hero_section has no HTML tags, applying fallback styling');
           hero = `<div style="color:#1f2937; font-size:15px; line-height:1.6;">${escapeHtml(hero)}</div>`;
         }
         let cost = jsonResponse.cost_comparison_html;
         if (!hasTags(cost)) {
+          console.log('[Perplexity] cost_comparison_html has no HTML tags, applying fallback styling');
           cost = `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">
   <tr><td style="background:#e74c3c; color:#ffffff; border-radius:6px; padding:14px;">${escapeHtml(cost || 'Current costs')}</td></tr>
   <tr><td style="height:8px;"></td></tr>
@@ -384,6 +393,7 @@ If you mention a specific month/year, it MUST be ${currentYear} or later.
         }
         let benefits = jsonResponse.benefits_section_html;
         if (!hasTags(benefits)) {
+          console.log('[Perplexity] benefits_section_html has no HTML tags, applying fallback styling');
           benefits = `<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr>
   <td width="50%" style="background:#f8f9fa; color:#1f2937; padding:16px; border-radius:6px;">${escapeHtml(benefits || 'Competitive rates')}</td>
   <td width="16" style="width:16px;">&nbsp;</td>
@@ -393,6 +403,7 @@ If you mention a specific month/year, it MUST be ${currentYear} or later.
         let cta = jsonResponse.cta_html;
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         if (!hasTags(cta)) {
+          console.log('[Perplexity] cta_html has no HTML tags, applying fallback styling');
           cta = `<table border="0" cellspacing="0" cellpadding="0" style="margin:20px 0;">
   <tr>
     <td style="background:#e67e22; border-radius:28px; padding:14px 28px;">
@@ -403,6 +414,7 @@ If you mention a specific month/year, it MUST be ${currentYear} or later.
         } else {
           // Ensure mailto points to sender if no href present
           if (!/mailto:/i.test(cta)) {
+            console.log('[Perplexity] cta_html has no mailto link, adding one');
             cta += `\n<table border="0" cellspacing="0" cellpadding="0" style="margin:12px 0;">
   <tr><td><a href="mailto:${mail}" style="color:#e67e22;">Email ${mail}</a></td></tr>
 </table>`;
