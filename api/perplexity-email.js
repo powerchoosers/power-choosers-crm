@@ -70,7 +70,7 @@ const emailHtmlSchema = {
   }
 };
 
-function buildSystemPrompt({ mode, recipient, to, prompt }) {
+function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson' }) {
   // Extract recipient data
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
@@ -136,6 +136,10 @@ ${company ? `Use your web search to find additional context about ${company} (in
   if (mode === 'html') {
     return `You are generating content for a professional HTML email from Power Choosers.
 
+SENDER: ${senderName}
+EMAIL: l.patterson@powerchoosers.com
+PHONE: 817-663-0380
+
 CRITICAL INSTRUCTIONS:
 - Generate structured JSON matching the schema
 - All HTML must use INLINE CSS only (no external styles)
@@ -144,12 +148,14 @@ CRITICAL INSTRUCTIONS:
 - Use table-based layouts for email compatibility
 - Red (#e74c3c) for current costs, Green (#27ae60) for savings
 - Include actual calculations based on recipient data
+- ALWAYS use "${senderName}" when referring to yourself/the sender
+- DO NOT use "Laurence" or any other name
 
 RECIPIENT CONTEXT:
 ${recipientContext}
 
 CONTENT REQUIREMENTS:
-1. hero_section: Greeting + brief intro (dark text on white)
+1. hero_section: Greeting + brief intro (dark text on white). Start with "Hello ${firstName}," then "I'm ${senderName} from Power Choosers..."
 2. cost_comparison_html: Cost table with current rate vs. our rate, annual costs, savings
 3. benefits_section_html: 2-column benefits (expert negotiation, efficiency solutions)
 4. additional_info_html: Efficiency savings info (5-20% additional savings)
@@ -296,7 +302,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Missing PERPLEXITY_API_KEY environment variable' });
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '' } = req.body || {};
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson' } = req.body || {};
     
     // Build system prompt with TODAY context
     const today = new Date();
@@ -318,7 +324,7 @@ If you mention a specific month/year, it MUST be ${currentYear} or later.
 
 `;
     
-    const systemPrompt = dateContext + buildSystemPrompt({ mode, recipient, to, prompt });
+    const systemPrompt = dateContext + buildSystemPrompt({ mode, recipient, to, prompt, senderName });
     
     console.log('[Perplexity] Calling Sonar API with prompt type:', prompt);
 
