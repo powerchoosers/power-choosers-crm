@@ -787,8 +787,12 @@ class EmailManager {
                         requestAnimationFrame(() => subjectInput.classList.add('fade-in'));
                     }
                     if (mode === 'html') {
-                        if (!this._isHtmlMode) this.toggleHtmlMode(compose);
-                        editor.textContent = html2;
+                        // Render the generated HTML (not raw source)
+                        if (this._isHtmlMode) this.toggleHtmlMode(compose);
+                        editor.innerHTML = html2;
+                        // Post-insert sanitation and signature handling
+                        this.sanitizeGeneratedEditor(editor, enrichedRecipient);
+                        this.moveSignatureToEnd(editor);
                         if (status) status.textContent = 'Inserted HTML into editor (prod).';
                     } else {
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
@@ -881,8 +885,8 @@ class EmailManager {
                     }
                 } catch(_) {}
             if (mode === 'html') {
-                // Switch to HTML mode and set raw HTML
-                if (!this._isHtmlMode) this.toggleHtmlMode(compose);
+                // Ensure we're in rendered mode (not raw HTML code view)
+                if (this._isHtmlMode) this.toggleHtmlMode(compose);
                 }
                 // Warm intro adjustment
                 if ((prompt || '').toLowerCase().includes('warm intro')) {
@@ -891,7 +895,10 @@ class EmailManager {
                 // Replace variables with actual values before inserting
                 html = this.replaceVariablesInHtml(html, enrichedRecipient);
                 if (mode === 'html') {
-                editor.textContent = html; // raw source in HTML mode
+                editor.innerHTML = html; // render HTML in editor
+                // Post-insert sanitation and signature handling
+                this.sanitizeGeneratedEditor(editor, enrichedRecipient);
+                this.moveSignatureToEnd(editor);
                 if (status) status.textContent = 'Inserted HTML into editor.';
                 }
             } else {
