@@ -641,7 +641,9 @@ class EmailManager {
         if (status) status.textContent = 'Generating...';
         try {
             const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-            const genUrl = `${base}/api/gemini-email`;
+            const genUrl = `${base}/api/perplexity-email`;
+            
+            console.log('[AI] Calling Perplexity Sonar...');
 
             // Resolve recipient by email if not selected or missing core fields
             try {
@@ -741,7 +743,7 @@ class EmailManager {
                 });
             } catch (netErr) {
                 console.warn('[AI] Primary endpoint failed, trying Vercel fallback', netErr);
-                const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
+                const prodUrl = 'https://power-choosers-crm.vercel.app/api/perplexity-email';
                 res = await fetch(prodUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -752,7 +754,7 @@ class EmailManager {
             try { data = await res.json(); } catch (_) { data = null; }
             if (!res.ok) {
                 // Retry once directly against Vercel if not already
-                const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
+                const prodUrl = 'https://power-choosers-crm.vercel.app/api/perplexity-email';
                 if (!genUrl.startsWith(prodUrl)) {
                     const res2 = await fetch(prodUrl, {
                         method: 'POST',
@@ -816,8 +818,8 @@ class EmailManager {
                         let finalContent2 = cleanHtml2;
                         if (signature) {
                             // Always place signature at the very end, after any existing content
-                            // Add proper spacing between AI content and signature
-                            finalContent2 = cleanHtml2 + '<br><br>' + signature;
+                            // sanitizeGeneratedEditor already adds "Best regards," with spacing
+                            finalContent2 = cleanHtml2 + signature;
                         }
                         
                         editor.innerHTML = finalContent2;
@@ -836,6 +838,13 @@ class EmailManager {
                 return;
             }
             const output = data?.output || '';
+            
+            // Store citations if available (for future enhancement)
+            if (data?.citations && data.citations.length > 0) {
+                console.log('[AI] Web sources used:', data.citations.slice(0, 5));
+                // Future: Display citations in UI to show research sources
+            }
+            
             try {
                 console.debug('[AI][generate] mode:', mode, 'recipient.firstName:', recipient?.firstName, 'company:', recipient?.company);
                 console.debug('[AI][generate] raw output (first 600 chars):', String(output).slice(0, 600));
@@ -920,8 +929,8 @@ class EmailManager {
                 let finalContent = cleanHtml;
                 if (signature) {
                     // Always place signature at the very end, after any existing content
-                    // Add proper spacing between AI content and signature
-                    finalContent = cleanHtml + '<br><br>' + signature;
+                    // sanitizeGeneratedEditor already adds "Best regards," with spacing
+                    finalContent = cleanHtml + signature;
                 }
                 
                 editor.innerHTML = finalContent;
@@ -1065,6 +1074,15 @@ class EmailManager {
         // Build HTML paragraphs from body
         let paras = body.split(/\n\n/).map(p => p.trim()).filter(Boolean);
 
+        // Remove duplicate name at start of first content paragraph (fixes "Hi Patrick, Patrick, I hope..." bug)
+        if (paras.length > 0 && firstName) {
+            const firstPara = paras[0];
+            const namePattern = new RegExp(`^${firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')},?\\s+`, 'i');
+            if (namePattern.test(firstPara)) {
+                paras[0] = firstPara.replace(namePattern, '');
+            }
+        }
+
         // Force-insert a standardized Energy line and (optional) pain point right after the greeting
         try {
             const e = recipient?.energy || {};
@@ -1136,13 +1154,22 @@ class EmailManager {
             const allSentences = splitSentences(body);
             console.debug('[AI][format] sentences (pre-CTA-scan):', allSentences);
 
+            // Strengthened CTA detection - must be actionable question with time or action words
+            const isRealCTA = (text) => {
+                const hasQuestion = text.trim().endsWith('?');
+                const hasActionWords = /\b(would you|can you|could you|are you|does|available|work for you|schedule|call|meet|discuss|interested|open to)\b/i.test(text);
+                const hasTimeReference = /\b(today|tomorrow|this week|next week|tue|wed|thu|fri|monday|tuesday|wednesday|thursday|friday|\d{1,2}\s*(am|pm)|eod|end of day)\b/i.test(text);
+                
+                // Real CTA must have question mark AND (action words OR time reference)
+                return hasQuestion && (hasActionWords || hasTimeReference);
+            };
+            
             // Detect CTA from original body (prefer scheduling/time or explicit CTA keywords; exclude explanation-like questions)
             let detectedCTA = null;
             for (const s of allSentences) {
-                const looksQuestion = /\?$/.test(s);
-                const looksCTA = ctaMatchers.test(s) || timeSignals.test(s);
-                if ((looksCTA || (looksQuestion && (ctaMatchers.test(s) || timeSignals.test(s)))) && !isColleagueLine(s) && !isExplanationSentence(s)) {
-                    detectedCTA = s; break;
+                if (isRealCTA(s) && !isColleagueLine(s) && !isExplanationSentence(s)) {
+                    detectedCTA = s; 
+                    break;
                 }
             }
 
@@ -1169,6 +1196,16 @@ class EmailManager {
             }
             paras = trimmedParas.length ? trimmedParas : paras.slice(0, 2);
             console.debug('[AI][format] paras after trim/no-dup-CTA:', paras);
+
+            // Move "following up" or call reference to beginning (fixes out-of-order content)
+            const followUpIdx = paras.findIndex(p => 
+                /following up|as we discussed|per our (call|conversation)|it was (great|a pleasure) speaking/i.test(p)
+            );
+            if (followUpIdx > 0) {
+                const followUpPara = paras.splice(followUpIdx, 1)[0];
+                paras.unshift(followUpPara);
+                console.debug('[AI][format] Reordered "following up" paragraph to beginning');
+            }
 
             // For Energy Health Check, ensure ordering: explanation first, coverage second
             try {
@@ -1228,28 +1265,35 @@ class EmailManager {
             const looksEHC2 = /energy\s*health\s*check/i.test(body);
             const looksInvoice2 = /standard\s*invoice\s*request|invoice\s+request|invoice\b/i.test(body);
             let cta = detectedCTA
-                || (looksEHC2 ? 'Does Tue 10–12 or Thu 2–4 work for a brief review?'
+                || (looksEHC2 ? 'Does Tuesday 10am-12pm or Thursday 2-4pm work for a brief review?'
                 : looksInvoice2 ? 'Could you send a copy of your latest invoice today by EOD so my team can get started right away?'
-                : 'Open to a quick 10‑min call next week?');
+                : 'Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?');
             // Keep CTA very short
             const ctaWords = cta.split(/\s+/).filter(Boolean);
             if (ctaWords.length > 16) cta = ctaWords.slice(0, 16).join(' ').replace(/[,;:]$/, '') + (cta.endsWith('?') ? '' : '?');
             console.debug('[AI][format] chosen CTA:', cta);
 
-            // Global word cap (~100). If exceeded, drop last sentences first, then shorten CTA
+            // Global word cap (~130). If exceeded, drop last sentences first, then shorten CTA
             const countWords = (txt) => String(txt || '').trim().split(/\s+/).filter(Boolean).length;
             const totalWords = () => countWords(paras.join(' ')) + countWords(cta);
-            while (totalWords() > 100 && paras.length) {
+            while (totalWords() > 130 && paras.length) {
                 // Remove last sentence from last paragraph
                 const parts = splitSentences(paras[paras.length - 1]);
                 if (parts.length > 1) {
-                    parts.pop();
-                    paras[paras.length - 1] = parts.join(' ');
+                    // Safety check: Don't trim if it would cut an incomplete sentence
+                    const lastSentence = parts[parts.length - 1];
+                    if (lastSentence.trim().match(/[.!?]$/)) {
+                        parts.pop();
+                        paras[paras.length - 1] = parts.join(' ');
+                    } else {
+                        // Don't cut incomplete sentences
+                        break;
+                    }
                 } else {
                     paras.pop();
                 }
             }
-            if (totalWords() > 100) {
+            if (totalWords() > 130) {
                 // Shorten CTA further
                 const words = cta.split(/\s+/).filter(Boolean).slice(0, 10);
                 cta = (words.join(' ').replace(/[,;:]$/, '')) + '?';
@@ -1852,7 +1896,7 @@ class EmailManager {
             const toInput = compose?.querySelector('#compose-to');
             const recipient = this._selectedRecipient || null;
             const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-            const genUrl = `${base}/api/gemini-email`;
+            const genUrl = `${base}/api/perplexity-email`;
             const prompts = [
                 'Warm intro after a call',
                 'Follow-up with tailored value props',
@@ -2000,6 +2044,16 @@ class EmailManager {
     sanitizeGeneratedEditor(editor, recipient) {
         try {
             if (!editor) return;
+            
+            // CRITICAL: Extract and preserve signature BEFORE any modifications
+            const signatureDiv = editor.querySelector('[data-signature="true"]') || 
+                                 Array.from(editor.querySelectorAll('div')).find(div => 
+                                   div.style.marginTop === '20px' && 
+                                   div.style.paddingTop === '20px' &&
+                                   (div.style.borderTop && div.style.borderTop.includes('1px solid'))
+                                 );
+            const savedSignature = signatureDiv ? signatureDiv.cloneNode(true) : null;
+            
             const nameSource = (recipient?.fullName || recipient?.name || '').trim();
             const firstName = (nameSource.split(' ')[0] || '').trim() || 'there';
             
@@ -2016,6 +2070,13 @@ class EmailManager {
                 return s.startsWith('best regards') || s === 'regards' || s.startsWith('kind regards') || s.startsWith('warm regards') || s === 'sincerely' || s === 'thanks' || s === 'thank you' || s === 'cheers';
             };
             const isPlaceholder = (t) => /\[\s*(your\s+name|your\s+title|your\s+contact\s*information)\s*\]/i.test(String(t || ''));
+            const isSignature = (el) => {
+                return el.hasAttribute('data-signature') || 
+                       (el.tagName === 'DIV' && 
+                        el.style.marginTop === '20px' && 
+                        el.style.paddingTop === '20px' &&
+                        (el.style.borderTop && el.style.borderTop.includes('1px solid')));
+            };
 
             const ps = Array.from(editor.querySelectorAll('p'));
             if (!ps.length) return;
@@ -2084,15 +2145,24 @@ class EmailManager {
                 senderChip.textContent = 'sender first name';
             }
 
-            // Trim trailing blank paragraphs before appending closing
+            // Trim trailing blank paragraphs before appending closing (SKIP signature div)
             let last = editor.lastElementChild;
-            while (last && last.tagName === 'P') {
-                const txt = (last.textContent || '').replace(/\u00A0/g, ' ').trim();
-                const onlyBr = !txt && last.querySelectorAll('br').length > 0;
-                if (!txt || onlyBr) {
-                    const toRemove = last;
-                    last = last.previousElementSibling;
-                    toRemove.remove();
+            while (last) {
+                // SKIP if this is the signature div - don't remove it!
+                if (isSignature(last)) {
+                    break;
+                }
+                
+                if (last.tagName === 'P') {
+                    const txt = (last.textContent || '').replace(/\u00A0/g, ' ').trim();
+                    const onlyBr = !txt && last.querySelectorAll('br').length > 0;
+                    if (!txt || onlyBr) {
+                        const toRemove = last;
+                        last = last.previousElementSibling;
+                        toRemove.remove();
+                    } else {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -2110,6 +2180,22 @@ class EmailManager {
                 const txt = (p.textContent || '').replace(/\u00A0/g, ' ').trim();
                 if (!txt) p.remove();
             });
+            
+            // CRITICAL: Re-append the saved signature at the very end if it existed
+            if (savedSignature) {
+                // Remove any signature that might have been accidentally kept during processing
+                const existingSig = editor.querySelector('[data-signature="true"]') || 
+                                   Array.from(editor.querySelectorAll('div')).find(div => 
+                                     div.style.marginTop === '20px' && 
+                                     div.style.paddingTop === '20px' &&
+                                     (div.style.borderTop && div.style.borderTop.includes('1px solid'))
+                                   );
+                if (existingSig) {
+                    existingSig.remove();
+                }
+                editor.appendChild(savedSignature);
+                console.log('[Signature] Preserved signature during AI generation');
+            }
         } catch (e) {
             console.warn('sanitizeGeneratedEditor failed', e);
         }
@@ -2125,7 +2211,7 @@ class EmailManager {
                           Array.from(doc.querySelectorAll('div')).find(div => 
                             div.style.marginTop === '20px' && 
                             div.style.paddingTop === '20px' && 
-                            div.style.borderTop === '1px solid #e0e0e0'
+                            (div.style.borderTop && div.style.borderTop.includes('1px solid'))
                           );
             return sigDiv ? sigDiv.outerHTML : null;
         } catch (e) {
@@ -2141,29 +2227,36 @@ class EmailManager {
             
             // Extract signature using DOM parser
             const signature = this.extractSignature(editor.innerHTML);
-            if (!signature) return; // no signature present
+            if (!signature) {
+                console.log('[Signature] No signature found to move');
+                return; // no signature present - don't do anything
+            }
             
-            // Remove signature from current position using DOM
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(editor.innerHTML, 'text/html');
-            const sigDiv = doc.querySelector('[data-signature="true"]') || 
-                          Array.from(doc.querySelectorAll('div')).find(div => 
+            // Create a temporary div to work with
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = editor.innerHTML;
+            
+            // Remove signature from temp div
+            const sigDiv = tempDiv.querySelector('[data-signature="true"]') || 
+                          Array.from(tempDiv.querySelectorAll('div')).find(div => 
                             div.style.marginTop === '20px' && 
-                            div.style.paddingTop === '20px'
+                            div.style.paddingTop === '20px' &&
+                            (div.style.borderTop && div.style.borderTop.includes('1px solid'))
                           );
             if (sigDiv) {
                 sigDiv.remove();
             }
             
-            // Serialize back to HTML and append signature at the end
-            const bodyContent = doc.body.innerHTML;
-            editor.innerHTML = bodyContent + signature;
-
-            // Remove extra empty paragraphs at the end
-            Array.from(editor.querySelectorAll('p')).forEach(p => {
+            // Remove empty paragraphs from temp div (but not signature)
+            Array.from(tempDiv.querySelectorAll('p')).forEach(p => {
                 const t = (p.textContent || '').replace(/\u00A0/g, ' ').trim();
                 if (!t) p.remove();
             });
+            
+            // Reconstruct: content + signature
+            editor.innerHTML = tempDiv.innerHTML + signature;
+            console.log('[Signature] Moved signature to end');
+            
         } catch (e) {
             console.warn('[Email] moveSignatureToEnd failed', e);
         }
@@ -3449,6 +3542,9 @@ class EmailManager {
     resetComposeWindow() {
         const composeWindow = document.getElementById('compose-window');
         if (!composeWindow) return;
+
+        // CRITICAL: Clear selected recipient to prevent context bleeding between emails
+        this._selectedRecipient = null;
 
         // Inputs
         const toInput = composeWindow.querySelector('#compose-to');
