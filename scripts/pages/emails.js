@@ -39,20 +39,6 @@ class EmailManager {
         this.setupEventListeners();
     }
 
-    // Normalize CTA: ensure a single question with future-oriented wording
-    normalizeCta(ctaText) {
-        try {
-            let t = String(ctaText || '').trim();
-            // Ensure it is a question
-            if (!/[?]$/.test(t)) t = t.replace(/[,;:]$/, '') + '?';
-            // Replace vague phrases with specific future framing
-            t = t.replace(/sometime\s+next\s+week\??/i, 'early next week?');
-            // Prevent duplicate question marks
-            t = t.replace(/\?+$/,'?');
-            return t;
-        } catch (_) { return ctaText; }
-    }
-
     // Setup event listeners for the emails page
     setupEventListeners() {
         // Compose button
@@ -654,9 +640,8 @@ class EmailManager {
         this.startGeneratingAnimation(compose);
         if (status) status.textContent = 'Generating...';
         try {
-            // Lock to production endpoint for consistent prompt/version behavior
-            const base = 'https://power-choosers-crm.vercel.app';
-            const genUrl = `${base.replace(/\/$/, '')}/api/gemini-email`;
+            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+            const genUrl = `${base}/api/gemini-email`;
 
             // Resolve recipient by email if not selected or missing core fields
             try {
@@ -751,16 +736,100 @@ class EmailManager {
             try {
                 res = await fetch(genUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CRM-Endpoint': 'vercel', 'X-CRM-Prompt-Version': 'v-urgency-structured-1' },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
             } catch (netErr) {
-                console.warn('[AI] Endpoint failed', netErr);
-                throw netErr;
+                console.warn('[AI] Primary endpoint failed, trying Vercel fallback', netErr);
+                const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
+                res = await fetch(prodUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
             }
             let data = null;
             try { data = await res.json(); } catch (_) { data = null; }
             if (!res.ok) {
+                // Retry once directly against Vercel if not already
+                const prodUrl = 'https://power-choosers-crm.vercel.app/api/gemini-email';
+                if (!genUrl.startsWith(prodUrl)) {
+                    const res2 = await fetch(prodUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    let data2 = null; try { data2 = await res2.json(); } catch (_) {}
+                    if (!res2.ok) {
+                        const msg2 = (data2 && (data2.error || data2.message)) || `HTTP ${res2.status}`;
+                        console.error('[AI] Production generation failed', { status: res2.status, data: data2 });
+                        if (status) status.textContent = `Generation failed: ${msg2}`;
+                        return;
+                    }
+                    const output2 = data2?.output || '';
+                    let { subject: subject2, html: html2 } = this.formatGeneratedEmail(output2, enrichedRecipient, mode);
+                    // Warm intro adjustment
+                    if ((prompt || '').toLowerCase().includes('warm intro')) {
+                        html2 = this.adjustWarmIntroHtml(html2);
+                    }
+                    // Replace variables with actual values before inserting
+                    html2 = this.replaceVariablesInHtml(html2, enrichedRecipient);
+                    if (subjectInput) {
+                        subjectInput.classList.remove('fade-in');
+                        try {
+                            const improved2 = this.improveSubject(subject2, enrichedRecipient);
+                            subjectInput.value = improved2 || subject2 || '';
+                        } catch (_) {
+                            subjectInput.value = subject2 || '';
+                        }
+                        requestAnimationFrame(() => subjectInput.classList.add('fade-in'));
+                    }
+                    if (mode === 'html') {
+                        if (!this._isHtmlMode) this.toggleHtmlMode(compose);
+                        editor.textContent = html2;
+                        if (status) status.textContent = 'Inserted HTML into editor (prod).';
+                    } else {
+                        if (this._isHtmlMode) this.toggleHtmlMode(compose);
+                        
+                        // Preserve signature when inserting AI content (production fallback) using DOM parser
+                        const currentContent = editor.innerHTML;
+                        const signature = this.extractSignature(currentContent);
+                        
+                        // Remove any existing signature from AI content using DOM parser
+                        let cleanHtml2 = html2;
+                        const aiSig2 = this.extractSignature(html2);
+                        if (aiSig2) {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html2, 'text/html');
+                            const sigDiv = doc.querySelector('[data-signature="true"]') || 
+                                          Array.from(doc.querySelectorAll('div')).find(div => 
+                                            div.style.marginTop === '20px' && 
+                                            div.style.paddingTop === '20px'
+                                          );
+                            if (sigDiv) {
+                                sigDiv.remove();
+                                cleanHtml2 = doc.body.innerHTML;
+                            }
+                        }
+                        
+                        // Place signature after the AI content's closing
+                        let finalContent2 = cleanHtml2;
+                        if (signature) {
+                            // Always place signature at the very end, after any existing content
+                            // Add proper spacing between AI content and signature
+                            finalContent2 = cleanHtml2 + '<br><br>' + signature;
+                        }
+                        
+                        editor.innerHTML = finalContent2;
+                        this.sanitizeGeneratedEditor(editor, enrichedRecipient);
+                        // Ensure signature is positioned after the standardized closing
+                        this.moveSignatureToEnd(editor);
+                        if (status) status.textContent = 'Draft inserted (prod).';
+                    }
+                    editor.classList.remove('fade-in');
+                    requestAnimationFrame(() => editor.classList.add('fade-in'));
+                    return;
+                }
                 const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
                 console.error('[AI] Generation failed', { status: res.status, data });
                 if (status) status.textContent = `Generation failed: ${msg}`;
@@ -1187,36 +1256,35 @@ class EmailManager {
             const looksEHC2 = /energy\s*health\s*check/i.test(body);
             const looksInvoice2 = /standard\s*invoice\s*request|invoice\s+request|invoice\b/i.test(body);
             let cta = detectedCTA
-                || (looksEHC2 ? 'Does Tue 10–12 or Thu 2–4 work for a brief review?'
+                || (looksEHC2 ? 'Does Tuesday 10am-12pm or Thursday 2-4pm work for a brief review?'
                 : looksInvoice2 ? 'Could you send a copy of your latest invoice today by EOD so my team can get started right away?'
-                : 'Open to a quick 10‑min call next week?');
+                : 'Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?');
             // Keep CTA very short
             const ctaWords = cta.split(/\s+/).filter(Boolean);
             if (ctaWords.length > 16) cta = ctaWords.slice(0, 16).join(' ').replace(/[,;:]$/, '') + (cta.endsWith('?') ? '' : '?');
-            // Normalize CTA to ensure future-oriented and proper punctuation
-            try {
-                if (typeof this.normalizeCta === 'function') {
-                    cta = this.normalizeCta(cta);
-                } else if (!cta.endsWith('?')) {
-                    cta = cta.replace(/[,;:]$/, '') + '?';
-                }
-            } catch (_) { /* noop */ }
             console.debug('[AI][format] chosen CTA:', cta);
 
-            // Global word cap (~100). If exceeded, drop last sentences first, then shorten CTA
+            // Global word cap (~130). If exceeded, drop last sentences first, then shorten CTA
             const countWords = (txt) => String(txt || '').trim().split(/\s+/).filter(Boolean).length;
             const totalWords = () => countWords(paras.join(' ')) + countWords(cta);
-            while (totalWords() > 100 && paras.length) {
+            while (totalWords() > 130 && paras.length) {
                 // Remove last sentence from last paragraph
                 const parts = splitSentences(paras[paras.length - 1]);
                 if (parts.length > 1) {
-                    parts.pop();
-                    paras[paras.length - 1] = parts.join(' ');
+                    // Safety check: Don't trim if it would cut an incomplete sentence
+                    const lastSentence = parts[parts.length - 1];
+                    if (lastSentence.trim().match(/[.!?]$/)) {
+                        parts.pop();
+                        paras[paras.length - 1] = parts.join(' ');
+                    } else {
+                        // Don't cut incomplete sentences
+                        break;
+                    }
                 } else {
                     paras.pop();
                 }
             }
-            if (totalWords() > 100) {
+            if (totalWords() > 130) {
                 // Shorten CTA further
                 const words = cta.split(/\s+/).filter(Boolean).slice(0, 10);
                 cta = (words.join(' ').replace(/[,;:]$/, '')) + '?';
@@ -1969,7 +2037,12 @@ class EmailManager {
             if (!editor) return;
             
             // CRITICAL: Extract and preserve signature BEFORE any modifications
-            const signatureDiv = editor.querySelector('[data-signature="true"]');
+            const signatureDiv = editor.querySelector('[data-signature="true"]') || 
+                                 Array.from(editor.querySelectorAll('div')).find(div => 
+                                   div.style.marginTop === '20px' && 
+                                   div.style.paddingTop === '20px' &&
+                                   (div.style.borderTop && div.style.borderTop.includes('1px solid'))
+                                 );
             const savedSignature = signatureDiv ? signatureDiv.cloneNode(true) : null;
             
             const nameSource = (recipient?.fullName || recipient?.name || '').trim();
@@ -1988,7 +2061,13 @@ class EmailManager {
                 return s.startsWith('best regards') || s === 'regards' || s.startsWith('kind regards') || s.startsWith('warm regards') || s === 'sincerely' || s === 'thanks' || s === 'thank you' || s === 'cheers';
             };
             const isPlaceholder = (t) => /\[\s*(your\s+name|your\s+title|your\s+contact\s*information)\s*\]/i.test(String(t || ''));
-            const isSignature = (el) => el && el.getAttribute && el.getAttribute('data-signature') === 'true';
+            const isSignature = (el) => {
+                return el.hasAttribute('data-signature') || 
+                       (el.tagName === 'DIV' && 
+                        el.style.marginTop === '20px' && 
+                        el.style.paddingTop === '20px' &&
+                        (el.style.borderTop && el.style.borderTop.includes('1px solid')));
+            };
 
             const ps = Array.from(editor.querySelectorAll('p'));
             if (!ps.length) return;
@@ -2096,8 +2175,15 @@ class EmailManager {
             // CRITICAL: Re-append the saved signature at the very end if it existed
             if (savedSignature) {
                 // Remove any signature that might have been accidentally kept during processing
-                const existingSig = editor.querySelector('[data-signature="true"]');
-                if (existingSig && existingSig !== savedSignature) existingSig.remove();
+                const existingSig = editor.querySelector('[data-signature="true"]') || 
+                                   Array.from(editor.querySelectorAll('div')).find(div => 
+                                     div.style.marginTop === '20px' && 
+                                     div.style.paddingTop === '20px' &&
+                                     (div.style.borderTop && div.style.borderTop.includes('1px solid'))
+                                   );
+                if (existingSig) {
+                    existingSig.remove();
+                }
                 editor.appendChild(savedSignature);
                 console.log('[Signature] Preserved signature during AI generation');
             }
@@ -2116,7 +2202,7 @@ class EmailManager {
                           Array.from(doc.querySelectorAll('div')).find(div => 
                             div.style.marginTop === '20px' && 
                             div.style.paddingTop === '20px' && 
-                            div.style.borderTop === '1px solid #e0e0e0'
+                            (div.style.borderTop && div.style.borderTop.includes('1px solid'))
                           );
             return sigDiv ? sigDiv.outerHTML : null;
         } catch (e) {
@@ -2142,7 +2228,12 @@ class EmailManager {
             tempDiv.innerHTML = editor.innerHTML;
             
             // Remove signature from temp div
-            const sigDiv = tempDiv.querySelector('[data-signature="true"]');
+            const sigDiv = tempDiv.querySelector('[data-signature="true"]') || 
+                          Array.from(tempDiv.querySelectorAll('div')).find(div => 
+                            div.style.marginTop === '20px' && 
+                            div.style.paddingTop === '20px' &&
+                            (div.style.borderTop && div.style.borderTop.includes('1px solid'))
+                          );
             if (sigDiv) {
                 sigDiv.remove();
             }
