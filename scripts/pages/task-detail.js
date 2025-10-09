@@ -752,6 +752,9 @@
     
     // Navigate to next task instead of going back
     try {
+      // Clean up any existing avatars/icons before navigation
+      cleanupExistingAvatarsAndIcons();
+      
       // Small delay to ensure task deletion has been processed
       await new Promise(resolve => setTimeout(resolve, 100));
       await navigateToAdjacentTask('next');
@@ -941,6 +944,10 @@
       const targetTask = todaysTasks[targetIndex];
       if (targetTask && targetTask.id) {
         console.log(`Navigating ${direction} from task ${currentIndex} to task ${targetIndex}: ${targetTask.title}`);
+        
+        // Clean up any existing avatars/icons before loading new task
+        cleanupExistingAvatarsAndIcons();
+        
         // Load the target task data directly instead of calling TaskDetail.open
         await loadTaskData(targetTask.id);
       }
@@ -1169,8 +1176,54 @@
     }
   }
 
+  // Robust cleanup function to remove all existing avatars/icons
+  function cleanupExistingAvatarsAndIcons() {
+    const titleSection = document.querySelector('.contact-header-text');
+    if (!titleSection) return;
+    
+    // Remove all possible avatar/icon elements
+    const selectors = [
+      '.avatar-initials',
+      '.company-favicon-header', 
+      '.avatar-absolute',
+      '[class*="avatar"]',
+      '[class*="favicon"]',
+      '[class*="company-logo"]',
+      '[class*="company-icon"]'
+    ];
+    
+    selectors.forEach(selector => {
+      const elements = titleSection.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (el && el.parentNode) {
+          el.remove();
+        }
+      });
+    });
+    
+    // Also check for any absolutely positioned elements that might be avatars
+    const allChildren = titleSection.querySelectorAll('*');
+    allChildren.forEach(child => {
+      if (child.style && child.style.position === 'absolute' && 
+          (child.classList.contains('avatar-absolute') || 
+           child.querySelector('.avatar-initials') || 
+           child.querySelector('.company-favicon-header') ||
+           child.querySelector('[class*="avatar"]') ||
+           child.querySelector('[class*="favicon"]'))) {
+        child.remove();
+      }
+    });
+    
+    // Force a reflow to ensure DOM is clean
+    titleSection.offsetHeight;
+  }
+
   function renderTaskPage() {
     if (!state.currentTask) return;
+    
+    // Clean up any existing avatars/icons first
+    cleanupExistingAvatarsAndIcons();
+    
     injectTaskDetailStyles();
     
     // Update page title and subtitle - keep original task title and due date/time
@@ -1222,11 +1275,24 @@
         // Add company icon/favicon to header
         const titleSection = document.querySelector('.contact-header-text');
         if (titleSection) {
-          // Remove any existing avatar/icon
-          const existingAvatar = titleSection.querySelector('.avatar-initials, .company-favicon-header');
-          if (existingAvatar) {
-            existingAvatar.remove();
-          }
+          // More thorough cleanup of existing avatars/icons
+          const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
+          existingElements.forEach(el => {
+            if (el && el.parentNode) {
+              el.remove();
+            }
+          });
+          
+          // Also check for any absolutely positioned elements that might be avatars
+          const allChildren = titleSection.querySelectorAll('*');
+          allChildren.forEach(child => {
+            if (child.style && child.style.position === 'absolute' && 
+                (child.classList.contains('avatar-absolute') || 
+                 child.querySelector('.avatar-initials') || 
+                 child.querySelector('.company-favicon-header'))) {
+              child.remove();
+            }
+          });
           
           // If no icon HTML generated, create a fallback with first letter
           if (!companyIconHTML) {
@@ -1327,17 +1393,31 @@
         contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
         
         // Add absolutely positioned avatar to the main title container
-        // Use a small delay to ensure DOM is ready
+        // Use a longer delay to ensure DOM is ready and previous elements are cleaned up
         setTimeout(() => {
           const titleSection = document.querySelector('.contact-header-text');
           console.log('Contact task - Title section found:', !!titleSection, 'Initials:', initials);
           if (titleSection) {
-            // Remove any existing avatar
-            const existingAvatar = titleSection.querySelector('.avatar-initials');
-            if (existingAvatar) {
-              console.log('Removing existing avatar');
-              existingAvatar.remove();
-            }
+            // More thorough cleanup of existing avatars/icons
+            const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
+            existingElements.forEach(el => {
+              if (el && el.parentNode) {
+                console.log('Removing existing avatar/icon element:', el.className);
+                el.remove();
+              }
+            });
+            
+            // Also check for any absolutely positioned elements that might be avatars
+            const allChildren = titleSection.querySelectorAll('*');
+            allChildren.forEach(child => {
+              if (child.style && child.style.position === 'absolute' && 
+                  (child.classList.contains('avatar-absolute') || 
+                   child.querySelector('.avatar-initials') || 
+                   child.querySelector('.company-favicon-header'))) {
+                console.log('Removing absolutely positioned avatar element:', child.className);
+                child.remove();
+              }
+            });
             
             // Ensure we have valid initials
             const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
@@ -1349,7 +1429,7 @@
           } else {
             console.log('Contact task - No title section found');
           }
-        }, 50);
+        }, 150); // Increased delay for better cleanup
       }
     }
     

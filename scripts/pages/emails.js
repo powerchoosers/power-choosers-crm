@@ -149,6 +149,19 @@ class EmailManager {
                 }
             } else {
                 console.warn('[EmailManager] Email tracking manager not available');
+                // Retry with backoff up to ~2s to allow initialization
+                const start = Date.now();
+                await new Promise((resolve) => {
+                    const tick = () => {
+                        if (window.emailTrackingManager) return resolve();
+                        if (Date.now() - start > 2000) return resolve();
+                        setTimeout(tick, 160);
+                    };
+                    tick();
+                });
+                if (window.emailTrackingManager) {
+                    return this.loadEmails();
+                }
                 this.showEmptyState();
             }
         } catch (error) {
@@ -165,7 +178,8 @@ class EmailManager {
 
     // Render conversation threads
     renderConversationThreads(threads) {
-        const container = document.getElementById('emails-list');
+        const container = document.getElementById('email-list');
+        const emailCount = document.getElementById('email-count');
         if (!container) return;
 
         if (threads.length === 0) {
@@ -174,6 +188,10 @@ class EmailManager {
         }
 
         console.log('[EmailManager] Rendering conversation threads:', threads.length);
+
+        if (emailCount) {
+            emailCount.textContent = `${threads.length} email${threads.length !== 1 ? 's' : ''}`;
+        }
 
         container.innerHTML = threads.map(thread => {
             const latestEmail = thread.emails[thread.emails.length - 1];
@@ -224,10 +242,15 @@ class EmailManager {
 
     // Render emails within a conversation thread
     renderConversationEmails(emails) {
-        const container = document.getElementById('emails-list');
+        const container = document.getElementById('email-list');
+        const emailCount = document.getElementById('email-count');
         if (!container) return;
 
         console.log('[EmailManager] Rendering conversation emails:', emails.length);
+
+        if (emailCount) {
+            emailCount.textContent = `${emails.length} email${emails.length !== 1 ? 's' : ''}`;
+        }
 
         // Stack messages (oldest → newest), with a compact header and content preview
         container.innerHTML = emails.map(email => {
@@ -768,22 +791,26 @@ class EmailManager {
                     } else {
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
                         
-                        // Preserve signature when inserting AI content (production fallback)
+                        // Preserve signature when inserting AI content (production fallback) using DOM parser
                         const currentContent = editor.innerHTML;
-                        const hasSignature = currentContent.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
-                        let signature = '';
+                        const signature = this.extractSignature(currentContent);
                         
-                        if (hasSignature) {
-                            // Extract signature from current content
-                            const signatureMatch = currentContent.match(/<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/);
-                            if (signatureMatch) {
-                                signature = signatureMatch[0];
+                        // Remove any existing signature from AI content using DOM parser
+                        let cleanHtml2 = html2;
+                        const aiSig2 = this.extractSignature(html2);
+                        if (aiSig2) {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html2, 'text/html');
+                            const sigDiv = doc.querySelector('[data-signature="true"]') || 
+                                          Array.from(doc.querySelectorAll('div')).find(div => 
+                                            div.style.marginTop === '20px' && 
+                                            div.style.paddingTop === '20px'
+                                          );
+                            if (sigDiv) {
+                                sigDiv.remove();
+                                cleanHtml2 = doc.body.innerHTML;
                             }
                         }
-                        
-                        // Insert AI content and preserve signature at the very end
-                        // Remove any existing signature from AI content first
-                        const cleanHtml2 = html2.replace(/<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/g, '');
                         
                         // Place signature after the AI content's closing
                         let finalContent2 = cleanHtml2;
@@ -868,22 +895,26 @@ class EmailManager {
                 // Replace variables with actual values before inserting
                 html = this.replaceVariablesInHtml(html, enrichedRecipient);
                 
-                // Preserve signature when inserting AI content
+                // Preserve signature when inserting AI content using DOM parser
                 const currentContent = editor.innerHTML;
-                const hasSignature = currentContent.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
-                let signature = '';
+                const signature = this.extractSignature(currentContent);
                 
-                if (hasSignature) {
-                    // Extract signature from current content
-                    const signatureMatch = currentContent.match(/<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/);
-                    if (signatureMatch) {
-                        signature = signatureMatch[0];
+                // Remove any existing signature from AI content using DOM parser
+                let cleanHtml = html;
+                const aiSig = this.extractSignature(html);
+                if (aiSig) {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const sigDiv = doc.querySelector('[data-signature="true"]') || 
+                                  Array.from(doc.querySelectorAll('div')).find(div => 
+                                    div.style.marginTop === '20px' && 
+                                    div.style.paddingTop === '20px'
+                                  );
+                    if (sigDiv) {
+                        sigDiv.remove();
+                        cleanHtml = doc.body.innerHTML;
                     }
                 }
-                
-                // Insert AI content and preserve signature at the very end
-                // Remove any existing signature from AI content first
-                const cleanHtml = html.replace(/<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/g, '');
                 
                 // Place signature after the AI content's closing
                 let finalContent = cleanHtml;
@@ -1034,6 +1065,15 @@ class EmailManager {
         // Build HTML paragraphs from body
         let paras = body.split(/\n\n/).map(p => p.trim()).filter(Boolean);
 
+        // Remove duplicate name at start of first content paragraph (fixes "Hi Patrick, Patrick, I hope..." bug)
+        if (paras.length > 0 && firstName) {
+            const firstPara = paras[0];
+            const namePattern = new RegExp(`^${firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')},?\\s+`, 'i');
+            if (namePattern.test(firstPara)) {
+                paras[0] = firstPara.replace(namePattern, '');
+            }
+        }
+
         // Force-insert a standardized Energy line and (optional) pain point right after the greeting
         try {
             const e = recipient?.energy || {};
@@ -1105,13 +1145,22 @@ class EmailManager {
             const allSentences = splitSentences(body);
             console.debug('[AI][format] sentences (pre-CTA-scan):', allSentences);
 
+            // Strengthened CTA detection - must be actionable question with time or action words
+            const isRealCTA = (text) => {
+                const hasQuestion = text.trim().endsWith('?');
+                const hasActionWords = /\b(would you|can you|could you|are you|does|available|work for you|schedule|call|meet|discuss|interested|open to)\b/i.test(text);
+                const hasTimeReference = /\b(today|tomorrow|this week|next week|tue|wed|thu|fri|monday|tuesday|wednesday|thursday|friday|\d{1,2}\s*(am|pm)|eod|end of day)\b/i.test(text);
+                
+                // Real CTA must have question mark AND (action words OR time reference)
+                return hasQuestion && (hasActionWords || hasTimeReference);
+            };
+            
             // Detect CTA from original body (prefer scheduling/time or explicit CTA keywords; exclude explanation-like questions)
             let detectedCTA = null;
             for (const s of allSentences) {
-                const looksQuestion = /\?$/.test(s);
-                const looksCTA = ctaMatchers.test(s) || timeSignals.test(s);
-                if ((looksCTA || (looksQuestion && (ctaMatchers.test(s) || timeSignals.test(s)))) && !isColleagueLine(s) && !isExplanationSentence(s)) {
-                    detectedCTA = s; break;
+                if (isRealCTA(s) && !isColleagueLine(s) && !isExplanationSentence(s)) {
+                    detectedCTA = s; 
+                    break;
                 }
             }
 
@@ -1138,6 +1187,16 @@ class EmailManager {
             }
             paras = trimmedParas.length ? trimmedParas : paras.slice(0, 2);
             console.debug('[AI][format] paras after trim/no-dup-CTA:', paras);
+
+            // Move "following up" or call reference to beginning (fixes out-of-order content)
+            const followUpIdx = paras.findIndex(p => 
+                /following up|as we discussed|per our (call|conversation)|it was (great|a pleasure) speaking/i.test(p)
+            );
+            if (followUpIdx > 0) {
+                const followUpPara = paras.splice(followUpIdx, 1)[0];
+                paras.unshift(followUpPara);
+                console.debug('[AI][format] Reordered "following up" paragraph to beginning');
+            }
 
             // For Energy Health Check, ensure ordering: explanation first, coverage second
             try {
@@ -1313,9 +1372,25 @@ class EmailManager {
             .join('');
 
         if (mode === 'html') {
+            // Check if this is a rich HTML email with structured content
+            const richHtml = this.buildRichHtmlEmail(contentHtml, subject, recipient, body);
+            if (richHtml) {
+                return { subject, html: richHtml };
+            }
+            
             // Build a fully branded HTML email with inline styles and logo
             const logoUrl = 'https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png';
             const safeSubject = this.escapeHtml(subject || 'Power Choosers — Energy Options');
+            
+            // Get signature for HTML emails
+            const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+            const signatureHtml = signature ? `
+              <tr>
+                <td style="padding:16px 24px; border-top:1px solid rgba(255,255,255,0.2); text-align:left;">
+                  ${signature}
+                </td>
+              </tr>` : '';
+            
             const htmlDoc = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1325,7 +1400,7 @@ class EmailManager {
   <meta http-equiv="x-ua-compatible" content="ie=edge" />
 </head>
 <body style="margin:0; padding:0; background-color:#f8fafc; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
-  <center role="presentation" style="width:100%; background-color:#f8fafc;">
+  <center role="presentation" style="width:100%; background-color:#f8fafc; padding:20px 0;">
     <div style="max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.08); overflow:hidden;">
       <!-- Header -->
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); text-align:center;">
@@ -1338,26 +1413,25 @@ class EmailManager {
       </table>
 
       <!-- Body Container -->
-      <div style="padding:20px; background-color:#f8fafc;">
-        <div style="background-color:#ffffff; border-radius:10px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.08); border-left:4px solid #1e3a8a;">
-          <!-- Subject Ribbon -->
-          <div style="background-color:#eff6ff; padding:12px 14px; border-radius:6px; margin-bottom:18px; border-left:3px solid #1e3a8a;">
-            <strong style="color:#1e3a8a; font-size:15px;">Subject:</strong>
-            <span style="color:#1f2937; font-size:15px;"> ${safeSubject}</span>
-          </div>
-          <!-- Message Content -->
-          <div style="color:#374151; font-size:15px; line-height:1.7;">${contentHtml}</div>
+      <div style="background-color:#ffffff; padding:32px 24px;">
+        <!-- Subject Ribbon -->
+        <div style="background-color:#eff6ff; padding:12px 14px; border-radius:6px; margin-bottom:24px; border-left:3px solid #1e3a8a;">
+          <strong style="color:#1e3a8a; font-size:15px;">Subject:</strong>
+          <span style="color:#1f2937; font-size:15px;"> ${safeSubject}</span>
         </div>
-
-        <!-- Footer -->
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:20px; background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff; text-align:center; border-radius:0 0 12px 12px;">
-          <tr>
-            <td style="padding:16px 24px;">
-              <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
-            </td>
-          </tr>
-        </table>
+        <!-- Message Content -->
+        <div style="color:#374151; font-size:15px; line-height:1.7; text-align:left;">${contentHtml}</div>
       </div>
+
+      <!-- Footer -->
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff; text-align:center;">
+        <tr>
+          <td style="padding:20px 24px;">
+            <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
+          </td>
+        </tr>
+        ${signatureHtml}
+      </table>
     </div>
   </center>
   <!-- Preheader spacing for mobile clients -->
@@ -1373,6 +1447,250 @@ class EmailManager {
             subject = this.improveSubject(subject, recipient) || subject;
         } catch(_) { /* noop */ }
         return { subject, html: contentHtml };
+    }
+
+    // Build rich HTML email with cards, buttons, icons, and structured layout
+    buildRichHtmlEmail(contentHtml, subject, recipient, bodyText) {
+        try {
+            // Detect email type from subject and body
+            const combined = (subject + ' ' + bodyText).toLowerCase();
+            const isEnergyHealthCheck = /energy.*health.*check/i.test(combined);
+            const isInvoiceRequest = /invoice.*request|send.*invoice/i.test(combined);
+            const isColdEmail = /cold.*email|could.*not.*reach/i.test(combined);
+            const isProposal = /proposal/i.test(combined);
+            
+            // Extract sections from contentHtml
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(contentHtml, 'text/html');
+            const paragraphs = Array.from(doc.querySelectorAll('p'));
+            
+            if (paragraphs.length < 2) return null; // Not enough content for rich layout
+            
+            const logoUrl = 'https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png';
+            const safeSubject = this.escapeHtml(subject || 'Power Choosers — Energy Options');
+            
+            // Get signature for HTML emails
+            const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+            const signatureHtml = signature ? `
+              <tr>
+                <td style="padding:16px 24px; border-top:1px solid rgba(255,255,255,0.2); text-align:left;">
+                  ${signature}
+                </td>
+              </tr>` : '';
+            
+            // Determine hero icon
+            let heroIcon = '⚡';
+            let heroColor = '#f59e0b';
+            if (isEnergyHealthCheck) {
+                heroIcon = '📊';
+                heroColor = '#3b82f6';
+            } else if (isInvoiceRequest) {
+                heroIcon = '📋';
+                heroColor = '#10b981';
+            } else if (isColdEmail) {
+                heroIcon = '👋';
+                heroColor = '#8b5cf6';
+            } else if (isProposal) {
+                heroIcon = '📄';
+                heroColor = '#ec4899';
+            }
+            
+            // Build sections
+            let sections = '';
+            let greeting = '';
+            let contentSections = [];
+            let cta = '';
+            
+            for (let i = 0; i < paragraphs.length; i++) {
+                const text = paragraphs[i].textContent.trim();
+                const html = paragraphs[i].innerHTML;
+                
+                // Skip empty paragraphs
+                if (!text) continue;
+                
+                // Greeting (first paragraph starting with Hi/Hello)
+                if (i === 0 && /^(hi|hello|hey)/i.test(text)) {
+                    greeting = text;
+                    continue;
+                }
+                
+                // Closing (Best regards)
+                if (/best regards|regards|sincerely/i.test(text)) {
+                    break;
+                }
+                
+                // CTA (ends with ?)
+                if (text.endsWith('?') && (i === paragraphs.length - 1 || i === paragraphs.length - 2)) {
+                    cta = text;
+                    continue;
+                }
+                
+                // Regular content
+                contentSections.push(html);
+            }
+            
+            // Build greeting section
+            if (greeting) {
+                const firstName = greeting.match(/hi\s+([^,]+)/i)?.[1] || '';
+                sections += `
+                <div style="margin-bottom:24px;">
+                  <div style="display:inline-block; font-size:48px; margin-bottom:12px;">${heroIcon}</div>
+                  <h2 style="margin:0 0 8px 0; font-size:20px; font-weight:600; color:#1f2937;">${greeting}</h2>
+                </div>`;
+            }
+            
+            // Build content cards
+            if (contentSections.length > 0) {
+                // First section as intro
+                sections += `
+                <div style="margin-bottom:20px; color:#374151; font-size:15px; line-height:1.7;">
+                  ${contentSections[0]}
+                </div>`;
+                
+                // Additional sections as feature cards
+                if (contentSections.length > 1) {
+                    for (let i = 1; i < contentSections.length; i++) {
+                        const content = contentSections[i];
+                        
+                        // Check if content has bullet points or lists
+                        const hasList = content.includes('<ul') || content.includes('<li');
+                        
+                        if (hasList) {
+                            // Render as checklist card
+                            sections += `
+                            <div style="background:#f8fafc; border-left:3px solid ${heroColor}; padding:16px; margin:20px 0; border-radius:6px;">
+                              <div style="color:#374151; font-size:14px; line-height:1.6;">
+                                ${content}
+                              </div>
+                            </div>`;
+                        } else {
+                            // Regular content card
+                            sections += `
+                            <div style="background:#eff6ff; padding:16px; margin:20px 0; border-radius:8px; border-left:3px solid #1e3a8a;">
+                              <div style="color:#1f2937; font-size:15px; line-height:1.6;">
+                                ${content}
+                              </div>
+                            </div>`;
+                        }
+                    }
+                }
+            }
+            
+            // Add energy data card if available
+            const energy = recipient?.energy || {};
+            if (energy.supplier || energy.currentRate || energy.contractEnd) {
+                sections += `
+                <div style="background:linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding:20px; margin:24px 0; border-radius:8px; border:1px solid #bfdbfe;">
+                  <div style="font-size:14px; font-weight:600; color:#1e3a8a; margin-bottom:12px; display:flex; align-items:center;">
+                    <span style="font-size:20px; margin-right:8px;">📌</span>
+                    Your Energy Profile
+                  </div>
+                  <table style="width:100%; border-collapse:collapse;">
+                    ${energy.supplier ? `<tr><td style="padding:6px 0; color:#1f2937; font-size:14px;"><strong>Supplier:</strong></td><td style="padding:6px 0; color:#374151; text-align:right;">${energy.supplier}</td></tr>` : ''}
+                    ${energy.currentRate ? `<tr><td style="padding:6px 0; color:#1f2937; font-size:14px;"><strong>Current Rate:</strong></td><td style="padding:6px 0; color:#374151; text-align:right;">${energy.currentRate}/kWh</td></tr>` : ''}
+                    ${energy.contractEnd ? `<tr><td style="padding:6px 0; color:#1f2937; font-size:14px;"><strong>Contract Ends:</strong></td><td style="padding:6px 0; color:#374151; text-align:right;">${energy.contractEnd}</td></tr>` : ''}
+                  </table>
+                </div>`;
+            }
+            
+            // Build CTA button
+            let ctaHtml = '';
+            if (cta) {
+                ctaHtml = `
+                <div style="text-align:center; margin:32px 0 24px 0;">
+                  <div style="background:linear-gradient(135deg, ${heroColor} 0%, ${this.adjustColorBrightness(heroColor, -20)} 100%); color:#ffffff; padding:14px 28px; border-radius:8px; display:inline-block; font-weight:600; font-size:15px; box-shadow:0 4px 12px rgba(0,0,0,0.15); text-decoration:none;">
+                    ${this.escapeHtml(cta)}
+                  </div>
+                </div>`;
+            }
+            
+            // Build closing
+            const closingHtml = `
+            <div style="margin-top:32px; padding-top:20px; border-top:1px solid #e5e7eb; color:#6b7280; font-size:14px;">
+              <p style="margin:0;">Best regards,</p>
+              <p style="margin:4px 0 0 0; font-weight:500; color:#1f2937;">Power Choosers</p>
+            </div>`;
+            
+            // Assemble full HTML
+            const htmlDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${safeSubject}</title>
+  <meta http-equiv="x-ua-compatible" content="ie=edge" />
+</head>
+<body style="margin:0; padding:0; background-color:#f8fafc; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  <center role="presentation" style="width:100%; background-color:#f8fafc; padding:20px 0;">
+    <div style="max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.08); overflow:hidden;">
+      <!-- Header -->
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); text-align:center;">
+        <tr>
+          <td style="padding:28px 24px;">
+            <img src="${logoUrl}" alt="Power Choosers Logo" width="450" style="max-width:100%; height:auto; display:block; margin:0 auto 8px;" />
+            <div style="font-size:14px; font-weight:500; color:#ffffff; opacity:0.9;">Your Energy Partner</div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Body Container -->
+      <div style="background-color:#ffffff; padding:32px 24px;">
+        <!-- Subject Ribbon -->
+        <div style="background-color:#eff6ff; padding:12px 14px; border-radius:6px; margin-bottom:24px; border-left:3px solid #1e3a8a;">
+          <strong style="color:#1e3a8a; font-size:15px;">Subject:</strong>
+          <span style="color:#1f2937; font-size:15px;"> ${safeSubject}</span>
+        </div>
+        
+        <!-- Message Content -->
+        <div style="text-align:left;">
+          ${sections}
+          ${ctaHtml}
+          ${closingHtml}
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff; text-align:center;">
+        <tr>
+          <td style="padding:20px 24px;">
+            <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
+          </td>
+        </tr>
+        ${signatureHtml}
+      </table>
+    </div>
+  </center>
+  <div style="display:none; max-height:0; overflow:hidden;">&nbsp;</div>
+</body>
+</html>`;
+            
+            return htmlDoc;
+        } catch (e) {
+            console.warn('[RichHTML] Failed to build rich HTML email:', e);
+            return null; // Fall back to standard template
+        }
+    }
+    
+    // Helper to adjust color brightness
+    adjustColorBrightness(hex, percent) {
+        // Remove # if present
+        hex = hex.replace(/^#/, '');
+        
+        // Convert to RGB
+        let r = parseInt(hex.substring(0, 2), 16);
+        let g = parseInt(hex.substring(2, 4), 16);
+        let b = parseInt(hex.substring(4, 6), 16);
+        
+        // Adjust brightness
+        r = Math.max(0, Math.min(255, r + (r * percent / 100)));
+        g = Math.max(0, Math.min(255, g + (g * percent / 100)));
+        b = Math.max(0, Math.min(255, b + (b * percent / 100)));
+        
+        // Convert back to hex
+        return '#' + [r, g, b].map(x => {
+            const hex = Math.round(x).toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+        }).join('');
     }
 
     // Strengthen generic subjects with name/company and energy details; vary patterns slightly
@@ -1825,21 +2143,49 @@ class EmailManager {
         }
     }
 
+    // Extract signature from HTML using DOM parser (more reliable than regex)
+    extractSignature(html) {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            // Look for signature div by data attribute or style pattern
+            const sigDiv = doc.querySelector('[data-signature="true"]') || 
+                          Array.from(doc.querySelectorAll('div')).find(div => 
+                            div.style.marginTop === '20px' && 
+                            div.style.paddingTop === '20px' && 
+                            div.style.borderTop === '1px solid #e0e0e0'
+                          );
+            return sigDiv ? sigDiv.outerHTML : null;
+        } catch (e) {
+            console.warn('[Email] extractSignature failed:', e);
+            return null;
+        }
+    }
+
     // Ensure signature block is after the standardized closing lines
     moveSignatureToEnd(editor) {
         try {
             if (!editor) return;
-            const html = editor.innerHTML || '';
-            const sigRegex = /<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">[\s\S]*?<\/div>/;
-            const match = html.match(sigRegex);
-            if (!match) return; // no signature present
-
-            // Remove signature from current position
-            const withoutSig = html.replace(sigRegex, '');
-
-            // Ensure closing exists (sanitizeGeneratedEditor should have appended one)
-            // Append signature after everything
-            editor.innerHTML = withoutSig + match[0];
+            
+            // Extract signature using DOM parser
+            const signature = this.extractSignature(editor.innerHTML);
+            if (!signature) return; // no signature present
+            
+            // Remove signature from current position using DOM
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(editor.innerHTML, 'text/html');
+            const sigDiv = doc.querySelector('[data-signature="true"]') || 
+                          Array.from(doc.querySelectorAll('div')).find(div => 
+                            div.style.marginTop === '20px' && 
+                            div.style.paddingTop === '20px'
+                          );
+            if (sigDiv) {
+                sigDiv.remove();
+            }
+            
+            // Serialize back to HTML and append signature at the end
+            const bodyContent = doc.body.innerHTML;
+            editor.innerHTML = bodyContent + signature;
 
             // Remove extra empty paragraphs at the end
             Array.from(editor.querySelectorAll('p')).forEach(p => {
@@ -2273,6 +2619,8 @@ class EmailManager {
     updateUI() {
         // Always load emails - no need for auth prompt since we use tracking system
         this.loadEmails();
+        // Update folder counts after a brief delay to let data load
+        setTimeout(() => this.updateFolderCounts(), 1000);
     }
 
     saveAuthState() {
@@ -2541,6 +2889,11 @@ class EmailManager {
                 console.log('[EmailManager] Loading emails from SendGrid data...');
                 
                 if (this.currentFolder === 'threads') {
+                    // Clear previous emails to prevent showing stale data
+                    this.emails = [];
+                    const emailList = document.getElementById('email-list');
+                    if (emailList) emailList.innerHTML = '';
+                    
                     // Load conversation threads and render thread list
                     const threads = await window.emailTrackingManager.getConversationThreads();
                     console.log('[EmailManager] Retrieved threads:', threads.length);
@@ -2556,12 +2909,41 @@ class EmailManager {
                     // Filter by folder
                     let filteredEmails = allEmails;
                     if (this.currentFolder === 'inbox') {
+                        // Show only received emails
+                        filteredEmails = allEmails.filter(email => {
+                            if (email.emailType === 'sent' || email.isSentEmail || email.type === 'sent') {
+                                return false;
+                            }
+                            return true;
+                        });
+                    } else if (this.currentFolder === 'starred') {
+                        // Show only starred emails
+                        filteredEmails = allEmails.filter(email => email.starred === true);
+                    } else if (this.currentFolder === 'important') {
+                        // Show only important emails
+                        filteredEmails = allEmails.filter(email => email.important === true);
+                    } else if (this.currentFolder === 'drafts') {
+                        // Show only draft emails
+                        filteredEmails = allEmails.filter(email => email.status === 'draft');
+                    } else if (this.currentFolder === 'spam') {
+                        // Show only spam emails
                         filteredEmails = allEmails.filter(email => 
-                            email.emailType === 'received' || email.provider === 'sendgrid_inbound'
+                            (email.labels && email.labels.includes('SPAM')) || email.isSpam === true
+                        );
+                    } else if (this.currentFolder === 'trash') {
+                        // Show only trashed emails
+                        filteredEmails = allEmails.filter(email => 
+                            (email.labels && email.labels.includes('TRASH')) || email.isDeleted === true
+                        );
+                    } else if (this.currentFolder === 'scheduled') {
+                        // Show only scheduled emails
+                        filteredEmails = allEmails.filter(email => 
+                            (email.labels && email.labels.includes('SCHEDULED')) || email.scheduledAt
                         );
                     } else if (this.currentFolder === 'sent') {
+                        // This is handled separately in loadEmails, but add fallback
                         filteredEmails = allEmails.filter(email => 
-                            email.emailType === 'sent' || (email.from && email.from.includes('noreply@powerchoosers.com'))
+                            email.emailType === 'sent' || email.isSentEmail || email.type === 'sent'
                         );
                     }
                     
@@ -2573,8 +2955,20 @@ class EmailManager {
                 }
             } else {
                 console.warn('[EmailManager] Email tracking manager not available');
-                this.emails = [];
-                this.showEmptyState();
+                // Retry with exponential backoff up to ~2s
+                const start = Date.now();
+                const tryLater = async () => {
+                    if (window.emailTrackingManager || Date.now() - start > 2000) {
+                        if (window.emailTrackingManager) {
+                            return this.loadEmails();
+                        }
+                        this.emails = [];
+                        this.showEmptyState();
+                        return;
+                    }
+                    setTimeout(tryLater, 160);
+                };
+                await tryLater();
             }
         } catch (error) {
             console.error('Error loading emails:', error);
@@ -2626,10 +3020,12 @@ class EmailManager {
     }
 
     parseSentEmailData(emailData) {
-        // Fix date formatting issue - pass the actual Date object instead of string
+        // Fix date formatting issue - handle both sent and received emails
         let dateObj = null;
         try {
-            dateObj = new Date(emailData.sentAt);
+            // Try multiple date fields (sentAt for sent, receivedAt for received, createdAt as fallback)
+            const dateSource = emailData.sentAt || emailData.receivedAt || emailData.createdAt || emailData.timestamp;
+            dateObj = new Date(dateSource);
             if (isNaN(dateObj.getTime())) {
                 dateObj = new Date(); // Fallback to current time
             }
@@ -2637,6 +3033,18 @@ class EmailManager {
             console.warn('[EmailManager] Date parsing error:', error);
             dateObj = new Date(); // Fallback to current time
         }
+
+        // Determine if this is a sent or received email
+        const inferredIsSent = (
+            emailData.emailType === 'sent' ||
+            emailData.type === 'sent' ||
+            emailData.isSentEmail === true ||
+            (typeof emailData.from === 'string' && emailData.from.includes('noreply@powerchoosers.com')) ||
+            emailData.provider === 'sendgrid_outbound'
+        );
+
+        const computedEmailType = inferredIsSent ? 'sent' : (emailData.emailType || 'received');
+        const computedStatus = inferredIsSent ? 'sent' : (emailData.status || 'received');
 
         return {
             id: emailData.id,
@@ -2656,13 +3064,13 @@ class EmailManager {
             replyCount: emailData.replyCount || 0,
             lastOpened: emailData.lastOpened,
             lastReplied: emailData.lastReplied,
-            status: emailData.status || 'sent',
-            // Mark as sent email for UI rendering
-            isSentEmail: true,
+            status: computedStatus,
+            // Sent vs received computed for UI rendering
+            isSentEmail: inferredIsSent,
             // Provider and type information
             provider: emailData.provider,
             type: emailData.type,
-            emailType: emailData.emailType,
+            emailType: computedEmailType,
             // Gmail API specific data
             sentVia: emailData.sentVia || 'simulation',
             gmailMessageId: emailData.gmailMessageId
@@ -2989,23 +3397,36 @@ class EmailManager {
         document.getElementById('mark-read-btn')?.toggleAttribute('disabled', !hasSelection);
     }
 
-    updateFolderCounts() {
-        // This would typically come from the API, but for now we'll use placeholder logic
-        const counts = {
-            inbox: this.emails.filter(e => e.labels && e.labels.includes('INBOX')).length,
-            starred: this.emails.filter(e => e.starred).length,
-            important: this.emails.filter(e => e.important).length,
-            sent: this.emails.filter(e => e.isSentEmail).length, // Count sent emails
-            drafts: 0, // Would need separate API call
-            scheduled: 0,
-            spam: 0,
-            trash: 0
-        };
+    async updateFolderCounts() {
+        try {
+            if (!window.emailTrackingManager) return;
+            
+            // Load ALL emails to get accurate counts
+            const allEmails = await window.emailTrackingManager.getAllEmails();
+            
+            const counts = {
+                inbox: allEmails.filter(e => {
+                    if (e.emailType === 'sent' || e.isSentEmail || e.type === 'sent') return false;
+                    return true;
+                }).length,
+                starred: allEmails.filter(e => e.starred === true).length,
+                important: allEmails.filter(e => e.important === true).length,
+                sent: allEmails.filter(e => e.emailType === 'sent' || e.isSentEmail || e.type === 'sent').length,
+                drafts: allEmails.filter(e => e.status === 'draft').length,
+                scheduled: allEmails.filter(e => (e.labels && e.labels.includes('SCHEDULED')) || e.scheduledAt).length,
+                spam: allEmails.filter(e => (e.labels && e.labels.includes('SPAM')) || e.isSpam === true).length,
+                trash: allEmails.filter(e => (e.labels && e.labels.includes('TRASH')) || e.isDeleted === true).length
+            };
 
-        Object.entries(counts).forEach(([folder, count]) => {
-            const countElement = document.getElementById(`${folder}-count`);
-            if (countElement) countElement.textContent = count;
-        });
+            Object.entries(counts).forEach(([folder, count]) => {
+                const countElement = document.getElementById(`${folder}-count`);
+                if (countElement) countElement.textContent = count;
+            });
+            
+            console.log('[EmailManager] Folder counts updated:', counts);
+        } catch (error) {
+            console.error('[EmailManager] Error updating folder counts:', error);
+        }
     }
 
     async toggleStar(emailId) {
@@ -5061,9 +5482,9 @@ class EmailManager {
         const contentContainer = modal.querySelector(`#email-content-${email.id}`);
         if (!contentContainer) return;
 
-        // Get the best available content
-        const htmlContent = email.html || email.bodyHtml || email.content;
-        const textContent = email.text || email.bodyText || email.snippet;
+        // Get the best available content (handle arrays)
+        const htmlContent = Array.isArray(email.html) ? email.html[0] : (email.html || email.bodyHtml || email.content);
+        const textContent = Array.isArray(email.text) ? email.text[0] : (email.text || email.bodyText || email.snippet);
 
         // If we have HTML content, render it properly using innerHTML
         if (htmlContent && htmlContent.trim()) {

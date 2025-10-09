@@ -528,7 +528,8 @@ class SettingsPage {
                 reader.readAsDataURL(file);
             });
 
-            const response = await fetch(`${window.API_BASE_URL}/api/upload/signature-image`, {
+            const apiBase = (typeof window.API_BASE_URL === 'string' && /^https?:/i.test(window.API_BASE_URL)) ? window.API_BASE_URL : '';
+            const response = await fetch(`${apiBase}/api/upload/signature-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ image: base64, type: 'signature' })
@@ -564,7 +565,8 @@ class SettingsPage {
             formData.append('image', file);
             formData.append('type', 'signature');
 
-            const response = await fetch(`${window.API_BASE_URL}/api/upload/signature-image`, {
+            const apiBase = (typeof window.API_BASE_URL === 'string' && /^https?:/i.test(window.API_BASE_URL)) ? window.API_BASE_URL : '';
+            const response = await fetch(`${apiBase}/api/upload/signature-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ image: await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result.split(',')[1]); r.onerror = reject; r.readAsDataURL(file); }), type: 'signature' })
@@ -578,10 +580,8 @@ class SettingsPage {
             return result.imageUrl;
 
         } catch (error) {
-            console.error('[Signature] Upload failed:', error);
-            
-            // Fallback: Use a free image hosting service
-            return await this.uploadToImgur(file);
+            console.error('[Signature] Upload failed (server endpoint):', error);
+            throw error;
         }
     }
 

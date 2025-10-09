@@ -333,6 +333,86 @@
     document.head.appendChild(style);
   }
 
+  // Parent Company Autocomplete Styles
+  function injectParentCompanyAutocompleteStyles() {
+    if (document.getElementById('parent-company-autocomplete-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'parent-company-autocomplete-styles';
+    style.textContent = `
+      .parent-company-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin-top: 4px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--elevation-card);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+      }
+      
+      .parent-company-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        border-bottom: 1px solid var(--border-light);
+      }
+      
+      .parent-company-dropdown-item:last-child {
+        border-bottom: none;
+      }
+      
+      .parent-company-dropdown-item:hover {
+        background: var(--bg-hover);
+      }
+      
+      .parent-company-dropdown-favicon {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .parent-company-dropdown-favicon img {
+        max-width: 32px;
+        max-height: 32px;
+        object-fit: contain;
+      }
+      
+      .parent-company-dropdown-info {
+        flex: 1;
+        min-width: 0;
+      }
+      
+      .parent-company-dropdown-name {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+      }
+      
+      .parent-company-dropdown-details {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      
+      .parent-company-dropdown-empty {
+        padding: 12px;
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function injectAccountTaskPopoverStyles() {
     if (document.getElementById('account-task-popover-styles')) return;
     const style = document.createElement('style');
@@ -849,6 +929,25 @@
             ${renderAccountContacts(a)}
           </div>
         </div>
+
+        ${(() => {
+          // Check for parent company
+          if (a.parentCompanyId) {
+            const parentAccount = getParentCompany(a.parentCompanyId);
+            if (parentAccount) {
+              return renderParentCompanySection(parentAccount);
+            }
+          }
+          
+          // Check for subsidiaries
+          const subsidiaries = getSubsidiaries(a.id);
+          if (subsidiaries && subsidiaries.length > 0) {
+            return renderSubsidiariesSection(subsidiaries);
+          }
+          
+          // No parent or subsidiaries
+          return '';
+        })()}
 
         <div class="contact-activity-section">
           <div class="activity-header">
@@ -2070,6 +2169,144 @@
     }
   }
 
+  // Parent Company Autocomplete Functions
+  let autocompleteDebounceTimer = null;
+
+  function setupParentCompanyAutocomplete(inputElement, dropdownElement, hiddenIdElement) {
+    if (!inputElement || !dropdownElement || !hiddenIdElement) return;
+
+    // Inject styles
+    injectParentCompanyAutocompleteStyles();
+
+    // Handle input with debounce
+    inputElement.addEventListener('input', (e) => {
+      const searchTerm = e.target.value.trim();
+      
+      // Clear debounce timer
+      if (autocompleteDebounceTimer) {
+        clearTimeout(autocompleteDebounceTimer);
+      }
+
+      // If empty, hide dropdown and clear hidden ID
+      if (!searchTerm) {
+        dropdownElement.style.display = 'none';
+        hiddenIdElement.value = '';
+        return;
+      }
+
+      // Debounce search
+      autocompleteDebounceTimer = setTimeout(() => {
+        performParentCompanySearch(searchTerm, inputElement, dropdownElement, hiddenIdElement);
+      }, 300);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!inputElement.contains(e.target) && !dropdownElement.contains(e.target)) {
+        dropdownElement.style.display = 'none';
+      }
+    });
+  }
+
+  function performParentCompanySearch(searchTerm, inputElement, dropdownElement, hiddenIdElement) {
+    const accounts = window.getAccountsData ? window.getAccountsData() : [];
+    const currentAccountId = state.currentAccount?.id || '';
+    
+    // Filter accounts (exclude current account to prevent circular relationships)
+    const lowerSearch = searchTerm.toLowerCase();
+    const results = accounts.filter(account => {
+      if (account.id === currentAccountId) return false;
+      const name = (account.accountName || account.name || account.companyName || '').toLowerCase();
+      const city = (account.city || account.locationCity || '').toLowerCase();
+      const stateVal = (account.state || account.locationState || '').toLowerCase();
+      const industry = (account.industry || '').toLowerCase();
+      
+      return name.includes(lowerSearch) || 
+             city.includes(lowerSearch) || 
+             stateVal.includes(lowerSearch) ||
+             industry.includes(lowerSearch);
+    }).slice(0, 10); // Limit to 10 results
+
+    renderParentCompanyDropdown(results, inputElement, dropdownElement, hiddenIdElement);
+  }
+
+  function renderParentCompanyDropdown(results, inputElement, dropdownElement, hiddenIdElement) {
+    if (!results || results.length === 0) {
+      dropdownElement.innerHTML = '<div class="parent-company-dropdown-empty">No companies found</div>';
+      dropdownElement.style.display = 'block';
+      return;
+    }
+
+    const html = results.map(account => {
+      const accountName = account.accountName || account.name || account.companyName || '';
+      const city = account.city || account.locationCity || '';
+      const stateVal = account.state || account.locationState || '';
+      const industry = account.industry || '';
+      
+      // Build location/industry string
+      const locationParts = [];
+      if (city && stateVal) locationParts.push(`${city}, ${stateVal}`);
+      else if (city) locationParts.push(city);
+      else if (stateVal) locationParts.push(stateVal);
+      
+      if (industry) locationParts.push(industry);
+      const details = locationParts.join(' • ');
+
+      // Get company icon/favicon
+      const deriveDomain = (input) => {
+        try {
+          if (!input) return '';
+          let s = String(input).trim();
+          if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+          if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+          return '';
+        } catch(_) { return ''; }
+      };
+      const domain = account.domain ? String(account.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(account.website || '');
+      const logoUrl = account.logoUrl || '';
+      
+      let iconHTML = '';
+      try {
+        if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+          iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+        }
+      } catch(_) {}
+      
+      if (!iconHTML) {
+        const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
+        iconHTML = `<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">${fallbackLetter}</div>`;
+      }
+
+      return `
+        <div class="parent-company-dropdown-item" data-account-id="${escapeHtml(account.id)}" data-account-name="${escapeHtml(accountName)}">
+          <div class="parent-company-dropdown-favicon">${iconHTML}</div>
+          <div class="parent-company-dropdown-info">
+            <div class="parent-company-dropdown-name">${escapeHtml(accountName)}</div>
+            ${details ? `<div class="parent-company-dropdown-details">${escapeHtml(details)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    dropdownElement.innerHTML = html;
+    dropdownElement.style.display = 'block';
+
+    // Add click handlers to dropdown items
+    dropdownElement.querySelectorAll('.parent-company-dropdown-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const accountId = item.getAttribute('data-account-id');
+        const accountName = item.getAttribute('data-account-name');
+        selectParentCompany(accountId, accountName, inputElement, dropdownElement, hiddenIdElement);
+      });
+    });
+  }
+
+  function selectParentCompany(accountId, accountName, inputElement, dropdownElement, hiddenIdElement) {
+    inputElement.value = accountName;
+    hiddenIdElement.value = accountId;
+    dropdownElement.style.display = 'none';
+  }
+
   // Edit Account modal (reuse Add Account modal styles)
   function openEditAccountModal() {
     const a = state.currentAccount || {};
@@ -2104,6 +2341,13 @@
             <div class="form-row">
               <label>Occupancy %<input type="number" name="occupancyPct" class="input-dark" min="0" max="100" value="${escapeHtml(String(a.occupancyPct ?? a.occupancy ?? a.occupancy_percentage ?? ''))}" /></label>
               <label>Employees<input type="number" name="employees" class="input-dark" value="${escapeHtml(String(a.employees ?? a.employeeCount ?? ''))}" /></label>
+            </div>
+            <div class="form-row">
+              <label style="position: relative;">Parent Company
+                <input type="text" name="parentCompanyName" class="input-dark" id="parent-company-search-edit" placeholder="Search for parent company..." autocomplete="off" value="${escapeHtml(a.parentCompanyName || '')}" />
+                <input type="hidden" name="parentCompanyId" id="parent-company-id-edit" value="${escapeHtml(a.parentCompanyId || '')}" />
+                <div id="parent-company-dropdown-edit" class="parent-company-dropdown" style="display: none;"></div>
+              </label>
             </div>
             <div class="form-row">
               <label>Short Description<textarea name="shortDescription" class="input-dark" rows="3">${escapeHtml(a.shortDescription || a.short_desc || a.descriptionShort || '')}</textarea></label>
@@ -2154,6 +2398,16 @@
     dialog.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keydown', handleKeyDown);
 
+    // Setup parent company autocomplete
+    setTimeout(() => {
+      const searchInput = overlay.querySelector('#parent-company-search-edit');
+      const dropdown = overlay.querySelector('#parent-company-dropdown-edit');
+      const hiddenId = overlay.querySelector('#parent-company-id-edit');
+      if (searchInput && dropdown && hiddenId) {
+        setupParentCompanyAutocomplete(searchInput, dropdown, hiddenId);
+      }
+    }, 0);
+
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
@@ -2168,6 +2422,8 @@
         squareFootage: Number((fd.get('squareFootage') || '').toString().trim() || 0) || 0,
         occupancyPct: Number((fd.get('occupancyPct') || '').toString().trim() || 0) || 0,
         employees: Number((fd.get('employees') || '').toString().trim() || 0) || 0,
+        parentCompanyId: (fd.get('parentCompanyId') || '').toString().trim(),
+        parentCompanyName: (fd.get('parentCompanyName') || '').toString().trim(),
         shortDescription: (fd.get('shortDescription') || '').toString().trim(),
         electricitySupplier: (fd.get('electricitySupplier') || '').toString().trim(),
         annualUsage: Number((fd.get('annualUsage') || '').toString().trim() || 0) || 0,
@@ -2362,6 +2618,48 @@
             window._accountNavigationSource = null;
             window.__taskDetailRestoreData = null;
           } catch (_) { /* noop */ }
+          return;
+        }
+
+        // Check if we came from another Account Detail page (parent/subsidiary navigation)
+        if (window._accountNavigationSource === 'account-details') {
+          try {
+            const restore = window._accountDetailsReturnData || {};
+            const returnAccountId = restore.accountId;
+            
+            if (returnAccountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+              // Clear navigation markers first to prevent loops
+              window._accountNavigationSource = null;
+              window._accountDetailsReturnData = null;
+              
+              // Navigate back to the previous account detail page
+              window.AccountDetail.show(returnAccountId);
+              
+              // Restore scroll position after the account detail renders
+              setTimeout(() => {
+                try {
+                  const scrollY = parseInt(restore.scroll || 0, 10);
+                  if (scrollY > 0) {
+                    window.scrollTo(0, scrollY);
+                  }
+                } catch(_) {}
+              }, 100);
+            } else {
+              // Fallback: if no valid return account ID, go to accounts list
+              window._accountNavigationSource = null;
+              window._accountDetailsReturnData = null;
+              if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                window.crm.navigateToPage('accounts');
+              }
+            }
+          } catch (_) {
+            // Error fallback: go to accounts list
+            window._accountNavigationSource = null;
+            window._accountDetailsReturnData = null;
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('accounts');
+            }
+          }
           return;
         }
 
@@ -2692,6 +2990,12 @@
     
     // Bind contacts pagination
     bindContactsPagination();
+    
+    // Bind parent company / subsidiaries navigation
+    bindParentSubsidiariesNavigation();
+    
+    // Bind subsidiaries pagination
+    bindSubsidiariesPagination();
   }
 
   function bindContactItemEvents() {
@@ -4815,10 +5119,239 @@
     }
   }
 
+  // Parent Company / Subsidiaries Functions
+  let subsidiariesPage = 1;
+  const subsidiariesPageSize = 4;
+
+  function getSubsidiaries(accountId) {
+    if (!accountId) return [];
+    const accounts = window.getAccountsData ? window.getAccountsData() : [];
+    return accounts.filter(account => account.parentCompanyId === accountId);
+  }
+
+  function getParentCompany(parentCompanyId) {
+    if (!parentCompanyId) return null;
+    const accounts = window.getAccountsData ? window.getAccountsData() : [];
+    return accounts.find(account => account.id === parentCompanyId) || null;
+  }
+
+  function renderParentCompanySection(parentAccount) {
+    if (!parentAccount) return '';
+
+    const accountName = parentAccount.accountName || parentAccount.name || parentAccount.companyName || '';
+    const city = parentAccount.city || parentAccount.locationCity || '';
+    const stateVal = parentAccount.state || parentAccount.locationState || '';
+    
+    const location = city && stateVal ? `${city}, ${stateVal}` : (city || stateVal || '');
+
+    // Get company icon/favicon
+    const deriveDomain = (input) => {
+      try {
+        if (!input) return '';
+        let s = String(input).trim();
+        if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+        if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+        return '';
+      } catch(_) { return ''; }
+    };
+    const domain = parentAccount.domain ? String(parentAccount.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(parentAccount.website || '');
+    const logoUrl = parentAccount.logoUrl || '';
+    
+    let iconHTML = '';
+    try {
+      if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+        iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+      }
+    } catch(_) {}
+    
+    if (!iconHTML) {
+      const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
+      iconHTML = `<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">${fallbackLetter}</div>`;
+    }
+
+    return `
+      <div class="contact-info-section">
+        <h3 class="section-title">Parent Company</h3>
+        <div class="contact-item parent-company-item" data-account-id="${escapeHtml(parentAccount.id)}" style="cursor: pointer;">
+          <div class="contact-avatar">
+            ${iconHTML}
+          </div>
+          <div class="contact-info">
+            <div class="contact-name company-link" data-account-id="${escapeHtml(parentAccount.id)}">${escapeHtml(accountName)}</div>
+            ${location ? `<div class="contact-details">${escapeHtml(location)}</div>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderSubsidiariesSection(subsidiaries) {
+    if (!subsidiaries || subsidiaries.length === 0) return '';
+
+    const totalPages = Math.ceil(subsidiaries.length / subsidiariesPageSize);
+    const startIdx = (subsidiariesPage - 1) * subsidiariesPageSize;
+    const endIdx = startIdx + subsidiariesPageSize;
+    const pageSubsidiaries = subsidiaries.slice(startIdx, endIdx);
+
+    const subsidiariesHTML = pageSubsidiaries.map(subsidiary => {
+      const accountName = subsidiary.accountName || subsidiary.name || subsidiary.companyName || '';
+      const city = subsidiary.city || subsidiary.locationCity || '';
+      const stateVal = subsidiary.state || subsidiary.locationState || '';
+      
+      const location = city && stateVal ? `${city}, ${stateVal}` : (city || stateVal || '');
+
+      // Get company icon/favicon
+      const deriveDomain = (input) => {
+        try {
+          if (!input) return '';
+          let s = String(input).trim();
+          if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+          if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+          return '';
+        } catch(_) { return ''; }
+      };
+      const domain = subsidiary.domain ? String(subsidiary.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(subsidiary.website || '');
+      const logoUrl = subsidiary.logoUrl || '';
+      
+      let iconHTML = '';
+      try {
+        if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+          iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+        }
+      } catch(_) {}
+      
+      if (!iconHTML) {
+        const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
+        iconHTML = `<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">${fallbackLetter}</div>`;
+      }
+
+      return `
+        <div class="contact-item subsidiary-item" data-account-id="${escapeHtml(subsidiary.id)}" style="cursor: pointer;">
+          <div class="contact-avatar">
+            ${iconHTML}
+          </div>
+          <div class="contact-info">
+            <div class="contact-name company-link" data-account-id="${escapeHtml(subsidiary.id)}">${escapeHtml(accountName)}</div>
+            ${location ? `<div class="contact-details">${escapeHtml(location)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const paginationHTML = totalPages > 1 ? `
+      <div class="contacts-pager" id="subsidiaries-pager">
+        <button class="contacts-page-btn" id="subsidiaries-prev" ${subsidiariesPage === 1 ? 'disabled' : ''} aria-label="Previous page">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
+        </button>
+        <div class="contacts-page-info" id="subsidiaries-info">${subsidiariesPage}</div>
+        <button class="contacts-page-btn" id="subsidiaries-next" ${subsidiariesPage === totalPages ? 'disabled' : ''} aria-label="Next page">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"/></svg>
+        </button>
+      </div>
+    ` : '';
+
+    return `
+      <div class="contact-info-section">
+        <div class="section-header">
+          <h3 class="section-title">Subsidiaries</h3>
+          ${paginationHTML}
+        </div>
+        <div class="subsidiaries-list">
+          ${subsidiariesHTML}
+        </div>
+      </div>
+    `;
+  }
+
+  function updateSubsidiariesPagination(currentPage, totalPages) {
+    const pager = document.getElementById('subsidiaries-pager');
+    const prevBtn = document.getElementById('subsidiaries-prev');
+    const nextBtn = document.getElementById('subsidiaries-next');
+    const info = document.getElementById('subsidiaries-info');
+
+    if (!pager || !prevBtn || !nextBtn || !info) return;
+
+    info.textContent = currentPage;
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+    
+    if (totalPages <= 1) {
+      pager.style.display = 'none';
+    } else {
+      pager.style.display = 'flex';
+    }
+  }
+
+  function bindSubsidiariesPagination() {
+    const prevBtn = document.getElementById('subsidiaries-prev');
+    const nextBtn = document.getElementById('subsidiaries-next');
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (subsidiariesPage > 1) {
+          subsidiariesPage--;
+          renderAccountDetail();
+        }
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const subsidiaries = getSubsidiaries(state.currentAccount?.id);
+        const totalPages = Math.ceil(subsidiaries.length / subsidiariesPageSize);
+        if (subsidiariesPage < totalPages) {
+          subsidiariesPage++;
+          renderAccountDetail();
+        }
+      });
+    }
+  }
+
+  function bindParentSubsidiariesNavigation() {
+    // Handle parent company item clicks
+    const parentItems = document.querySelectorAll('.parent-company-item');
+    parentItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        const accountId = item.getAttribute('data-account-id');
+        if (accountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          // Set navigation source for back button
+          window._accountNavigationSource = 'account-details';
+          window._accountDetailsReturnData = {
+            accountId: state.currentAccount?.id,
+            scroll: window.scrollY || 0
+          };
+          
+          // Navigate to parent account
+          window.AccountDetail.show(accountId);
+        }
+      });
+    });
+
+    // Handle subsidiary item clicks
+    const subsidiaryItems = document.querySelectorAll('.subsidiary-item');
+    subsidiaryItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        const accountId = item.getAttribute('data-account-id');
+        if (accountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+          // Set navigation source for back button
+          window._accountNavigationSource = 'account-details';
+          window._accountDetailsReturnData = {
+            accountId: state.currentAccount?.id,
+            scroll: window.scrollY || 0
+          };
+          
+          // Navigate to subsidiary account
+          window.AccountDetail.show(accountId);
+        }
+      });
+    });
+  }
+
   // Export API
   window.AccountDetail = {
     show: showAccountDetail,
-    setupEnergyUpdateListener: setupEnergyUpdateListener
+    setupEnergyUpdateListener: setupEnergyUpdateListener,
+    setupParentCompanyAutocomplete: setupParentCompanyAutocomplete
   };
   // Backward-compat global alias used by some modules
   try { window.showAccountDetail = showAccountDetail; } catch (_) {}
