@@ -164,12 +164,12 @@ const invoiceSchema = {
       properties: {
         subject: { type: "string", description: "Email subject under 50 chars" },
         greeting: { type: "string", description: "Hello {firstName}," },
-        reminder_text: { type: "string", description: "Why we need invoice" },
-        checklist_items: { type: "array", items: { type: "string" }, description: "What we review" },
-        deadline: { type: "string", description: "When we need it" },
-        cta_text: { type: "string", description: "Call to action" }
+        intro_paragraph: { type: "string", description: "Context about why we're conducting energy analysis, reference notes/transcripts from conversation" },
+        checklist_items: { type: "array", items: { type: "string" }, description: "What we review from invoice" },
+        deadline: { type: "string", description: "When we need it (e.g., by EOD today)" },
+        cta_text: { type: "string", description: "Call to action asking for invoice" }
       },
-      required: ["subject", "greeting", "reminder_text", "checklist_items", "deadline", "cta_text"],
+      required: ["subject", "greeting", "intro_paragraph", "checklist_items", "deadline", "cta_text"],
       additionalProperties: false
     }
   }
@@ -308,10 +308,10 @@ Generate text for these fields:
 TEMPLATE: Invoice Request
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- reminder_text: Why we need the invoice (1-2 sentences)
-- checklist_items: Array of 3-4 items we review from invoice
+- intro_paragraph: Context from our conversation explaining we'll conduct an energy analysis to identify discrepancies and determine how ${company || 'the company'} is using energy and the best plan moving forward. Reference notes/transcripts if available. (2-3 sentences)
+- checklist_items: Array of 3-4 specific items we'll review from the invoice (e.g., invoice date/number, billing period, charge breakdown, payment details)
 - deadline: When we need it (e.g., "by EOD today")
-- cta_text: Simple request to send invoice`,
+- cta_text: Use exactly: "Will you be able to send over the invoice by end of day so me and my team can get started?"`,
 
       general: `
 TEMPLATE: General Purpose Email
@@ -332,18 +332,66 @@ KEY CONTEXT:
 - Companies with contracts ending 2025-2026 face higher renewal rates
 - Early renewals save 20-30% vs. waiting`;
 
+  // Check if this is an invoice request in standard mode
+  const isInvoiceStandard = /invoice.*request|send.*invoice/i.test(String(prompt || ''));
+  
+  if (isInvoiceStandard) {
+    const invoiceRules = `
+INVOICE REQUEST EMAIL STRUCTURE:
+
+Paragraph 1 (2-3 sentences):
+- Context from our conversation about conducting energy analysis
+- Explain we'll identify discrepancies and determine how ${company || 'the company'} is using energy
+- Reference notes/transcripts if available
+
+Paragraph 2 (Bullet list):
+What we'll review from your invoice:
+• Invoice date and unique invoice number
+• Billing period matching contract terms
+• Detailed breakdown of charges and rates
+• Payment instructions and banking details
+
+Paragraph 3 (CTA):
+"Will you be able to send over the invoice by end of day so me and my team can get started?"
+
+CRITICAL RULES:
+✓ Subject line: Under 50 chars, mention invoice request
+✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
+✓ Closing: "Best regards," on its own line
+✓ Length: 90-140 words total
+✓ DO NOT include citation markers like [1], [2], [3]
+✓ DO NOT repeat the contact's name after greeting`;
+
+    const invoiceOutputFormat = `
+OUTPUT FORMAT:
+Subject: [Invoice request subject with ${firstName || 'recipient name'}]
+
+Hi ${firstName || 'there'},
+
+[Paragraph 1: Context about energy analysis]
+
+[Paragraph 2: Bullet list of what we'll review]
+
+[Paragraph 3: CTA asking for invoice by EOD]
+
+Best regards,`;
+
+    return [identity, recipientContext, invoiceRules, invoiceOutputFormat].join('\n');
+  }
+
   const qualityRules = `
 QUALITY REQUIREMENTS:
 ✓ Length: 90-130 words total
-✓ Use "${firstName || 'there'}," in greeting
+✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
 ✓ Middle paragraph: 3-4 complete sentences
 ✓ MUST mention "15-25%" rate increase
 ✓ CTA: 2 specific time slots with question mark
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
 ✓ Closing: "Best regards," on its own line
+✓ DO NOT include citation markers like [1], [2], [3]
 
 CRITICAL RULES:
-❌ NO duplicate names
+❌ NO duplicate names after greeting
 ❌ NO vague CTAs
 ❌ NO incomplete sentences
 ✅ MUST stop after paragraph 3
@@ -353,7 +401,9 @@ CRITICAL RULES:
 OUTPUT FORMAT:
 Subject: [Your subject line]
 
-[3 paragraphs of plain text]`;
+[3 paragraphs of plain text]
+
+Best regards,`;
 
   return [identity, recipientContext, qualityRules, outputFormat].join('\n');
 }
