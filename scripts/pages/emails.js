@@ -1729,10 +1729,6 @@ class EmailManager {
         const logoUrl = 'https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png';
         const safeSubject = this.escapeHtml(subject || 'Energy Solutions');
         
-        // Get signature from settings
-        const signature = window.getEmailSignature ? window.getEmailSignature() : '';
-        const signatureHtml = signature ? `<div style="margin-top: 10px;">${signature}</div>` : '';
-        
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1756,7 +1752,7 @@ class EmailManager {
       </table>
 
       <!-- Sonar-Generated Content -->
-      <div style="padding:32px 24px;">
+      <div style="padding:32px 24px; color:#1f2937; font-size:15px; line-height:1.6;">
         ${sonarGeneratedHtml}
       </div>
 
@@ -1775,7 +1771,6 @@ class EmailManager {
               817-663-0380<br>
               Fort Worth, Texas
             </div>
-            ${signatureHtml}
           </td>
         </tr>
       </table>
