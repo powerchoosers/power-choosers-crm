@@ -78,6 +78,20 @@ function buildSystemPrompt({ mode, recipient, to, prompt }) {
     }
   });
 
+  // Define recipientContext BEFORE it's used in HTML mode check
+  const recipientContext = `
+RECIPIENT INFORMATION:
+- Name: ${firstName || 'there'} ${company ? `at ${company}` : ''}
+${job ? `- Role: ${job}` : ''}
+${industry ? `- Industry: ${industry}` : ''}
+${energy.supplier ? `- Current Supplier: ${energy.supplier}` : ''}
+${energy.currentRate ? `- Current Rate: ${energy.currentRate}/kWh` : ''}
+${contractEndLabel ? `- Contract Ends: ${contractEndLabel}` : ''}
+${transcript ? `- Call Notes: ${transcript}` : ''}
+${notes ? `- Additional Notes: ${notes}` : ''}
+
+${company ? `Use your web search to find additional context about ${company} (industry, size, location, recent news) to personalize the email.` : ''}`;
+
   // For HTML mode, use completely different prompt structure
   if (mode === 'html') {
     const exampleStructure = `
@@ -274,19 +288,6 @@ Paragraph 3: CTA with 2 specific time slots
 Format: "Does [Day Time] or [Day Time] work for a 15-minute call?"
 Example: "Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?"`;
   }
-
-  const recipientContext = `
-RECIPIENT INFORMATION:
-- Name: ${firstName || 'there'} ${company ? `at ${company}` : ''}
-${job ? `- Role: ${job}` : ''}
-${industry ? `- Industry: ${industry}` : ''}
-${energy.supplier ? `- Current Supplier: ${energy.supplier}` : ''}
-${energy.currentRate ? `- Current Rate: ${energy.currentRate}/kWh` : ''}
-${contractEndLabel ? `- Contract Ends: ${contractEndLabel}` : ''}
-${transcript ? `- Call Notes: ${transcript}` : ''}
-${notes ? `- Additional Notes: ${notes}` : ''}
-
-${company ? `Use your web search to find additional context about ${company} (industry, size, location, recent news) to personalize the email.` : ''}`;
 
   const qualityRules = `
 QUALITY REQUIREMENTS:
