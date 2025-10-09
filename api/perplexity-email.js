@@ -30,6 +30,46 @@ function cors(req, res) {
   return false;
 }
 
+// JSON Schema for HTML email structured output
+const emailHtmlSchema = {
+  type: "json_schema",
+  json_schema: {
+    name: "email_html_output",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        subject: {
+          type: "string",
+          description: "Email subject line (under 50 characters)"
+        },
+        hero_section: {
+          type: "string",
+          description: "Opening greeting and intro paragraph with inline CSS. Use color:#1f2937 for text on white backgrounds."
+        },
+        cost_comparison_html: {
+          type: "string",
+          description: "HTML table showing current vs. Power Choosers rates. Red box (#e74c3c background, white text) for current costs, green box (#27ae60 background, white text) for savings. Include annual cost calculations. Use table-based layout with inline CSS only."
+        },
+        benefits_section_html: {
+          type: "string",
+          description: "2-column table layout showing benefits. Each column in a light grey box (#f8f9fa background, dark text #1f2937). Use table cells for columns. Inline CSS only."
+        },
+        additional_info_html: {
+          type: "string",
+          description: "Additional savings information (5-20% efficiency gains). Use styled div or table. Dark text (#374151) on light background. Inline CSS only."
+        },
+        cta_html: {
+          type: "string",
+          description: "Call-to-action button or text. Orange background (#e67e22), white text, rounded corners, centered. Use table for button structure. Include contact email and phone."
+        }
+      },
+      required: ["subject", "hero_section", "cost_comparison_html", "benefits_section_html", "cta_html"],
+      additionalProperties: false
+    }
+  }
+};
+
 function buildSystemPrompt({ mode, recipient, to, prompt }) {
   // Extract recipient data
   const r = recipient || {};
@@ -92,104 +132,32 @@ ${notes ? `- Additional Notes: ${notes}` : ''}
 
 ${company ? `Use your web search to find additional context about ${company} (industry, size, location, recent news) to personalize the email.` : ''}`;
 
-  // For HTML mode, use completely different prompt structure
+  // For HTML mode, use JSON schema structured output
   if (mode === 'html') {
-    const exampleStructure = `
-<!-- Cost Comparison Table Example -->
-<table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ecf0f1; border-radius: 8px; margin: 20px 0;">
-  <tr><td style="padding: 25px;">
-    <h3 style="color: #2c3e50; text-align: center;">Your Energy Costs</h3>
-    
-    <table width="100%" cellpadding="15" style="background-color: #e74c3c; border-radius: 6px; margin-bottom: 15px;">
-      <tr><td>
-        <h4 style="color: #ffffff;">Current Rate: $0.082/kWh</h4>
-        <p style="color: #ffffff; font-size: 24px; font-weight: bold;">$418,200 annually</p>
-      </td></tr>
-    </table>
-    
-    <table width="100%" cellpadding="15" style="background-color: #27ae60; border-radius: 6px;">
-      <tr><td>
-        <h4 style="color: #ffffff;">Power Choosers Rate: $0.075/kWh</h4>
-        <p style="color: #ffffff; font-size: 24px; font-weight: bold;">$382,500 annually</p>
-        <p style="color: #ffffff;"><strong>Savings: $35,700/year</strong></p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
+    return `You are generating content for a professional HTML email from Power Choosers.
 
-<!-- 2-Column Benefits Example -->
-<table width="100%" cellpadding="0" cellspacing="0">
-  <tr>
-    <td width="50%" style="padding-right: 15px; vertical-align: top;">
-      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px;">
-        <h4>🔥 Competitive Rates</h4>
-        <p>Access to 100+ suppliers</p>
-      </div>
-    </td>
-    <td width="50%" style="padding-left: 15px; vertical-align: top;">
-      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px;">
-        <h4>⚡ Efficiency Audits</h4>
-        <p>LED upgrades, HVAC optimization</p>
-      </div>
-    </td>
-  </tr>
-</table>
-
-<!-- CTA Button Example -->
-<table cellpadding="0" cellspacing="0" style="margin: 20px 0;">
-  <tr>
-    <td style="background-color: #e67e22; border-radius: 25px; padding: 15px 35px;">
-      <a href="mailto:l.patterson@powerchoosers.com" style="color: #ffffff; text-decoration: none; font-size: 18px; font-weight: bold;">
-        Schedule Your Free Consultation
-      </a>
-    </td>
-  </tr>
-</table>`;
-
-    return `You are an expert at creating professional HTML email templates for Power Choosers.
-
-CRITICAL: Generate COMPLETE HTML EMAIL BODY with inline CSS (no external stylesheets).
-
-YOUR TASK:
-Generate a structured HTML email body that includes:
-
-1. HERO SECTION (optional based on context):
-   - Personalized greeting
-   - Brief intro paragraph
-
-2. MAIN CONTENT (choose appropriate structure):
-   - Cost comparison tables (if numbers available)
-   - 2-column benefit sections
-   - Feature cards with icons/emojis
-   - Bullet point lists
-   - Color-coded boxes for emphasis
-
-3. CALL TO ACTION:
-   - Orange button linking to email/phone
-   - Specific time slots or action request
-
-4. STYLING REQUIREMENTS:
-   - Use table-based layout (email-safe)
-   - Inline CSS only
-   - Background colors: Use green (#27ae60) for savings, red (#e74c3c) for costs, blue (#3498db) for benefits, grey (#ecf0f1) for neutral
-   - Font: Arial, sans-serif
-   - Responsive: max-width 600px
-   - Professional spacing and padding
+CRITICAL INSTRUCTIONS:
+- Generate structured JSON matching the schema
+- All HTML must use INLINE CSS only (no external styles)
+- Text on white/light backgrounds: use #1f2937 or #374151
+- Text on dark backgrounds: use #ffffff
+- Use table-based layouts for email compatibility
+- Red (#e74c3c) for current costs, Green (#27ae60) for savings
+- Include actual calculations based on recipient data
 
 RECIPIENT CONTEXT:
 ${recipientContext}
 
-OUTPUT:
-Generate ONLY the email body HTML (no <html>, <head>, or <body> tags).
-Start with the hero section and end with the CTA.
-Use real data from context when available.
+CONTENT REQUIREMENTS:
+1. hero_section: Greeting + brief intro (dark text on white)
+2. cost_comparison_html: Cost table with current rate vs. our rate, annual costs, savings
+3. benefits_section_html: 2-column benefits (expert negotiation, efficiency solutions)
+4. additional_info_html: Efficiency savings info (5-20% additional savings)
+5. cta_html: Contact button with email (l.patterson@powerchoosers.com) and phone (817-663-0380)
 
-Example structure to follow:
-${exampleStructure}
+Use web search to find context about ${company || 'the company'} for personalization.
 
-Subject: [Create compelling subject line under 50 chars]
-
-[Your HTML content here]`;
+OUTPUT: Return JSON matching the schema with properly styled HTML in each field.`;
   }
 
   // Build simplified system prompt - let Sonar do the research
@@ -367,7 +335,9 @@ If you mention a specific month/year, it MUST be ${currentYear} or later.
           role: 'user',
           content: prompt || 'Draft a professional outreach email'
         }
-      ]
+      ],
+      // Add JSON schema for HTML mode
+      ...(mode === 'html' ? { response_format: emailHtmlSchema } : {})
     };
 
     const response = await fetch(url, {
@@ -388,9 +358,38 @@ If you mention a specific month/year, it MUST be ${currentYear} or later.
     }
 
     // Extract content and citations
-    const content = data?.choices?.[0]?.message?.content || '';
+    let content = data?.choices?.[0]?.message?.content || '';
     const citations = data?.citations || [];
     const searchResults = data?.search_results || [];
+    
+    // Parse JSON response for HTML mode
+    if (mode === 'html' && content) {
+      try {
+        const jsonResponse = JSON.parse(content);
+        
+        // Assemble HTML from JSON fields
+        const htmlBody = `
+${jsonResponse.hero_section || ''}
+
+${jsonResponse.cost_comparison_html || ''}
+
+${jsonResponse.benefits_section_html || ''}
+
+${jsonResponse.additional_info_html || ''}
+
+${jsonResponse.cta_html || ''}
+        `.trim();
+        
+        // Return as structured output
+        content = `Subject: ${jsonResponse.subject || 'Energy Solutions'}
+
+${htmlBody}`;
+        
+        console.log('[Perplexity] Parsed JSON structured output for HTML email');
+      } catch (e) {
+        console.warn('[Perplexity] Failed to parse JSON response, using raw content:', e);
+      }
+    }
     
     console.log('[Perplexity] Response received, length:', content.length);
     if (citations.length > 0) {
