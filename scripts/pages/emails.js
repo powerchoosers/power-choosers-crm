@@ -2028,6 +2028,16 @@ class EmailManager {
     sanitizeGeneratedEditor(editor, recipient) {
         try {
             if (!editor) return;
+            
+            // CRITICAL: Extract and preserve signature BEFORE any modifications
+            const signatureDiv = editor.querySelector('[data-signature="true"]') || 
+                                 Array.from(editor.querySelectorAll('div')).find(div => 
+                                   div.style.marginTop === '20px' && 
+                                   div.style.paddingTop === '20px' &&
+                                   div.style.borderTop === '1px solid #e0e0e0'
+                                 );
+            const savedSignature = signatureDiv ? signatureDiv.cloneNode(true) : null;
+            
             const nameSource = (recipient?.fullName || recipient?.name || '').trim();
             const firstName = (nameSource.split(' ')[0] || '').trim() || 'there';
             
@@ -2044,6 +2054,13 @@ class EmailManager {
                 return s.startsWith('best regards') || s === 'regards' || s.startsWith('kind regards') || s.startsWith('warm regards') || s === 'sincerely' || s === 'thanks' || s === 'thank you' || s === 'cheers';
             };
             const isPlaceholder = (t) => /\[\s*(your\s+name|your\s+title|your\s+contact\s*information)\s*\]/i.test(String(t || ''));
+            const isSignature = (el) => {
+                return el.hasAttribute('data-signature') || 
+                       (el.tagName === 'DIV' && 
+                        el.style.marginTop === '20px' && 
+                        el.style.paddingTop === '20px' &&
+                        el.style.borderTop === '1px solid #e0e0e0');
+            };
 
             const ps = Array.from(editor.querySelectorAll('p'));
             if (!ps.length) return;
@@ -2112,15 +2129,24 @@ class EmailManager {
                 senderChip.textContent = 'sender first name';
             }
 
-            // Trim trailing blank paragraphs before appending closing
+            // Trim trailing blank paragraphs before appending closing (SKIP signature div)
             let last = editor.lastElementChild;
-            while (last && last.tagName === 'P') {
-                const txt = (last.textContent || '').replace(/\u00A0/g, ' ').trim();
-                const onlyBr = !txt && last.querySelectorAll('br').length > 0;
-                if (!txt || onlyBr) {
-                    const toRemove = last;
-                    last = last.previousElementSibling;
-                    toRemove.remove();
+            while (last) {
+                // SKIP if this is the signature div - don't remove it!
+                if (isSignature(last)) {
+                    break;
+                }
+                
+                if (last.tagName === 'P') {
+                    const txt = (last.textContent || '').replace(/\u00A0/g, ' ').trim();
+                    const onlyBr = !txt && last.querySelectorAll('br').length > 0;
+                    if (!txt || onlyBr) {
+                        const toRemove = last;
+                        last = last.previousElementSibling;
+                        toRemove.remove();
+                    } else {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -2138,6 +2164,21 @@ class EmailManager {
                 const txt = (p.textContent || '').replace(/\u00A0/g, ' ').trim();
                 if (!txt) p.remove();
             });
+            
+            // CRITICAL: Re-append the saved signature at the very end if it existed
+            if (savedSignature) {
+                // Remove any signature that might have been accidentally kept during processing
+                const existingSig = editor.querySelector('[data-signature="true"]') || 
+                                   Array.from(editor.querySelectorAll('div')).find(div => 
+                                     div.style.marginTop === '20px' && 
+                                     div.style.paddingTop === '20px'
+                                   );
+                if (existingSig) {
+                    existingSig.remove();
+                }
+                editor.appendChild(savedSignature);
+                console.log('[Signature] Preserved signature during AI generation');
+            }
         } catch (e) {
             console.warn('sanitizeGeneratedEditor failed', e);
         }
@@ -2169,13 +2210,18 @@ class EmailManager {
             
             // Extract signature using DOM parser
             const signature = this.extractSignature(editor.innerHTML);
-            if (!signature) return; // no signature present
+            if (!signature) {
+                console.log('[Signature] No signature found to move');
+                return; // no signature present - don't do anything
+            }
             
-            // Remove signature from current position using DOM
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(editor.innerHTML, 'text/html');
-            const sigDiv = doc.querySelector('[data-signature="true"]') || 
-                          Array.from(doc.querySelectorAll('div')).find(div => 
+            // Create a temporary div to work with
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = editor.innerHTML;
+            
+            // Remove signature from temp div
+            const sigDiv = tempDiv.querySelector('[data-signature="true"]') || 
+                          Array.from(tempDiv.querySelectorAll('div')).find(div => 
                             div.style.marginTop === '20px' && 
                             div.style.paddingTop === '20px'
                           );
@@ -2183,15 +2229,16 @@ class EmailManager {
                 sigDiv.remove();
             }
             
-            // Serialize back to HTML and append signature at the end
-            const bodyContent = doc.body.innerHTML;
-            editor.innerHTML = bodyContent + signature;
-
-            // Remove extra empty paragraphs at the end
-            Array.from(editor.querySelectorAll('p')).forEach(p => {
+            // Remove empty paragraphs from temp div (but not signature)
+            Array.from(tempDiv.querySelectorAll('p')).forEach(p => {
                 const t = (p.textContent || '').replace(/\u00A0/g, ' ').trim();
                 if (!t) p.remove();
             });
+            
+            // Reconstruct: content + signature
+            editor.innerHTML = tempDiv.innerHTML + signature;
+            console.log('[Signature] Moved signature to end');
+            
         } catch (e) {
             console.warn('[Email] moveSignatureToEnd failed', e);
         }
