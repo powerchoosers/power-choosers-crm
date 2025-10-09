@@ -794,9 +794,8 @@ class EmailManager {
                         // Render the generated HTML (not raw source)
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
                         editor.innerHTML = html2;
-                        // Post-insert sanitation and signature handling
-                        this.sanitizeGeneratedEditor(editor, enrichedRecipient);
-                        this.moveSignatureToEnd(editor);
+                        // TEST: Skip sanitization to preserve Sonar's inline styles
+                        console.log('[HTML Mode] Skipped sanitization to preserve inline styles (prod fallback)');
                         if (status) status.textContent = 'Inserted HTML into editor (prod).';
                     } else {
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
@@ -900,9 +899,8 @@ class EmailManager {
                 html = this.replaceVariablesInHtml(html, enrichedRecipient);
                 if (mode === 'html') {
                 editor.innerHTML = html; // render HTML in editor
-                // Post-insert sanitation and signature handling
-                this.sanitizeGeneratedEditor(editor, enrichedRecipient);
-                this.moveSignatureToEnd(editor);
+                // TEST: Skip sanitization to preserve Sonar's inline styles
+                console.log('[HTML Mode] Skipped sanitization to preserve inline styles (main path)');
                 if (status) status.textContent = 'Inserted HTML into editor.';
                 }
             } else {
