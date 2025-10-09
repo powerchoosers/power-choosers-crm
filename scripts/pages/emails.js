@@ -723,8 +723,10 @@ class EmailManager {
             const randomSubj = subjStyles[Math.floor(Math.random() * subjStyles.length)];
             const subjectSeed = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 
-            // Get sender name from settings
-            const senderName = (window.SettingsPage?.getSettings?.()?.general?.agentName) || 'Lewis Patterson';
+            // Get sender name and email from settings
+            const settings = (window.SettingsPage?.getSettings?.()) || {};
+            const senderName = settings?.general?.agentName || 'Lewis Patterson';
+            const fromEmail = settings?.emailDeliverability?.fromEmail || 'l.patterson@powerchoosers.com';
             
             const payload = { 
                 prompt, 
@@ -736,7 +738,8 @@ class EmailManager {
                 subjectSeed,
                 isManualPrompt: isManual,
                 contextCompleteness: contextValidation.completeness,
-                senderName: senderName
+                senderName: senderName,
+                fromEmail: fromEmail
             };
             let res;
             try {
@@ -794,8 +797,9 @@ class EmailManager {
                         // Render the generated HTML (not raw source)
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
                         editor.innerHTML = html2;
-                        // TEST: Skip sanitization to preserve Sonar's inline styles
-                        console.log('[HTML Mode] Skipped sanitization to preserve inline styles (prod fallback)');
+                        // Post-insert sanitation and signature handling
+                        this.sanitizeGeneratedEditor(editor, enrichedRecipient);
+                        this.moveSignatureToEnd(editor);
                         if (status) status.textContent = 'Inserted HTML into editor (prod).';
                     } else {
                         if (this._isHtmlMode) this.toggleHtmlMode(compose);
@@ -845,6 +849,7 @@ class EmailManager {
                 return;
             }
             const output = data?.output || '';
+            const templateType = data?.templateType || null;
             
             // Store citations if available (for future enhancement)
             if (data?.citations && data.citations.length > 0) {
@@ -853,12 +858,14 @@ class EmailManager {
             }
             
             try {
-                console.debug('[AI][generate] mode:', mode, 'recipient.firstName:', recipient?.firstName, 'company:', recipient?.company);
-                console.debug('[AI][generate] raw output (first 600 chars):', String(output).slice(0, 600));
+                console.debug('[AI][generate] mode:', mode, 'templateType:', templateType, 'recipient.firstName:', recipient?.firstName, 'company:', recipient?.company);
+                console.debug('[AI][generate] raw output (first 600 chars):', JSON.stringify(output).slice(0, 600));
             } catch (_) {}
 
             // Build clean subject + body layout
-            let { subject, html } = this.formatGeneratedEmail(output, enrichedRecipient, mode);
+            let { subject, html } = templateType 
+                ? this.formatTemplatedEmail(output, enrichedRecipient, templateType, payload.fromEmail)
+                : this.formatGeneratedEmail(output, enrichedRecipient, mode);
             try {
                 console.debug('[AI][generate] formatted subject:', subject);
             } catch (_) {}
@@ -899,8 +906,9 @@ class EmailManager {
                 html = this.replaceVariablesInHtml(html, enrichedRecipient);
                 if (mode === 'html') {
                 editor.innerHTML = html; // render HTML in editor
-                // TEST: Skip sanitization to preserve Sonar's inline styles
-                console.log('[HTML Mode] Skipped sanitization to preserve inline styles (main path)');
+                // Post-insert sanitation and signature handling
+                this.sanitizeGeneratedEditor(editor, enrichedRecipient);
+                this.moveSignatureToEnd(editor);
                 if (status) status.textContent = 'Inserted HTML into editor.';
                 }
             } else {
@@ -960,6 +968,41 @@ class EmailManager {
         } finally {
             // Stop the loading shimmer
             this.stopGeneratingAnimation(compose);
+        }
+    }
+
+    // Format templated email from JSON response with preset HTML template
+    formatTemplatedEmail(jsonData, recipient, templateType, fromEmail) {
+        try {
+            console.log('[AI] Formatting templated email, type:', templateType);
+            
+            // Extract data from JSON response
+            const subject = jsonData.subject || 'Energy Solutions';
+            const greeting = jsonData.greeting || 'Hello,';
+            
+            // Build template HTML using the appropriate builder
+            const templateHtml = this.buildTemplateHtml(templateType, jsonData, recipient, fromEmail);
+            
+            // Wrap with branding (header + footer) and add greeting at top
+            const fullHtml = this.wrapSonarHtmlWithBranding(
+                `<p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0 0 20px 0;">${this.escapeHtml(greeting)}</p>\n${templateHtml}`,
+                recipient,
+                subject
+            );
+            
+            console.log('[AI] Template email built successfully');
+            
+            return {
+                subject: subject,
+                html: fullHtml
+            };
+        } catch (error) {
+            console.error('[AI] Error formatting templated email:', error);
+            // Fallback to basic formatting
+            return {
+                subject: 'Energy Solutions',
+                html: '<p>Error generating email. Please try again.</p>'
+            };
         }
     }
 
@@ -1730,6 +1773,342 @@ class EmailManager {
             const hex = Math.round(x).toString(16);
             return hex.length === 1 ? '0' + hex : hex;
         }).join('');
+    }
+
+    // ========== 7 PRESET HTML TEMPLATE BUILDERS ==========
+    
+    // Template 1: Warm Intro (Blue gradient theme)
+    buildWarmIntroHtml(data, recipient, fromEmail) {
+        const mail = fromEmail || 'l.patterson@powerchoosers.com';
+        return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+    <tr>
+        <td style="background:linear-gradient(135deg, #3498db, #2980b9); padding:25px; border-radius:8px; color:#ffffff;">
+            <h2 style="margin:0 0 15px 0; font-size:22px; font-weight:600;">🤝 ${this.escapeHtml(data.call_reference || 'Great speaking with you')}</h2>
+        </td>
+    </tr>
+</table>
+
+<div style="background:#ffffff; padding:20px; border-radius:6px; margin:15px 0; border-left:4px solid #3498db;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
+        ${this.escapeHtml(data.main_message || 'Looking forward to our next conversation.')}
+    </p>
+</div>
+
+<table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
+    <tr>
+        <td style="background:#e67e22; border-radius:28px; padding:14px 28px;">
+            <a href="mailto:${mail}?subject=Re: ${encodeURIComponent(data.subject || 'Follow up')}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+                ${this.escapeHtml(data.cta_text || 'Schedule a Follow-Up Call')}
+            </a>
+        </td>
+    </tr>
+</table>`;
+    }
+
+    // Template 2: Follow-Up (Purple accent theme)
+    buildFollowUpHtml(data, recipient, fromEmail) {
+        const mail = fromEmail || 'l.patterson@powerchoosers.com';
+        const valueProps = Array.isArray(data.value_props) ? data.value_props : [data.value_props || ''];
+        
+        return `
+<div style="background:#f8f9fa; padding:20px; border-radius:6px; margin:15px 0;">
+    <h3 style="color:#8e44ad; font-size:18px; margin:0 0 10px 0;">📊 Progress Update</h3>
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
+        ${this.escapeHtml(data.progress_update || 'Here\'s where we are...')}
+    </p>
+</div>
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+    <tr>
+        <td width="50%" style="padding-right:10px; vertical-align:top;">
+            <div style="background:#ffffff; padding:20px; border-radius:6px; border:2px solid #8e44ad; height:100%;">
+                <h4 style="color:#8e44ad; font-size:16px; margin:0 0 15px 0;">✓ Key Benefits</h4>
+                ${valueProps.slice(0, Math.ceil(valueProps.length / 2)).map(prop => 
+                    `<p style="color:#555; font-size:14px; line-height:1.5; margin:0 0 10px 0;">• ${this.escapeHtml(prop)}</p>`
+                ).join('')}
+            </div>
+        </td>
+        <td width="50%" style="padding-left:10px; vertical-align:top;">
+            <div style="background:#ffffff; padding:20px; border-radius:6px; border:2px solid #8e44ad; height:100%;">
+                <h4 style="color:#8e44ad; font-size:16px; margin:0 0 15px 0;">✓ Why Act Now</h4>
+                ${valueProps.slice(Math.ceil(valueProps.length / 2)).map(prop => 
+                    `<p style="color:#555; font-size:14px; line-height:1.5; margin:0 0 10px 0;">• ${this.escapeHtml(prop)}</p>`
+                ).join('')}
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div style="background:#fff3cd; border-left:4px solid #f39c12; padding:15px; border-radius:4px; margin:15px 0;">
+    <p style="color:#856404; font-size:14px; line-height:1.5; margin:0; font-weight:600;">
+        ⚠️ Market Update: ${this.escapeHtml(data.urgency_message || 'Time-sensitive opportunity')}
+    </p>
+</div>
+
+<table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
+    <tr>
+        <td style="background:#27ae60; border-radius:28px; padding:14px 28px;">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+                ${this.escapeHtml(data.cta_text || 'Let\'s Continue the Conversation')}
+            </a>
+        </td>
+    </tr>
+</table>`;
+    }
+
+    // Template 3: Energy Health Check (Teal/medical theme)
+    buildEnergyHealthHtml(data, recipient, fromEmail) {
+        const mail = fromEmail || 'l.patterson@powerchoosers.com';
+        const assessmentItems = Array.isArray(data.assessment_items) ? data.assessment_items : [data.assessment_items || ''];
+        
+        return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+    <tr>
+        <td style="background:linear-gradient(135deg, #16a085, #1abc9c); padding:25px; border-radius:8px; text-align:center;">
+            <h2 style="color:#ffffff; font-size:24px; margin:0; font-weight:600;">⚡ Free Energy Health Check</h2>
+            <p style="color:#ffffff; font-size:14px; margin:10px 0 0 0; opacity:0.95;">Comprehensive Assessment • No Obligation</p>
+        </td>
+    </tr>
+</table>
+
+<div style="background:#e8f8f5; padding:20px; border-radius:6px; margin:15px 0;">
+    <h3 style="color:#16a085; font-size:18px; margin:0 0 15px 0;">📋 What We'll Review</h3>
+    ${assessmentItems.map(item => 
+        `<div style="background:#ffffff; padding:12px; margin:8px 0; border-radius:4px; border-left:3px solid #1abc9c;">
+            <p style="color:#1f2937; font-size:14px; margin:0;">✓ ${this.escapeHtml(item)}</p>
+        </div>`
+    ).join('')}
+</div>
+
+<table width="100%" cellpadding="15" cellspacing="0" border="0" style="background:#d1f2eb; border-radius:6px; margin:15px 0;">
+    <tr>
+        <td>
+            <p style="color:#0e6655; font-size:15px; line-height:1.5; margin:0;">
+                <strong>Your Contract:</strong> ${this.escapeHtml(data.contract_info || 'Review current terms and expiration')}
+            </p>
+        </td>
+    </tr>
+</table>
+
+<div style="background:#ffffff; padding:20px; border-radius:6px; margin:15px 0; border:2px solid #16a085;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
+        ${this.escapeHtml(data.benefits || 'Get insights into potential savings and optimization opportunities.')}
+    </p>
+</div>
+
+<table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
+    <tr>
+        <td style="background:#16a085; border-radius:28px; padding:14px 28px;">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+                ${this.escapeHtml(data.cta_text || 'Schedule Your Free Assessment')}
+            </a>
+        </td>
+    </tr>
+</table>`;
+    }
+
+    // Template 4: Proposal Delivery (Gold/premium theme)
+    buildProposalHtml(data, recipient, fromEmail) {
+        const mail = fromEmail || 'l.patterson@powerchoosers.com';
+        const timeline = Array.isArray(data.timeline) ? data.timeline : [data.timeline || ''];
+        
+        return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0; position:relative;">
+    <tr>
+        <td style="background:linear-gradient(135deg, #f39c12, #e67e22); padding:30px; border-radius:8px; text-align:center; position:relative;">
+            <div style="position:absolute; top:10px; right:10px; background:#ffffff; color:#f39c12; padding:5px 15px; border-radius:20px; font-size:12px; font-weight:700;">
+                EXCLUSIVE OFFER
+            </div>
+            <h2 style="color:#ffffff; font-size:24px; margin:0; font-weight:600;">📄 Your Custom Proposal</h2>
+        </td>
+    </tr>
+</table>
+
+<div style="background:#fff8e1; border:3px solid #f39c12; padding:20px; border-radius:8px; margin:15px 0;">
+    <h3 style="color:#f57c00; font-size:18px; margin:0 0 10px 0;">Proposal Summary</h3>
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
+        ${this.escapeHtml(data.proposal_summary || 'Tailored energy solution designed for your needs.')}
+    </p>
+</div>
+
+<table width="100%" cellpadding="20" cellspacing="0" border="0" style="background:linear-gradient(135deg, #ffd700, #ffa500); border-radius:8px; margin:15px 0;">
+    <tr>
+        <td style="text-align:center;">
+            <h3 style="color:#ffffff; font-size:20px; margin:0 0 10px 0; text-shadow:0 2px 4px rgba(0,0,0,0.2);">💰 Pricing Highlight</h3>
+            <p style="color:#ffffff; font-size:16px; line-height:1.5; margin:0; font-weight:600;">
+                ${this.escapeHtml(data.pricing_highlight || 'Competitive rates with significant savings potential')}
+            </p>
+        </td>
+    </tr>
+</table>
+
+<div style="background:#ffffff; padding:20px; border-radius:6px; margin:15px 0; border:2px solid #f39c12;">
+    <h3 style="color:#f57c00; font-size:18px; margin:0 0 15px 0;">📅 Implementation Timeline</h3>
+    ${timeline.map((step, idx) => 
+        `<div style="padding:10px; margin:8px 0; background:#fff8e1; border-radius:4px; border-left:4px solid #f39c12;">
+            <p style="color:#1f2937; font-size:14px; margin:0;"><strong>Step ${idx + 1}:</strong> ${this.escapeHtml(step)}</p>
+        </div>`
+    ).join('')}
+</div>
+
+<table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
+    <tr>
+        <td style="background:#f39c12; border-radius:28px; padding:14px 28px;">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+                ${this.escapeHtml(data.cta_text || 'Let\'s Discuss Your Proposal')}
+            </a>
+        </td>
+    </tr>
+</table>`;
+    }
+
+    // Template 5: Cold Email (Red urgency theme)
+    buildColdEmailHtml(data, recipient, fromEmail) {
+        const mail = fromEmail || 'l.patterson@powerchoosers.com';
+        const painPoints = Array.isArray(data.pain_points) ? data.pain_points : [data.pain_points || ''];
+        
+        return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+    <tr>
+        <td style="background:linear-gradient(135deg, #e74c3c, #c0392b); padding:25px; border-radius:8px; text-align:center;">
+            <h2 style="color:#ffffff; font-size:22px; margin:0; font-weight:600;">⚠️ Energy Costs Rising Fast</h2>
+        </td>
+    </tr>
+</table>
+
+<div style="background:#fff5f5; padding:20px; border-radius:6px; margin:15px 0; border-left:4px solid #e74c3c;">
+    <h3 style="color:#c0392b; font-size:18px; margin:0 0 15px 0;">Common Challenges We're Seeing</h3>
+    ${painPoints.map(point => 
+        `<div style="background:#ffffff; padding:12px; margin:8px 0; border-radius:4px;">
+            <p style="color:#555; font-size:14px; margin:0;">❌ ${this.escapeHtml(point)}</p>
+        </div>`
+    ).join('')}
+</div>
+
+<div style="background:#d1f2eb; border:2px solid #16a085; padding:20px; border-radius:8px; margin:15px 0;">
+    <h3 style="color:#16a085; font-size:18px; margin:0 0 10px 0;">✓ How Power Choosers Helps</h3>
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
+        ${this.escapeHtml(data.solution_intro || 'We help businesses reduce energy costs through competitive procurement and efficiency solutions.')}
+    </p>
+</div>
+
+<div style="background:#e8f8f5; padding:15px; border-radius:6px; margin:15px 0;">
+    <p style="color:#16a085; font-size:14px; line-height:1.5; margin:0; font-style:italic;">
+        ${this.escapeHtml(data.social_proof || 'Companies like yours are saving 20-30% on energy costs.')}
+    </p>
+</div>
+
+<table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
+    <tr>
+        <td style="background:#e74c3c; border-radius:28px; padding:14px 28px;">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+                ${this.escapeHtml(data.cta_text || 'Explore Your Savings Potential')}
+            </a>
+        </td>
+    </tr>
+</table>`;
+    }
+
+    // Template 6: Invoice Request (Simple/clean theme)
+    buildInvoiceHtml(data, recipient, fromEmail) {
+        const mail = fromEmail || 'l.patterson@powerchoosers.com';
+        const checklist = Array.isArray(data.checklist_items) ? data.checklist_items : [data.checklist_items || ''];
+        
+        return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+    <tr>
+        <td style="background:#3498db; padding:20px; border-radius:6px; text-align:center;">
+            <h2 style="color:#ffffff; font-size:20px; margin:0; font-weight:600;">📎 Invoice Request</h2>
+        </td>
+    </tr>
+</table>
+
+<div style="background:#fff8e1; border-left:4px solid #f39c12; padding:15px; border-radius:4px; margin:15px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
+        ${this.escapeHtml(data.reminder_text || 'We need your latest invoice to complete your energy analysis.')}
+    </p>
+</div>
+
+<div style="background:#f8f9fa; padding:20px; border-radius:6px; margin:15px 0;">
+    <h3 style="color:#2c3e50; font-size:18px; margin:0 0 15px 0;">✓ What We'll Review</h3>
+    ${checklist.map(item => 
+        `<div style="padding:10px; margin:8px 0; background:#ffffff; border-radius:4px; border:2px solid #ecf0f1;">
+            <p style="color:#1f2937; font-size:14px; margin:0;">☐ ${this.escapeHtml(item)}</p>
+        </div>`
+    ).join('')}
+</div>
+
+<table width="100%" cellpadding="15" cellspacing="0" border="0" style="background:#ffe5e5; border-radius:6px; margin:15px 0;">
+    <tr>
+        <td style="text-align:center;">
+            <p style="color:#c0392b; font-size:16px; margin:0; font-weight:600;">
+                ⏰ Needed: ${this.escapeHtml(data.deadline || 'As soon as possible')}
+            </p>
+        </td>
+    </tr>
+</table>
+
+<table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
+    <tr>
+        <td style="background:#3498db; border-radius:28px; padding:14px 28px;">
+            <a href="mailto:${mail}?subject=Invoice for Energy Review" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+                ${this.escapeHtml(data.cta_text || 'Send Invoice Now')}
+            </a>
+        </td>
+    </tr>
+</table>`;
+    }
+
+    // Template 7: General/Manual (Flexible theme)
+    buildGeneralHtml(data, recipient, fromEmail) {
+        const mail = fromEmail || 'l.patterson@powerchoosers.com';
+        const sections = Array.isArray(data.sections) ? data.sections : [data.sections || ''];
+        
+        return `
+${sections.map((section, idx) => {
+    const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';
+    const borderColor = '#3498db';
+    
+    return `<div style="background:${bgColor}; padding:20px; margin:15px 0; border-radius:6px; border-left:4px solid ${borderColor};">
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
+        ${this.escapeHtml(section)}
+    </p>
+</div>`;
+}).join('')}
+
+<table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
+    <tr>
+        <td style="background:#e67e22; border-radius:28px; padding:14px 28px;">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+                ${this.escapeHtml(data.cta_text || 'Let\'s Connect')}
+            </a>
+        </td>
+    </tr>
+</table>`;
+    }
+
+    // Main template builder dispatcher
+    buildTemplateHtml(templateType, data, recipient, fromEmail) {
+        console.log('[AI] Building template:', templateType);
+        
+        switch (templateType) {
+            case 'warm_intro':
+                return this.buildWarmIntroHtml(data, recipient, fromEmail);
+            case 'follow_up':
+                return this.buildFollowUpHtml(data, recipient, fromEmail);
+            case 'energy_health':
+                return this.buildEnergyHealthHtml(data, recipient, fromEmail);
+            case 'proposal':
+                return this.buildProposalHtml(data, recipient, fromEmail);
+            case 'cold_email':
+                return this.buildColdEmailHtml(data, recipient, fromEmail);
+            case 'invoice':
+                return this.buildInvoiceHtml(data, recipient, fromEmail);
+            case 'general':
+            default:
+                return this.buildGeneralHtml(data, recipient, fromEmail);
+        }
     }
 
     // Wrap Sonar-generated HTML with Power Choosers branding (header/footer)
