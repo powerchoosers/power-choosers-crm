@@ -2415,7 +2415,7 @@
         accountName: (fd.get('accountName') || '').toString().trim(),
         industry: (fd.get('industry') || '').toString().trim(),
         website: (fd.get('website') || '').toString().trim(),
-        phone: (fd.get('phone') || '').toString().trim(),
+        phone: normalizePhone((fd.get('phone') || '').toString().trim()),
         city: (fd.get('city') || '').toString().trim(),
         state: (fd.get('state') || '').toString().trim(),
         linkedin: (fd.get('linkedin') || '').toString().trim(),

@@ -4605,7 +4605,7 @@
               subject: step.emailContent.subject || 'Follow up',
               html: step.emailContent.body || 'Hello, this is a follow up email.',
               from: 'noreply@powerchoosers.com',
-              fromName: 'Power Choosers',
+              fromName: (window.SettingsPage?.getSettings?.()?.general?.agentName) || 'Power Choosers',
               contactName: contactData.name,
               companyName: contactData.company
             };

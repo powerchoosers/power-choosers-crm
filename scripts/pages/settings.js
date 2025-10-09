@@ -35,6 +35,7 @@ class SettingsPage {
                 },
                 twilioNumbers: [],
                 general: {
+                    agentName: 'Power Choosers',
                     autoSaveNotes: true,
                     emailNotifications: true,
                     callRecordingNotifications: false,
@@ -107,6 +108,15 @@ class SettingsPage {
         const addPhoneBtn = document.getElementById('add-phone-number');
         if (addPhoneBtn) {
             addPhoneBtn.addEventListener('click', () => this.showAddPhoneModal());
+        }
+
+        // General settings - Agent Name text input
+        const agentName = document.getElementById('agent-name');
+        if (agentName) {
+            agentName.addEventListener('input', (e) => {
+                this.state.settings.general.agentName = e.target.value.trim() || 'Power Choosers';
+                this.markDirty();
+            });
         }
 
         // General settings checkboxes and selects
@@ -325,6 +335,11 @@ class SettingsPage {
         this.renderPhoneNumbers();
 
         // Render general settings
+        const agentName = document.getElementById('agent-name');
+        if (agentName) {
+            agentName.value = this.state.settings.general.agentName || 'Power Choosers';
+        }
+
         const autoSaveNotes = document.getElementById('auto-save-notes');
         if (autoSaveNotes) {
             autoSaveNotes.checked = this.state.settings.general.autoSaveNotes;
