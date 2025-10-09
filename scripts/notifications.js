@@ -74,7 +74,9 @@
 
         notifications.unshift(notification);
         updateBadge();
-        saveNotifications(); // Persist to localStorage
+        
+        // Save to Firestore (with localStorage fallback)
+        saveToFirestore(notification);
         
         // Trigger browser notification if permission granted
         if (Notification.permission === 'granted') {
@@ -94,16 +96,23 @@
             notification.read = true;
             updateBadge();
             renderNotifications();
-            saveNotifications(); // Persist changes
+            
+            // Update in Firestore
+            updateInFirestore(notification);
         }
     }
 
     // Mark all notifications as read
     function markAllAsRead() {
-        notifications.forEach(n => n.read = true);
+        notifications.forEach(n => {
+            if (!n.read) {
+                n.read = true;
+                // Update in Firestore
+                updateInFirestore(n);
+            }
+        });
         updateBadge();
         renderNotifications();
-        saveNotifications(); // Persist changes
     }
 
     // Update notification badge
@@ -242,10 +251,35 @@
         return timestamp.toLocaleDateString();
     }
 
-    // Load real CRM notifications from API or local storage
+    // Firebase listener for real-time sync
+    let firestoreUnsubscribe = null;
+
+    // Load real CRM notifications from Firebase Firestore
     async function loadRealNotifications() {
         try {
-            // Try to load from localStorage first
+            // Wait for Firebase to be ready
+            if (!window.firebaseDB) {
+                console.warn('[Notifications] Firebase not ready, loading from localStorage fallback');
+                loadFromLocalStorage();
+                // Try again after delay
+                setTimeout(() => {
+                    if (window.firebaseDB) {
+                        loadFromFirestore();
+                    }
+                }, 2000);
+                return;
+            }
+
+            await loadFromFirestore();
+        } catch (error) {
+            console.warn('[Notifications] Failed to load from Firestore, falling back to localStorage:', error);
+            loadFromLocalStorage();
+        }
+    }
+
+    // Load from localStorage (fallback)
+    function loadFromLocalStorage() {
+        try {
             const stored = localStorage.getItem('crm_notifications');
             if (stored) {
                 const parsed = JSON.parse(stored);
@@ -254,24 +288,141 @@
                     timestamp: new Date(n.timestamp)
                 }));
                 updateBadge();
+                renderNotifications();
             }
-
-            // TODO: Load from actual CRM API endpoints
-            // const response = await fetch('/api/notifications');
-            // const data = await response.json();
-            // notifications = data.notifications || [];
-            
         } catch (error) {
-            console.warn('[Notifications] Failed to load stored notifications:', error);
+            console.warn('[Notifications] Failed to load from localStorage:', error);
         }
     }
 
-    // Save notifications to localStorage
-    function saveNotifications() {
+    // Load from Firestore and set up real-time listener
+    async function loadFromFirestore() {
+        try {
+            const db = window.firebaseDB;
+            if (!db) return;
+
+            // Get current user ID (assuming Firebase Auth is initialized)
+            const userId = window.firebase?.auth?.()?.currentUser?.uid || 'default-user';
+
+            // Query notifications for current user
+            const notificationsRef = db.collection('notifications')
+                .where('userId', '==', userId)
+                .orderBy('timestamp', 'desc')
+                .limit(100);
+
+            // Set up real-time listener
+            if (firestoreUnsubscribe) {
+                firestoreUnsubscribe();
+            }
+
+            firestoreUnsubscribe = notificationsRef.onSnapshot((snapshot) => {
+                notifications = [];
+                let maxId = 0;
+
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const notification = {
+                        id: data.id || doc.id,
+                        type: data.type,
+                        title: data.title,
+                        message: data.message,
+                        timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
+                        read: data.read || false,
+                        data: data.data || {}
+                    };
+                    notifications.push(notification);
+                    
+                    // Track highest ID for auto-increment
+                    if (typeof notification.id === 'number' && notification.id > maxId) {
+                        maxId = notification.id;
+                    }
+                });
+
+                // Update notificationId counter for next notification
+                notificationId = maxId + 1;
+
+                updateBadge();
+                renderNotifications();
+                
+                // Also save to localStorage as backup
+                saveToLocalStorage();
+                
+                console.log('[Notifications] Loaded', notifications.length, 'notifications from Firestore');
+            }, (error) => {
+                console.error('[Notifications] Firestore listener error:', error);
+                // Fallback to localStorage
+                loadFromLocalStorage();
+            });
+
+        } catch (error) {
+            console.error('[Notifications] Error setting up Firestore listener:', error);
+            loadFromLocalStorage();
+        }
+    }
+
+    // Save to localStorage (backup)
+    function saveToLocalStorage() {
         try {
             localStorage.setItem('crm_notifications', JSON.stringify(notifications));
         } catch (error) {
-            console.warn('[Notifications] Failed to save notifications:', error);
+            console.warn('[Notifications] Failed to save to localStorage:', error);
+        }
+    }
+
+    // Save notification to Firestore
+    async function saveToFirestore(notification) {
+        try {
+            const db = window.firebaseDB;
+            if (!db) {
+                console.warn('[Notifications] Firebase not ready, saving to localStorage only');
+                saveToLocalStorage();
+                return;
+            }
+
+            const userId = window.firebase?.auth?.()?.currentUser?.uid || 'default-user';
+
+            // Create notification document
+            const notificationDoc = {
+                userId: userId,
+                id: notification.id,
+                type: notification.type,
+                title: notification.title,
+                message: notification.message,
+                timestamp: window.firebase?.firestore?.Timestamp?.fromDate(notification.timestamp) || notification.timestamp,
+                read: notification.read || false,
+                data: notification.data || {}
+            };
+
+            // Use notification ID as document ID for easy updates
+            await db.collection('notifications')
+                .doc(`${userId}_${notification.id}`)
+                .set(notificationDoc);
+
+            console.log('[Notifications] Saved to Firestore:', notification.title);
+        } catch (error) {
+            console.error('[Notifications] Failed to save to Firestore:', error);
+            // Fallback to localStorage
+            saveToLocalStorage();
+        }
+    }
+
+    // Update notification in Firestore
+    async function updateInFirestore(notification) {
+        try {
+            const db = window.firebaseDB;
+            if (!db) return;
+
+            const userId = window.firebase?.auth?.()?.currentUser?.uid || 'default-user';
+
+            await db.collection('notifications')
+                .doc(`${userId}_${notification.id}`)
+                .update({
+                    read: notification.read
+                });
+
+            console.log('[Notifications] Updated in Firestore:', notification.id);
+        } catch (error) {
+            console.error('[Notifications] Failed to update in Firestore:', error);
         }
     }
 

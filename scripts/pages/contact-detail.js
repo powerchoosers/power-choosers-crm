@@ -1470,13 +1470,13 @@
     return `<div class="tp-footer"><div class="tp-subtitle">Current tasks for ${escapeHtml(fullName)}</div>${items}</div>`;
   }
 
-  // Normalize phone numbers to E.164 when possible.
+  // Normalize phone numbers to formatted display format (not E.164)
   // Enhanced phone number parsing with extension support
   // Examples:
-  //  - "9728342317" => "+19728342317"
-  //  - "972-834-2317" => "+19728342317"
-  //  - "+1 (972) 834-2317" => "+19728342317"
-  //  - "+1 337-233-0464 ext 10117" => "+13372330464 ext 10117"
+  //  - "9728342317" => "+1 (972) 834-2317"
+  //  - "972-834-2317" => "+1 (972) 834-2317"
+  //  - "+1 (972) 834-2317" => "+1 (972) 834-2317"
+  //  - "+1 337-233-0464 ext 10117" => "+1 (337) 233-0464 ext. 10117"
   //  - "+447911123456" stays as "+447911123456"
   function normalizePhone(input) {
     const raw = (input || '').toString().trim();
@@ -1488,24 +1488,27 @@
     
     // Format the number part
     let formattedNumber = '';
-    if (/^\+/.test(parsed.number)) {
+    const cleaned = parsed.number.replace(/[^\d]/g, '');
+    
+    // Always display US numbers with +1 prefix and formatting
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    } else if (/^\+/.test(String(parsed.number))) {
+      // International number - keep as-is
       formattedNumber = parsed.number;
+    } else if (cleaned.length >= 8) {
+      // International without +, add it
+      formattedNumber = '+' + cleaned;
     } else {
-      const digits = parsed.number.replace(/[^\d]/g, '');
-      if (digits.length === 11 && digits.startsWith('1')) {
-        formattedNumber = '+' + digits;
-      } else if (digits.length === 10) {
-        formattedNumber = '+1' + digits;
-      } else if (digits.length >= 8) {
-        formattedNumber = '+' + digits;
-      } else {
-        return raw; // too short; leave as typed
-      }
+      // Fallback: return original if we can't format
+      return raw;
     }
     
-    // Add extension if present
+    // Add extension if present (use consistent format with period)
     if (parsed.extension) {
-      return `${formattedNumber} ext ${parsed.extension}`;
+      return `${formattedNumber} ext. ${parsed.extension}`;
     }
     
     return formattedNumber;
