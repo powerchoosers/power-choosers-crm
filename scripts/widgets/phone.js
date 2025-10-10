@@ -537,8 +537,8 @@
                 const callStartTime = Date.now();
                 const callId = `call_${callStartTime}_${Math.random().toString(36).substr(2, 9)}`;
                 if (typeof updateCallStatus === 'function') {
-                  // Use Twilio CallSid if available so backend persists immediately
-                  updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
+                // Use Twilio CallSid if available so backend persists immediately
+                updateCallStatus(number, 'connected', callStartTime, 0, incomingCallSid || callId, number, 'incoming');
                 // Immediately notify recent calls refresh so account detail updates without reload
                 try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
                 } else {
@@ -582,8 +582,8 @@
                     setTimeout(() => {
                       const callEndTime = Date.now();
                       const duration = Math.floor((callEndTime - callStartTime) / 1000);
-                      updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
-                      try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
+                  updateCallStatus(number, 'completed', callStartTime, duration, incomingCallSid || callId, number, 'incoming');
+                  try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
                     }, 0);
                   }
                   
@@ -626,7 +626,7 @@
                         body: JSON.stringify({ callSid: sid })
                       }).catch(()=>{});
                     } catch (_) {}
-                      window.currentServerCallSid = null;
+                    window.currentServerCallSid = null;
                   }
                   
                   // [REMOVED] Audio device release - was causing UI freeze on hangup
@@ -1068,9 +1068,9 @@
             const src = favicon || (domain ? `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}` : '');
             if (src) {
               avatarWrap.innerHTML = `<img class="company-favicon" src="${src}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy">`;
-            } else if (typeof window.__pcAccountsIcon === 'function') {
-              avatarWrap.innerHTML = window.__pcAccountsIcon();
-            }
+          } else if (typeof window.__pcAccountsIcon === 'function') {
+            avatarWrap.innerHTML = window.__pcAccountsIcon();
+          }
           } else if (typeof window.__pcAccountsIcon === 'function') {
             avatarWrap.innerHTML = window.__pcAccountsIcon();
           }
@@ -1238,17 +1238,17 @@
       if (currentCallSid) {
         const tick = Math.floor(elapsed / 2000);
         if (tick !== Math.floor((elapsed - 1000) / 2000)) {
-              try {
-                document.dispatchEvent(new CustomEvent('pc:live-call-duration', { 
-                  detail: { 
-                    callSid: currentCallSid, 
-                    duration: Math.floor(elapsed / 1000),
-                    durationFormatted: formatDurationForRecentCalls(elapsed)
-                  } 
-                }));
-              } catch(_) {}
+          try {
+            document.dispatchEvent(new CustomEvent('pc:live-call-duration', {
+              detail: {
+                callSid: currentCallSid,
+                duration: Math.floor(elapsed / 1000),
+                durationFormatted: formatDurationForRecentCalls(elapsed)
+              }
+            }));
+          } catch(_) {}
         }
-            }
+      }
     }, 1000);
   }
   function stopLiveCallTimer(card) {
@@ -1684,25 +1684,36 @@
       const style = document.createElement('style');
       style.id = 'phone-mini-scripts-styles';
       style.textContent = `
-        .mini-scripts { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px; margin-top: 10px; }
+        .mini-scripts { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px; margin-top: 10px; opacity: 0; transform: translateY(-4px); transition: opacity 250ms ease, transform 250ms ease; }
+        .mini-scripts.--show { opacity: 1; transform: translateY(0); }
         .mini-scripts .ms-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .mini-scripts .ms-search { position: relative; display: flex; align-items: center; gap: 8px; flex: 1; }
         .mini-scripts .ms-search input { flex: 1; }
-        .mini-scripts .ms-actions { display: flex; gap: 6px; }
+        .mini-scripts .ms-actions { display: flex; gap: 8px; }
         .mini-scripts .ms-suggest { position: absolute; top: 34px; left: 0; right: 0; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; z-index: 50; max-height: 200px; overflow: auto; padding: 6px 0; }
         .mini-scripts .ms-suggest[hidden] { display: none; }
         .mini-scripts .ms-suggest .item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; }
         .mini-scripts .ms-suggest .item:hover { background: var(--bg-subtle); }
         .mini-scripts .ms-suggest .glyph { width: 20px; height: 20px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 11px; font-weight: 700; }
-        .mini-scripts .ms-row { display: flex; gap: 8px; margin: 8px 0; }
-        .mini-scripts .ms-row .btn-secondary { flex: 1; }
+        .mini-scripts .ms-row { display: flex; gap: 8px; margin: 8px 0 0 0; }
+        .mini-scripts .ms-row .btn-secondary { flex: 1; padding: 10px 0; border-radius: 10px; background: var(--bg-item); color: var(--text-primary); border: 1px solid var(--border-light); box-shadow: var(--elevation-card); cursor: pointer; font-size: 14px; font-weight: 500; transition: transform 120ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease; }
+        .mini-scripts .ms-row .btn-secondary:hover { background: var(--grey-600); transform: translateY(-1px); }
+        .mini-scripts .ms-row .btn-secondary:active { transform: translateY(0); filter: brightness(0.98); }
         .mini-scripts .ms-row.--single { justify-content: stretch; }
-        .mini-scripts .ms-display { color: var(--text-primary); line-height: 1.4; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; margin: 8px 0; }
-        .mini-scripts .ms-responses { display: flex; flex-wrap: wrap; gap: 8px; }
+        .mini-scripts .ms-display { color: var(--text-primary); line-height: 1.4; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; margin: 8px 0; min-height: 60px; opacity: 0; transition: opacity 200ms ease; }
+        .mini-scripts .ms-display.--visible { opacity: 1; }
+        .mini-scripts .ms-display:empty { display: none; }
+        .mini-scripts .ms-responses { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 8px; }
+        .mini-scripts .ms-responses:empty { display: none; }
+        .mini-scripts .ms-responses .btn-secondary { width: 100%; padding: 12px 16px; border-radius: 10px; background: var(--bg-item); color: var(--text-primary); border: 1px solid var(--border-light); box-shadow: var(--elevation-card); cursor: pointer; font-size: 14px; font-weight: 500; text-align: center; transition: opacity 200ms ease, transform 120ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease; white-space: normal; word-wrap: break-word; opacity: 0; }
+        .mini-scripts .ms-responses .btn-secondary.--visible { opacity: 1; }
+        .mini-scripts .ms-responses .btn-secondary:hover { background: var(--grey-600); transform: translateY(-1px); }
+        .mini-scripts .ms-responses .btn-secondary:active { transform: translateY(0); filter: brightness(0.98); }
         .mini-scripts .ms-var { color: var(--grey-400); font-weight: 400; }
-        .mini-scripts .ms-toolbar { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-        .mini-scripts .icon-btn { background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 6px; border-radius: 6px; transition: color 0.2s ease; }
-        .mini-scripts .icon-btn:hover { color: var(--text-inverse); }
+        .mini-scripts .icon-btn { flex: 0 0 auto; padding: 10px; border-radius: 10px; background: var(--bg-item); color: var(--text-primary); border: 1px solid var(--border-light); box-shadow: var(--elevation-card); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 120ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease; overflow: visible; }
+        .mini-scripts .icon-btn:hover { background: var(--grey-600); transform: translateY(-1px); }
+        .mini-scripts .icon-btn:active { transform: translateY(0); filter: brightness(0.98); }
+        .mini-scripts .icon-btn svg { display: block; overflow: visible; }
       `;
       document.head.appendChild(style);
     }
@@ -1890,7 +1901,17 @@
       const FLOW = (window.callScriptsModule && window.callScriptsModule.FLOW) || {
         hook: { text: 'Good {{day.part}}, is this {{contact.first_name}}?', responses: [ { label: 'Yes, this is', next: 'awesome_told_to_speak' }, { label: 'Speaking', next: 'awesome_told_to_speak' }, { label: "Who's calling?", next: 'main_script_start' }, { label: 'Not me', next: 'gatekeeper_intro' } ] },
         awesome_told_to_speak: { text: 'Awesome I was actually told to speak with you — do you have a quick minute?', responses: [ { label: 'Yes', next: 'main_script_start' }, { label: 'What is this about?', next: 'main_script_start' } ] },
-        main_script_start: { text: "Perfect — So, my name is Lewis with PowerChoosers.com, and — I understand you're responsible for electricity agreements and contracts for {{account.name}}. Is that still accurate?", responses: [ { label: "Yes, that's me / I handle that", next: 'pathA' }, { label: 'That would be someone else / not the right person', next: 'gatekeeper_intro' } ] },
+        main_script_start: { text: "Perfect — So, my name is Lewis and — I understand you're responsible for utility expenses and contracts for {{account.name}}. Is that still accurate?", responses: [ { label: "Yes, that's me / I handle that", next: 'utility_discovery' }, { label: 'That would be someone else / not the right person', next: 'gatekeeper_intro' }, { label: 'We both handle it / team decision', next: 'utility_discovery' } ] },
+        utility_discovery: { text: "Gotcha. So most companies we work with — their main expenses tend to be electricity and water — we help companies reduce these expenses by any means necessary. <br><br>What would you say — is the biggest reoccurring cost for {{account.name}}?", responses: [ { label: 'Electricity', next: 'electricity_spending_question' }, { label: 'Water', next: 'water_confirm' }, { label: 'Other', next: 'pathA' } ] },
+        electricity_spending_question: { text: "How much are you guys typically spending on energy on a monthly basis?", responses: [ { label: 'Share amount ($X/month)', next: 'electricity_confirm' }, { label: 'Not sure / need to check', next: 'electricity_confirm' }, { label: 'Too high / struggling', next: 'electricity_confirm' } ] },
+        electricity_confirm: { text: "Now {{contact.first_name}}, if you could reduce your annual energy expenses, would you?", responses: [ { label: 'Yes', next: 'pathA' }, { label: 'Maybe / tell me more', next: 'pathA' }, { label: 'Not interested', next: 'voicemail' } ] },
+        water_confirm: { text: "Now {{contact.first_name}}, if you could reduce your annual water expenses, would you?", responses: [ { label: 'Yes', next: 'water_savings_pitch' }, { label: 'Maybe / tell me more', next: 'water_savings_pitch' }, { label: 'Not interested', next: 'voicemail' } ] },
+        water_savings_pitch: { text: "We have been able to guarantee 10% in savings on water bills for the year, and in most cases — our clients end up saving anywhere between 20%-30% — annually. <br><br>How much are you guys spending on water expenses on a monthly basis?", responses: [ { label: 'Share amount ($X/month)', next: 'water_calculate_savings' }, { label: 'Not sure / need to check', next: 'water_appointment_offer' }, { label: 'Too high / struggling', next: 'water_calculate_savings' } ] },
+        water_calculate_savings: { text: "Got it — so if we could save {{account.name}} even just 15% on that, we're talking real money back in your budget every year. Would it make sense to set up a quick 10-minute call where I can show you exactly how we do it?", responses: [ { label: 'Yes, schedule it', next: 'water_book_appointment' }, { label: 'Send me details first', next: 'water_send_details' }, { label: 'Not now', next: 'voicemail' } ] },
+        water_appointment_offer: { text: "No problem — most companies don't have that number off the top of their head. What works best for you, {{contact.first_name}} — a quick 10-minute call today or tomorrow where I can walk you through our water savings program and we can pull those numbers together?", responses: [ { label: 'Book on calendar', next: 'water_book_appointment' }, { label: 'Email me the details', next: 'water_send_details' }, { label: 'Not interested', next: 'voicemail' } ] },
+        water_book_appointment: { text: "Perfect — I'll get that on the calendar for you. I'll bring some case studies from similar {{account.industry}} companies in {{account.city}} so you can see the exact savings we've achieved. Sound good?", responses: [ { label: 'Sounds good', next: 'start' }, { label: 'What do I need to prepare?', next: 'water_prep_info' }, { label: 'Back', next: 'water_calculate_savings' } ] },
+        water_send_details: { text: "No problem — I'll send over a quick overview with our water savings case studies and next steps for {{account.name}}. Should I send it to {{contact.email}} or is there a better email?", responses: [ { label: 'Send to that email', next: 'start' }, { label: 'Use a different email', next: 'start' }, { label: 'Back', next: 'water_calculate_savings' } ] },
+        water_prep_info: { text: "Just have your most recent water bill handy — that's it. We'll walk through the numbers together and I can show you where the savings come from. I'll send a calendar invite right after this call.", responses: [ { label: 'Perfect, talk soon', next: 'start' }, { label: 'Back', next: 'water_book_appointment' } ] },
         gatekeeper_intro: { text: 'Good {{day.part}}. I\'m actually needin\' to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?', responses: [ { label: "What's this about?", next: 'gatekeeper_whats_about' }, { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' } ] },
         gatekeeper_whats_about: { text: 'My name is Lewis with PowerChoosers.com and I am looking to speak with someone about the future electricity agreements for {{account.name}}. Who would be the best person for that?', responses: [ { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' }, { label: 'I can help you', next: 'pathA' } ] },
         transfer_dialing: { text: 'Connecting... Ringing...', responses: [ { label: 'Call connected', next: 'hook' }, { label: 'Not connected', next: 'voicemail' } ] },
@@ -1914,17 +1935,45 @@
         const key = state.current;
         const node = FLOW[key];
         if (!node) { display.innerHTML = ''; responses.innerHTML = ''; return; }
-        const live = (function(){ try { return hasActiveCall() || (currentCallContext && currentCallContext.isActive); } catch(_) { return false; } })();
-        display.innerHTML = live ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
-        responses.innerHTML = '';
-        (node.responses || []).forEach(r => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'btn-secondary';
-          b.textContent = r.label || '';
-          b.addEventListener('click', () => { if (r.next && FLOW[r.next]) { state.history.push(state.current); state.current = r.next; renderNode(); } });
-          responses.appendChild(b);
-        });
+        
+        // Fade out current content
+        display.classList.remove('--visible');
+        const oldButtons = responses.querySelectorAll('.btn-secondary');
+        oldButtons.forEach(b => b.classList.remove('--visible'));
+        
+        // Update DOM immediately (but content will be invisible due to missing --visible class)
+        setTimeout(() => {
+          const live = (function(){ try { return hasActiveCall() || (currentCallContext && currentCallContext.isActive); } catch(_) { return false; } })();
+          display.innerHTML = live ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
+          responses.innerHTML = '';
+          (node.responses || []).forEach(r => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn-secondary';
+            b.textContent = r.label || '';
+            b.addEventListener('click', () => { if (r.next && FLOW[r.next]) { state.history.push(state.current); state.current = r.next; renderNode(); } });
+            responses.appendChild(b);
+          });
+          
+          // Wait for browser to paint new content, then measure and animate
+          requestAnimationFrame(() => {
+            // Capture snapshot AFTER new content is in DOM for accurate measurements
+            const snapshot = captureLayoutSnapshot(card);
+            
+            // Run smooth resize with accurate target height
+            smoothResize(card, 250);
+            
+            // Run FLIP animation to shift dialpad smoothly
+            runFlipFromSnapshot(snapshot, card, 250);
+            
+            // Fade in new content after measurements are done
+            requestAnimationFrame(() => {
+              display.classList.add('--visible');
+              const newButtons = responses.querySelectorAll('.btn-secondary');
+              newButtons.forEach(b => b.classList.add('--visible'));
+            });
+          });
+        }, 80);
       }
 
       function startAt(key){ state.current = key; state.history = []; renderNode(); }
@@ -1984,17 +2033,59 @@
     function toggleMiniScripts(card){
       const wrap = card.querySelector('.mini-scripts-wrap');
       if (!wrap) return;
-      const snapshot = captureLayoutSnapshot(card);
       const isHidden = wrap.hasAttribute('hidden');
+      
       if (isHidden) {
+        // OPENING SEQUENCE
+        // 1. Build UI without --show class (invisible)
         buildMiniScriptsUI(card);
+        const miniScripts = wrap.querySelector('.mini-scripts');
+        if (miniScripts) miniScripts.classList.remove('--show');
+        
+        // 2. Unhide wrapper
         wrap.removeAttribute('hidden');
-        try { const si = wrap.querySelector('.ms-input'); if (si) si.focus(); } catch(_) {}
+        
+        // 3. Wait for next frame to ensure DOM is ready
+        requestAnimationFrame(() => {
+          // 4. Capture FLIP snapshot now that content is in DOM
+          const snapshot = captureLayoutSnapshot(card);
+          
+          // 5. Add --show class to fade in content
+          requestAnimationFrame(() => {
+            if (miniScripts) miniScripts.classList.add('--show');
+            
+            // 6. Run smoothResize to expand container
+            smoothResize(card, 300);
+            
+            // 7. Run FLIP animation to shift dialpad down
+            runFlipFromSnapshot(snapshot, card, 300);
+            
+            // Focus search input after animations start
+            try { const si = wrap.querySelector('.ms-input'); if (si) setTimeout(() => si.focus(), 50); } catch(_) {}
+          });
+        });
       } else {
-        wrap.setAttribute('hidden','');
-        wrap.innerHTML = '';
+        // CLOSING SEQUENCE
+        const miniScripts = wrap.querySelector('.mini-scripts');
+        
+        // 1. Capture FLIP snapshot
+        const snapshot = captureLayoutSnapshot(card);
+        
+        // 2. Remove --show class to fade out content
+        if (miniScripts) miniScripts.classList.remove('--show');
+        
+        // 3. Run smoothResize to collapse container
+        smoothResize(card, 300);
+        
+        // 4. Run FLIP animation to shift dialpad up
+        runFlipFromSnapshot(snapshot, card, 300);
+        
+        // 5. After 250ms, hide wrapper and clear innerHTML
+        setTimeout(() => {
+          wrap.setAttribute('hidden','');
+          wrap.innerHTML = '';
+        }, 250);
       }
-      runFlipFromSnapshot(snapshot, card, 300);
     }
 
     const backspace = () => {
@@ -2340,8 +2431,8 @@
             setTimeout(() => {
               const callEndTime = Date.now();
               const duration = Math.floor((callEndTime - callStartTime) / 1000);
-              updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
-              try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
+          updateCallStatus(number, 'completed', callStartTime, duration, twilioCallSid || callId);
+          try { document.dispatchEvent(new CustomEvent('pc:recent-calls-refresh', { detail: { number } })); } catch(_) {}
             }, 0);
           }
           
@@ -2658,9 +2749,9 @@
           // [CRITICAL FIX] Fire-and-forget to prevent UI freeze/blocking
           // Don't await - let it run in background so user can navigate immediately
           fetch(`${base}/api/calls`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
           }).then(resp => resp.json()).then(respJson => {
             phoneLog('[Phone] /api/calls response (background)', { status: 'success', body: respJson });
           }).catch(err => {
@@ -2704,8 +2795,8 @@
           if (window.callsModule && typeof window.callsModule.loadData === 'function') {
             // Schedule in next tick to avoid blocking current execution
             setTimeout(() => {
-              try { window.callsModule.loadData(); } catch(_) {}
-              phoneLog(`[Phone] Refreshed calls page data (${label})`);
+            try { window.callsModule.loadData(); } catch(_) {}
+            phoneLog(`[Phone] Refreshed calls page data (${label})`);
             }, 0);
           }
         };
