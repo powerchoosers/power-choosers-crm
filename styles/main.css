@@ -10368,6 +10368,15 @@ margin-bottom: var(--spacing-md);
 }
 /* Full-width row (e.g., Short Description) */
 #account-detail-view .info-row--full { grid-column: 1 / -1; }
+
+/* Contact detail service addresses should use same 4-column grid as account detail */
+#contact-service-addresses-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  #contact-service-addresses-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  #contact-service-addresses-grid { grid-template-columns: 1fr; }
+}
 /* Multiline value display */
 #account-detail-view .info-value-wrap--multiline { align-items: flex-start; }
 #account-detail-view .info-value-wrap .info-value-text--multiline {
