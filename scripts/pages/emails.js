@@ -2043,10 +2043,11 @@ class EmailManager {
 </table>`;
     }
 
-    // Template 6: Invoice Request (Clean modern theme)
+    // Template 6: Invoice Request (Clean modern theme with 2-column layout)
     buildInvoiceHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         const checklist = Array.isArray(data.checklist_items) ? data.checklist_items : [data.checklist_items || ''];
+        const discrepancies = Array.isArray(data.discrepancies) ? data.discrepancies : [data.discrepancies || ''];
         
         return `
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">
@@ -2067,21 +2068,37 @@ class EmailManager {
 </div>
 
 <div style="background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #bae6fd;">
-    <h3 style="color:#0369a1; font-size:18px; margin:0 0 15px 0; text-align:center; font-weight:600;">✓ What We'll Review</h3>
-    <div style="padding-left:0;">
-        ${checklist.map(item => 
-            `<div style="padding:8px 0 8px 20px;">
-                <p style="color:#1f2937; font-size:14px; line-height:1.6; margin:0;">• ${this.escapeHtml(item)}</p>
-            </div>`
-        ).join('')}
-    </div>
+    <table width="100%" cellspacing="0" cellpadding="0" border="0">
+        <tr>
+            <td width="50%" style="vertical-align:top; padding-right:10px;">
+                <h3 style="color:#0369a1; font-size:16px; margin:0 0 12px 0; font-weight:600;">✓ What We'll Review</h3>
+                <div style="padding-left:0; text-align:left;">
+                    ${checklist.map(item => 
+                        `<div style="padding:4px 0;">
+                            <p style="color:#1f2937; font-size:13px; line-height:1.5; margin:0;">• ${this.escapeHtml(item)}</p>
+                        </div>`
+                    ).join('')}
+                </div>
+            </td>
+            <td width="50%" style="vertical-align:top; padding-left:10px;">
+                <h3 style="color:#dc2626; font-size:16px; margin:0 0 12px 0; font-weight:600;">⚠️ Common Discrepancies</h3>
+                <div style="padding-left:0; text-align:left;">
+                    ${discrepancies.map(item => 
+                        `<div style="padding:4px 0;">
+                            <p style="color:#1f2937; font-size:13px; line-height:1.5; margin:0;">• ${this.escapeHtml(item)}</p>
+                        </div>`
+                    ).join('')}
+                </div>
+            </td>
+        </tr>
+    </table>
 </div>
 
 <table width="100%" cellpadding="15" cellspacing="0" border="0" style="background:linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius:8px; margin:20px 0; border:1px solid #fca5a5;">
     <tr>
         <td style="text-align:center;">
             <p style="color:#dc2626; font-size:16px; margin:0; font-weight:600;">
-                ⏰ Needed: ${this.escapeHtml(data.deadline || 'By end of day today')}
+                ⏰ ${this.escapeHtml(data.deadline || 'Needed in 3 business days')}
             </p>
         </td>
     </tr>
@@ -2172,8 +2189,8 @@ ${sections.map((section, idx) => {
   <meta http-equiv="x-ua-compatible" content="ie=edge" />
 </head>
 <body style="margin:0; padding:0; background-color:#f8fafc; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
-  <center role="presentation" style="width:100%; background-color:#f8fafc; padding:20px 0;">
-    <div style="max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.08); overflow:hidden;">
+  <center role="presentation" style="width:100%; background-color:#f8fafc;">
+    <div style="max-width:600px; margin:0 auto; background-color:#ffffff;">
       
       <!-- Power Choosers Header -->
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); text-align:center;">
@@ -2190,21 +2207,11 @@ ${sections.map((section, idx) => {
         ${sonarGeneratedHtml}
       </div>
 
-      <!-- Power Choosers Footer with Signature -->
+      <!-- Power Choosers Footer (No signature - handled by email client) -->
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff;">
         <tr>
           <td style="padding:20px 24px; text-align:center;">
             <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 24px; border-top:1px solid rgba(255,255,255,0.2);">
-            <div style="color:#ffffff; font-size:14px; line-height:1.4;">
-              <strong>Lewis Patterson</strong><br>
-              Energy Strategist<br>
-              817-663-0380<br>
-              Fort Worth, Texas
-            </div>
           </td>
         </tr>
       </table>
