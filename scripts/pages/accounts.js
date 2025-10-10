@@ -90,15 +90,7 @@
               if (window.__restoringAccounts) {
                 window.__restoringAccounts = false; 
                 console.log('[Accounts] Cleared restoration flag');
-                
-                // Trigger a final render to apply any pending account updates
-                // that were skipped during restoration
-                setTimeout(() => {
-                  try {
-                    render();
-                    console.log('[Accounts] Applied pending updates after restoration');
-                  } catch (_) {}
-                }, 100);
+                // No need for additional render() - applyFilters() already rendered
               }
             } catch(_){} 
           }, 2000); // Increased to 2 seconds
@@ -763,6 +755,15 @@
         try { window.__restoringAccounts = false; window.__restoringAccountsUntil = 0; } catch(_) {}
       }
       render();
+      
+      // Immediately scan for cached favicon images and mark them loaded (no flicker)
+      requestAnimationFrame(() => {
+        document.querySelectorAll('#accounts-page .company-favicon').forEach(img => {
+          if (img.complete && img.naturalWidth > 0 && !img.classList.contains('icon-loaded')) {
+            img.classList.add('icon-loaded');
+          }
+        });
+      });
     } catch (e) {
       state.data = [];
       state.filtered = [];
@@ -926,8 +927,16 @@
     applyFilters();
   }
 
-  function render() {
+  async function render(forceReloadCalls = false) {
     if (!els.tbody) return;
+    
+    // Reload calls data if forced (e.g., pagination change)
+    if (forceReloadCalls && window.callsModule && typeof window.callsModule.loadData === 'function') {
+      try {
+        await window.callsModule.loadData();
+      } catch (e) { /* noop */ }
+    }
+    
     ensureSelected();
     const pageItems = getPageItems();
     const rows = pageItems.map((a) => rowHtml(a)).join('');
@@ -1311,6 +1320,14 @@
 
   function init() {
     if (!initDomRefs()) return;
+    
+    // FORCE REFRESH BADGES: Clear and reload calls data to ensure badges are accurate
+    // This ensures badges update when navigating back to the page after placing a call
+    if (window.callsModule && typeof window.callsModule.getCallsData === 'function') {
+      const callsData = window.callsModule.getCallsData();
+      console.log('[Accounts] Page init - calls data available:', callsData?.length || 0, 'calls');
+    }
+    
     // Load saved order and prep header
     accountsColumnOrder = loadAccountsColumnOrder();
     ensureAccountsHeaderColMeta();
@@ -1324,48 +1341,6 @@
     loadDataOnce();
     startLiveAccountsListener();
     
-    // Listen for calls data load to refresh badges
-    if (!document._accountsCallsLoadedBound) {
-      document.addEventListener('pc:calls-loaded', () => {
-        try {
-          // Re-render to update badges now that calls data is available
-          if (state.loaded) render();
-        } catch (e) { /* noop */ }
-      });
-      document._accountsCallsLoadedBound = true;
-    }
-    
-    // Listen for new calls being logged to remove "No Calls" badge in real-time
-    if (!document._accountsCallLoggedBound) {
-      document.addEventListener('pc:call-logged', (e) => {
-        try {
-          const { targetPhone, accountId } = e.detail;
-          const normalizePhone = (phone) => String(phone || '').replace(/\D/g, '').slice(-10);
-          const targetNormalized = normalizePhone(targetPhone);
-          
-          // Find all account rows that match this call
-          state.filtered.forEach((account) => {
-            const accountPhone = normalizePhone(account.companyPhone || account.phone || account.primaryPhone || account.mainPhone);
-            
-            // Check if this call matches this account's phone or accountId
-            const matchesPhone = accountPhone.length === 10 && accountPhone === targetNormalized;
-            const matchesAccount = accountId && account.id === accountId;
-            
-            if (matchesPhone || matchesAccount) {
-              // Find and remove the "No Calls" badge from this row
-              const row = els.tbody?.querySelector(`tr[data-account-id="${account.id}"]`);
-              if (row) {
-                const badge = row.querySelector('.status-badge-no-calls');
-                if (badge) {
-                  badge.remove();
-                }
-              }
-            }
-          });
-        } catch (e) { /* noop */ }
-      });
-      document._accountsCallLoggedBound = true;
-    }
   }
 
   // Helper function to calculate contact activity score (same logic as calls page)
@@ -1949,7 +1924,7 @@
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(current, totalPages, (page) => {
         state.currentPage = page;
-        render();
+        render(true); // Force reload calls data on pagination change
         // Scroll to top after page change via unified paginator
         try {
           requestAnimationFrame(() => {
@@ -2015,6 +1990,8 @@
     getCurrentState
   };
 
-  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+  if (document.readyState === 'loading') { 
+    document.addEventListener('DOMContentLoaded', init); 
+  }
   else { init(); }
 })();

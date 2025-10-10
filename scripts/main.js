@@ -3686,7 +3686,7 @@ window.__pcFaviconHelper = {
     onFaviconLoad: function(containerId) {
         const img = document.getElementById(containerId);
         if (img) {
-            img.classList.add('favicon-loaded');
+            img.classList.add('icon-loaded');
         }
     },
 
@@ -3739,19 +3739,32 @@ window.__pcIconAnimator = {
     observeImages: function() {
         // Get all favicon images currently in DOM
         const loadImage = (img) => {
-            if (img.complete && img.naturalWidth > 0) {
-                // Already loaded
+            // Prevent duplicate processing
+            if (img.dataset.iconObserved) return;
+            img.dataset.iconObserved = 'true';
+            
+            // Check if already loaded (cached images)
+            const checkAndLoad = () => {
+                if (img.complete && img.naturalWidth > 0) {
+                    // Synchronously add class for cached images - no animation delay
+                    img.classList.add('icon-loaded');
+                    return true;
+                }
+                return false;
+            };
+            
+            // Immediate check for cached images
+            if (checkAndLoad()) return;
+            
+            // If not cached, wait for load event
+            img.addEventListener('load', () => {
                 requestAnimationFrame(() => img.classList.add('icon-loaded'));
-            } else {
-                // Wait for load
-                img.addEventListener('load', () => {
-                    requestAnimationFrame(() => img.classList.add('icon-loaded'));
-                }, { once: true });
-                // Handle error - still show with animation
-                img.addEventListener('error', () => {
-                    requestAnimationFrame(() => img.classList.add('icon-loaded'));
-                }, { once: true });
-            }
+            }, { once: true });
+            
+            // Handle error - still show with animation
+            img.addEventListener('error', () => {
+                requestAnimationFrame(() => img.classList.add('icon-loaded'));
+            }, { once: true });
         };
         
         // Load existing images

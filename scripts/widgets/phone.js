@@ -2839,15 +2839,18 @@
             phoneLog('[Phone] /api/calls response (background)', { status: 'success', body: respJson });
             // Dispatch event to update "No Calls" badges on People/Accounts pages
             try {
-              document.dispatchEvent(new CustomEvent('pc:call-logged', { 
-                detail: { 
-                  call: respJson.call || payload,
-                  targetPhone: payload.targetPhone,
-                  accountId: payload.accountId,
-                  contactId: payload.contactId
-                } 
-              }));
-            } catch (e) { /* noop */ }
+              const eventDetail = { 
+                call: respJson.call || payload,
+                targetPhone: payload.targetPhone,
+                accountId: payload.accountId,
+                contactId: payload.contactId
+              };
+              console.log('[Phone] Dispatching pc:call-logged event', eventDetail);
+              document.dispatchEvent(new CustomEvent('pc:call-logged', { detail: eventDetail }));
+              console.log('[Phone] ✓ Event dispatched successfully');
+            } catch (e) { 
+              console.error('[Phone] Error dispatching pc:call-logged event:', e);
+            }
           }).catch(err => {
             phoneLog('[Phone] /api/calls error (non-blocking)', err);
           });
