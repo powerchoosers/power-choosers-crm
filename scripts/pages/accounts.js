@@ -1143,6 +1143,11 @@
     document.head.appendChild(style);
   }
 
+  // Helper function to normalize phone numbers (last 10 digits)
+  function normalizePhone(phone) {
+    return String(phone || '').replace(/\D/g, '').slice(-10);
+  }
+
   // Generate status badges for an account
   function generateStatusBadgesForAccount(account) {
     const badges = [];
@@ -1167,17 +1172,25 @@
         const companyPhone = account.companyPhone || account.phone || account.primaryPhone || account.mainPhone;
         if (!companyPhone) return false; // No phone number, don't show badge
         
-        const phone = String(companyPhone).replace(/\D/g, '');
-        if (!phone) return false;
+        const phone = normalizePhone(companyPhone);
+        if (phone.length !== 10) return false; // Invalid phone number
         
-        // Check if any calls exist for this phone number
-        const callsData = (typeof window.getCallsData === 'function') ? window.getCallsData() : [];
-        if (!callsData || callsData.length === 0) return true; // No calls in system
+        // Get calls data from callsModule
+        const callsData = (window.callsModule && typeof window.callsModule.getCallsData === 'function') 
+          ? window.callsModule.getCallsData() 
+          : [];
+        
+        if (!callsData || callsData.length === 0) return true; // No calls in system, show badge
         
         // Check if any call matches the account's phone number
         const hasCall = callsData.some(call => {
-          const callPhone = String(call.to || call.from || '').replace(/\D/g, '');
-          return callPhone.includes(phone) || phone.includes(callPhone);
+          const callTo = normalizePhone(call.to);
+          const callFrom = normalizePhone(call.from);
+          const callTarget = normalizePhone(call.targetPhone);
+          
+          return (phone === callTo && callTo.length === 10) || 
+                 (phone === callFrom && callFrom.length === 10) || 
+                 (phone === callTarget && callTarget.length === 10);
         });
         
         return !hasCall; // Show badge if no calls found
