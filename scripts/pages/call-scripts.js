@@ -531,7 +531,7 @@
       ]
     },
     gatekeeper_intro: {
-      text: 'Good {{day.part}}. I\'m actually needin\' to speak with someone over electricity agreements and contracts for {{account.name}} — do you know who would be responsible for that?',
+      text: 'Good {{day.part}}. I\'m actually needin\' to speak with someone over utility expenses and contracts for {{account.name}} — do you know who would be responsible for that?',
       responses: [
         { label: "What's this about?", next: 'gatekeeper_whats_about' },
         { label: "I'll connect you", next: 'transfer_dialing' },
