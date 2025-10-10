@@ -1114,8 +1114,89 @@
       .delete-popover::after {
         background: var(--bg-container) !important;
       }
+      
+      /* Status badges */
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        margin-left: 8px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-radius: 3px;
+        white-space: nowrap;
+      }
+      
+      .status-badge-new {
+        background: #10b981;
+        color: #fff;
+      }
+      
+      .status-badge-no-calls {
+        background: rgba(156, 163, 175, 0.15);
+        color: rgba(156, 163, 175, 0.85);
+        border: 1px solid rgba(156, 163, 175, 0.25);
+      }
     `;
     document.head.appendChild(style);
+  }
+
+  // Generate status badges for an account
+  function generateStatusBadgesForAccount(account) {
+    const badges = [];
+    
+    // Check if account is new (created within 24 hours)
+    const isNew = (() => {
+      try {
+        const created = coerceDate(account.createdAt);
+        if (!created) return false;
+        const now = new Date();
+        const hoursDiff = (now - created) / (1000 * 60 * 60);
+        return hoursDiff < 24;
+      } catch (e) {
+        return false;
+      }
+    })();
+    
+    // Check if account has any calls logged
+    const hasNoCalls = (() => {
+      try {
+        // Get the company phone number
+        const companyPhone = account.companyPhone || account.phone || account.primaryPhone || account.mainPhone;
+        if (!companyPhone) return false; // No phone number, don't show badge
+        
+        const phone = String(companyPhone).replace(/\D/g, '');
+        if (!phone) return false;
+        
+        // Check if any calls exist for this phone number
+        const callsData = (typeof window.getCallsData === 'function') ? window.getCallsData() : [];
+        if (!callsData || callsData.length === 0) return true; // No calls in system
+        
+        // Check if any call matches the account's phone number
+        const hasCall = callsData.some(call => {
+          const callPhone = String(call.to || call.from || '').replace(/\D/g, '');
+          return callPhone.includes(phone) || phone.includes(callPhone);
+        });
+        
+        return !hasCall; // Show badge if no calls found
+      } catch (e) {
+        return false;
+      }
+    })();
+    
+    // Add "New" badge (green)
+    if (isNew) {
+      badges.push('<span class="status-badge status-badge-new">New</span>');
+    }
+    
+    // Add "No Calls" badge (grey) - only if not new (to avoid clutter)
+    if (!isNew && hasNoCalls) {
+      badges.push('<span class="status-badge status-badge-no-calls">No Calls</span>');
+    }
+    
+    return badges.join('');
   }
 
   function rowHtml(a) {
@@ -1161,9 +1242,12 @@
     const benefits = safe(a.benefits || '');
     const painPoints = safe(a.painPoints || '');
 
+    // Generate status badges
+    const badges = generateStatusBadgesForAccount(a);
+
     const cells = {
       select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${aid}" aria-label="Select account"${checked}></td>`,
-      name: `<td class="name-cell"><a href="#account-details" class="acct-link" data-id="${aid}" title="View account details"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 32 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : '') : '')}<span class="name-text account-name">${escapeHtml(name || 'Unknown Account')}</span></span></a></td>`,
+      name: `<td class="name-cell"><a href="#account-details" class="acct-link" data-id="${aid}" title="View account details"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 32 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : '') : '')}<span class="name-text account-name">${escapeHtml(name || 'Unknown Account')}</span>${badges}</span></a></td>`,
       industry: `<td>${escapeHtml(industry)}</td>`,
       domain: `<td>${escapeHtml(domain)}</td>`,
       companyPhone: `<td data-field="companyPhone" class="phone-cell click-to-call" data-phone="${escapeHtml(phone)}" data-name="${escapeHtml(name)}">${escapeHtml(formatPhoneForDisplay(phone))}</td>`,
