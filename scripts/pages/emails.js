@@ -2674,12 +2674,30 @@ ${sections.map((section, idx) => {
                 }
             }
 
-            // Append a clean closing block at the end with actual sender name (no variable chip)
-            const pCloseName = document.createElement('p');
-            pCloseName.appendChild(document.createTextNode('Best regards,'));
-            pCloseName.appendChild(document.createElement('br'));
-            pCloseName.appendChild(document.createTextNode(senderFirstName));
-            editor.appendChild(pCloseName);
+            // Check if closing already exists before appending
+            const allText = editor.textContent || '';
+            const hasClosing = /best\s+regards/i.test(allText);
+            
+            if (!hasClosing) {
+                // Only append closing if not already present
+                const pCloseName = document.createElement('p');
+                pCloseName.appendChild(document.createTextNode('Best regards,'));
+                pCloseName.appendChild(document.createElement('br'));
+                pCloseName.appendChild(document.createTextNode(senderFirstName));
+                editor.appendChild(pCloseName);
+            } else {
+                // Closing exists - check if it has the sender name, if not, add it
+                const paragraphs = Array.from(editor.querySelectorAll('p'));
+                const closingPara = paragraphs.find(p => /best\s+regards/i.test(p.textContent));
+                if (closingPara) {
+                    const text = closingPara.textContent || '';
+                    // If it's just "Best regards," without name, add the name
+                    if (text.trim() === 'Best regards,' || text.trim() === 'Best regards') {
+                        closingPara.appendChild(document.createElement('br'));
+                        closingPara.appendChild(document.createTextNode(senderFirstName));
+                    }
+                }
+            }
 
             // Remove empty paragraphs and collapse extra blanks (leave natural spacing to CSS)
             Array.from(editor.querySelectorAll('p')).forEach((p, idx, arr) => {
