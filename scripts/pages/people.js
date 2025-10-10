@@ -2548,7 +2548,7 @@
     for (const key of order) {
       if (cells[key]) tds.push(cells[key]);
     }
-    return `\n<tr${rowClass}>\n  ${tds.join('\n  ')}\n</tr>`;
+    return `\n<tr${rowClass} data-contact-id="${escapeHtml(c.id)}">\n  ${tds.join('\n  ')}\n</tr>`;
   }
 
   function emptyHtml() {
@@ -2636,6 +2636,43 @@
         } catch (e) { /* noop */ }
       });
       document._peopleCallsLoadedBound = true;
+    }
+    
+    // Listen for new calls being logged to remove "No Calls" badge in real-time
+    if (!document._peopleCallLoggedBound) {
+      document.addEventListener('pc:call-logged', (e) => {
+        try {
+          const { targetPhone, accountId, contactId } = e.detail;
+          const normalizePhone = (phone) => String(phone || '').replace(/\D/g, '').slice(-10);
+          const targetNormalized = normalizePhone(targetPhone);
+          
+          // Find all contact rows that match this call
+          state.filtered.forEach((contact, index) => {
+            const contactPhones = [
+              normalizePhone(contact.mobile),
+              normalizePhone(contact.workDirectPhone),
+              normalizePhone(contact.otherPhone)
+            ].filter(p => p.length === 10);
+            
+            // Check if this call matches this contact's phone or contactId
+            const matchesPhone = contactPhones.includes(targetNormalized);
+            const matchesContact = contactId && contact.id === contactId;
+            const matchesAccount = accountId && contact.accountId === accountId;
+            
+            if (matchesPhone || matchesContact || matchesAccount) {
+              // Find and remove the "No Calls" badge from this row
+              const row = els.tbody?.querySelector(`tr[data-contact-id="${contact.id}"]`);
+              if (row) {
+                const badge = row.querySelector('.status-badge-no-calls');
+                if (badge) {
+                  badge.remove();
+                }
+              }
+            }
+          });
+        } catch (e) { /* noop */ }
+      });
+      document._peopleCallLoggedBound = true;
     }
   }
 

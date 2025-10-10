@@ -3582,6 +3582,24 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   };
   
   document.addEventListener('DOMContentLoaded', init);
+  
+  // Listen for new calls being logged to update internal state
+  if (!document._callsModuleCallLoggedBound) {
+    document.addEventListener('pc:call-logged', (e) => {
+      try {
+        const { call } = e.detail;
+        if (call && state.data) {
+          // Add the new call to the beginning of the data array (most recent first)
+          state.data.unshift(call);
+          // Also add to filtered if we're on the calls page
+          if (state.filtered) {
+            state.filtered.unshift(call);
+          }
+        }
+      } catch (err) { /* noop */ }
+    });
+    document._callsModuleCallLoggedBound = true;
+  }
 })();
 
   function parseTimelineToTask(text){

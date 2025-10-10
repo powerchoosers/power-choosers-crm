@@ -1291,7 +1291,7 @@
     const tds = [];
     const order = (accountsColumnOrder && accountsColumnOrder.length) ? accountsColumnOrder : DEFAULT_ACCOUNTS_COL_ORDER;
     for (const key of order) if (cells[key]) tds.push(cells[key]);
-    return `\n<tr${rowClass}>\n  ${tds.join('\n  ')}\n</tr>`;
+    return `\n<tr${rowClass} data-account-id="${aid}">\n  ${tds.join('\n  ')}\n</tr>`;
   }
 
   function emptyHtml() {
@@ -1333,6 +1333,38 @@
         } catch (e) { /* noop */ }
       });
       document._accountsCallsLoadedBound = true;
+    }
+    
+    // Listen for new calls being logged to remove "No Calls" badge in real-time
+    if (!document._accountsCallLoggedBound) {
+      document.addEventListener('pc:call-logged', (e) => {
+        try {
+          const { targetPhone, accountId } = e.detail;
+          const normalizePhone = (phone) => String(phone || '').replace(/\D/g, '').slice(-10);
+          const targetNormalized = normalizePhone(targetPhone);
+          
+          // Find all account rows that match this call
+          state.filtered.forEach((account) => {
+            const accountPhone = normalizePhone(account.companyPhone || account.phone || account.primaryPhone || account.mainPhone);
+            
+            // Check if this call matches this account's phone or accountId
+            const matchesPhone = accountPhone.length === 10 && accountPhone === targetNormalized;
+            const matchesAccount = accountId && account.id === accountId;
+            
+            if (matchesPhone || matchesAccount) {
+              // Find and remove the "No Calls" badge from this row
+              const row = els.tbody?.querySelector(`tr[data-account-id="${account.id}"]`);
+              if (row) {
+                const badge = row.querySelector('.status-badge-no-calls');
+                if (badge) {
+                  badge.remove();
+                }
+              }
+            }
+          });
+        } catch (e) { /* noop */ }
+      });
+      document._accountsCallLoggedBound = true;
     }
   }
 
