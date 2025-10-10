@@ -3491,6 +3491,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     stopAutoRefresh,
     getCallContactById,
     getCurrentState,
+    getCallsData: () => state.data,
     // Debug functions
     testApiEndpoint: async function() {
       const base = 'https://power-choosers-crm.vercel.app';

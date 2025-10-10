@@ -2330,6 +2330,11 @@
     else els.titleClear.setAttribute('hidden', '');
   }
 
+  // Helper function to normalize phone numbers (last 10 digits)
+  function normalizePhone(phone) {
+    return String(phone || '').replace(/\D/g, '').slice(-10);
+  }
+
   // Generate status badges for a contact
   function generateStatusBadges(contact) {
     const badges = [];
@@ -2350,23 +2355,67 @@
     // Check if contact has any calls logged
     const hasNoCalls = (() => {
       try {
-        // Get all phone numbers for this contact
-        const phones = [
-          contact.workDirectPhone,
-          contact.mobile,
-          contact.otherPhone
-        ].filter(Boolean).map(p => String(p).replace(/\D/g, ''));
+        // Collect all phone numbers for this contact
+        const phoneNumbers = new Set();
+        
+        // Add contact's direct phone numbers
+        if (contact.workDirectPhone) phoneNumbers.add(normalizePhone(contact.workDirectPhone));
+        if (contact.mobile) phoneNumbers.add(normalizePhone(contact.mobile));
+        if (contact.otherPhone) phoneNumbers.add(normalizePhone(contact.otherPhone));
+        
+        // Also add company phone from linked account
+        try {
+          const accounts = (typeof window.getAccountsData === 'function') ? window.getAccountsData() : [];
+          let linkedAccount = null;
+          
+          // Try to find by accountId first
+          if (contact.accountId) {
+            linkedAccount = accounts.find(a => a.id === contact.accountId);
+          }
+          
+          // Fallback to company name match
+          if (!linkedAccount && contact.companyName) {
+            const normName = String(contact.companyName).toLowerCase().trim();
+            linkedAccount = accounts.find(a => {
+              const accName = String(a.accountName || a.name || '').toLowerCase().trim();
+              return accName === normName;
+            });
+          }
+          
+          // Add company phone if found
+          if (linkedAccount) {
+            const companyPhone = linkedAccount.companyPhone || linkedAccount.phone;
+            if (companyPhone) {
+              phoneNumbers.add(normalizePhone(companyPhone));
+            }
+          }
+        } catch (e) {
+          // Silently continue if account lookup fails
+        }
+        
+        // Convert to array and filter out empty strings
+        const phones = Array.from(phoneNumbers).filter(p => p.length === 10);
         
         if (phones.length === 0) return false; // No phone numbers, don't show badge
         
-        // Check if any calls exist for these phone numbers
-        const callsData = (typeof window.getCallsData === 'function') ? window.getCallsData() : [];
-        if (!callsData || callsData.length === 0) return true; // No calls in system
+        // Get calls data from callsModule
+        const callsData = (window.callsModule && typeof window.callsModule.getCallsData === 'function') 
+          ? window.callsModule.getCallsData() 
+          : [];
+        
+        if (!callsData || callsData.length === 0) return true; // No calls in system, show badge
         
         // Check if any call matches any of the contact's phone numbers
         const hasCall = callsData.some(call => {
-          const callPhone = String(call.to || call.from || '').replace(/\D/g, '');
-          return phones.some(p => callPhone.includes(p) || p.includes(callPhone));
+          const callTo = normalizePhone(call.to);
+          const callFrom = normalizePhone(call.from);
+          const callTarget = normalizePhone(call.targetPhone);
+          
+          return phones.some(p => 
+            (p === callTo && callTo.length === 10) || 
+            (p === callFrom && callFrom.length === 10) || 
+            (p === callTarget && callTarget.length === 10)
+          );
         });
         
         return !hasCall; // Show badge if no calls found
