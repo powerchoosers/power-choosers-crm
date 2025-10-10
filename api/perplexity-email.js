@@ -69,6 +69,40 @@ function formatDeadline(days = 3) {
   return `Needed in ${days} business days (by ${formatted})`;
 }
 
+// Calculate appropriate meeting times (2+ business days out)
+function getSuggestedMeetingTimes() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  
+  // Calculate 2 business days from today
+  const firstSlot = addBusinessDays(today, 2);
+  const secondSlot = addBusinessDays(today, 4); // 4 business days for second option
+  
+  const formatDay = (date) => {
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const today = new Date();
+    const daysUntil = Math.floor((date - today) / (1000 * 60 * 60 * 24));
+    
+    // Determine if it's "this week" or "next week"
+    const todayDay = today.getDay();
+    const targetDay = date.getDay();
+    
+    // If crossing into next week or more than 7 days away
+    if (daysUntil > 7 || (targetDay <= todayDay && daysUntil > 2)) {
+      return `${weekday} next week`;
+    } else {
+      return `this ${weekday}`;
+    }
+  };
+  
+  return {
+    slot1: formatDay(firstSlot),
+    slot2: formatDay(secondSlot),
+    slot1Time: '2-3pm',
+    slot2Time: '10-11am'
+  };
+}
+
 // JSON Schema for Template 1: Warm Intro
 const warmIntroSchema = {
   type: "json_schema",
@@ -356,7 +390,14 @@ Generate text for these fields:
   }
 
   // Standard text mode (existing logic)
-  const identity = `You are an AI email assistant for Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.
+  const identity = `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.
+
+CONTEXT USAGE RULES:
+${contractEndLabel ? `- The recipient's contract ends ${contractEndLabel} - YOU MUST REFERENCE THIS` : ''}
+${notes || transcript ? `- Use call notes/transcript to add specific context from your conversation` : ''}
+${job ? `- Acknowledge their role as ${job}` : ''}
+- Personalize based on their industry and current situation
+- Make it feel like you just spoke with them
 
 KEY CONTEXT:
 - Electricity rates rising 15-25% due to data center demand
@@ -421,23 +462,40 @@ QUALITY REQUIREMENTS:
 ✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
 ✓ Middle paragraph: 3-4 complete sentences
 ✓ MUST mention "15-25%" rate increase
-✓ CTA: 2 specific time slots with question mark
+✓ CTA: 2 COMPLETE time slots with question mark (e.g., "Tuesday 2-3pm or Thursday 10-11am")
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
 ✓ Closing: "Best regards," on its own line
 ✓ DO NOT include citation markers like [1], [2], [3]
 
+PERSONALIZATION REQUIREMENTS:
+${contractEndLabel ? `✓ MUST reference contract ending ${contractEndLabel} - this is CRITICAL context` : ''}
+${energy.supplier ? `✓ Reference their current supplier ${energy.supplier} when relevant` : ''}
+${notes || transcript ? `✓ MUST reference specific details from call notes/transcript` : ''}
+${job ? `✓ Reference their role as ${job} when relevant` : ''}
+${industry ? `✓ Include industry-specific insights for ${industry} sector` : ''}
+
 CRITICAL RULES:
 ❌ NO duplicate names after greeting
-❌ NO vague CTAs
-❌ NO incomplete sentences
+❌ NO vague CTAs - must include BOTH complete time slots from suggested meeting times
+❌ NO incomplete sentences - every sentence must have proper ending
+❌ NO generic contract references - use actual date ${contractEndLabel || 'when provided'}
+❌ NO generic "Tuesday/Thursday" - use the EXACT meeting times provided above
 ✅ MUST stop after paragraph 3
-✅ MUST include question mark in CTA`;
+✅ MUST include question mark in CTA
+✅ MUST use the suggested meeting times with proper "this week" or "next week" context`;
 
   const outputFormat = `
 OUTPUT FORMAT:
 Subject: [Your subject line]
 
-[3 paragraphs of plain text]
+Hi ${firstName || 'there'},
+
+[Paragraph 1: Reference call and their situation ${job ? `as ${job}` : ''} - 2 sentences]
+
+[Paragraph 2: Value prop and urgency ${contractEndLabel ? `- mention contract ending ${contractEndLabel}` : ''} - 3-4 sentences]
+
+[Paragraph 3: CTA with 2 COMPLETE time slots - USE THE SUGGESTED MEETING TIMES PROVIDED ABOVE]
+Example format: "Would [slot1] [time1] or [slot2] [time2] work for a 15-minute call?"
 
 Best regards,`;
 
@@ -462,7 +520,7 @@ export default async function handler(req, res) {
     
     console.log('[Perplexity] Template type:', templateType, 'for prompt:', prompt);
     
-    // Build system prompt with TODAY context
+    // Build system prompt with TODAY context and suggested meeting times
     const today = new Date();
     const todayLabel = today.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -471,11 +529,17 @@ export default async function handler(req, res) {
       day: 'numeric' 
     });
     
+    const meetingTimes = getSuggestedMeetingTimes();
+    
     const dateContext = `TODAY'S DATE: ${todayLabel}
 
-CRITICAL: ALL time references MUST be in the FUTURE.
-✅ Correct: "Tuesday 2-3pm", "Thursday afternoon", "next week"
-❌ Wrong: Past dates
+SUGGESTED MEETING TIMES (2+ business days out):
+- Option 1: ${meetingTimes.slot1} ${meetingTimes.slot1Time}
+- Option 2: ${meetingTimes.slot2} ${meetingTimes.slot2Time}
+
+CRITICAL: Use these EXACT meeting times in your CTA.
+✅ Correct: "Would ${meetingTimes.slot1} ${meetingTimes.slot1Time} or ${meetingTimes.slot2} ${meetingTimes.slot2Time} work for a 15-minute call?"
+❌ Wrong: Generic "Tuesday" or past dates
 
 `;
     
@@ -488,6 +552,7 @@ CRITICAL: ALL time references MUST be in the FUTURE.
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt || 'Draft a professional email' }
       ],
+      max_tokens: 500, // Ensure complete email generation without truncation
       // Add JSON schema for HTML mode
       ...(mode === 'html' ? { response_format: getTemplateSchema(templateType) } : {})
     };
