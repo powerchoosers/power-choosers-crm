@@ -341,17 +341,16 @@ INVOICE REQUEST EMAIL STRUCTURE:
 
 Paragraph 1 (2-3 sentences):
 - Context from our conversation about conducting energy analysis
-- Explain we'll identify discrepancies and determine how ${company || 'the company'} is using energy
-- Reference notes/transcripts if available
+- Explain we'll identify discrepancies and determine how ${company || 'the company'} is using energy and the best plan moving forward
+- DO NOT explicitly mention "notes/transcripts" - just reference "as we discussed"
 
-Paragraph 2 (Bullet list):
-What we'll review from your invoice:
+Paragraph 2 (What we'll review from your invoice:):
 • Invoice date and unique invoice number
-• Billing period matching contract terms
-• Detailed breakdown of charges and rates
-• Payment instructions and banking details
+• Billing period (start and end dates)
+• Detailed charge breakdown (including kWh rate, demand charges, fees)
+• Payment details and remittance address
 
-Paragraph 3 (CTA):
+Paragraph 3 (CTA - use EXACTLY this text):
 "Will you be able to send over the invoice by end of day so me and my team can get started?"
 
 CRITICAL RULES:
@@ -360,7 +359,9 @@ CRITICAL RULES:
 ✓ Closing: "Best regards," on its own line
 ✓ Length: 90-140 words total
 ✓ DO NOT include citation markers like [1], [2], [3]
-✓ DO NOT repeat the contact's name after greeting`;
+✓ DO NOT repeat the contact's name after greeting
+✓ DO NOT repeat "We will review..." or "What we'll review..." twice - say it ONCE before the bullet list
+✓ NO standalone sender name before "Best regards,"`;
 
     const invoiceOutputFormat = `
 OUTPUT FORMAT:
@@ -368,11 +369,15 @@ Subject: [Invoice request subject with ${firstName || 'recipient name'}]
 
 Hi ${firstName || 'there'},
 
-[Paragraph 1: Context about energy analysis]
+[Paragraph 1: Context about energy analysis - 2-3 sentences]
 
-[Paragraph 2: Bullet list of what we'll review]
+What we'll review from your invoice:
+• Invoice date and unique invoice number
+• Billing period (start and end dates)
+• Detailed charge breakdown (including kWh rate, demand charges, fees)
+• Payment details and remittance address
 
-[Paragraph 3: CTA asking for invoice by EOD]
+Will you be able to send over the invoice by end of day so me and my team can get started?
 
 Best regards,`;
 
