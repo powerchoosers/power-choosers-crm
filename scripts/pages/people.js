@@ -2396,27 +2396,69 @@
         // Convert to array and filter out empty strings
         const phones = Array.from(phoneNumbers).filter(p => p.length === 10);
         
-        if (phones.length === 0) return false; // No phone numbers, don't show badge
+        // DEBUG: Store debug info on window for manual inspection
+        if (!window._badgeDebug) window._badgeDebug = [];
+        const debugInfo = {
+          contactName: `${contact.firstName} ${contact.lastName}`,
+          contactPhones: phones,
+          callsModuleExists: !!(window.callsModule && window.callsModule.getCallsData),
+          callsDataLength: 0,
+          hasCall: false
+        };
+        
+        if (phones.length === 0) {
+          debugInfo.result = 'no-phones';
+          window._badgeDebug.push(debugInfo);
+          return false; // No phone numbers, don't show badge
+        }
         
         // Get calls data from callsModule
         const callsData = (window.callsModule && typeof window.callsModule.getCallsData === 'function') 
           ? window.callsModule.getCallsData() 
           : [];
         
-        if (!callsData || callsData.length === 0) return true; // No calls in system, show badge
+        debugInfo.callsDataLength = callsData ? callsData.length : 0;
+
+        if (!callsData || callsData.length === 0) {
+          debugInfo.result = 'no-calls-in-system';
+          window._badgeDebug.push(debugInfo);
+          return true; // No calls in system, show badge
+        }
+        
+        // Sample first 3 call phone numbers for debugging
+        debugInfo.sampleCallPhones = callsData.slice(0, 3).map(call => String(call.counterparty || '').replace(/\D/g, '').slice(-10));
         
         // Check if any call matches any of the contact's phone numbers
+        let matchedPhones = [];
         const hasCall = callsData.some(call => {
+          // Check counterparty field (already normalized to 10 digits)
+          const counterparty = String(call.counterparty || '').replace(/\D/g, '').slice(-10);
+          // Also check contactPhone and other potential fields
+          const contactPhone = normalizePhone(call.contactPhone);
           const callTo = normalizePhone(call.to);
           const callFrom = normalizePhone(call.from);
           const callTarget = normalizePhone(call.targetPhone);
           
-          return phones.some(p => 
-            (p === callTo && callTo.length === 10) || 
-            (p === callFrom && callFrom.length === 10) || 
-            (p === callTarget && callTarget.length === 10)
-          );
+          const isMatch = phones.some(p => {
+            const matches = (p === counterparty && counterparty.length === 10) ||
+                           (p === contactPhone && contactPhone.length === 10) ||
+                           (p === callTo && callTo.length === 10) || 
+                           (p === callFrom && callFrom.length === 10) || 
+                           (p === callTarget && callTarget.length === 10);
+            if (matches) {
+              matchedPhones.push({ contactPhone: p, callPhone: counterparty || contactPhone || callTo || callFrom || callTarget });
+            }
+            return matches;
+          });
+          
+          return isMatch;
         });
+        
+        debugInfo.matchedPhones = matchedPhones;
+        
+        debugInfo.hasCall = hasCall;
+        debugInfo.result = hasCall ? 'has-calls' : 'no-calls';
+        window._badgeDebug.push(debugInfo);
         
         return !hasCall; // Show badge if no calls found
       } catch (e) {
@@ -2584,6 +2626,17 @@
     renderDepartmentChips();
     loadDataOnce();
     startLivePeopleListener();
+    
+    // Listen for calls data load to refresh badges
+    if (!document._peopleCallsLoadedBound) {
+      document.addEventListener('pc:calls-loaded', () => {
+        try {
+          // Re-render to update badges now that calls data is available
+          if (state.loaded) render();
+        } catch (e) { /* noop */ }
+      });
+      document._peopleCallsLoadedBound = true;
+    }
   }
 
   // Live listener to keep People table in sync without navigation
