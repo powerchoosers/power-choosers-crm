@@ -417,10 +417,10 @@ Paragraph 1 (2-3 sentences):
 - DO NOT explicitly mention "notes/transcripts" - just reference "as we discussed"
 
 Paragraph 2 (What we'll review from your invoice:):
-• Invoice date and unique invoice number
+• Invoice date and service address
 • Billing period (start and end dates)
 • Detailed charge breakdown (including kWh rate, demand charges, fees)
-• Payment details and remittance address
+• Payment details and service address
 
 Paragraph 3 (CTA - use EXACTLY this text):
 "Will you be able to send over the invoice by end of day so me and my team can get started?"
@@ -444,10 +444,10 @@ Hi ${firstName || 'there'},
 [Paragraph 1: Context about energy analysis - 2-3 sentences]
 
 What we'll review from your invoice:
-• Invoice date and unique invoice number
+• Invoice date and service address
 • Billing period (start and end dates)
 • Detailed charge breakdown (including kWh rate, demand charges, fees)
-• Payment details and remittance address
+• Payment details and service address
 
 Will you be able to send over the invoice by end of day so me and my team can get started?
 
@@ -552,7 +552,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt || 'Draft a professional email' }
       ],
-      max_tokens: 500, // Ensure complete email generation without truncation
+      max_tokens: 600, // Increased to prevent CTA truncation
       // Add JSON schema for HTML mode
       ...(mode === 'html' ? { response_format: getTemplateSchema(templateType) } : {})
     };
