@@ -1184,11 +1184,17 @@
         
         // Check if any call matches the account's phone number
         const hasCall = callsData.some(call => {
+          // Check counterparty field (already normalized to 10 digits)
+          const counterparty = String(call.counterparty || '').replace(/\D/g, '').slice(-10);
+          // Also check contactPhone and other potential fields
+          const contactPhone = normalizePhone(call.contactPhone);
           const callTo = normalizePhone(call.to);
           const callFrom = normalizePhone(call.from);
           const callTarget = normalizePhone(call.targetPhone);
           
-          return (phone === callTo && callTo.length === 10) || 
+          return (phone === counterparty && counterparty.length === 10) ||
+                 (phone === contactPhone && contactPhone.length === 10) ||
+                 (phone === callTo && callTo.length === 10) || 
                  (phone === callFrom && callFrom.length === 10) || 
                  (phone === callTarget && callTarget.length === 10);
         });
@@ -1317,6 +1323,17 @@
     injectAccountsBulkStyles();
     loadDataOnce();
     startLiveAccountsListener();
+    
+    // Listen for calls data load to refresh badges
+    if (!document._accountsCallsLoadedBound) {
+      document.addEventListener('pc:calls-loaded', () => {
+        try {
+          // Re-render to update badges now that calls data is available
+          if (state.loaded) render();
+        } catch (e) { /* noop */ }
+      });
+      document._accountsCallsLoadedBound = true;
+    }
   }
 
   // Helper function to calculate contact activity score (same logic as calls page)

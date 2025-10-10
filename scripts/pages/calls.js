@@ -1526,6 +1526,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           // Always use API data, even if empty
           dbgCalls('[Calls] Rows mapped count:', rows.length);
           state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
+          // Notify other pages that calls data is loaded (for badge updates)
+          try {
+            document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: rows.length } }));
+          } catch (e) { /* noop */ }
           return;
         } else {
           console.log('[Calls] API returned no calls or error:', j);
@@ -1586,6 +1590,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     console.log('[Calls] Demo data loaded:', rows.length, 'calls');
     console.log('[Calls] Sample call data:', rows[0]);
     state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
+    // Notify other pages that calls data is loaded (for badge updates)
+    try {
+      document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: rows.length } }));
+    } catch (e) { /* noop */ }
   }
 
   function applyFilters() {
