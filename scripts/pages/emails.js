@@ -1444,9 +1444,13 @@ class EmailManager {
         }).join('');
 
         // Add a single standardized closing (first name only)
+        // For standard mode, sanitizeGeneratedEditor will add the closing - don't add it here
+        // For HTML mode, include it in the content
         const agentName = (window.SettingsPage?.getSettings?.()?.general?.agentName) || 'Power Choosers';
-        const senderFirst = (mode === 'html') ? agentName : agentName;
-        const closingHtml = `<p style="margin: 0 0 16px 0;">Best regards,</p><p style="margin: 0 0 16px 0;">${senderFirst}</p>`;
+        const senderFirst = agentName.split(' ')[0] || agentName;
+        const closingHtml = (mode === 'html') 
+            ? `<p style="margin: 0 0 16px 0;">Best regards,</p><p style="margin: 0 0 16px 0;">${senderFirst}</p>`
+            : ''; // Don't add closing for standard mode - sanitizeGeneratedEditor handles it
 
         const contentHtml = [`<p style="margin: 0 0 16px 0;">${this.escapeHtml(greeting)}</p>`, paraHtml, closingHtml]
             .filter(Boolean)
