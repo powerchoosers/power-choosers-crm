@@ -758,6 +758,31 @@
       #people-sequence-panel .btn, #people-lists-panel .btn { border: 1px solid var(--grey-700); background: var(--grey-850); color: var(--text-inverse); border-radius: var(--border-radius-sm); padding:6px 10px; }
       #people-sequence-panel .btn:focus, #people-lists-panel .btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35); }
       #people-sequence-panel .btn-primary, #people-lists-panel .btn-primary { background: var(--primary-700); border-color: var(--primary-600); color: #fff; }
+      
+      /* Status badges */
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        margin-left: 8px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-radius: 3px;
+        white-space: nowrap;
+      }
+      
+      .status-badge-new {
+        background: #10b981;
+        color: #fff;
+      }
+      
+      .status-badge-no-calls {
+        background: rgba(156, 163, 175, 0.15);
+        color: rgba(156, 163, 175, 0.85);
+        border: 1px solid rgba(156, 163, 175, 0.25);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -2305,6 +2330,64 @@
     else els.titleClear.setAttribute('hidden', '');
   }
 
+  // Generate status badges for a contact
+  function generateStatusBadges(contact) {
+    const badges = [];
+    
+    // Check if contact is new (created within 24 hours)
+    const isNew = (() => {
+      try {
+        const created = coerceDate(contact.createdAt);
+        if (!created) return false;
+        const now = new Date();
+        const hoursDiff = (now - created) / (1000 * 60 * 60);
+        return hoursDiff < 24;
+      } catch (e) {
+        return false;
+      }
+    })();
+    
+    // Check if contact has any calls logged
+    const hasNoCalls = (() => {
+      try {
+        // Get all phone numbers for this contact
+        const phones = [
+          contact.workDirectPhone,
+          contact.mobile,
+          contact.otherPhone
+        ].filter(Boolean).map(p => String(p).replace(/\D/g, ''));
+        
+        if (phones.length === 0) return false; // No phone numbers, don't show badge
+        
+        // Check if any calls exist for these phone numbers
+        const callsData = (typeof window.getCallsData === 'function') ? window.getCallsData() : [];
+        if (!callsData || callsData.length === 0) return true; // No calls in system
+        
+        // Check if any call matches any of the contact's phone numbers
+        const hasCall = callsData.some(call => {
+          const callPhone = String(call.to || call.from || '').replace(/\D/g, '');
+          return phones.some(p => callPhone.includes(p) || p.includes(callPhone));
+        });
+        
+        return !hasCall; // Show badge if no calls found
+      } catch (e) {
+        return false;
+      }
+    })();
+    
+    // Add "New" badge (green)
+    if (isNew) {
+      badges.push('<span class="status-badge status-badge-new">New</span>');
+    }
+    
+    // Add "No Calls" badge (grey) - only if not new (to avoid clutter)
+    if (!isNew && hasNoCalls) {
+      badges.push('<span class="status-badge status-badge-no-calls">No Calls</span>');
+    }
+    
+    return badges.join('');
+  }
+
   function rowHtml(c) {
     const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || safe(c.name);
     const title = safe(c.title);
@@ -2350,9 +2433,12 @@
       return d ? d.replace(/^www\./i, '') : '';
     })();
 
+    // Generate status badges
+    const badges = generateStatusBadges(c);
+
     const cells = {
       select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(c.id)}" aria-label="Select contact"${checked}></td>`,
-      name: `<td class="name-cell" data-contact-id="${escapeHtml(c.id)}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${escapeHtml(fullName)}</span></div></td>`,
+      name: `<td class="name-cell" data-contact-id="${escapeHtml(c.id)}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${escapeHtml(fullName)}</span>${badges}</div></td>`,
       title: `<td>${escapeHtml(title)}</td>`,
       company: `<td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${favDomain && window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : ''}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`,
       email: `<td>${escapeHtml(email)}</td>`,
