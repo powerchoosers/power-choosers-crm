@@ -107,6 +107,48 @@ class PowerChoosersCRM {
         input.addEventListener('blur', () => input.classList.remove('focus-orange'));
       });
 
+      // Service address plus and minus button handler (event delegation)
+      const serviceAddressesContainer = modal.querySelector('#service-addresses-container');
+      if (serviceAddressesContainer) {
+        serviceAddressesContainer.addEventListener('click', (e) => {
+          const plusBtn = e.target.closest('.add-service-address-btn');
+          const minusBtn = e.target.closest('.remove-service-address-btn');
+          
+          if (plusBtn) {
+            e.preventDefault();
+            const container = modal.querySelector('#service-addresses-container');
+            const currentRows = container.querySelectorAll('.service-address-input-row');
+            const newIndex = currentRows.length;
+            const newRow = document.createElement('div');
+            newRow.className = 'service-address-input-row';
+            newRow.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+            newRow.innerHTML = `
+              <input type="text" name="serviceAddress_${newIndex}" class="input-dark" placeholder="123 Main St, City, State" style="flex: 1;" />
+              <button type="button" class="remove-service-address-btn" style="background: var(--grey-600); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Remove this service address">-</button>
+              <button type="button" class="add-service-address-btn" style="background: var(--orange-primary); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Add another service address">+</button>
+            `;
+            // Add focus ring to new input
+            const newInput = newRow.querySelector('input');
+            if (newInput) {
+              newInput.addEventListener('focus', () => newInput.classList.add('focus-orange'));
+              newInput.addEventListener('blur', () => newInput.classList.remove('focus-orange'));
+            }
+            container.appendChild(newRow);
+          } else if (minusBtn) {
+            e.preventDefault();
+            const container = modal.querySelector('#service-addresses-container');
+            const currentRows = container.querySelectorAll('.service-address-input-row');
+            // Only remove if there's more than one row
+            if (currentRows.length > 1) {
+              const rowToRemove = minusBtn.closest('.service-address-input-row');
+              if (rowToRemove) {
+                rowToRemove.remove();
+              }
+            }
+          }
+        });
+      }
+
       // Submit handler -> Firestore save
       if (form) {
         form.addEventListener('submit', async (e) => {
@@ -137,6 +179,17 @@ class PowerChoosersCRM {
 
           // Remove empty fields
           Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
+
+          // Collect service addresses
+          const serviceAddresses = [];
+          form.querySelectorAll('[name^="serviceAddress_"]').forEach((input, idx) => {
+            if (input.value.trim()) {
+              serviceAddresses.push({
+                address: input.value.trim(),
+                isPrimary: idx === 0
+              });
+            }
+          });
 
           try {
             const db = window.firebaseDB;
@@ -174,6 +227,11 @@ class PowerChoosersCRM {
               createdAt: now,
               updatedAt: now,
             };
+
+            // Add service addresses if any
+            if (serviceAddresses.length > 0) {
+              doc.serviceAddresses = serviceAddresses;
+            }
 
             const ref = await db.collection('accounts').add(doc);
 
@@ -2099,6 +2157,7 @@ class PowerChoosersCRM {
                 { value: 'companyPhone', label: 'Company Phone' },
                 { value: 'city', label: 'City' },
                 { value: 'state', label: 'State' },
+                { value: 'serviceAddresses', label: 'Service Addresses (semicolon separated)' },
                 { value: 'squareFootage', label: 'SQ FT' },
                 { value: 'occupancyPct', label: 'Occupancy %' },
                 { value: 'employees', label: 'Employees' },
@@ -2717,6 +2776,17 @@ class PowerChoosersCRM {
                 // Remove Excel formula-style wrappers
                 v = v.replace(/^=\s*["']?(.+?)["']?$/u, '$1').trim();
                 return v;
+            }
+            // Normalize service addresses (semicolon-separated)
+            if (f === 'serviceaddresses') {
+                let v = String(value == null ? '' : value).trim();
+                if (!v) return [];
+                // Split by semicolon and create array of address objects
+                const addresses = v.split(';').map((addr, idx) => ({
+                    address: addr.trim(),
+                    isPrimary: idx === 0
+                })).filter(a => a.address.length > 0);
+                return addresses;
             }
             return value;
         } catch (_) {
