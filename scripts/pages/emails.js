@@ -2050,14 +2050,6 @@ class EmailManager {
         const checklist = Array.isArray(data.checklist_items) ? data.checklist_items : [data.checklist_items || ''];
         
         return `
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 15px 0;">
-    <tr>
-        <td style="background:#ffffff; padding:20px; border-radius:8px; text-align:center; border:1px solid #e0e7ff; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <h2 style="color:#2563eb; font-size:20px; margin:0; font-weight:600;">📎 Invoice Request</h2>
-        </td>
-    </tr>
-</table>
-
 <div style="text-align:left; margin:0 0 20px 0;">
     <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0 0 8px 0;">
         ${this.escapeHtml(data.greeting || 'Hi,')}
@@ -2066,6 +2058,14 @@ class EmailManager {
         ${this.escapeHtml(data.intro_paragraph || 'We need your latest invoice to complete your energy analysis.')}
     </p>
 </div>
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 15px 0;">
+    <tr>
+        <td style="background:#ffffff; padding:20px; border-radius:8px; text-align:center; border:1px solid #e0e7ff; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <h2 style="color:#2563eb; font-size:20px; margin:0; font-weight:600;">📎 Invoice Request</h2>
+        </td>
+    </tr>
+</table>
 
 <div style="background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #bae6fd;">
     <h3 style="color:#0369a1; font-size:18px; margin:0 0 15px 0; text-align:center; font-weight:600;">✓ What We'll Review</h3>
@@ -2077,6 +2077,16 @@ class EmailManager {
         ).join('')}
     </div>
 </div>
+
+<table width="100%" cellpadding="15" cellspacing="0" border="0" style="background:linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius:8px; margin:20px 0; border:1px solid #fca5a5;">
+    <tr>
+        <td style="text-align:center;">
+            <p style="color:#dc2626; font-size:16px; margin:0; font-weight:600;">
+                ⏰ Needed: ${this.escapeHtml(data.deadline || 'By end of day today')}
+            </p>
+        </td>
+    </tr>
+</table>
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
