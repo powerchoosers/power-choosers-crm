@@ -914,8 +914,8 @@
             `).join('') : ''}
             <div class="info-row">
               <div class="info-label"></div>
-              <div class="info-value-wrap">
-                <button class="btn-text" id="add-service-address" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px;">
+              <div class="info-value-wrap" style="display: flex; align-items: center;">
+                <button class="btn-text" id="add-service-address" style="display: flex; align-items: center; gap: 6px; padding: 0;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>

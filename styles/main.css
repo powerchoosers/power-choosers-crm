@@ -11281,7 +11281,8 @@ th.drag-over::after {
 /* Fade-in with scale-up for all icons - GPU accelerated */
 
 /* Company favicons - initial hidden state */
-.company-favicon {
+.company-favicon,
+.company-favicon-header {
     opacity: 0;
     transform: scale(0.95);
     transition: opacity 300ms ease-out, transform 300ms ease-out;
@@ -11289,7 +11290,8 @@ th.drag-over::after {
 }
 
 /* Company favicons - loaded/visible state */
-.company-favicon.icon-loaded {
+.company-favicon.icon-loaded,
+.company-favicon-header.icon-loaded {
     opacity: 1;
     transform: scale(1);
 }
@@ -11297,7 +11299,8 @@ th.drag-over::after {
 /* Contact avatar circles - initial hidden state */
 .contact-avatar .avatar-circle,
 .name-cell__wrap .avatar-circle,
-.activity-entity-avatar-circle {
+.activity-entity-avatar-circle,
+.avatar-initials {
     opacity: 0;
     transform: scale(0.95);
     transition: opacity 300ms ease-out, transform 300ms ease-out;
@@ -11307,7 +11310,8 @@ th.drag-over::after {
 /* Contact avatar circles - visible state */
 .contact-avatar .avatar-circle.icon-loaded,
 .name-cell__wrap .avatar-circle.icon-loaded,
-.activity-entity-avatar-circle.icon-loaded {
+.activity-entity-avatar-circle.icon-loaded,
+.avatar-initials.icon-loaded {
     opacity: 1;
     transform: scale(1);
 }

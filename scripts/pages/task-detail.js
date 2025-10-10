@@ -1303,6 +1303,12 @@
           // Add company favicon positioned like the avatar
           const faviconWrapper = `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${companyIconHTML}</div>`;
           titleSection.insertAdjacentHTML('beforeend', faviconWrapper);
+          
+          // Add icon-loaded class immediately for smooth animation
+          requestAnimationFrame(() => {
+            const favicon = titleSection.querySelector('.company-favicon-header');
+            if (favicon) favicon.classList.add('icon-loaded');
+          });
         }
         
         // Add location info under title
@@ -1426,6 +1432,12 @@
             const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true">${escapeHtml(finalInitials)}</span>`;
             console.log('Adding avatar HTML:', avatarHTML);
             titleSection.insertAdjacentHTML('beforeend', avatarHTML);
+            
+            // Add icon-loaded class immediately for smooth animation
+            requestAnimationFrame(() => {
+              const avatar = titleSection.querySelector('.avatar-initials');
+              if (avatar) avatar.classList.add('icon-loaded');
+            });
           } else {
             console.log('Contact task - No title section found');
           }

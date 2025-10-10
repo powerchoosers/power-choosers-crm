@@ -1739,7 +1739,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
             <button type="button" class="icon-btn ms-reset" title="Reset" aria-label="Reset" data-action="reset">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15A9 9 0 1 1 17 8.5L23 10"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
             </button>
           </div>
         </div>
@@ -1994,7 +1994,53 @@
 
       function startAt(key){ state.current = key; state.history = []; renderNode(); }
       function goBack(){ if (!state.history.length) return; state.current = state.history.pop(); renderNode(); }
-      function resetAll(){ state.current = ''; state.history = []; state.overrideContactId = null; display.innerHTML=''; responses.innerHTML=''; inputEl.value=''; closeSuggest(); }
+      function resetAll(){ 
+        // Smooth animation when resetting
+        state.current = ''; 
+        state.history = []; 
+        state.overrideContactId = null; 
+        inputEl.value = ''; 
+        closeSuggest();
+        
+        // Animate collapse smoothly
+        const currentHeight = card.getBoundingClientRect().height;
+        
+        // Fade out content
+        display.classList.remove('--visible');
+        const oldButtons = responses.querySelectorAll('.btn-secondary');
+        oldButtons.forEach(b => b.classList.remove('--visible'));
+        
+        setTimeout(() => {
+          // Clear content
+          display.innerHTML = '';
+          responses.innerHTML = '';
+          
+          // Animate height collapse
+          requestAnimationFrame(() => {
+            card.style.height = currentHeight + 'px';
+            card.style.overflow = 'hidden';
+            
+            requestAnimationFrame(() => {
+              // Measure collapsed height
+              const tempHeight = card.style.height;
+              card.style.height = 'auto';
+              const targetHeight = card.scrollHeight;
+              card.style.height = tempHeight;
+              
+              requestAnimationFrame(() => {
+                // Trigger CSS transition
+                card.style.height = targetHeight + 'px';
+                
+                // Clean up after transition
+                setTimeout(() => {
+                  card.style.height = '';
+                  card.style.overflow = '';
+                }, 300);
+              });
+            });
+          });
+        }, 80);
+      }
 
       // Buttons
       el.querySelector('.ms-gk').addEventListener('click', () => startAt('gatekeeper_intro'));
