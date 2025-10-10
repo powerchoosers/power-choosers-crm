@@ -2247,20 +2247,17 @@
           <h3 class="section-title">Service Addresses</h3>
           <div class="info-grid" id="contact-service-addresses-grid">
             ${(linkedAccount.serviceAddresses && Array.isArray(linkedAccount.serviceAddresses) && linkedAccount.serviceAddresses.length > 0) ? linkedAccount.serviceAddresses.map((sa, idx) => `
-              <div class="info-row"><div class="info-label">${sa.isPrimary ? 'PRIMARY ADDRESS' : 'SERVICE ADDRESS'}</div><div class="info-value"><div class="info-value-wrap" data-field="serviceAddress_${idx}" data-address-index="${idx}"><span class="info-value-text">${escapeHtml(sa.address) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
+              <div class="info-row"><div class="info-label">${sa.isPrimary ? 'PRIMARY ADDRESS' : 'SERVICE ADDRESS'}</div><div class="info-value-wrap" data-field="serviceAddress_${idx}" data-address-index="${idx}" style="width: 350px;"><span class="info-value-text">${escapeHtml(sa.address) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div>
             `).join('') : ''}
             <div class="info-row">
-              <div class="info-label"></div>
-              <div class="info-value">
-                <div class="info-value-wrap" style="display: flex; align-items: center;">
-                  <button class="btn-text" id="contact-add-service-address" style="display: flex; align-items: center; gap: 6px; padding: 0;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Add Service Address
-                  </button>
-                </div>
+              <div class="info-label" style="grid-column: span 2;">
+                <button class="btn-text" id="contact-add-service-address" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; margin-top: 8px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Add Service Address
+                </button>
               </div>
             </div>
           </div>
