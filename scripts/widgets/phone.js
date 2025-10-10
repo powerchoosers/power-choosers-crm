@@ -2837,6 +2837,17 @@
           body: JSON.stringify(payload)
           }).then(resp => resp.json()).then(respJson => {
             phoneLog('[Phone] /api/calls response (background)', { status: 'success', body: respJson });
+            // Dispatch event to update "No Calls" badges on People/Accounts pages
+            try {
+              document.dispatchEvent(new CustomEvent('pc:call-logged', { 
+                detail: { 
+                  call: respJson.call || payload,
+                  targetPhone: payload.targetPhone,
+                  accountId: payload.accountId,
+                  contactId: payload.contactId
+                } 
+              }));
+            } catch (e) { /* noop */ }
           }).catch(err => {
             phoneLog('[Phone] /api/calls error (non-blocking)', err);
           });
