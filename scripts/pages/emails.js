@@ -2193,7 +2193,7 @@ ${sections.map((section, idx) => {
     <div style="max-width:600px; margin:0 auto; background-color:#ffffff;">
       
       <!-- Power Choosers Header -->
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); text-align:center;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); text-align:center; border-top-left-radius:12px; border-top-right-radius:12px;">
         <tr>
           <td style="padding:28px 24px;">
             <img src="${logoUrl}" alt="Power Choosers" width="450" style="max-width:100%; height:auto; display:block; margin:0 auto 8px;">
@@ -2208,7 +2208,7 @@ ${sections.map((section, idx) => {
       </div>
 
       <!-- Power Choosers Footer (No signature - handled by email client) -->
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff; border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
         <tr>
           <td style="padding:20px 24px; text-align:center;">
             <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
