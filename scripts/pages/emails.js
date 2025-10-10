@@ -1073,6 +1073,14 @@ class EmailManager {
             return closingTerms.some(term => t2.startsWith(term));
         };
         const placeholderRegex = /\[\s*(your\s+name|your\s+title|your\s+contact\s*information)\s*\]/i;
+        const isSenderNameLine = (text) => {
+            // Check if line is just the sender's first name (Lewis, etc.)
+            const settings = (window.SettingsPage?.getSettings?.()) || {};
+            const senderName = settings?.general?.agentName || 'Lewis Patterson';
+            const senderFirst = senderName.split(' ')[0] || senderName;
+            const t = String(text || '').trim().replace(/[.,!;:]+$/,'');
+            return t.toLowerCase() === senderFirst.toLowerCase();
+        };
 
         const kept = [];
         let cut = false;
@@ -1080,6 +1088,7 @@ class EmailManager {
             if (cut) break;
             const t = ln.trim();
             if (!t) { kept.push(''); continue; }
+            if (isSenderNameLine(t)) { continue; } // Skip standalone sender name lines
             if (isClosingLine(t) || placeholderRegex.test(t)) { cut = true; continue; }
             if (greetAnyRegex.test(t)) { continue; } // drop all greetings from model
             // Also drop a greeting directly addressing firstName (case-insensitive)
@@ -1298,8 +1307,8 @@ class EmailManager {
                                 }
                             }
                             paras.splice(1, 0, bullet);
-                            // Keep only the first two content paragraphs (explanation + bullets)
-                            paras = paras.slice(0, 2);
+                            // Keep first three paragraphs for invoice (explanation + bullets + CTA)
+                            paras = paras.slice(0, 3);
                             console.debug('[AI][format][INVOICE] Reordered to ensure bullets as second paragraph');
                         } else if (bulletIdx === 0 && paras.length >= 2) {
                             // If bullets are first, try swapping with next non-bullet
@@ -1307,10 +1316,10 @@ class EmailManager {
                                 [paras[0], paras[1]] = [paras[1], paras[0]];
                                 console.debug('[AI][format][INVOICE] Swapped to ensure reminder first, bullets second');
                             }
-                            paras = paras.slice(0, 2);
+                            paras = paras.slice(0, 3);
                         } else {
-                            // Ensure we don't exceed two content paragraphs
-                            paras = paras.slice(0, 2);
+                            // Ensure we don't exceed three content paragraphs for invoice
+                            paras = paras.slice(0, 3);
                         }
                     }
                 }
