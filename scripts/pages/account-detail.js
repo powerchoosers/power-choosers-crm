@@ -886,6 +886,27 @@
           </div>
         </div>
 
+        <div class="contact-info-section">
+          <h3 class="section-title">Service Addresses</h3>
+          <div class="info-grid" id="account-service-addresses-grid">
+            ${(a.serviceAddresses && Array.isArray(a.serviceAddresses) && a.serviceAddresses.length > 0) ? a.serviceAddresses.map((sa, idx) => `
+              <div class="info-row"><div class="info-label">${sa.isPrimary ? 'PRIMARY ADDRESS' : 'SERVICE ADDRESS'}</div><div class="info-value-wrap" data-field="serviceAddress_${idx}" data-address-index="${idx}"><span class="info-value-text">${escapeHtml(sa.address) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button><button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button><button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button></div></div></div>
+            `).join('') : ''}
+            <div class="info-row">
+              <div class="info-label"></div>
+              <div class="info-value-wrap">
+                <button class="btn-text" id="add-service-address" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Add Service Address
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="contact-info-section" id="account-recent-calls">
           <div class="rc-header">
             <h3 class="section-title">Recent Calls</h3>
@@ -2334,6 +2355,26 @@
               <label>City<input type="text" name="city" class="input-dark" value="${escapeHtml(a.city || a.locationCity || '')}" /></label>
               <label>State<input type="text" name="state" class="input-dark" value="${escapeHtml(a.state || a.locationState || '')}" /></label>
             </div>
+            <div class="form-row" style="grid-template-columns: 1fr;">
+              <label>Service Addresses
+                <div id="edit-service-addresses-container" style="display: flex; flex-direction: column; gap: 8px;">
+                  ${(a.serviceAddresses && Array.isArray(a.serviceAddresses) && a.serviceAddresses.length > 0) ? 
+                    a.serviceAddresses.map((sa, idx) => `
+                      <div class="service-address-input-row" style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" name="serviceAddress_${idx}" class="input-dark" placeholder="123 Main St, City, State" style="flex: 1;" value="${escapeHtml(sa.address || '')}" />
+                        <button type="button" class="remove-service-address-btn" style="background: var(--grey-600); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Remove this service address">-</button>
+                        <button type="button" class="add-service-address-btn" style="background: var(--orange-primary); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Add another service address">+</button>
+                      </div>
+                    `).join('') : 
+                    `<div class="service-address-input-row" style="display: flex; gap: 8px; align-items: center;">
+                      <input type="text" name="serviceAddress_0" class="input-dark" placeholder="123 Main St, City, State" style="flex: 1;" />
+                      <button type="button" class="remove-service-address-btn" style="background: var(--grey-600); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Remove this service address">-</button>
+                      <button type="button" class="add-service-address-btn" style="background: var(--orange-primary); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Add another service address">+</button>
+                    </div>`
+                  }
+                </div>
+              </label>
+            </div>
             <div class="form-row">
               <label>LinkedIn URL<input type="url" name="linkedin" class="input-dark" value="${escapeHtml(a.linkedin || a.linkedinUrl || a.linkedin_url || '')}" /></label>
               <label>Square Footage<input type="number" name="squareFootage" class="input-dark" value="${escapeHtml(String(a.squareFootage ?? a.sqft ?? a.square_feet ?? ''))}" /></label>
@@ -2408,9 +2449,57 @@
       }
     }, 0);
 
+    // Service address plus and minus button handler (event delegation) for Edit Account modal
+    const editServiceAddressesContainer = overlay.querySelector('#edit-service-addresses-container');
+    if (editServiceAddressesContainer) {
+      editServiceAddressesContainer.addEventListener('click', (e) => {
+        const plusBtn = e.target.closest('.add-service-address-btn');
+        const minusBtn = e.target.closest('.remove-service-address-btn');
+        
+        if (plusBtn) {
+          e.preventDefault();
+          const container = overlay.querySelector('#edit-service-addresses-container');
+          const currentRows = container.querySelectorAll('.service-address-input-row');
+          const newIndex = currentRows.length;
+          const newRow = document.createElement('div');
+          newRow.className = 'service-address-input-row';
+          newRow.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+          newRow.innerHTML = `
+            <input type="text" name="serviceAddress_${newIndex}" class="input-dark" placeholder="123 Main St, City, State" style="flex: 1;" />
+            <button type="button" class="remove-service-address-btn" style="background: var(--grey-600); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Remove this service address">-</button>
+            <button type="button" class="add-service-address-btn" style="background: var(--orange-primary); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Add another service address">+</button>
+          `;
+          container.appendChild(newRow);
+        } else if (minusBtn) {
+          e.preventDefault();
+          const container = overlay.querySelector('#edit-service-addresses-container');
+          const currentRows = container.querySelectorAll('.service-address-input-row');
+          // Only remove if there's more than one row
+          if (currentRows.length > 1) {
+            const rowToRemove = minusBtn.closest('.service-address-input-row');
+            if (rowToRemove) {
+              rowToRemove.remove();
+            }
+          }
+        }
+      });
+    }
+
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
+      
+      // Collect service addresses
+      const serviceAddresses = [];
+      form.querySelectorAll('[name^="serviceAddress_"]').forEach((input, idx) => {
+        if (input.value.trim()) {
+          serviceAddresses.push({
+            address: input.value.trim(),
+            isPrimary: idx === 0
+          });
+        }
+      });
+      
       const updates = {
         accountName: (fd.get('accountName') || '').toString().trim(),
         industry: (fd.get('industry') || '').toString().trim(),
@@ -2430,6 +2519,7 @@
         currentRate: (fd.get('currentRate') || '').toString().trim(),
         contractEndDate: (fd.get('contractEndDate') || '').toString().trim(),
         logoUrl: (fd.get('logoUrl') || '').toString().trim(),
+        serviceAddresses: serviceAddresses,
       };
 
       const id = state.currentAccount?.id;
@@ -2953,6 +3043,22 @@
           const delBtn = e.target.closest('.info-delete');
           if (delBtn) {
             e.preventDefault();
+            // Special handling for service addresses
+            if (field.startsWith('serviceAddress_')) {
+              const addressIndex = parseInt(wrap.getAttribute('data-address-index'), 10);
+              if (!isNaN(addressIndex)) {
+                const a = state.currentAccount;
+                if (a && a.serviceAddresses && Array.isArray(a.serviceAddresses)) {
+                  // Remove this address from the array
+                  const updatedAddresses = a.serviceAddresses.filter((_, idx) => idx !== addressIndex);
+                  await saveServiceAddresses(updatedAddresses);
+                  // Re-render to update the UI
+                  renderAccountDetail();
+                  return;
+                }
+              }
+            }
+            // Standard delete for other fields
             await saveField(field, '');
             updateFieldText(wrap, '');
             return;
@@ -2996,6 +3102,39 @@
     
     // Bind subsidiaries pagination
     bindSubsidiariesPagination();
+
+    // Add Service Address button
+    const addServiceAddressBtn = document.getElementById('add-service-address');
+    if (addServiceAddressBtn && !addServiceAddressBtn._bound) {
+      addServiceAddressBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const a = state.currentAccount;
+        if (!a) return;
+        
+        // Get current service addresses
+        const currentAddresses = (a.serviceAddresses && Array.isArray(a.serviceAddresses)) ? a.serviceAddresses : [];
+        
+        // Add a new empty address
+        const newAddress = { address: '', isPrimary: currentAddresses.length === 0 };
+        const updatedAddresses = [...currentAddresses, newAddress];
+        
+        // Save to Firestore
+        await saveServiceAddresses(updatedAddresses);
+        
+        // Re-render the page to show the new address in edit mode
+        renderAccountDetail();
+        
+        // Find the newly added address field and start editing it
+        setTimeout(() => {
+          const newIndex = updatedAddresses.length - 1;
+          const newWrap = document.querySelector(`[data-field="serviceAddress_${newIndex}"]`);
+          if (newWrap) {
+            beginEditField(newWrap, `serviceAddress_${newIndex}`);
+          }
+        }, 100);
+      });
+      addServiceAddressBtn._bound = true;
+    }
   }
 
   function bindContactItemEvents() {
@@ -3821,6 +3960,27 @@
   // Commit the edit to Firestore and update UI
   async function commitEdit(wrap, field, value) {
     console.log('[Account Detail] commitEdit called:', { field, value, type: typeof value });
+    
+    // Special handling for service addresses
+    if (field.startsWith('serviceAddress_')) {
+      const addressIndex = parseInt(wrap.getAttribute('data-address-index'), 10);
+      if (!isNaN(addressIndex)) {
+        const a = state.currentAccount;
+        if (a && a.serviceAddresses && Array.isArray(a.serviceAddresses)) {
+          const updatedAddresses = [...a.serviceAddresses];
+          updatedAddresses[addressIndex] = {
+            ...updatedAddresses[addressIndex],
+            address: value.trim()
+          };
+          await saveServiceAddresses(updatedAddresses);
+          // Update UI
+          cancelEdit(wrap, field, value);
+          renderAccountDetail();
+          return;
+        }
+      }
+    }
+    
     // Convert contractEndDate to ISO for storage, display as MM/DD/YYYY via updateFieldText
     let toSave = value;
     if (field === 'contractEndDate') {
@@ -3960,6 +4120,44 @@
       }
     } catch (err) {
       console.warn('Save field failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to save');
+    }
+  }
+
+  // Save service addresses array to Firestore
+  async function saveServiceAddresses(addresses) {
+    const accountId = state.currentAccount?.id;
+    if (!accountId) return;
+    
+    try {
+      const db = window.firebaseDB;
+      if (db && typeof db.collection === 'function') {
+        await db.collection('accounts').doc(accountId).update({
+          serviceAddresses: addresses,
+          updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
+        });
+        
+        // Update local state
+        if (state.currentAccount) {
+          state.currentAccount.serviceAddresses = addresses;
+        }
+        
+        // Also update the global accounts cache
+        try {
+          if (typeof window.getAccountsData === 'function' && accountId) {
+            const accounts = window.getAccountsData();
+            const idx = accounts.findIndex(a => a.id === accountId);
+            if (idx !== -1) {
+              accounts[idx].serviceAddresses = addresses;
+              accounts[idx].updatedAt = new Date();
+            }
+          }
+        } catch (_) { /* noop */ }
+        
+        window.crm?.showToast && window.crm.showToast('Saved');
+      }
+    } catch (err) {
+      console.warn('Save service addresses failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to save');
     }
   }
