@@ -44,6 +44,31 @@ function getTemplateType(prompt) {
   return promptMap[prompt] || 'general'; // Default to general template for manual prompts
 }
 
+// Calculate business days (excluding weekends)
+function addBusinessDays(startDate, days) {
+  let count = 0;
+  let current = new Date(startDate);
+  
+  while (count < days) {
+    current.setDate(current.getDate() + 1);
+    const dayOfWeek = current.getDay();
+    // Skip Saturday (6) and Sunday (0)
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      count++;
+    }
+  }
+  
+  return current;
+}
+
+// Format deadline with calculated business days
+function formatDeadline(days = 3) {
+  const deadline = addBusinessDays(new Date(), days);
+  const options = { weekday: 'long', month: 'long', day: 'numeric' };
+  const formatted = deadline.toLocaleDateString('en-US', options);
+  return `Needed in ${days} business days (by ${formatted})`;
+}
+
 // JSON Schema for Template 1: Warm Intro
 const warmIntroSchema = {
   type: "json_schema",
@@ -166,10 +191,11 @@ const invoiceSchema = {
         greeting: { type: "string", description: "Hello {firstName}," },
         intro_paragraph: { type: "string", description: "Context about why we're conducting energy analysis, reference notes/transcripts from conversation" },
         checklist_items: { type: "array", items: { type: "string" }, description: "What we review from invoice" },
-        deadline: { type: "string", description: "When we need it (e.g., by EOD today)" },
+        discrepancies: { type: "array", items: { type: "string" }, description: "3-4 common billing discrepancies to watch for based on industry/company" },
+        deadline: { type: "string", description: "When we need it (e.g., in 3 business days by [date])" },
         cta_text: { type: "string", description: "Call to action asking for invoice" }
       },
-      required: ["subject", "greeting", "intro_paragraph", "checklist_items", "deadline", "cta_text"],
+      required: ["subject", "greeting", "intro_paragraph", "checklist_items", "discrepancies", "deadline", "cta_text"],
       additionalProperties: false
     }
   }
@@ -310,7 +336,12 @@ Generate text for these fields:
 - greeting: "Hello ${firstName},"
 - intro_paragraph: Context from our conversation explaining we'll conduct an energy analysis to identify discrepancies and determine how ${company || 'the company'} is using energy and the best plan moving forward. Reference notes/transcripts if available. (2-3 sentences)
 - checklist_items: Array of 3-4 specific items we'll review from the invoice (e.g., invoice date/number, billing period, charge breakdown, payment details)
-- deadline: When we need it (e.g., "by EOD today")
+- discrepancies: Array of 3-4 common billing discrepancies to watch for. Intelligently select based on:
+  * Industry type: ${industry || 'general business'}
+  * Company size: ${energy.annualUsage ? `${energy.annualUsage} kWh annually` : 'standard commercial'}
+  * Business nature: ${company || 'commercial'} ${job ? `(${job})` : ''}
+  Choose from: high rates, excessive delivery charges, hidden fees, wrong contract type, poor customer service, unfavorable renewal timing, demand charges, peak usage penalties, incorrect meter readings, unauthorized fees
+- deadline: Use exactly: "${formatDeadline(3)}"
 - cta_text: Use exactly: "Will you be able to send over the invoice by end of day so me and my team can get started?"`,
 
       general: `
