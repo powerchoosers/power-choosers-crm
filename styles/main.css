@@ -7257,6 +7257,8 @@ html, body {
 .phone-card {
   /* Use the same bottom padding as other widgets to avoid double spacing */
   padding-bottom: var(--spacing-base);
+  /* Smooth height transitions when mini-scripts expand/collapse */
+  transition: height 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 /* During live calls, slightly reduce bottom padding to avoid a double-gap feeling */
 .phone-card.in-call { padding-bottom: var(--spacing-sm); }

@@ -1936,12 +1936,15 @@
         const node = FLOW[key];
         if (!node) { display.innerHTML = ''; responses.innerHTML = ''; return; }
         
+        // Measure current height before changes
+        const currentHeight = card.getBoundingClientRect().height;
+        
         // Fade out current content
         display.classList.remove('--visible');
         const oldButtons = responses.querySelectorAll('.btn-secondary');
         oldButtons.forEach(b => b.classList.remove('--visible'));
         
-        // Update DOM immediately (but content will be invisible due to missing --visible class)
+        // Update DOM after brief fade
         setTimeout(() => {
           const live = (function(){ try { return hasActiveCall() || (currentCallContext && currentCallContext.isActive); } catch(_) { return false; } })();
           display.innerHTML = live ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
@@ -1955,22 +1958,35 @@
             responses.appendChild(b);
           });
           
-          // Wait for browser to paint new content, then measure and animate
+          // Let CSS transition handle height smoothly
           requestAnimationFrame(() => {
-            // Capture snapshot AFTER new content is in DOM for accurate measurements
-            const snapshot = captureLayoutSnapshot(card);
+            // Set explicit start height
+            card.style.height = currentHeight + 'px';
+            card.style.overflow = 'hidden';
             
-            // Run smooth resize with accurate target height
-            smoothResize(card, 250);
-            
-            // Run FLIP animation to shift dialpad smoothly
-            runFlipFromSnapshot(snapshot, card, 250);
-            
-            // Fade in new content after measurements are done
             requestAnimationFrame(() => {
-              display.classList.add('--visible');
-              const newButtons = responses.querySelectorAll('.btn-secondary');
-              newButtons.forEach(b => b.classList.add('--visible'));
+              // Get target height with new content
+              const tempHeight = card.style.height;
+              card.style.height = 'auto';
+              const targetHeight = card.scrollHeight;
+              card.style.height = tempHeight;
+              
+              // Trigger CSS transition to target
+              requestAnimationFrame(() => {
+                card.style.height = targetHeight + 'px';
+                
+                // Fade in new content
+                display.classList.add('--visible');
+                const newButtons = responses.querySelectorAll('.btn-secondary');
+                newButtons.forEach(b => b.classList.add('--visible'));
+                
+                // Clean up after transition
+                const cleanup = () => {
+                  card.style.height = '';
+                  card.style.overflow = '';
+                };
+                setTimeout(cleanup, 300);
+              });
             });
           });
         }, 80);
@@ -2036,55 +2052,76 @@
       const isHidden = wrap.hasAttribute('hidden');
       
       if (isHidden) {
-        // OPENING SEQUENCE
-        // 1. Build UI without --show class (invisible)
+        // OPENING: Use CSS transition for smooth expansion
+        const currentHeight = card.getBoundingClientRect().height;
+        
+        // Build UI and unhide
         buildMiniScriptsUI(card);
-        const miniScripts = wrap.querySelector('.mini-scripts');
-        if (miniScripts) miniScripts.classList.remove('--show');
-        
-        // 2. Unhide wrapper
         wrap.removeAttribute('hidden');
+        const miniScripts = wrap.querySelector('.mini-scripts');
         
-        // 3. Wait for next frame to ensure DOM is ready
         requestAnimationFrame(() => {
-          // 4. Capture FLIP snapshot now that content is in DOM
-          const snapshot = captureLayoutSnapshot(card);
+          // Set explicit start height
+          card.style.height = currentHeight + 'px';
+          card.style.overflow = 'hidden';
           
-          // 5. Add --show class to fade in content
           requestAnimationFrame(() => {
-            if (miniScripts) miniScripts.classList.add('--show');
+            // Measure target height
+            const tempHeight = card.style.height;
+            card.style.height = 'auto';
+            const targetHeight = card.scrollHeight;
+            card.style.height = tempHeight;
             
-            // 6. Run smoothResize to expand container
-            smoothResize(card, 300);
-            
-            // 7. Run FLIP animation to shift dialpad down
-            runFlipFromSnapshot(snapshot, card, 300);
-            
-            // Focus search input after animations start
-            try { const si = wrap.querySelector('.ms-input'); if (si) setTimeout(() => si.focus(), 50); } catch(_) {}
+            requestAnimationFrame(() => {
+              // Trigger CSS transition
+              card.style.height = targetHeight + 'px';
+              if (miniScripts) miniScripts.classList.add('--show');
+              
+              // Focus input and cleanup after transition
+              try { const si = wrap.querySelector('.ms-input'); if (si) setTimeout(() => si.focus(), 100); } catch(_) {}
+              setTimeout(() => {
+                card.style.height = '';
+                card.style.overflow = '';
+              }, 300);
+            });
           });
         });
       } else {
-        // CLOSING SEQUENCE
+        // CLOSING: Use CSS transition for smooth collapse
         const miniScripts = wrap.querySelector('.mini-scripts');
+        const currentHeight = card.getBoundingClientRect().height;
         
-        // 1. Capture FLIP snapshot
-        const snapshot = captureLayoutSnapshot(card);
-        
-        // 2. Remove --show class to fade out content
+        // Fade out content
         if (miniScripts) miniScripts.classList.remove('--show');
         
-        // 3. Run smoothResize to collapse container
-        smoothResize(card, 300);
-        
-        // 4. Run FLIP animation to shift dialpad up
-        runFlipFromSnapshot(snapshot, card, 300);
-        
-        // 5. After 250ms, hide wrapper and clear innerHTML
-        setTimeout(() => {
-          wrap.setAttribute('hidden','');
-          wrap.innerHTML = '';
-        }, 250);
+        requestAnimationFrame(() => {
+          // Set explicit start height
+          card.style.height = currentHeight + 'px';
+          card.style.overflow = 'hidden';
+          
+          requestAnimationFrame(() => {
+            // Measure target height (after hiding mini-scripts)
+            wrap.setAttribute('hidden', '');
+            const tempHeight = card.style.height;
+            card.style.height = 'auto';
+            const targetHeight = card.scrollHeight;
+            card.style.height = tempHeight;
+            wrap.removeAttribute('hidden');
+            
+            requestAnimationFrame(() => {
+              // Trigger CSS transition
+              card.style.height = targetHeight + 'px';
+              
+              // Clean up after transition
+              setTimeout(() => {
+                card.style.height = '';
+                card.style.overflow = '';
+                wrap.setAttribute('hidden', '');
+                wrap.innerHTML = '';
+              }, 300);
+            });
+          });
+        });
       }
     }
 
