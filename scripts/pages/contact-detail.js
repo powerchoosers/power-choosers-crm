@@ -187,6 +187,62 @@
     }
   }
 
+  // Save service addresses array to linked account from contact detail
+  async function saveAccountServiceAddresses(addresses) {
+    console.log('[Contact Detail] saveAccountServiceAddresses called:', { addresses });
+    const db = window.firebaseDB;
+    const accountId = state._linkedAccountId;
+    console.log('[Contact Detail] Linked account ID:', accountId);
+    
+    if (!accountId) {
+      console.log('[Contact Detail] No linked account ID found');
+      return;
+    }
+    
+    const payload = { serviceAddresses: addresses, updatedAt: Date.now() };
+    console.log('[Contact Detail] Payload to save:', payload);
+    
+    // Update local cache if we have it
+    try {
+      if (typeof window.getAccountsData === 'function') {
+        const accounts = window.getAccountsData() || [];
+        const idx = accounts.findIndex(a => a.id === accountId);
+        if (idx !== -1) {
+          try { 
+            accounts[idx].serviceAddresses = addresses;
+            accounts[idx].updatedAt = new Date();
+          } catch(_) {}
+          console.log('[Contact Detail] Updated local cache for account service addresses:', accountId);
+        }
+      }
+    } catch(_) {}
+    
+    if (!db) { 
+      console.log('[Contact Detail] No database, dispatching service-addresses-updated event');
+      try { document.dispatchEvent(new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } })); } catch(_) {} 
+      return; 
+    }
+    
+    try { 
+      console.log('[Contact Detail] Saving to Firestore:', { accountId, payload });
+      await db.collection('accounts').doc(accountId).update(payload); 
+      console.log('[Contact Detail] Firestore save successful');
+      window.crm?.showToast && window.crm.showToast('Saved');
+      console.log('[Contact Detail] Dispatching service-addresses-updated event:', { entity: 'account', id: accountId, addresses });
+      try { 
+        const event = new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } });
+        console.log('[Contact Detail] Event created, dispatching...');
+        document.dispatchEvent(event);
+        console.log('[Contact Detail] Event dispatched successfully');
+      } catch(e) { 
+        console.log('[Contact Detail] Error dispatching event:', e);
+      }
+    } catch (e) { 
+      console.warn('[Contact Detail] Failed to save service addresses', e); 
+      window.crm?.showToast && window.crm.showToast('Save failed'); 
+    }
+  }
+
   // Recent Calls (Contact) keyed patching & styles
   function injectRecentCallsStyles(){
     if (document.getElementById('contact-recent-calls-styles')) return;
@@ -2186,6 +2242,29 @@
             <div class="info-row"><div class="info-label">CONTRACT END DATE</div><div class="info-value"><div class="info-value-wrap" data-field="contractEndDate"><span class="info-value-text">${escapeHtml(contractEndDateFormatted) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
           </div>
         </div>
+        
+        <div class="contact-info-section">
+          <h3 class="section-title">Service Addresses</h3>
+          <div class="info-grid" id="contact-service-addresses-grid">
+            ${(linkedAccount.serviceAddresses && Array.isArray(linkedAccount.serviceAddresses) && linkedAccount.serviceAddresses.length > 0) ? linkedAccount.serviceAddresses.map((sa, idx) => `
+              <div class="info-row"><div class="info-label">${sa.isPrimary ? 'PRIMARY ADDRESS' : 'SERVICE ADDRESS'}</div><div class="info-value"><div class="info-value-wrap" data-field="serviceAddress_${idx}" data-address-index="${idx}"><span class="info-value-text">${escapeHtml(sa.address) || '--'}</span><div class="info-actions"><button class="icon-btn-sm info-edit" title="Edit">${svgPencil()}</button><button class="icon-btn-sm info-copy" title="Copy">${svgCopy()}</button><button class="icon-btn-sm info-delete" title="Clear">${svgTrash()}</button></div></div></div></div>
+            `).join('') : ''}
+            <div class="info-row">
+              <div class="info-label"></div>
+              <div class="info-value">
+                <div class="info-value-wrap" style="display: flex; align-items: center;">
+                  <button class="btn-text" id="contact-add-service-address" style="display: flex; align-items: center; gap: 6px; padding: 0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Service Address
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         ` : ''}
 
         <div class="contact-info-section" id="contact-recent-calls">
@@ -3327,6 +3406,94 @@
       energyGrid._bound = '1';
     }
 
+    // Inline edit/copy/delete for Service Addresses (Account fields shown on Contact Detail)
+    const serviceAddressesGrid = document.querySelector('#contact-service-addresses-grid');
+    if (serviceAddressesGrid && !serviceAddressesGrid._bound) {
+      serviceAddressesGrid.addEventListener('click', async (e) => {
+        const wrap = e.target.closest?.('.info-value-wrap');
+        if (!wrap) return;
+        const field = wrap.getAttribute('data-field');
+        if (!field) return;
+
+        // Edit button: switch to input
+        const editBtn = e.target.closest('.info-edit');
+        if (editBtn) {
+          e.preventDefault();
+          beginEditAccountServiceAddress(wrap, field);
+          return;
+        }
+        // Copy button
+        const copyBtn = e.target.closest('.info-copy');
+        if (copyBtn) {
+          const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
+          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          return;
+        }
+        // Delete button
+        const deleteBtn = e.target.closest('.info-delete');
+        if (deleteBtn) {
+          e.preventDefault();
+          // Special handling for service addresses
+          if (field.startsWith('serviceAddress_')) {
+            const addressIndex = parseInt(wrap.getAttribute('data-address-index'), 10);
+            if (!isNaN(addressIndex)) {
+              // Get linked account
+              const linkedAccount = findAssociatedAccount(state.currentContact);
+              if (linkedAccount && linkedAccount.serviceAddresses && Array.isArray(linkedAccount.serviceAddresses)) {
+                // Remove this address from the array
+                const updatedAddresses = linkedAccount.serviceAddresses.filter((_, idx) => idx !== addressIndex);
+                await saveAccountServiceAddresses(updatedAddresses);
+                // Re-render to update the UI
+                renderContactDetail();
+                return;
+              }
+            }
+          }
+          return;
+        }
+      });
+      serviceAddressesGrid._bound = '1';
+    }
+
+    // Add Service Address button (Contact Detail)
+    const contactAddServiceAddressBtn = document.getElementById('contact-add-service-address');
+    if (contactAddServiceAddressBtn && !contactAddServiceAddressBtn._bound) {
+      contactAddServiceAddressBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        // Get linked account
+        const linkedAccount = findAssociatedAccount(state.currentContact);
+        if (!linkedAccount) {
+          window.crm?.showToast && window.crm.showToast('No linked account found');
+          return;
+        }
+        
+        // Get current service addresses
+        const currentAddresses = (linkedAccount.serviceAddresses && Array.isArray(linkedAccount.serviceAddresses)) ? linkedAccount.serviceAddresses : [];
+        
+        // Add a new empty address
+        const newAddress = { address: '', isPrimary: currentAddresses.length === 0 };
+        const updatedAddresses = [...currentAddresses, newAddress];
+        
+        // Save to Firestore
+        await saveAccountServiceAddresses(updatedAddresses);
+        
+        // Re-render the contact detail to show the new address
+        renderContactDetail();
+        
+        // Find the newly added address field and start editing it
+        setTimeout(() => {
+          const newIndex = updatedAddresses.length - 1;
+          const newWrap = document.querySelector(`#contact-service-addresses-grid [data-field="serviceAddress_${newIndex}"]`);
+          if (newWrap) {
+            beginEditAccountServiceAddress(newWrap, `serviceAddress_${newIndex}`);
+          }
+        }, 100);
+      });
+      contactAddServiceAddressBtn._bound = true;
+    }
+
     // Inline edit/copy/delete for Contact Information
     const infoGrid = document.querySelector('#contact-detail-view .info-grid');
     if (infoGrid && !infoGrid._bound) {
@@ -3631,6 +3798,83 @@
       } catch(e) { 
         console.error('[Contact Detail] Error dispatching energy-updated event:', e);
       }
+    };
+
+    const onKey = async (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); await commit(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); cancelEdit(wrap, field, current); }
+    };
+    input.addEventListener('keydown', onKey);
+    saveBtn.addEventListener('click', async () => { await commit(); });
+    cancelBtn.addEventListener('click', () => { cancelEdit(wrap, field, current); });
+  }
+
+  // Inline edit for Service Address fields (Account fields shown on Contact Detail)
+  function beginEditAccountServiceAddress(wrap, field) {
+    if (!wrap) return;
+
+    const current = wrap.querySelector('.info-value-text')?.textContent || '';
+    wrap.classList.add('editing');
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'input-dark info-edit-input';
+    input.value = current === '--' ? '' : current;
+    input.placeholder = 'Enter address';
+
+    const actions = wrap.querySelector('.info-actions');
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'icon-btn-sm info-save';
+    saveBtn.innerHTML = svgSave();
+    saveBtn.title = 'Save';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'icon-btn-sm info-cancel';
+    cancelBtn.textContent = '×';
+    cancelBtn.title = 'Cancel';
+
+    // Swap text for input
+    const textEl = wrap.querySelector('.info-value-text');
+    if (textEl && textEl.parentElement) textEl.parentElement.replaceChild(input, textEl);
+
+    // Replace actions with save/cancel temporarily
+    if (actions) {
+      actions.innerHTML = '';
+      actions.appendChild(saveBtn);
+      actions.appendChild(cancelBtn);
+    }
+
+    setTimeout(() => input.focus(), 0);
+
+    const commit = async () => {
+      const val = input.value.trim();
+      
+      // Get address index from field name
+      const addressIndex = parseInt(wrap.getAttribute('data-address-index'), 10);
+      if (isNaN(addressIndex)) {
+        console.error('[Contact Detail] Invalid address index');
+        return;
+      }
+      
+      // Get linked account
+      const linkedAccount = findAssociatedAccount(state.currentContact);
+      if (!linkedAccount) {
+        console.error('[Contact Detail] No linked account found');
+        return;
+      }
+      
+      // Update the address in the array
+      const currentAddresses = (linkedAccount.serviceAddresses && Array.isArray(linkedAccount.serviceAddresses)) ? linkedAccount.serviceAddresses : [];
+      const updatedAddresses = [...currentAddresses];
+      
+      if (addressIndex < updatedAddresses.length) {
+        updatedAddresses[addressIndex] = { ...updatedAddresses[addressIndex], address: val };
+      }
+      
+      // Save to account
+      await saveAccountServiceAddresses(updatedAddresses);
+      
+      // Update display
+      updateFieldText(wrap, val || '--');
     };
 
     const onKey = async (ev) => {

@@ -3808,26 +3808,26 @@ window.__pcIconAnimator = {
     },
     
     observeAvatars: function() {
-        // Add loaded class to avatar circles
+        // Add loaded class to avatar circles and task detail avatars/favicons
         const loadAvatar = (avatar) => {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => avatar.classList.add('icon-loaded'));
             });
         };
         
-        // Load existing avatars
-        document.querySelectorAll('.avatar-circle, .activity-entity-avatar-circle').forEach(loadAvatar);
+        // Load existing avatars (including task detail page icons)
+        document.querySelectorAll('.avatar-circle, .activity-entity-avatar-circle, .avatar-initials, .company-favicon-header').forEach(loadAvatar);
         
         // Watch for new avatars
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
-                        if (node.matches && node.matches('.avatar-circle, .activity-entity-avatar-circle')) {
+                        if (node.matches && node.matches('.avatar-circle, .activity-entity-avatar-circle, .avatar-initials, .company-favicon-header')) {
                             loadAvatar(node);
                         }
                         if (node.querySelectorAll) {
-                            node.querySelectorAll('.avatar-circle, .activity-entity-avatar-circle').forEach(loadAvatar);
+                            node.querySelectorAll('.avatar-circle, .activity-entity-avatar-circle, .avatar-initials, .company-favicon-header').forEach(loadAvatar);
                         }
                     }
                 });
