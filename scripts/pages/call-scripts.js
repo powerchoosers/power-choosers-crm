@@ -443,12 +443,91 @@
       ]
     },
     main_script_start: {
-      text: "Perfect — So, my name is Lewis with PowerChoosers.com, and — I understand you're responsible for electricity agreements and contracts for {{account.name}}. Is that still accurate?",
+      text: "Perfect — So, my name is Lewis and — I understand you're responsible for utility expenses and contracts for {{account.name}}. Is that still accurate?",
       responses: [
-        { label: "Yes, that's me / I handle that", next: 'pathA' },
+        { label: "Yes, that's me / I handle that", next: 'utility_discovery' },
         { label: 'That would be someone else / not the right person', next: 'gatekeeper_intro' },
-        { label: 'We both handle it / team decision', next: 'pathA' },
+        { label: 'We both handle it / team decision', next: 'utility_discovery' },
         { label: 'Unsure or hesitant', next: 'pathD' } // pathD not explicitly defined in source; route to discovery instead
+      ]
+    },
+    utility_discovery: {
+      text: "Gotcha. So most companies we work with — their main expenses tend to be electricity and water — we help companies reduce these expenses by any means necessary. <br><br>What would you say — is the biggest reoccurring cost for {{account.name}}?",
+      responses: [
+        { label: 'Electricity', next: 'electricity_spending_question' },
+        { label: 'Water', next: 'water_confirm' },
+        { label: 'Other', next: 'pathA' }
+      ]
+    },
+    electricity_spending_question: {
+      text: "How much are you guys typically spending on energy on a monthly basis?",
+      responses: [
+        { label: 'Share amount ($X/month)', next: 'electricity_confirm' },
+        { label: 'Not sure / need to check', next: 'electricity_confirm' },
+        { label: 'Too high / struggling', next: 'electricity_confirm' }
+      ]
+    },
+    electricity_confirm: {
+      text: "Now {{contact.first_name}}, if you could reduce your annual energy expenses, would you?",
+      responses: [
+        { label: 'Yes', next: 'pathA' },
+        { label: 'Maybe / tell me more', next: 'pathA' },
+        { label: 'Not interested', next: 'voicemail_or_hangup' }
+      ]
+    },
+    water_confirm: {
+      text: "Now {{contact.first_name}}, if you could reduce your annual water expenses, would you?",
+      responses: [
+        { label: 'Yes', next: 'water_savings_pitch' },
+        { label: 'Maybe / tell me more', next: 'water_savings_pitch' },
+        { label: 'Not interested', next: 'voicemail_or_hangup' }
+      ]
+    },
+    water_savings_pitch: {
+      text: "We have been able to guarantee 10% in savings on water bills for the year, and in most cases — our clients end up saving anywhere between 20%-30% — annually. <br><br>How much are you guys spending on water expenses on a monthly basis?",
+      responses: [
+        { label: 'Share amount ($X/month)', next: 'water_calculate_savings' },
+        { label: 'Not sure / need to check', next: 'water_appointment_offer' },
+        { label: 'Too high / struggling', next: 'water_calculate_savings' }
+      ]
+    },
+    water_calculate_savings: {
+      text: "Got it — so if we could save {{account.name}} even just 15% on that, we're talking real money back in your budget every year. Would it make sense to set up a quick 10-minute call where I can show you exactly how we do it?",
+      responses: [
+        { label: 'Yes, schedule it', next: 'water_book_appointment' },
+        { label: 'Send me details first', next: 'water_send_details' },
+        { label: 'Not now', next: 'voicemail_or_hangup' }
+      ]
+    },
+    water_appointment_offer: {
+      text: "No problem — most companies don't have that number off the top of their head. What works best for you, {{contact.first_name}} — a quick 10-minute call today or tomorrow where I can walk you through our water savings program and we can pull those numbers together?",
+      responses: [
+        { label: 'Book on calendar', next: 'water_book_appointment' },
+        { label: 'Email me the details', next: 'water_send_details' },
+        { label: 'Not interested', next: 'voicemail_or_hangup' }
+      ]
+    },
+    water_book_appointment: {
+      text: "Perfect — I'll get that on the calendar for you. I'll bring some case studies from similar {{account.industry}} companies in {{account.city}} so you can see the exact savings we've achieved. Sound good?",
+      responses: [
+        { label: 'Sounds good', next: 'start' },
+        { label: 'What do I need to prepare?', next: 'water_prep_info' },
+        { label: 'Back', next: 'water_calculate_savings' }
+      ]
+    },
+    water_send_details: {
+      text: "No problem — I'll send over a quick overview with our water savings case studies and next steps for {{account.name}}. Should I send it to {{contact.email}} or is there a better email?",
+      responses: [
+        { label: 'Send to that email', next: 'start' },
+        { label: 'Use a different email', next: 'start' },
+        { label: 'Back', next: 'water_calculate_savings' }
+      ]
+    },
+    water_prep_info: {
+      text: "Just have your most recent water bill handy — that's it. We'll walk through the numbers together and I can show you where the savings come from. I'll send a calendar invite right after this call.",
+      responses: [
+        { label: 'Perfect, talk soon', next: 'start' },
+        { label: 'Back', next: 'water_book_appointment' }
       ]
     },
     gatekeeper_intro: {
