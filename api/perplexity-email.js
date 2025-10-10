@@ -428,12 +428,11 @@ Paragraph 3 (CTA - use EXACTLY this text):
 CRITICAL RULES:
 ✓ Subject line: Under 50 chars, mention invoice request
 ✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
-✓ Closing: "Best regards," on its own line
 ✓ Length: 90-140 words total
 ✓ DO NOT include citation markers like [1], [2], [3]
 ✓ DO NOT repeat the contact's name after greeting
 ✓ DO NOT repeat "We will review..." or "What we'll review..." twice - say it ONCE before the bullet list
-✓ NO standalone sender name before "Best regards,"`;
+✓ DO NOT include closing or sender name - these will be added automatically`;
 
     const invoiceOutputFormat = `
 OUTPUT FORMAT:
@@ -451,7 +450,7 @@ What we'll review from your invoice:
 
 Will you be able to send over the invoice by end of day so me and my team can get started?
 
-Best regards,`;
+DO NOT include closing or sender name - these will be added automatically.`;
 
     return [identity, recipientContext, invoiceRules, invoiceOutputFormat].join('\n');
   }
@@ -495,9 +494,9 @@ Hi ${firstName || 'there'},
 [Paragraph 2: Value prop and urgency ${contractEndLabel ? `- mention contract ending ${contractEndLabel}` : ''} - 3-4 sentences]
 
 [Paragraph 3: CTA with 2 COMPLETE time slots - USE THE SUGGESTED MEETING TIMES PROVIDED ABOVE]
-Example format: "Would [slot1] [time1] or [slot2] [time2] work for a 15-minute call?"
+Example: "Would Tuesday next week 2-3pm or Thursday next week 10-11am work for a 15-minute call?"
 
-Best regards,`;
+DO NOT include closing or sender name - these will be added automatically.`;
 
   return [identity, recipientContext, qualityRules, outputFormat].join('\n');
 }
