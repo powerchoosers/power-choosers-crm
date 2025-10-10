@@ -36,6 +36,26 @@
         }
         return;
       }
+      
+      // Check if click is on website header button
+      const websiteBtn = e.target.closest('.website-header-btn');
+      if (websiteBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[AccountDetail] Website button clicked via delegation');
+        handleQuickAction('website');
+        return;
+      }
+      
+      // Check if click is on LinkedIn header button
+      const linkedInBtn = e.target.closest('.linkedin-header-btn');
+      if (linkedInBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[AccountDetail] LinkedIn button clicked via delegation');
+        handleQuickAction('linkedin');
+        return;
+      }
     };
     
     // Attach to document with capture phase to catch events early
@@ -2944,16 +2964,10 @@
       widgetsDrawer._bound = '1';
     }
 
-    // Quick actions
-    const headerWebsiteBtn = document.querySelector('.website-header-btn');
-    if (headerWebsiteBtn) {
-      headerWebsiteBtn.addEventListener('click', () => handleQuickAction('website'));
-    }
-    
-    const headerLinkedInBtn = document.querySelector('.linkedin-header-btn');
-    if (headerLinkedInBtn) {
-      headerLinkedInBtn.addEventListener('click', () => handleQuickAction('linkedin'));
-    }
+    // NOTE: Website and LinkedIn quick action buttons now use event delegation
+    // Event listener is attached at module initialization on document level
+    // This eliminates race conditions when DOM is replaced during account navigation
+    // See setupEventDelegation() for implementation
 
     // Title actions: edit/copy/clear account name (mirror Contact Detail)
     const header = document.getElementById('account-detail-header');
