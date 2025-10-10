@@ -978,14 +978,14 @@ class EmailManager {
             
             // Extract data from JSON response
             const subject = jsonData.subject || 'Energy Solutions';
-            const greeting = jsonData.greeting || 'Hello,';
             
             // Build template HTML using the appropriate builder
+            // Note: Each template builder now handles its own greeting internally
             const templateHtml = this.buildTemplateHtml(templateType, jsonData, recipient, fromEmail);
             
-            // Wrap with branding (header + footer) and add greeting at top
+            // Wrap with branding (header + footer) - no additional greeting needed
             const fullHtml = this.wrapSonarHtmlWithBranding(
-                `<p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0 0 20px 0;">${this.escapeHtml(greeting)}</p>\n${templateHtml}`,
+                templateHtml,
                 recipient,
                 subject
             );
@@ -1781,19 +1781,25 @@ class EmailManager {
 
     // ========== 7 PRESET HTML TEMPLATE BUILDERS ==========
     
-    // Template 1: Warm Intro (Blue gradient theme)
+    // Template 1: Warm Intro (Modern blue gradient theme)
     buildWarmIntroHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         return `
+<div style="text-align:left; margin:0 0 20px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
+        ${this.escapeHtml(data.greeting || 'Hi,')}
+    </p>
+</div>
+
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
     <tr>
-        <td style="background:linear-gradient(135deg, #3498db, #2980b9); padding:25px; border-radius:8px; color:#ffffff;">
-            <h2 style="margin:0 0 15px 0; font-size:22px; font-weight:600;">🤝 ${this.escapeHtml(data.call_reference || 'Great speaking with you')}</h2>
+        <td style="background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding:25px; border-radius:8px; color:#ffffff; box-shadow:0 4px 12px rgba(59, 130, 246, 0.3);">
+            <h2 style="margin:0; font-size:22px; font-weight:600;">🤝 ${this.escapeHtml(data.call_reference || 'Great speaking with you')}</h2>
         </td>
     </tr>
 </table>
 
-<div style="background:#ffffff; padding:20px; border-radius:6px; margin:15px 0; border-left:4px solid #3498db;">
+<div style="background:linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #93c5fd;">
     <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
         ${this.escapeHtml(data.main_message || 'Looking forward to our next conversation.')}
     </p>
@@ -1801,8 +1807,8 @@ class EmailManager {
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:#e67e22; border-radius:28px; padding:14px 28px;">
-            <a href="mailto:${mail}?subject=Re: ${encodeURIComponent(data.subject || 'Follow up')}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+        <td style="background:linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(249, 115, 22, 0.3);">
+            <a href="mailto:${mail}?subject=Re: ${encodeURIComponent(data.subject || 'Follow up')}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
                 ${this.escapeHtml(data.cta_text || 'Schedule a Follow-Up Call')}
             </a>
         </td>
@@ -1810,14 +1816,20 @@ class EmailManager {
 </table>`;
     }
 
-    // Template 2: Follow-Up (Purple accent theme)
+    // Template 2: Follow-Up (Modern purple theme)
     buildFollowUpHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         const valueProps = Array.isArray(data.value_props) ? data.value_props : [data.value_props || ''];
         
         return `
-<div style="background:#f8f9fa; padding:20px; border-radius:6px; margin:15px 0;">
-    <h3 style="color:#8e44ad; font-size:18px; margin:0 0 10px 0;">📊 Progress Update</h3>
+<div style="text-align:left; margin:0 0 20px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
+        ${this.escapeHtml(data.greeting || 'Hi,')}
+    </p>
+</div>
+
+<div style="background:linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #d8b4fe;">
+    <h3 style="color:#7c3aed; font-size:18px; margin:0 0 10px 0; font-weight:600;">📊 Progress Update</h3>
     <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
         ${this.escapeHtml(data.progress_update || 'Here\'s where we are...')}
     </p>
@@ -1826,34 +1838,34 @@ class EmailManager {
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
     <tr>
         <td width="50%" style="padding-right:10px; vertical-align:top;">
-            <div style="background:#ffffff; padding:20px; border-radius:6px; border:2px solid #8e44ad; height:100%;">
-                <h4 style="color:#8e44ad; font-size:16px; margin:0 0 15px 0;">✓ Key Benefits</h4>
+            <div style="background:#ffffff; padding:20px; border-radius:8px; border:1px solid #d8b4fe; box-shadow:0 1px 3px rgba(0,0,0,0.05); height:100%;">
+                <h4 style="color:#7c3aed; font-size:16px; margin:0 0 15px 0; font-weight:600;">✓ Key Benefits</h4>
                 ${valueProps.slice(0, Math.ceil(valueProps.length / 2)).map(prop => 
-                    `<p style="color:#555; font-size:14px; line-height:1.5; margin:0 0 10px 0;">• ${this.escapeHtml(prop)}</p>`
+                    `<p style="color:#1f2937; font-size:14px; line-height:1.5; margin:0 0 10px 0;">• ${this.escapeHtml(prop)}</p>`
                 ).join('')}
             </div>
         </td>
         <td width="50%" style="padding-left:10px; vertical-align:top;">
-            <div style="background:#ffffff; padding:20px; border-radius:6px; border:2px solid #8e44ad; height:100%;">
-                <h4 style="color:#8e44ad; font-size:16px; margin:0 0 15px 0;">✓ Why Act Now</h4>
+            <div style="background:#ffffff; padding:20px; border-radius:8px; border:1px solid #d8b4fe; box-shadow:0 1px 3px rgba(0,0,0,0.05); height:100%;">
+                <h4 style="color:#7c3aed; font-size:16px; margin:0 0 15px 0; font-weight:600;">✓ Why Act Now</h4>
                 ${valueProps.slice(Math.ceil(valueProps.length / 2)).map(prop => 
-                    `<p style="color:#555; font-size:14px; line-height:1.5; margin:0 0 10px 0;">• ${this.escapeHtml(prop)}</p>`
+                    `<p style="color:#1f2937; font-size:14px; line-height:1.5; margin:0 0 10px 0;">• ${this.escapeHtml(prop)}</p>`
                 ).join('')}
             </div>
         </td>
     </tr>
 </table>
 
-<div style="background:#fff3cd; border-left:4px solid #f39c12; padding:15px; border-radius:4px; margin:15px 0;">
-    <p style="color:#856404; font-size:14px; line-height:1.5; margin:0; font-weight:600;">
+<div style="background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left:4px solid #f59e0b; padding:15px; border-radius:8px; margin:20px 0;">
+    <p style="color:#92400e; font-size:14px; line-height:1.5; margin:0; font-weight:600;">
         ⚠️ Market Update: ${this.escapeHtml(data.urgency_message || 'Time-sensitive opportunity')}
     </p>
 </div>
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:#27ae60; border-radius:28px; padding:14px 28px;">
-            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+        <td style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(16, 185, 129, 0.3);">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
                 ${this.escapeHtml(data.cta_text || 'Let\'s Continue the Conversation')}
             </a>
         </td>
@@ -1861,41 +1873,47 @@ class EmailManager {
 </table>`;
     }
 
-    // Template 3: Energy Health Check (Teal/medical theme)
+    // Template 3: Energy Health Check (Modern teal theme)
     buildEnergyHealthHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         const assessmentItems = Array.isArray(data.assessment_items) ? data.assessment_items : [data.assessment_items || ''];
         
         return `
+<div style="text-align:left; margin:0 0 20px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
+        ${this.escapeHtml(data.greeting || 'Hi,')}
+    </p>
+</div>
+
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
     <tr>
-        <td style="background:linear-gradient(135deg, #16a085, #1abc9c); padding:25px; border-radius:8px; text-align:center;">
+        <td style="background:linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); padding:25px; border-radius:8px; text-align:center; box-shadow:0 4px 12px rgba(20, 184, 166, 0.3);">
             <h2 style="color:#ffffff; font-size:24px; margin:0; font-weight:600;">⚡ Free Energy Health Check</h2>
             <p style="color:#ffffff; font-size:14px; margin:10px 0 0 0; opacity:0.95;">Comprehensive Assessment • No Obligation</p>
         </td>
     </tr>
 </table>
 
-<div style="background:#e8f8f5; padding:20px; border-radius:6px; margin:15px 0;">
-    <h3 style="color:#16a085; font-size:18px; margin:0 0 15px 0;">📋 What We'll Review</h3>
+<div style="background:linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #99f6e4;">
+    <h3 style="color:#0f766e; font-size:18px; margin:0 0 15px 0; font-weight:600;">📋 What We'll Review</h3>
     ${assessmentItems.map(item => 
-        `<div style="background:#ffffff; padding:12px; margin:8px 0; border-radius:4px; border-left:3px solid #1abc9c;">
-            <p style="color:#1f2937; font-size:14px; margin:0;">✓ ${this.escapeHtml(item)}</p>
+        `<div style="background:#ffffff; padding:12px; margin:8px 0; border-radius:6px; border-left:3px solid #14b8a6; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+            <p style="color:#1f2937; font-size:14px; margin:0; line-height:1.5;">✓ ${this.escapeHtml(item)}</p>
         </div>`
     ).join('')}
 </div>
 
-<table width="100%" cellpadding="15" cellspacing="0" border="0" style="background:#d1f2eb; border-radius:6px; margin:15px 0;">
+<table width="100%" cellpadding="15" cellspacing="0" border="0" style="background:linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius:8px; margin:20px 0;">
     <tr>
         <td>
-            <p style="color:#0e6655; font-size:15px; line-height:1.5; margin:0;">
+            <p style="color:#065f46; font-size:15px; line-height:1.5; margin:0;">
                 <strong>Your Contract:</strong> ${this.escapeHtml(data.contract_info || 'Review current terms and expiration')}
             </p>
         </td>
     </tr>
 </table>
 
-<div style="background:#ffffff; padding:20px; border-radius:6px; margin:15px 0; border:2px solid #16a085;">
+<div style="background:#ffffff; padding:20px; border-radius:8px; margin:20px 0; border:1px solid #99f6e4; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
     <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
         ${this.escapeHtml(data.benefits || 'Get insights into potential savings and optimization opportunities.')}
     </p>
@@ -1903,8 +1921,8 @@ class EmailManager {
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:#16a085; border-radius:28px; padding:14px 28px;">
-            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+        <td style="background:linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(20, 184, 166, 0.3);">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
                 ${this.escapeHtml(data.cta_text || 'Schedule Your Free Assessment')}
             </a>
         </td>
@@ -1912,16 +1930,22 @@ class EmailManager {
 </table>`;
     }
 
-    // Template 4: Proposal Delivery (Gold/premium theme)
+    // Template 4: Proposal Delivery (Modern gold theme)
     buildProposalHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         const timeline = Array.isArray(data.timeline) ? data.timeline : [data.timeline || ''];
         
         return `
+<div style="text-align:left; margin:0 0 20px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
+        ${this.escapeHtml(data.greeting || 'Hi,')}
+    </p>
+</div>
+
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0; position:relative;">
     <tr>
-        <td style="background:linear-gradient(135deg, #f39c12, #e67e22); padding:30px; border-radius:8px; text-align:center; position:relative;">
-            <div style="position:absolute; top:10px; right:10px; background:#ffffff; color:#f39c12; padding:5px 15px; border-radius:20px; font-size:12px; font-weight:700;">
+        <td style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding:30px; border-radius:8px; text-align:center; position:relative; box-shadow:0 4px 12px rgba(245, 158, 11, 0.3);">
+            <div style="position:absolute; top:10px; right:10px; background:#ffffff; color:#d97706; padding:5px 15px; border-radius:20px; font-size:12px; font-weight:700;">
                 EXCLUSIVE OFFER
             </div>
             <h2 style="color:#ffffff; font-size:24px; margin:0; font-weight:600;">📄 Your Custom Proposal</h2>
@@ -1929,14 +1953,14 @@ class EmailManager {
     </tr>
 </table>
 
-<div style="background:#fff8e1; border:3px solid #f39c12; padding:20px; border-radius:8px; margin:15px 0;">
-    <h3 style="color:#f57c00; font-size:18px; margin:0 0 10px 0;">Proposal Summary</h3>
+<div style="background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border:1px solid #fbbf24; padding:20px; border-radius:8px; margin:20px 0;">
+    <h3 style="color:#b45309; font-size:18px; margin:0 0 10px 0; font-weight:600;">Proposal Summary</h3>
     <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
         ${this.escapeHtml(data.proposal_summary || 'Tailored energy solution designed for your needs.')}
     </p>
 </div>
 
-<table width="100%" cellpadding="20" cellspacing="0" border="0" style="background:linear-gradient(135deg, #ffd700, #ffa500); border-radius:8px; margin:15px 0;">
+<table width="100%" cellpadding="20" cellspacing="0" border="0" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius:8px; margin:20px 0; box-shadow:0 4px 12px rgba(245, 158, 11, 0.3);">
     <tr>
         <td style="text-align:center;">
             <h3 style="color:#ffffff; font-size:20px; margin:0 0 10px 0; text-shadow:0 2px 4px rgba(0,0,0,0.2);">💰 Pricing Highlight</h3>
@@ -1947,10 +1971,10 @@ class EmailManager {
     </tr>
 </table>
 
-<div style="background:#ffffff; padding:20px; border-radius:6px; margin:15px 0; border:2px solid #f39c12;">
-    <h3 style="color:#f57c00; font-size:18px; margin:0 0 15px 0;">📅 Implementation Timeline</h3>
+<div style="background:#ffffff; padding:20px; border-radius:8px; margin:20px 0; border:1px solid #fbbf24; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+    <h3 style="color:#b45309; font-size:18px; margin:0 0 15px 0; font-weight:600;">📅 Implementation Timeline</h3>
     ${timeline.map((step, idx) => 
-        `<div style="padding:10px; margin:8px 0; background:#fff8e1; border-radius:4px; border-left:4px solid #f39c12;">
+        `<div style="padding:12px; margin:8px 0; background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius:6px; border-left:4px solid #f59e0b;">
             <p style="color:#1f2937; font-size:14px; margin:0;"><strong>Step ${idx + 1}:</strong> ${this.escapeHtml(step)}</p>
         </div>`
     ).join('')}
@@ -1958,8 +1982,8 @@ class EmailManager {
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:#f39c12; border-radius:28px; padding:14px 28px;">
-            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+        <td style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(245, 158, 11, 0.3);">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
                 ${this.escapeHtml(data.cta_text || 'Let\'s Discuss Your Proposal')}
             </a>
         </td>
@@ -1967,46 +1991,52 @@ class EmailManager {
 </table>`;
     }
 
-    // Template 5: Cold Email (Red urgency theme)
+    // Template 5: Cold Email (Modern red urgency theme)
     buildColdEmailHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         const painPoints = Array.isArray(data.pain_points) ? data.pain_points : [data.pain_points || ''];
         
         return `
+<div style="text-align:left; margin:0 0 20px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
+        ${this.escapeHtml(data.greeting || 'Hi,')}
+    </p>
+</div>
+
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
     <tr>
-        <td style="background:linear-gradient(135deg, #e74c3c, #c0392b); padding:25px; border-radius:8px; text-align:center;">
+        <td style="background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding:25px; border-radius:8px; text-align:center; box-shadow:0 4px 12px rgba(239, 68, 68, 0.3);">
             <h2 style="color:#ffffff; font-size:22px; margin:0; font-weight:600;">⚠️ Energy Costs Rising Fast</h2>
         </td>
     </tr>
 </table>
 
-<div style="background:#fff5f5; padding:20px; border-radius:6px; margin:15px 0; border-left:4px solid #e74c3c;">
-    <h3 style="color:#c0392b; font-size:18px; margin:0 0 15px 0;">Common Challenges We're Seeing</h3>
+<div style="background:linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #fca5a5;">
+    <h3 style="color:#b91c1c; font-size:18px; margin:0 0 15px 0; font-weight:600;">Common Challenges We're Seeing</h3>
     ${painPoints.map(point => 
-        `<div style="background:#ffffff; padding:12px; margin:8px 0; border-radius:4px;">
-            <p style="color:#555; font-size:14px; margin:0;">❌ ${this.escapeHtml(point)}</p>
+        `<div style="background:#ffffff; padding:12px; margin:8px 0; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+            <p style="color:#1f2937; font-size:14px; margin:0;">❌ ${this.escapeHtml(point)}</p>
         </div>`
     ).join('')}
 </div>
 
-<div style="background:#d1f2eb; border:2px solid #16a085; padding:20px; border-radius:8px; margin:15px 0;">
-    <h3 style="color:#16a085; font-size:18px; margin:0 0 10px 0;">✓ How Power Choosers Helps</h3>
+<div style="background:linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); border:1px solid #99f6e4; padding:20px; border-radius:8px; margin:20px 0;">
+    <h3 style="color:#0f766e; font-size:18px; margin:0 0 10px 0; font-weight:600;">✓ How Power Choosers Helps</h3>
     <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
         ${this.escapeHtml(data.solution_intro || 'We help businesses reduce energy costs through competitive procurement and efficiency solutions.')}
     </p>
 </div>
 
-<div style="background:#e8f8f5; padding:15px; border-radius:6px; margin:15px 0;">
-    <p style="color:#16a085; font-size:14px; line-height:1.5; margin:0; font-style:italic;">
+<div style="background:linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); padding:15px; border-radius:8px; margin:20px 0;">
+    <p style="color:#1e40af; font-size:14px; line-height:1.5; margin:0; font-style:italic;">
         ${this.escapeHtml(data.social_proof || 'Companies like yours are saving 20-30% on energy costs.')}
     </p>
 </div>
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:#e74c3c; border-radius:28px; padding:14px 28px;">
-            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+        <td style="background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(239, 68, 68, 0.3);">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
                 ${this.escapeHtml(data.cta_text || 'Explore Your Savings Potential')}
             </a>
         </td>
@@ -2014,67 +2044,70 @@ class EmailManager {
 </table>`;
     }
 
-    // Template 6: Invoice Request (Simple/clean theme)
+    // Template 6: Invoice Request (Clean modern theme)
     buildInvoiceHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         const checklist = Array.isArray(data.checklist_items) ? data.checklist_items : [data.checklist_items || ''];
         
         return `
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 15px 0;">
     <tr>
-        <td style="background:#ffffff; padding:20px; border-radius:6px; text-align:center; border:1px solid #e5e7eb;">
-            <h2 style="color:#3498db; font-size:20px; margin:0; font-weight:600;">📎 Invoice Request</h2>
+        <td style="background:#ffffff; padding:20px; border-radius:8px; text-align:center; border:1px solid #e0e7ff; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <h2 style="color:#2563eb; font-size:20px; margin:0; font-weight:600;">📎 Invoice Request</h2>
         </td>
     </tr>
 </table>
 
-<div style="text-align:left; margin:15px 0;">
-    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0 0 15px 0;">
+<div style="text-align:left; margin:0 0 20px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0 0 8px 0;">
+        ${this.escapeHtml(data.greeting || 'Hi,')}
+    </p>
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
         ${this.escapeHtml(data.intro_paragraph || 'We need your latest invoice to complete your energy analysis.')}
     </p>
 </div>
 
-<div style="background:#f8f9fa; padding:20px; border-radius:6px; margin:15px 0;">
-    <h3 style="color:#2c3e50; font-size:18px; margin:0 0 15px 0; text-align:center;">✓ What We'll Review</h3>
-    <div style="padding-left:20px;">
+<div style="background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #bae6fd;">
+    <h3 style="color:#0369a1; font-size:18px; margin:0 0 15px 0; text-align:center; font-weight:600;">✓ What We'll Review</h3>
+    <div style="padding-left:0;">
         ${checklist.map(item => 
-            `<p style="color:#1f2937; font-size:14px; line-height:1.8; margin:8px 0;">• ${this.escapeHtml(item)}</p>`
+            `<div style="padding:8px 0 8px 20px;">
+                <p style="color:#1f2937; font-size:14px; line-height:1.6; margin:0;">• ${this.escapeHtml(item)}</p>
+            </div>`
         ).join('')}
     </div>
 </div>
 
-<table width="100%" cellpadding="15" cellspacing="0" border="0" style="background:#ffe5e5; border-radius:6px; margin:15px 0;">
-    <tr>
-        <td style="text-align:center;">
-            <p style="color:#c0392b; font-size:16px; margin:0; font-weight:600;">
-                ⏰ Needed: ${this.escapeHtml(data.deadline || 'As soon as possible')}
-            </p>
-        </td>
-    </tr>
-</table>
-
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:#3498db; border-radius:28px; padding:14px 28px;">
-            <a href="mailto:${mail}?subject=Invoice for Energy Review" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
-                ${this.escapeHtml(data.cta_text || 'Send Invoice Now')}
+        <td style="background:linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); border-radius:8px; padding:16px 32px; text-align:center; box-shadow:0 4px 12px rgba(37, 99, 235, 0.3);">
+            <a href="#" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+                📅 Click to Schedule a Strategy Call
             </a>
         </td>
     </tr>
 </table>`;
     }
 
-    // Template 7: General/Manual (Flexible theme)
+    // Template 7: General/Manual (Modern flexible theme)
     buildGeneralHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         const sections = Array.isArray(data.sections) ? data.sections : [data.sections || ''];
         
         return `
+<div style="text-align:left; margin:0 0 20px 0;">
+    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
+        ${this.escapeHtml(data.greeting || 'Hi,')}
+    </p>
+</div>
+
 ${sections.map((section, idx) => {
-    const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';
-    const borderColor = '#3498db';
+    const bgGradient = idx % 2 === 0 
+        ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' 
+        : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)';
+    const borderColor = idx % 2 === 0 ? '#3b82f6' : '#64748b';
     
-    return `<div style="background:${bgColor}; padding:20px; margin:15px 0; border-radius:6px; border-left:4px solid ${borderColor};">
+    return `<div style="background:${bgGradient}; padding:20px; margin:15px 0; border-radius:8px; border:1px solid ${idx % 2 === 0 ? '#93c5fd' : '#cbd5e1'}; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
     <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
         ${this.escapeHtml(section)}
     </p>
@@ -2083,8 +2116,8 @@ ${sections.map((section, idx) => {
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:#e67e22; border-radius:28px; padding:14px 28px;">
-            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+        <td style="background:linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(249, 115, 22, 0.3);">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
                 ${this.escapeHtml(data.cta_text || 'Let\'s Connect')}
             </a>
         </td>
