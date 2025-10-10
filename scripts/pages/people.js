@@ -2233,8 +2233,16 @@
 
   
 
-  function render() {
+  async function render(forceReloadCalls = false) {
     if (!els.tbody) return;
+    
+    // Reload calls data if forced (e.g., pagination change)
+    if (forceReloadCalls && window.callsModule && typeof window.callsModule.loadData === 'function') {
+      try {
+        await window.callsModule.loadData();
+      } catch (e) { /* noop */ }
+    }
+    
     const pageItems = getPageItems();
     const rows = pageItems.map((c) => rowHtml(c)).join('');
     els.tbody.innerHTML = rows || emptyHtml();
@@ -2593,6 +2601,14 @@
 
   function init() {
     if (!initDomRefs()) return; // Not on this page
+    
+    // FORCE REFRESH BADGES: Clear and reload calls data to ensure badges are accurate
+    // This ensures badges update when navigating back to the page after placing a call
+    if (window.callsModule && typeof window.callsModule.getCallsData === 'function') {
+      const callsData = window.callsModule.getCallsData();
+      console.log('[People] Page init - calls data available:', callsData?.length || 0, 'calls');
+    }
+    
     attachEvents();
     // Ensure styles for bulk popover and actions bar match CRM theme
     injectPeopleBulkStyles();
@@ -2627,53 +2643,6 @@
     loadDataOnce();
     startLivePeopleListener();
     
-    // Listen for calls data load to refresh badges
-    if (!document._peopleCallsLoadedBound) {
-      document.addEventListener('pc:calls-loaded', () => {
-        try {
-          // Re-render to update badges now that calls data is available
-          if (state.loaded) render();
-        } catch (e) { /* noop */ }
-      });
-      document._peopleCallsLoadedBound = true;
-    }
-    
-    // Listen for new calls being logged to remove "No Calls" badge in real-time
-    if (!document._peopleCallLoggedBound) {
-      document.addEventListener('pc:call-logged', (e) => {
-        try {
-          const { targetPhone, accountId, contactId } = e.detail;
-          const normalizePhone = (phone) => String(phone || '').replace(/\D/g, '').slice(-10);
-          const targetNormalized = normalizePhone(targetPhone);
-          
-          // Find all contact rows that match this call
-          state.filtered.forEach((contact, index) => {
-            const contactPhones = [
-              normalizePhone(contact.mobile),
-              normalizePhone(contact.workDirectPhone),
-              normalizePhone(contact.otherPhone)
-            ].filter(p => p.length === 10);
-            
-            // Check if this call matches this contact's phone or contactId
-            const matchesPhone = contactPhones.includes(targetNormalized);
-            const matchesContact = contactId && contact.id === contactId;
-            const matchesAccount = accountId && contact.accountId === accountId;
-            
-            if (matchesPhone || matchesContact || matchesAccount) {
-              // Find and remove the "No Calls" badge from this row
-              const row = els.tbody?.querySelector(`tr[data-contact-id="${contact.id}"]`);
-              if (row) {
-                const badge = row.querySelector('.status-badge-no-calls');
-                if (badge) {
-                  badge.remove();
-                }
-              }
-            }
-          });
-        } catch (e) { /* noop */ }
-      });
-      document._peopleCallLoggedBound = true;
-    }
   }
 
   // Live listener to keep People table in sync without navigation
@@ -3822,7 +3791,7 @@
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(current, totalPages, (page) => {
         state.currentPage = page;
-        render();
+        render(true); // Force reload calls data on pagination change
         // After page change, scroll to the top of the actual scroll container
         try {
           requestAnimationFrame(() => {
