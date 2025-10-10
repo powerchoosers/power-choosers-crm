@@ -749,7 +749,7 @@ class SettingsPage {
         let signatureHtml = '';
 
         if (signature.text || signature.image) {
-            signatureHtml += '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
+            signatureHtml += '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
             
             if (signature.text) {
                 // Convert line breaks to HTML
