@@ -15103,4 +15103,43 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     }
 }
 
+/* ========================================
+   EMAIL SIGNATURE EDITOR DISPLAY
+   ======================================== */
+
+/* 
+ * Make signature text white in the editor for visibility on dark backgrounds
+ * CSS only affects the contenteditable editor display - doesn't affect sent emails
+ * Recipients will still see the original dark text color
+ */
+
+/* Target signature in contenteditable editor only */
+[contenteditable="true"] [data-signature="true"],
+[contenteditable="true"] [data-signature="true"] * {
+    color: #ffffff !important;
+}
+
+/* Make links in signature visible with light blue color */
+[contenteditable="true"] [data-signature="true"] a {
+    color: #60a5fa !important;
+    text-decoration: underline;
+}
+
+/* Also target signatures by style pattern (fallback for older signatures without data-signature attribute) */
+[contenteditable="true"] div[style*="margin-top: 20px"][style*="padding-top: 20px"][style*="border-top: 1px solid"],
+[contenteditable="true"] div[style*="margin-top: 20px"][style*="padding-top: 20px"][style*="border-top: 1px solid"] * {
+    color: #ffffff !important;
+}
+
+[contenteditable="true"] div[style*="margin-top: 20px"][style*="padding-top: 20px"][style*="border-top: 1px solid"] a {
+    color: #60a5fa !important;
+    text-decoration: underline;
+}
+
+/* Ensure signature images remain visible */
+[contenteditable="true"] [data-signature="true"] img {
+    opacity: 1;
+    filter: none;
+}
+
 
