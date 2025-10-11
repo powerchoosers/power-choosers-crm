@@ -118,7 +118,7 @@ class EmailManager {
 
         if (emailLoading) {
             // Always show loading state initially - emails will load from tracking system
-            emailLoading.innerHTML = `
+                emailLoading.innerHTML = `
                 <div class="loading-spinner"></div>
                 <h3>Loading emails...</h3>
                 <p>Fetching your emails from the tracking system.</p>
@@ -1227,7 +1227,7 @@ class EmailManager {
                 // Real CTA must have question mark AND (action words OR time reference)
                 return hasQuestion && (hasActionWords || hasTimeReference);
             };
-            
+
             // Detect CTA from original body (prefer scheduling/time or explicit CTA keywords; exclude explanation-like questions)
             let detectedCTA = null;
             for (const s of allSentences) {
@@ -1347,8 +1347,8 @@ class EmailManager {
                     // Safety check: Don't trim if it would cut an incomplete sentence
                     const lastSentence = parts[parts.length - 1];
                     if (lastSentence.trim().match(/[.!?]$/)) {
-                        parts.pop();
-                        paras[paras.length - 1] = parts.join(' ');
+                    parts.pop();
+                    paras[paras.length - 1] = parts.join(' ');
                     } else {
                         // Don't cut incomplete sentences
                         break;
@@ -1512,24 +1512,24 @@ class EmailManager {
 
       <!-- Body Container -->
       <div style="background-color:#ffffff; padding:32px 24px;">
-        <!-- Subject Ribbon -->
+          <!-- Subject Ribbon -->
         <div style="background-color:#eff6ff; padding:12px 14px; border-radius:6px; margin-bottom:24px; border-left:3px solid #1e3a8a;">
-          <strong style="color:#1e3a8a; font-size:15px;">Subject:</strong>
-          <span style="color:#1f2937; font-size:15px;"> ${safeSubject}</span>
-        </div>
-        <!-- Message Content -->
+            <strong style="color:#1e3a8a; font-size:15px;">Subject:</strong>
+            <span style="color:#1f2937; font-size:15px;"> ${safeSubject}</span>
+          </div>
+          <!-- Message Content -->
         <div style="color:#374151; font-size:15px; line-height:1.7; text-align:left;">${contentHtml}</div>
-      </div>
+        </div>
 
-      <!-- Footer -->
+        <!-- Footer -->
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff; text-align:center;">
-        <tr>
+          <tr>
           <td style="padding:20px 24px;">
-            <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
-          </td>
-        </tr>
+              <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
+            </td>
+          </tr>
         ${signatureHtml}
-      </table>
+        </table>
     </div>
   </center>
   <!-- Preheader spacing for mobile clients -->
@@ -2673,12 +2673,12 @@ ${sections.map((section, idx) => {
                 }
                 
                 if (last.tagName === 'P') {
-                    const txt = (last.textContent || '').replace(/\u00A0/g, ' ').trim();
-                    const onlyBr = !txt && last.querySelectorAll('br').length > 0;
-                    if (!txt || onlyBr) {
-                        const toRemove = last;
-                        last = last.previousElementSibling;
-                        toRemove.remove();
+                const txt = (last.textContent || '').replace(/\u00A0/g, ' ').trim();
+                const onlyBr = !txt && last.querySelectorAll('br').length > 0;
+                if (!txt || onlyBr) {
+                    const toRemove = last;
+                    last = last.previousElementSibling;
+                    toRemove.remove();
                     } else {
                         break;
                     }
@@ -2693,11 +2693,11 @@ ${sections.map((section, idx) => {
             
             if (!hasClosing) {
                 // Only append closing if not already present
-                const pCloseName = document.createElement('p');
-                pCloseName.appendChild(document.createTextNode('Best regards,'));
-                pCloseName.appendChild(document.createElement('br'));
+            const pCloseName = document.createElement('p');
+            pCloseName.appendChild(document.createTextNode('Best regards,'));
+            pCloseName.appendChild(document.createElement('br'));
                 pCloseName.appendChild(document.createTextNode(senderFirstName));
-                editor.appendChild(pCloseName);
+            editor.appendChild(pCloseName);
             } else {
                 // Closing exists - check if it has the sender name, if not, add it
                 const paragraphs = Array.from(editor.querySelectorAll('p'));
@@ -3505,12 +3505,12 @@ ${sections.map((section, idx) => {
                     this.hideLoading();
                 } else {
                     // Load all emails then filter
-                    const allEmails = await window.emailTrackingManager.getAllEmails();
-                    console.log('[EmailManager] Retrieved all emails:', allEmails.length);
-                    
-                    // Filter by folder
-                    let filteredEmails = allEmails;
-                    if (this.currentFolder === 'inbox') {
+                const allEmails = await window.emailTrackingManager.getAllEmails();
+                console.log('[EmailManager] Retrieved all emails:', allEmails.length);
+                
+                // Filter by folder
+                let filteredEmails = allEmails;
+                if (this.currentFolder === 'inbox') {
                         // Show only received emails
                         filteredEmails = allEmails.filter(email => {
                             if (email.emailType === 'sent' || email.isSentEmail || email.type === 'sent') {
@@ -3529,7 +3529,7 @@ ${sections.map((section, idx) => {
                         filteredEmails = allEmails.filter(email => email.status === 'draft');
                     } else if (this.currentFolder === 'spam') {
                         // Show only spam emails
-                        filteredEmails = allEmails.filter(email => 
+                    filteredEmails = allEmails.filter(email => 
                             (email.labels && email.labels.includes('SPAM')) || email.isSpam === true
                         );
                     } else if (this.currentFolder === 'trash') {
@@ -3541,19 +3541,19 @@ ${sections.map((section, idx) => {
                         // Show only scheduled emails
                         filteredEmails = allEmails.filter(email => 
                             (email.labels && email.labels.includes('SCHEDULED')) || email.scheduledAt
-                        );
-                    } else if (this.currentFolder === 'sent') {
+                    );
+                } else if (this.currentFolder === 'sent') {
                         // This is handled separately in loadEmails, but add fallback
-                        filteredEmails = allEmails.filter(email => 
+                    filteredEmails = allEmails.filter(email => 
                             email.emailType === 'sent' || email.isSentEmail || email.type === 'sent'
-                        );
-                    }
-                    
-                    this.emails = filteredEmails.map(email => this.parseSentEmailData(email));
-                    console.log('[EmailManager] Parsed emails for', this.currentFolder, ':', this.emails.length);
-                    this.renderEmails();
-                    this.updateFolderCounts();
-                    this.hideLoading();
+                    );
+                }
+                
+                this.emails = filteredEmails.map(email => this.parseSentEmailData(email));
+                console.log('[EmailManager] Parsed emails for', this.currentFolder, ':', this.emails.length);
+                this.renderEmails();
+                this.updateFolderCounts();
+                this.hideLoading();
                 }
             } else {
                 console.warn('[EmailManager] Email tracking manager not available');
@@ -3564,8 +3564,8 @@ ${sections.map((section, idx) => {
                         if (window.emailTrackingManager) {
                             return this.loadEmails();
                         }
-                        this.emails = [];
-                        this.showEmptyState();
+                this.emails = [];
+                this.showEmptyState();
                         return;
                     }
                     setTimeout(tryLater, 160);
@@ -4006,7 +4006,7 @@ ${sections.map((section, idx) => {
             // Load ALL emails to get accurate counts
             const allEmails = await window.emailTrackingManager.getAllEmails();
             
-            const counts = {
+        const counts = {
                 inbox: allEmails.filter(e => {
                     if (e.emailType === 'sent' || e.isSentEmail || e.type === 'sent') return false;
                     return true;
@@ -4018,12 +4018,12 @@ ${sections.map((section, idx) => {
                 scheduled: allEmails.filter(e => (e.labels && e.labels.includes('SCHEDULED')) || e.scheduledAt).length,
                 spam: allEmails.filter(e => (e.labels && e.labels.includes('SPAM')) || e.isSpam === true).length,
                 trash: allEmails.filter(e => (e.labels && e.labels.includes('TRASH')) || e.isDeleted === true).length
-            };
+        };
 
-            Object.entries(counts).forEach(([folder, count]) => {
-                const countElement = document.getElementById(`${folder}-count`);
-                if (countElement) countElement.textContent = count;
-            });
+        Object.entries(counts).forEach(([folder, count]) => {
+            const countElement = document.getElementById(`${folder}-count`);
+            if (countElement) countElement.textContent = count;
+        });
             
             console.log('[EmailManager] Folder counts updated:', counts);
         } catch (error) {
@@ -6318,7 +6318,7 @@ ${sections.map((section, idx) => {
         const threadId = originalEmail.threadId || originalEmail.messageId || null;
         const inReplyTo = originalEmail.messageId || null;
         const references = Array.isArray(originalEmail.references) ? originalEmail.references.concat(inReplyTo || []).filter(Boolean) : (inReplyTo ? [inReplyTo] : []);
-
+        
         const emailData = {
             to: toInput.value,
             subject: subjectInput.value,
@@ -6743,7 +6743,7 @@ function initEmailsPage() {
 
     // Always load emails from tracking system (regardless of Gmail auth)
     // The tracking system handles both sent and received emails
-    emailManager.loadEmails();
+        emailManager.loadEmails();
 
     // Debug helper: run search and force open suggestions under To field
     window.debugComposeAutocomplete = async function(query = '') {
