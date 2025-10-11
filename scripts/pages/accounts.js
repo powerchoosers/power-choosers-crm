@@ -742,22 +742,9 @@
         return;
       }
       
-      // Use DataManager for ownership-aware loading
-      if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function' && window.currentUserRole) {
-        try {
-          state.data = await window.DataManager.queryWithOwnership('accounts');
-        } catch (error) {
-          console.error('[Accounts] DataManager query failed, falling back to direct query:', error);
-          // Fallback to direct query if ownership query fails
-          const snap = await window.firebaseDB.collection('accounts').get();
-          state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        }
-      } else {
-        // Fallback to direct query if DataManager not loaded yet
-        console.log('[Accounts] Using fallback query (DataManager not ready)');
-        const snap = await window.firebaseDB.collection('accounts').get();
-        state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      }
+      // Direct query - simple and reliable
+      const snap = await window.firebaseDB.collection('accounts').get();
+      state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       
       state.filtered = state.data.slice();
       state.loaded = true;
@@ -1992,30 +1979,6 @@
       sortDirection: state.sortDirection || 'asc',
       timestamp: Date.now()
     };
-  }
-
-  // Initialize BulkAssignment for admin users (wrapped in try-catch to prevent breakage)
-  try {
-    if (window.BulkAssignment && window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function' && window.DataManager.isCurrentUserAdmin()) {
-      window.BulkAssignment.init('accounts').catch(err => {
-        console.error('[Accounts] Failed to initialize bulk assignment:', err);
-      });
-    }
-  } catch (error) {
-    console.error('[Accounts] Error initializing bulk assignment:', error);
-  }
-
-  // Listen for bulk assignment completion and refresh data
-  try {
-    document.addEventListener('bulk-assignment-complete', (event) => {
-      if (event.detail && event.detail.collectionType === 'accounts') {
-        console.log('[Accounts] Bulk assignment complete, refreshing...');
-        state.loaded = false;
-        loadDataOnce();
-      }
-    });
-  } catch (error) {
-    console.error('[Accounts] Error setting up bulk assignment listener:', error);
   }
 
   window.accountsModule = {
