@@ -35,6 +35,20 @@ class SettingsPage {
                 },
                 twilioNumbers: [],
                 general: {
+                    // Google-synced profile (auto-filled)
+                    firstName: '',
+                    lastName: '',
+                    email: '',              // Read-only from Google
+                    photoURL: '',           // Google avatar URL
+                    hostedPhotoURL: '',     // Re-hosted to Imgur
+                    
+                    // Editable professional info
+                    jobTitle: 'Energy Strategist',
+                    location: 'Fort Worth, TX',
+                    phone: '',              // Personal/direct line
+                    companyName: 'Power Choosers',
+                    
+                    // Existing fields
                     agentName: 'Power Choosers',
                     autoSaveNotes: true,
                     emailNotifications: true,
@@ -119,6 +133,26 @@ class SettingsPage {
             });
         }
 
+        // Profile information fields
+        const profileFields = [
+            { id: 'user-first-name', key: 'firstName' },
+            { id: 'user-last-name', key: 'lastName' },
+            { id: 'user-job-title', key: 'jobTitle' },
+            { id: 'user-location', key: 'location' },
+            { id: 'user-phone', key: 'phone' },
+            { id: 'company-name', key: 'companyName' }
+        ];
+
+        profileFields.forEach(({ id, key }) => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', (e) => {
+                    this.state.settings.general[key] = e.target.value.trim();
+                    this.markDirty();
+                });
+            }
+        });
+
         // General settings checkboxes and selects
         const generalFields = [
             'auto-save-notes',
@@ -195,18 +229,19 @@ class SettingsPage {
                     const firebaseSettings = settingsDoc.data();
                     this.state.settings = { ...this.state.settings, ...firebaseSettings };
                     console.log('[Settings] Loaded from Firebase');
-                    return;
                 }
             }
             
             // Fallback to localStorage if Firebase not available or no data
-            const savedSettings = localStorage.getItem('crm-settings');
-            if (savedSettings) {
-                try {
-                    this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
-                    console.log('[Settings] Loaded from localStorage');
-                } catch (error) {
-                    console.error('Error loading settings from localStorage:', error);
+            if (!this.state.settings.general.firstName) {
+                const savedSettings = localStorage.getItem('crm-settings');
+                if (savedSettings) {
+                    try {
+                        this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
+                        console.log('[Settings] Loaded from localStorage');
+                    } catch (error) {
+                        console.error('Error loading settings from localStorage:', error);
+                    }
                 }
             }
         } catch (error) {
@@ -220,6 +255,72 @@ class SettingsPage {
                     console.error('Error parsing localStorage settings:', parseError);
                 }
             }
+        }
+        
+        // Auto-populate from Google login
+        const user = firebase.auth().currentUser;
+        if (user) {
+            const nameParts = (user.displayName || '').trim().split(' ');
+            
+            // Only set if not already customized
+            if (!this.state.settings.general.firstName) {
+                this.state.settings.general.firstName = nameParts[0] || '';
+            }
+            if (!this.state.settings.general.lastName) {
+                this.state.settings.general.lastName = nameParts.slice(1).join(' ') || '';
+            }
+            if (!this.state.settings.general.email) {
+                this.state.settings.general.email = user.email || '';
+            }
+            if (user.photoURL && !this.state.settings.general.photoURL) {
+                this.state.settings.general.photoURL = user.photoURL;
+                // Trigger re-hosting to Imgur
+                await this.hostGoogleAvatar(user.photoURL);
+            }
+        }
+    }
+
+    async hostGoogleAvatar(googlePhotoURL) {
+        if (!googlePhotoURL || this.state.settings.general.hostedPhotoURL) return;
+        
+        try {
+            // Download the image
+            const response = await fetch(googlePhotoURL);
+            const blob = await response.blob();
+            
+            // Convert to base64
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+                const base64data = reader.result.split(',')[1];
+                
+                // Upload to Imgur via existing endpoint
+                try {
+                    const apiBase = (typeof window.API_BASE_URL === 'string' && /^https?:/i.test(window.API_BASE_URL)) ? window.API_BASE_URL : '';
+                    const uploadResponse = await fetch(`${apiBase}/api/upload/signature-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64data, type: 'avatar' })
+                    });
+
+                    if (uploadResponse.ok) {
+                        const { imageUrl } = await uploadResponse.json();
+                        if (imageUrl) {
+                            this.state.settings.general.hostedPhotoURL = imageUrl;
+                            this.markDirty();
+                            console.log('[Settings] Google avatar hosted successfully');
+                        }
+                    }
+                } catch (uploadError) {
+                    console.error('[Settings] Error uploading avatar:', uploadError);
+                    // Fallback to direct Google URL
+                    this.state.settings.general.hostedPhotoURL = googlePhotoURL;
+                }
+            };
+        } catch (error) {
+            console.error('[Settings] Error hosting Google avatar:', error);
+            // Fallback to direct Google URL
+            this.state.settings.general.hostedPhotoURL = googlePhotoURL;
         }
     }
 
@@ -334,10 +435,64 @@ class SettingsPage {
         // Render Twilio phone numbers
         this.renderPhoneNumbers();
 
+        // Render profile information fields (Google login + editable)
+        const g = this.state.settings.general || {};
+        
+        const userFirstName = document.getElementById('user-first-name');
+        if (userFirstName) {
+            userFirstName.value = g.firstName || '';
+        }
+        
+        const userLastName = document.getElementById('user-last-name');
+        if (userLastName) {
+            userLastName.value = g.lastName || '';
+        }
+        
+        const userEmail = document.getElementById('user-email');
+        if (userEmail) {
+            userEmail.value = g.email || '';
+        }
+        
+        const userJobTitle = document.getElementById('user-job-title');
+        if (userJobTitle) {
+            userJobTitle.value = g.jobTitle || 'Energy Strategist';
+        }
+        
+        const userLocation = document.getElementById('user-location');
+        if (userLocation) {
+            userLocation.value = g.location || 'Fort Worth, TX';
+        }
+        
+        const userPhone = document.getElementById('user-phone');
+        if (userPhone) {
+            userPhone.value = g.phone || '';
+        }
+        
+        const companyName = document.getElementById('company-name');
+        if (companyName) {
+            companyName.value = g.companyName || 'Power Choosers';
+        }
+        
+        // Render avatar preview if available
+        const avatarPreview = document.getElementById('user-avatar-preview');
+        if (avatarPreview && (g.hostedPhotoURL || g.photoURL)) {
+            const avatarUrl = g.hostedPhotoURL || g.photoURL;
+            avatarPreview.innerHTML = `
+                <img src="${avatarUrl}" alt="Profile" 
+                     style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid var(--orange-primary);">
+            `;
+        } else if (avatarPreview) {
+            avatarPreview.innerHTML = `
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--grey-600); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 600;">
+                    ${(g.firstName || 'U').charAt(0).toUpperCase()}
+                </div>
+            `;
+        }
+
         // Render general settings
         const agentName = document.getElementById('agent-name');
         if (agentName) {
-            agentName.value = this.state.settings.general.agentName || 'Power Choosers';
+            agentName.value = g.agentName || 'Power Choosers';
         }
 
         const autoSaveNotes = document.getElementById('auto-save-notes');

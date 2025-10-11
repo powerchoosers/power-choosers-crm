@@ -723,10 +723,13 @@ class EmailManager {
             const randomSubj = subjStyles[Math.floor(Math.random() * subjStyles.length)];
             const subjectSeed = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 
-            // Get sender name and email from settings
+            // Get sender name and email from settings (with Google login)
             const settings = (window.SettingsPage?.getSettings?.()) || {};
-            const senderName = settings?.general?.agentName || 'Lewis Patterson';
-            const fromEmail = settings?.emailDeliverability?.fromEmail || 'l.patterson@powerchoosers.com';
+            const g = settings?.general || {};
+            const senderName = (g.firstName && g.lastName) 
+                ? `${g.firstName} ${g.lastName}`.trim()
+                : (g.agentName || 'Power Choosers Team');
+            const fromEmail = g.email || settings?.emailDeliverability?.fromEmail || 'info@powerchoosers.com';
             
             const payload = { 
                 prompt, 
@@ -1074,10 +1077,13 @@ class EmailManager {
         };
         const placeholderRegex = /\[\s*(your\s+name|your\s+title|your\s+contact\s*information)\s*\]/i;
         const isSenderNameLine = (text) => {
-            // Check if line is just the sender's first name (Lewis, etc.)
+            // Check if line is just the sender's first name
             const settings = (window.SettingsPage?.getSettings?.()) || {};
-            const senderName = settings?.general?.agentName || 'Lewis Patterson';
-            const senderFirst = senderName.split(' ')[0] || senderName;
+            const g = settings?.general || {};
+            const senderName = (g.firstName && g.lastName) 
+                ? `${g.firstName} ${g.lastName}`.trim()
+                : (g.agentName || 'Power Choosers Team');
+            const senderFirst = g.firstName || senderName.split(' ')[0] || senderName;
             const t = String(text || '').trim().replace(/[.,!;:]+$/,'');
             return t.toLowerCase() === senderFirst.toLowerCase();
         };
@@ -1796,36 +1802,49 @@ class EmailManager {
     // Template 1: Warm Intro (Modern blue gradient theme)
     buildWarmIntroHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
+        const company = recipient?.company || recipient?.accountName || 'your company';
+        
         return `
-<div style="text-align:left; margin:0 0 20px 0;">
-    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
+<div style="margin:20px 0 2px 0; font-size:14px; color:#234bb7; font-weight:600; letter-spacing:0.02em; opacity:0.93; background:#f3f8ff; padding:6px 13px; border-radius:6px; display:inline-block;">
+    ${this.escapeHtml(data.subject_blurb || `Great speaking with you about ${company}'s energy needs`)}
+</div>
+
+<div style="margin:18px 0; padding:18px 0 2px 0;">
+    <p style="margin:0 0 3px 0; font-size:16px; color:#1e3a8a;">
         ${this.escapeHtml(data.greeting || 'Hi,')}
+    </p>
+    <p style="margin:0 0 3px 0; font-size:16px; color:#1e3a8a;">
+        Thank you for taking my call today. I wanted to quickly follow up and ensure you have the key details about how Power Choosers can support your team's energy procurement goals.
     </p>
 </div>
 
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
-    <tr>
-        <td style="background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding:25px; border-radius:8px; color:#ffffff; box-shadow:0 4px 12px rgba(59, 130, 246, 0.3);">
-            <h2 style="margin:0; font-size:22px; font-weight:600;">🤝 ${this.escapeHtml(data.call_reference || 'Great speaking with you')}</h2>
-        </td>
-    </tr>
-</table>
+<p style="margin:18px 0; padding:18px; background:#fff; border-radius:7px; line-height:1.6; color:#1f2937; font-size:15px;">
+    <strong>Market Insight:</strong> ${this.escapeHtml(data.main_message || 'Electricity rates for manufacturers are forecasted to rise 15–25% over the next year, driven by surging data center demand. Now is the perfect window to compare supplier quotes and secure lower rates before renewal offers increase.')}
+</p>
 
-<div style="background:linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #93c5fd;">
-    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
-        ${this.escapeHtml(data.main_message || 'Looking forward to our next conversation.')}
-    </p>
+<div style="background:#f6f7fb; border-radius:8px; padding:16px 22px; margin:18px 0; box-shadow:0 2px 8px rgba(30,64,175,0.06); font-size:15.5px; color:#22223b;">
+    <strong>How Power Choosers Can Help:</strong>
+    <ul style="margin:0; padding:0; list-style:none;">
+        <li style="padding:6px 0; border-bottom:1px solid #e5e8ec;">Fast, impartial rate analysis from 100+ suppliers</li>
+        <li style="padding:6px 0; border-bottom:1px solid #e5e8ec;">Pricing often 20–30% below typical renewal offers</li>
+        <li style="padding:6px 0; border-bottom:1px solid #e5e8ec;">Transparent, no-pressure contract review</li>
+        <li style="padding:6px 0;">Answers to your team's energy strategy questions</li>
+    </ul>
 </div>
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(249, 115, 22, 0.3);">
-            <a href="mailto:${mail}?subject=Re: ${encodeURIComponent(data.subject || 'Follow up')}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+        <td style="background:linear-gradient(135deg, #1e3a8a 0%, #1631a4 100%); border-radius:7px; padding:13px 36px; box-shadow:0 2px 8px rgba(30,58,138,0.13); transition:background 0.18s;">
+            <a href="mailto:${mail}?subject=Re: ${encodeURIComponent(data.subject || 'Follow up')}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
                 ${this.escapeHtml(data.cta_text || 'Schedule a Follow-Up Call')}
             </a>
         </td>
     </tr>
-</table>`;
+</table>
+
+<p style="margin-top:8px; font-size:14px; color:#1e3a8a; opacity:0.83; text-align:center;">
+    Prefer email or need more info? Just reply—happy to assist.
+</p>`;
     }
 
     // Template 2: Follow-Up (Modern purple theme)
@@ -1945,46 +1964,43 @@ class EmailManager {
     // Template 4: Proposal Delivery (Modern gold theme)
     buildProposalHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
-        const timeline = Array.isArray(data.timeline) ? data.timeline : [data.timeline || ''];
+        const timeline = Array.isArray(data.timeline) ? data.timeline : [
+            'Contract review and approval (24 Hours)',
+            'Supplier onboarding and enrollment (30-45 days from start date)',
+            'Service activation (seamless transition)'
+        ];
         
         return `
-<div style="text-align:left; margin:0 0 20px 0;">
-    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
+<div style="margin:20px 0 2px 0; font-size:14px; color:#b45309; font-weight:600; letter-spacing:0.02em; opacity:0.93; background:#fef3c7; padding:6px 13px; border-radius:6px; display:inline-block;">
+    📄 Your Custom Proposal
+    <span style="display:inline-block; background:#d97706; color:#fff; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; letter-spacing:0.05em; margin-left:8px; vertical-align:middle;">EXCLUSIVE</span>
+</div>
+
+<div style="margin:18px 0; padding:18px 0 2px 0;">
+    <p style="margin:0 0 3px 0; font-size:16px; color:#1e3a8a;">
         ${this.escapeHtml(data.greeting || 'Hi,')}
     </p>
-</div>
-
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0; position:relative;">
-    <tr>
-        <td style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding:30px; border-radius:8px; text-align:center; position:relative; box-shadow:0 4px 12px rgba(245, 158, 11, 0.3);">
-            <div style="position:absolute; top:10px; right:10px; background:#ffffff; color:#d97706; padding:5px 15px; border-radius:20px; font-size:12px; font-weight:700;">
-                EXCLUSIVE OFFER
-            </div>
-            <h2 style="color:#ffffff; font-size:24px; margin:0; font-weight:600;">📄 Your Custom Proposal</h2>
-        </td>
-    </tr>
-</table>
-
-<div style="background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border:1px solid #fbbf24; padding:20px; border-radius:8px; margin:20px 0;">
-    <h3 style="color:#b45309; font-size:18px; margin:0 0 10px 0; font-weight:600;">Proposal Summary</h3>
-    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
-        ${this.escapeHtml(data.proposal_summary || 'Tailored energy solution designed for your needs.')}
+    <p style="margin:0; font-size:16px; color:#1e3a8a;">
+        I'm excited to share the custom energy proposal we've prepared. Based on your facility's profile and energy needs, we've secured competitive rates from three top-tier suppliers.
     </p>
 </div>
 
-<table width="100%" cellpadding="20" cellspacing="0" border="0" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius:8px; margin:20px 0; box-shadow:0 4px 12px rgba(245, 158, 11, 0.3);">
-    <tr>
-        <td style="text-align:center;">
-            <h3 style="color:#ffffff; font-size:20px; margin:0 0 10px 0; text-shadow:0 2px 4px rgba(0,0,0,0.2);">💰 Pricing Highlight</h3>
-            <p style="color:#ffffff; font-size:16px; line-height:1.5; margin:0; font-weight:600;">
-                ${this.escapeHtml(data.pricing_highlight || 'Competitive rates with significant savings potential')}
-            </p>
-        </td>
-    </tr>
-</table>
+<div style="background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border:1px solid #fbbf24; padding:18px 20px; margin:18px 0; border-radius:8px; box-shadow:0 2px 8px rgba(245,158,11,0.08);">
+    <h3 style="color:#b45309; font-size:16px; margin:0 0 10px 0; font-weight:600;">Proposal Summary</h3>
+    <p style="color:#1f2937; font-size:15px; line-height:1.5; margin:0;">
+        ${this.escapeHtml(data.proposal_summary || 'This proposal includes fixed-rate options that lock in significant savings before your contract expiration, protecting you from projected rate increases.')}
+    </p>
+</div>
 
-<div style="background:#ffffff; padding:20px; border-radius:8px; margin:20px 0; border:1px solid #fbbf24; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-    <h3 style="color:#b45309; font-size:18px; margin:0 0 15px 0; font-weight:600;">📅 Implementation Timeline</h3>
+<div style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding:20px; margin:18px 0; border-radius:8px; text-align:center; box-shadow:0 4px 12px rgba(245,158,11,0.3);">
+    <h3 style="color:#ffffff; font-size:18px; margin:0 0 10px 0; text-shadow:0 2px 4px rgba(0,0,0,0.2);">💰 Pricing Highlight</h3>
+    <p style="color:#ffffff; font-size:16px; line-height:1.5; margin:0; font-weight:600;">
+        ${this.escapeHtml(data.pricing_highlight || 'Best rate: 15% below current rate with estimated annual savings')}
+    </p>
+</div>
+
+<div style="background:#ffffff; padding:18px 20px; margin:18px 0; border-radius:8px; border:1px solid #fbbf24; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+    <h3 style="color:#b45309; font-size:16px; margin:0 0 15px 0; font-weight:600;">📅 Implementation Timeline</h3>
     ${timeline.map((step, idx) => 
         `<div style="padding:12px; margin:8px 0; background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius:6px; border-left:4px solid #f59e0b;">
             <p style="color:#1f2937; font-size:14px; margin:0;"><strong>Step ${idx + 1}:</strong> ${this.escapeHtml(step)}</p>
@@ -1992,15 +2008,23 @@ class EmailManager {
     ).join('')}
 </div>
 
+<p style="margin:18px 0; padding:18px; background:#fff; border-radius:7px; line-height:1.6; color:#1f2937; font-size:15px;">
+    Our team has negotiated these rates exclusively for your facility. The pricing is competitive, the transition is seamless, and you maintain complete control throughout the process. This is a <strong>time-sensitive offer</strong> as market conditions continue to shift.
+</p>
+
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(245, 158, 11, 0.3);">
-            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
+        <td style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius:7px; padding:13px 36px; box-shadow:0 2px 8px rgba(245,158,11,0.13); transition:background 0.18s;">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
                 ${this.escapeHtml(data.cta_text || 'Let\'s Discuss Your Proposal')}
             </a>
         </td>
     </tr>
-</table>`;
+</table>
+
+<p style="margin-top:8px; font-size:14px; color:#b45309; opacity:0.83; text-align:center;">
+    Questions? I'm here to walk through every detail.
+</p>`;
     }
 
     // Template 5: Cold Email (Modern red urgency theme)
@@ -2063,20 +2087,23 @@ class EmailManager {
         const discrepancies = Array.isArray(data.discrepancies) ? data.discrepancies : [data.discrepancies || ''];
         
         return `
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">
-    <tr>
-        <td style="background:#ffffff; padding:20px; border-radius:8px; text-align:center; border:1px solid #e0e7ff; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <h2 style="color:#2563eb; font-size:20px; margin:0; font-weight:600;">📎 Invoice Request</h2>
-        </td>
-    </tr>
-</table>
+<div style="margin:20px 0 2px 0; font-size:14px; color:#2563eb; font-weight:600; letter-spacing:0.02em; opacity:0.93; background:#f0f9ff; padding:6px 13px; border-radius:6px; display:inline-block;">
+    📎 Invoice Request for Energy Analysis
+</div>
 
-<div style="text-align:left; margin:0 0 20px 0;">
-    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0 0 8px 0;">
+<div style="margin:18px 0; padding:18px 0 2px 0;">
+    <p style="margin:0 0 3px 0; font-size:16px; color:#1e3a8a;">
         ${this.escapeHtml(data.greeting || 'Hi,')}
     </p>
-    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
-        ${this.escapeHtml(data.intro_paragraph || 'We need your latest invoice to complete your energy analysis.')}
+    <p style="margin:0 0 3px 0; font-size:16px; color:#1e3a8a;">
+        ${this.escapeHtml(data.intro_paragraph || 'As we discussed, we\'re conducting an energy analysis for your facility to identify any discrepancies and determine how you\'re using energy.')}
+    </p>
+</div>
+
+<div style="background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%); border:1px solid #fbbf24; padding:20px 22px; margin:18px 0; border-radius:8px; box-shadow:0 1px 3px rgba(245,158,11,0.08);">
+    <h3 style="margin:0 0 12px 0; color:#d97706; font-size:16px; font-weight:600; letter-spacing:0.02em;">💡 Key Points</h3>
+    <p style="margin:0; color:#1f2937; font-size:15.5px; line-height:1.6; font-weight:500;">
+        With your contract ending and rates expected to rise 15-25%, it's important we review your current invoice to identify potential savings opportunities before your renewal period.
     </p>
 </div>
 
@@ -2128,40 +2155,50 @@ class EmailManager {
 </table>`;
     }
 
-    // Template 7: General/Manual (Modern flexible theme)
+    // Template 7: General/Manual (Modern flexible theme with info list)
     buildGeneralHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
         const sections = Array.isArray(data.sections) ? data.sections : [data.sections || ''];
         
         return `
-<div style="text-align:left; margin:0 0 20px 0;">
-    <p style="color:#1f2937; font-size:15px; line-height:1.4; margin:0;">
-        ${this.escapeHtml(data.greeting || 'Hi,')}
-    </p>
+<div style="margin:20px 0 2px 0; font-size:14px; color:#234bb7; font-weight:600; letter-spacing:0.02em; opacity:0.93; background:#eff6ff; padding:6px 13px; border-radius:6px; display:inline-block;">
+    ${this.escapeHtml(data.subject_blurb || 'Energy Solutions')}
 </div>
 
-${sections.map((section, idx) => {
-    const bgGradient = idx % 2 === 0 
-        ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' 
-        : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)';
-    const borderColor = idx % 2 === 0 ? '#3b82f6' : '#64748b';
-    
-    return `<div style="background:${bgGradient}; padding:20px; margin:15px 0; border-radius:8px; border:1px solid ${idx % 2 === 0 ? '#93c5fd' : '#cbd5e1'}; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
-        ${this.escapeHtml(section)}
+<div style="margin:18px 0; padding:18px 0 2px 0;">
+    <p style="margin:0 0 12px 0; font-size:16px; color:#1e3a8a; line-height:1.6;">
+        ${this.escapeHtml(data.greeting || 'Hi,')}
     </p>
-</div>`;
-}).join('')}
+    ${sections.slice(0, 1).map(section => 
+        `<p style="margin:0 0 12px 0; font-size:16px; color:#1e3a8a; line-height:1.6;">
+            ${this.escapeHtml(section)}
+        </p>`
+    ).join('')}
+</div>
+
+${sections.length > 1 ? `
+<div style="background:#f6f7fb; border-radius:8px; padding:12px 18px; margin:0 auto 18px auto; max-width:450px; box-shadow:0 2px 8px rgba(30,64,175,0.06); font-size:14px; color:#22223b;">
+    <strong>How Power Choosers Can Help:</strong>
+    <ul style="margin:0; padding:0; list-style:none;">
+        ${sections.slice(1).map(item => 
+            `<li style="padding:4px 0; border-bottom:1px solid #e5e8ec; line-height:1.5;">${this.escapeHtml(item)}</li>`
+        ).join('')}
+    </ul>
+</div>` : ''}
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
-        <td style="background:linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius:8px; padding:16px 32px; box-shadow:0 4px 12px rgba(249, 115, 22, 0.3);">
-            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:600; font-size:16px;">
-                ${this.escapeHtml(data.cta_text || 'Let\'s Connect')}
+        <td style="background:linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius:7px; padding:13px 36px; box-shadow:0 2px 8px rgba(249,115,22,0.13); transition:background 0.18s;">
+            <a href="mailto:${mail}" style="color:#ffffff; text-decoration:none; font-weight:700; font-size:16px;">
+                ${this.escapeHtml(data.cta_text || 'Schedule A Meeting')}
             </a>
         </td>
     </tr>
-</table>`;
+</table>
+
+<p style="margin-top:8px; font-size:14px; color:#1e3a8a; opacity:0.83; text-align:center;">
+    Prefer email or need more info? Just reply—happy to assist.
+</p>`;
     }
 
     // Main template builder dispatcher
@@ -2193,6 +2230,54 @@ ${sections.map((section, idx) => {
         const logoUrl = 'https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png';
         const safeSubject = this.escapeHtml(subject || 'Energy Solutions');
         
+        // Get sender info from settings (with Google login auto-population)
+        const settings = (window.SettingsPage?.getSettings?.()) || {};
+        const g = settings?.general || {};
+        
+        // Build full name from Google login or fallback to agentName
+        const senderFirstName = g.firstName || '';
+        const senderLastName = g.lastName || '';
+        const senderName = (senderFirstName && senderLastName) 
+            ? `${senderFirstName} ${senderLastName}`.trim()
+            : (g.agentName || 'Power Choosers Team');
+        
+        const senderTitle = g.jobTitle || 'Energy Strategist';
+        const senderLocation = g.location || 'Fort Worth, TX';
+        const senderPhone = g.phone || '';
+        const senderEmail = g.email || '';
+        const senderAvatar = g.hostedPhotoURL || g.photoURL || '';
+        const companyName = g.companyName || 'Power Choosers';
+        
+        // Build signature HTML with avatar if available
+        let signatureHTML = '';
+        if (senderAvatar) {
+            // Modern signature with avatar
+            signatureHTML = `
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <img src="${this.escapeHtml(senderAvatar)}" alt="${this.escapeHtml(senderName)}" 
+             style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${this.escapeHtml(senderName)}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${this.escapeHtml(senderTitle)}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${this.escapeHtml(senderLocation)}<br>
+        ${senderPhone ? this.escapeHtml(senderPhone) + '<br>' : ''}
+        ${senderEmail ? this.escapeHtml(senderEmail) + '<br>' : ''}
+        ${this.escapeHtml(companyName)}
+      </div>`;
+        } else {
+            // Classic signature without avatar
+            signatureHTML = `
+      ${this.escapeHtml(senderName)}<br>
+      ${this.escapeHtml(senderTitle)}<br>
+      ${this.escapeHtml(senderLocation)}<br>
+      ${senderPhone ? this.escapeHtml(senderPhone) + '<br>' : ''}
+      ${senderEmail ? this.escapeHtml(senderEmail) + '<br>' : ''}
+      ${this.escapeHtml(companyName)}`;
+        }
+        
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2200,38 +2285,50 @@ ${sections.map((section, idx) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${safeSubject}</title>
   <meta http-equiv="x-ua-compatible" content="ie=edge" />
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03);
+      overflow:hidden;
+    }
+    .signature {
+      margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer {
+      padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .container {margin:0 3vw;}
+    }
+  </style>
 </head>
-<body style="margin:0; padding:0; background-color:#f8fafc; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
-  <center role="presentation" style="width:100%; background-color:#f8fafc;">
-    <div style="max-width:600px; margin:0 auto; background-color:#ffffff;">
-      
-      <!-- Power Choosers Header -->
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); text-align:center; border-top-left-radius:12px; border-top-right-radius:12px;">
-        <tr>
-          <td style="padding:28px 24px;">
-            <img src="${logoUrl}" alt="Power Choosers" width="450" style="max-width:100%; height:auto; display:block; margin:0 auto 8px;">
-            <div style="font-size:14px; font-weight:500; color:#ffffff; opacity:0.9;">Your Energy Partner</div>
-          </td>
-        </tr>
-      </table>
-
-      <!-- Sonar-Generated Content -->
-      <div style="padding:32px 24px; color:#1f2937; font-size:15px; line-height:1.6;">
-        ${sonarGeneratedHtml}
-      </div>
-
-      <!-- Power Choosers Footer (No signature - handled by email client) -->
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color:#ffffff; border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
-        <tr>
-          <td style="padding:20px 24px; text-align:center;">
-            <p style="margin:0; font-size:13px; opacity:0.9;">Power Choosers • Your Energy Partner</p>
-          </td>
-        </tr>
-      </table>
-      
+<body>
+  <div class="container">
+    <!-- HEADER -->
+    <div style="padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%); color:#fff; text-align:center;">
+      <img src="${logoUrl}" alt="${this.escapeHtml(companyName)}" style="max-width:190px; margin:0 auto 10px; display:block;">
+      <div style="font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;">Your Energy Partner</div>
     </div>
-  </center>
-  <div style="display:none; max-height:0; overflow:hidden;">&nbsp;</div>
+    
+    <!-- CONTENT -->
+    <div style="padding:32px 24px; color:#1f2937; font-size:15px; line-height:1.6;">
+      ${sonarGeneratedHtml}
+    </div>
+    
+    <!-- SIGNATURE BLOCK -->
+    <div class="signature">
+      ${signatureHTML}
+    </div>
+    
+    <!-- FOOTER -->
+    <div class="footer">
+      ${this.escapeHtml(companyName)} &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
 </body>
 </html>`;
     }
@@ -2661,8 +2758,11 @@ ${sections.map((section, idx) => {
 
             // Get actual sender name from settings (not a variable chip)
             const settings = (window.SettingsPage?.getSettings?.()) || {};
-            const senderName = settings?.general?.agentName || 'Lewis Patterson';
-            const senderFirstName = senderName.split(' ')[0] || senderName;
+            const g = settings?.general || {};
+            const senderName = (g.firstName && g.lastName) 
+                ? `${g.firstName} ${g.lastName}`.trim()
+                : (g.agentName || 'Power Choosers Team');
+            const senderFirstName = g.firstName || senderName.split(' ')[0] || senderName;
 
             // Trim trailing blank paragraphs before appending closing (SKIP signature div)
             let last = editor.lastElementChild;

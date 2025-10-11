@@ -742,9 +742,20 @@
         return;
       }
       
-      // Direct query - simple and reliable
-      const snap = await window.firebaseDB.collection('accounts').get();
-      state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Use DataManager for ownership-aware loading with robust fallback
+      if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function' && window.currentUserRole) {
+        try {
+          state.data = await window.DataManager.queryWithOwnership('accounts');
+        } catch (error) {
+          console.error('[Accounts] DataManager query failed, falling back to direct query:', error);
+          const snap = await window.firebaseDB.collection('accounts').get();
+          state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        }
+      } else {
+        console.log('[Accounts] Using fallback query (DataManager not ready)');
+        const snap = await window.firebaseDB.collection('accounts').get();
+        state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
       
       state.filtered = state.data.slice();
       state.loaded = true;
@@ -985,6 +996,8 @@
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="display:block"><text x="12" y="12" dy="-0.12em" text-anchor="middle" dominant-baseline="central" fill="currentColor" font-size="18" font-weight="800" letter-spacing="0.05" font-family="Inter, system-ui, -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif">AI</text></svg>';
       case 'delete':
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+      case 'assign':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
       case 'linkedin':
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5z" transform="translate(4 4)"/><path d="M2 8h4v10H2z" transform="translate(4 4)"/><path d="M9 8h3v1.7c.6-1 1.6-1.7 3.2-1.7 3 0 4.8 2 4.8 5.6V18h-4v-3.7c0-1.4-.5-2.4-1.7-2.4-1 0-1.5.7-1.8 1.4-.1.2-.1.6-.1.9V18H9z" transform="translate(4 4)"/></svg>';
       case 'link':
@@ -1685,6 +1698,7 @@
       if (existing) { existing.remove(); }
       return;
     }
+    const isAdmin = window.DataManager && window.DataManager.isCurrentUserAdmin && window.DataManager.isCurrentUserAdmin();
     const html = `
       <div class="bar">
         <button class="action-btn-sm" id="bulk-clear">${svgIcon('clear')}<span>Clear ${count} selected</span></button>
@@ -1693,6 +1707,7 @@
         <button class="action-btn-sm" id="bulk-sequence">${svgIcon('sequence')}<span>Sequence ▾</span></button>
         <button class="action-btn-sm" id="bulk-call">${svgIcon('call')}<span>Call</span></button>
         <button class="action-btn-sm" id="bulk-addlist">${svgIcon('addlist')}<span>Add to list</span></button>
+        ${isAdmin ? `<button class="action-btn-sm" id="bulk-assign">${svgIcon('assign')}<span>Assign to ▾</span></button>` : ''}
         <button class="action-btn-sm" id="bulk-export">${svgIcon('export')}<span>Export</span></button>
         <button class="action-btn-sm" id="bulk-ai">${svgIcon('ai')}<span>Research with AI</span></button>
         <button class="action-btn-sm danger" id="bulk-delete">${svgIcon('delete')}<span>Delete</span></button>
@@ -1722,6 +1737,17 @@
     container.querySelector('#bulk-sequence').addEventListener('click', () => console.log('Bulk add to sequence', Array.from(state.selected)));
     container.querySelector('#bulk-call').addEventListener('click', () => console.log('Bulk call', Array.from(state.selected)));
     container.querySelector('#bulk-addlist').addEventListener('click', () => console.log('Bulk add to list', Array.from(state.selected)));
+    
+    // Assign button handler (admin only)
+    const assignBtn = container.querySelector('#bulk-assign');
+    if (assignBtn) {
+      assignBtn.addEventListener('click', () => {
+        if (window.BulkAssignment && typeof window.BulkAssignment.renderAssignMenu === 'function') {
+          window.BulkAssignment.renderAssignMenu(assignBtn, state.selected);
+        }
+      });
+    }
+    
     container.querySelector('#bulk-export').addEventListener('click', () => console.log('Bulk export', Array.from(state.selected)));
     container.querySelector('#bulk-ai').addEventListener('click', () => console.log('Bulk research with AI', Array.from(state.selected)));
     const delBtn = container.querySelector('#bulk-delete');
@@ -1981,6 +2007,32 @@
     };
   }
 
+  // Initialize BulkAssignment for admin users
+  try {
+    if (window.BulkAssignment && window.DataManager && 
+        typeof window.DataManager.isCurrentUserAdmin === 'function' && 
+        window.DataManager.isCurrentUserAdmin()) {
+      window.BulkAssignment.init('accounts').catch(err => {
+        console.error('[Accounts] Failed to initialize bulk assignment:', err);
+      });
+    }
+  } catch (error) {
+    console.error('[Accounts] Error initializing bulk assignment:', error);
+  }
+
+  // Listen for bulk assignment completion
+  try {
+    document.addEventListener('bulk-assignment-complete', (event) => {
+      if (event.detail && event.detail.collectionType === 'accounts') {
+        console.log('[Accounts] Bulk assignment complete, refreshing...');
+        state.loaded = false;
+        loadDataOnce();
+      }
+    });
+  } catch (error) {
+    console.error('[Accounts] Error setting up bulk assignment listener:', error);
+  }
+
   window.accountsModule = {
     rebindDynamic: function () {
       try {
@@ -1990,7 +2042,8 @@
       } catch (e) { /* noop */ }
     },
     init,
-    getCurrentState
+    getCurrentState,
+    getState: function() { return state; }
   };
 
   if (document.readyState === 'loading') { 

@@ -2329,6 +2329,8 @@
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,11 12,14 22,4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>';
       case 'delete':
         return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+      case 'assign':
+        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
       default:
         return '';
       }
@@ -2618,7 +2620,7 @@
     refreshPeopleHeaderOrder();
     // Export for other modules if needed
     if (typeof window !== 'undefined') {
-      window.peopleModule = { init, loadDataOnce, applyFilters, state, rebindDynamic, getCurrentState };
+      window.peopleModule = { init, loadDataOnce, applyFilters, state, rebindDynamic, getCurrentState, getState: function() { return state; } };
       // Export contacts data for contact-detail module
       window.getPeopleData = () => state.data;
     }
@@ -2643,6 +2645,31 @@
     loadDataOnce();
     startLivePeopleListener();
     
+    // Initialize BulkAssignment for admin users
+    try {
+      if (window.BulkAssignment && window.DataManager && 
+          typeof window.DataManager.isCurrentUserAdmin === 'function' && 
+          window.DataManager.isCurrentUserAdmin()) {
+        window.BulkAssignment.init('contacts').catch(err => {
+          console.error('[People] Failed to initialize bulk assignment:', err);
+        });
+      }
+    } catch (error) {
+      console.error('[People] Error initializing bulk assignment:', error);
+    }
+  }
+  
+  // Listen for bulk assignment completion
+  try {
+    document.addEventListener('bulk-assignment-complete', (event) => {
+      if (event.detail && event.detail.collectionType === 'contacts') {
+        console.log('[People] Bulk assignment complete, refreshing...');
+        state.loaded = false;
+        loadDataOnce();
+      }
+    });
+  } catch (error) {
+    console.error('[People] Error setting up bulk assignment listener:', error);
   }
 
   // Live listener to keep People table in sync without navigation
@@ -3674,6 +3701,7 @@
       if (existing) existing.remove();
       return;
     }
+    const isAdmin = window.DataManager && window.DataManager.isCurrentUserAdmin && window.DataManager.isCurrentUserAdmin();
     const html = `
       <div class="bar">
         <button class="action-btn-sm" id="bulk-clear">${svgIcon('clear')}<span>Clear ${count} selected</span></button>
@@ -3682,6 +3710,7 @@
         <button class="action-btn-sm" id="bulk-sequence">${svgIcon('sequence')}<span>Sequence ▾</span></button>
         <button class="action-btn-sm" id="bulk-call">${svgIcon('call')}<span>Call</span></button>
         <button class="action-btn-sm" id="bulk-addlist">${svgIcon('addlist')}<span>Add to list</span></button>
+        ${isAdmin ? `<button class="action-btn-sm" id="bulk-assign">${svgIcon('assign')}<span>Assign to ▾</span></button>` : ''}
         <button class="action-btn-sm" id="bulk-export">${svgIcon('export')}<span>Export</span></button>
         <button class="action-btn-sm" id="bulk-ai">${svgIcon('ai')}<span>Research with AI</span></button>
         <button class="action-btn-sm danger" id="bulk-delete">${svgIcon('delete')}<span>Delete</span></button>
@@ -3750,6 +3779,14 @@
         openBulkListsPanel();
       }
     });
+    const assignBtn = container.querySelector('#bulk-assign');
+    if (assignBtn) {
+      assignBtn.addEventListener('click', () => {
+        if (window.BulkAssignment) {
+          window.BulkAssignment.renderAssignMenu(assignBtn);
+        }
+      });
+    }
     const seqBtn = container.querySelector('#bulk-sequence');
     if (seqBtn) seqBtn.addEventListener('click', () => {
       // Toggle behavior: close if already open
@@ -3759,6 +3796,7 @@
         openBulkSequencePanel();
       }
     });
+    
     const exportBtn = container.querySelector('#bulk-export');
     if (exportBtn) exportBtn.addEventListener('click', () => exportSelectedToCSV());
     const deleteBtn = container.querySelector('#bulk-delete');
