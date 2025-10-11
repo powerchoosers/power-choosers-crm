@@ -741,8 +741,16 @@
         render();
         return;
       }
-      const snap = await window.firebaseDB.collection('accounts').get();
-      state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      
+      // Use DataManager for ownership-aware loading
+      if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+        state.data = await window.DataManager.queryWithOwnership('accounts');
+      } else {
+        // Fallback to direct query if DataManager not loaded yet
+        const snap = await window.firebaseDB.collection('accounts').get();
+        state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
+      
       state.filtered = state.data.slice();
       state.loaded = true;
       state.errorMsg = '';
@@ -1977,6 +1985,22 @@
       timestamp: Date.now()
     };
   }
+
+  // Initialize BulkAssignment for admin users
+  if (window.BulkAssignment && window.DataManager && window.DataManager.isCurrentUserAdmin()) {
+    window.BulkAssignment.init('accounts').catch(err => {
+      console.error('[Accounts] Failed to initialize bulk assignment:', err);
+    });
+  }
+
+  // Listen for bulk assignment completion and refresh data
+  document.addEventListener('bulk-assignment-complete', (event) => {
+    if (event.detail && event.detail.collectionType === 'accounts') {
+      console.log('[Accounts] Bulk assignment complete, refreshing...');
+      state.loaded = false;
+      loadDataOnce();
+    }
+  });
 
   window.accountsModule = {
     rebindDynamic: function () {
