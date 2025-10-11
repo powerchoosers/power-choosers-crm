@@ -2233,15 +2233,8 @@
 
   
 
-  async function render(forceReloadCalls = false) {
+  async function render() {
     if (!els.tbody) return;
-    
-    // Reload calls data if forced (e.g., pagination change)
-    if (forceReloadCalls && window.callsModule && typeof window.callsModule.loadData === 'function') {
-      try {
-        await window.callsModule.loadData();
-      } catch (e) { /* noop */ }
-    }
     
     const pageItems = getPageItems();
     const rows = pageItems.map((c) => rowHtml(c)).join('');
@@ -2670,6 +2663,81 @@
     });
   } catch (error) {
     console.error('[People] Error setting up bulk assignment listener:', error);
+  }
+
+  // Listen for call completion to remove "No Calls" badges in real-time
+  try {
+    document.addEventListener('pc:call-logged', (event) => {
+      const { call, targetPhone, accountId, contactId } = event.detail || {};
+      console.log('[People] Call logged event received:', { targetPhone, accountId, contactId });
+      
+      // 1. Add call to in-memory cache if available
+      if (call && window.callsModule && window.callsModule.state && Array.isArray(window.callsModule.state.data)) {
+        window.callsModule.state.data.push(call);
+        console.log('[People] Added call to cache, total calls now:', window.callsModule.state.data.length);
+      }
+      
+      // 2. Normalize the target phone for matching
+      const normalizePhone = (phone) => {
+        if (!phone) return '';
+        const digits = String(phone).replace(/\D/g, '');
+        return digits.slice(-10);
+      };
+      const targetPhone10 = normalizePhone(targetPhone);
+      
+      // 3. Find and remove badges from matching contacts
+      if (!els.tbody) return;
+      
+      const allRows = els.tbody.querySelectorAll('tr[data-contact-id]');
+      let badgesRemoved = 0;
+      
+      allRows.forEach(row => {
+        const rowContactId = row.getAttribute('data-contact-id');
+        let shouldRemoveBadge = false;
+        
+        // Match by contactId
+        if (contactId && rowContactId === contactId) {
+          shouldRemoveBadge = true;
+        }
+        
+        // Match by phone number - check contact's phones
+        if (!shouldRemoveBadge && targetPhone10) {
+          // Get the contact data from state
+          const contact = state.data.find(c => c.id === rowContactId);
+          if (contact) {
+            const contactPhones = [
+              contact.workDirectPhone,
+              contact.mobile,
+              contact.otherPhone,
+              contact.phone
+            ].map(normalizePhone).filter(Boolean);
+            
+            if (contactPhones.includes(targetPhone10)) {
+              shouldRemoveBadge = true;
+            }
+            
+            // If this is an account-level call, also check if contact is at this company
+            if (accountId && (contact.accountId === accountId || contact.account_id === accountId)) {
+              shouldRemoveBadge = true;
+            }
+          }
+        }
+        
+        // Remove the badge directly from DOM
+        if (shouldRemoveBadge) {
+          const badge = row.querySelector('.status-badge-no-calls');
+          if (badge) {
+            badge.remove();
+            badgesRemoved++;
+            console.log('[People] Removed "No Calls" badge from contact:', rowContactId);
+          }
+        }
+      });
+      
+      console.log('[People] Total badges removed:', badgesRemoved);
+    });
+  } catch (error) {
+    console.error('[People] Error setting up call-logged listener:', error);
   }
 
   // Live listener to keep People table in sync without navigation
@@ -3829,7 +3897,7 @@
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(current, totalPages, (page) => {
         state.currentPage = page;
-        render(true); // Force reload calls data on pagination change
+        render();
         // After page change, scroll to the top of the actual scroll container
         try {
           requestAnimationFrame(() => {

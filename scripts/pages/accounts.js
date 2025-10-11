@@ -941,15 +941,8 @@
     applyFilters();
   }
 
-  async function render(forceReloadCalls = false) {
+  async function render() {
     if (!els.tbody) return;
-    
-    // Reload calls data if forced (e.g., pagination change)
-    if (forceReloadCalls && window.callsModule && typeof window.callsModule.loadData === 'function') {
-      try {
-        await window.callsModule.loadData();
-      } catch (e) { /* noop */ }
-    }
     
     ensureSelected();
     const pageItems = getPageItems();
@@ -1953,7 +1946,7 @@
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(current, totalPages, (page) => {
         state.currentPage = page;
-        render(true); // Force reload calls data on pagination change
+        render();
         // Scroll to top after page change via unified paginator
         try {
           requestAnimationFrame(() => {
@@ -2031,6 +2024,83 @@
     });
   } catch (error) {
     console.error('[Accounts] Error setting up bulk assignment listener:', error);
+  }
+
+  // Listen for call completion to remove "No Calls" badges in real-time
+  try {
+    document.addEventListener('pc:call-logged', (event) => {
+      const { call, targetPhone, accountId, contactId } = event.detail || {};
+      console.log('[Accounts] Call logged event received:', { targetPhone, accountId, contactId });
+      
+      // 1. Add call to in-memory cache if available
+      if (call && window.callsModule && window.callsModule.state && Array.isArray(window.callsModule.state.data)) {
+        window.callsModule.state.data.push(call);
+        console.log('[Accounts] Added call to cache, total calls now:', window.callsModule.state.data.length);
+      }
+      
+      // 2. Normalize the target phone for matching
+      const normalizePhone = (phone) => {
+        if (!phone) return '';
+        const digits = String(phone).replace(/\D/g, '');
+        return digits.slice(-10);
+      };
+      const targetPhone10 = normalizePhone(targetPhone);
+      
+      // 3. Find and remove badges from matching accounts
+      if (!els.tbody) return;
+      
+      const allRows = els.tbody.querySelectorAll('tr[data-account-id]');
+      let badgesRemoved = 0;
+      
+      allRows.forEach(row => {
+        const rowAccountId = row.getAttribute('data-account-id');
+        let shouldRemoveBadge = false;
+        
+        // Match by accountId directly
+        if (accountId && rowAccountId === accountId) {
+          shouldRemoveBadge = true;
+        }
+        
+        // Match by phone number - check account's company phone
+        if (!shouldRemoveBadge && targetPhone10) {
+          // Get the account data from state
+          const account = state.data.find(a => a.id === rowAccountId);
+          if (account) {
+            const companyPhone10 = normalizePhone(account.phone);
+            
+            if (companyPhone10 === targetPhone10) {
+              shouldRemoveBadge = true;
+            }
+          }
+        }
+        
+        // If a contact was called, also check if that contact belongs to this account
+        if (!shouldRemoveBadge && contactId) {
+          // Get all contacts for this account
+          if (typeof window.getPeopleData === 'function') {
+            const people = window.getPeopleData() || [];
+            const contact = people.find(p => p.id === contactId);
+            if (contact && (contact.accountId === rowAccountId || contact.account_id === rowAccountId)) {
+              shouldRemoveBadge = true;
+            }
+          }
+        }
+        
+        // Remove the badge directly from DOM
+        if (shouldRemoveBadge) {
+          const badge = row.querySelector('.status-badge-no-calls');
+          if (badge) {
+            badge.remove();
+            badgesRemoved++;
+            console.log('[Accounts] Removed "No Calls" badge from account:', rowAccountId);
+          }
+        }
+      });
+      
+      console.log('[Accounts] Total badges removed:', badgesRemoved);
+    });
+  } catch (error) {
+    console.error('[Accounts] Error setting up call-logged listener:', error);
   }
 
   window.accountsModule = {
