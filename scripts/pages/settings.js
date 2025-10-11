@@ -1616,13 +1616,20 @@ function initVoicemailRecording() {
 }
 
 // Initialize settings page when DOM is ready
-document.addEventListener('DOMContentLoaded', async () => {
+async function initSettings() {
     // Only initialize if we're on the settings page
     if (document.getElementById('settings-page')) {
         window.SettingsPage = new SettingsPage();
         window.SettingsPage.instance = window.SettingsPage;
     }
-});
+}
+
+// Initialize immediately if DOM already loaded, otherwise wait
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSettings);
+} else {
+    initSettings();
+}
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {

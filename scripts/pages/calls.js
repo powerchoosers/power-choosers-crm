@@ -3581,7 +3581,12 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     }
   };
   
-  document.addEventListener('DOMContentLoaded', init);
+  // Initialize immediately if DOM already loaded, otherwise wait
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
   
   // Listen for new calls being logged to update internal state
   if (!document._callsModuleCallLoggedBound) {
