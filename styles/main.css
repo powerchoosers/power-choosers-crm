@@ -15208,8 +15208,14 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 }
 
 /* ========================================
-   GOOGLE LOGIN OVERLAY
+   GOOGLE LOGIN OVERLAY & CRM CONTENT WRAPPER
    ======================================== */
+
+/* CRM content wrapper - ensures proper layout after login */
+#crm-content {
+    display: none; /* Hidden by default until authenticated */
+    /* Don't set any sizing - just be a transparent wrapper */
+}
 
 .login-overlay {
     position: fixed;
@@ -15357,9 +15363,9 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     gap: 12px;
     width: 100%;
     padding: 14px 24px;
-    background: white;
-    color: #1f1f1f;
-    border: 1px solid #dadce0;
+    background: white !important;
+    color: #1f1f1f !important;
+    border: 1px solid #dadce0 !important;
     border-radius: 8px;
     font-size: 15px;
     font-weight: 500;
@@ -15369,14 +15375,17 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 }
 
 .google-signin-btn:hover {
-    background: #f8f9fa;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    border-color: #c6c6c6;
+    background: white !important;
+    color: #1f1f1f !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid #dadce0 !important;
 }
 
 .google-signin-btn:active {
-    transform: scale(0.98);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    background: white !important;
+    transform: scale(0.98) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
 }
 
 .google-signin-btn svg {

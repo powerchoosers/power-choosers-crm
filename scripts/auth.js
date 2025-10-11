@@ -92,12 +92,25 @@ class AuthManager {
         if (crmContent) crmContent.style.display = 'none';
     }
 
-    showCRM() {
+    async showCRM() {
         const loginOverlay = document.getElementById('login-overlay');
         const crmContent = document.getElementById('crm-content');
         
+        // Hide login overlay immediately
         if (loginOverlay) loginOverlay.style.display = 'none';
-        if (crmContent) crmContent.style.display = 'flex';
+        
+        // Show CRM content
+        if (crmContent) crmContent.style.display = 'block';
+        
+        // Load CRM scripts lazily (only once)
+        if (typeof window.loadCRMScripts === 'function') {
+            try {
+                await window.loadCRMScripts();
+                console.log('[Auth] CRM scripts loaded and ready');
+            } catch (error) {
+                console.error('[Auth] Failed to load CRM scripts:', error);
+            }
+        }
     }
 
     updateUserProfile(user) {

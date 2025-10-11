@@ -175,7 +175,7 @@
         </div>
 
         <!-- CRM Content (hidden until authenticated) -->
-        <div id="crm-content" style="display: none; flex: 1;">
+        <div id="crm-content">
         <!-- Main Layout -->
         <div class="main-layout">
             <!-- Left Sidebar -->
@@ -2462,7 +2462,75 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="scripts/firebase.js"></script>
     <script src="scripts/auth.js"></script>
-    <script src="scripts/supplier-data.js"></script>
+    
+    <!-- Lazy Load Manager - loads CRM scripts only after authentication -->
+    <script>
+        window.crmScriptsLoaded = false;
+        window.loadCRMScripts = function() {
+            if (window.crmScriptsLoaded) {
+                console.log('[LazyLoad] Scripts already loaded');
+                return Promise.resolve();
+            }
+            
+            console.log('[LazyLoad] Loading CRM scripts...');
+            
+            const scripts = [
+                'scripts/supplier-data.js',
+                'scripts/shared-ci-processor.js',
+                'scripts/pages/contact-detail.js',
+                'scripts/pages/account-detail.js',
+                'scripts/pages/people.js',
+                'scripts/pages/accounts.js',
+                'scripts/pages/calls.js',
+                'scripts/pages/lists-overview.js',
+                'scripts/pages/emails.js',
+                'scripts/email-tracking.js',
+                'scripts/pages/sequence-builder.js',
+                'scripts/pages/sequences.js',
+                'scripts/pages/deals.js',
+                'scripts/pages/tasks.js',
+                'scripts/pages/task-detail.js',
+                'scripts/pages/call-scripts.js',
+                'scripts/pages/settings.js',
+                'scripts/global-search.js',
+                'scripts/widgets/phone.js',
+                'scripts/widgets/notes.js',
+                'scripts/widgets/health.js',
+                'scripts/widgets/deal.js',
+                'scripts/widgets/lusha.js',
+                'scripts/widgets/maps.js',
+                'scripts/notifications.js',
+                'scripts/click-to-call.js',
+                'scripts/click-to-email.js',
+                'scripts/activity-manager.js',
+                'scripts/contact-merger.js',
+                'scripts/main.js',
+                'scripts/toast-manager.js',
+                'scripts/task-notifications.js',
+                'scripts/pages/client-management.js',
+                'scripts/pages/list-detail.js'
+            ];
+            
+            // Load scripts sequentially to maintain dependencies
+            return scripts.reduce((promise, src) => {
+                return promise.then(() => {
+                    return new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = src;
+                        script.onload = resolve;
+                        script.onerror = () => {
+                            console.warn('[LazyLoad] Failed to load:', src);
+                            resolve(); // Continue even if one fails
+                        };
+                        document.body.appendChild(script);
+                    });
+                });
+            }, Promise.resolve()).then(() => {
+                window.crmScriptsLoaded = true;
+                console.log('[LazyLoad] All CRM scripts loaded!');
+            });
+        };
+    </script>
     <!-- API Base URL (global) -->
     <script>
       (function(){
@@ -2520,38 +2588,7 @@
         }
       })();
     </script>
-    <script src="scripts/shared-ci-processor.js"></script>
-    <script src="scripts/pages/contact-detail.js"></script>
-    <script src="scripts/pages/account-detail.js"></script>
-    <script src="scripts/pages/people.js"></script>
-    <script src="scripts/pages/accounts.js"></script>
-    <script src="scripts/pages/calls.js"></script>
-    <script src="scripts/pages/lists-overview.js"></script>
-    <script src="scripts/pages/emails.js"></script>
-    <script src="scripts/email-tracking.js"></script>
-    <script src="scripts/pages/sequence-builder.js"></script>
-    <script src="scripts/pages/sequences.js"></script>
-    <script src="scripts/pages/deals.js"></script>
-    <script src="scripts/pages/tasks.js"></script>
-    <script src="scripts/pages/task-detail.js"></script>
-    <script src="scripts/pages/call-scripts.js"></script>
-    <script src="scripts/pages/settings.js"></script>
-    <script src="scripts/global-search.js"></script>
-    <script src="scripts/widgets/phone.js"></script>
-    <script src="scripts/widgets/notes.js"></script>
-    <script src="scripts/widgets/health.js"></script>
-    <script src="scripts/widgets/deal.js"></script>
-    <script src="scripts/widgets/lusha.js"></script>
-    <script src="scripts/widgets/maps.js"></script>
-    <!-- live-call-insights removed per request -->
-    <script src="scripts/notifications.js"></script>
-    <script src="scripts/click-to-call.js"></script>
-    <script src="scripts/click-to-email.js"></script>
-    <script src="scripts/activity-manager.js"></script>
-    <script src="scripts/contact-merger.js"></script>
-    <script src="scripts/main.js"></script>
-    <script src="scripts/toast-manager.js"></script>
-    <script src="scripts/task-notifications.js"></script>
+    <!-- All CRM scripts now loaded lazily after authentication via window.loadCRMScripts() -->
     <script>
       (function(){
         function formatUsdPerKwh(n){
