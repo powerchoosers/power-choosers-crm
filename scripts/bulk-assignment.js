@@ -290,13 +290,49 @@
     }
   }
 
+  // Render assignment menu based on current page context
+  function renderAssignMenu(anchorElement) {
+    // Get selected items from the current page
+    let selectedIds = [];
+    
+    // Check accounts page
+    const accountsModule = window.accountsModule;
+    if (accountsModule && typeof accountsModule.getState === 'function') {
+      const state = accountsModule.getState();
+      if (state.selected && state.selected.size > 0) {
+        selectedIds = Array.from(state.selected);
+        currentCollectionType = 'accounts';
+      }
+    }
+    
+    // Check people page
+    const peopleModule = window.peopleModule;
+    if (!selectedIds.length && peopleModule && typeof peopleModule.getState === 'function') {
+      const state = peopleModule.getState();
+      if (state.selected && state.selected.size > 0) {
+        selectedIds = Array.from(state.selected);
+        currentCollectionType = 'contacts';
+      }
+    }
+    
+    if (selectedIds.length === 0) {
+      console.warn('[BulkAssignment] No items selected');
+      return;
+    }
+    
+    console.log(`[BulkAssignment] Rendering assign menu for ${selectedIds.length} ${currentCollectionType}`);
+    showQuickAssignDropdown(selectedIds, anchorElement);
+  }
+
   // Expose API
   window.BulkAssignment = {
     init: initBulkAssignment,
     showQuickDropdown: showQuickAssignDropdown,
     showAdvancedModal,
     loadTeamMembers,
-    getTeamMembers: () => teamMembers
+    getTeamMembers: () => teamMembers,
+    renderAssignMenu,
+    get _currentCollection() { return currentCollectionType; }
   };
 
   console.log('[BulkAssignment] Module loaded');
