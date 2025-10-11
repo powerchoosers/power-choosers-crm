@@ -14,7 +14,11 @@
 
     const fallbackConfig = {
       apiKey: 'AIzaSyBKg28LJZgyI3J--I8mnQXOLGN5351tfaE',
-      projectId: 'power-choosers-crm'
+      projectId: 'power-choosers-crm',
+      authDomain: 'power-choosers-crm.firebaseapp.com',
+      storageBucket: 'power-choosers-crm.firebasestorage.app',
+      messagingSenderId: '792458658491',
+      appId: '1:792458658491:web:0ad91d0b47ae39e1e2d6df'
     };
 
     // Guard: ignore invalid placeholder overrides (e.g., YOUR_PROJECT_ID)

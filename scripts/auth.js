@@ -12,24 +12,16 @@ class AuthManager {
         if (this.initialized) return;
 
         try {
-            // Initialize Firebase with client-side config
-            // These values come from the HTML inline script or env vars
-            const firebaseConfig = {
-                apiKey: window.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDHTBM2i3iKNBb6VTMSRUgn9xhsF4KJBMM",
-                authDomain: window.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "power-choosers-crm.firebaseapp.com",
-                projectId: window.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "power-choosers-crm",
-                storageBucket: window.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "power-choosers-crm.firebasestorage.app",
-                messagingSenderId: window.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "792458658491",
-                appId: window.NEXT_PUBLIC_FIREBASE_APP_ID || "1:792458658491:web:0ad91d0b47ae39e1e2d6df"
-            };
-
-            // Initialize Firebase App
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
+            // Firebase is already initialized by firebase.js
+            // Just get the auth instance
+            if (!firebase || !firebase.apps || !firebase.apps.length) {
+                throw new Error('Firebase not initialized. Ensure firebase.js loads before auth.js');
             }
 
             this.auth = firebase.auth();
             this.initialized = true;
+            
+            console.log('[Auth] Firebase Auth initialized');
 
             // Listen for auth state changes
             this.auth.onAuthStateChanged((user) => {
