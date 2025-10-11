@@ -34,16 +34,77 @@ class AuthManager {
         }
     }
 
-    handleAuthStateChange(user) {
+    async handleAuthStateChange(user) {
         this.user = user;
 
         if (user) {
+            // Check domain restriction
+            if (!user.email.endsWith('@powerchoosers.com')) {
+                console.warn('[Auth] Unauthorized domain:', user.email);
+                this.showError('Access restricted to Power Choosers employees (@powerchoosers.com)');
+                await this.signOut();
+                return;
+            }
+            
             console.log('[Auth] User signed in:', user.email);
+            
+            // Ensure user profile exists and get role
+            await this.ensureUserProfile(user);
+            
             this.showCRM();
             this.updateUserProfile(user);
+            
+            // Run migration if admin and not done
+            if (window.DataManager) {
+                await window.DataManager.checkAndRunMigration();
+            }
         } else {
             console.log('[Auth] User signed out');
             this.showLogin();
+        }
+    }
+
+    async ensureUserProfile(user) {
+        const db = firebase.firestore();
+        const userRef = db.collection('users').doc(user.email);
+        
+        try {
+            const userDoc = await userRef.get();
+            
+            if (!userDoc.exists) {
+                // First time login - create profile
+                const isAdmin = (user.email === 'l.patterson@powerchoosers.com');
+                const role = isAdmin ? 'admin' : 'employee';
+                
+                await userRef.set({
+                    email: user.email,
+                    name: user.displayName || user.email.split('@')[0],
+                    role: role,
+                    photoURL: user.photoURL || null,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log(`[Auth] Created ${role} profile for ${user.email}`);
+            } else {
+                // Update last login
+                await userRef.update({
+                    lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            // Get and store role globally
+            const profile = await userRef.get();
+            const userData = profile.data();
+            window.currentUserRole = userData.role;
+            window.currentUserEmail = user.email;
+            
+            console.log(`[Auth] User role: ${userData.role}`);
+        } catch (error) {
+            console.error('[Auth] Error ensuring user profile:', error);
+            // Fallback to determining role from email
+            window.currentUserEmail = user.email;
+            window.currentUserRole = (user.email === 'l.patterson@powerchoosers.com') ? 'admin' : 'employee';
         }
     }
 
