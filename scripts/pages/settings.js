@@ -124,15 +124,6 @@ class SettingsPage {
             addPhoneBtn.addEventListener('click', () => this.showAddPhoneModal());
         }
 
-        // General settings - Agent Name text input
-        const agentName = document.getElementById('agent-name');
-        if (agentName) {
-            agentName.addEventListener('input', (e) => {
-                this.state.settings.general.agentName = e.target.value.trim() || 'Power Choosers';
-                this.markDirty();
-            });
-        }
-
         // Profile information fields
         const profileFields = [
             { id: 'user-first-name', key: 'firstName' },
@@ -234,13 +225,13 @@ class SettingsPage {
             
             // Fallback to localStorage if Firebase not available or no data
             if (!this.state.settings.general.firstName) {
-                const savedSettings = localStorage.getItem('crm-settings');
-                if (savedSettings) {
-                    try {
-                        this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
-                        console.log('[Settings] Loaded from localStorage');
-                    } catch (error) {
-                        console.error('Error loading settings from localStorage:', error);
+            const savedSettings = localStorage.getItem('crm-settings');
+            if (savedSettings) {
+                try {
+                    this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
+                    console.log('[Settings] Loaded from localStorage');
+                } catch (error) {
+                    console.error('Error loading settings from localStorage:', error);
                     }
                 }
             }
@@ -692,7 +683,7 @@ class SettingsPage {
 
             // Convert file to base64 and upload as JSON
             const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
+        const reader = new FileReader();
                 reader.onload = () => resolve(reader.result.split(',')[1]);
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
@@ -711,8 +702,8 @@ class SettingsPage {
             if (imageUrl) {
                 // Store the hosted image URL
                 this.state.settings.emailSignature.image = imageUrl;
-                this.markDirty();
-                this.renderSignatureSection();
+            this.markDirty();
+            this.renderSignatureSection();
                 
                 if (window.showToast) {
                     window.showToast('Signature image uploaded successfully!', 'success');
@@ -762,7 +753,7 @@ class SettingsPage {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result.split(',')[1]);
                 reader.onerror = reject;
-                reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
             });
 
             const response = await fetch('https://api.imgur.com/3/image', {
@@ -839,20 +830,141 @@ class SettingsPage {
     }
 
     showAddPhoneModal() {
-        // Placeholder for add phone modal
-        const phoneNumber = prompt('Enter phone number (e.g., +1 (555) 123-4567):');
-        if (!phoneNumber) return;
+        // Check if form already exists
+        if (document.getElementById('add-phone-inline-form')) {
+            return;
+        }
 
-        const label = prompt('Enter label for this number (e.g., Primary Business Line):');
-        if (!label) return;
+        // Get the button container
+        const addBtn = document.getElementById('add-phone-number');
+        if (!addBtn) return;
 
+        // Create inline form
+        const formHTML = `
+            <div id="add-phone-inline-form" class="add-phone-inline-form" style="opacity: 0; transform: translateX(-20px);">
+                <div class="inline-form-field">
+                    <label for="new-phone-number">Phone Number</label>
+                    <input 
+                        type="tel" 
+                        id="new-phone-number" 
+                        class="settings-input" 
+                        placeholder="+1 (555) 123-4567"
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="inline-form-field">
+                    <label for="new-phone-label">Label</label>
+                    <input 
+                        type="text" 
+                        id="new-phone-label" 
+                        class="settings-input" 
+                        placeholder="Primary Business Line"
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="inline-form-actions">
+                    <button class="btn-small btn-secondary" id="cancel-add-phone">Cancel</button>
+                    <button class="btn-small btn-primary" id="save-add-phone">Save</button>
+                </div>
+            </div>
+        `;
+
+        // Insert form after the "Add Phone Number" button
+        addBtn.insertAdjacentHTML('afterend', formHTML);
+
+        // Get form element
+        const form = document.getElementById('add-phone-inline-form');
+
+        // Animate in
+        requestAnimationFrame(() => {
+            form.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            form.style.opacity = '1';
+            form.style.transform = 'translateX(0)';
+        });
+
+        // Focus first input
+        setTimeout(() => {
+            document.getElementById('new-phone-number')?.focus();
+        }, 100);
+
+        // Cancel button
+        document.getElementById('cancel-add-phone')?.addEventListener('click', () => {
+            this.hideAddPhoneForm();
+        });
+
+        // Save button
+        document.getElementById('save-add-phone')?.addEventListener('click', () => {
+            this.saveNewPhone();
+        });
+
+        // Enter key to save
+        form.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.saveNewPhone();
+            }
+        });
+
+        // Escape key to cancel
+        form.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.hideAddPhoneForm();
+            }
+        });
+    }
+
+    hideAddPhoneForm() {
+        const form = document.getElementById('add-phone-inline-form');
+        if (!form) return;
+
+        // Animate out
+        form.style.opacity = '0';
+        form.style.transform = 'translateX(-20px)';
+
+        // Remove after animation
+        setTimeout(() => {
+            form.remove();
+        }, 300);
+    }
+
+    saveNewPhone() {
+        const phoneNumber = document.getElementById('new-phone-number')?.value.trim();
+        const label = document.getElementById('new-phone-label')?.value.trim();
+
+        // Validate
+        if (!phoneNumber) {
+            if (window.showToast) {
+                window.showToast('Please enter a phone number', 'error');
+            }
+            document.getElementById('new-phone-number')?.focus();
+            return;
+        }
+
+        if (!label) {
+            if (window.showToast) {
+                window.showToast('Please enter a label', 'error');
+            }
+            document.getElementById('new-phone-label')?.focus();
+            return;
+        }
+
+        // Add to settings
         this.state.settings.twilioNumbers.push({
             number: phoneNumber,
             label: label
         });
 
+        // Update UI
         this.renderPhoneNumbers();
         this.markDirty();
+
+        // Show success toast
+        if (window.showToast) {
+            window.showToast('Phone number added successfully', 'success');
+        }
+
+        // Hide form
+        this.hideAddPhoneForm();
     }
 
     editPhoneNumber(phoneItem) {
@@ -1450,6 +1562,81 @@ function injectModernStyles() {
             #settings-page .phone-actions {
                 align-self: flex-end;
             }
+        }
+        
+        /* Inline Add Phone Form */
+        #settings-page .add-phone-inline-form {
+            margin-top: 16px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-light);
+            border-radius: 8px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        #settings-page .inline-form-field {
+            margin-bottom: 16px;
+        }
+        
+        #settings-page .inline-form-field:last-of-type {
+            margin-bottom: 20px;
+        }
+        
+        #settings-page .inline-form-field label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        #settings-page .inline-form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        #settings-page .btn-small {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        #settings-page .btn-primary {
+            background: var(--orange-primary);
+            color: white;
+        }
+        
+        #settings-page .btn-primary:hover {
+            background: #e55a2b;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+        }
+        
+        #settings-page .btn-secondary {
+            background: var(--grey-600);
+            color: var(--text-primary);
+        }
+        
+        #settings-page .btn-secondary:hover {
+            background: var(--grey-500);
+            transform: translateY(-1px);
+        }
+        
+        #settings-page .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+        
+        #settings-page .btn-danger:hover {
+            background: #b91c1c;
+            transform: translateY(-1px);
         }
     `;
     
