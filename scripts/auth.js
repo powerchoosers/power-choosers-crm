@@ -66,16 +66,6 @@ class AuthManager {
             console.log('[Auth] Updating user profile UI...');
             this.updateUserProfile(user);
             
-            // Run migration if admin and not done
-            if (window.DataManager) {
-                console.log('[Auth] Checking for data migration...');
-                try {
-                    await window.DataManager.checkAndRunMigration();
-                } catch (error) {
-                    console.error('[Auth] Migration error:', error);
-                }
-            }
-            
             console.log('[Auth] ✓ Auth flow complete');
         } else {
             console.log('[Auth] No user - showing login');
