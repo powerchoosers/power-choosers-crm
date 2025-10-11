@@ -4013,9 +4013,11 @@ function addSignatureToAIContent(content, isHtmlMode = false) {
     return content + signature;
 }
 
-// Initialize CRM when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize CRM when DOM is loaded OR immediately if already loaded
+function initializeCRM() {
+    console.log('[Main] Initializing PowerChoosersCRM...');
     window.crm = new PowerChoosersCRM();
+    console.log('[Main] ✓ PowerChoosersCRM initialized');
     
     // Add compose button listener for signature injection
     const composeBtn = document.getElementById('compose-email-btn');
@@ -4062,7 +4064,15 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (window.initGlobalSearch) {
         window.initGlobalSearch();
     }
-});
+}
+
+// Call immediately if DOM is already loaded, otherwise wait
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeCRM);
+} else {
+    // DOM already loaded (lazy loaded scripts case)
+    initializeCRM();
+}
 
 // Export for potential module use
 if (typeof module !== 'undefined' && module.exports) {

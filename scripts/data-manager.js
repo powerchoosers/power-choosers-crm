@@ -98,14 +98,16 @@
     
     const db = firebase.firestore();
     const collections = ['accounts', 'contacts', 'deals', 'tasks', 'emails', 'calls', 'notes', 'lists'];
-    const batch = db.batch();
-    let updateCount = 0;
     const batchLimit = 500; // Firestore batch limit
+    let totalUpdated = 0;
     
     for (const collectionName of collections) {
       try {
         console.log(`[DataManager] Migrating ${collectionName}...`);
         const snapshot = await db.collection(collectionName).get();
+        
+        let batch = db.batch(); // Create new batch for each collection
+        let updateCount = 0;
         
         for (const doc of snapshot.docs) {
           const data = doc.data();
@@ -125,12 +127,21 @@
           
           updateCount++;
           
-          // Commit batch if reaching limit
+          // Commit batch if reaching limit and create new batch
           if (updateCount >= batchLimit) {
             await batch.commit();
-            console.log(`[DataManager] Committed batch of ${updateCount} updates`);
+            console.log(`[DataManager] Committed batch of ${updateCount} updates for ${collectionName}`);
+            totalUpdated += updateCount;
+            batch = db.batch(); // Create NEW batch for next set
             updateCount = 0;
           }
+        }
+        
+        // Commit remaining updates for this collection
+        if (updateCount > 0) {
+          await batch.commit();
+          console.log(`[DataManager] Committed final batch of ${updateCount} updates for ${collectionName}`);
+          totalUpdated += updateCount;
         }
         
         console.log(`[DataManager] ✓ Migrated ${collectionName}`);
@@ -139,13 +150,7 @@
       }
     }
     
-    // Commit remaining updates
-    if (updateCount > 0) {
-      await batch.commit();
-      console.log(`[DataManager] Committed final batch of ${updateCount} updates`);
-    }
-    
-    console.log('[DataManager] ✅ Migration complete!');
+    console.log(`[DataManager] ✅ Migration complete! Updated ${totalUpdated} records`);
     
     // Store migration flag
     localStorage.setItem('pc_data_migrated', 'true');
@@ -180,17 +185,20 @@
   }
 
   // Expose functions globally
-  window.DataManager = {
-    getCurrentUserEmail,
-    isCurrentUserAdmin,
-    addOwnership,
-    queryWithOwnership,
-    migrateExistingData,
-    isMigrationComplete,
-    checkAndRunMigration,
-    ADMIN_EMAIL
-  };
-
-  console.log('[DataManager] Initialized');
+  try {
+    window.DataManager = {
+      getCurrentUserEmail,
+      isCurrentUserAdmin,
+      addOwnership,
+      queryWithOwnership,
+      migrateExistingData,
+      isMigrationComplete,
+      checkAndRunMigration,
+      ADMIN_EMAIL
+    };
+    console.log('[DataManager] Initialized');
+  } catch (error) {
+    console.error('[DataManager] Initialization error:', error);
+  }
 })();
 

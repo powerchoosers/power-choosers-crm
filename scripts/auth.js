@@ -35,31 +35,45 @@ class AuthManager {
     }
 
     async handleAuthStateChange(user) {
+        console.log('[Auth] ==> handleAuthStateChange triggered, user:', user ? user.email : 'null');
         this.user = user;
 
         if (user) {
+            console.log('[Auth] User object:', {email: user.email, uid: user.uid});
+            
             // Check domain restriction
             if (!user.email.endsWith('@powerchoosers.com')) {
-                console.warn('[Auth] Unauthorized domain:', user.email);
+                console.warn('[Auth] ✗ Unauthorized domain:', user.email);
                 this.showError('Access restricted to Power Choosers employees (@powerchoosers.com)');
                 await this.signOut();
                 return;
             }
             
-            console.log('[Auth] User signed in:', user.email);
+            console.log('[Auth] ✓ Domain authorized:', user.email);
             
             // Ensure user profile exists and get role
-            await this.ensureUserProfile(user);
+            console.log('[Auth] Creating/fetching user profile...');
+            try {
+                await this.ensureUserProfile(user);
+                console.log('[Auth] ✓ User profile ready');
+            } catch (error) {
+                console.error('[Auth] ✗ Error with user profile:', error);
+            }
             
-            this.showCRM();
+            console.log('[Auth] Calling showCRM()...');
+            await this.showCRM();
+            
+            console.log('[Auth] Updating user profile UI...');
             this.updateUserProfile(user);
             
-            // Run migration if admin and not done
-            if (window.DataManager) {
-                await window.DataManager.checkAndRunMigration();
-            }
+            // Run migration if admin and not done (temporarily disabled for debugging)
+            // if (window.DataManager) {
+            //     await window.DataManager.checkAndRunMigration();
+            // }
+            
+            console.log('[Auth] ✓ Auth flow complete');
         } else {
-            console.log('[Auth] User signed out');
+            console.log('[Auth] No user - showing login');
             this.showLogin();
         }
     }
@@ -154,23 +168,35 @@ class AuthManager {
     }
 
     async showCRM() {
+        console.log('[Auth] showCRM() called');
         const loginOverlay = document.getElementById('login-overlay');
         const crmContent = document.getElementById('crm-content');
         
         // Hide login overlay immediately
-        if (loginOverlay) loginOverlay.style.display = 'none';
+        if (loginOverlay) {
+            loginOverlay.style.display = 'none';
+            console.log('[Auth] Login overlay hidden');
+        }
         
         // Show CRM content
-        if (crmContent) crmContent.style.display = 'block';
+        if (crmContent) {
+            crmContent.style.display = 'block';
+            console.log('[Auth] CRM content shown');
+        }
         
         // Load CRM scripts lazily (only once)
         if (typeof window.loadCRMScripts === 'function') {
+            console.log('[Auth] Loading CRM scripts...');
             try {
                 await window.loadCRMScripts();
-                console.log('[Auth] CRM scripts loaded and ready');
+                console.log('[Auth] ✓ CRM scripts loaded and ready');
             } catch (error) {
-                console.error('[Auth] Failed to load CRM scripts:', error);
+                console.error('[Auth] ✗ Failed to load CRM scripts:', error);
+                alert('Error loading CRM scripts. Please refresh the page.');
             }
+        } else {
+            console.error('[Auth] ✗ loadCRMScripts function not found!');
+            alert('CRM loader not found. Please refresh the page.');
         }
     }
 
