@@ -859,8 +859,6 @@
       await createTask({ title, type, priority: 'medium', contact, account, dueDate, dueTime, notes });
     });
   }
-  
-  document.addEventListener('DOMContentLoaded', init);
 
   // Expose minimal API for cross-page creation and auto-task events
   try {
@@ -874,4 +872,11 @@
       } catch(_) {}
     });
   } catch(_) {}
+
+  // Initialize immediately if DOM already loaded, otherwise wait
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
