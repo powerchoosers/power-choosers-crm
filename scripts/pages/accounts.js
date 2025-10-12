@@ -734,7 +734,7 @@
   async function loadDataOnce() {
     if (state.loaded) return;
     try {
-      if (!window.firebaseDB) {
+      if (!window.firebaseDB && !window.CacheManager) {
         state.data = [];
         state.filtered = [];
         state.loaded = true;
@@ -742,9 +742,14 @@
         return;
       }
       
-      // Use DataManager for ownership-aware loading with robust fallback
-      if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function' && window.currentUserRole) {
+      // Use CacheManager if available, otherwise fallback
+      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+        console.log('[Accounts] Loading data from cache...');
+        state.data = await window.CacheManager.get('accounts');
+      } else if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function' && window.currentUserRole) {
+        // Use DataManager for ownership-aware loading with robust fallback
         try {
+          console.log('[Accounts] Using DataManager query...');
           state.data = await window.DataManager.queryWithOwnership('accounts');
         } catch (error) {
           console.error('[Accounts] DataManager query failed, falling back to direct query:', error);
@@ -752,7 +757,7 @@
           state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         }
       } else {
-        console.log('[Accounts] Using fallback query (DataManager not ready)');
+        console.log('[Accounts] Using fallback query (CacheManager and DataManager not ready)');
         const snap = await window.firebaseDB.collection('accounts').get();
         state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       }
@@ -805,6 +810,12 @@
           const fresh = [];
           snap.forEach((doc) => { fresh.push({ id: doc.id, ...doc.data() }); });
           state.data = fresh;
+          
+          // Update cache with real-time changes
+          if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+            window.CacheManager.set('accounts', fresh).catch(() => {});
+          }
+          
           applyFilters();
         } catch (_) { /* noop */ }
       }, (err) => {

@@ -83,6 +83,14 @@
           const serverTs = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : new Date();
           const optimisticTs = new Date();
           const payload = Object.assign({}, changes || {}, { updatedAt: serverTs });
+          
+          // Update cache immediately (optimistic)
+          try {
+            if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+              await window.CacheManager.updateRecord(collection, id, Object.assign({}, changes || {}, { updatedAt: optimisticTs }));
+            }
+          } catch (_) {}
+          
           // Optimistic event before persistence (so UI updates instantly)
           try {
             if (options && options.eventName && id) {
@@ -90,6 +98,7 @@
               document.dispatchEvent(ev);
             }
           } catch (_) {}
+          
           // Persist to Firestore
           if (db && collection && id) {
             try { await db.collection(collection).doc(id).set(payload, { merge: true }); } catch (e) { console.warn('[PCSaves] update failed', { collection, id }, e); }

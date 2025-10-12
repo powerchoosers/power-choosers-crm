@@ -772,13 +772,30 @@
     
     try {
       if (console.time) console.time('[ListDetail] loadDataOnce');
-      if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+      
+      // Use CacheManager if available for much faster loading
+      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+        // Load people from cache
+        if (!state.loadedPeople) {
+          state.dataPeople = await window.CacheManager.get('contacts');
+          state.loadedPeople = true;
+          console.debug('[ListDetail] loadDataOnce: people loaded from cache', { count: state.dataPeople.length });
+        }
+        
+        // Load accounts from cache
+        if (!state.loadedAccounts) {
+          state.dataAccounts = await window.CacheManager.get('accounts');
+          state.loadedAccounts = true;
+          console.debug('[ListDetail] loadDataOnce: accounts loaded from cache', { count: state.dataAccounts.length });
+        }
+      } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+        // Fallback to Firestore
         // Load people
         if (!state.loadedPeople) {
           const peopleSnap = await window.firebaseDB.collection('contacts').limit(200).get();
           state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
           state.loadedPeople = true;
-          console.debug('[ListDetail] loadDataOnce: people loaded', { count: state.dataPeople.length });
+          console.debug('[ListDetail] loadDataOnce: people loaded from Firestore', { count: state.dataPeople.length });
         }
         
         // Load accounts
@@ -786,7 +803,7 @@
           const accountsSnap = await window.firebaseDB.collection('accounts').get();
           state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
           state.loadedAccounts = true;
-          console.debug('[ListDetail] loadDataOnce: accounts loaded', { count: state.dataAccounts.length });
+          console.debug('[ListDetail] loadDataOnce: accounts loaded from Firestore', { count: state.dataAccounts.length });
         }
       }
     } catch (e) {

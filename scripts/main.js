@@ -550,6 +550,7 @@ class PowerChoosersCRM {
         this.setupSearchFunctionality();
         this.setupWidgetInteractions();
         this.installCustomTooltips();
+        this.setupRefreshButton();
         this.loadInitialData();
         // Ensure widget panel visibility state is reflected on first load
         try {
@@ -574,9 +575,18 @@ class PowerChoosersCRM {
         });
     }
 
-    navigateToPage(pageName) {
+    async navigateToPage(pageName) {
         // Update current page tracking
         this.currentPage = pageName;
+        
+        // Lazy load page scripts if needed
+        if (window.loadPageScripts && typeof window.loadPageScripts === 'function') {
+            try {
+                await window.loadPageScripts(pageName);
+            } catch (error) {
+                console.error(`[CRM] Error loading scripts for ${pageName}:`, error);
+            }
+        }
         
         // Hide all pages
         document.querySelectorAll('.page').forEach(page => {
@@ -755,6 +765,62 @@ class PowerChoosersCRM {
         
         this.currentPage = pageName;
         this.updateWidgetPanel(pageName);
+    }
+
+    // Setup Refresh Data Button
+    setupRefreshButton() {
+        const refreshBtn = document.getElementById('refresh-data-btn');
+        if (!refreshBtn) {
+            console.warn('[CRM] Refresh button not found');
+            return;
+        }
+
+        refreshBtn.addEventListener('click', async () => {
+            try {
+                // Show visual feedback
+                refreshBtn.style.opacity = '0.5';
+                refreshBtn.disabled = true;
+                
+                console.log('[CRM] Refreshing all data...');
+                
+                // Invalidate all caches
+                if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
+                    await window.CacheManager.invalidateAll();
+                    this.showToast('Data refreshed successfully', 'success');
+                    
+                    // Reload current page to fetch fresh data
+                    const currentPage = this.currentPage;
+                    if (currentPage) {
+                        // Force reload by clearing loaded flags
+                        if (window.peopleModule && currentPage === 'people') {
+                            window.peopleModule.state.loaded = false;
+                            window.peopleModule.loadDataOnce();
+                        } else if (window.accountsModule && currentPage === 'accounts') {
+                            window.accountsModule.state.loaded = false;
+                            window.accountsModule.loadDataOnce();
+                        } else if (window.callsModule && currentPage === 'calls') {
+                            window.callsModule.state.loaded = false;
+                            window.callsModule.loadDataOnce();
+                        } else {
+                            // For other pages, just reload the browser
+                            location.reload();
+                        }
+                    }
+                } else {
+                    console.warn('[CRM] CacheManager not available');
+                    this.showToast('Refresh not available', 'error');
+                }
+            } catch (error) {
+                console.error('[CRM] Error refreshing data:', error);
+                this.showToast('Error refreshing data', 'error');
+            } finally {
+                // Restore button state
+                refreshBtn.style.opacity = '1';
+                refreshBtn.disabled = false;
+            }
+        });
+        
+        console.log('[CRM] Refresh button initialized');
     }
 
     // Sidebar Hover Effects
