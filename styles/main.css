@@ -633,6 +633,43 @@ button:hover:not(:disabled),
     transform: translateY(1px);
 }
 
+/* === GLOBAL TABLE ROW ANIMATIONS === */
+@keyframes rowFadeZoom {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.97) translateY(4px);
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Apply to table rows ONLY when tbody gets fresh content (via .animating class) */
+tbody.animating tr {
+  animation: rowFadeZoom 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Stagger animation for multiple rows */
+tbody.animating tr:nth-child(1) { animation-delay: 0ms; }
+tbody.animating tr:nth-child(2) { animation-delay: 20ms; }
+tbody.animating tr:nth-child(3) { animation-delay: 40ms; }
+tbody.animating tr:nth-child(4) { animation-delay: 60ms; }
+tbody.animating tr:nth-child(5) { animation-delay: 80ms; }
+tbody.animating tr:nth-child(6) { animation-delay: 100ms; }
+tbody.animating tr:nth-child(7) { animation-delay: 120ms; }
+tbody.animating tr:nth-child(8) { animation-delay: 140ms; }
+tbody.animating tr:nth-child(9) { animation-delay: 160ms; }
+tbody.animating tr:nth-child(10) { animation-delay: 180ms; }
+tbody.animating tr:nth-child(n+11) { animation-delay: 200ms; }
+
+/* Disable animations for reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  tbody tr {
+    animation: none !important;
+  }
+}
+
 /* === AI GENERATION LOADING + FADE-IN === */
 @keyframes aiShimmer {
   0% { background-position: 200% 0; }

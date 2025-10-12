@@ -702,22 +702,18 @@ class SettingsPage {
             return;
         }
 
-        phoneList.innerHTML = this.state.settings.twilioNumbers.map((phone, index) => {
-            // Format phone number for display
-            const formattedNumber = formatPhoneNumberForInput(phone.number) || phone.number;
-            return `
-                <div class="phone-number-item" data-index="${index}">
-                    <div class="phone-info">
-                        <span class="phone-number">${formattedNumber}</span>
-                        <span class="phone-label">${phone.label}</span>
-                    </div>
-                    <div class="phone-actions">
-                        <button class="btn-small btn-secondary" data-action="edit">Edit</button>
-                        <button class="btn-small btn-danger" data-action="remove">Remove</button>
-                    </div>
+        phoneList.innerHTML = this.state.settings.twilioNumbers.map((phone, index) => `
+            <div class="phone-number-item" data-index="${index}">
+                <div class="phone-info">
+                    <span class="phone-number">${phone.number}</span>
+                    <span class="phone-label">${phone.label}</span>
                 </div>
-            `;
-        }).join('');
+                <div class="phone-actions">
+                    <button class="btn-small btn-secondary" data-action="edit">Edit</button>
+                    <button class="btn-small btn-danger" data-action="remove">Remove</button>
+                </div>
+            </div>
+        `).join('');
     }
 
     async handleImageUpload(event) {
@@ -1067,11 +1063,8 @@ class SettingsPage {
         const newLabel = prompt('Enter new label:', phone.label);
         if (!newLabel) return;
 
-        // Format phone number before saving
-        const formattedPhone = formatPhoneNumberForInput(newNumber);
-
         this.state.settings.twilioNumbers[index] = {
-            number: formattedPhone,
+            number: newNumber,
             label: newLabel
         };
 

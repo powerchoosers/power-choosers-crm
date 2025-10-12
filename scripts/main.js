@@ -7,23 +7,8 @@ class PowerChoosersCRM {
         this.sidebar = document.getElementById('sidebar');
         this.init();
         
-        // Load home activities on initial load if we're on the dashboard
-        // Use the same logic as pagination to ensure it works
-        const loadActivities = () => {
-            if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
-                console.log('[CRM] Loading home activities...');
-                // Use the same method as pagination - direct ActivityManager call
-                window.ActivityManager.renderActivities('home-activity-timeline', 'global');
-            } else {
-                console.log('[CRM] ActivityManager not ready or not on dashboard, retrying...');
-                setTimeout(loadActivities, 200);
-            }
-        };
-        
-        // Try immediately and also with delays
-        setTimeout(loadActivities, 50);
-        setTimeout(loadActivities, 200);
-        setTimeout(loadActivities, 500);
+        // PRE-LOAD ESSENTIAL DATA THEN LOAD WIDGETS
+        this.initializeDashboardData();
 
         // Listen for activity refresh events
         document.addEventListener('pc:activities-refresh', (e) => {
@@ -33,6 +18,106 @@ class PowerChoosersCRM {
                 this.loadHomeActivities(forceRefresh);
             }
         });
+    }
+
+    // Initialize dashboard data and widgets in correct order
+    async initializeDashboardData() {
+        console.log('[CRM] Initializing dashboard data...');
+        
+        // STEP 1: Pre-load essential data and WAIT for completion
+        await this.preloadEssentialData();
+        
+        // STEP 2: Now load widgets that depend on this data
+        this.loadDashboardWidgets();
+    }
+    
+    // Load dashboard widgets after data is ready
+    loadDashboardWidgets() {
+        console.log('[CRM] Loading dashboard widgets...');
+        
+        // Load home activities
+        const loadActivities = () => {
+            if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
+                console.log('[CRM] Loading home activities...');
+                window.ActivityManager.renderActivities('home-activity-timeline', 'global');
+            } else {
+                console.log('[CRM] ActivityManager not ready, retrying...');
+                setTimeout(loadActivities, 200);
+            }
+        };
+        
+        // Try with small delays to ensure DOM is ready
+        setTimeout(loadActivities, 50);
+        setTimeout(loadActivities, 200);
+        
+        // Start background calls loading after a short delay
+        // This enables "No Calls" badges on People/Accounts pages without blocking
+        setTimeout(() => {
+            if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.start === 'function') {
+                console.log('[CRM] Starting background calls loading for badge system...');
+                window.BackgroundCallsLoader.start();
+            } else {
+                console.warn('[CRM] BackgroundCallsLoader not available');
+            }
+        }, 2500); // 2.5 second delay to ensure main scripts are ready
+    }
+
+    // Pre-load essential data for widgets and navigation
+    async preloadEssentialData() {
+        console.log('[CRM] Pre-loading essential data for widgets...');
+        
+        try {
+            // Load accounts data for account navigation and activity logos
+            if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+                const accountsData = await window.CacheManager.get('accounts');
+                if (accountsData && Array.isArray(accountsData)) {
+                    window._essentialAccountsData = accountsData;
+                    window.getAccountsData = () => window._essentialAccountsData || [];
+                    console.log('[CRM] ✓ Pre-loaded', accountsData.length, 'accounts');
+                }
+            }
+            
+            // Load contacts data for contact navigation
+            if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+                const contactsData = await window.CacheManager.get('contacts');
+                if (contactsData && Array.isArray(contactsData)) {
+                    window._essentialContactsData = contactsData;
+                    window.getPeopleData = () => window._essentialContactsData || [];
+                    console.log('[CRM] ✓ Pre-loaded', contactsData.length, 'contacts');
+                }
+            }
+            
+            // Load tasks - use tasks module if available, otherwise load from Firebase
+            if (window.tasksModule && typeof window.tasksModule.getTasksData === 'function') {
+                // Tasks module already loaded, use its data
+                await window.tasksModule.loadDataOnce();
+                const tasksData = window.tasksModule.getTasksData();
+                window._essentialTasksData = tasksData;
+                console.log('[CRM] ✓ Pre-loaded', tasksData.length, 'tasks from tasks module');
+            } else if (window.firebaseDB) {
+                // Fallback: load directly from Firebase
+                const snapshot = await window.firebaseDB.collection('tasks')
+                    .orderBy('timestamp', 'desc')
+                    .limit(100)
+                    .get();
+                const tasksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Merge with localStorage
+                try {
+                    const localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+                    const existingIds = new Set(tasksData.map(t => t.id));
+                    const newLocalTasks = localTasks.filter(t => !existingIds.has(t.id));
+                    window._essentialTasksData = [...tasksData, ...newLocalTasks];
+                } catch(e) {
+                    window._essentialTasksData = tasksData;
+                }
+                console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from Firebase');
+            }
+            
+            console.log('[CRM] ✓✓✓ All essential data pre-loaded successfully');
+        } catch (error) {
+            console.error('[CRM] Error pre-loading essential data:', error);
+        }
     }
 
   createAddAccountModal() {

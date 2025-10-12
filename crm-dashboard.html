@@ -21,6 +21,8 @@
     <link rel="icon" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" type="image/png">
     <!-- Twilio Voice SDK for browser calling -->
     <script src="https://unpkg.com/@twilio/voice-sdk@2.11.0/dist/twilio.min.js"></script>
+    <!-- Algolia Search Library -->
+    <script src="https://cdn.jsdelivr.net/npm/algoliasearch@4/dist/algoliasearch-lite.umd.js"></script>
     <script>
         // Verify SDK loading
         window.addEventListener('load', () => {
@@ -33,6 +35,18 @@
     </script>
     <script>
         // API base will be set later based on environment
+    </script>
+    <script>
+        // Algolia Configuration
+        window.ALGOLIA_CONFIG = {
+          appId: '63BBAAFSUC',
+          searchApiKey: 'e0a748084186656052dd3de543547f8b',
+          indices: {
+            contacts: 'contacts',
+            accounts: 'accounts'
+          }
+        };
+        console.log('[Algolia] Configuration loaded');
     </script>
     <script>
         // Optional: Configure your Twilio/Business phone numbers so Calls page can identify the counterparty correctly
@@ -2619,6 +2633,8 @@
             // Core scripts loaded immediately (cache manager MUST be first)
             const coreScripts = [
                 'scripts/cache-manager.js',        // NEW - cache system
+                'scripts/badge-loader.js',         // NEW - lightweight badge data loader
+                'scripts/algolia-search.js',       // NEW - Algolia search helper
                 'scripts/supplier-data.js',
                 'scripts/data-manager.js',
                 'scripts/bulk-assignment.js',
@@ -2635,6 +2651,11 @@
                 'scripts/click-to-call.js',
                 'scripts/click-to-email.js',
                 'scripts/activity-manager.js',
+                'scripts/pages/tasks.js',          // NEW - load tasks immediately for widget
+                'scripts/pages/task-detail.js',    // NEW - load task-detail for Today's Tasks clicks
+                'scripts/pages/account-detail.js', // NEW - load account-detail for account navigation
+                'scripts/pages/contact-detail.js', // NEW - load contact-detail for contact navigation
+                'scripts/background-calls-loader.js', // NEW - background calls loading for badges
                 'scripts/contact-merger.js',
                 'scripts/email-tracking.js',
                 'scripts/toast-manager.js',
