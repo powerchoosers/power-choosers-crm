@@ -83,6 +83,13 @@
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                     </svg>
                 </button>
+                <button class="icon-btn" id="refresh-data-btn" title="Refresh Data">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                </button>
                 <div class="notification-container">
                     <button class="icon-btn" id="notifications-btn" title="Notifications">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2575,35 +2582,48 @@
     <!-- Lazy Load Manager - loads CRM scripts only after authentication -->
     <script>
         window.crmScriptsLoaded = false;
+        window._loadedPageScripts = new Set();
+        
+        // Helper to load a single script
+        window.loadScript = function(src) {
+            return new Promise((resolve, reject) => {
+                // Check if already loaded
+                if (document.querySelector(`script[src="${src}"]`)) {
+                    resolve();
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => {
+                    console.log('[LazyLoad] ✓ Loaded:', src);
+                    resolve();
+                };
+                script.onerror = () => {
+                    console.warn('[LazyLoad] Failed to load:', src);
+                    resolve(); // Continue even if one fails
+                };
+                document.body.appendChild(script);
+            });
+        };
+        
+        // Load core CRM scripts (essentials only)
         window.loadCRMScripts = function() {
             if (window.crmScriptsLoaded) {
                 console.log('[LazyLoad] Scripts already loaded');
                 return Promise.resolve();
             }
             
-            console.log('[LazyLoad] Loading CRM scripts...');
+            console.log('[LazyLoad] Loading core CRM scripts...');
             
-            const scripts = [
+            // Core scripts loaded immediately (cache manager MUST be first)
+            const coreScripts = [
+                'scripts/cache-manager.js',        // NEW - cache system
                 'scripts/supplier-data.js',
                 'scripts/data-manager.js',
                 'scripts/bulk-assignment.js',
                 'scripts/employee-welcome.js',
                 'scripts/shared-ci-processor.js',
-                'scripts/pages/contact-detail.js',
-                'scripts/pages/account-detail.js',
-                'scripts/pages/people.js',
-                'scripts/pages/accounts.js',
-                'scripts/pages/calls.js',
-                'scripts/pages/lists-overview.js',
-                'scripts/pages/emails.js',
-                'scripts/email-tracking.js',
-                'scripts/pages/sequence-builder.js',
-                'scripts/pages/sequences.js',
-                'scripts/pages/deals.js',
-                'scripts/pages/tasks.js',
-                'scripts/pages/task-detail.js',
-                'scripts/pages/call-scripts.js',
-                'scripts/pages/settings.js',
                 'scripts/global-search.js',
                 'scripts/widgets/phone.js',
                 'scripts/widgets/notes.js',
@@ -2616,31 +2636,86 @@
                 'scripts/click-to-email.js',
                 'scripts/activity-manager.js',
                 'scripts/contact-merger.js',
-                'scripts/main.js',
+                'scripts/email-tracking.js',
                 'scripts/toast-manager.js',
                 'scripts/task-notifications.js',
-                'scripts/pages/client-management.js',
-                'scripts/pages/list-detail.js'
+                'scripts/main.js'                  // Main must be last
             ];
             
-            // Load scripts sequentially to maintain dependencies
-            return scripts.reduce((promise, src) => {
-                return promise.then(() => {
-                    return new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = src;
-                        script.onload = resolve;
-                        script.onerror = () => {
-                            console.warn('[LazyLoad] Failed to load:', src);
-                            resolve(); // Continue even if one fails
-                        };
-                        document.body.appendChild(script);
-                    });
-                });
+            // Load core scripts sequentially
+            return coreScripts.reduce((promise, src) => {
+                return promise.then(() => window.loadScript(src));
             }, Promise.resolve()).then(() => {
                 window.crmScriptsLoaded = true;
-                console.log('[LazyLoad] All CRM scripts loaded!');
+                console.log('[LazyLoad] ✓ Core CRM scripts loaded!');
             });
+        };
+        
+        // Load page-specific scripts on demand
+        window.loadPageScripts = async function(pageName) {
+            // Map of page names to their required scripts
+            const pageScriptMap = {
+                people: [
+                    'scripts/pages/contact-detail.js',
+                    'scripts/pages/people.js'
+                ],
+                accounts: [
+                    'scripts/pages/account-detail.js',
+                    'scripts/pages/accounts.js'
+                ],
+                calls: [
+                    'scripts/pages/calls.js'
+                ],
+                tasks: [
+                    'scripts/pages/task-detail.js',
+                    'scripts/pages/tasks.js'
+                ],
+                emails: [
+                    'scripts/pages/emails.js'
+                ],
+                sequences: [
+                    'scripts/pages/sequence-builder.js',
+                    'scripts/pages/sequences.js'
+                ],
+                deals: [
+                    'scripts/pages/deals.js'
+                ],
+                lists: [
+                    'scripts/pages/list-detail.js',
+                    'scripts/pages/lists-overview.js'
+                ],
+                'call-scripts': [
+                    'scripts/pages/call-scripts.js'
+                ],
+                settings: [
+                    'scripts/pages/settings.js'
+                ],
+                'client-management': [
+                    'scripts/pages/client-management.js'
+                ]
+            };
+            
+            const scripts = pageScriptMap[pageName];
+            if (!scripts) {
+                console.log(`[LazyLoad] No scripts needed for page: ${pageName}`);
+                return;
+            }
+            
+            // Check if already loaded
+            if (window._loadedPageScripts.has(pageName)) {
+                console.log(`[LazyLoad] Page scripts already loaded for: ${pageName}`);
+                return;
+            }
+            
+            console.log(`[LazyLoad] Loading scripts for page: ${pageName}`);
+            
+            // Load scripts for this page
+            for (const src of scripts) {
+                await window.loadScript(src);
+            }
+            
+            window._loadedPageScripts.add(pageName);
+            console.log(`[LazyLoad] ✓ Page scripts loaded for: ${pageName}`);
         };
     </script>
     <!-- API Base URL (global) -->

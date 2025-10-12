@@ -1673,19 +1673,36 @@
   async function loadDataOnce() {
     if (state.loaded) return;
     try {
-      if (!window.firebaseDB) {
-        console.warn('Firestore not initialized');
+      if (!window.firebaseDB && !window.CacheManager) {
+        console.warn('Firestore and CacheManager not initialized');
         state.data = [];
         state.filtered = [];
         state.loaded = true;
         render();
         return;
       }
-      // Load contacts and accounts in parallel so we can derive accountEmployees from accounts
-      const contactsPromise = window.firebaseDB.collection('contacts').get();
-      const accountsPromise = window.firebaseDB.collection('accounts').get().catch(() => null);
-      const [contactsSnap, accountsSnap] = await Promise.all([contactsPromise, accountsPromise]);
-
+      
+      // Use CacheManager if available, otherwise fallback to direct Firestore
+      let contactsData, accountsData;
+      
+      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+        console.log('[People] Loading data from cache...');
+        const [contacts, accounts] = await Promise.all([
+          window.CacheManager.get('contacts'),
+          window.CacheManager.get('accounts').catch(() => [])
+        ]);
+        contactsData = contacts;
+        accountsData = accounts;
+      } else {
+        console.log('[People] Cache not available, loading from Firestore...');
+        // Fallback: Load contacts and accounts in parallel from Firestore
+        const contactsPromise = window.firebaseDB.collection('contacts').get();
+        const accountsPromise = window.firebaseDB.collection('accounts').get().catch(() => null);
+        const [contactsSnap, accountsSnap] = await Promise.all([contactsPromise, accountsPromise]);
+        contactsData = contactsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        accountsData = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+      }
+      
       // Build quick lookups for accounts → employees
       const accountById = new Map();
       const accountByName = new Map();
@@ -1699,18 +1716,23 @@
         }
         return null;
       };
-      if (accountsSnap && accountsSnap.docs) {
-        for (const doc of accountsSnap.docs) {
-          const data = doc.data() || {};
-          accountById.set(doc.id, data);
-          const name = (data.accountName || data.name || data.companyName || '').toString().trim();
-          if (name) accountByName.set(normalize(name), data);
+      
+      // Process accounts data (works with both arrays and Firestore snapshots)
+      const accountsArray = Array.isArray(accountsData) ? accountsData : (accountsData && accountsData.docs ? accountsData.docs.map(d => ({ id: d.id, ...d.data() })) : []);
+      for (const acc of accountsArray) {
+        if (acc && acc.id) {
+          accountById.set(acc.id, acc);
+          const name = (acc.accountName || acc.name || acc.companyName || '').toString().trim();
+          if (name) accountByName.set(normalize(name), acc);
         }
       }
 
+      // Process contacts data (works with both arrays and Firestore snapshots)
+      const contactsArray = Array.isArray(contactsData) ? contactsData : (contactsData && contactsData.docs ? contactsData.docs.map(d => ({ id: d.id, ...d.data() })) : []);
+      
       // Map contacts and inject derived accountEmployees from accounts by id or name
-      state.data = contactsSnap.docs.map((d) => {
-        const c = { id: d.id, ...d.data() };
+      state.data = contactsArray.map((c) => {
+        // c is already an object with id and data
         // Locate matching account by id or name
         let acc = null;
         if (c.accountId && accountById.has(c.accountId)) {
@@ -2752,6 +2774,12 @@
           const fresh = [];
           snap.forEach((doc) => { fresh.push({ id: doc.id, ...doc.data() }); });
           state.data = fresh;
+          
+          // Update cache with real-time changes
+          if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+            window.CacheManager.set('contacts', fresh).catch(() => {});
+          }
+          
           applyFilters();
         } catch (_) { /* noop */ }
       }, (err) => {

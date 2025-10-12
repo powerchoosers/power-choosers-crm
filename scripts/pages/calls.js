@@ -119,16 +119,23 @@ var console = {
           }
         }
       }
-      // Fallback: attempt lightweight Firestore lookup once and cache
-      if (phone10 && window.firebaseDB && !findAccountByPhone._cache) {
+      // Fallback: attempt lightweight cache or Firestore lookup once and cache
+      if (phone10 && (window.CacheManager || window.firebaseDB) && !findAccountByPhone._cache) {
         findAccountByPhone._cache = { ready:false, map:new Map() };
         (async ()=>{
           try{
-            const snap = await window.firebaseDB.collection('accounts').limit(500).get();
-            snap.forEach(doc=>{
-              const d = doc.data()||{};
+            let accounts = [];
+            // Try CacheManager first, fallback to Firestore
+            if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+              accounts = await window.CacheManager.get('accounts');
+            } else if (window.firebaseDB) {
+              const snap = await window.firebaseDB.collection('accounts').limit(500).get();
+              accounts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            }
+            
+            accounts.forEach(d=>{
               const ph = normPhone(d.companyPhone||d.phone||d.primaryPhone||d.mainPhone);
-              if (ph && !findAccountByPhone._cache.map.has(ph)) findAccountByPhone._cache.map.set(ph,{ id:doc.id, ...d });
+              if (ph && !findAccountByPhone._cache.map.has(ph)) findAccountByPhone._cache.map.set(ph,{ id:d.id, ...d });
             });
             findAccountByPhone._cache.ready = true;
           }catch(_){ /* ignore */ }
@@ -164,58 +171,55 @@ var console = {
           _phoneToContactCache = map; return map;
         }
       }
-      // 2) Fallback to Firestore (limited) to populate essential mappings
-      if (window.firebaseDB){
+      // 2) Fallback to cache or Firestore to populate essential mappings
+      if (window.CacheManager || window.firebaseDB){
         const map = new Map();
         const norm = (p)=>(p||'').toString().replace(/\D/g,'').slice(-10);
-        // Query contacts with phone
-        try{
-          const snap1 = await window.firebaseDB.collection('contacts').where('phone','!=',null).limit(500).get();
-          snap1.forEach(doc=>{
-            const d = doc.data()||{};
-            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
-            const title = d.title || '';
-            const company = d.companyName || d.accountName || '';
-            const ph = norm(d.phone);
-            if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
-          });
-        }catch(_){ /* ignore */ }
-        // Query contacts with mobile
-        try{
-          const snap2 = await window.firebaseDB.collection('contacts').where('mobile','!=',null).limit(500).get();
-          snap2.forEach(doc=>{
-            const d = doc.data()||{};
-            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
-            const title = d.title || '';
-            const company = d.companyName || d.accountName || '';
-            const ph = norm(d.mobile);
-            if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
-          });
-        }catch(_){ /* ignore */ }
-        // Query contacts with workDirectPhone
-        try{
-          const snap3 = await window.firebaseDB.collection('contacts').where('workDirectPhone','!=',null).limit(500).get();
-          snap3.forEach(doc=>{
-            const d = doc.data()||{};
-            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
-            const title = d.title || '';
-            const company = d.companyName || d.accountName || '';
-            const ph = norm(d.workDirectPhone);
-            if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
-          });
-        }catch(_){ /* ignore */ }
-        // Query contacts with otherPhone
-        try{
-          const snap4 = await window.firebaseDB.collection('contacts').where('otherPhone','!=',null).limit(500).get();
-          snap4.forEach(doc=>{
-            const d = doc.data()||{};
-            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
-            const title = d.title || '';
-            const company = d.companyName || d.accountName || '';
-            const ph = norm(d.otherPhone);
-            if (ph && !map.has(ph)) map.set(ph,{ id: doc.id, name, title, company });
-          });
-        }catch(_){ /* ignore */ }
+        
+        let contacts = [];
+        // Try CacheManager first for much faster loading
+        if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+          try {
+            contacts = await window.CacheManager.get('contacts');
+            console.log('[Calls] Loaded', contacts.length, 'contacts from cache for phone mapping');
+          } catch(_){ /* ignore */ }
+        }
+        
+        // Fallback to Firestore if cache not available
+        if (!contacts.length && window.firebaseDB) {
+          // Query contacts with phone
+          try{
+            const snap1 = await window.firebaseDB.collection('contacts').where('phone','!=',null).limit(500).get();
+            snap1.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
+          }catch(_){ /* ignore */ }
+          // Query contacts with mobile
+          try{
+            const snap2 = await window.firebaseDB.collection('contacts').where('mobile','!=',null).limit(500).get();
+            snap2.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
+          }catch(_){ /* ignore */ }
+          // Query contacts with workDirectPhone
+          try{
+            const snap3 = await window.firebaseDB.collection('contacts').where('workDirectPhone','!=',null).limit(500).get();
+            snap3.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
+          }catch(_){ /* ignore */ }
+          // Query contacts with otherPhone
+          try{
+            const snap4 = await window.firebaseDB.collection('contacts').where('otherPhone','!=',null).limit(500).get();
+            snap4.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
+          }catch(_){ /* ignore */ }
+        }
+        
+        // Build map from contacts array
+        for (const d of contacts) {
+          const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
+          const title = d.title || '';
+          const company = d.companyName || d.accountName || '';
+          const phones = [d.phone, d.mobile, d.workDirectPhone, d.otherPhone].map(norm).filter(Boolean);
+          for (const ph of phones) {
+            if (ph && !map.has(ph)) map.set(ph,{ id: d.id, name, title, company });
+          }
+        }
+        
         // Don't filter out company phones - let the attribution logic handle it properly
         // The issue was that filtering out company phones was causing misattribution
         _phoneToContactCache = map; return map;
