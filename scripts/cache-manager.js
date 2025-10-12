@@ -7,7 +7,7 @@ class CacheManager {
     this.dbVersion = 1;
     this.db = null;
     this.cacheExpiry = 5 * 60 * 1000; // 5 minutes in milliseconds
-    this.collections = ['contacts', 'accounts', 'calls', 'tasks', 'sequences', 'lists', 'deals', 'settings'];
+    this.collections = ['contacts', 'accounts', 'calls', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data'];
     this.initPromise = null;
   }
 

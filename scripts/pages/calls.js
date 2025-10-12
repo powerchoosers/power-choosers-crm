@@ -264,7 +264,7 @@ var console = {
 
 function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console, arguments); } catch(_) {} }
 (function () {
-  const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] }, virtual: { enabled: true, rowHeight: 0, headerH: 0, overscan: 4, first: 0, count: 0, rows: [] } };
+  const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, hasAnimated: false, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] }, virtual: { enabled: true, rowHeight: 0, headerH: 0, overscan: 4, first: 0, count: 0, rows: [] } };
   const els = {};
   const chips = [
     { k: 'city', i: 'calls-filter-city', c: 'calls-filter-city-chips', x: 'calls-filter-city-clear', s: 'calls-filter-city-suggest', acc: r => r.contactCity || '' },
@@ -998,13 +998,80 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   async function loadData() {
     // Debug disabled by default for performance; enable by setting localStorage.CRM_DEBUG_CALLS = '1'
     
-    // 1) Try to load real calls from backend - use current origin by default
+    // STEP 1: Try cache first for instant loading
+    if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+      try {
+        const cached = await window.CacheManager.get('calls');
+        // Validate cached data has required enriched fields
+        const isValidCache = cached && cached.length > 0 && cached[0] && 
+                             cached[0].hasOwnProperty('counterpartyPretty') &&
+                             cached[0].hasOwnProperty('direction');
+        
+        if (isValidCache) {
+          console.log('[Calls] Using cached calls:', cached.length);
+          // Sort cached calls by callTime descending
+          cached.sort((a, b) => {
+            const timeA = new Date(a.callTime || 0).getTime();
+            const timeB = new Date(b.callTime || 0).getTime();
+            return timeB - timeA;
+          });
+          state.data = cached;
+          state.filtered = cached.slice();
+          chips.forEach(buildPool);
+          render();
+          // Notify other pages
+          try {
+            document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: cached.length } }));
+          } catch (e) { /* noop */ }
+          return;
+        } else if (cached && cached.length > 0) {
+          console.log('[Calls] Cache exists but invalid (missing enriched fields), reloading from API');
+        }
+      } catch (cacheError) {
+        console.warn('[Calls] Cache error:', cacheError);
+      }
+    }
+    
+    // STEP 2: Cache miss - load from API with progressive loading
     try {
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-      console.log('[Calls] Loading real call data from:', `${base}/api/calls`);
-        const r = await fetch(`${base}/api/calls`, { method: 'GET' });
-        const j = await r.json().catch(()=>({}));
-        if (r.ok && j && j.ok && Array.isArray(j.calls)) {
+      console.log('[Calls] Cache miss, loading from API:', `${base}/api/calls`);
+      
+      // Progressive loading: fetch in batches of 200
+      const batchSize = 200;
+      let offset = 0;
+      let allCalls = [];
+      let hasMore = true;
+      
+      while (hasMore) {
+        const url = `${base}/api/calls?limit=${batchSize}&offset=${offset}`;
+        console.log('[Calls] Fetching batch:', offset, '-', offset + batchSize);
+        
+        const r = await fetch(url, { method: 'GET' });
+        const j = await r.json().catch(() => ({}));
+        
+        if (!r.ok || !j || !j.ok || !Array.isArray(j.calls) || j.calls.length === 0) {
+          hasMore = false;
+          break;
+        }
+        
+        allCalls = [...allCalls, ...j.calls];
+        offset += batchSize;
+        hasMore = j.hasMore === true && j.calls.length === batchSize;
+        
+        // Show progress indicator
+        console.log('[Calls] Loaded', allCalls.length, 'calls...');
+        
+        // Small delay to keep UI responsive
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      console.log('[Calls] Total calls loaded:', allCalls.length);
+      
+      // Process all calls at once
+      if (allCalls.length > 0) {
+        const r = { ok: true, calls: allCalls };
+        const j = r;
           // Build quick phone → contact map from People data (if available), else Firestore
           const phoneToContact = await buildPhoneToContactMap();
 
@@ -1527,9 +1594,27 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
 
             return row;
           });
+          // Sort calls by callTime descending (newest first)
+          rows.sort((a, b) => {
+            const timeA = new Date(a.callTime || 0).getTime();
+            const timeB = new Date(b.callTime || 0).getTime();
+            return timeB - timeA; // Descending order (newest first)
+          });
+          
           // Always use API data, even if empty
           dbgCalls('[Calls] Rows mapped count:', rows.length);
           state.data = rows; state.filtered = rows.slice(); chips.forEach(buildPool); render();
+          
+          // Cache the data for future loads
+          if (window.CacheManager && typeof window.CacheManager.set === 'function' && rows.length > 0) {
+            try {
+              await window.CacheManager.set('calls', rows);
+              console.log('[Calls] Cached', rows.length, 'calls for future loads');
+            } catch (cacheError) {
+              console.warn('[Calls] Failed to cache calls:', cacheError);
+            }
+          }
+          
           // Notify other pages that calls data is loaded (for badge updates)
           try {
             document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: rows.length } }));
@@ -1672,6 +1757,22 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   function render(){ if(!els.tbody) return; const rows=getPageItems();
     // Use virtualization to render only visible rows
     ensureVirtualization(rows);
+    
+    // Trigger fade-zoom animation ONLY on first render
+    if (!state.hasAnimated && els.tbody && rows.length > 0) {
+      els.tbody.classList.remove('animating');
+      void els.tbody.offsetHeight; // Force reflow
+      els.tbody.classList.add('animating');
+      
+      // Mark as animated
+      state.hasAnimated = true;
+      
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        if (els.tbody) els.tbody.classList.remove('animating');
+      }, 400);
+    }
+    
     // DEBUG: header sanity and row sample (silenced unless enabled)
     try {
       const header = document.querySelector('#calls-table thead tr');
@@ -3582,6 +3683,28 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         console.log('No call data found for contact ID:', contactId);
         return null;
       }
+    },
+    // NEW: Allow background loader to update calls data
+    updateCallsData: function(calls) {
+      if (!Array.isArray(calls)) {
+        console.warn('[Calls] updateCallsData: Invalid data, expected array');
+        return;
+      }
+      
+      state.data = calls;
+      state.filtered = calls.slice();
+      
+      console.log('[Calls] Data updated externally:', calls.length, 'calls');
+      
+      // Update filter pools if chips exist
+      if (typeof buildPool === 'function' && Array.isArray(chips)) {
+        chips.forEach(buildPool);
+      }
+      
+      // Re-render if on calls page
+      if (typeof render === 'function' && els.tbody) {
+        render();
+      }
     }
   };
   
@@ -3594,9 +3717,30 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   
   // Listen for new calls being logged to update internal state
   if (!document._callsModuleCallLoggedBound) {
-    document.addEventListener('pc:call-logged', (e) => {
+    document.addEventListener('pc:call-logged', async (e) => {
       try {
         const { call } = e.detail;
+        
+        // Invalidate caches immediately when new call arrives
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          try {
+            await window.CacheManager.invalidate('calls');
+            console.log('[Calls] Invalidated calls cache due to new call');
+          } catch (cacheError) {
+            console.warn('[Calls] Failed to invalidate calls cache:', cacheError);
+          }
+        }
+        
+        // Invalidate badge data cache
+        if (window.BadgeLoader && typeof window.BadgeLoader.invalidate === 'function') {
+          try {
+            await window.BadgeLoader.invalidate();
+            console.log('[Calls] Invalidated badge data cache due to new call');
+          } catch (badgeError) {
+            console.warn('[Calls] Failed to invalidate badge cache:', badgeError);
+          }
+        }
+        
         if (call && state.data) {
           // Add the new call to the beginning of the data array (most recent first)
           state.data.unshift(call);

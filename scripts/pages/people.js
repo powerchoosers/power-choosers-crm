@@ -9,6 +9,13 @@
     selected: new Set(), // ids of selected contacts
     pageSize: 50,
     currentPage: 1,
+    searchMode: false, // NEW - Algolia search active
+    searchQuery: '',   // NEW - Current search query
+    hasMore: false,    // NEW - More records available for pagination
+    lastDoc: null,     // NEW - Last Firestore document for pagination
+    allContactsCache: null, // NEW - Full cache for load more
+    totalCount: 0,     // NEW - Total contacts in database (for footer display)
+    hasAnimated: false, // NEW - Track if initial animation has played
     // Tokenized filters
     titleTokens: [],
     companyTokens: [],
@@ -1185,6 +1192,51 @@
       });
     }
 
+    // Algolia instant search
+    async function performAlgoliaSearch(query) {
+      if (!window.AlgoliaSearch || !window.AlgoliaSearch.isAvailable()) {
+        console.warn('[People] Algolia not available, falling back to local search');
+        applyFilters();
+        return;
+      }
+
+      try {
+        // Show loading state
+        if (els.tableBody) {
+          els.tableBody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Searching...</td></tr>';
+        }
+
+        // Search with Algolia
+        const results = await window.AlgoliaSearch.searchContacts(query, {
+          limit: 100,
+          page: 0
+        });
+
+        console.log('[People] Algolia search results:', results.nbHits, 'contacts found');
+
+        // Map Algolia hits to our data format
+        state.filtered = results.hits.map(hit => ({
+          id: hit.objectID,
+          ...hit
+        }));
+        
+        state.currentPage = 1;
+        
+        // Update search UI
+        if (els.quickSearch) {
+          els.quickSearch.style.borderColor = 'var(--orange-primary)';
+          els.quickSearch.placeholder = `Found ${results.nbHits} contacts...`;
+        }
+        
+        render();
+
+      } catch (error) {
+        console.error('[People] Algolia search failed:', error);
+        // Fallback to local search
+        applyFilters();
+      }
+    }
+
     const reFilter = debounce(applyFilters, 200);
 
   // Select-all checkbox behavior
@@ -1557,7 +1609,23 @@
 
     if (els.applyBtn) els.applyBtn.addEventListener('click', () => { state.currentPage = 1; applyFilters(); });
     if (els.clearBtn) els.clearBtn.addEventListener('click', () => { clearFilters(); state.currentPage = 1; });
-    if (els.quickSearch) els.quickSearch.addEventListener('input', reFilter);
+    if (els.quickSearch) {
+      els.quickSearch.addEventListener('input', async (e) => {
+        const query = e.target.value.trim();
+        
+        if (query.length >= 2) {
+          // SEARCH MODE: Use Algolia instant search
+          state.searchMode = true;
+          state.searchQuery = query;
+          await performAlgoliaSearch(query);
+        } else if (query.length === 0) {
+          // BROWSE MODE: Back to local filtering
+          state.searchMode = false;
+          state.searchQuery = '';
+          reFilter();
+        }
+      });
+    }
 
     // Select-all
     if (els.selectAll) {
@@ -1636,7 +1704,7 @@
 
     // Pagination click handling
     if (els.pagination) {
-      els.pagination.addEventListener('click', (e) => {
+      els.pagination.addEventListener('click', async (e) => {
         const btn = e.target.closest('button.page-btn');
         if (!btn || btn.disabled) return;
         const rel = btn.dataset.rel;
@@ -1647,6 +1715,20 @@
         else if (btn.dataset.page) next = Math.min(total, Math.max(1, parseInt(btn.dataset.page, 10)));
         if (next !== state.currentPage) {
           state.currentPage = next;
+          
+          // SEAMLESS AUTO-LOAD: Check if we need data for this page
+          const neededIndex = (next - 1) * state.pageSize + state.pageSize - 1;
+          if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
+            console.log('[People] Loading more contacts for page', next, '...');
+            
+            // Show brief loading indicator
+            if (els.tbody) {
+              els.tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Loading more contacts...</td></tr>';
+            }
+            
+            await loadMoreContacts(); // Wait for data before rendering
+          }
+          
           render();
           // After page change, scroll the actual scrollable container to top
           try {
@@ -1682,24 +1764,51 @@
         return;
       }
       
-      // Use CacheManager if available, otherwise fallback to direct Firestore
-      let contactsData, accountsData;
+    // PAGINATION: Load only 100 contacts at a time
+    const pageSize = 100;
+    let contactsData, accountsData;
+    
+    // Check if essential data was pre-loaded
+    if (window._essentialContactsData && !window.CacheManager) {
+      console.log('[People] Using pre-loaded essential data');
+      state.allContactsCache = window._essentialContactsData;
+      state.totalCount = window._essentialContactsData.length;
+      contactsData = window._essentialContactsData.slice(0, pageSize);
+      state.hasMore = window._essentialContactsData.length > pageSize;
+      accountsData = window._essentialAccountsData || [];
+    }
+    // Use cache if available
+    else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+      console.log('[People] Loading data from cache...');
+      const [contacts, accounts] = await Promise.all([
+        window.CacheManager.get('contacts'),
+        window.CacheManager.get('accounts').catch(() => [])
+      ]);
       
-      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-        console.log('[People] Loading data from cache...');
-        const [contacts, accounts] = await Promise.all([
-          window.CacheManager.get('contacts'),
-          window.CacheManager.get('accounts').catch(() => [])
-        ]);
-        contactsData = contacts;
-        accountsData = accounts;
+      // Store full cache for "load more" functionality
+      if (contacts && contacts.length > 0) {
+        state.allContactsCache = contacts;
+        state.totalCount = contacts.length; // Store total count for footer
+        // Take only first 100 for initial load
+        contactsData = contacts.slice(0, pageSize);
+        state.hasMore = contacts.length > pageSize;
+        console.log(`[People] Loaded ${contactsData.length} of ${contacts.length} contacts from cache (${state.hasMore ? 'more available' : 'all loaded'})`);
       } else {
-        console.log('[People] Cache not available, loading from Firestore...');
-        // Fallback: Load contacts and accounts in parallel from Firestore
-        const contactsPromise = window.firebaseDB.collection('contacts').get();
-        const accountsPromise = window.firebaseDB.collection('accounts').get().catch(() => null);
-        const [contactsSnap, accountsSnap] = await Promise.all([contactsPromise, accountsPromise]);
+        contactsData = [];
+      }
+      
+      accountsData = accounts;
+    } else {
+        console.log('[People] Cache not available, loading from Firestore with pagination...');
+        // Load contacts with pagination from Firestore
+        const contactsSnap = await window.firebaseDB.collection('contacts').limit(pageSize).get();
         contactsData = contactsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        state.lastDoc = contactsSnap.docs[contactsSnap.docs.length - 1]; // For next page
+        state.hasMore = contactsData.length === pageSize;
+        console.log(`[People] Loaded ${contactsData.length} contacts from Firestore (${state.hasMore ? 'more available' : 'all loaded'})`);
+        
+        // Load accounts (still load all for enrichment lookups)
+        const accountsSnap = await window.firebaseDB.collection('accounts').get().catch(() => null);
         accountsData = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
       }
       
@@ -1795,6 +1904,46 @@
       if (typeof buildSenioritySuggestionPool === 'function') buildSenioritySuggestionPool();
       if (typeof buildDepartmentSuggestionPool === 'function') buildDepartmentSuggestionPool();
       render();
+    }
+  }
+
+  // Load more contacts (pagination)
+  async function loadMoreContacts() {
+    if (!state.hasMore || state.searchMode) return;
+
+    try {
+      console.log('[People] Loading more contacts...');
+      let moreContacts = [];
+
+      // Check if we have cached data first
+      if (state.allContactsCache && state.allContactsCache.length > state.data.length) {
+        const nextBatch = state.allContactsCache.slice(
+          state.data.length,
+          state.data.length + 100
+        );
+        moreContacts = nextBatch;
+        state.hasMore = state.data.length + nextBatch.length < state.allContactsCache.length;
+        console.log(`[People] Loaded ${nextBatch.length} more contacts from cache`);
+      } else if (state.lastDoc) {
+        // Load from Firestore
+        const snapshot = await window.firebaseDB.collection('contacts')
+          .startAfter(state.lastDoc)
+          .limit(100)
+          .get();
+
+        moreContacts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        state.lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        state.hasMore = moreContacts.length === 100;
+        console.log(`[People] Loaded ${moreContacts.length} more contacts from Firestore`);
+      }
+
+      if (moreContacts.length > 0) {
+        state.data = [...state.data, ...moreContacts];
+        applyFilters(); // Re-apply filters with new data
+      }
+
+    } catch (error) {
+      console.error('[People] Failed loading more contacts:', error);
     }
   }
 
@@ -2261,6 +2410,22 @@
     const pageItems = getPageItems();
     const rows = pageItems.map((c) => rowHtml(c)).join('');
     els.tbody.innerHTML = rows || emptyHtml();
+    
+    // Trigger fade-zoom animation ONLY on first render
+    if (!state.hasAnimated && rows) {
+      els.tbody.classList.remove('animating');
+      void els.tbody.offsetHeight; // Force reflow
+      els.tbody.classList.add('animating');
+      
+      // Mark as animated
+      state.hasAnimated = true;
+      
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        if (els.tbody) els.tbody.classList.remove('animating');
+      }, 400);
+    }
+    
     // After render, sync select-all and row selections
     updateRowsCheckedState();
     updateSelectAllState();
@@ -2437,7 +2602,8 @@
           return false; // No phone numbers, don't show badge
         }
         
-        // Get calls data from callsModule
+        // Get calls data from callsModule (already cached by calls page)
+        // This is synchronous and benefits from the IndexedDB cache we implemented
         const callsData = (window.callsModule && typeof window.callsModule.getCallsData === 'function') 
           ? window.callsModule.getCallsData() 
           : [];
@@ -2892,7 +3058,7 @@
 
     // Attach pagination click handling once
     if (els.pagination && !els.pagination.dataset.bound) {
-      els.pagination.addEventListener('click', (e) => {
+      els.pagination.addEventListener('click', async (e) => {
         const btn = e.target.closest('button.page-btn');
         if (!btn || btn.disabled) return;
         const rel = btn.dataset.rel;
@@ -2903,6 +3069,20 @@
         else if (btn.dataset.page) next = Math.min(total, Math.max(1, parseInt(btn.dataset.page, 10)));
         if (next !== state.currentPage) {
           state.currentPage = next;
+          
+          // SEAMLESS AUTO-LOAD: Check if we need data for this page
+          const neededIndex = (next - 1) * state.pageSize + state.pageSize - 1;
+          if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
+            console.log('[People] Loading more contacts for page', next, '...');
+            
+            // Show brief loading indicator
+            if (els.tbody) {
+              els.tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Loading more contacts...</td></tr>';
+            }
+            
+            await loadMoreContacts(); // Wait for data before rendering
+          }
+          
           render();
           // After page change, scroll the actual scrollable container to top
           try {
@@ -3900,7 +4080,10 @@
   }
 
   function getTotalPages() {
-    return Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
+    // In browse mode with more data available, calculate pages based on total count
+    // In search mode, use filtered results
+    const totalRecords = state.searchMode ? state.filtered.length : (state.totalCount || state.filtered.length);
+    return Math.max(1, Math.ceil(totalRecords / state.pageSize));
   }
 
   function getPageItems() {
@@ -3917,7 +4100,8 @@
     const totalPages = getTotalPages();
     const current = Math.min(state.currentPage, totalPages);
     state.currentPage = current;
-    const total = state.filtered.length;
+    // Show total count from database, not just loaded contacts
+    const total = state.searchMode ? state.filtered.length : (state.totalCount || state.filtered.length);
     const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
 

@@ -1103,6 +1103,14 @@
       console.warn('Could not load task from localStorage:', e);
     }
     
+    // If not found, try pre-loaded essential data
+    if (!task && window._essentialTasksData) {
+      task = window._essentialTasksData.find(t => t.id === taskId);
+      if (task) {
+        console.log('[TaskDetail] Using pre-loaded task data');
+      }
+    }
+    
     // If not found, try Firebase
     if (!task && window.firebaseDB) {
       try {

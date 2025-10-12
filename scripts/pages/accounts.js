@@ -9,7 +9,14 @@
     selected: new Set(), // ids of selected accounts
     pageSize: 50,
     currentPage: 1,
-    errorMsg: ''
+    errorMsg: '',
+    searchMode: false, // NEW - Algolia search active
+    searchQuery: '',   // NEW - Current search query
+    hasMore: false,    // NEW - More records available for pagination
+    lastDoc: null,     // NEW - Last Firestore document for pagination
+    allAccountsCache: null, // NEW - Full cache for load more
+    totalCount: 0,     // NEW - Total accounts in database (for footer display)
+    hasAnimated: false // NEW - Track if initial animation has played
   };
 
   // Listen for restore event from back button navigation
@@ -538,6 +545,51 @@
       });
     }
 
+    // Algolia instant search
+    async function performAlgoliaSearch(query) {
+      if (!window.AlgoliaSearch || !window.AlgoliaSearch.isAvailable()) {
+        console.warn('[Accounts] Algolia not available, falling back to local search');
+        applyFilters();
+        return;
+      }
+
+      try {
+        // Show loading state
+        if (els.tbody) {
+          els.tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Searching...</td></tr>';
+        }
+
+        // Search with Algolia
+        const results = await window.AlgoliaSearch.searchAccounts(query, {
+          limit: 100,
+          page: 0
+        });
+
+        console.log('[Accounts] Algolia search results:', results.nbHits, 'accounts found');
+
+        // Map Algolia hits to our data format
+        state.filtered = results.hits.map(hit => ({
+          id: hit.objectID,
+          ...hit
+        }));
+        
+        state.currentPage = 1;
+        
+        // Update search UI
+        if (els.quickSearch) {
+          els.quickSearch.style.borderColor = 'var(--orange-primary)';
+          els.quickSearch.placeholder = `Found ${results.nbHits} accounts...`;
+        }
+        
+        render();
+
+      } catch (error) {
+        console.error('[Accounts] Algolia search failed:', error);
+        // Fallback to local search
+        applyFilters();
+      }
+    }
+
     const reFilter = debounce(applyFilters, 200);
 
     [els.fName, els.fIndustry, els.fDomain].forEach((inp) => {
@@ -549,7 +601,24 @@
 
     if (els.applyBtn) els.applyBtn.addEventListener('click', () => { state.currentPage = 1; applyFilters(); });
     if (els.clearBtn) els.clearBtn.addEventListener('click', () => { clearFilters(); state.currentPage = 1; });
-    if (els.quickSearch) els.quickSearch.addEventListener('input', () => { state.currentPage = 1; reFilter(); });
+    if (els.quickSearch) {
+      els.quickSearch.addEventListener('input', async (e) => {
+        const query = e.target.value.trim();
+        
+        if (query.length >= 2) {
+          // SEARCH MODE: Use Algolia instant search
+          state.searchMode = true;
+          state.searchQuery = query;
+          await performAlgoliaSearch(query);
+        } else if (query.length === 0) {
+          // BROWSE MODE: Back to local filtering
+          state.searchMode = false;
+          state.searchQuery = '';
+          state.currentPage = 1;
+          reFilter();
+        }
+      });
+    }
 
     // Select-all
     if (els.selectAll) {
@@ -638,7 +707,7 @@
 
     // Pagination click handling
     if (els.pagination) {
-      els.pagination.addEventListener('click', (e) => {
+      els.pagination.addEventListener('click', async (e) => {
         const btn = e.target.closest('button.page-btn');
         if (!btn || btn.disabled) return;
         const rel = btn.dataset.rel;
@@ -649,6 +718,20 @@
         else if (btn.dataset.page) next = Math.min(total, Math.max(1, parseInt(btn.dataset.page, 10)));
         if (next !== state.currentPage) {
           state.currentPage = next;
+          
+          // SEAMLESS AUTO-LOAD: Check if we need data for this page
+          const neededIndex = (next - 1) * state.pageSize + state.pageSize - 1;
+          if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
+            console.log('[Accounts] Loading more accounts for page', next, '...');
+            
+            // Show brief loading indicator
+            if (els.tbody) {
+              els.tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Loading more accounts...</td></tr>';
+            }
+            
+            await loadMoreAccounts(); // Wait for data before rendering
+          }
+          
           render();
           // After page change, scroll to the top of the list
           try {
@@ -729,6 +812,46 @@
     }
   }
 
+  // Load more accounts (pagination)
+  async function loadMoreAccounts() {
+    if (!state.hasMore || state.searchMode) return;
+
+    try {
+      console.log('[Accounts] Loading more accounts...');
+      let moreAccounts = [];
+
+      // Check if we have cached data first
+      if (state.allAccountsCache && state.allAccountsCache.length > state.data.length) {
+        const nextBatch = state.allAccountsCache.slice(
+          state.data.length,
+          state.data.length + 100
+        );
+        moreAccounts = nextBatch;
+        state.hasMore = state.data.length + nextBatch.length < state.allAccountsCache.length;
+        console.log(`[Accounts] Loaded ${nextBatch.length} more accounts from cache`);
+      } else if (state.lastDoc) {
+        // Load from Firestore
+        const snapshot = await window.firebaseDB.collection('accounts')
+          .startAfter(state.lastDoc)
+          .limit(100)
+          .get();
+
+        moreAccounts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        state.lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        state.hasMore = moreAccounts.length === 100;
+        console.log(`[Accounts] Loaded ${moreAccounts.length} more accounts from Firestore`);
+      }
+
+      if (moreAccounts.length > 0) {
+        state.data = [...state.data, ...moreAccounts];
+        applyFilters(); // Re-apply filters with new data
+      }
+
+    } catch (error) {
+      console.error('[Accounts] Failed loading more accounts:', error);
+    }
+  }
+
   function debounce(fn, ms) { let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), ms); }; }
 
   async function loadDataOnce() {
@@ -742,24 +865,55 @@
         return;
       }
       
+      // PAGINATION: Load only 100 accounts at a time
+      const pageSize = 100;
+      
+      // Check if essential data was pre-loaded
+      if (window._essentialAccountsData && !window.CacheManager) {
+        console.log('[Accounts] Using pre-loaded essential data');
+        state.allAccountsCache = window._essentialAccountsData;
+        state.totalCount = window._essentialAccountsData.length;
+        state.data = window._essentialAccountsData.slice(0, pageSize);
+        state.hasMore = window._essentialAccountsData.length > pageSize;
+      }
       // Use CacheManager if available, otherwise fallback
-      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+      else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
         console.log('[Accounts] Loading data from cache...');
-        state.data = await window.CacheManager.get('accounts');
+        const cachedAccounts = await window.CacheManager.get('accounts');
+        
+        // Store full cache for "load more" functionality
+        if (cachedAccounts && cachedAccounts.length > 0) {
+          state.allAccountsCache = cachedAccounts;
+          state.totalCount = cachedAccounts.length; // Store total count for footer
+          // Take only first 100 for initial load
+          state.data = cachedAccounts.slice(0, pageSize);
+          state.hasMore = cachedAccounts.length > pageSize;
+          console.log(`[Accounts] Loaded ${state.data.length} of ${cachedAccounts.length} accounts from cache (${state.hasMore ? 'more available' : 'all loaded'})`);
+        } else {
+          state.data = [];
+        }
       } else if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function' && window.currentUserRole) {
-        // Use DataManager for ownership-aware loading with robust fallback
+        // Use DataManager for ownership-aware loading with pagination
         try {
-          console.log('[Accounts] Using DataManager query...');
-          state.data = await window.DataManager.queryWithOwnership('accounts');
+          console.log('[Accounts] Using DataManager query with pagination...');
+          const snap = await window.firebaseDB.collection('accounts').limit(pageSize).get();
+          state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          state.lastDoc = snap.docs[snap.docs.length - 1];
+          state.hasMore = state.data.length === pageSize;
+          console.log(`[Accounts] Loaded ${state.data.length} accounts from Firestore (${state.hasMore ? 'more available' : 'all loaded'})`);
         } catch (error) {
           console.error('[Accounts] DataManager query failed, falling back to direct query:', error);
-          const snap = await window.firebaseDB.collection('accounts').get();
+          const snap = await window.firebaseDB.collection('accounts').limit(pageSize).get();
           state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          state.lastDoc = snap.docs[snap.docs.length - 1];
+          state.hasMore = state.data.length === pageSize;
         }
       } else {
-        console.log('[Accounts] Using fallback query (CacheManager and DataManager not ready)');
-        const snap = await window.firebaseDB.collection('accounts').get();
+        console.log('[Accounts] Using fallback query with pagination...');
+        const snap = await window.firebaseDB.collection('accounts').limit(pageSize).get();
         state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        state.lastDoc = snap.docs[snap.docs.length - 1];
+        state.hasMore = state.data.length === pageSize;
       }
       
       state.filtered = state.data.slice();
@@ -959,6 +1113,22 @@
     const pageItems = getPageItems();
     const rows = pageItems.map((a) => rowHtml(a)).join('');
     els.tbody.innerHTML = rows || emptyHtml();
+    
+    // Trigger fade-zoom animation ONLY on first render
+    if (!state.hasAnimated && rows) {
+      els.tbody.classList.remove('animating');
+      void els.tbody.offsetHeight; // Force reflow
+      els.tbody.classList.add('animating');
+      
+      // Mark as animated
+      state.hasAnimated = true;
+      
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        if (els.tbody) els.tbody.classList.remove('animating');
+      }, 400);
+    }
+    
     updateRowsCheckedState();
     updateSelectAllState();
     renderPagination();
@@ -1204,7 +1374,8 @@
         const phone = normalizePhone(companyPhone);
         if (phone.length !== 10) return false; // Invalid phone number
         
-        // Get calls data from callsModule
+        // Get calls data from callsModule (already cached by calls page)
+        // This is synchronous and benefits from the IndexedDB cache we implemented
         const callsData = (window.callsModule && typeof window.callsModule.getCallsData === 'function') 
           ? window.callsModule.getCallsData() 
           : [];
@@ -1933,7 +2104,12 @@
     updateSelectAllState();
   }
 
-  function getTotalPages() { return Math.max(1, Math.ceil(state.filtered.length / state.pageSize)); }
+  function getTotalPages() { 
+    // In browse mode with more data available, calculate pages based on total count
+    // In search mode, use filtered results
+    const totalRecords = state.searchMode ? state.filtered.length : (state.totalCount || state.filtered.length);
+    return Math.max(1, Math.ceil(totalRecords / state.pageSize)); 
+  }
 
   function getPageItems() {
     const total = state.filtered.length;
@@ -1949,7 +2125,8 @@
     const totalPages = getTotalPages();
     const current = Math.min(state.currentPage, totalPages);
     state.currentPage = current;
-    const total = state.filtered.length;
+    // Show total count from database, not just loaded accounts
+    const total = state.searchMode ? state.filtered.length : (state.totalCount || state.filtered.length);
     const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
 
