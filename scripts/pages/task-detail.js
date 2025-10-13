@@ -2226,30 +2226,53 @@
     }
   }
 
-  // Load recent activity for the task contact
+  // Load recent activity for the task (account or contact)
   async function loadRecentActivityForTask() {
     const timelineEl = document.getElementById('task-activity-timeline');
     if (!timelineEl) return;
     
-    const contactName = state.currentTask?.contact || '';
-    if (!contactName) {
-      timelineEl.innerHTML = `
-        <div class="activity-placeholder">
-          <div class="placeholder-text">No contact specified for this task</div>
-        </div>
-      `;
-      return;
-    }
+    // Check if this is an account task or contact task
+    const isAcctTask = isAccountTask(state.currentTask);
     
-    try {
-      // Use ActivityManager to load real activities for the contact
-      if (window.ActivityManager) {
-        // Find the contact ID from the contact name
-        const contactId = findContactIdByName(contactName);
-        if (contactId) {
-          await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId);
+    if (isAcctTask) {
+      // ACCOUNT TASK - Load account activities
+      const accountName = state.currentTask?.account || '';
+      const accountId = state.currentTask?.accountId || '';
+      
+      if (!accountName && !accountId) {
+        timelineEl.innerHTML = `
+          <div class="activity-placeholder">
+            <div class="placeholder-text">No account specified for this task</div>
+          </div>
+        `;
+        return;
+      }
+      
+      try {
+        if (window.ActivityManager) {
+          // Find the account ID
+          let finalAccountId = accountId;
+          if (!finalAccountId && accountName) {
+            const account = findAccountByIdOrName('', accountName);
+            finalAccountId = account?.id || '';
+          }
+          
+          if (finalAccountId) {
+            await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId);
+          } else {
+            // Show empty state if account not found
+            timelineEl.innerHTML = `
+              <div class="activity-placeholder">
+                <div class="placeholder-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1v6m0 6v6"/>
+                  </svg>
+                </div>
+                <div class="placeholder-text">No recent activity</div>
+              </div>
+            `;
+          }
         } else {
-          // Show empty state if contact not found
           timelineEl.innerHTML = `
             <div class="activity-placeholder">
               <div class="placeholder-icon">
@@ -2261,26 +2284,68 @@
             </div>
           `;
         }
-      } else {
-        // Show empty state if ActivityManager not available
+      } catch (error) {
+        console.error('Error loading account activity:', error);
         timelineEl.innerHTML = `
           <div class="activity-placeholder">
-            <div class="placeholder-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 1v6m0 6v6"/>
-              </svg>
-            </div>
-            <div class="placeholder-text">No recent activity</div>
+            <div class="placeholder-text">Error loading activity</div>
           </div>
         `;
       }
-    } catch (error) {
-      console.error('Error loading recent activity:', error);
-      timelineEl.innerHTML = `
-        <div class="activity-placeholder">
-          <div class="placeholder-text">Error loading activity</div>
-        </div>
-      `;
+    } else {
+      // CONTACT TASK - Load contact activities
+      const contactName = state.currentTask?.contact || '';
+      
+      if (!contactName) {
+        timelineEl.innerHTML = `
+          <div class="activity-placeholder">
+            <div class="placeholder-text">No contact specified for this task</div>
+          </div>
+        `;
+        return;
+      }
+      
+      try {
+        // Use ActivityManager to load real activities for the contact
+        if (window.ActivityManager) {
+          // Find the contact ID from the contact name
+          const contactId = findContactIdByName(contactName);
+          if (contactId) {
+            await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId);
+          } else {
+            // Show empty state if contact not found
+            timelineEl.innerHTML = `
+              <div class="activity-placeholder">
+                <div class="placeholder-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1v6m0 6v6"/>
+                  </svg>
+                </div>
+                <div class="placeholder-text">No recent activity</div>
+              </div>
+            `;
+          }
+        } else {
+          // Show empty state if ActivityManager not available
+          timelineEl.innerHTML = `
+            <div class="activity-placeholder">
+              <div class="placeholder-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1v6m0 6v6"/>
+                </svg>
+              </div>
+              <div class="placeholder-text">No recent activity</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading contact activity:', error);
+        timelineEl.innerHTML = `
+          <div class="activity-placeholder">
+            <div class="placeholder-text">Error loading activity</div>
+          </div>
+        `;
+      }
     }
   }
   
