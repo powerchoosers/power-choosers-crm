@@ -129,7 +129,7 @@ var console = {
             if (window.CacheManager && typeof window.CacheManager.get === 'function') {
               accounts = await window.CacheManager.get('accounts');
             } else if (window.firebaseDB) {
-              const snap = await window.firebaseDB.collection('accounts').limit(500).get();
+            const snap = await window.firebaseDB.collection('accounts').limit(500).get();
               accounts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             }
             
@@ -187,33 +187,33 @@ var console = {
         
         // Fallback to Firestore if cache not available
         if (!contacts.length && window.firebaseDB) {
-          // Query contacts with phone
-          try{
-            const snap1 = await window.firebaseDB.collection('contacts').where('phone','!=',null).limit(500).get();
+        // Query contacts with phone
+        try{
+          const snap1 = await window.firebaseDB.collection('contacts').where('phone','!=',null).limit(500).get();
             snap1.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
-          }catch(_){ /* ignore */ }
-          // Query contacts with mobile
-          try{
-            const snap2 = await window.firebaseDB.collection('contacts').where('mobile','!=',null).limit(500).get();
+        }catch(_){ /* ignore */ }
+        // Query contacts with mobile
+        try{
+          const snap2 = await window.firebaseDB.collection('contacts').where('mobile','!=',null).limit(500).get();
             snap2.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
-          }catch(_){ /* ignore */ }
-          // Query contacts with workDirectPhone
-          try{
-            const snap3 = await window.firebaseDB.collection('contacts').where('workDirectPhone','!=',null).limit(500).get();
+        }catch(_){ /* ignore */ }
+        // Query contacts with workDirectPhone
+        try{
+          const snap3 = await window.firebaseDB.collection('contacts').where('workDirectPhone','!=',null).limit(500).get();
             snap3.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
-          }catch(_){ /* ignore */ }
-          // Query contacts with otherPhone
-          try{
-            const snap4 = await window.firebaseDB.collection('contacts').where('otherPhone','!=',null).limit(500).get();
+        }catch(_){ /* ignore */ }
+        // Query contacts with otherPhone
+        try{
+          const snap4 = await window.firebaseDB.collection('contacts').where('otherPhone','!=',null).limit(500).get();
             snap4.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
           }catch(_){ /* ignore */ }
         }
         
         // Build map from contacts array
         for (const d of contacts) {
-          const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
-          const title = d.title || '';
-          const company = d.companyName || d.accountName || '';
+            const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || (d.name||'');
+            const title = d.title || '';
+            const company = d.companyName || d.accountName || '';
           const phones = [d.phone, d.mobile, d.workDirectPhone, d.otherPhone].map(norm).filter(Boolean);
           for (const ph of phones) {
             if (ph && !map.has(ph)) map.set(ph,{ id: d.id, name, title, company });
@@ -1034,7 +1034,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     
     // STEP 2: Check background loader before API
     let allCalls = [];
-    const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
     
     if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
       const bgData = window.BackgroundCallsLoader.getCallsData();
@@ -3826,7 +3826,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           if (typeof render === 'function' && els.tbody) {
             console.log('[Calls] Re-rendering page with new call');
             render();
-          }
+        }
         }
       } catch (err) {
         console.error('[Calls] Error handling pc:call-logged event:', err);
