@@ -908,44 +908,46 @@
     }
 
     // Merge updates from contact-detail saves
-    if (!els.page._contactUpdatedHandler) els.page._contactUpdatedHandler = function (ev) {
-      try {
-        const detail = ev && ev.detail ? ev.detail : {};
-        const id = detail.id;
-        const changes = detail.changes || {};
-        if (!id) return;
-        let changed = false;
-        // Update in state.data
-        for (let i = 0; i < state.data.length; i++) {
-          const c = state.data[i];
-          if (c && c.id === id) {
-            Object.assign(c, changes);
-            changed = true;
-            break;
+    if (!els.page._contactUpdatedHandler) {
+      els.page._contactUpdatedHandler = function (ev) {
+        try {
+          const detail = ev && ev.detail ? ev.detail : {};
+          const id = detail.id;
+          const changes = detail.changes || {};
+          if (!id) return;
+          let changed = false;
+          // Update in state.data
+          for (let i = 0; i < state.data.length; i++) {
+            const c = state.data[i];
+            if (c && c.id === id) {
+              Object.assign(c, changes);
+              changed = true;
+              break;
+            }
           }
-        }
-        // Update in filtered slice as well (shallow merge by id)
-        for (let i = 0; i < state.filtered.length; i++) {
-          const c = state.filtered[i];
-          if (c && c.id === id) {
-            Object.assign(c, changes);
-            break;
+          // Update in filtered slice as well (shallow merge by id)
+          for (let i = 0; i < state.filtered.length; i++) {
+            const c = state.filtered[i];
+            if (c && c.id === id) {
+              Object.assign(c, changes);
+              break;
+            }
           }
-        }
-        if (changed) {
-          // Rebuild suggestion pools as values may have changed
-          if (typeof buildTitleSuggestionPool === 'function') buildTitleSuggestionPool();
-          if (typeof buildCompanySuggestionPool === 'function') buildCompanySuggestionPool();
-          if (typeof buildCitySuggestionPool === 'function') buildCitySuggestionPool();
-          if (typeof buildStateSuggestionPool === 'function') buildStateSuggestionPool();
-          if (typeof buildEmployeesSuggestionPool === 'function') buildEmployeesSuggestionPool();
-          if (typeof buildIndustrySuggestionPool === 'function') buildIndustrySuggestionPool();
-          if (typeof buildVisitorDomainSuggestionPool === 'function') buildVisitorDomainSuggestionPool();
-          applyFilters();
-        }
-      } catch (_) { /* noop */ }
-    };
-    document.addEventListener('pc:contact-updated', els.page._contactUpdatedHandler);
+          if (changed) {
+            // Rebuild suggestion pools as values may have changed
+            if (typeof buildTitleSuggestionPool === 'function') buildTitleSuggestionPool();
+            if (typeof buildCompanySuggestionPool === 'function') buildCompanySuggestionPool();
+            if (typeof buildCitySuggestionPool === 'function') buildCitySuggestionPool();
+            if (typeof buildStateSuggestionPool === 'function') buildStateSuggestionPool();
+            if (typeof buildEmployeesSuggestionPool === 'function') buildEmployeesSuggestionPool();
+            if (typeof buildIndustrySuggestionPool === 'function') buildIndustrySuggestionPool();
+            if (typeof buildVisitorDomainSuggestionPool === 'function') buildVisitorDomainSuggestionPool();
+            applyFilters();
+          }
+        } catch (_) { /* noop */ }
+      };
+      document.addEventListener('pc:contact-updated', els.page._contactUpdatedHandler);
+    }
 
     return true;
   }
@@ -2867,7 +2869,8 @@
   }
 
   // Listen for call completion to remove "No Calls" badges in real-time
-  try {
+  if (!document._peopleCallLoggedBound) {
+    document._peopleCallLoggedBound = true;
     document.addEventListener('pc:call-logged', (event) => {
       const { call, targetPhone, accountId, contactId } = event.detail || {};
       console.log('[People] Call logged event received:', { targetPhone, accountId, contactId });
@@ -2937,8 +2940,6 @@
       
       console.log('[People] Total badges removed:', badgesRemoved);
     });
-  } catch (error) {
-    console.error('[People] Error setting up call-logged listener:', error);
   }
 
   // Live listener to keep People table in sync without navigation

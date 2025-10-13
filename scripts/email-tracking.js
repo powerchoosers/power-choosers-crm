@@ -6,6 +6,8 @@
 class EmailTrackingManager {
     constructor() {
         this.db = null;
+        this._unsubscribers = []; // Track all onSnapshot unsubscribers to prevent duplicates
+        this._emailsUnsubscriber = null; // Guard for main emails onSnapshot
         this.init();
     }
 
@@ -329,29 +331,55 @@ class EmailTrackingManager {
 
             // If callback is provided, set up real-time listener
             if (callback) {
-                return this.db.collection('emails')
-                    .orderBy('createdAt', 'desc')
-                    .limit(100)
-                    .onSnapshot((snapshot) => {
-                        const emails = [];
-                        snapshot.forEach(doc => {
-                            const data = doc.data();
-                            emails.push({
-                                id: doc.id,
-                                ...data
+                // Guard to prevent duplicate onSnapshot subscriptions
+                if (!this._emailsUnsubscriber) {
+                    this._emailsUnsubscriber = this.db.collection('emails')
+                        .orderBy('createdAt', 'desc')
+                        .limit(100)
+                        .onSnapshot((snapshot) => {
+                            const emails = [];
+                            
+                            // Dispatch events for new emails (real-time updates)
+                            snapshot.docChanges().forEach(change => {
+                                if (change.type === 'added') {
+                                    const emailData = { id: change.doc.id, ...change.doc.data() };
+                                    // Determine if sent or received email
+                                    if (emailData.emailType === 'sent' || emailData.isSentEmail || emailData.type === 'sent') {
+                                        document.dispatchEvent(new CustomEvent('pc:email-sent', { 
+                                            detail: emailData 
+                                        }));
+                                        console.log('[EmailTracking] Dispatched pc:email-sent event');
+                                    } else {
+                                        document.dispatchEvent(new CustomEvent('pc:email-received', { 
+                                            detail: emailData 
+                                        }));
+                                        console.log('[EmailTracking] Dispatched pc:email-received event');
+                                    }
+                                }
                             });
-                        });
+                            
+                            snapshot.forEach(doc => {
+                                const data = doc.data();
+                                emails.push({
+                                    id: doc.id,
+                                    ...data
+                                });
+                            });
 
-                        // If no emails in database, return demo data
-                        if (emails.length === 0) {
+                            // If no emails in database, return demo data
+                            if (emails.length === 0) {
+                                callback(this.getDemoSentEmails());
+                            } else {
+                                callback(emails);
+                            }
+                        }, (error) => {
+                            console.error('[EmailTracking] Real-time listener error:', error);
                             callback(this.getDemoSentEmails());
-                        } else {
-                            callback(emails);
-                        }
-                    }, (error) => {
-                        console.error('[EmailTracking] Real-time listener error:', error);
-                        callback(this.getDemoSentEmails());
-                    });
+                        });
+                    
+                    console.log('[EmailTracking] Real-time email listener initialized (one-time)');
+                }
+                return this._emailsUnsubscriber;
             }
 
             // One-time fetch
@@ -645,7 +673,8 @@ class EmailTrackingManager {
                 return null;
             }
 
-            return this.db.collection('emails')
+            // Guard and track subscription to prevent duplicates
+            const unsubscribe = this.db.collection('emails')
                 .orderBy('updatedAt', 'desc')
                 .onSnapshot((snapshot) => {
                     const emails = [];
@@ -660,6 +689,12 @@ class EmailTrackingManager {
                 }, (error) => {
                     console.error('[EmailTracking] Subscription error:', error);
                 });
+            
+            // Track unsubscriber
+            this._unsubscribers.push(unsubscribe);
+            console.log('[EmailTracking] Email subscription created, total subscriptions:', this._unsubscribers.length);
+            
+            return unsubscribe; // Allow caller to unsubscribe
 
         } catch (error) {
             console.error('[EmailTracking] Subscribe error:', error);

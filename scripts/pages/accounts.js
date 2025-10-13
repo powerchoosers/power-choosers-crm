@@ -2228,7 +2228,8 @@
   }
 
   // Listen for call completion to remove "No Calls" badges in real-time
-  try {
+  if (!document._accountsCallLoggedBound) {
+    document._accountsCallLoggedBound = true;
     document.addEventListener('pc:call-logged', (event) => {
       const { call, targetPhone, accountId, contactId } = event.detail || {};
       console.log('[Accounts] Call logged event received:', { targetPhone, accountId, contactId });
@@ -2300,8 +2301,6 @@
       
       console.log('[Accounts] Total badges removed:', badgesRemoved);
     });
-  } catch (error) {
-    console.error('[Accounts] Error setting up call-logged listener:', error);
   }
 
   window.accountsModule = {
