@@ -246,10 +246,11 @@ const generalSchema = {
       properties: {
         subject: { type: "string", description: "Email subject under 50 chars" },
         greeting: { type: "string", description: "Hello {firstName}," },
-        sections: { type: "array", items: { type: "string" }, description: "1-5 content blocks" },
+        sections: { type: "array", items: { type: "string" }, description: "1-5 one-sentence content points" },
+        list_header: { type: "string", description: "Header for sections list, e.g. 'How We Can Help:', 'Key Benefits:', 'Why This Matters:'" },
         cta_text: { type: "string", description: "Call to action" }
       },
-      required: ["subject", "greeting", "sections", "cta_text"],
+      required: ["subject", "greeting", "sections", "list_header", "cta_text"],
       additionalProperties: false
     }
   }
@@ -382,8 +383,14 @@ Generate text for these fields:
 TEMPLATE: General Purpose Email
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- sections: Array of 2-4 content paragraphs (each 2-4 sentences)
-- cta_text: Appropriate call to action based on context`
+- sections: Array of 2-5 content points - EACH MUST BE EXACTLY ONE SENTENCE (no multi-sentence items)
+- list_header: Choose a contextual header for the list section based on email content (e.g., "How We Can Help:", "Key Benefits:", "Why This Matters:", "What to Expect:", "Our Approach:")
+- cta_text: Appropriate call to action based on context
+
+CRITICAL RULES:
+- Each item in sections array = ONE SENTENCE ONLY
+- list_header must be relevant to the specific email content, not generic
+- Keep sections concise and actionable`
     };
 
     return basePrompt + (templateInstructions[templateType] || templateInstructions.general);
