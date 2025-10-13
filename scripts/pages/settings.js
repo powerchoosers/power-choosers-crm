@@ -1,67 +1,6 @@
 // Power Choosers CRM - Settings Page
 // Handles settings management and configuration
 
-// Phone number formatting helper functions
-function parsePhoneWithExtension(input) {
-    const raw = (input || '').toString().trim();
-    if (!raw) return { number: '', extension: '' };
-    
-    // Common extension patterns
-    const extensionPatterns = [
-        /ext\.?\s*(\d+)/i,
-        /extension\s*(\d+)/i,
-        /x\.?\s*(\d+)/i,
-        /#\s*(\d+)/i,
-        /\s+(\d{3,6})\s*$/  // 3-6 digits at the end (common extension length)
-    ];
-    
-    let number = raw;
-    let extension = '';
-    
-    // Try to find extension using various patterns
-    for (const pattern of extensionPatterns) {
-        const match = number.match(pattern);
-        if (match) {
-            extension = match[1];
-            number = number.slice(0, match.index).trim();
-            break;
-        }
-    }
-    
-    return { number, extension };
-}
-
-function formatPhoneNumberForInput(value) {
-    if (!value) return '';
-    
-    // Parse to separate number and extension
-    const parsed = parsePhoneWithExtension(value);
-    if (!parsed.number) return value;
-    
-    // Format only the main number part
-    const cleaned = parsed.number.replace(/\D/g, '');
-    let formattedNumber = '';
-    
-    if (cleaned.length === 11 && cleaned.startsWith('1')) {
-        formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
-    } else if (cleaned.length === 10) {
-        formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
-    } else if (cleaned.length >= 8) {
-        // For international numbers, just clean up formatting
-        formattedNumber = parsed.number;
-    } else {
-        // Too short, return as-is
-        return value;
-    }
-    
-    // Add extension back if present
-    if (parsed.extension) {
-        return `${formattedNumber} ext. ${parsed.extension}`;
-    }
-    
-    return formattedNumber;
-}
-
 class SettingsPage {
     constructor() {
         this.state = {
@@ -948,28 +887,6 @@ class SettingsPage {
             document.getElementById('new-phone-number')?.focus();
         }, 100);
 
-        // Format phone number as user types
-        const phoneInput = document.getElementById('new-phone-number');
-        if (phoneInput) {
-            phoneInput.addEventListener('input', (e) => {
-                const cursorPosition = e.target.selectionStart;
-                const oldValue = e.target.value;
-                const formatted = formatPhoneNumberForInput(oldValue);
-                
-                if (formatted !== oldValue) {
-                    e.target.value = formatted;
-                    // Try to maintain cursor position
-                    const diff = formatted.length - oldValue.length;
-                    e.target.setSelectionRange(cursorPosition + diff, cursorPosition + diff);
-                }
-            });
-            
-            // Format on blur to ensure final formatting
-            phoneInput.addEventListener('blur', (e) => {
-                e.target.value = formatPhoneNumberForInput(e.target.value);
-            });
-        }
-
         // Cancel button
         document.getElementById('cancel-add-phone')?.addEventListener('click', () => {
             this.hideAddPhoneForm();
@@ -1031,12 +948,9 @@ class SettingsPage {
             return;
         }
 
-        // Format phone number before saving
-        const formattedPhone = formatPhoneNumberForInput(phoneNumber);
-
         // Add to settings
         this.state.settings.twilioNumbers.push({
-            number: formattedPhone,
+            number: phoneNumber,
             label: label
         });
 

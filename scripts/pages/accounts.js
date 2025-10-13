@@ -1374,11 +1374,15 @@
         const phone = normalizePhone(companyPhone);
         if (phone.length !== 10) return false; // Invalid phone number
         
-        // Get calls data from callsModule (already cached by calls page)
-        // This is synchronous and benefits from the IndexedDB cache we implemented
-        const callsData = (window.callsModule && typeof window.callsModule.getCallsData === 'function') 
-          ? window.callsModule.getCallsData() 
-          : [];
+        // Get calls data - check background loader first, then callsModule
+        let callsData = [];
+        if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
+          callsData = window.BackgroundCallsLoader.getCallsData() || [];
+        }
+        // Fallback to callsModule if available (when calls page has been visited)
+        if (callsData.length === 0 && window.callsModule && typeof window.callsModule.getCallsData === 'function') {
+          callsData = window.callsModule.getCallsData() || [];
+        }
         
         if (!callsData || callsData.length === 0) return true; // No calls in system, show badge
         
@@ -1512,12 +1516,15 @@
   function init() {
     if (!initDomRefs()) return;
     
-    // FORCE REFRESH BADGES: Clear and reload calls data to ensure badges are accurate
+    // FORCE REFRESH BADGES: Check calls data availability from background loader or callsModule
     // This ensures badges update when navigating back to the page after placing a call
-    if (window.callsModule && typeof window.callsModule.getCallsData === 'function') {
-      const callsData = window.callsModule.getCallsData();
-      console.log('[Accounts] Page init - calls data available:', callsData?.length || 0, 'calls');
+    let callsData = [];
+    if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
+      callsData = window.BackgroundCallsLoader.getCallsData() || [];
+    } else if (window.callsModule && typeof window.callsModule.getCallsData === 'function') {
+      callsData = window.callsModule.getCallsData() || [];
     }
+    console.log('[Accounts] Page init - calls data available:', callsData?.length || 0, 'calls');
     
     // Load saved order and prep header
     accountsColumnOrder = loadAccountsColumnOrder();

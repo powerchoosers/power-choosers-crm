@@ -15,6 +15,7 @@
 (function() {
   let isLoading = false;
   let loadedCount = 0;
+  let callsData = []; // Store calls for badge system
   
   async function loadCallsInBackground() {
     if (isLoading) {
@@ -49,11 +50,12 @@
           offset += batchSize;
           batchCount++;
           
-          // Update calls module with progressive data
+          // Store for badge system access
+          callsData = allCalls;
+          
+          // Update calls module if it's loaded
           if (window.callsModule && typeof window.callsModule.updateCallsData === 'function') {
             window.callsModule.updateCallsData(allCalls);
-          } else {
-            console.warn('[BackgroundCallsLoader] callsModule.updateCallsData not available');
           }
           
           // Notify badge system
@@ -86,6 +88,7 @@
       
       console.log(`[BackgroundCallsLoader] ✓ Complete: ${allCalls.length} calls loaded in ${batchCount} batches`);
       loadedCount = allCalls.length;
+      callsData = allCalls; // Store final data
       
       // Final notification
       try {
@@ -96,10 +99,10 @@
         console.warn('[BackgroundCallsLoader] Failed to dispatch completion event:', e);
       }
       
-      // Cache the loaded data
+      // Cache the loaded data for future loads
       if (window.CacheManager && typeof window.CacheManager.set === 'function' && allCalls.length > 0) {
         try {
-          await window.CacheManager.set('calls', allCalls);
+          await window.CacheManager.set('calls-raw', allCalls);
           console.log('[BackgroundCallsLoader] Cached', allCalls.length, 'calls for future loads');
         } catch (cacheError) {
           console.warn('[BackgroundCallsLoader] Failed to cache calls:', cacheError);
@@ -117,9 +120,29 @@
   window.BackgroundCallsLoader = {
     start: loadCallsInBackground,
     isLoading: () => isLoading,
-    getLoadedCount: () => loadedCount
+    getLoadedCount: () => loadedCount,
+    getCallsData: () => callsData // For badge system
   };
   
   console.log('[BackgroundCallsLoader] Module initialized');
+  
+  // Try to load from cache immediately for instant badge access
+  (async function() {
+    if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+      try {
+        const cached = await window.CacheManager.get('calls-raw');
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+          callsData = cached;
+          console.log('[BackgroundCallsLoader] Loaded', cached.length, 'calls from cache');
+          // Notify that cached data is available
+          document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
+            detail: { count: cached.length, partial: false, cached: true } 
+          }));
+        }
+      } catch (e) {
+        console.warn('[BackgroundCallsLoader] Cache load failed:', e);
+      }
+    }
+  })();
 })();
 

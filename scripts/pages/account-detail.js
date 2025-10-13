@@ -1220,10 +1220,23 @@
       });
       
       // Listen for new calls
-      document.addEventListener('pc:call-created', (event) => {
+      document.addEventListener('pc:call-logged', (event) => {
         const callData = event.detail;
-        if (callData && callData.accountId === state.currentAccount?.id) {
-          // Use debounced refresh to prevent freeze
+        if (callData && (callData.accountId === state.currentAccount?.id || 
+                          callData.call?.accountId === state.currentAccount?.id)) {
+          console.log('[AccountDetail] Call logged for this account, refreshing activities');
+          
+          // Immediately refresh recent calls section
+          if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
+            window.ActivityManager.renderActivities(
+              'account-activity-timeline', 
+              'account', 
+              state.currentAccount.id,
+              true // force refresh
+            );
+          }
+          
+          // Also use debounced refresh as backup
           onAnyAccountCallActivity();
         }
       });
@@ -2569,12 +2582,64 @@
 
     // Listen for contact creation events to refresh the contacts list
     document.addEventListener('pc:contact-created', (e) => {
-      if (state.currentAccount) {
+      if (state.currentAccount && e.detail) {
+        const newContact = e.detail.contact || e.detail.doc;
+        
+        // Inject into essential data if not already there
+        if (newContact && window._essentialContactsData) {
+          const exists = window._essentialContactsData.find(c => c.id === newContact.id);
+          if (!exists) {
+            window._essentialContactsData.push(newContact);
+            console.log('[AccountDetail] Added new contact to essential data');
+          }
+        }
+        
         // Refresh the contacts list
         const contactsList = document.getElementById('account-contacts-list');
         if (contactsList) {
           contactsList.innerHTML = renderAccountContacts(state.currentAccount);
           // Re-bind event handlers for the new contact items
+          bindContactItemEvents();
+        }
+      }
+    });
+
+    // Listen for contact updates to refresh the contacts list
+    document.addEventListener('pc:contact-updated', (e) => {
+      if (state.currentAccount && e.detail) {
+        const contactId = e.detail.id;
+        const changes = e.detail.changes || {};
+        
+        // Update the contact in essential data
+        if (window._essentialContactsData) {
+          const idx = window._essentialContactsData.findIndex(c => c.id === contactId);
+          if (idx >= 0) {
+            window._essentialContactsData[idx] = {
+              ...window._essentialContactsData[idx],
+              ...changes
+            };
+            console.log('[AccountDetail] Updated contact in essential data');
+          }
+        }
+        
+        // Update cache
+        if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+          window.CacheManager.get('contacts').then(contacts => {
+            if (contacts) {
+              const idx = contacts.findIndex(c => c.id === contactId);
+              if (idx >= 0) {
+                contacts[idx] = { ...contacts[idx], ...changes };
+                window.CacheManager.set('contacts', contacts);
+                console.log('[AccountDetail] Updated contact in cache');
+              }
+            }
+          }).catch(() => {});
+        }
+        
+        // Refresh contacts list display
+        const contactsList = document.getElementById('account-contacts-list');
+        if (contactsList) {
+          contactsList.innerHTML = renderAccountContacts(state.currentAccount);
           bindContactItemEvents();
         }
       }

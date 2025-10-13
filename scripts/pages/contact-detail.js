@@ -618,9 +618,42 @@
       }
       // Update local state
       try { Object.assign(state.currentContact, updates); } catch (_) {}
+      
+      // IMMEDIATELY update essential data
+      if (window._essentialContactsData) {
+        const idx = window._essentialContactsData.findIndex(c => c.id === id);
+        if (idx >= 0) {
+          window._essentialContactsData[idx] = {
+            ...window._essentialContactsData[idx],
+            ...updates
+          };
+          console.log('[ContactDetail] Updated essential data');
+        }
+      }
+      
+      // IMMEDIATELY update cache
+      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+        window.CacheManager.get('contacts').then(contacts => {
+          if (contacts && Array.isArray(contacts)) {
+            const idx = contacts.findIndex(c => c.id === id);
+            if (idx >= 0) {
+              contacts[idx] = { ...contacts[idx], ...updates };
+              window.CacheManager.set('contacts', contacts);
+              console.log('[ContactDetail] Updated cache');
+            }
+          }
+        }).catch(() => {});
+      }
+      
       // Notify other pages
       try {
-        const ev = new CustomEvent('pc:contact-updated', { detail: { id, changes: { ...updates } } });
+        const ev = new CustomEvent('pc:contact-updated', { 
+          detail: { 
+            id, 
+            changes: { ...updates },
+            contact: state.currentContact  // Full updated contact
+          } 
+        });
         document.dispatchEvent(ev);
       } catch (_) { /* noop */ }
       // Feedback and refresh UI
@@ -1897,6 +1930,29 @@
         }, 100);
       });
     } catch (_) {}
+    
+    // Listen for new calls to this contact
+    try {
+      document.addEventListener('pc:call-logged', (event) => {
+        const callData = event.detail;
+        const currentContactId = state.currentContact?.id;
+        
+        if (currentContactId && (callData.contactId === currentContactId || 
+                                 callData.call?.contactId === currentContactId)) {
+          console.log('[ContactDetail] Call logged for this contact, refreshing activities');
+          
+          // Immediately refresh recent calls section
+          if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
+            window.ActivityManager.renderActivities(
+              'contact-activity-timeline', 
+              'contact', 
+              currentContactId,
+              true // force refresh
+            );
+          }
+        }
+      });
+    } catch (_) { /* noop */ }
     
     // Setup contact loaded listener to ensure event handlers are attached
     try {

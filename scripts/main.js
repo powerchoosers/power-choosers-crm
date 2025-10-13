@@ -576,7 +576,32 @@ class PowerChoosersCRM {
                 createdAt: new Date(),
                 updatedAt: new Date(),
               });
-              document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: uiDoc } }));
+              const newContact = { id: ref.id, ...uiDoc };
+              
+              // IMMEDIATELY inject into essential data
+              if (window._essentialContactsData) {
+                window._essentialContactsData.push(newContact);
+                console.log('[Contact] Added to essential data');
+              }
+              
+              // IMMEDIATELY update cache
+              if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+                window.CacheManager.get('contacts').then(contacts => {
+                  if (contacts && Array.isArray(contacts)) {
+                    contacts.push(newContact);
+                    window.CacheManager.set('contacts', contacts);
+                    console.log('[Contact] Updated cache');
+                  }
+                }).catch(() => {});
+              }
+              
+              document.dispatchEvent(new CustomEvent('pc:contact-created', { 
+                detail: { 
+                  id: ref.id, 
+                  doc: uiDoc,
+                  contact: newContact  // Full contact object for immediate use
+                } 
+              }));
             } catch (_) { /* noop */ }
 
             if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Contact added!');
@@ -1764,6 +1789,29 @@ class PowerChoosersCRM {
         modal._csvHeaders = null;
         modal._csvRows = null;
         modal._importType = 'contacts';
+        
+        // Reset import type radio buttons to contacts
+        const typeInputs = modal.querySelectorAll('input[name="importType"]');
+        typeInputs.forEach(input => {
+            input.checked = (input.value === 'contacts');
+        });
+        
+        // Reset list dropdown selection
+        delete modal.dataset.selectedListId;
+        delete modal.dataset.selectedListName;
+        const trigger = modal.querySelector('#csv-list-trigger .selected-list-name');
+        if (trigger) trigger.textContent = 'No list assignment';
+        const dropdown = modal.querySelector('#csv-list-dropdown');
+        if (dropdown) dropdown.hidden = true;
+        
+        // Clean up event listeners
+        if (modal._csvDropdownCleanup) {
+            modal._csvDropdownCleanup.forEach(cleanup => cleanup());
+            modal._csvDropdownCleanup = [];
+        }
+        
+        // Reset initialization flag
+        modal._csvDropdownInitialized = false;
     }
 
     bindBulkImportEvents(modal) {
@@ -1771,6 +1819,8 @@ class PowerChoosersCRM {
         modal.querySelectorAll('[data-close="bulk-import"]').forEach(btn => {
             btn.addEventListener('click', () => {
                 modal.setAttribute('hidden', '');
+                // Reset modal to initial state for next import
+                this.resetBulkImportModal(modal);
             });
         });
 
@@ -1849,9 +1899,24 @@ class PowerChoosersCRM {
 
     setupImportTypeSelection(modal) {
         const typeInputs = modal.querySelectorAll('input[name="importType"]');
+        
+        // Set initial import type based on which radio is checked
+        const checkedInput = Array.from(typeInputs).find(input => input.checked);
+        if (checkedInput) {
+            modal._importType = checkedInput.value;
+        }
+        
+        // Listen for changes and refresh list dropdown when type changes
         typeInputs.forEach(input => {
             input.addEventListener('change', (e) => {
                 modal._importType = e.target.value;
+                
+                // Refresh list dropdown to show correct kind of lists
+                // Only refresh if we're on step 2 (where the list dropdown is visible)
+                const step2 = modal.querySelector('#csv-step-2');
+                if (step2 && !step2.hidden) {
+                    this.populateListAssignment(modal);
+                }
             });
         });
     }
@@ -1912,6 +1977,8 @@ class PowerChoosersCRM {
         if (finishBtn) {
             finishBtn.addEventListener('click', () => {
                 modal.setAttribute('hidden', '');
+                // Reset modal to initial state for next import
+                this.resetBulkImportModal(modal);
                 // Trigger a page refresh if we're on contacts/accounts page
                 if (this.currentPage === 'people' || this.currentPage === 'accounts') {
                     window.location.reload();
@@ -2229,11 +2296,8 @@ class PowerChoosersCRM {
     }
 
     async populateListAssignment(modal) {
-        const listSelect = modal.querySelector('#csv-assign-list');
-        if (!listSelect) return;
-        
-        // Clear existing options except the first one
-        listSelect.innerHTML = '<option value="">No list assignment</option>';
+        const dropdown = modal.querySelector('#csv-list-dropdown');
+        if (!dropdown) return;
         
         try {
             const db = window.firebaseDB;
@@ -2253,24 +2317,357 @@ class PowerChoosersCRM {
             // Sort by name
             lists.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             
-            // Add list options
+            // Build dropdown HTML
+            let dropdownHTML = `
+                <div class="csv-list-create-form" id="csv-list-create-form">
+                    <div class="form-title">Create New List</div>
+                    <input type="text" class="input-dark" id="csv-new-list-name" placeholder="Enter list name">
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="csv-create-cancel">Cancel</button>
+                        <button type="button" class="btn-primary" id="csv-create-save">Save</button>
+                    </div>
+                </div>
+                <div class="csv-list-items" id="csv-list-items">
+                    <div class="csv-list-item create-new" data-action="create">
+                        <span class="list-name">
+                            <span class="list-icon">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="8" y1="4" x2="8" y2="12"></line>
+                                    <line x1="4" y1="8" x2="12" y2="8"></line>
+                                </svg>
+                            </span>
+                            Create New List
+                        </span>
+                    </div>
+                    <div class="csv-list-item" data-list-id="" data-list-name="No list assignment">
+                        <span class="list-name">No list assignment</span>
+                    </div>
+            `;
+            
+            // Add list items
             lists.forEach(list => {
-                const option = document.createElement('option');
-                option.value = list.id;
-                option.textContent = list.name || 'Unnamed List';
-                listSelect.appendChild(option);
+                const count = list.count || list.recordCount || 0;
+                dropdownHTML += `
+                    <div class="csv-list-item" data-list-id="${this.escapeHtml(list.id)}" data-list-name="${this.escapeHtml(list.name || 'Unnamed List')}">
+                        <span class="list-name">${this.escapeHtml(list.name || 'Unnamed List')}</span>
+                        <span class="list-count">(${count})</span>
+                    </div>
+                `;
             });
+            
+            dropdownHTML += `</div>`;
+            dropdown.innerHTML = dropdownHTML;
+            
+            // Style the dropdown panel itself
+            dropdown.style.borderRadius = 'var(--border-radius)';
+            dropdown.style.border = '1px solid var(--border-light)';
+            dropdown.style.overflow = 'hidden'; // Ensure content respects rounded corners
+            
+            // Ensure create form is hidden by default using inline styles
+            const createForm = dropdown.querySelector('#csv-list-create-form');
+            if (createForm) {
+                createForm.style.display = 'none';
+            }
+            
+            // Apply styles to list items container
+            const listItemsContainer = dropdown.querySelector('#csv-list-items');
+            if (listItemsContainer) {
+                listItemsContainer.style.display = 'flex';
+                listItemsContainer.style.flexDirection = 'column';
+            }
+            
+            // Apply inline styles to all list items for guaranteed styling
+            const allListItems = dropdown.querySelectorAll('.csv-list-item');
+            allListItems.forEach(item => {
+                item.style.display = 'flex';
+                item.style.alignItems = 'center';
+                item.style.justifyContent = 'space-between';
+                item.style.padding = '10px 12px';
+                item.style.cursor = 'pointer';
+                item.style.borderBottom = '1px solid var(--border-light)';
+                item.style.transition = 'background-color 0.15s ease';
+                item.style.color = 'var(--text-primary)';
+                
+                // Style list name and count
+                const listName = item.querySelector('.list-name');
+                const listCount = item.querySelector('.list-count');
+                if (listName) {
+                    listName.style.fontSize = '0.9rem';
+                    listName.style.fontWeight = '500';
+                }
+                if (listCount) {
+                    listCount.style.fontSize = '0.85rem';
+                    listCount.style.color = 'var(--text-secondary)';
+                    listCount.style.opacity = '0.8';
+                }
+                
+                // Special styling for "Create New List"
+                if (item.classList.contains('create-new')) {
+                    item.style.borderBottom = '2px solid var(--border-medium)';
+                    item.style.fontWeight = '600';
+                    item.style.color = 'var(--orange-primary)';
+                    
+                    const icon = item.querySelector('.list-icon');
+                    if (icon) {
+                        icon.style.display = 'inline-flex';
+                        icon.style.alignItems = 'center';
+                        icon.style.marginRight = '6px';
+                    }
+                }
+                
+                // Hover effects
+                item.addEventListener('mouseenter', () => {
+                    if (item.classList.contains('create-new')) {
+                        item.style.background = 'var(--orange-subtle)';
+                        item.style.color = 'white';
+                    } else {
+                        item.style.background = 'var(--grey-800)';
+                    }
+                });
+                
+                item.addEventListener('mouseleave', () => {
+                    if (!item.classList.contains('selected')) {
+                        item.style.background = '';
+                        if (item.classList.contains('create-new')) {
+                            item.style.color = 'var(--orange-primary)';
+                        } else {
+                            item.style.color = 'var(--text-primary)';
+                        }
+                    }
+                });
+            });
+            
+            // Initialize dropdown interaction handlers
+            this.initCustomListDropdown(modal);
             
         } catch (error) {
             console.error('Failed to load lists for assignment:', error);
         }
     }
 
-    async assignToList(db, recordId, modal) {
-        const listSelect = modal.querySelector('#csv-assign-list');
-        if (!listSelect || !listSelect.value) return;
+    initCustomListDropdown(modal) {
+        const trigger = modal.querySelector('#csv-list-trigger');
+        const dropdown = modal.querySelector('#csv-list-dropdown');
+        if (!trigger || !dropdown) return;
         
-        const listId = listSelect.value;
+        // Check if already initialized to prevent duplicate listeners
+        if (modal._csvDropdownInitialized) {
+            return;
+        }
+        modal._csvDropdownInitialized = true;
+
+        // Toggle dropdown on trigger click
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = !dropdown.hidden;
+            
+            if (isOpen) {
+                dropdown.hidden = true;
+                trigger.classList.remove('open');
+            } else {
+                dropdown.hidden = false;
+                trigger.classList.add('open');
+            }
+        });
+
+        // Handle list item clicks
+        dropdown.addEventListener('click', (e) => {
+            const listItem = e.target.closest('.csv-list-item');
+            if (!listItem) return;
+
+            const action = listItem.dataset.action;
+            if (action === 'create') {
+                this.showInlineListCreateForm(modal, dropdown);
+                return;
+            }
+
+            const listId = listItem.dataset.listId || '';
+            const listName = listItem.dataset.listName || 'No list assignment';
+            this.handleListSelection(modal, listId, listName);
+        });
+
+        // Close dropdown when clicking outside
+        const closeDropdown = (e) => {
+            if (!modal.contains(e.target)) return;
+            if (!trigger.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.hidden = true;
+                trigger.classList.remove('open');
+            }
+        };
+        document.addEventListener('click', closeDropdown);
+
+        // Keyboard support
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape' && !dropdown.hidden) {
+                dropdown.hidden = true;
+                trigger.classList.remove('open');
+                trigger.focus();
+            }
+        };
+        document.addEventListener('keydown', handleKeydown);
+
+        // Store cleanup functions on modal
+        if (!modal._csvDropdownCleanup) {
+            modal._csvDropdownCleanup = [];
+        }
+        modal._csvDropdownCleanup.push(() => {
+            document.removeEventListener('click', closeDropdown);
+            document.removeEventListener('keydown', handleKeydown);
+            modal._csvDropdownInitialized = false;
+        });
+    }
+
+    handleListSelection(modal, listId, listName) {
+        const trigger = modal.querySelector('#csv-list-trigger');
+        const dropdown = modal.querySelector('#csv-list-dropdown');
+        const selectedNameSpan = trigger?.querySelector('.selected-list-name');
+        
+        if (!trigger || !dropdown) return;
+
+        // Update trigger text
+        if (selectedNameSpan) {
+            selectedNameSpan.textContent = listName;
+        }
+
+        // Store selection in modal dataset
+        modal.dataset.selectedListId = listId;
+        modal.dataset.selectedListName = listName;
+
+        // Update selected state in dropdown
+        const allItems = dropdown.querySelectorAll('.csv-list-item:not(.create-new)');
+        allItems.forEach(item => {
+            const itemId = item.dataset.listId || '';
+            if (itemId === listId) {
+                item.classList.add('selected');
+                item.style.background = 'var(--primary-700)';
+                item.style.color = 'white';
+            } else {
+                item.classList.remove('selected');
+                item.style.background = '';
+                item.style.color = 'var(--text-primary)';
+            }
+        });
+
+        // Close dropdown
+        dropdown.hidden = true;
+        trigger.classList.remove('open');
+    }
+
+    showInlineListCreateForm(modal, dropdown) {
+        const createForm = dropdown.querySelector('#csv-list-create-form');
+        const listItems = dropdown.querySelector('#csv-list-items');
+        const nameInput = dropdown.querySelector('#csv-new-list-name');
+        const saveBtn = dropdown.querySelector('#csv-create-save');
+        const cancelBtn = dropdown.querySelector('#csv-create-cancel');
+
+        if (!createForm || !listItems) return;
+
+        // Hide list items, show create form using inline styles
+        listItems.style.display = 'none';
+        createForm.style.display = 'block';
+        createForm.style.padding = '12px';
+        createForm.style.borderBottom = '1px solid var(--border-light)';
+        createForm.style.animation = 'formSlideIn 0.3s ease-out forwards';
+        
+        // Style the input field
+        if (nameInput) {
+            nameInput.style.width = '100%';
+            nameInput.style.marginBottom = '10px';
+        }
+        
+        // Focus input
+        setTimeout(() => nameInput?.focus(), 100);
+
+        // Handle save
+        const handleSave = async () => {
+            const name = nameInput?.value?.trim();
+            if (!name) {
+                nameInput?.focus();
+                return;
+            }
+
+            try {
+                const db = window.firebaseDB;
+                if (!db) {
+                    this.showToast('Database not available');
+                    return;
+                }
+
+                const importType = modal._importType || 'contacts';
+                const listKind = importType === 'accounts' ? 'accounts' : 'people';
+
+                // Create new list
+                const payload = { 
+                    name, 
+                    kind: listKind, 
+                    count: 0,
+                    recordCount: 0
+                };
+                
+                if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+                    payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+                    payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+                } else {
+                    payload.createdAt = new Date();
+                    payload.updatedAt = new Date();
+                }
+
+                const ref = await db.collection('lists').add(payload);
+                const newListId = ref.id;
+
+                // Select the new list
+                this.handleListSelection(modal, newListId, name);
+
+                // Reset form
+                nameInput.value = '';
+                createForm.style.display = 'none';
+                listItems.style.display = '';
+
+                // Refresh dropdown to show the new list
+                await this.populateListAssignment(modal);
+
+                // Re-select the newly created list
+                this.handleListSelection(modal, newListId, name);
+
+                this.showToast(`Created list "${name}"`);
+
+            } catch (error) {
+                console.error('Failed to create list:', error);
+                this.showToast('Failed to create list');
+            }
+        };
+
+        // Handle cancel
+        const handleCancel = () => {
+            nameInput.value = '';
+            createForm.style.display = 'none';
+            listItems.style.display = '';
+        };
+
+        // Bind buttons (remove old listeners first)
+        const newSaveBtn = saveBtn.cloneNode(true);
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        saveBtn.replaceWith(newSaveBtn);
+        cancelBtn.replaceWith(newCancelBtn);
+
+        newSaveBtn.addEventListener('click', handleSave);
+        newCancelBtn.addEventListener('click', handleCancel);
+
+        // Enter key to save
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSave();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                handleCancel();
+            }
+        });
+    }
+
+    async assignToList(db, recordId, modal) {
+        // Get selected list ID from modal dataset (new custom dropdown)
+        const listId = modal.dataset.selectedListId;
         if (!listId) return;
         
         try {
@@ -2293,6 +2690,20 @@ class PowerChoosersCRM {
                     targetType: targetType,
                     addedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
                 });
+                
+                // Increment list count
+                try {
+                    const increment = window.firebase?.firestore?.FieldValue?.increment?.(1);
+                    if (increment) {
+                        await db.collection('lists').doc(listId).update({
+                            count: increment,
+                            recordCount: increment,
+                            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
+                        });
+                    }
+                } catch (countError) {
+                    console.error('Failed to update list count:', countError);
+                }
             }
         } catch (error) {
             console.error('Failed to assign record to list:', error);
@@ -2395,11 +2806,8 @@ class PowerChoosersCRM {
         const mappings = this.getFieldMappings(modal);
         const mappedFieldCount = Object.keys(mappings).length;
         
-        // Get selected list info
-        const listSelect = modal.querySelector('#csv-assign-list');
-        const selectedListName = listSelect && listSelect.value ? 
-            (listSelect.selectedOptions[0]?.textContent || 'Unknown List') : 
-            'No list assignment';
+        // Get selected list info from modal dataset (custom dropdown)
+        const selectedListName = modal.dataset.selectedListName || 'No list assignment';
         
         // Generate summary
         const summaryHTML = `
@@ -2760,6 +3168,10 @@ class PowerChoosersCRM {
                         updateData.enrichedAt = updateData.updatedAt;
                         await item.existingRecord.ref.update(updateData);
                         enriched++;
+                        
+                        // Assign to list if selected
+                        await this.assignToList(db, item.existingRecord.id, modal);
+                        
                         // Notify UI
                         try {
                             document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: item.existingRecord.id, doc: Object.assign({}, updateData) } }));
@@ -2774,6 +3186,10 @@ class PowerChoosersCRM {
                         updateData.enrichedAt = updateData.updatedAt;
                         await item.existingRecord.ref.update(updateData);
                         enriched++;
+                        
+                        // Assign to list if selected
+                        await this.assignToList(db, item.existingRecord.id, modal);
+                        
                         // Notify UI
                         try {
                             const uiChanges = Object.assign({}, updateData, { updatedAt: new Date() });

@@ -1032,15 +1032,27 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }
     }
     
-    // STEP 2: Cache miss - load from API with progressive loading
+    // STEP 2: Check background loader before API
+    let allCalls = [];
+    const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+    
+    if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
+      const bgData = window.BackgroundCallsLoader.getCallsData();
+      if (bgData && bgData.length > 0) {
+        console.log('[Calls] Using data from background loader:', bgData.length, 'calls - skipping API load');
+        allCalls = bgData;
+      }
+    }
+    
+    // STEP 3: Load from API only if background loader didn't provide data
+    if (allCalls.length === 0) {
     try {
-      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-      console.log('[Calls] Cache miss, loading from API:', `${base}/api/calls`);
+      console.log('[Calls] Loading from API:', `${base}/api/calls`);
       
       // Progressive loading: fetch in batches of 200
       const batchSize = 200;
       let offset = 0;
-      let allCalls = [];
+      // allCalls already declared above
       let hasMore = true;
       
       while (hasMore) {
@@ -1066,12 +1078,47 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       
-      console.log('[Calls] Total calls loaded:', allCalls.length);
-      
-      // Process all calls at once
-      if (allCalls.length > 0) {
-        const r = { ok: true, calls: allCalls };
-        const j = r;
+      console.log('[Calls] Total calls loaded from API:', allCalls.length);
+    } catch (error) { 
+      console.warn('[Calls] Failed to load real call data:', error);
+    }
+    } // Close if (allCalls.length === 0) block
+
+    // STEP 4: Enrich the data (whether from cache, background loader, or API)
+    if (allCalls.length > 0) {
+      try {
+        console.log('[Calls] Enriching', allCalls.length, 'calls...');
+        
+        // CRITICAL: Wait for accounts and contacts data to be available
+        // This ensures title and company name fields can be populated
+        let retries = 0;
+        while (retries < 50) { // Max 5 seconds
+          const hasAccounts = typeof window.getAccountsData === 'function' && 
+                             (window.getAccountsData()?.length > 0 || window._essentialAccountsData?.length > 0);
+          const hasContacts = typeof window.getPeopleData === 'function' && 
+                             (window.getPeopleData()?.length > 0 || window._essentialContactsData?.length > 0);
+          
+          if (hasAccounts && hasContacts) {
+            console.log('[Calls] ✓ Essential data ready - accounts:', window.getAccountsData()?.length, 'contacts:', window.getPeopleData()?.length);
+            break;
+          }
+          
+          if (retries === 0) {
+            console.log('[Calls] Waiting for accounts and contacts data...');
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 100));
+          retries++;
+        }
+        
+        if (retries >= 50) {
+          console.warn('[Calls] Timeout waiting for essential data - enrichment may be incomplete');
+        }
+        
+        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+        const j = { ok: true, calls: allCalls };
+        
+        if (j.ok && Array.isArray(j.calls) && j.calls.length > 0) {
           // Build quick phone → contact map from People data (if available), else Firestore
           const phoneToContact = await buildPhoneToContactMap();
 
@@ -1621,14 +1668,16 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           } catch (e) { /* noop */ }
           return;
         } else {
-          console.log('[Calls] API returned no calls or error:', j);
+          console.log('[Calls] No calls to process or error:', j);
         }
-    } catch (error) { 
-      console.warn('[Calls] Failed to load real call data:', error);
-      console.log('[Calls] Falling back to demo data');
-    }
+      } catch (enrichError) { 
+        console.error('[Calls] Failed to enrich call data:', enrichError);
+        console.error('[Calls] Error stack:', enrichError.stack);
+      }
+    } // Close if (allCalls.length > 0) enrichment block
 
     // 2) Fallback: demo data (only used when no real API data available)
+    if (allCalls.length === 0) {
     console.log('[Calls] Using demo data - configure Twilio/Gemini APIs for real call insights');
     const cos = ['Acme Manufacturing','Metro Industries','Johnson Electric','Downtown Office','Northwind Traders'];
     const cities = ['Austin','Dallas','Houston','San Antonio','Fort Worth'];
@@ -1683,6 +1732,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     try {
       document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: rows.length } }));
     } catch (e) { /* noop */ }
+    } // Close if (allCalls.length === 0) block for demo data
   }
 
   function applyFilters() {
@@ -3721,11 +3771,34 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       try {
         const { call } = e.detail;
         
-        // Invalidate caches immediately when new call arrives
+        // Update background loader cache with new call
+        if (window.BackgroundCallsLoader && call) {
+          const bgData = window.BackgroundCallsLoader.getCallsData();
+          if (bgData && Array.isArray(bgData)) {
+            bgData.unshift(call); // Add to beginning (newest first)
+            console.log('[Calls] Added call to background loader cache');
+          }
+        }
+        
+        // Update calls-raw cache immediately
+        if (window.CacheManager && call) {
+          try {
+            const rawCalls = await window.CacheManager.get('calls-raw');
+            if (rawCalls && Array.isArray(rawCalls)) {
+              rawCalls.unshift(call);
+              await window.CacheManager.set('calls-raw', rawCalls);
+              console.log('[Calls] Updated calls-raw cache with new call');
+            }
+          } catch (cacheError) {
+            console.warn('[Calls] Failed to update calls-raw cache:', cacheError);
+          }
+        }
+        
+        // Invalidate enriched calls cache (will be regenerated on next visit)
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           try {
             await window.CacheManager.invalidate('calls');
-            console.log('[Calls] Invalidated calls cache due to new call');
+            console.log('[Calls] Invalidated enriched calls cache');
           } catch (cacheError) {
             console.warn('[Calls] Failed to invalidate calls cache:', cacheError);
           }
@@ -3735,7 +3808,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         if (window.BadgeLoader && typeof window.BadgeLoader.invalidate === 'function') {
           try {
             await window.BadgeLoader.invalidate();
-            console.log('[Calls] Invalidated badge data cache due to new call');
+            console.log('[Calls] Invalidated badge data cache');
           } catch (badgeError) {
             console.warn('[Calls] Failed to invalidate badge cache:', badgeError);
           }
@@ -3748,8 +3821,16 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           if (state.filtered) {
             state.filtered.unshift(call);
           }
+          
+          // CRITICAL: Re-render the UI to show the new call
+          if (typeof render === 'function' && els.tbody) {
+            console.log('[Calls] Re-rendering page with new call');
+            render();
+          }
         }
-      } catch (err) { /* noop */ }
+      } catch (err) {
+        console.error('[Calls] Error handling pc:call-logged event:', err);
+      }
     });
     document._callsModuleCallLoggedBound = true;
   }
