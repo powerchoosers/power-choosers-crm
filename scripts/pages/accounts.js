@@ -845,6 +845,12 @@
       if (moreAccounts.length > 0) {
         state.data = [...state.data, ...moreAccounts];
         applyFilters(); // Re-apply filters with new data
+        
+        // Clear full cache to save memory if we have 500+ records loaded
+        if (state.data.length > 500 && state.allAccountsCache) {
+          state.allAccountsCache = null;
+          console.log('[Accounts] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
+        }
       }
 
     } catch (error) {
@@ -2308,7 +2314,14 @@
     },
     init,
     getCurrentState,
-    getState: function() { return state; }
+    getState: function() { return state; },
+    cleanup: function() {
+      console.log('[Accounts] Cleaning up memory...');
+      state.allAccountsCache = null;
+      state.data = [];
+      state.filtered = [];
+      console.log('[Accounts] Memory cleaned');
+    }
   };
 
   if (document.readyState === 'loading') { 

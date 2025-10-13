@@ -2259,6 +2259,8 @@
           
           if (finalAccountId) {
             await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId);
+            // Ensure activities know they're being clicked from task-detail
+            window._activityClickSource = 'task-detail';
           } else {
             // Show empty state if account not found
             timelineEl.innerHTML = `
@@ -2312,6 +2314,8 @@
           const contactId = findContactIdByName(contactName);
           if (contactId) {
             await window.ActivityManager.renderActivities('task-activity-timeline', 'contact', contactId);
+            // Ensure activities know they're being clicked from task-detail
+            window._activityClickSource = 'task-detail';
           } else {
             // Show empty state if contact not found
             timelineEl.innerHTML = `
@@ -2721,6 +2725,25 @@
       setTimeout(() => {
         processClickToCallAndEmail();
       }, 100);
+    }
+  });
+
+  // Listen for task detail restore event
+  document.addEventListener('pc:task-detail-restore', async (e) => {
+    console.log('[TaskDetail] Restore event received:', e.detail);
+    const restoreData = e.detail || {};
+    
+    if (restoreData.taskId) {
+      // Don't call TaskDetail.open() - just reload the task data directly
+      // This preserves the navigation source that was already set
+      await loadTaskData(restoreData.taskId);
+      
+      // Restore scroll position if available
+      if (restoreData.scroll) {
+        setTimeout(() => {
+          window.scrollTo(0, restoreData.scroll);
+        }, 50);
+      }
     }
   });
 })();

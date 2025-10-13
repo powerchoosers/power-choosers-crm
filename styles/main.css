@@ -5090,6 +5090,23 @@ html, body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.btn-text-bordered {
+    background: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--grey-400);
+    padding: 6px var(--spacing-sm);
+    cursor: pointer;
+    font-size: 0.875rem;
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition-fast);
+}
+
+.btn-text-bordered:hover {
+    color: var(--text-inverse);
+    background: var(--grey-700);
+    border-color: var(--grey-500);
+}
+
 /* === TABLE STYLES === */
 .table-container {
     overflow: hidden; /* clip rounded corners; horizontal scroll handled by .table-scroll */
