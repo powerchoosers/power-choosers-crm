@@ -2667,6 +2667,7 @@
                 'scripts/contact-merger.js',
                 'scripts/email-tracking.js',
                 'scripts/toast-manager.js',
+                'scripts/pages/settings.js',       // NEW - settings loaded immediately to activate configurations
                 'scripts/task-notifications.js',
                 'scripts/main.js'                  // Main must be last
             ];
@@ -2716,9 +2717,7 @@
                 'call-scripts': [
                     'scripts/pages/call-scripts.js'
                 ],
-                settings: [
-                    'scripts/pages/settings.js'
-                ],
+                // settings.js now loaded as core script - removed from lazy load
                 'client-management': [
                     'scripts/pages/client-management.js'
                 ]

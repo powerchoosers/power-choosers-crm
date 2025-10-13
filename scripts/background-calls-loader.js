@@ -28,7 +28,6 @@
     
     const batchSize = 150;
     let offset = 0;
-    let allCalls = [];
     let hasMore = true;
     let batchCount = 0;
     
@@ -46,28 +45,26 @@
         const data = await response.json();
         
         if (data.ok && Array.isArray(data.calls) && data.calls.length > 0) {
-          allCalls = [...allCalls, ...data.calls];
+          // Append directly to callsData to avoid duplicate arrays
+          callsData = [...callsData, ...data.calls];
           offset += batchSize;
           batchCount++;
           
-          // Store for badge system access
-          callsData = allCalls;
-          
           // Update calls module if it's loaded
           if (window.callsModule && typeof window.callsModule.updateCallsData === 'function') {
-            window.callsModule.updateCallsData(allCalls);
+            window.callsModule.updateCallsData(callsData);
           }
           
           // Notify badge system
           try {
             document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
-              detail: { count: allCalls.length, partial: true, batch: batchCount } 
+              detail: { count: callsData.length, partial: true, batch: batchCount } 
             }));
           } catch (e) {
             console.warn('[BackgroundCallsLoader] Failed to dispatch event:', e);
           }
           
-          console.log(`[BackgroundCallsLoader] Loaded batch ${batchCount}: ${allCalls.length} total calls`);
+          console.log(`[BackgroundCallsLoader] Loaded batch ${batchCount}: ${callsData.length} total calls`);
           
           // Check if there are more calls to load
           hasMore = data.hasMore && data.calls.length === batchSize;
@@ -86,24 +83,23 @@
         }
       }
       
-      console.log(`[BackgroundCallsLoader] ✓ Complete: ${allCalls.length} calls loaded in ${batchCount} batches`);
-      loadedCount = allCalls.length;
-      callsData = allCalls; // Store final data
+      console.log(`[BackgroundCallsLoader] ✓ Complete: ${callsData.length} calls loaded in ${batchCount} batches`);
+      loadedCount = callsData.length;
       
       // Final notification
       try {
         document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
-          detail: { count: allCalls.length, partial: false, complete: true } 
+          detail: { count: callsData.length, partial: false, complete: true } 
         }));
       } catch (e) {
         console.warn('[BackgroundCallsLoader] Failed to dispatch completion event:', e);
       }
       
       // Cache the loaded data for future loads
-      if (window.CacheManager && typeof window.CacheManager.set === 'function' && allCalls.length > 0) {
+      if (window.CacheManager && typeof window.CacheManager.set === 'function' && callsData.length > 0) {
         try {
-          await window.CacheManager.set('calls-raw', allCalls);
-          console.log('[BackgroundCallsLoader] Cached', allCalls.length, 'calls for future loads');
+          await window.CacheManager.set('calls-raw', callsData);
+          console.log('[BackgroundCallsLoader] Cached', callsData.length, 'calls for future loads');
         } catch (cacheError) {
           console.warn('[BackgroundCallsLoader] Failed to cache calls:', cacheError);
         }

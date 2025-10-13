@@ -2161,8 +2161,8 @@ class EmailManager {
         const sections = Array.isArray(data.sections) ? data.sections : [data.sections || ''];
         
         return `
-<div style="margin:20px 0 2px 0; font-size:14px; color:#234bb7; font-weight:600; letter-spacing:0.02em; opacity:0.93; background:#eff6ff; padding:6px 13px; border-radius:6px; display:inline-block;">
-    ${this.escapeHtml(data.subject_blurb || 'Energy Solutions')}
+<div style="margin:20px 0 10px 0; font-size:14px; color:#234bb7; font-weight:600; letter-spacing:0.02em; opacity:0.93; background:#eff6ff; padding:8px 15px; border-radius:6px; display:inline-block;">
+    Subject: ${this.escapeHtml(data.subject || 'Energy Solutions')}
 </div>
 
 <div style="margin:18px 0; padding:18px 0 2px 0;">
@@ -2178,7 +2178,7 @@ class EmailManager {
 
 ${sections.length > 1 ? `
 <div style="background:#f6f7fb; border-radius:8px; padding:12px 18px; margin:0 auto 18px auto; max-width:450px; box-shadow:0 2px 8px rgba(30,64,175,0.06); font-size:14px; color:#22223b;">
-    <strong>How Power Choosers Can Help:</strong>
+    <strong>${this.escapeHtml(data.list_header || 'How Power Choosers Can Help:')}</strong>
     <ul style="margin:0; padding:0; list-style:none;">
         ${sections.slice(1).map(item => 
             `<li style="padding:4px 0; border-bottom:1px solid #e5e8ec; line-height:1.5;">${this.escapeHtml(item)}</li>`

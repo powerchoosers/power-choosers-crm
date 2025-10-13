@@ -1940,6 +1940,12 @@
       if (moreContacts.length > 0) {
         state.data = [...state.data, ...moreContacts];
         applyFilters(); // Re-apply filters with new data
+        
+        // Clear full cache to save memory if we have 500+ records loaded
+        if (state.data.length > 500 && state.allContactsCache) {
+          state.allContactsCache = null;
+          console.log('[People] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
+        }
       }
 
     } catch (error) {
@@ -4159,4 +4165,14 @@
   } else {
     init();
   }
+  
+  // Export cleanup function for memory management
+  window.peopleModule = window.peopleModule || {};
+  window.peopleModule.cleanup = function() {
+    console.log('[People] Cleaning up memory...');
+    state.allContactsCache = null;
+    state.data = [];
+    state.filtered = [];
+    console.log('[People] Memory cleaned');
+  };
 })();

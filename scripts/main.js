@@ -18,6 +18,11 @@ class PowerChoosersCRM {
                 this.loadHomeActivities(forceRefresh);
             }
         });
+        
+        // Memory monitoring (development mode)
+        if (window.location.hostname === 'localhost' || localStorage.getItem('debug-memory') === 'true') {
+            this.startMemoryMonitoring();
+        }
     }
 
     // Initialize dashboard data and widgets in correct order
@@ -71,9 +76,19 @@ class PowerChoosersCRM {
             if (window.CacheManager && typeof window.CacheManager.get === 'function') {
                 const accountsData = await window.CacheManager.get('accounts');
                 if (accountsData && Array.isArray(accountsData)) {
-                    window._essentialAccountsData = accountsData;
-                    window.getAccountsData = () => window._essentialAccountsData || [];
-                    console.log('[CRM] ✓ Pre-loaded', accountsData.length, 'accounts');
+                    // Limit to 200 most recent for widgets/navigation to save memory
+                    window._essentialAccountsData = accountsData.slice(0, 200);
+                    
+                    // Lazy-load full data function (loads on demand)
+                    window.getAccountsData = () => {
+                        // If called from a page that needs full data, return full dataset
+                        const needsFullData = ['accounts', 'account-detail', 'task-detail'].includes(window.crm?.currentPage);
+                        if (needsFullData && accountsData.length > 200) {
+                            return accountsData;  // Return full dataset when needed
+                        }
+                        return window._essentialAccountsData;  // Return limited set for widgets
+                    };
+                    console.log('[CRM] ✓ Pre-loaded 200 accounts (from', accountsData.length, 'total) - full data available on demand');
                 }
             }
             
@@ -81,9 +96,18 @@ class PowerChoosersCRM {
             if (window.CacheManager && typeof window.CacheManager.get === 'function') {
                 const contactsData = await window.CacheManager.get('contacts');
                 if (contactsData && Array.isArray(contactsData)) {
-                    window._essentialContactsData = contactsData;
-                    window.getPeopleData = () => window._essentialContactsData || [];
-                    console.log('[CRM] ✓ Pre-loaded', contactsData.length, 'contacts');
+                    // Limit to 200 most recent for widgets/navigation to save memory
+                    window._essentialContactsData = contactsData.slice(0, 200);
+                    
+                    // Lazy-load full data function (loads on demand)
+                    window.getPeopleData = () => {
+                        const needsFullData = ['people', 'contact-detail', 'task-detail'].includes(window.crm?.currentPage);
+                        if (needsFullData && contactsData.length > 200) {
+                            return contactsData;  // Return full dataset when needed
+                        }
+                        return window._essentialContactsData;  // Return limited set for widgets
+                    };
+                    console.log('[CRM] ✓ Pre-loaded 200 contacts (from', contactsData.length, 'total) - full data available on demand');
                 }
             }
             
@@ -118,6 +142,47 @@ class PowerChoosersCRM {
         } catch (error) {
             console.error('[CRM] Error pre-loading essential data:', error);
         }
+    }
+    
+    // Clean up page-specific memory on navigation
+    cleanupPageMemory(previousPage) {
+        console.log('[CRM] Cleaning up memory for:', previousPage);
+        
+        try {
+            // Call page-specific cleanup functions
+            if (previousPage === 'people' && window.peopleModule?.cleanup) {
+                window.peopleModule.cleanup();
+            }
+            if (previousPage === 'accounts' && window.accountsModule?.cleanup) {
+                window.accountsModule.cleanup();
+            }
+            if (previousPage === 'calls' && window.callsModule?.cleanup) {
+                window.callsModule.cleanup();
+            }
+            
+            console.log('[CRM] Memory cleanup complete for:', previousPage);
+        } catch (error) {
+            console.warn('[CRM] Error during memory cleanup:', error);
+        }
+    }
+    
+    // Memory monitoring for development
+    startMemoryMonitoring() {
+        console.log('[CRM] Memory monitoring enabled (to disable, run: localStorage.removeItem("debug-memory"))');
+        
+        setInterval(() => {
+            if (performance.memory) {
+                const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
+                const total = Math.round(performance.memory.totalJSHeapSize / 1048576);
+                const limit = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
+                console.log(`[Memory] ${used}MB / ${total}MB (limit: ${limit}MB)`);
+                
+                // Warn if approaching 80% of limit
+                if (used > limit * 0.8) {
+                    console.warn('[Memory] ⚠️ High memory usage! Consider refreshing page.');
+                }
+            }
+        }, 30000); // Log every 30 seconds
     }
 
   createAddAccountModal() {
@@ -686,6 +751,11 @@ class PowerChoosersCRM {
     }
 
     async navigateToPage(pageName) {
+        // Clean up previous page memory BEFORE navigating
+        if (this.currentPage && this.currentPage !== pageName) {
+            this.cleanupPageMemory(this.currentPage);
+        }
+        
         // Update current page tracking
         this.currentPage = pageName;
         

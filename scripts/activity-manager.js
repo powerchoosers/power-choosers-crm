@@ -1619,15 +1619,36 @@ class ActivityManager {
    * Store navigation source for back button restoration
    */
   storeNavigationSource() {
-    // Store current pagination state
-    window._dashboardNavigationSource = 'activities';
-    window._dashboardReturn = {
-      page: this.currentPage,
-      scroll: window.scrollY,
-      containerId: 'home-activity-timeline'
-    };
-    
-    console.log('[ActivityManager] Stored navigation source:', window._dashboardReturn);
+    try {
+      const currentPage = window.crm?.currentPage || '';
+      const activePage = document.querySelector('.page.active');
+      const pageId = activePage?.id || activePage?.getAttribute('data-page') || '';
+      
+      // Determine actual current page
+      const source = currentPage || pageId.replace('-page', '') || 'dashboard';
+      
+      console.log('[ActivityManager] Storing navigation source:', source);
+      
+      // For task-detail, store additional context
+      if (source === 'task-detail' && window.__taskDetailRestoreData) {
+        window._contactNavigationSource = 'task-detail';
+        window._accountNavigationSource = 'task-detail';
+        console.log('[ActivityManager] Stored task-detail as navigation source');
+      }
+      
+      // For dashboard, store current pagination state
+      if (source === 'dashboard') {
+        window._dashboardNavigationSource = 'activities';
+        window._dashboardReturn = {
+          page: this.currentPage,
+          scroll: window.scrollY,
+          containerId: 'home-activity-timeline'
+        };
+        console.log('[ActivityManager] Stored dashboard navigation:', window._dashboardReturn);
+      }
+    } catch (error) {
+      console.error('[ActivityManager] Error storing navigation source:', error);
+    }
   }
 
 }
