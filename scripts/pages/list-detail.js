@@ -914,6 +914,9 @@
   function applyFilters() {
     const q = normalize(els.quickSearch ? els.quickSearch.value : '');
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    
+    // Define qMatch outside so it's available for both people and accounts views
+    const qMatch = (str) => !q || normalize(str).includes(q);
 
     if (state.view === 'people') {
       const titleTokens = (state.chips.title || []).map(normalize).filter(Boolean);
@@ -925,8 +928,6 @@
       const domainTokens = (state.chips.visitorDomain || []).map(normalize).filter(Boolean);
       const seniorityTokens = (state.chips.seniority || []).map(normalize).filter(Boolean);
       const departmentTokens = (state.chips.department || []).map(normalize).filter(Boolean);
-
-      const qMatch = (str) => !q || normalize(str).includes(q);
       const tokenMatch = (tokens) => (str) => { 
         if (!tokens || tokens.length === 0) return true; 
         const n = normalize(str); 

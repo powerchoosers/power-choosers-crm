@@ -1570,8 +1570,11 @@
                                         <span class="filter-text">Show Filters</span>
                                         <span class="filter-count-badge" id="lists-filter-count" hidden>0</span>
                                     </button>
+                                    <div class="view-toggle" id="lists-view-toggle">
+                                        <button class="toggle-btn filter-tab active" data-view="people" aria-selected="true">People Lists</button>
+                                        <button class="toggle-btn filter-tab" data-view="accounts" aria-selected="false">Account Lists</button>
+                                    </div>
                                     <input type="text" class="search-input-small" id="lists-quick-search" placeholder="Quick search..." aria-label="Quick search" />
-                                    <button class="btn-secondary" id="lists-switch-btn" type="button" aria-live="polite">Switch to company lists</button>
                                 </div>
                             </div>
                             <div class="page-content lists-grid">
@@ -1607,11 +1610,7 @@
                                         <span class="filter-icon" aria-hidden="true">&#9881;</span>
                                         <span class="filter-text">Show Filters</span>
                                     </button>
-                                    <div class="view-toggle" id="list-detail-view-toggle">
-                                        <button class="toggle-btn filter-tab active" data-view="people" aria-selected="true">People</button>
-                                        <button class="toggle-btn filter-tab" data-view="accounts" aria-selected="false">Accounts</button>
-                                    </div>
-                                    <input type="text" id="list-detail-contact-search" class="search-input-small" placeholder="Search contacts to add..." aria-label="Search contacts to add" />
+                                    <input type="text" id="list-detail-quick-search" class="search-input-small" placeholder="Quick search..." aria-label="Quick search" />
                                 </div>
                             </div>
                             
@@ -2515,10 +2514,17 @@
                             <h5>Add to List (Optional)</h5>
                             <div class="form-row">
                                 <label>Assign imported records to a list</label>
-                                <select id="csv-assign-list" class="input-dark">
-                                    <option value="">No list assignment</option>
-                                    <!-- List options will be populated by JavaScript -->
-                                </select>
+                                <div class="csv-list-dropdown-wrap">
+                                    <button type="button" class="csv-list-trigger input-dark" id="csv-list-trigger">
+                                        <span class="selected-list-name">No list assignment</span>
+                                        <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M3 5L6 8L9 5"></path>
+                                        </svg>
+                                    </button>
+                                    <div class="csv-list-dropdown" id="csv-list-dropdown" hidden>
+                                        <!-- Dropdown content will be populated by JavaScript -->
+                                    </div>
+                                </div>
                             </div>
                             <p class="help-text">All imported contacts/accounts will be added to the selected list</p>
                         </div>
