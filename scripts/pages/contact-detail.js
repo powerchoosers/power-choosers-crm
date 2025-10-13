@@ -1920,51 +1920,60 @@
     } catch (_) {}
     
     // Setup contact updated listener to re-attach event handlers after editing
-    try {
-      document.addEventListener('pc:contact-updated', (e) => {
-        // Re-attach event handlers after contact is updated
-        setTimeout(() => {
-          if (!state._contactDetailEventsAttached) {
-            attachContactDetailEvents();
-          }
-        }, 100);
-      });
-    } catch (_) {}
+    if (!document._contactDetailUpdatedBound) {
+      document._contactDetailUpdatedBound = true;
+      try {
+        document.addEventListener('pc:contact-updated', (e) => {
+          // Re-attach event handlers after contact is updated
+          setTimeout(() => {
+            if (!state._contactDetailEventsAttached) {
+              attachContactDetailEvents();
+            }
+          }, 100);
+        });
+      } catch (_) {}
+    }
     
     // Listen for new calls to this contact
-    try {
-      document.addEventListener('pc:call-logged', (event) => {
-        const callData = event.detail;
-        const currentContactId = state.currentContact?.id;
-        
-        if (currentContactId && (callData.contactId === currentContactId || 
-                                 callData.call?.contactId === currentContactId)) {
-          console.log('[ContactDetail] Call logged for this contact, refreshing activities');
+    if (!document._contactDetailCallLoggedBound) {
+      document._contactDetailCallLoggedBound = true;
+      try {
+        document.addEventListener('pc:call-logged', (event) => {
+          const callData = event.detail;
+          const currentContactId = state.currentContact?.id;
           
-          // Immediately refresh recent calls section
-          if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
-            window.ActivityManager.renderActivities(
-              'contact-activity-timeline', 
-              'contact', 
-              currentContactId,
-              true // force refresh
-            );
+          if (currentContactId && (callData.contactId === currentContactId || 
+                                   callData.call?.contactId === currentContactId)) {
+            console.log('[ContactDetail] Call logged for this contact, refreshing activities');
+            
+            // Immediately refresh recent calls section
+            if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
+              window.ActivityManager.renderActivities(
+                'contact-activity-timeline', 
+                'contact', 
+                currentContactId,
+                true // force refresh
+              );
+            }
           }
-        }
-      });
-    } catch (_) { /* noop */ }
+        });
+      } catch (_) { /* noop */ }
+    }
     
     // Setup contact loaded listener to ensure event handlers are attached
-    try {
-      document.addEventListener('pc:contact-loaded', (e) => {
-        // Re-attach event handlers when contact is loaded
-        setTimeout(() => {
-          if (!state._contactDetailEventsAttached) {
-            attachContactDetailEvents();
-          }
-        }, 100);
-      });
-    } catch (_) {}
+    if (!document._contactDetailLoadedBound) {
+      document._contactDetailLoadedBound = true;
+      try {
+        document.addEventListener('pc:contact-loaded', (e) => {
+          // Re-attach event handlers when contact is loaded
+          setTimeout(() => {
+            if (!state._contactDetailEventsAttached) {
+              attachContactDetailEvents();
+            }
+          }, 100);
+        });
+      } catch (_) {}
+    }
     
     // Add click handler to persist default phone when star button is clicked
     const starButton = document.querySelector('.star-button');

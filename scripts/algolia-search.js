@@ -53,11 +53,14 @@ class AlgoliaSearchHelper {
     }
     
     try {
+      // Destructure and remove 'limit' and 'fields' from options to avoid passing them to Algolia
+      const { limit, fields, ...otherOptions } = options;
+      
       const searchOptions = {
-        hitsPerPage: options.limit || 100,
+        hitsPerPage: limit || 100,
         page: options.page || 0,
-        attributesToRetrieve: options.fields || ['*'],
-        ...options
+        attributesToRetrieve: fields || ['*'],
+        ...otherOptions // Now this won't include 'limit' or 'fields'
       };
 
       const results = await this.indices.contacts.search(query, searchOptions);
@@ -83,11 +86,14 @@ class AlgoliaSearchHelper {
     }
     
     try {
+      // Destructure and remove 'limit' and 'fields' from options to avoid passing them to Algolia
+      const { limit, fields, ...otherOptions } = options;
+      
       const searchOptions = {
-        hitsPerPage: options.limit || 100,
+        hitsPerPage: limit || 100,
         page: options.page || 0,
-        attributesToRetrieve: options.fields || ['*'],
-        ...options
+        attributesToRetrieve: fields || ['*'],
+        ...otherOptions // Now this won't include 'limit' or 'fields'
       };
 
       const results = await this.indices.accounts.search(query, searchOptions);

@@ -80,9 +80,10 @@ class PowerChoosersCRM {
                     window._essentialAccountsData = accountsData.slice(0, 200);
                     
                     // Lazy-load full data function (loads on demand)
-                    window.getAccountsData = () => {
+                    window.getAccountsData = (forceFullData = false) => {
                         // If called from a page that needs full data, return full dataset
-                        const needsFullData = ['accounts', 'account-detail', 'task-detail'].includes(window.crm?.currentPage);
+                        // FIXED: 'account-details' (with s) for correct page name, added 'dashboard' for task icons
+                        const needsFullData = forceFullData || ['dashboard', 'accounts', 'account-details', 'task-detail'].includes(window.crm?.currentPage);
                         if (needsFullData && accountsData.length > 200) {
                             return accountsData;  // Return full dataset when needed
                         }
@@ -100,8 +101,9 @@ class PowerChoosersCRM {
                     window._essentialContactsData = contactsData.slice(0, 200);
                     
                     // Lazy-load full data function (loads on demand)
-                    window.getPeopleData = () => {
-                        const needsFullData = ['people', 'contact-detail', 'task-detail'].includes(window.crm?.currentPage);
+                    window.getPeopleData = (forceFullData = false) => {
+                        // Added 'dashboard' for task rendering with full contact data
+                        const needsFullData = forceFullData || ['dashboard', 'people', 'contact-detail', 'task-detail'].includes(window.crm?.currentPage);
                         if (needsFullData && contactsData.length > 200) {
                             return contactsData;  // Return full dataset when needed
                         }
@@ -149,6 +151,13 @@ class PowerChoosersCRM {
         console.log('[CRM] Cleaning up memory for:', previousPage);
         
         try {
+            // Don't clean up dashboard - it's always potentially active
+            // Dashboard widgets need persistent state for task rendering and activities
+            if (previousPage === 'dashboard') {
+                console.log('[CRM] Skipping dashboard cleanup - preserving widget state');
+                return;
+            }
+            
             // Call page-specific cleanup functions
             if (previousPage === 'people' && window.peopleModule?.cleanup) {
                 window.peopleModule.cleanup();

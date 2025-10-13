@@ -63,6 +63,8 @@ class EmailManager {
 
     // Setup enter key handler for email composition
     setupComposeEnterKeyHandler() {
+        if (document._emailComposeEnterHandlerBound) return;
+        
         // Use event delegation to handle dynamically created compose windows
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -108,6 +110,9 @@ class EmailManager {
                 }
             }
         });
+        
+        document._emailComposeEnterHandlerBound = true;
+        console.log('[EmailManager] Compose enter key handler bound (one-time)');
     }
 
     // Update authentication UI
@@ -588,8 +593,12 @@ class EmailManager {
         };
         
         // Add mouse event listeners for debugging
-        document.addEventListener('mousedown', debugMouseEvents, true);
-        document.addEventListener('click', debugMouseEvents, true);
+        if (!document._emailDebugMouseBound) {
+            document.addEventListener('mousedown', debugMouseEvents, true);
+            document.addEventListener('click', debugMouseEvents, true);
+            document._emailDebugMouseBound = true;
+            console.log('[EmailManager] Debug mouse listeners bound (one-time)');
+        }
         
         // Prevent AI bar interactions from bubbling into handlers that open other toolbars,
         // but DO allow clicks on AI suggestions, prompt, and generate buttons to proceed.
@@ -615,9 +624,13 @@ class EmailManager {
         };
         
         // Add event listeners to prevent variables toolbar from opening
-        document.addEventListener('click', preventVariablesOnAI, true);
-        document.addEventListener('mousedown', preventVariablesOnAI, true);
-        document.addEventListener('focus', preventVariablesOnAI, true);
+        if (!document._emailPreventVariablesBound) {
+            document.addEventListener('click', preventVariablesOnAI, true);
+            document.addEventListener('mousedown', preventVariablesOnAI, true);
+            document.addEventListener('focus', preventVariablesOnAI, true);
+            document._emailPreventVariablesBound = true;
+            console.log('[EmailManager] Prevent variables listeners bound (one-time)');
+        }
     }
 
     async generateWithAI(aiBar, mode = 'standard') {
@@ -3459,7 +3472,11 @@ ${sections.length > 1 ? `
         searchInput?.addEventListener('input', (e) => this.searchEmails(e.target.value));
 
         // Authentication check on page focus
-        window.addEventListener('focus', () => this.checkAuthentication());
+        if (!window._emailAuthFocusBound) {
+            window.addEventListener('focus', () => this.checkAuthentication());
+            window._emailAuthFocusBound = true;
+            console.log('[EmailManager] Window focus listener bound (one-time)');
+        }
     }
 
     async checkAuthentication() {
@@ -6518,6 +6535,8 @@ ${sections.length > 1 ? `
     }
 
     setupEmailTrackingListeners() {
+        if (document._emailTrackingListenersBound) return;
+        
         // Listen for email tracking events
         document.addEventListener('email-opened', (event) => {
             console.log('[EmailManager] Email opened event:', event.detail);
@@ -6528,6 +6547,30 @@ ${sections.length > 1 ? `
             console.log('[EmailManager] Email replied event:', event.detail);
             this.handleEmailReplied(event.detail);
         });
+        
+        // Listen for new emails from Firestore (real-time updates)
+        document.addEventListener('pc:email-received', async (event) => {
+            console.log('[EmailManager] New email received:', event.detail);
+            
+            // Only refresh if we're on inbox or all mail folder
+            if (this.currentFolder === 'inbox' || this.currentFolder === 'all') {
+                await this.loadEmails();
+                window.crm?.showToast('📬 New email received!', 'info');
+            }
+        });
+        
+        // Listen for sent emails
+        document.addEventListener('pc:email-sent', async (event) => {
+            console.log('[EmailManager] Email sent:', event.detail);
+            
+            // Refresh if we're on sent folder
+            if (this.currentFolder === 'sent') {
+                await this.loadEmails();
+            }
+        });
+        
+        document._emailTrackingListenersBound = true;
+        console.log('[EmailManager] Email tracking listeners bound (one-time)');
     }
 
     handleEmailOpened(notification) {
@@ -6879,17 +6922,20 @@ function initEmailsPage() {
 }
 
 // Auto-initialize
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initEmailsPage);
-} else {
-    initEmailsPage();
+if (!document._emailTopLevelListenersBound) {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEmailsPage);
+    } else {
+        initEmailsPage();
+    }
 }
 
 // Export for global access
 window.emailManager = emailManager;
 
-// Global enter key handler for email composition  
-document.addEventListener('keydown', (e) => {
+// Global enter key handler for email composition
+if (!document._emailGlobalEnterBound) {
+    document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         const editor = document.querySelector('.body-input');
         if (editor && editor.contains(e.target)) {
@@ -6928,11 +6974,15 @@ document.addEventListener('keydown', (e) => {
             return false;
         }
     }
-}, true); // Use capture phase to intercept before other handlers
-
+    }, true); // Use capture phase to intercept before other handlers
+    
+    document._emailGlobalEnterBound = true;
+    console.log('[EmailManager] Global enter key listener bound (one-time)');
+}
 
 // Prevent cursor from moving into signature area on click
-document.addEventListener('click', (e) => {
+if (!document._emailGlobalClickBound) {
+    document.addEventListener('click', (e) => {
     const editor = document.querySelector('.body-input');
     if (editor && editor.contains(e.target)) {
         // Check if click was on or inside signature
@@ -6954,7 +7004,14 @@ document.addEventListener('click', (e) => {
             node = node.parentElement;
         }
     }
-});
+    });
+    
+    document._emailGlobalClickBound = true;
+    console.log('[EmailManager] Global click listener bound (one-time)');
+    
+    document._emailTopLevelListenersBound = true;
+    console.log('[EmailManager] All top-level listeners bound (one-time)');
+}
 
 // Global helper to open compose with a prefilled recipient (sitewide)
 // Usage: window.EmailCompose.openTo('someone@company.com', 'Optional Name')

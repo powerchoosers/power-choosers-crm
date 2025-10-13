@@ -114,33 +114,185 @@
     return !!els.page && !!els.mainContent;
   }
 
-  function showAccountDetail(accountId) {
+  async function showAccountDetail(accountId) {
     // Ensure page exists and navigate to it
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
       try { window.crm.navigateToPage('account-details'); } catch (e) { /* noop */ }
     }
     if (!initDomRefs()) return;
 
-    const account = findAccountById(accountId);
+    // STEP 1: Clear old account and ALL old content IMMEDIATELY
+    state.currentAccount = null;
+    
+    const headerSection = els.pageContainer ? els.pageContainer.querySelector('.page-title-section') : null;
+    
+    // Clear header completely first (prevents flash of old content)
+    if (headerSection) {
+      headerSection.innerHTML = '';
+    }
+    if (els.mainContent) {
+      els.mainContent.innerHTML = '';
+    }
+    
+    // STEP 2: Quick check - is account in cache? (synchronous)
+    let accountFromCache = null;
+    let needsLoading = false;
+    
+    try {
+      if (window._prefetchedAccountForDetail && window._prefetchedAccountForDetail.id === accountId) {
+        accountFromCache = window._prefetchedAccountForDetail;
+        window._prefetchedAccountForDetail = null;
+      } else if (window.getAccountsData) {
+        const accounts = window.getAccountsData(true);
+        accountFromCache = accounts.find(a => a.id === accountId);
+      }
+      needsLoading = !accountFromCache;
+    } catch (_) {
+      needsLoading = true;
+    }
+    
+    // STEP 3: Only show loading state if we need to fetch from Firebase
+    if (needsLoading) {
+      // Small delay to ensure clear happens before skeleton (prevents flash)
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // Show loading skeleton in header
+      if (headerSection) {
+        headerSection.innerHTML = `
+          <div class="contact-header-info account-detail-loading">
+            <button class="back-btn back-btn--icon" id="back-to-accounts" aria-label="Back to Accounts" title="Back to Accounts">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+            </button>
+            <div class="contact-header-profile">
+              <div style="width: 64px; height: 64px; border-radius: 8px; background: var(--grey-300); margin-right: 16px;"></div>
+              <div class="contact-header-text">
+                <div class="skeleton-loader" style="width: 240px; height: 28px; background: linear-gradient(90deg, var(--grey-300) 0%, var(--grey-400) 50%, var(--grey-300) 100%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; margin-bottom: 8px;"></div>
+                <div class="skeleton-loader" style="width: 160px; height: 16px; background: linear-gradient(90deg, var(--grey-300) 0%, var(--grey-400) 50%, var(--grey-300) 100%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="page-actions">
+            <button class="btn-secondary" disabled style="opacity: 0.5;">Edit Account</button>
+          </div>
+          <style>
+            @keyframes shimmer {
+              0% { background-position: 200% 0; }
+              100% { background-position: -200% 0; }
+            }
+            .account-detail-loading {
+              opacity: 1;
+              transition: opacity 0.3s ease-out;
+            }
+            .account-detail-loading.fade-out {
+              opacity: 0;
+            }
+          </style>
+        `;
+      }
+      
+      // Show loading spinner in body
+      if (els.mainContent) {
+        els.mainContent.innerHTML = `
+          <div class="account-body-loading" style="display: flex; align-items: center; justify-content: center; min-height: 400px; flex-direction: column; gap: 16px; opacity: 1; transition: opacity 0.3s ease-out;">
+            <div class="loading-spinner" style="width: 32px; height: 32px; border: 3px solid var(--grey-400); border-top: 3px solid var(--orange-subtle); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+            <p style="color: var(--text-secondary); font-size: 14px;">Loading account...</p>
+          </div>
+          <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+            .account-body-loading.fade-out {
+              opacity: 0;
+            }
+          </style>
+        `;
+      }
+    }
+
+    const account = await findAccountById(accountId);
     if (!account) {
       console.error('Account not found:', accountId);
+      if (headerSection) {
+        headerSection.innerHTML = `
+          <div class="contact-header-info">
+            <button class="back-btn back-btn--icon" id="back-to-accounts" aria-label="Back to Accounts" title="Back to Accounts">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+            </button>
+            <div class="contact-header-profile">
+              <div class="contact-header-text">
+                <h2 class="page-title">Account Details</h2>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      if (els.mainContent) {
+        els.mainContent.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: center; min-height: 400px; flex-direction: column; gap: 16px;">
+            <p style="color: var(--text-secondary); font-size: 14px;">Account not found</p>
+          </div>
+        `;
+      }
       return;
     }
 
     state.currentAccount = account;
-    renderAccountDetail();
     
-    // Setup energy update listener for real-time sync with Health Widget
-    try {
-      if (window.AccountDetail && window.AccountDetail.setupEnergyUpdateListener) {
-        window.AccountDetail.setupEnergyUpdateListener();
-      }
-    } catch (_) {}
+    // If we showed loading states, fade them out before rendering
+    if (needsLoading) {
+      const loadingHeader = headerSection ? headerSection.querySelector('.account-detail-loading') : null;
+      const loadingBody = els.mainContent ? els.mainContent.querySelector('.account-body-loading') : null;
+      
+      if (loadingHeader) loadingHeader.classList.add('fade-out');
+      if (loadingBody) loadingBody.classList.add('fade-out');
+      
+      // Wait for fade-out, then render with fade-in
+      setTimeout(() => {
+    renderAccountDetail();
+        
+        requestAnimationFrame(() => {
+          const newHeaderSection = els.pageContainer ? els.pageContainer.querySelector('.page-title-section') : null;
+          const newContent = els.mainContent;
+          
+          if (newHeaderSection) {
+            newHeaderSection.style.opacity = '0';
+            newHeaderSection.style.transition = 'opacity 0.4s ease-in';
+            requestAnimationFrame(() => {
+              newHeaderSection.style.opacity = '1';
+            });
+          }
+          
+          if (newContent) {
+            newContent.style.opacity = '0';
+            newContent.style.transition = 'opacity 0.4s ease-in';
+            requestAnimationFrame(() => {
+              newContent.style.opacity = '1';
+            });
+          }
+        });
+      }, 300);
+    } else {
+      // Account was in cache - render immediately without animations
+      renderAccountDetail();
+    }
+    
+    // Setup energy update listener for real-time sync with Health Widget (ONCE)
+    if (!window._accountDetailEnergyListenerBound) {
+      try {
+        if (window.AccountDetail && window.AccountDetail.setupEnergyUpdateListener) {
+          window.AccountDetail.setupEnergyUpdateListener();
+          window._accountDetailEnergyListenerBound = true;
+          console.log('[AccountDetail] Energy listener initialized (one-time)');
+        }
+      } catch (_) {}
+    }
   }
 
 
 
-  function findAccountById(accountId) {
+  async function findAccountById(accountId) {
     // Use prefetched account if provided by navigation source (avoids extra hops)
     try {
       if (window._prefetchedAccountForDetail && window._prefetchedAccountForDetail.id === accountId) {
@@ -150,10 +302,29 @@
       }
     } catch (_) {}
 
+    // Try getting from cache first
     if (window.getAccountsData) {
-      const accounts = window.getAccountsData();
-      return accounts.find(a => a.id === accountId);
+      // Force full data when searching for specific account (timing-safe)
+      const accounts = window.getAccountsData(true);
+      const found = accounts.find(a => a.id === accountId);
+      if (found) return found;
     }
+    
+    // FALLBACK: If not in cache (e.g., after clearing cache), load from Firebase
+    console.log('[AccountDetail] Account not in cache, loading from Firebase:', accountId);
+    if (window.firebaseDB) {
+      try {
+        const doc = await window.firebaseDB.collection('accounts').doc(accountId).get();
+        if (doc.exists) {
+          const account = { id: doc.id, ...doc.data() };
+          console.log('[AccountDetail] ✓ Loaded account from Firebase:', account.name || account.accountName);
+          return account;
+        }
+      } catch (error) {
+        console.error('[AccountDetail] Error loading account from Firebase:', error);
+      }
+    }
+    
     return null;
   }
 
