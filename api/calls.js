@@ -179,6 +179,8 @@ export default async function handler(req, res) {
       // Optional filter by Call SID
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
       const callSid = urlObj.searchParams.get('callSid');
+      const limit = parseInt(urlObj.searchParams.get('limit')) || 0;
+      const offset = parseInt(urlObj.searchParams.get('offset')) || 0;
 
       if (db) {
         if (callSid) {
@@ -198,10 +200,25 @@ export default async function handler(req, res) {
           }
         }
 
-        const calls = await getCallsFromFirestore(0);
+        // Support pagination with limit and offset
+        let q = db.collection('calls').orderBy('timestamp', 'desc');
+        if (limit > 0) {
+          q = q.limit(limit);
+        }
+        if (offset > 0) {
+          q = q.offset(offset);
+        }
+        
+        const snap = await q.get();
+        const calls = [];
+        snap.forEach((doc) => {
+          const data = doc.data() || {};
+          calls.push(normalizeCallForResponse({ id: doc.id, ...data }));
+        });
+
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ ok: true, calls }));
+        res.end(JSON.stringify({ ok: true, calls, hasMore: calls.length === limit }));
         return;
       }
 
