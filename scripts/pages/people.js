@@ -131,6 +131,18 @@
           }, 150);
         }
         
+        // Clear restoring hint flag with longer delay to ensure stability
+        try {
+          setTimeout(() => { 
+            try { 
+              if (window.__restoringPeople) {
+                window.__restoringPeople = false; 
+                console.log('[People] ✓ Cleared restoration flag - navigation complete');
+              }
+            } catch(_){} 
+          }, 2000); // 2 seconds delay
+        } catch (_) {}
+        
         console.log('[People] State restored successfully');
       } catch (e) { 
         console.error('[People] Error restoring state:', e);
@@ -1755,64 +1767,57 @@
   }
 
   async function loadDataOnce() {
-    if (state.loaded) return;
-    try {
-      if (!window.firebaseDB && !window.CacheManager) {
-        console.warn('Firestore and CacheManager not initialized');
-        state.data = [];
-        state.filtered = [];
-        state.loaded = true;
-        render();
-        return;
-      }
-      
-    // PAGINATION: Load only 100 contacts at a time
-    const pageSize = 100;
-    let contactsData, accountsData;
-    
-    // Check if essential data was pre-loaded
-    if (window._essentialContactsData && !window.CacheManager) {
-      console.log('[People] Using pre-loaded essential data');
-      state.allContactsCache = window._essentialContactsData;
-      state.totalCount = window._essentialContactsData.length;
-      contactsData = window._essentialContactsData.slice(0, pageSize);
-      state.hasMore = window._essentialContactsData.length > pageSize;
-      accountsData = window._essentialAccountsData || [];
+    // RESTORE: If state is empty but allContactsCache exists, restore it
+    if ((!state.data || state.data.length === 0) && state.allContactsCache && state.allContactsCache.length > 0) {
+      console.log('[People] Restoring from allContactsCache:', state.allContactsCache.length, 'contacts');
+      state.data = state.allContactsCache.slice();
+      state.filtered = state.data.slice();
+      state.loaded = true;
+      render();
+      return; // Don't reload from Firebase/cache again
     }
-    // Use cache if available
-    else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-      console.log('[People] Loading data from cache...');
-      const [contacts, accounts] = await Promise.all([
-        window.CacheManager.get('contacts'),
-        window.CacheManager.get('accounts').catch(() => [])
-      ]);
+    
+    // Allow reload if data is actually empty (failed or cleared)
+    if (state.loaded && state.data && state.data.length > 0) {
+      console.log('[People] Data already loaded:', state.data.length, 'contacts');
+      return;
+    }
+    
+    // If loaded flag is set but data is empty, reset and reload
+    if (state.loaded && (!state.data || state.data.length === 0)) {
+      console.log('[People] Loaded flag set but data empty, resetting...');
+      state.loaded = false;
+    }
+    
+    try {
+      // NEW: Use Background Loader for instant data access
+      let contactsData = [];
+      let accountsData = [];
       
-      // Store full cache for "load more" functionality
-      if (contacts && contacts.length > 0) {
-        state.allContactsCache = contacts;
-        state.totalCount = contacts.length; // Store total count for footer
-        // Take only first 100 for initial load
-        contactsData = contacts.slice(0, pageSize);
-        state.hasMore = contacts.length > pageSize;
-        console.log(`[People] Loaded ${contactsData.length} of ${contacts.length} contacts from cache (${state.hasMore ? 'more available' : 'all loaded'})`);
-      } else {
-        contactsData = [];
+      // Get data from background loaders (already loaded on app init)
+      if (window.BackgroundContactsLoader) {
+        contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+        console.log('[People] Got', contactsData.length, 'contacts from BackgroundContactsLoader');
       }
       
-      accountsData = accounts;
-    } else {
-        console.log('[People] Cache not available, loading from Firestore with pagination...');
-        // Load contacts with pagination from Firestore
-        const contactsSnap = await window.firebaseDB.collection('contacts').limit(pageSize).get();
-        contactsData = contactsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        state.lastDoc = contactsSnap.docs[contactsSnap.docs.length - 1]; // For next page
-        state.hasMore = contactsData.length === pageSize;
-        console.log(`[People] Loaded ${contactsData.length} contacts from Firestore (${state.hasMore ? 'more available' : 'all loaded'})`);
-        
-        // Load accounts (still load all for enrichment lookups)
-        const accountsSnap = await window.firebaseDB.collection('accounts').get().catch(() => null);
-        accountsData = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+      if (window.BackgroundAccountsLoader) {
+        accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+        console.log('[People] Got', accountsData.length, 'accounts from BackgroundAccountsLoader');
       }
+      
+      // If no background loaders, try legacy method
+      if (contactsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
+        console.log('[People] Background loader empty, falling back to CacheManager...');
+        contactsData = await window.CacheManager.get('contacts') || [];
+      }
+      
+      if (accountsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
+        accountsData = await window.CacheManager.get('accounts') || [];
+      }
+      
+      // Store full dataset for pagination
+      state.allContactsCache = contactsData;
+      state.totalCount = contactsData.length;
       
       // Build quick lookups for accounts → employees
       const accountById = new Map();
@@ -1879,7 +1884,36 @@
       });
       state.filtered = state.data.slice();
       state.loaded = true;
-      state.currentPage = 1;
+      
+      // Check if we're restoring from back navigation
+      if (window.__restoringPeople && window._peopleReturn) {
+        const targetPage = Math.max(1, parseInt(window._peopleReturn.currentPage || window._peopleReturn.page || 1, 10));
+        state.currentPage = targetPage;
+        console.log('[People] Restoring to page:', targetPage, 'from back navigation');
+      } else {
+        state.currentPage = 1;
+      }
+      
+      // Ensure cache is saved immediately for subsequent visits
+      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+        // Cache the FULL dataset, not just the sliced/paginated data
+        const fullData = state.allContactsCache || state.data;
+        window.CacheManager.set('contacts', fullData).then(() => {
+          console.log('[People] Saved', fullData.length, 'contacts to cache (full dataset)');
+        }).catch((err) => {
+          console.error('[People] Failed to cache:', err);
+        });
+      }
+      
+      // Dispatch event so other pages know contacts are available
+      try {
+        const event = new CustomEvent('pc:contacts-loaded', { 
+          detail: { count: state.data.length } 
+        });
+        document.dispatchEvent(event);
+        console.log('[People] Dispatched contacts-loaded event:', state.data.length);
+      } catch (_) {}
+      
       if (typeof buildTitleSuggestionPool === 'function') buildTitleSuggestionPool();
       if (typeof buildCompanySuggestionPool === 'function') buildCompanySuggestionPool();
       if (typeof buildCitySuggestionPool === 'function') buildCitySuggestionPool();
@@ -1889,6 +1923,12 @@
       if (typeof buildVisitorDomainSuggestionPool === 'function') buildVisitorDomainSuggestionPool();
       if (typeof buildSenioritySuggestionPool === 'function') buildSenioritySuggestionPool();
       if (typeof buildDepartmentSuggestionPool === 'function') buildDepartmentSuggestionPool();
+      
+      // Extra guard: if restoring hint is set but stale, clear it
+      if (window.__restoringPeopleUntil && Date.now() > window.__restoringPeopleUntil) {
+        try { window.__restoringPeople = false; window.__restoringPeopleUntil = 0; } catch(_) {}
+      }
+      
       render();
     } catch (e) {
       console.error('Failed loading contacts:', e);
@@ -1943,11 +1983,9 @@
         state.data = [...state.data, ...moreContacts];
         applyFilters(); // Re-apply filters with new data
         
-        // Clear full cache to save memory if we have 500+ records loaded
-        if (state.data.length > 500 && state.allContactsCache) {
-          state.allContactsCache = null;
-          console.log('[People] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
-        }
+        // DON'T clear cache - we need it for seamless pagination
+        // Memory impact is minimal (~10MB for 2000 contacts)
+        console.log('[People] Loaded more contacts, total:', state.data.length);
       }
 
     } catch (error) {
@@ -2416,7 +2454,14 @@
     if (!els.tbody) return;
     
     const pageItems = getPageItems();
-    const rows = pageItems.map((c) => rowHtml(c)).join('');
+    let rows = pageItems.map((c) => rowHtml(c)).join('');
+    
+    // If this isn't the first render, pre-mark icons as loaded to prevent animation flicker
+    if (state.hasAnimated && rows) {
+      rows = rows.replace(/class="company-favicon"/g, 'class="company-favicon icon-loaded"');
+      rows = rows.replace(/class="avatar-initials"/g, 'class="avatar-initials icon-loaded"');
+    }
+    
     els.tbody.innerHTML = rows || emptyHtml();
     
     // Trigger fade-zoom animation ONLY on first render
@@ -2816,9 +2861,32 @@
     refreshPeopleHeaderOrder();
     // Export for other modules if needed
     if (typeof window !== 'undefined') {
-      window.peopleModule = { init, loadDataOnce, applyFilters, state, rebindDynamic, getCurrentState, getState: function() { return state; } };
+      window.peopleModule = { 
+        init, 
+        loadDataOnce, 
+        applyFilters, 
+        render: applyFilters,  // Alias for clarity
+        state, 
+        rebindDynamic, 
+        getCurrentState, 
+        getState: function() { return state; } 
+      };
       // Export contacts data for contact-detail module
-      window.getPeopleData = () => state.data;
+      // Return the FULL dataset (allContactsCache), not just the paginated view (state.data)
+      window.getPeopleData = () => {
+        try {
+          // Priority 1: Background loader (always available, loads on app init)
+          if (window.BackgroundContactsLoader) {
+            const data = window.BackgroundContactsLoader.getContactsData();
+            if (data && data.length > 0) return data;
+          }
+          // Priority 2: Page state cache
+          const fullData = state.allContactsCache || state.data;
+          return Array.isArray(fullData) ? fullData : [];
+        } catch (_) {
+          return [];
+        }
+      };
     }
     // Initialize global DnD if available (from contacts module)
     if (typeof window !== 'undefined' && typeof window.initContactsColumnDnD === 'function') {
@@ -2944,13 +3012,23 @@
 
   // Live listener to keep People table in sync without navigation
   let _unsubscribePeople = null;
+  let _snapshotFirstFire = true;
   async function startLivePeopleListener() {
     try {
       if (!window.firebaseDB || !window.firebaseDB.collection) return;
       if (_unsubscribePeople) { try { _unsubscribePeople(); } catch(_) {} _unsubscribePeople = null; }
+      _snapshotFirstFire = true; // Reset flag when setting up new listener
       const col = window.firebaseDB.collection('contacts');
       _unsubscribePeople = col.onSnapshot((snap) => {
         try {
+          // Skip first fire to prevent double-render on page load
+          // (loadDataOnce already populated the data)
+          if (_snapshotFirstFire) {
+            _snapshotFirstFire = false;
+            console.log('[People] onSnapshot first fire - skipping render to prevent flicker');
+            return;
+          }
+          
           const fresh = [];
           snap.forEach((doc) => { fresh.push({ id: doc.id, ...doc.data() }); });
           state.data = fresh;
@@ -2960,7 +3038,12 @@
             window.CacheManager.set('contacts', fresh).catch(() => {});
           }
           
-          applyFilters();
+          // Only render if not currently restoring from navigation
+          if (!window.__restoringPeople) {
+            applyFilters();
+          } else {
+            console.log('[People] Skipping render due to active restoration - contact update will be applied when restoration completes');
+          }
         } catch (_) { /* noop */ }
       }, (err) => {
         console.warn('[People] onSnapshot error', err);
@@ -4170,10 +4253,12 @@
   // Export cleanup function for memory management
   window.peopleModule = window.peopleModule || {};
   window.peopleModule.cleanup = function() {
-    console.log('[People] Cleaning up memory...');
-    state.allContactsCache = null;
-    state.data = [];
-    state.filtered = [];
-    console.log('[People] Memory cleaned');
+    console.log('[People] Cleaning up UI state...');
+    // Don't clear allContactsCache - keep it for window.getPeopleData()
+    // state.allContactsCache = null;
+    state.data = [];      // Clear paginated view
+    state.filtered = [];  // Clear filtered view
+    // Keep hasAnimated = true to prevent icon animations on subsequent visits
+    console.log('[People] UI state cleaned');
   };
 })();

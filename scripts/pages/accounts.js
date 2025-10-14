@@ -1,5 +1,24 @@
 'use strict';
 
+// Silence verbose logs from this module unless explicitly enabled via localStorage CRM_DEBUG_ACCOUNTS=1
+// This shadowed console only affects this file, not the whole app
+var __ACCOUNTS_ORIG_CONSOLE__ = window.console || {};
+function __accountsDebugEnabled__(){
+  try {
+    const v = localStorage.getItem('CRM_DEBUG_ACCOUNTS');
+    if (v != null) return v === '1' || v === 'true';
+  } catch(_) {}
+  return !!window.CRM_DEBUG_ACCOUNTS;
+}
+// eslint-disable-next-line no-redeclare
+var console = {
+  log: function() { if (__accountsDebugEnabled__()) __ACCOUNTS_ORIG_CONSOLE__.log.apply(__ACCOUNTS_ORIG_CONSOLE__, arguments); },
+  warn: __ACCOUNTS_ORIG_CONSOLE__.warn || function(){},
+  error: __ACCOUNTS_ORIG_CONSOLE__.error || function(){},
+  info: function() { if (__accountsDebugEnabled__()) __ACCOUNTS_ORIG_CONSOLE__.info.apply(__ACCOUNTS_ORIG_CONSOLE__, arguments); },
+  debug: function() { if (__accountsDebugEnabled__()) __ACCOUNTS_ORIG_CONSOLE__.debug.apply(__ACCOUNTS_ORIG_CONSOLE__, arguments); }
+};
+
 // Accounts page module: filtering + table render, Firestore-backed (client-side filtering initially)
 (function () {
   const state = {
@@ -55,21 +74,39 @@
           console.log('[Accounts] Restored sort direction:', detail.sortDirection);
         }
         
-        // Re-render with restored state - but only if data is loaded
-        if (state.data && state.data.length > 0) {
-          applyFilters();
-        } else {
-          // If data isn't loaded yet, wait for it and then apply filters
-          const checkDataAndApply = () => {
-            if (state.data && state.data.length > 0) {
+        // Re-render with restored state - wait for sufficient data
+        // targetPage is already declared above at line 55
+        const pageSize = 100;
+        const neededAccounts = targetPage * pageSize;
+        
+        const checkDataAndApply = () => {
+          if (state.data && state.data.length >= neededAccounts) {
+            // Page is already rendered correctly by loadDataOnce() - no need to re-render!
+            console.log('[Accounts] Restore: Data already loaded for page', targetPage, '- skipping render to prevent flicker');
+            // Mark as animated to prevent row animations on restore
+            state.hasAnimated = true;
+          } else if (state.data && state.data.length > 0) {
+            // We have some data but not enough - need to load more
+            console.log('[Accounts] Restore: Need more data. Have', state.data.length, 'need', neededAccounts);
+            
+            // Ensure we have enough data from allAccountsCache
+            if (state.allAccountsCache && state.allAccountsCache.length >= neededAccounts) {
+              state.data = state.allAccountsCache.slice(0, neededAccounts);
+              state.filtered = state.data.slice();
               applyFilters();
+              console.log('[Accounts] Restore: Loaded additional data from cache');
             } else {
-              // Retry after a short delay
+              // Retry if data is still loading
               setTimeout(checkDataAndApply, 100);
             }
-          };
-          setTimeout(checkDataAndApply, 100);
-        }
+          } else {
+            // No data yet, retry
+            setTimeout(checkDataAndApply, 100);
+          }
+        };
+        
+        // Start checking immediately
+        checkDataAndApply();
         
         // Restore scroll position with multiple attempts
         const y = parseInt(detail.scroll || 0, 10);
@@ -96,7 +133,7 @@
             try { 
               if (window.__restoringAccounts) {
                 window.__restoringAccounts = false; 
-                console.log('[Accounts] Cleared restoration flag');
+                console.log('[Accounts] ✓ Cleared restoration flag - navigation complete');
                 // No need for additional render() - applyFilters() already rendered
               }
             } catch(_){} 
@@ -861,74 +898,65 @@
   function debounce(fn, ms) { let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), ms); }; }
 
   async function loadDataOnce() {
+    // RESTORE: If state is empty but allAccountsCache exists, restore it
+    if ((!state.data || state.data.length === 0) && state.allAccountsCache && state.allAccountsCache.length > 0) {
+      console.log('[Accounts] Restoring from allAccountsCache:', state.allAccountsCache.length, 'accounts');
+      // Restore first page of accounts for pagination
+      const pageSize = 100;
+      state.data = state.allAccountsCache.slice(0, pageSize);
+      state.filtered = state.data.slice();
+      state.totalCount = state.allAccountsCache.length;
+      state.hasMore = state.allAccountsCache.length > pageSize;
+      state.loaded = true;
+      render();
+      return; // Don't reload from Firebase/cache again
+    }
+    
     if (state.loaded) return;
     try {
-      if (!window.firebaseDB && !window.CacheManager) {
-        state.data = [];
-        state.filtered = [];
-        state.loaded = true;
-        render();
-        return;
+      // NEW: Use Background Loader for instant data access
+      let accountsData = [];
+      
+      // Get data from background loader (already loaded on app init)
+      if (window.BackgroundAccountsLoader) {
+        accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+        console.log('[Accounts] Got', accountsData.length, 'accounts from BackgroundAccountsLoader');
       }
       
-      // PAGINATION: Load only 100 accounts at a time
+      // If no background loader, try legacy method
+      if (accountsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
+        console.log('[Accounts] Background loader empty, falling back to CacheManager...');
+        accountsData = await window.CacheManager.get('accounts') || [];
+      }
+      
+      // Store full dataset for pagination
+      state.allAccountsCache = accountsData;
+      state.totalCount = accountsData.length;
+      
+      // For UI pagination, determine how many accounts to load
       const pageSize = 100;
       
-      // Check if essential data was pre-loaded
-      if (window._essentialAccountsData && !window.CacheManager) {
-        console.log('[Accounts] Using pre-loaded essential data');
-        state.allAccountsCache = window._essentialAccountsData;
-        state.totalCount = window._essentialAccountsData.length;
-        state.data = window._essentialAccountsData.slice(0, pageSize);
-        state.hasMore = window._essentialAccountsData.length > pageSize;
-      }
-      // Use CacheManager if available, otherwise fallback
-      else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-        console.log('[Accounts] Loading data from cache...');
-        const cachedAccounts = await window.CacheManager.get('accounts');
-        
-        // Store full cache for "load more" functionality
-        if (cachedAccounts && cachedAccounts.length > 0) {
-          state.allAccountsCache = cachedAccounts;
-          state.totalCount = cachedAccounts.length; // Store total count for footer
-          // Take only first 100 for initial load
-          state.data = cachedAccounts.slice(0, pageSize);
-          state.hasMore = cachedAccounts.length > pageSize;
-          console.log(`[Accounts] Loaded ${state.data.length} of ${cachedAccounts.length} accounts from cache (${state.hasMore ? 'more available' : 'all loaded'})`);
-        } else {
-          state.data = [];
-        }
-      } else if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function' && window.currentUserRole) {
-        // Use DataManager for ownership-aware loading with pagination
-        try {
-          console.log('[Accounts] Using DataManager query with pagination...');
-          const snap = await window.firebaseDB.collection('accounts').limit(pageSize).get();
-          state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          state.lastDoc = snap.docs[snap.docs.length - 1];
-          state.hasMore = state.data.length === pageSize;
-          console.log(`[Accounts] Loaded ${state.data.length} accounts from Firestore (${state.hasMore ? 'more available' : 'all loaded'})`);
-        } catch (error) {
-          console.error('[Accounts] DataManager query failed, falling back to direct query:', error);
-          const snap = await window.firebaseDB.collection('accounts').limit(pageSize).get();
-          state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          state.lastDoc = snap.docs[snap.docs.length - 1];
-          state.hasMore = state.data.length === pageSize;
-        }
-      } else {
-        console.log('[Accounts] Using fallback query with pagination...');
-        const snap = await window.firebaseDB.collection('accounts').limit(pageSize).get();
-        state.data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        state.lastDoc = snap.docs[snap.docs.length - 1];
-        state.hasMore = state.data.length === pageSize;
+      // Check if we're restoring from back navigation
+      let targetPage = 1;
+      if (window.__restoringAccounts && window._accountsReturn) {
+        targetPage = Math.max(1, parseInt(window._accountsReturn.currentPage || window._accountsReturn.page || 1, 10));
+        console.log('[Accounts] Restoring to page:', targetPage, 'from back navigation');
       }
       
+      // Load enough data to cover the target page
+      const neededAccounts = targetPage * pageSize;
+      state.data = accountsData.slice(0, neededAccounts);
       state.filtered = state.data.slice();
+      state.hasMore = accountsData.length > neededAccounts;
+      
       state.loaded = true;
       state.errorMsg = '';
-      // While restoring from back-nav, do not reset to page 1
-      if (!window.__restoringAccounts) {
-        state.currentPage = 1;
-      }
+      
+      // Set current page (either 1 for normal load, or target page for restoration)
+      state.currentPage = targetPage;
+      console.log('[Accounts] Set initial page to:', targetPage);
+      
+      console.log(`[Accounts] Loaded ${state.data.length} of ${accountsData.length} accounts (${state.hasMore ? 'more available' : 'all loaded'})`);
       // Extra guard: if restoring hint is set but stale, clear it
       if (window.__restoringAccountsUntil && Date.now() > window.__restoringAccountsUntil) {
         try { window.__restoringAccounts = false; window.__restoringAccountsUntil = 0; } catch(_) {}
@@ -960,13 +988,23 @@
 
   // Live reconcile via onSnapshot (keeps table in sync without navigation)
   let _unsubscribeAccounts = null;
+  let _snapshotFirstFire = true;
   async function startLiveAccountsListener() {
     try {
       if (!window.firebaseDB || !window.firebaseDB.collection) return;
       if (_unsubscribeAccounts) { try { _unsubscribeAccounts(); } catch(_) {} _unsubscribeAccounts = null; }
+      _snapshotFirstFire = true; // Reset flag when setting up new listener
       const col = window.firebaseDB.collection('accounts');
       _unsubscribeAccounts = col.onSnapshot((snap) => {
         try {
+          // Skip first fire to prevent double-render on page load
+          // (loadDataOnce already populated the data)
+          if (_snapshotFirstFire) {
+            _snapshotFirstFire = false;
+            console.log('[Accounts] onSnapshot first fire - skipping render to prevent flicker');
+            return;
+          }
+          
           const fresh = [];
           snap.forEach((doc) => { fresh.push({ id: doc.id, ...doc.data() }); });
           state.data = fresh;
@@ -976,7 +1014,12 @@
             window.CacheManager.set('accounts', fresh).catch(() => {});
           }
           
-          applyFilters();
+          // Only render if not currently restoring from navigation
+          if (!window.__restoringAccounts) {
+            applyFilters();
+          } else {
+            console.log('[Accounts] Skipping render due to active restoration - account update will be applied when restoration completes');
+          }
         } catch (_) { /* noop */ }
       }, (err) => {
         console.warn('[Accounts] onSnapshot error', err);
@@ -1117,7 +1160,13 @@
     
     ensureSelected();
     const pageItems = getPageItems();
-    const rows = pageItems.map((a) => rowHtml(a)).join('');
+    let rows = pageItems.map((a) => rowHtml(a)).join('');
+    
+    // If this isn't the first render, pre-mark favicons as loaded to prevent animation flicker
+    if (state.hasAnimated && rows) {
+      rows = rows.replace(/class="company-favicon"/g, 'class="company-favicon icon-loaded"');
+    }
+    
     els.tbody.innerHTML = rows || emptyHtml();
     
     // Trigger fade-zoom animation ONLY on first render
@@ -2182,8 +2231,20 @@
   }
 
   // Expose minimal global API for other modules (e.g., AccountDetail)
+  // Return the FULL dataset (allAccountsCache), not just the paginated view (state.data)
   window.getAccountsData = function () {
-    try { return Array.isArray(state.data) ? state.data : []; } catch (_) { return []; }
+    try {
+      // Priority 1: Background loader (always available, loads on app init)
+      if (window.BackgroundAccountsLoader) {
+        const data = window.BackgroundAccountsLoader.getAccountsData();
+        if (data && data.length > 0) return data;
+      }
+      // Priority 2: Page state cache
+      const fullData = state.allAccountsCache || state.data;
+      return Array.isArray(fullData) ? fullData : [];
+    } catch (_) {
+      return [];
+    }
   };
   function getCurrentState(){
     return {
@@ -2315,11 +2376,13 @@
     getCurrentState,
     getState: function() { return state; },
     cleanup: function() {
-      console.log('[Accounts] Cleaning up memory...');
-      state.allAccountsCache = null;
-      state.data = [];
-      state.filtered = [];
-      console.log('[Accounts] Memory cleaned');
+      console.log('[Accounts] Cleaning up UI state...');
+      // Don't clear allAccountsCache - keep it for navigation between pages
+      // state.allAccountsCache = null;
+      state.data = [];      // Clear paginated view
+      state.filtered = [];  // Clear filtered view
+      // Keep hasAnimated = true to prevent favicon animations on subsequent visits
+      console.log('[Accounts] UI state cleaned');
     }
   };
 

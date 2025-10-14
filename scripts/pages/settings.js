@@ -285,9 +285,9 @@ class SettingsPage {
             reader.onloadend = async () => {
                 const base64data = reader.result.split(',')[1];
                 
-                // Upload to Imgur via existing endpoint
+                // Upload to Imgur via existing endpoint (always use Vercel)
                 try {
-                    const apiBase = (typeof window.API_BASE_URL === 'string' && /^https?:/i.test(window.API_BASE_URL)) ? window.API_BASE_URL : '';
+                    const apiBase = 'https://power-choosers-crm.vercel.app';
                     const uploadResponse = await fetch(`${apiBase}/api/upload/signature-image`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -689,7 +689,8 @@ class SettingsPage {
                 reader.readAsDataURL(file);
             });
 
-            const apiBase = (typeof window.API_BASE_URL === 'string' && /^https?:/i.test(window.API_BASE_URL)) ? window.API_BASE_URL : '';
+            // Always use Vercel endpoint (works locally and deployed)
+            const apiBase = 'https://power-choosers-crm.vercel.app';
             const response = await fetch(`${apiBase}/api/upload/signature-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -721,16 +722,21 @@ class SettingsPage {
 
     async uploadSignatureImage(file) {
         try {
-            // Option 1: Upload to your Vercel server (recommended)
-            const formData = new FormData();
-            formData.append('image', file);
-            formData.append('type', 'signature');
+            // Always use Vercel endpoint for uploads (works locally and deployed)
+            const apiBase = 'https://power-choosers-crm.vercel.app';
+            
+            // Convert file to base64
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
 
-            const apiBase = (typeof window.API_BASE_URL === 'string' && /^https?:/i.test(window.API_BASE_URL)) ? window.API_BASE_URL : '';
             const response = await fetch(`${apiBase}/api/upload/signature-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result.split(',')[1]); r.onerror = reject; r.readAsDataURL(file); }), type: 'signature' })
+                body: JSON.stringify({ image: base64, type: 'signature' })
             });
 
             if (!response.ok) {
