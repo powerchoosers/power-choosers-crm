@@ -701,7 +701,8 @@ class EmailManager {
                             industry: acct.industry || '',
                             domain: acct.domain || acct.website || '',
                             city: acct.city || acct.billingCity || acct.locationCity || '',
-                            state: acct.state || acct.billingState || acct.region || ''
+                            state: acct.state || acct.billingState || acct.region || '',
+                            shortDescription: acct.shortDescription || acct.short_desc || acct.descriptionShort || ''
                         };
                         let rate = String(acctEnergy.currentRate || '').trim();
                         if (/^\.\d+$/.test(rate)) rate = '0' + rate;
@@ -2588,7 +2589,8 @@ ${sections.length > 1 ? `
                             id: acct.id,
                             name: acct.accountName || acct.name || acct.companyName || '',
                             industry: acct.industry || '',
-                            domain: acct.domain || acct.website || ''
+                            domain: acct.domain || acct.website || '',
+                            shortDescription: acct.shortDescription || acct.short_desc || acct.descriptionShort || ''
                         };
                         const rE = enrichedRecipient.energy || {};
                         const merged = {
@@ -6669,6 +6671,9 @@ ${sections.length > 1 ? `
             return { isValid: false, issues, score: 0, maxScore };
         }
 
+        // Detect if this is a cold email
+        const isColdEmail = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
+
         // Basic recipient info (2 points)
         if (recipient.name || recipient.fullName) {
             score += 1;
@@ -6695,50 +6700,59 @@ ${sections.length > 1 ? `
             issues.push('Missing job title');
         }
 
-        // Energy contract details (3 points)
-        if (recipient.energy) {
-            if (recipient.energy.supplier) {
+        // For cold emails, skip energy contract details and notes/transcript validation
+        if (isColdEmail) {
+            score += 3; // Cold emails don't need energy contract details
+            score += 2; // Cold emails don't need notes or transcripts
+            
+            if (recipient.account && (recipient.account.industry || recipient.account.city)) {
                 score += 1;
-            } else {
-                issues.push('Missing energy supplier');
-            }
-
-            if (recipient.energy.contractEnd) {
-                score += 1;
-            } else {
-                issues.push('Missing contract end date');
-            }
-
-            if (recipient.energy.currentRate) {
-                score += 1;
-            } else {
-                issues.push('Missing current rate');
             }
         } else {
-            issues.push('No energy contract data available');
+            // Warm emails - use original validation for energy details and notes
+            if (recipient.energy) {
+                if (recipient.energy.supplier) {
+                    score += 1;
+                } else {
+                    issues.push('Missing energy supplier');
+                }
+
+                if (recipient.energy.contractEnd) {
+                    score += 1;
+                } else {
+                    issues.push('Missing contract end date');
+                }
+
+                if (recipient.energy.currentRate) {
+                    score += 1;
+                } else {
+                    issues.push('Missing current rate');
+                }
+            } else {
+                issues.push('No energy contract data available');
+            }
+
+            if (recipient.notes && recipient.notes.trim()) {
+                score += 1;
+            } else {
+                issues.push('No notes available for personalization');
+            }
+
+            if (recipient.transcript && recipient.transcript.trim()) {
+                score += 1;
+            } else {
+                issues.push('No call transcript available');
+            }
+
+            if (recipient.account && (recipient.account.industry || recipient.account.city)) {
+                score += 1;
+            } else {
+                issues.push('Limited account context available');
+            }
         }
 
-        // Notes and context (2 points)
-        if (recipient.notes && recipient.notes.trim()) {
-            score += 1;
-        } else {
-            issues.push('No notes available for personalization');
-        }
-
-        if (recipient.transcript && recipient.transcript.trim()) {
-            score += 1;
-        } else {
-            issues.push('No call transcript available');
-        }
-
-        // Account context (1 point)
-        if (recipient.account && (recipient.account.industry || recipient.account.city)) {
-            score += 1;
-        } else {
-            issues.push('Limited account context available');
-        }
-
-        const isValid = score >= 5; // Require at least 50% context completeness
+        const completeness = Math.round((score / maxScore) * 100);
+        const isValid = isColdEmail ? score >= 4 : score >= 6;
 
         console.log(`[ContextValidation] Score: ${score}/${maxScore}, Valid: ${isValid}`);
         if (issues.length > 0) {
