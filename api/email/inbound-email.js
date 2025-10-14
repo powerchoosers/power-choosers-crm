@@ -3,35 +3,11 @@
  * FIXED VERSION - Parses multipart data and saves to Firebase
  */
 
-import { initializeApp, getApps } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  serverTimestamp,
-  query,
-  where,
-  getDocs,
-  limit,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  increment
-} from 'firebase/firestore';
+import { admin, db } from '../_firebase';
 import crypto from 'crypto';
 const formidable = require('formidable');
 import { simpleParser } from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
-
-// Firebase configuration - using your existing variables
-const firebaseConfig = {
-  projectId: process.env.FIREBASE_PROJECT_ID
-};
-
-// Initialize Firebase (only if not already initialized)
-const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(firebaseApp);
 
 // SendGrid signature verification
 function verifySendGridSignature(payload, signature, timestamp, publicKey) {
@@ -123,6 +99,7 @@ export default async function handler(req, res) {
       messageId: first(fields.message_id) || first(fields['Message-ID']) || '',
       receivedAt: new Date().toISOString(),
       type: 'received',
+      emailType: 'received',     // For consistency with filtering logic
       provider: 'sendgrid_inbound',
       inReplyTo: '',
       references: [],
@@ -195,8 +172,10 @@ export default async function handler(req, res) {
 
     // Idempotency: dedupe on Message-ID when available
     if (emailData.messageId) {
-      const q = query(collection(db, 'emails'), where('messageId', '==', emailData.messageId), limit(1));
-      const snap = await getDocs(q);
+      const snap = await db.collection('emails')
+        .where('messageId', '==', emailData.messageId)
+        .limit(1)
+        .get();
       if (!snap.empty) {
         console.log('[InboundEmail] Duplicate messageId detected, skipping save:', emailData.messageId);
         return res.status(200).json({ success: true, deduped: true, message: 'Duplicate Message-ID ignored' });
@@ -249,28 +228,28 @@ export default async function handler(req, res) {
 
     // Upsert thread doc
     try {
-      const tRef = doc(db, 'threads', threadId);
-      const existing = await getDoc(tRef);
-      if (existing.exists()) {
-        await updateDoc(tRef, {
+      const tRef = db.collection('threads').doc(threadId);
+      const existing = await tRef.get();
+      if (existing.exists) {
+        await tRef.update({
           subjectNormalized: existing.data().subjectNormalized || subjectNorm,
           participants: Array.from(new Set([...(existing.data().participants || []), ...participants])),
-          lastMessageAt: serverTimestamp(),
+          lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
           lastSnippet: snippet || existing.data().lastSnippet || '',
           lastFrom: emailData.from || existing.data().lastFrom || '',
-          messageCount: increment(1)
+          messageCount: admin.firestore.FieldValue.increment(1)
         });
       } else {
-        await setDoc(tRef, {
+        await tRef.set({
           id: threadId,
           subjectNormalized: subjectNorm,
           participants,
-          lastMessageAt: serverTimestamp(),
+          lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
           lastSnippet: snippet,
           lastFrom: emailData.from || '',
           messageCount: 1,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
     } catch (threadErr) {
@@ -290,11 +269,11 @@ export default async function handler(req, res) {
       const emailDoc = {
         ...emailData,
         threadId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
       
-      const docRef = await addDoc(collection(db, 'emails'), emailDoc);
+      const docRef = await db.collection('emails').add(emailDoc);
       console.log('[InboundEmail] Email saved to Firebase with ID:', docRef.id);
 
     // Return success response

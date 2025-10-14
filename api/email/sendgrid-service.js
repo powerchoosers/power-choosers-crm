@@ -236,6 +236,10 @@ export class SendGridService {
         openCount: 0,
         replyCount: 0,
         status: 'sent',
+        type: 'sent',              // Required for email filtering in emails.js
+        emailType: 'sent',         // Alternative field for filtering
+        isSentEmail: true,         // Additional flag for filtering
+        provider: 'sendgrid',      // Identify the email provider
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
