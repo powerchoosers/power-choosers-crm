@@ -799,67 +799,116 @@
 
   async function loadDataOnce() {
     if (state.loadedPeople && state.loadedAccounts) return;
-    // Preload from global caches to eliminate blank flash
-    try {
-      if (!state.loadedPeople && typeof window.getPeopleData === 'function') {
-        const cachedPeople = window.getPeopleData() || [];
-        if (Array.isArray(cachedPeople) && cachedPeople.length) {
-          state.dataPeople = cachedPeople;
-          state.loadedPeople = true;
-        }
-      }
-      if (!state.loadedAccounts && typeof window.getAccountsData === 'function') {
-        const cachedAccounts = window.getAccountsData() || [];
-        if (Array.isArray(cachedAccounts) && cachedAccounts.length) {
-          state.dataAccounts = cachedAccounts;
-          state.loadedAccounts = true;
-        }
-      }
-      if (state.loadedPeople || state.loadedAccounts) {
-        renderTableHead();
-        buildSuggestionPools();
-        applyFilters();
-      }
-    } catch (_) {}
     
     try {
       if (console.time) console.time('[ListDetail] loadDataOnce');
       
-      // Use CacheManager if available for much faster loading
-      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-        // Load people from cache
-        if (!state.loadedPeople) {
-          state.dataPeople = await window.CacheManager.get('contacts');
+      // PRIORITY 1: Use BackgroundContactsLoader and BackgroundAccountsLoader for instant data access
+      if (!state.loadedPeople) {
+        if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+          state.dataPeople = window.BackgroundContactsLoader.getContactsData() || [];
           state.loadedPeople = true;
-          console.debug('[ListDetail] loadDataOnce: people loaded from cache', { count: state.dataPeople.length });
-        }
-        
-        // Load accounts from cache
-        if (!state.loadedAccounts) {
-          state.dataAccounts = await window.CacheManager.get('accounts');
-          state.loadedAccounts = true;
-          console.debug('[ListDetail] loadDataOnce: accounts loaded from cache', { count: state.dataAccounts.length });
-        }
-      } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
-        // Fallback to Firestore
-        // Load people
-        if (!state.loadedPeople) {
-          const peopleSnap = await window.firebaseDB.collection('contacts').limit(200).get();
-          state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+          console.debug('[ListDetail] loadDataOnce: people loaded from BackgroundContactsLoader', { count: state.dataPeople.length });
+        } else if (typeof window.getPeopleData === 'function') {
+          state.dataPeople = window.getPeopleData() || [];
           state.loadedPeople = true;
-          console.debug('[ListDetail] loadDataOnce: people loaded from Firestore', { count: state.dataPeople.length });
-        }
-        
-        // Load accounts
-        if (!state.loadedAccounts) {
-          const accountsSnap = await window.firebaseDB.collection('accounts').get();
-          state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-          state.loadedAccounts = true;
-          console.debug('[ListDetail] loadDataOnce: accounts loaded from Firestore', { count: state.dataAccounts.length });
+          console.debug('[ListDetail] loadDataOnce: people loaded from getPeopleData', { count: state.dataPeople.length });
         }
       }
+      
+      if (!state.loadedAccounts) {
+        if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+          state.dataAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+          state.loadedAccounts = true;
+          console.debug('[ListDetail] loadDataOnce: accounts loaded from BackgroundAccountsLoader', { count: state.dataAccounts.length });
+        } else if (typeof window.getAccountsData === 'function') {
+          state.dataAccounts = window.getAccountsData() || [];
+          state.loadedAccounts = true;
+          console.debug('[ListDetail] loadDataOnce: accounts loaded from getAccountsData', { count: state.dataAccounts.length });
+        }
+      }
+      
+      // FALLBACK: If background loaders not ready yet, wait for them
+      if ((!state.loadedPeople || !state.loadedAccounts) && 
+          (window.BackgroundContactsLoader || window.BackgroundAccountsLoader)) {
+        console.log('[ListDetail] Background loaders not ready yet, waiting...');
+        
+        // Wait up to 3 seconds (30 attempts x 100ms)
+        for (let attempt = 0; attempt < 30; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          if (!state.loadedPeople && window.BackgroundContactsLoader) {
+            const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+            if (contacts.length > 0) {
+              state.dataPeople = contacts;
+              state.loadedPeople = true;
+              console.log('[ListDetail] ✓ BackgroundContactsLoader ready after', (attempt + 1) * 100, 'ms with', contacts.length, 'contacts');
+            }
+          }
+          
+          if (!state.loadedAccounts && window.BackgroundAccountsLoader) {
+            const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+            if (accounts.length > 0) {
+              state.dataAccounts = accounts;
+              state.loadedAccounts = true;
+              console.log('[ListDetail] ✓ BackgroundAccountsLoader ready after', (attempt + 1) * 100, 'ms with', accounts.length, 'accounts');
+            }
+          }
+          
+          // Break if both are loaded
+          if (state.loadedPeople && state.loadedAccounts) {
+            break;
+          }
+        }
+        
+        if (!state.loadedPeople || !state.loadedAccounts) {
+          console.warn('[ListDetail] ⚠ Timeout waiting for background loaders after 3 seconds', {
+            peopleLoaded: state.loadedPeople,
+            accountsLoaded: state.loadedAccounts
+          });
+        }
+      }
+      
+      // FINAL FALLBACK: Use CacheManager or Firestore
+      if (!state.loadedPeople || !state.loadedAccounts) {
+        if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+          if (!state.loadedPeople) {
+            state.dataPeople = await window.CacheManager.get('contacts') || [];
+            state.loadedPeople = true;
+            console.debug('[ListDetail] loadDataOnce: people loaded from CacheManager', { count: state.dataPeople.length });
+          }
+          
+          if (!state.loadedAccounts) {
+            state.dataAccounts = await window.CacheManager.get('accounts') || [];
+            state.loadedAccounts = true;
+            console.debug('[ListDetail] loadDataOnce: accounts loaded from CacheManager', { count: state.dataAccounts.length });
+          }
+        } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+          // Firestore fallback
+          if (!state.loadedPeople) {
+            const peopleSnap = await window.firebaseDB.collection('contacts').get();
+            state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            state.loadedPeople = true;
+            console.debug('[ListDetail] loadDataOnce: people loaded from Firestore', { count: state.dataPeople.length });
+          }
+          
+          if (!state.loadedAccounts) {
+            const accountsSnap = await window.firebaseDB.collection('accounts').get();
+            state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            state.loadedAccounts = true;
+            console.debug('[ListDetail] loadDataOnce: accounts loaded from Firestore', { count: state.dataAccounts.length });
+          }
+        }
+      }
+      
+      // Ensure defaults
+      state.dataPeople = state.dataPeople || [];
+      state.dataAccounts = state.dataAccounts || [];
+      state.loadedPeople = true;
+      state.loadedAccounts = true;
+      
     } catch (e) {
-      console.error('Failed loading list detail data:', e);
+      console.error('[ListDetail] Failed loading data:', e);
       state.dataPeople = state.dataPeople || [];
       state.dataAccounts = state.dataAccounts || [];
       state.loadedPeople = true;
@@ -1082,7 +1131,7 @@
   function render() {
     if (!els.tbody) return;
     const pageItems = getPageItems();
-    const rows = pageItems.map((item) => state.view === 'people' ? rowHtmlPeople(item) : rowHtmlAccount(item)).join('');
+    let rows = pageItems.map((item) => state.view === 'people' ? rowHtmlPeople(item) : rowHtmlAccount(item)).join('');
 
     // If this isn't the first render, pre-mark icons as loaded to prevent animation flicker
     if (state.hasAnimated && rows) {
@@ -1562,12 +1611,28 @@
     if (!window._listDetailRestoreListenerBound) {
       document.addEventListener('pc:list-detail-restore', (e) => {
         if (!e.detail) return;
-        const { page, scroll, filters } = e.detail;
+        const { page, scroll, filters, view, listId, listName } = e.detail;
         
         console.log('[ListDetail] Restore event received:', e.detail);
         
         // Mark as animated to prevent row animations
         state.hasAnimated = true;
+        
+        // Restore list context (view, listId, listName)
+        if (view) {
+          state.view = view;
+          console.log('[ListDetail] Restored view:', view);
+        }
+        if (listId) {
+          state.listId = listId;
+        }
+        if (listName) {
+          state.listName = listName;
+          // Update page title
+          if (els.detailTitle) {
+            els.detailTitle.textContent = listName;
+          }
+        }
         
         // Restore page
         if (page) {
@@ -1586,6 +1651,9 @@
             state.flags = { ...state.flags, ...filters.flags };
           }
         }
+        
+        // Re-render table header for correct columns (people vs accounts)
+        renderTableHead();
         
         // Re-render with restored state
         applyFilters();

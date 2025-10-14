@@ -901,12 +901,11 @@ var console = {
     // RESTORE: If state is empty but allAccountsCache exists, restore it
     if ((!state.data || state.data.length === 0) && state.allAccountsCache && state.allAccountsCache.length > 0) {
       console.log('[Accounts] Restoring from allAccountsCache:', state.allAccountsCache.length, 'accounts');
-      // Restore first page of accounts for pagination
-      const pageSize = 100;
-      state.data = state.allAccountsCache.slice(0, pageSize);
+      // Load ALL cached accounts for proper pagination
+      state.data = state.allAccountsCache;
       state.filtered = state.data.slice();
       state.totalCount = state.allAccountsCache.length;
-      state.hasMore = state.allAccountsCache.length > pageSize;
+      state.hasMore = false;
       state.loaded = true;
       render();
       return; // Don't reload from Firebase/cache again

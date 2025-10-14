@@ -1772,17 +1772,17 @@
       console.log('[People] Restoring from allContactsCache:', state.allContactsCache.length, 'contacts');
       state.data = state.allContactsCache.slice();
       state.filtered = state.data.slice();
-      state.loaded = true;
-      render();
+        state.loaded = true;
+        render();
       return; // Don't reload from Firebase/cache again
     }
     
     // Allow reload if data is actually empty (failed or cleared)
     if (state.loaded && state.data && state.data.length > 0) {
       console.log('[People] Data already loaded:', state.data.length, 'contacts');
-      return;
-    }
-    
+        return;
+      }
+      
     // If loaded flag is set but data is empty, reset and reload
     if (state.loaded && (!state.data || state.data.length === 0)) {
       console.log('[People] Loaded flag set but data empty, resetting...');
@@ -1891,7 +1891,7 @@
         state.currentPage = targetPage;
         console.log('[People] Restoring to page:', targetPage, 'from back navigation');
       } else {
-        state.currentPage = 1;
+      state.currentPage = 1;
       }
       
       // Ensure cache is saved immediately for subsequent visits
@@ -3040,7 +3040,7 @@
           
           // Only render if not currently restoring from navigation
           if (!window.__restoringPeople) {
-            applyFilters();
+          applyFilters();
           } else {
             console.log('[People] Skipping render due to active restoration - contact update will be applied when restoration completes');
           }

@@ -2896,6 +2896,59 @@ var console = {
           }
         }
         
+        // Update ALL contact caches to include the new contact
+        if (newContact) {
+          // Update account detail people cache
+          if (!window._accountDetailPeopleCache) {
+            window._accountDetailPeopleCache = [];
+          }
+          const exists = window._accountDetailPeopleCache.find(c => c.id === newContact.id);
+          if (!exists) {
+            window._accountDetailPeopleCache.push(newContact);
+            console.log('[AccountDetail] Added new contact to _accountDetailPeopleCache');
+          }
+          
+          // Update BackgroundContactsLoader if available
+          if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+            const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+            const exists = contactsData.find(c => c.id === newContact.id);
+            if (!exists) {
+              contactsData.push(newContact);
+              console.log('[AccountDetail] Added new contact to BackgroundContactsLoader');
+            }
+          }
+          
+          // Update CacheManager contacts asynchronously
+          if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+            window.CacheManager.get('contacts').then(contacts => {
+              if (!contacts) contacts = [];
+              const exists = contacts.find(c => c.id === newContact.id);
+              if (!exists) {
+                contacts.push(newContact);
+                return window.CacheManager.set('contacts', contacts);
+              }
+            }).then(() => {
+              console.log('[AccountDetail] Added new contact to CacheManager and persisted');
+            }).catch(err => {
+              console.warn('[AccountDetail] Failed to update cache:', err);
+            });
+          }
+          
+          // Dispatch event to notify other modules
+          try {
+            const event = new CustomEvent('pc:contacts-loaded', {
+              detail: { 
+                count: window._accountDetailPeopleCache.length,
+                newContact: true 
+              }
+            });
+            document.dispatchEvent(event);
+            console.log('[AccountDetail] Dispatched pc:contacts-loaded event for new contact');
+          } catch (err) {
+            console.warn('[AccountDetail] Failed to dispatch event:', err);
+          }
+        }
+        
         // Refresh the contacts list
         const contactsList = document.getElementById('account-contacts-list');
         if (contactsList) {
@@ -2924,17 +2977,43 @@ var console = {
           }
         }
         
-        // Update cache
+        // Update account detail people cache
+        if (window._accountDetailPeopleCache && Array.isArray(window._accountDetailPeopleCache)) {
+          const idx = window._accountDetailPeopleCache.findIndex(c => c.id === contactId);
+          if (idx >= 0) {
+            window._accountDetailPeopleCache[idx] = {
+              ...window._accountDetailPeopleCache[idx],
+              ...changes
+            };
+            console.log('[AccountDetail] Updated contact in _accountDetailPeopleCache');
+          }
+        }
+        
+        // Update BackgroundContactsLoader if available
+        if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+          const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+          const idx = contactsData.findIndex(c => c.id === contactId);
+          if (idx >= 0) {
+            contactsData[idx] = {
+              ...contactsData[idx],
+              ...changes
+            };
+            console.log('[AccountDetail] Updated contact in BackgroundContactsLoader');
+          }
+        }
+        
+        // Update CacheManager
         if (window.CacheManager && typeof window.CacheManager.get === 'function') {
           window.CacheManager.get('contacts').then(contacts => {
             if (contacts) {
               const idx = contacts.findIndex(c => c.id === contactId);
               if (idx >= 0) {
                 contacts[idx] = { ...contacts[idx], ...changes };
-                window.CacheManager.set('contacts', contacts);
-                console.log('[AccountDetail] Updated contact in cache');
+                return window.CacheManager.set('contacts', contacts);
               }
             }
+          }).then(() => {
+            console.log('[AccountDetail] Updated contact in CacheManager and persisted');
           }).catch(() => {});
         }
         
@@ -3594,6 +3673,7 @@ var console = {
           // Store the source page for back button navigation
           window._contactNavigationSource = 'account-details';
           window._contactNavigationAccountId = state.currentAccount?.id;
+          window._contactNavigationAccount = state.currentAccount; // Store full object for prefetch
           
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             // Pre-hide the people page table to prevent flicker before contact detail loads

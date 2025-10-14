@@ -3266,16 +3266,39 @@
           // Navigate back to account details page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('account-details');
-            // Show the specific account
-            setTimeout(() => {
-              if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
-                window.showAccountDetail(window._contactNavigationAccountId);
+            // Use retry pattern to ensure account detail module is ready and data is loaded
+            requestAnimationFrame(() => {
+              const accountId = window._contactNavigationAccountId;
+              const accountObj = window._contactNavigationAccount;
+              
+              // Prefetch FIRST, before any retry attempts
+              if (accountObj) {
+                try { 
+                  window._prefetchedAccountForDetail = accountObj;
+                  console.log('[ContactDetail] Prefetched account for return navigation:', accountObj.name || accountObj.accountName);
+                } catch (_) {}
               }
-            }, 100);
+              
+              // Now do the retry
+              let attempts = 0;
+              const maxAttempts = 25;
+              const retryInterval = 80;
+              
+              const retry = () => {
+                attempts++;
+                if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
+                  window.showAccountDetail(accountId);
+                  // Clear navigation variables AFTER the call
+                  window._contactNavigationSource = null;
+                  window._contactNavigationAccountId = null;
+                  window._contactNavigationAccount = null;
+                } else if (attempts < maxAttempts) {
+                  setTimeout(retry, retryInterval);
+                }
+              };
+              retry();
+            });
           }
-          // Clear the navigation source
-          window._contactNavigationSource = null;
-          window._contactNavigationAccountId = null;
           return;
         }
         
