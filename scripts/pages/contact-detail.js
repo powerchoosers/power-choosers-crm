@@ -72,6 +72,18 @@
         }
         return;
       }
+      
+      // Company link click delegation (fix inconsistent behavior)
+      if (e.target.closest('#contact-company-link')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.currentContact && state.currentContact.id) {
+          window._contactNavigationSource = 'contact-detail';
+          window._contactNavigationContactId = state.currentContact.id;
+          navigateToAccountFromContact();
+        }
+        return;
+      }
     };
     
     // Attach to document with capture phase to catch events early
@@ -84,6 +96,25 @@
   
   // Initialize event delegation immediately
   setupEventDelegation();
+
+  // Listen for accounts data becoming available (ONCE)
+  if (!document._contactDetailAccountsListenerBound) {
+    document.addEventListener('pc:accounts-loaded', async (e) => {
+      console.log('[ContactDetail] Accounts loaded event received, count:', e.detail?.count);
+      
+      // Only re-render if we're showing a contact and don't have account data yet
+      if (state.currentContact && !state._linkedAccountId) {
+        console.log('[ContactDetail] Re-rendering contact detail with newly loaded account data');
+        try {
+          await renderContactDetail();
+        } catch (error) {
+          console.error('[ContactDetail] Error re-rendering after accounts loaded:', error);
+        }
+      }
+    });
+    document._contactDetailAccountsListenerBound = true;
+    console.log('[ContactDetail] Registered accounts-loaded listener');
+  }
 
   // Save a Contact field from the contact detail page
   async function saveField(field, value) {
@@ -658,7 +689,7 @@
       } catch (_) { /* noop */ }
       // Feedback and refresh UI
       try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) {}
-      try { renderContactDetail(); } catch (_) {}
+      try { await renderContactDetail(); } catch (_) {}
       close();
     });
 
@@ -1744,7 +1775,7 @@
     return formattedNumber;
   }
 
-  function showContactDetail(contactId, tempContact) {
+  async function showContactDetail(contactId, tempContact) {
     if (!initDomRefs()) return;
     
     // Find contact in people data, or use provided temporary contact
@@ -1905,7 +1936,7 @@
     if (els.page) { els.page.classList.add('contact-detail-mode'); }
     // Seed preferred phone selection from persisted value so the primary phone row reflects it immediately
     try { state.preferredPhoneField = String(contact.preferredPhoneField || '').trim(); } catch(_) { state.preferredPhoneField = ''; }
-    renderContactDetail();
+    await renderContactDetail();
     
     // Setup energy update listener for real-time sync with Health Widget
     try {
@@ -2107,23 +2138,158 @@
     return '';
   }
 
+  // Helper to safely get accounts data even if accounts.js hasn't loaded yet
+  // Helper to safely get accounts data - now simplified with background loader
+  async function getAccountsDataSafe() {
+    const log = window.console.log.bind(window.console); // Bypass log silencing
+    
+    // Priority 1: Background loader (always available, loads on app init)
+    if (window.BackgroundAccountsLoader) {
+      const data = window.BackgroundAccountsLoader.getAccountsData();
+      if (data && data.length > 0) {
+        log('[ContactDetail] Got', data.length, 'accounts from BackgroundAccountsLoader');
+        return data;
+      }
+    }
+    
+    // Priority 2: window.getAccountsData (if accounts.js is loaded)
+    if (typeof window.getAccountsData === 'function') {
+      const data = window.getAccountsData() || [];
+      if (data.length > 0) {
+        log('[ContactDetail] Got', data.length, 'accounts from window.getAccountsData');
+        return data;
+      }
+    }
+    
+    // Priority 3: Fallback to CacheManager (shouldn't happen with background loader)
+    if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+      try {
+        const cached = await window.CacheManager.get('accounts');
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+          log('[ContactDetail] Got', cached.length, 'accounts from CacheManager');
+          return cached;
+        }
+      } catch (err) {
+        window.console.warn('[ContactDetail] Cache read failed:', err);
+      }
+    }
+    
+    window.console.warn('[ContactDetail] No accounts data available');
+    return [];
+  }
+
   // Find the associated account for this contact (by id or normalized company name)
-  function findAssociatedAccount(contact) {
+  async function findAssociatedAccount(contact, maxRetries = 3) {
     try {
-      if (!contact || typeof window.getAccountsData !== 'function') return null;
-      const accounts = window.getAccountsData() || [];
+      let accounts = [];
+      
+      // Try getting accounts with retry logic
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        accounts = await getAccountsDataSafe();
+        
+        if (accounts.length > 0) {
+          console.log('[ContactDetail] Got', accounts.length, 'accounts on attempt', attempt + 1);
+          break;
+        }
+        
+        // Wait before retrying (50ms, 100ms, 200ms exponential backoff)
+        if (attempt < maxRetries - 1) {
+          const delay = 50 * Math.pow(2, attempt);
+          console.log('[ContactDetail] No accounts yet, retrying in', delay, 'ms...');
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      
+      if (!contact || accounts.length === 0) {
+        console.warn('[ContactDetail] No accounts available after', maxRetries, 'retries');
+        return null;
+      }
+      
       // Prefer explicit accountId
       const accountId = contact.accountId || contact.account_id || '';
       if (accountId) {
         const m = accounts.find(a => a.id === accountId);
-        if (m) return m;
+        if (m) {
+          console.log('[ContactDetail] Found account by ID:', m.accountName || m.name);
+          return m;
+        }
       }
-      // Fallback to company name
-      const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
-      const key = norm(contact.companyName || contact.accountName || '');
-      if (!key) return null;
-      return accounts.find(a => norm(a.accountName || a.name || a.companyName) === key) || null;
-    } catch (_) { return null; }
+      
+      // Fallback to company name with safer fuzzy matching (token/Jaccard)
+      const STOP = new Set([
+        'inc','llc','ltd','corp','corporation','company','co','incorporated',
+        'group','international','services','solutions','systems','industries',
+        'manufacturing','electric','electrical','the','and','of','usa','us'
+      ]);
+      const norm = (s) => String(s || '').toLowerCase()
+        .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const toTokens = (s) => Array.from(new Set(
+        norm(s).split(' ').filter(w => w.length >= 3 && !STOP.has(w))
+      ));
+      
+      const contactName = contact.companyName || contact.accountName || '';
+      const key = norm(contactName);
+      
+      if (!key) {
+        window.console.log('[ContactDetail] No company name to match');
+        return null;
+      }
+      
+      window.console.log('[ContactDetail] Searching for account matching:', contactName, '(normalized:', key + ')');
+      
+      // Try exact match first
+      let match = accounts.find(a => {
+        const accountName = norm(a.accountName || a.name || a.companyName || '');
+        return accountName === key;
+      });
+      
+      // If no exact match, try token/Jaccard fallback
+      if (!match) {
+        const cTok = toTokens(contactName);
+        match = accounts.find(a => {
+          const aTok = toTokens(a.accountName || a.name || a.companyName || '');
+          if (!cTok.length || !aTok.length) return false;
+          const inter = aTok.filter(t => cTok.includes(t));
+          const jaccard = inter.length / (new Set([...aTok, ...cTok]).size);
+          return inter.length >= 2 || jaccard >= 0.5;
+        });
+        if (match) window.console.log('[ContactDetail] Found account by token/Jaccard match:', match.accountName || match.name);
+      } else {
+        window.console.log('[ContactDetail] Found account by exact match:', match.accountName || match.name);
+      }
+      
+      if (!match) {
+        window.console.warn('[ContactDetail] No account match for company:', contactName);
+        // Try one more fuzzy search - look for ANY words in common
+        const contactWords = key.split(' ').filter(w => w.length >= 3);
+        if (contactWords.length > 0) {
+          match = accounts.find(a => {
+            const accountName = norm(a.accountName || a.name || a.companyName || '');
+            const accountWords = accountName.split(' ').filter(w => w.length >= 3);
+            // Match if ANY word appears in both
+            return contactWords.some(cw => accountWords.some(aw => aw.includes(cw) || cw.includes(aw)));
+          });
+          if (match) {
+            window.console.log('[ContactDetail] Found account by word matching:', match.accountName || match.name);
+          }
+        }
+        
+        if (!match) {
+          // Log first 10 account names for debugging
+          const sampleNames = accounts.slice(0, 10).map(a => a.accountName || a.name).join(', ');
+          window.console.log('[ContactDetail] Sample account names:', sampleNames, '...');
+          window.console.log('[ContactDetail] Total accounts available:', accounts.length);
+        }
+      }
+      
+      return match || null;
+    } catch (err) {
+      console.error('[ContactDetail] Error finding account:', err);
+      return null;
+    }
   }
 
   function promotePageContent(){
@@ -2143,7 +2309,7 @@
     document.head.appendChild(style);
   }
 
-  function renderContactDetail() {
+  async function renderContactDetail() {
     if (!state.currentContact || !els.mainContent) return;
 
     const contact = state.currentContact;
@@ -2155,7 +2321,7 @@
     const city = contact.city || contact.locationCity || '';
     const stateVal = contact.state || contact.locationState || '';
     const industry = contact.industry || contact.companyIndustry || '';
-    const linkedAccount = findAssociatedAccount(contact);
+    const linkedAccount = await findAssociatedAccount(contact);
     // Cache for saves
     try { state._linkedAccountId = linkedAccount?.id || null; } catch (_) {}
     const electricitySupplier = linkedAccount?.electricitySupplier || '';
@@ -3222,12 +3388,18 @@
           try {
             const restore = window._peopleReturn || {};
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              // Set restoration flag so People page knows to restore state
+              try {
+                window.__restoringPeople = true;
+                window.__restoringPeopleUntil = Date.now() + 15000; // 15 seconds
+              } catch (_) {}
+              
               window.crm.navigateToPage('people');
               // Dispatch an event for People page to restore UI state
               setTimeout(() => {
                 try {
                   const ev = new CustomEvent('pc:people-restore', { detail: {
-                    page: restore.page, scroll: restore.scroll, filters: restore.filters, searchTerm: restore.searchTerm, sortColumn: restore.sortColumn, sortDirection: restore.sortDirection } });
+                    page: restore.page, scroll: restore.scroll, filters: restore.filters, searchTerm: restore.searchTerm, sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page } });
                   document.dispatchEvent(ev);
                   
                   // Clear navigation markers AFTER successful navigation and restore
@@ -3253,10 +3425,52 @@
                   state.prevPeopleContent = '';
                 }
               }
-              if (window.peopleModule && typeof window.peopleModule.rebindDynamic === 'function') {
+              if (window.peopleModule) {
+                // Ensure data is loaded before filtering
+                const peopleState = window.peopleModule.state || {};
+                console.log('[ContactDetail] People state check:', {
+                  loaded: peopleState.loaded,
+                  dataLength: peopleState.data?.length || 0
+                });
+                
+                // Check if data is actually loaded (not just the flag)
+                if (!peopleState.data || peopleState.data.length === 0) {
+                  console.log('[ContactDetail] People data empty, forcing reload');
+                  
+                  // Reset loaded flag if data is empty
+                  if (peopleState.loaded) {
+                    console.log('[ContactDetail] Resetting loaded flag');
+                    peopleState.loaded = false;
+                  }
+                  
+                  if (typeof window.peopleModule.loadDataOnce === 'function') {
+                    window.peopleModule.loadDataOnce().then(() => {
+                      console.log('[ContactDetail] People data reloaded');
+                      if (typeof window.peopleModule.applyFilters === 'function') {
+                        window.peopleModule.applyFilters();
+                      }
+                      if (typeof window.peopleModule.rebindDynamic === 'function') {
                 try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
-              } else if (window.peopleModule && typeof window.peopleModule.init === 'function') {
-                try { window.peopleModule.init(); } catch (e) { /* noop */ }
+                      }
+                    }).catch((error) => {
+                      console.error('[ContactDetail] Failed to reload people data:', error);
+                    });
+                  }
+                } else {
+                  // Data exists, just filter and rebind
+                  if (typeof window.peopleModule.applyFilters === 'function') {
+                    try { 
+                      console.log('[ContactDetail] Forcing people table re-render');
+                      window.peopleModule.applyFilters(); 
+                    } catch (e) { 
+                      console.error('[ContactDetail] Failed to re-render people table:', e);
+                    }
+                  }
+                  // Then rebind dynamic handlers
+                  if (typeof window.peopleModule.rebindDynamic === 'function') {
+                    try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
+                  }
+                }
               }
             } catch (_) { /* noop */ }
           } catch (_) { /* noop */ }
@@ -3285,11 +3499,53 @@
             state.prevPeopleContent = '';
           }
         }
-        // Ensure dynamic handlers remain intact
-        if (window.peopleModule && typeof window.peopleModule.rebindDynamic === 'function') {
+        // Ensure dynamic handlers remain intact and force table re-render
+        if (window.peopleModule) {
+          // Ensure data is loaded before filtering
+          const peopleState = window.peopleModule.state || {};
+          console.log('[ContactDetail] People state check (default):', {
+            loaded: peopleState.loaded,
+            dataLength: peopleState.data?.length || 0
+          });
+          
+          // Check if data is actually loaded (not just the flag)
+          if (!peopleState.data || peopleState.data.length === 0) {
+            console.log('[ContactDetail] People data empty, forcing reload');
+            
+            // Reset loaded flag if data is empty
+            if (peopleState.loaded) {
+              console.log('[ContactDetail] Resetting loaded flag');
+              peopleState.loaded = false;
+            }
+            
+            if (typeof window.peopleModule.loadDataOnce === 'function') {
+              window.peopleModule.loadDataOnce().then(() => {
+                console.log('[ContactDetail] People data reloaded');
+                if (typeof window.peopleModule.applyFilters === 'function') {
+                  window.peopleModule.applyFilters();
+                }
+                if (typeof window.peopleModule.rebindDynamic === 'function') {
           try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
-        } else if (window.peopleModule && typeof window.peopleModule.init === 'function') {
-          try { window.peopleModule.init(); } catch (e) { /* noop */ }
+                }
+              }).catch((error) => {
+                console.error('[ContactDetail] Failed to reload people data:', error);
+              });
+            }
+          } else {
+            // Data exists, just filter and rebind
+            if (typeof window.peopleModule.applyFilters === 'function') {
+              try { 
+                console.log('[ContactDetail] Forcing people table re-render');
+                window.peopleModule.applyFilters(); 
+              } catch (e) { 
+                console.error('[ContactDetail] Failed to re-render people table:', e);
+              }
+            }
+            // Then rebind dynamic handlers
+            if (typeof window.peopleModule.rebindDynamic === 'function') {
+              try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
+            }
+          }
         }
       };
       document.addEventListener('click', onBackClick, true);
@@ -3352,26 +3608,7 @@
       });
     });
 
-    // Company link -> open Account Detail
-    const compLink = document.getElementById('contact-company-link');
-    if (compLink && !compLink._bound) {
-      compLink.addEventListener('click', (e) => { 
-        e.preventDefault(); 
-        window._contactNavigationSource = 'contact-detail';
-        window._contactNavigationContactId = state.currentContact.id;
-        navigateToAccountFromContact(); 
-      });
-      compLink.addEventListener('keydown', (e) => { 
-        if (e.key === 'Enter' || e.key === ' ') { 
-          e.preventDefault(); 
-          window._contactNavigationSource = 'contact-detail';
-          window._contactNavigationContactId = state.currentContact.id;
-          navigateToAccountFromContact(); 
-        } 
-      });
-      compLink._bound = '1';
-    }
-
+    // NOTE: Company link now uses event delegation (see setupEventDelegation)
     // NOTE: "Add to List" and "Add to Sequences" buttons now use event delegation
     // Event listeners are attached at module initialization on document level
     // This eliminates race conditions when DOM is replaced during contact navigation
@@ -3505,7 +3742,7 @@
                 const updatedAddresses = linkedAccount.serviceAddresses.filter((_, idx) => idx !== addressIndex);
                 await saveAccountServiceAddresses(updatedAddresses);
                 // Re-render to update the UI
-                renderContactDetail();
+                await renderContactDetail();
                 return;
               }
             }
@@ -3540,7 +3777,7 @@
         await saveAccountServiceAddresses(updatedAddresses);
         
         // Re-render the contact detail to show the new address
-        renderContactDetail();
+        await renderContactDetail();
         
         // Find the newly added address field and start editing it
         setTimeout(() => {

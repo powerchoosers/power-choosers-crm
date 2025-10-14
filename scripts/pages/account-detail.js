@@ -1,5 +1,24 @@
 'use strict';
 
+// Silence verbose logs from this module unless explicitly enabled via localStorage CRM_DEBUG_ACCOUNT_DETAIL=1
+// This shadowed console only affects this file, not the whole app
+var __ACCOUNT_DETAIL_ORIG_CONSOLE__ = window.console || {};
+function __accountDetailDebugEnabled__(){
+  try {
+    const v = localStorage.getItem('CRM_DEBUG_ACCOUNT_DETAIL');
+    if (v != null) return v === '1' || v === 'true';
+  } catch(_) {}
+  return !!window.CRM_DEBUG_ACCOUNT_DETAIL;
+}
+// eslint-disable-next-line no-redeclare
+var console = {
+  log: function() { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.log.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); },
+  warn: __ACCOUNT_DETAIL_ORIG_CONSOLE__.warn || function(){},
+  error: __ACCOUNT_DETAIL_ORIG_CONSOLE__.error || function(){},
+  info: function() { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.info.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); },
+  debug: function() { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.debug.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); }
+};
+
 // Account Detail page module
 (function () {
   const state = {
@@ -11,6 +30,14 @@
   
   // Track event listeners for cleanup
   const eventListeners = [];
+
+  // Export API immediately so other modules can reference it
+  window.AccountDetail = {
+    show: null,  // Will be set when functions are defined
+    setupEnergyUpdateListener: null,
+    setupParentCompanyAutocomplete: null,
+    state: state  // Expose state for debugging and other modules
+  };
 
   // Set up event delegation for account detail buttons on stable parent
   // This runs once and handles all button clicks regardless of DOM replacement
@@ -69,6 +96,40 @@
   // Initialize event delegation immediately
   setupEventDelegation();
 
+  // Listen for contacts data becoming available (ONCE)
+  if (!document._accountDetailContactsListenerBound) {
+    document.addEventListener('pc:contacts-loaded', async (e) => {
+      console.log('[AccountDetail] Contacts loaded event received, count:', e.detail?.count);
+      
+      // Update the contacts cache
+      if (typeof window.getPeopleData === 'function') {
+        window._accountDetailPeopleCache = window.getPeopleData() || [];
+        console.log('[AccountDetail] Updated people cache from event:', window._accountDetailPeopleCache.length);
+      }
+      
+      // Re-render just the contacts section if we're showing an account
+      if (state.currentAccount && window._accountDetailPeopleCache && window._accountDetailPeopleCache.length > 0) {
+        const contactsList = document.getElementById('account-contacts-list');
+        if (contactsList) {
+          console.log('[AccountDetail] Re-rendering contacts section with', window._accountDetailPeopleCache.length, 'contacts');
+          try {
+            contactsList.innerHTML = renderAccountContacts(state.currentAccount);
+            bindContactItemEvents();
+            console.log('[AccountDetail] Contacts section re-rendered successfully');
+          } catch (error) {
+            console.error('[AccountDetail] Error re-rendering contacts:', error);
+          }
+        } else {
+          console.warn('[AccountDetail] Contact list element not found');
+        }
+      } else {
+        console.log('[AccountDetail] Not re-rendering: account=', !!state.currentAccount, 'cache length=', window._accountDetailPeopleCache?.length);
+      }
+    });
+    document._accountDetailContactsListenerBound = true;
+    console.log('[AccountDetail] Registered contacts-loaded listener');
+  }
+
   // ==== Date helpers for Energy & Contract fields ====
   function parseDateFlexible(s){
     if (!s) return null;
@@ -121,97 +182,13 @@
     }
     if (!initDomRefs()) return;
 
-    // STEP 1: Clear old account and ALL old content IMMEDIATELY
+    // Set loading state but don't clear DOM (prevents flicker)
     state.currentAccount = null;
-    
-    const headerSection = els.pageContainer ? els.pageContainer.querySelector('.page-title-section') : null;
-    
-    // Clear header completely first (prevents flash of old content)
-    if (headerSection) {
-      headerSection.innerHTML = '';
-    }
-    if (els.mainContent) {
-      els.mainContent.innerHTML = '';
-    }
-    
-    // STEP 2: Quick check - is account in cache? (synchronous)
-    let accountFromCache = null;
-    let needsLoading = false;
-    
-    try {
-      if (window._prefetchedAccountForDetail && window._prefetchedAccountForDetail.id === accountId) {
-        accountFromCache = window._prefetchedAccountForDetail;
-        window._prefetchedAccountForDetail = null;
-      } else if (window.getAccountsData) {
-        const accounts = window.getAccountsData(true);
-        accountFromCache = accounts.find(a => a.id === accountId);
-      }
-      needsLoading = !accountFromCache;
-    } catch (_) {
-      needsLoading = true;
-    }
-    
-    // STEP 3: Only show loading state if we need to fetch from Firebase
-    if (needsLoading) {
-      // Small delay to ensure clear happens before skeleton (prevents flash)
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      // Show loading skeleton in header
-      if (headerSection) {
-        headerSection.innerHTML = `
-          <div class="contact-header-info account-detail-loading">
-            <button class="back-btn back-btn--icon" id="back-to-accounts" aria-label="Back to Accounts" title="Back to Accounts">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-            </button>
-            <div class="contact-header-profile">
-              <div style="width: 64px; height: 64px; border-radius: 8px; background: var(--grey-300); margin-right: 16px;"></div>
-              <div class="contact-header-text">
-                <div class="skeleton-loader" style="width: 240px; height: 28px; background: linear-gradient(90deg, var(--grey-300) 0%, var(--grey-400) 50%, var(--grey-300) 100%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; margin-bottom: 8px;"></div>
-                <div class="skeleton-loader" style="width: 160px; height: 16px; background: linear-gradient(90deg, var(--grey-300) 0%, var(--grey-400) 50%, var(--grey-300) 100%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px;"></div>
-              </div>
-            </div>
-          </div>
-          <div class="page-actions">
-            <button class="btn-secondary" disabled style="opacity: 0.5;">Edit Account</button>
-          </div>
-          <style>
-            @keyframes shimmer {
-              0% { background-position: 200% 0; }
-              100% { background-position: -200% 0; }
-            }
-            .account-detail-loading {
-              opacity: 1;
-              transition: opacity 0.3s ease-out;
-            }
-            .account-detail-loading.fade-out {
-              opacity: 0;
-            }
-          </style>
-        `;
-      }
-      
-      // Show loading spinner in body
-      if (els.mainContent) {
-        els.mainContent.innerHTML = `
-          <div class="account-body-loading" style="display: flex; align-items: center; justify-content: center; min-height: 400px; flex-direction: column; gap: 16px; opacity: 1; transition: opacity 0.3s ease-out;">
-            <div class="loading-spinner" style="width: 32px; height: 32px; border: 3px solid var(--grey-400); border-top: 3px solid var(--orange-subtle); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
-            <p style="color: var(--text-secondary); font-size: 14px;">Loading account...</p>
-          </div>
-          <style>
-            @keyframes spin { to { transform: rotate(360deg); } }
-            .account-body-loading.fade-out {
-              opacity: 0;
-            }
-          </style>
-        `;
-      }
-    }
 
     const account = await findAccountById(accountId);
     if (!account) {
       console.error('Account not found:', accountId);
+      const headerSection = els.pageContainer ? els.pageContainer.querySelector('.page-title-section') : null;
       if (headerSection) {
         headerSection.innerHTML = `
           <div class="contact-header-info">
@@ -240,42 +217,75 @@
 
     state.currentAccount = account;
     
-    // If we showed loading states, fade them out before rendering
-    if (needsLoading) {
-      const loadingHeader = headerSection ? headerSection.querySelector('.account-detail-loading') : null;
-      const loadingBody = els.mainContent ? els.mainContent.querySelector('.account-body-loading') : null;
+    // Load contacts data upfront for renderAccountContacts
+    let contactsLoaded = false;
+    try {
+      if (typeof window.getPeopleData === 'function') {
+        window._accountDetailPeopleCache = window.getPeopleData() || [];
+        console.log('[AccountDetail] Cached people data from people.js:', window._accountDetailPeopleCache.length);
+        contactsLoaded = window._accountDetailPeopleCache.length > 0;
+      } else if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+        console.log('[AccountDetail] Loading people data from cache...');
+        const contacts = await window.CacheManager.get('contacts');
+        window._accountDetailPeopleCache = (contacts && Array.isArray(contacts)) ? contacts : [];
+        console.log('[AccountDetail] Cached people data from CacheManager:', window._accountDetailPeopleCache.length);
+        contactsLoaded = window._accountDetailPeopleCache.length > 0;
+      } else {
+        // If people.js hasn't loaded and no cache, contacts will load via event
+        console.log('[AccountDetail] No people data available yet, will update when loaded');
+        window._accountDetailPeopleCache = [];
+        contactsLoaded = false;
+      }
+    } catch (error) {
+      console.error('[AccountDetail] Failed to load people data:', error);
+      window._accountDetailPeopleCache = [];
+      contactsLoaded = false;
+    }
+    
+    console.log('[AccountDetail] Contacts loaded:', contactsLoaded, 'Count:', window._accountDetailPeopleCache.length);
+    
+    // Render account detail immediately (no animations)
+    try {
+      if (!account) {
+        console.error('[AccountDetail] Cannot render: account is null');
+        return;
+      }
+      if (!els.mainContent) {
+        console.error('[AccountDetail] Cannot render: els.mainContent is null');
+        return;
+      }
       
-      if (loadingHeader) loadingHeader.classList.add('fade-out');
-      if (loadingBody) loadingBody.classList.add('fade-out');
-      
-      // Wait for fade-out, then render with fade-in
-      setTimeout(() => {
-    renderAccountDetail();
-        
-        requestAnimationFrame(() => {
-          const newHeaderSection = els.pageContainer ? els.pageContainer.querySelector('.page-title-section') : null;
-          const newContent = els.mainContent;
-          
-          if (newHeaderSection) {
-            newHeaderSection.style.opacity = '0';
-            newHeaderSection.style.transition = 'opacity 0.4s ease-in';
-            requestAnimationFrame(() => {
-              newHeaderSection.style.opacity = '1';
-            });
-          }
-          
-          if (newContent) {
-            newContent.style.opacity = '0';
-            newContent.style.transition = 'opacity 0.4s ease-in';
-            requestAnimationFrame(() => {
-              newContent.style.opacity = '1';
-            });
-          }
-        });
-      }, 300);
-    } else {
-      // Account was in cache - render immediately without animations
+      console.log('[AccountDetail] Rendering account:', account.accountName || account.name);
       renderAccountDetail();
+      console.log('[AccountDetail] Render complete');
+    } catch (error) {
+      console.error('[AccountDetail] Error during render:', error);
+    }
+    
+    // If no contacts loaded and account is rendering, set up retry
+    if (!contactsLoaded && state.currentAccount) {
+      console.log('[AccountDetail] No contacts available yet, will retry when event fires');
+      
+      // Add a one-time retry with timeout in case event doesn't fire
+      setTimeout(async () => {
+        if (window._accountDetailPeopleCache && window._accountDetailPeopleCache.length === 0) {
+          // Try loading again
+          if (typeof window.getPeopleData === 'function') {
+            window._accountDetailPeopleCache = window.getPeopleData() || [];
+            console.log('[AccountDetail] Retry: Got', window._accountDetailPeopleCache.length, 'contacts');
+            
+            // Update contacts section
+            if (window._accountDetailPeopleCache.length > 0) {
+              const contactsList = document.getElementById('account-contacts-list');
+              if (contactsList && state.currentAccount) {
+                console.log('[AccountDetail] Retry: Re-rendering contacts section');
+                contactsList.innerHTML = renderAccountContacts(state.currentAccount);
+                bindContactItemEvents();
+              }
+            }
+          }
+        }
+      }, 1000); // Retry after 1 second
     }
     
     // Setup energy update listener for real-time sync with Health Widget (ONCE)
@@ -702,28 +712,106 @@
     document.head.appendChild(style);
   }
 
+  // Helper to safely get people data - now simplified with background loader
+  async function getPeopleDataSafe() {
+    const log = window.console.log.bind(window.console); // Bypass log silencing
+    
+    // Priority 1: Background loader (always available, loads on app init)
+    if (window.BackgroundContactsLoader) {
+      const data = window.BackgroundContactsLoader.getContactsData();
+      if (data && data.length > 0) {
+        log('[AccountDetail] Got', data.length, 'contacts from BackgroundContactsLoader');
+        return data;
+      }
+    }
+    
+    // Priority 2: window.getPeopleData (if people.js is loaded)
+    if (typeof window.getPeopleData === 'function') {
+      const data = window.getPeopleData() || [];
+      if (data.length > 0) {
+        log('[AccountDetail] Got', data.length, 'contacts from window.getPeopleData');
+        return data;
+      }
+    }
+    
+    // Priority 3: Fallback to CacheManager (shouldn't happen with background loader)
+    if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+      try {
+        const cached = await window.CacheManager.get('contacts');
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+          log('[AccountDetail] Got', cached.length, 'contacts from CacheManager');
+          return cached;
+        }
+      } catch (err) {
+        window.console.warn('[AccountDetail] Cache read failed:', err);
+      }
+    }
+    
+    window.console.warn('[AccountDetail] No contacts data available');
+    return [];
+  }
+
   function renderAccountContacts(account, page = 1, pageSize = 4) {
-    if (!account || !window.getPeopleData) {
+    const log = window.console.log.bind(window.console); // Bypass log silencing
+    
+    // Use cached data from window scope (loaded upfront in showAccountDetail)
+    let allContacts = [];
+    
+    if (typeof window.getPeopleData === 'function') {
+      allContacts = window.getPeopleData() || [];
+      log('[AccountDetail] Got', allContacts.length, 'contacts from getPeopleData');
+    } else if (window._accountDetailPeopleCache && Array.isArray(window._accountDetailPeopleCache)) {
+      allContacts = window._accountDetailPeopleCache;
+      log('[AccountDetail] Got', allContacts.length, 'contacts from _accountDetailPeopleCache');
+    } else {
+      log('[AccountDetail] NO CONTACTS SOURCE AVAILABLE!');
+    }
+    
+    log('[AccountDetail] renderAccountContacts called: account=', account?.accountName || account?.name, 'allContacts=', allContacts.length);
+    
+    if (!account) {
+      log('[AccountDetail] ERROR: No account provided to renderAccountContacts');
       return '<div class="contacts-placeholder">No contacts found</div>';
+    }
+    
+    if (allContacts.length === 0) {
+      log('[AccountDetail] ERROR: No contacts in cache - cannot render');
+      return '<div class="contacts-placeholder">No contacts found (cache empty)</div>';
     }
 
     try {
-      const allContacts = window.getPeopleData() || [];
       const accountName = account.accountName || account.name || account.companyName;
       
-      // Find contacts associated with this account
+      // Normalize function for fuzzy matching (same as contact-detail.js)
+      const norm = (s) => String(s || '').toLowerCase()
+        .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '') // Remove USA/US suffixes
+        .replace(/\b(inc|llc|ltd|corp|corporation|company|co|incorporated)\b/g, '') // Remove common suffixes
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      const normalizedAccountName = norm(accountName);
+      
+      // Find contacts associated with this account (STRICT)
+      // 1) Prefer explicit accountId match
+      // 2) Fallback: exact normalized company name match only
       const associatedContacts = allContacts.filter(contact => {
-        // Check if contact has accountId matching this account
-        if (contact.accountId === account.id) return true;
-        
-        // Check if contact's company name matches this account name
+        if (contact.accountId === account.id || contact.account_id === account.id) return true;
         const contactCompany = contact.companyName || contact.accountName || '';
-        return contactCompany.toLowerCase().trim() === accountName.toLowerCase().trim();
+        return norm(contactCompany) === normalizedAccountName;
       });
-
+      
+      log('[AccountDetail] Found', associatedContacts.length, 'contacts for account:', accountName);
+      
       if (associatedContacts.length === 0) {
+        // Debug: Show why no contacts matched
+        log('[AccountDetail] No contacts matched. Normalized account name:', normalizedAccountName);
+        log('[AccountDetail] Sample contact companies (first 5):', 
+          allContacts.slice(0, 5).map(c => c.companyName || c.accountName).join(', '));
         return '<div class="contacts-placeholder">No contacts found for this account</div>';
       }
+      
+      log('[AccountDetail] Rendering', associatedContacts.length, 'contacts');
 
       // Store all contacts in state for pagination
       state._allContacts = associatedContacts;
@@ -2928,11 +3016,17 @@
           try {
             const restore = window._peopleReturn || {};
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              // Set restoration flag so People page knows to restore state
+              try {
+                window.__restoringPeople = true;
+                window.__restoringPeopleUntil = Date.now() + 15000; // 15 seconds
+              } catch (_) {}
+              
               window.crm.navigateToPage('people');
               // Dispatch an event for People page to restore pagination and scroll
               setTimeout(() => {
                 try {
-                  const ev = new CustomEvent('pc:people-restore', { detail: { page: restore.page, scroll: restore.scroll } });
+                  const ev = new CustomEvent('pc:people-restore', { detail: { page: restore.page, scroll: restore.scroll, currentPage: restore.currentPage || restore.page } });
                   document.dispatchEvent(ev);
                 } catch(_) {}
               }, 40);
@@ -5838,12 +5932,11 @@
     });
   }
 
-  // Export API
-  window.AccountDetail = {
-    show: showAccountDetail,
-    setupEnergyUpdateListener: setupEnergyUpdateListener,
-    setupParentCompanyAutocomplete: setupParentCompanyAutocomplete
-  };
+  // Set actual function references (object already created at module top)
+  window.AccountDetail.show = showAccountDetail;
+  window.AccountDetail.setupEnergyUpdateListener = setupEnergyUpdateListener;
+  window.AccountDetail.setupParentCompanyAutocomplete = setupParentCompanyAutocomplete;
+  
   // Backward-compat global alias used by some modules
   try { window.showAccountDetail = showAccountDetail; } catch (_) {}
 })();
