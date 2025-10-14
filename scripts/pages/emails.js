@@ -866,6 +866,18 @@ class EmailManager {
             }
             const output = data?.output || '';
             const templateType = data?.templateType || null;
+            const metadata = data?.metadata || null;
+            
+            // Store tracking metadata for cold emails
+            if (templateType === 'cold_email' && metadata) {
+                this._lastGeneratedMetadata = {
+                    subject_style: metadata.subject_style,
+                    cta_type: metadata.cta_type,
+                    opening_style: metadata.opening_style,
+                    generated_at: metadata.generated_at
+                };
+                console.log('[AI] Cold email metadata stored:', this._lastGeneratedMetadata);
+            }
             
             // Store citations if available (for future enhancement)
             if (data?.citations && data.citations.length > 0) {
@@ -3792,7 +3804,9 @@ ${sections.length > 1 ? `
             emailType: computedEmailType,
             // Gmail API specific data
             sentVia: emailData.sentVia || 'simulation',
-            gmailMessageId: emailData.gmailMessageId
+            gmailMessageId: emailData.gmailMessageId,
+            // Tracking metadata for cold email performance
+            trackingMetadata: emailData.trackingMetadata || null
         };
     }
 
@@ -5846,7 +5860,7 @@ ${sections.length > 1 ? `
 
     async sendEmailViaSendGrid(emailData) {
         try {
-            const { to, subject, content, _deliverability, threadId, inReplyTo, references } = emailData;
+            const { to, subject, content, _deliverability, threadId, inReplyTo, references, trackingMetadata } = emailData;
             
             // Generate unique tracking ID for this email
             const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -5894,7 +5908,8 @@ ${sections.length > 1 ? `
                     sentAt: new Date().toISOString(),
                     threadId: threadId || null,
                     inReplyTo: inReplyTo || null,
-                    references: Array.isArray(references) ? references : (references ? [references] : [])
+                    references: Array.isArray(references) ? references : (references ? [references] : []),
+                    trackingMetadata: trackingMetadata || null
                 };
                 
                 try {
@@ -5976,7 +5991,8 @@ ${sections.length > 1 ? `
             const emailData = {
                 to: to.split(',').map(email => email.trim()),
                 subject,
-                content: contentWithSignature
+                content: contentWithSignature,
+                trackingMetadata: this._lastGeneratedMetadata
             };
 
             // Send via SendGrid
@@ -5985,6 +6001,29 @@ ${sections.length > 1 ? `
                 console.log('[EmailManager] Sending via SendGrid...');
                 result = await this.sendEmailViaSendGrid({ ...emailData, _deliverability: deliver });
                 console.log('[EmailManager] Email sent via SendGrid');
+                
+                // Track email performance if metadata is available
+                if (this._lastGeneratedMetadata) {
+                    const trackingData = {
+                        emailId: result.trackingId || `email_${Date.now()}`,
+                        recipientEmail: to,
+                        subjectStyle: this._lastGeneratedMetadata.subject_style,
+                        ctaType: this._lastGeneratedMetadata.cta_type,
+                        openingStyle: this._lastGeneratedMetadata.opening_style,
+                        timestamp: new Date().toISOString(),
+                        event: 'sent'
+                    };
+                    
+                    // Send to tracking endpoint
+                    fetch('/api/track-email-performance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(trackingData)
+                    }).catch(err => console.warn('[Tracking] Failed to log send event:', err));
+                    
+                    // Clear metadata after tracking
+                    this._lastGeneratedMetadata = null;
+                }
             } catch (sendGridError) {
                 console.error('[EmailManager] SendGrid failed:', sendGridError);
                 throw new Error(`Failed to send email: ${sendGridError.message}`);
@@ -6577,6 +6616,26 @@ ${sections.length > 1 ? `
         // Show notification
         if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast(`📧 ${notification.message}`, 'success');
+        }
+
+        // Track email open event if we have tracking metadata
+        if (notification.emailId) {
+            // Try to find the email in our list to get tracking metadata
+            const email = this.emails?.find(e => e.id === notification.emailId);
+            if (email && email.trackingMetadata) {
+                const trackingData = {
+                    ...email.trackingMetadata,
+                    event: 'opened',
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Send to tracking endpoint
+                fetch('/api/track-email-performance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(trackingData)
+                }).catch(err => console.warn('[Tracking] Failed to log open event:', err));
+            }
         }
 
         // Real-time listener will automatically update the UI
