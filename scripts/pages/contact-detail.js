@@ -6382,23 +6382,25 @@ async function createContactSequenceThenAdd(name) {
     };
     document.addEventListener('mousedown', _onContactListsOutside, true);
 
-    function handleListChoose(el) {
-      const action = el.getAttribute('data-action');
-      if (action === 'create') {
-        const name = window.prompt('New list name');
-        if (!name) return;
-        createContactListThenAdd(name.trim());
-        return;
-      }
-      const id = el.getAttribute('data-id');
-      const name = el.getAttribute('data-name') || 'List';
-      const memberDocId = el.getAttribute('data-member-id');
-      if (memberDocId) {
-        // Already a member -> remove from list
-        removeCurrentContactFromList(memberDocId, name);
-      } else {
-        addCurrentContactToList(id, name);
-      }
+  }
+
+  // Handle list selection (moved to global scope to fix reference error)
+  function handleListChoose(el) {
+    const action = el.getAttribute('data-action');
+    if (action === 'create') {
+      const name = window.prompt('New list name');
+      if (!name) return;
+      createContactListThenAdd(name.trim());
+      return;
+    }
+    const id = el.getAttribute('data-id');
+    const name = el.getAttribute('data-name') || 'List';
+    const memberDocId = el.getAttribute('data-member-id');
+    if (memberDocId) {
+      // Already a member -> remove from list
+      removeCurrentContactFromList(memberDocId, name);
+    } else {
+      addCurrentContactToList(id, name);
     }
   }
 
