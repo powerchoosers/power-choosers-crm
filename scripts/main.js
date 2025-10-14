@@ -1869,6 +1869,23 @@ class PowerChoosersCRM {
         const nextBtn1 = modal.querySelector('#csv-next-step-1');
         if (nextBtn1) nextBtn1.disabled = true;
         
+        // Reset Step 3 completion state
+        const progressDiv = modal.querySelector('#csv-import-progress');
+        const resultsDiv = modal.querySelector('#csv-import-results');
+        const summaryDiv = modal.querySelector('#csv-results-summary');
+        const startBtn = modal.querySelector('#csv-start-import');
+        const finishBtn = modal.querySelector('#csv-finish-import');
+        const reviewSummary = modal.querySelector('#csv-review-summary');
+        const finalPreview = modal.querySelector('#csv-final-preview');
+        
+        if (progressDiv) progressDiv.hidden = true;
+        if (resultsDiv) resultsDiv.hidden = true;
+        if (summaryDiv) summaryDiv.innerHTML = '';
+        if (startBtn) startBtn.hidden = false;
+        if (finishBtn) finishBtn.hidden = true;
+        if (reviewSummary) reviewSummary.innerHTML = '';
+        if (finalPreview) finalPreview.innerHTML = '';
+        
         // Clear any stored data
         modal._csvData = null;
         modal._csvHeaders = null;

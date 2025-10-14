@@ -3289,8 +3289,8 @@
                 if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
                   window.showAccountDetail(accountId);
                   // Clear navigation variables AFTER the call
-                  window._contactNavigationSource = null;
-                  window._contactNavigationAccountId = null;
+          window._contactNavigationSource = null;
+          window._contactNavigationAccountId = null;
                   window._contactNavigationAccount = null;
                 } else if (attempts < maxAttempts) {
                   setTimeout(retry, retryInterval);
@@ -6546,9 +6546,7 @@ async function createContactSequenceThenAdd(name) {
       // Click handlers
       container.querySelectorAll('.list-item').forEach(el => {
         el.addEventListener('click', () => {
-          el.focus();
-          const evt = new KeyboardEvent('keydown', { key: 'Enter' });
-          document.dispatchEvent(evt);
+          handleListChoose(el);
         });
       });
     } catch (err) {
