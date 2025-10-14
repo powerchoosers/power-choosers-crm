@@ -11,6 +11,7 @@
     loadedAccounts: false,
     pageSize: 50,
     currentPage: 1,
+    hasAnimated: false, // Prevent re-animation on restore
     selectedPeople: new Set(),
     selectedAccounts: new Set(),
     // List detail context
@@ -288,6 +289,23 @@
             window._contactNavigationListId = state.listId;
             window._contactNavigationListName = state.listName;
             
+            // Capture state for restoration
+            try {
+              window._listDetailReturn = {
+                page: state.currentPage,
+                scroll: window.scrollY || 0,
+                filters: {
+                  quickSearch: els.quickSearch ? els.quickSearch.value : '',
+                  chips: { ...state.chips },
+                  flags: { ...state.flags }
+                },
+                listId: state.listId,
+                listName: state.listName,
+                view: state.view
+              };
+              console.log('[ListDetail] Captured state for back navigation (contact):', window._listDetailReturn);
+            } catch (_) { /* noop */ }
+            
             // Navigate via existing people route to ensure modules are bound, then open detail with retry mechanism
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('people');
@@ -341,6 +359,23 @@
               window._accountNavigationListName = state.listName;
               window._accountNavigationListView = 'people';
               
+              // Capture state for restoration
+              try {
+                window._listDetailReturn = {
+                  page: state.currentPage,
+                  scroll: window.scrollY || 0,
+                  filters: {
+                    quickSearch: els.quickSearch ? els.quickSearch.value : '',
+                    chips: { ...state.chips },
+                    flags: { ...state.flags }
+                  },
+                  listId: state.listId,
+                  listName: state.listName,
+                  view: state.view
+                };
+                console.log('[ListDetail] Captured state for back navigation:', window._listDetailReturn);
+              } catch (_) { /* noop */ }
+              
               // Prefetch account object and open detail immediately
               try { window._prefetchedAccountForDetail = account; } catch (_) {}
               if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
@@ -364,6 +399,23 @@
             window._accountNavigationListId = state.listId;
             window._accountNavigationListName = state.listName;
             window._accountNavigationListView = 'accounts';
+            
+            // Capture state for restoration
+            try {
+              window._listDetailReturn = {
+                page: state.currentPage,
+                scroll: window.scrollY || 0,
+                filters: {
+                  quickSearch: els.quickSearch ? els.quickSearch.value : '',
+                  chips: { ...state.chips },
+                  flags: { ...state.flags }
+                },
+                listId: state.listId,
+                listName: state.listName,
+                view: state.view
+              };
+              console.log('[ListDetail] Captured state for back navigation:', window._listDetailReturn);
+            } catch (_) { /* noop */ }
             
             // Prefetch account object if available and open detail immediately
             try {
@@ -1031,7 +1083,20 @@
     if (!els.tbody) return;
     const pageItems = getPageItems();
     const rows = pageItems.map((item) => state.view === 'people' ? rowHtmlPeople(item) : rowHtmlAccount(item)).join('');
+
+    // If this isn't the first render, pre-mark icons as loaded to prevent animation flicker
+    if (state.hasAnimated && rows) {
+      rows = rows.replace(/class="company-favicon"/g, 'class="company-favicon icon-loaded"');
+      rows = rows.replace(/class="avatar-initials"/g, 'class="avatar-initials icon-loaded"');
+    }
+
     els.tbody.innerHTML = rows || emptyHtml();
+
+    // Mark as animated after first render to prevent future animations
+    if (!state.hasAnimated) {
+      state.hasAnimated = true;
+    }
+
     renderPagination();
 
     // Bind row selection events (delegate)
@@ -1473,6 +1538,15 @@
         els.tbody.innerHTML = '';
       }
     }
+    
+    // Check if we're restoring from back navigation
+    if (window.__restoringListDetail && window._listDetailReturn) {
+      const restore = window._listDetailReturn;
+      const targetPage = Math.max(1, parseInt(restore.page || 1, 10));
+      state.currentPage = targetPage;
+      state.hasAnimated = true; // Prevent animations on restore
+      console.log('[ListDetail] Pre-setting page for restoration:', targetPage);
+    }
 
     // Update title
     if (els.detailTitle) {
@@ -1483,6 +1557,68 @@
 
     attachEvents();
     injectListDetailBulkStyles();
+    
+    // Listen for restoration event from back navigation (with guard to prevent duplicates)
+    if (!window._listDetailRestoreListenerBound) {
+      document.addEventListener('pc:list-detail-restore', (e) => {
+        if (!e.detail) return;
+        const { page, scroll, filters } = e.detail;
+        
+        console.log('[ListDetail] Restore event received:', e.detail);
+        
+        // Mark as animated to prevent row animations
+        state.hasAnimated = true;
+        
+        // Restore page
+        if (page) {
+          state.currentPage = Math.max(1, parseInt(page, 10));
+        }
+        
+        // Restore filters
+        if (filters) {
+          if (filters.quickSearch && els.quickSearch) {
+            els.quickSearch.value = filters.quickSearch;
+          }
+          if (filters.chips) {
+            state.chips = { ...state.chips, ...filters.chips };
+          }
+          if (filters.flags) {
+            state.flags = { ...state.flags, ...filters.flags };
+          }
+        }
+        
+        // Re-render with restored state
+        applyFilters();
+        
+        // Restore scroll position - use requestAnimationFrame for better timing
+        if (scroll !== undefined) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              try {
+                window.scrollTo(0, scroll);
+                console.log('[ListDetail] ✓ Restored scroll position:', scroll);
+                
+                // Clear restoration flag after successful restore
+                try {
+                  window.__restoringListDetail = false;
+                  window.__restoringListDetailUntil = 0;
+                  console.log('[ListDetail] ✓ Cleared restoration flag');
+                } catch (_) {}
+              } catch (_) {}
+            });
+          });
+        } else {
+          // Clear flag even if no scroll to restore
+          try {
+            setTimeout(() => {
+              window.__restoringListDetail = false;
+              window.__restoringListDetailUntil = 0;
+            }, 100);
+          } catch (_) {}
+        }
+      });
+      window._listDetailRestoreListenerBound = true;
+    }
     
     // Instant paint: draw header and render cached data if available
     renderTableHead();
@@ -1509,8 +1645,19 @@
       }
     } catch (_) {}
     
+    // Extra guard: if restoring hint is set but stale, clear it
+    if (window.__restoringListDetailUntil && Date.now() > window.__restoringListDetailUntil) {
+      try {
+        window.__restoringListDetail = false;
+        window.__restoringListDetailUntil = 0;
+        console.log('[ListDetail] Cleared stale restoration flag');
+      } catch (_) {}
+    }
+    
     // Load data in parallel for faster loading
-    state.currentPage = 1;
+    if (!window.__restoringListDetail) {
+      state.currentPage = 1;
+    }
     const [dataLoaded, membersLoaded] = await Promise.all([
       loadDataOnce(),
       fetchMembers(state.listId)

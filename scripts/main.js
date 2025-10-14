@@ -929,6 +929,12 @@ class PowerChoosersCRM {
         // List Detail page - initialize the detail view
         if (pageName === 'list-detail') {
             setTimeout(() => {
+                // DON'T re-init if we're restoring from back navigation
+                if (window.__restoringListDetail) {
+                    console.log('[Main] Skipping ListDetail.init() - restoring from back navigation');
+                    return;
+                }
+                
                 // Initialize the list detail module if needed
                 if (window.ListDetail && typeof window.ListDetail.init === 'function') {
                     // Use context passed from the lists overview

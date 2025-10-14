@@ -3096,7 +3096,7 @@
           updateBulkActionsBar();
         }
       });
-      els.tbody.addEventListener('click', (e) => {
+      els.tbody.addEventListener('click', async (e) => {
         // Company name click -> open Account Detail by matching domain or name
         const companyLink = e.target.closest && e.target.closest('.company-link');
         if (companyLink) {
@@ -3111,6 +3111,28 @@
           } catch (_) {}
           const dom = (companyLink.getAttribute('data-domain') || '').trim();
           const comp = (companyLink.getAttribute('data-company') || companyLink.textContent || '').trim();
+          
+          // RETRY MECHANISM: Wait for BackgroundAccountsLoader if needed
+          let accountsData = window.getAccountsData ? window.getAccountsData() : [];
+          if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
+            console.log('[People] No accounts yet, waiting for BackgroundAccountsLoader...');
+            
+            // Wait up to 3 seconds (30 attempts x 100ms)
+            for (let attempt = 0; attempt < 30; attempt++) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+              accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+              
+              if (accountsData.length > 0) {
+                console.log('[People] ✓ BackgroundAccountsLoader ready after', (attempt + 1) * 100, 'ms with', accountsData.length, 'accounts');
+                break;
+              }
+            }
+            
+            if (accountsData.length === 0) {
+              console.warn('[People] ⚠ Timeout waiting for accounts after 3 seconds');
+            }
+          }
+          
           const acct = findAccountByDomainOrName(dom, comp);
           if (acct && acct.id && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
             try { window.AccountDetail.show(acct.id); } catch (_) { /* noop */ }
@@ -4254,11 +4276,11 @@
   window.peopleModule = window.peopleModule || {};
   window.peopleModule.cleanup = function() {
     console.log('[People] Cleaning up UI state...');
-    // Don't clear allContactsCache - keep it for window.getPeopleData()
+    // Don't clear data caches - preserve for instant back navigation
     // state.allContactsCache = null;
-    state.data = [];      // Clear paginated view
-    state.filtered = [];  // Clear filtered view
+    // state.data = [];      // Keep paginated view for restoration
+    // state.filtered = [];  // Keep filtered view for restoration
     // Keep hasAnimated = true to prevent icon animations on subsequent visits
-    console.log('[People] UI state cleaned');
+    console.log('[People] UI state cleaned (preserving data for back navigation)');
   };
 })();

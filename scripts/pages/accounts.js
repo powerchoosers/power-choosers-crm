@@ -943,11 +943,10 @@ var console = {
         console.log('[Accounts] Restoring to page:', targetPage, 'from back navigation');
       }
       
-      // Load enough data to cover the target page
-      const neededAccounts = targetPage * pageSize;
-      state.data = accountsData.slice(0, neededAccounts);
-      state.filtered = state.data.slice();
-      state.hasMore = accountsData.length > neededAccounts;
+      // Load ALL accounts for proper pagination (getPageItems handles slicing)
+      state.data = accountsData; // Full dataset
+      state.filtered = state.data.slice(); // Full dataset
+      state.hasMore = false; // All data is loaded
       
       state.loaded = true;
       state.errorMsg = '';
