@@ -275,39 +275,25 @@ class SettingsPage {
         if (!googlePhotoURL || this.state.settings.general.hostedPhotoURL) return;
         
         try {
-            // Download the image
-            const response = await fetch(googlePhotoURL);
-            const blob = await response.blob();
-            
-            // Convert to base64
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = async () => {
-                const base64data = reader.result.split(',')[1];
-                
-                // Upload to Imgur via existing endpoint (always use Vercel)
-                try {
-                    const apiBase = 'https://power-choosers-crm.vercel.app';
-                    const uploadResponse = await fetch(`${apiBase}/api/upload/signature-image`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image: base64data, type: 'avatar' })
-                    });
+            // Send Google URL to server to download and re-host
+            const apiBase = 'https://power-choosers-crm.vercel.app';
+            const uploadResponse = await fetch(`${apiBase}/api/upload/host-google-avatar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ googlePhotoURL })
+            });
 
-                    if (uploadResponse.ok) {
-                        const { imageUrl } = await uploadResponse.json();
-                        if (imageUrl) {
-                            this.state.settings.general.hostedPhotoURL = imageUrl;
-                            this.markDirty();
-                            console.log('[Settings] Google avatar hosted successfully');
-                        }
-                    }
-                } catch (uploadError) {
-                    console.error('[Settings] Error uploading avatar:', uploadError);
-                    // Fallback to direct Google URL
-                    this.state.settings.general.hostedPhotoURL = googlePhotoURL;
+            if (uploadResponse.ok) {
+                const { imageUrl } = await uploadResponse.json();
+                if (imageUrl) {
+                    this.state.settings.general.hostedPhotoURL = imageUrl;
+                    this.markDirty();
+                    console.log('[Settings] Google avatar hosted successfully:', imageUrl);
                 }
-            };
+            } else {
+                console.warn('[Settings] Upload failed, using Google URL directly');
+                this.state.settings.general.hostedPhotoURL = googlePhotoURL;
+            }
         } catch (error) {
             console.error('[Settings] Error hosting Google avatar:', error);
             // Fallback to direct Google URL
