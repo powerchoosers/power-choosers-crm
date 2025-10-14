@@ -44,6 +44,73 @@ function getTemplateType(prompt) {
   return promptMap[prompt] || 'general'; // Default to general template for manual prompts
 }
 
+// CTA Pattern System (Hybrid Approach)
+function getCTAPattern(recipient) {
+  const patterns = [
+    {
+      type: 'soft_ask',
+      template: 'Would you be open to a brief [duration] call to discuss [topic]?',
+      guidance: 'Low commitment, asks permission first'
+    },
+    {
+      type: 'value_offer', 
+      template: 'Would you be interested in [specific value/analysis] for [company]?',
+      guidance: 'Offers value before asking for time'
+    },
+    {
+      type: 'question_based',
+      template: 'Any thoughts on how [company] is handling [specific challenge]?',
+      guidance: 'Asks for opinion, very low pressure'
+    },
+    {
+      type: 'direct_meeting',
+      template: 'Does [time1] or [time2] work for a quick [duration] call?',
+      guidance: 'Direct but flexible with options'
+    }
+  ];
+  
+  // Weighted random selection (can be adjusted based on performance data)
+  const weights = [0.3, 0.3, 0.25, 0.15]; // Favor soft approaches
+  const random = Math.random();
+  let cumulative = 0;
+  
+  for (let i = 0; i < patterns.length; i++) {
+    cumulative += weights[i];
+    if (random < cumulative) return patterns[i];
+  }
+  
+  return patterns[0];
+}
+
+// Opening Style Variations
+function getOpeningStyle(recipient) {
+  const styles = [
+    {
+      type: 'industry_insight',
+      prompt: 'Start with industry-specific trend or insight relevant to recipient',
+      example: 'I\'ve been tracking how [industry] companies are responding to the 15-25% energy rate increases...'
+    },
+    {
+      type: 'market_urgency',
+      prompt: 'Open with urgent market condition affecting their business',
+      example: 'Electricity rates in [region/industry] are spiking 15-25% as suppliers warn of continued increases...'
+    },
+    {
+      type: 'social_proof',
+      prompt: 'Reference similar companies or recent conversations',
+      example: 'I recently helped a [industry] company similar to [company] reduce energy costs by 20%...'
+    },
+    {
+      type: 'direct_problem',
+      prompt: 'Immediately address specific pain point they likely face',
+      example: 'With your contract ending [date], you might be concerned about renewal rates...'
+    }
+  ];
+  
+  // Equal distribution for now (will adjust based on performance)
+  return styles[Math.floor(Math.random() * styles.length)];
+}
+
 // Calculate business days (excluding weekends)
 function addBusinessDays(startDate, days) {
   let count = 0;
@@ -199,14 +266,22 @@ const coldEmailSchema = {
     schema: {
       type: "object",
       properties: {
-        subject: { type: "string", description: "Email subject under 50 chars" },
+        subject: { 
+          type: "string", 
+          description: "Email subject under 50 chars following best practices"
+        },
+        subject_style: {
+          type: "string",
+          description: "Style used: quick_question, re_prefix, thoughts, industry_specific, or value_prop"
+        },
         greeting: { type: "string", description: "Hello {firstName}," },
         pain_points: { type: "array", items: { type: "string" }, description: "Industry challenges" },
         solution_intro: { type: "string", description: "How we help" },
         social_proof: { type: "string", description: "Companies like yours..." },
-        cta_text: { type: "string", description: "Call to action" }
+        cta_text: { type: "string", description: "Call to action" },
+        cta_type: { type: "string", description: "CTA pattern used: soft_ask, value_offer, question_based, or direct_meeting" }
       },
-      required: ["subject", "greeting", "pain_points", "solution_intro", "social_proof", "cta_text"],
+      required: ["subject", "subject_style", "greeting", "pain_points", "solution_intro", "social_proof", "cta_text", "cta_type"],
       additionalProperties: false
     }
   }
@@ -309,6 +384,10 @@ ${notes ? `- Additional Notes: ${notes}` : ''}
 
   // For HTML mode, return text-only prompts based on template type
   if (mode === 'html') {
+    // Get dynamic patterns for cold emails
+    const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient) : null;
+    const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
+    
     const basePrompt = `You are generating TEXT CONTENT ONLY for Power Choosers email templates.
 
 SENDER: ${senderName}
@@ -363,7 +442,34 @@ Generate text for these fields:
 - pain_points: Array of 3-4 industry challenges (concise)
 - solution_intro: How Power Choosers solves these (2-3 sentences)
 - social_proof: Reference to similar companies (1-2 sentences)
-- cta_text: Low-pressure meeting request`,
+- cta_text: ${ctaPattern.guidance}. Use this pattern: "${ctaPattern.template}". Customize with specific details from recipient context.
+- cta_type: Return "${ctaPattern.type}" as the CTA pattern used
+
+CTA CUSTOMIZATION RULES:
+- Replace [duration] with "10-minute" or "15-minute"
+- Replace [topic] with specific relevant topic (e.g., "energy cost reduction strategies")
+- Replace [company] with actual company name
+- Replace [specific value/analysis] with concrete offering
+- Replace [specific challenge] with industry-relevant challenge
+- Replace [time1] and [time2] with meeting times if using direct_meeting pattern
+
+SUBJECT LINE RULES:
+- Under 50 characters
+- Choose ONE of these proven patterns and customize:
+  * "Quick question about [company]'s energy costs"
+  * "Re: [company] energy rates" 
+  * "[firstName], thoughts on [industry] energy savings?"
+  * "[company] - [specific timely issue]?"
+  * "Following up on [company]'s energy needs"
+- Personalize with actual company name, recipient name, or industry
+- Avoid spam triggers (no "Free", "Act Now", excessive punctuation)
+- Return the style you chose in subject_style field
+
+OPENING STYLE:
+Use "${openingStyle.type}" approach. ${openingStyle.prompt}. Keep it 1-2 sentences that feel natural and conversational.
+
+OPENING STYLE EXAMPLES:
+${openingStyle.example}`,
 
       invoice: `
 TEMPLATE: Invoice Request
@@ -410,6 +516,43 @@ KEY CONTEXT:
 - Electricity rates rising 15-25% due to data center demand
 - Companies with contracts ending 2025-2026 face higher renewal rates
 - Early renewals save 20-30% vs. waiting`;
+
+  // Check if this is a cold email in standard mode
+  const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
+  
+  if (isColdEmailStandard) {
+    const ctaPattern = getCTAPattern(recipient);
+    const openingStyle = getOpeningStyle(recipient);
+    
+    const coldEmailRules = `
+EMAIL TYPE: Cold Email (Never Spoke Before)
+
+OPENING (1-2 sentences):
+Style: ${openingStyle.type}
+${openingStyle.prompt}
+Example: ${openingStyle.example}
+
+BODY (2-3 sentences):
+- Briefly explain Power Choosers value proposition
+- Reference specific context: ${industry ? `industry (${industry})` : 'business type'}, ${contractEndLabel ? `contract ending ${contractEndLabel}` : 'energy costs'}
+- Create urgency with 15-25% rate increases or timing
+
+CTA:
+Pattern: ${ctaPattern.type}
+${ctaPattern.guidance}
+Template: "${ctaPattern.template}"
+Customize with specific recipient details.
+
+SUBJECT LINE:
+- Under 50 characters
+- Use proven patterns: "Quick question", "Re:", "thoughts on", "[Company] -", "Following up"
+- Personalize with ${firstName ? firstName : 'recipient'} or ${company ? company : 'company'}
+
+TOTAL LENGTH: 80-120 words
+`;
+
+    return [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n');
+  }
 
   // Check if this is an invoice request in standard mode
   const isInvoiceStandard = /invoice.*request|send.*invoice/i.test(String(prompt || ''));
@@ -595,7 +738,13 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           ok: true, 
           output: jsonData,
           templateType: templateType,
-          citations: citations
+          citations: citations,
+          metadata: {
+            subject_style: jsonData.subject_style,
+            cta_type: jsonData.cta_type,
+            opening_style: templateType === 'cold_email' ? openingStyle?.type : null,
+            generated_at: new Date().toISOString()
+          }
         });
       } catch (e) {
         console.error('[Perplexity] Failed to parse JSON:', e);
