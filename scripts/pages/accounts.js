@@ -340,9 +340,31 @@ var console = {
           const id = detail.id;
           const doc = detail.doc || {};
           if (!id) return;
+          
+          // SAFETY: Don't process events if page hasn't loaded yet
+          // This prevents clearing all accounts during bulk import
+          if (!state.loaded) {
+            console.warn('[Accounts] Ignoring pc:account-created event - page not fully loaded yet');
+            return;
+          }
+          
+          // SAFETY: Ensure state.data is an array before proceeding
+          if (!Array.isArray(state.data)) {
+            console.warn('[Accounts] state.data is not an array, initializing to empty array');
+            state.data = [];
+          }
+          
           // Deduplicate, prepend, and refresh filters/render
-          state.data = (Array.isArray(state.data) ? state.data : []).filter((a) => a && a.id !== id);
+          state.data = state.data.filter((a) => a && a.id !== id);
           state.data.unshift({ id, ...doc });
+          
+          // Also update allAccountsCache to keep it in sync
+          if (state.allAccountsCache && Array.isArray(state.allAccountsCache)) {
+            state.allAccountsCache = state.allAccountsCache.filter((a) => a && a.id !== id);
+            state.allAccountsCache.unshift({ id, ...doc });
+            state.totalCount = state.allAccountsCache.length;
+          }
+          
           applyFilters();
         } catch (_) { /* noop */ }
       };
@@ -1097,6 +1119,7 @@ var console = {
     if (!state.data || !Array.isArray(state.data)) {
       console.warn('[Accounts] applyFilters called but state.data is not ready:', state.data);
       state.filtered = [];
+      state.totalCount = 0; // Prevent NaN in footer
       render();
       return;
     }

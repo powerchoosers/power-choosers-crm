@@ -259,7 +259,7 @@ var console = {
       }
       
       console.log('[AccountDetail] Rendering account:', account.accountName || account.name);
-      renderAccountDetail();
+    renderAccountDetail();
       console.log('[AccountDetail] Render complete');
     } catch (error) {
       console.error('[AccountDetail] Error during render:', error);
@@ -831,7 +831,7 @@ var console = {
       });
       
       log('[AccountDetail] Found', associatedContacts.length, 'contacts for account:', accountName);
-      
+
       if (associatedContacts.length === 0) {
         // Debug: Show why no contacts matched
         log('[AccountDetail] No contacts matched. Normalized account name:', normalizedAccountName);
@@ -1345,12 +1345,12 @@ var console = {
         try {
           contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
           bindContactItemEvents();
-          
-          // Update contacts pagination after DOM is inserted
-          if (state._allContacts && state._allContacts.length > 4) {
-            const totalPages = Math.ceil(state._allContacts.length / state._contactsPageSize);
-            updateContactsPagination(state._contactsPage, totalPages);
-          }
+    
+    // Update contacts pagination after DOM is inserted
+    if (state._allContacts && state._allContacts.length > 4) {
+      const totalPages = Math.ceil(state._allContacts.length / state._contactsPageSize);
+      updateContactsPagination(state._contactsPage, totalPages);
+    }
         } catch (error) {
           console.error('[AccountDetail] Error rendering contacts:', error);
           contactsList.innerHTML = '<div class="contacts-placeholder">Error loading contacts</div>';
