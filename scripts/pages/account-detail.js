@@ -2882,6 +2882,24 @@ var console = {
       }
     });
 
+    // Listen for account creation/update events (from CSV import, etc.)
+    document.addEventListener('pc:account-created', (e) => {
+      if (state.currentAccount && e.detail) {
+        const { id, doc } = e.detail;
+        
+        // Only update if this is the current account being viewed
+        if (id === state.currentAccount.id) {
+          console.log('[AccountDetail] Account updated via pc:account-created, refreshing display');
+          
+          // Update the current account data with new fields
+          state.currentAccount = { ...state.currentAccount, ...doc };
+          
+          // Re-render the account detail to show updated fields
+          renderAccountDetail();
+        }
+      }
+    });
+
     // Listen for contact creation events to refresh the contacts list
     document.addEventListener('pc:contact-created', async (e) => {
       if (state.currentAccount && e.detail) {

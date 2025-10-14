@@ -6545,12 +6545,16 @@ async function createContactSequenceThenAdd(name) {
       if (createRow) container.appendChild(createRow);
       container.insertAdjacentHTML('beforeend', listHtml || `<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No lists found</div><div class="list-meta">Create a new list</div></div></div>`);
 
-      // Click handlers
-      container.querySelectorAll('.list-item').forEach(el => {
-        el.addEventListener('click', () => {
-          handleListChoose(el);
+      // Event delegation - attach once to container, persists through re-renders
+      if (!container._listItemHandlerAttached) {
+        container.addEventListener('click', (e) => {
+          const listItem = e.target.closest('.list-item');
+          if (listItem && !listItem.hasAttribute('aria-disabled')) {
+            handleListChoose(listItem);
+          }
         });
-      });
+        container._listItemHandlerAttached = true;
+      }
     } catch (err) {
       console.warn('Failed to load lists', err);
     }
@@ -6676,10 +6680,15 @@ async function createContactSequenceThenAdd(name) {
       console.warn('Add to list failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to add to list');
     } finally {
-      // Reload panel data to show updated state
-      const body = document.getElementById('contact-lists-body');
-      if (body) {
-        populateContactListsPanel(body);
+      // Update only the specific list item to show checkmark
+      const panel = document.getElementById('contact-lists-panel');
+      if (panel) {
+        const listItem = panel.querySelector(`[data-id="${listId}"]`);
+        if (listItem) {
+          listItem.setAttribute('data-member-id', 'pending');
+          const checkEl = listItem.querySelector('.list-check');
+          if (checkEl) checkEl.textContent = '✓';
+        }
       }
     }
   }
@@ -6695,10 +6704,15 @@ async function createContactSequenceThenAdd(name) {
       console.warn('Remove from list failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to remove from list');
     } finally {
-      // Reload panel data to show updated state
-      const body = document.getElementById('contact-lists-body');
-      if (body) {
-        populateContactListsPanel(body);
+      // Update only the specific list item to remove checkmark
+      const panel = document.getElementById('contact-lists-panel');
+      if (panel) {
+        const listItem = panel.querySelector(`[data-member-id="${memberDocId}"]`);
+        if (listItem) {
+          listItem.removeAttribute('data-member-id');
+          const checkEl = listItem.querySelector('.list-check');
+          if (checkEl) checkEl.textContent = '';
+        }
       }
     }
   }
