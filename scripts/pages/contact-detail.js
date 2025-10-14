@@ -3312,7 +3312,7 @@
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
           
-          // Navigate back to list detail page
+          // Navigate back to list detail page with state restoration
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             // Provide context up-front so navigateToPage's internal init uses it immediately
             try {
@@ -3322,8 +3322,57 @@
                 listKind: 'people'
               };
             } catch (_) {}
+            
+            // Set restoration flag BEFORE navigation
+            try {
+              window.__restoringListDetail = true;
+              window.__restoringListDetailUntil = Date.now() + 10000; // 10 seconds
+            } catch (_) {}
+            
             window.crm.navigateToPage('list-detail');
+            
+            // Dispatch restore event with retry mechanism
+            setTimeout(() => {
+              const restore = window._listDetailReturn || {};
+              const deadline = Date.now() + 8000; // 8 second timeout
+              let attempts = 0;
+              
+              const tryRestore = () => {
+                attempts++;
+                if (Date.now() > deadline) {
+                  console.warn('[ContactDetail] List detail page not ready after 8 seconds');
+                  return;
+                }
+                
+                try {
+                  const page = document.getElementById('list-detail-page');
+                  const listDetailModule = window.ListDetail;
+                  if (page && page.offsetParent !== null && listDetailModule) {
+                    const ev = new CustomEvent('pc:list-detail-restore', {
+                      detail: {
+                        page: restore.page,
+                        scroll: restore.scroll,
+                        filters: restore.filters,
+                        listId: restore.listId,
+                        listName: restore.listName,
+                        view: restore.view,
+                        timestamp: Date.now()
+                      }
+                    });
+                    document.dispatchEvent(ev);
+                    console.log('[ContactDetail] Dispatched pc:list-detail-restore event (ready) after', attempts, 'attempts');
+                    return;
+                  }
+                } catch (_) {}
+                
+                // Retry after 80ms
+                setTimeout(tryRestore, 80);
+              };
+              
+              tryRestore();
+            }, 60);
           }
+          
           // Clear the navigation source
           window._contactNavigationSource = null;
           window._contactNavigationListId = null;

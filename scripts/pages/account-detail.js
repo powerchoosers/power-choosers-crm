@@ -101,10 +101,13 @@ var console = {
     document.addEventListener('pc:contacts-loaded', async (e) => {
       console.log('[AccountDetail] Contacts loaded event received, count:', e.detail?.count);
       
-      // Update the contacts cache
-      if (typeof window.getPeopleData === 'function') {
+      // Update the contacts cache - prioritize BackgroundContactsLoader
+      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+        window._accountDetailPeopleCache = window.BackgroundContactsLoader.getContactsData() || [];
+        console.log('[AccountDetail] Updated people cache from BackgroundContactsLoader:', window._accountDetailPeopleCache.length);
+      } else if (typeof window.getPeopleData === 'function') {
         window._accountDetailPeopleCache = window.getPeopleData() || [];
-        console.log('[AccountDetail] Updated people cache from event:', window._accountDetailPeopleCache.length);
+        console.log('[AccountDetail] Updated people cache from getPeopleData:', window._accountDetailPeopleCache.length);
       }
       
       // Re-render just the contacts section if we're showing an account
@@ -113,7 +116,7 @@ var console = {
         if (contactsList) {
           console.log('[AccountDetail] Re-rendering contacts section with', window._accountDetailPeopleCache.length, 'contacts');
           try {
-            contactsList.innerHTML = renderAccountContacts(state.currentAccount);
+            contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
             bindContactItemEvents();
             console.log('[AccountDetail] Contacts section re-rendered successfully');
           } catch (error) {
@@ -279,7 +282,7 @@ var console = {
               const contactsList = document.getElementById('account-contacts-list');
               if (contactsList && state.currentAccount) {
                 console.log('[AccountDetail] Retry: Re-rendering contacts section');
-                contactsList.innerHTML = renderAccountContacts(state.currentAccount);
+                contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
                 bindContactItemEvents();
               }
             }
@@ -751,13 +754,17 @@ var console = {
     return [];
   }
 
-  function renderAccountContacts(account, page = 1, pageSize = 4) {
+  async function renderAccountContacts(account, page = 1, pageSize = 4) {
     const log = window.console.log.bind(window.console); // Bypass log silencing
     
     // Use cached data from window scope (loaded upfront in showAccountDetail)
     let allContacts = [];
     
-    if (typeof window.getPeopleData === 'function') {
+    // Try to get contacts from various sources with priority
+    if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+      allContacts = window.BackgroundContactsLoader.getContactsData() || [];
+      log('[AccountDetail] Got', allContacts.length, 'contacts from BackgroundContactsLoader');
+    } else if (typeof window.getPeopleData === 'function') {
       allContacts = window.getPeopleData() || [];
       log('[AccountDetail] Got', allContacts.length, 'contacts from getPeopleData');
     } else if (window._accountDetailPeopleCache && Array.isArray(window._accountDetailPeopleCache)) {
@@ -765,6 +772,28 @@ var console = {
       log('[AccountDetail] Got', allContacts.length, 'contacts from _accountDetailPeopleCache');
     } else {
       log('[AccountDetail] NO CONTACTS SOURCE AVAILABLE!');
+    }
+    
+    // RETRY MECHANISM: If no contacts yet, wait for BackgroundContactsLoader
+    if (allContacts.length === 0 && window.BackgroundContactsLoader) {
+      log('[AccountDetail] No contacts yet, waiting for BackgroundContactsLoader...');
+      
+      // Wait up to 3 seconds (30 attempts x 100ms)
+      for (let attempt = 0; attempt < 30; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        allContacts = window.BackgroundContactsLoader.getContactsData() || [];
+        
+        if (allContacts.length > 0) {
+          log('[AccountDetail] ✓ BackgroundContactsLoader ready after', (attempt + 1) * 100, 'ms with', allContacts.length, 'contacts');
+          // Update cache for next render
+          window._accountDetailPeopleCache = allContacts;
+          break;
+        }
+      }
+      
+      if (allContacts.length === 0) {
+        log('[AccountDetail] ⚠ Timeout waiting for contacts after 3 seconds');
+      }
     }
     
     log('[AccountDetail] renderAccountContacts called: account=', account?.accountName || account?.name, 'allContacts=', allContacts.length);
@@ -895,12 +924,12 @@ var console = {
     const nextBtn = document.getElementById('contacts-next');
 
     if (prevBtn && !prevBtn._bound) {
-      prevBtn.addEventListener('click', () => {
+      prevBtn.addEventListener('click', async () => {
         if (state._contactsPage > 1) {
           const newPage = state._contactsPage - 1;
           const contactsList = document.getElementById('account-contacts-list');
           if (contactsList && state.currentAccount) {
-            contactsList.innerHTML = renderAccountContacts(state.currentAccount, newPage, state._contactsPageSize);
+            contactsList.innerHTML = await renderAccountContacts(state.currentAccount, newPage, state._contactsPageSize);
             bindContactItemEvents();
             // Update pagination controls after page change
             const totalPages = Math.ceil((state._allContacts || []).length / state._contactsPageSize);
@@ -912,13 +941,13 @@ var console = {
     }
 
     if (nextBtn && !nextBtn._bound) {
-      nextBtn.addEventListener('click', () => {
+      nextBtn.addEventListener('click', async () => {
         const totalPages = Math.ceil((state._allContacts || []).length / state._contactsPageSize);
         if (state._contactsPage < totalPages) {
           const newPage = state._contactsPage + 1;
           const contactsList = document.getElementById('account-contacts-list');
           if (contactsList && state.currentAccount) {
-            contactsList.innerHTML = renderAccountContacts(state.currentAccount, newPage, state._contactsPageSize);
+            contactsList.innerHTML = await renderAccountContacts(state.currentAccount, newPage, state._contactsPageSize);
             bindContactItemEvents();
             // Update pagination controls after page change
             updateContactsPagination(newPage, totalPages);
@@ -1225,7 +1254,7 @@ var console = {
             </div>
           </div>
           <div class="contacts-list" id="account-contacts-list">
-            ${renderAccountContacts(a)}
+            <div class="contacts-placeholder">Loading contacts...</div>
           </div>
         </div>
 
@@ -1309,11 +1338,25 @@ var console = {
     attachAccountDetailEvents();
     startAccountRecentCallsLiveHooks();
     
-    // Update contacts pagination after DOM is inserted
-    if (state._allContacts && state._allContacts.length > 4) {
-      const totalPages = Math.ceil(state._allContacts.length / state._contactsPageSize);
-      updateContactsPagination(state._contactsPage, totalPages);
-    }
+    // Render contacts list now that DOM is ready (async)
+    (async () => {
+      const contactsList = document.getElementById('account-contacts-list');
+      if (contactsList && state.currentAccount) {
+        try {
+          contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
+          bindContactItemEvents();
+          
+          // Update contacts pagination after DOM is inserted
+          if (state._allContacts && state._allContacts.length > 4) {
+            const totalPages = Math.ceil(state._allContacts.length / state._contactsPageSize);
+            updateContactsPagination(state._contactsPage, totalPages);
+          }
+        } catch (error) {
+          console.error('[AccountDetail] Error rendering contacts:', error);
+          contactsList.innerHTML = '<div class="contacts-placeholder">Error loading contacts</div>';
+        }
+      }
+    })();
     
           // Add periodic refresh to ensure eye icons update when recordings are ready
           let refreshInterval = null;
@@ -2840,7 +2883,7 @@ var console = {
     });
 
     // Listen for contact creation events to refresh the contacts list
-    document.addEventListener('pc:contact-created', (e) => {
+    document.addEventListener('pc:contact-created', async (e) => {
       if (state.currentAccount && e.detail) {
         const newContact = e.detail.contact || e.detail.doc;
         
@@ -2856,7 +2899,7 @@ var console = {
         // Refresh the contacts list
         const contactsList = document.getElementById('account-contacts-list');
         if (contactsList) {
-          contactsList.innerHTML = renderAccountContacts(state.currentAccount);
+          contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
           // Re-bind event handlers for the new contact items
           bindContactItemEvents();
         }
@@ -2864,7 +2907,7 @@ var console = {
     });
 
     // Listen for contact updates to refresh the contacts list
-    document.addEventListener('pc:contact-updated', (e) => {
+    document.addEventListener('pc:contact-updated', async (e) => {
       if (state.currentAccount && e.detail) {
         const contactId = e.detail.id;
         const changes = e.detail.changes || {};
@@ -2898,7 +2941,7 @@ var console = {
         // Refresh contacts list display
         const contactsList = document.getElementById('account-contacts-list');
         if (contactsList) {
-          contactsList.innerHTML = renderAccountContacts(state.currentAccount);
+          contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
           bindContactItemEvents();
         }
       }
@@ -3182,13 +3225,61 @@ var console = {
                 listKind: (window._accountNavigationListView === 'people') ? 'people' : 'accounts'
               };
             } catch (_) {}
+            // Set restoration flag BEFORE navigation
+            try {
+              window.__restoringListDetail = true;
+              window.__restoringListDetailUntil = Date.now() + 10000; // 10 seconds
+            } catch (_) {}
+            
             window.crm.navigateToPage('list-detail');
+            
+            // Dispatch restore event with retry mechanism
+            setTimeout(() => {
+              const restore = window._listDetailReturn || {};
+              const deadline = Date.now() + 8000; // 8 second timeout
+              let attempts = 0;
+              
+              const tryRestore = () => {
+                attempts++;
+                if (Date.now() > deadline) {
+                  console.warn('[Account Detail] List detail page not ready after 8 seconds');
+                  return;
+                }
+                
+                try {
+                  const page = document.getElementById('list-detail-page');
+                  const listDetailModule = window.ListDetail;
+                  if (page && page.offsetParent !== null && listDetailModule) {
+                    const ev = new CustomEvent('pc:list-detail-restore', {
+                      detail: {
+                        page: restore.page,
+                        scroll: restore.scroll,
+                        filters: restore.filters,
+                        listId: restore.listId,
+                        listName: restore.listName,
+                        view: restore.view,
+                        timestamp: Date.now()
+                      }
+                    });
+                    document.dispatchEvent(ev);
+                    console.log('[AccountDetail] Dispatched pc:list-detail-restore event (ready) after', attempts, 'attempts');
+                    return;
+                  }
+                } catch (_) {}
+                
+                // Retry after 80ms
+                setTimeout(tryRestore, 80);
+              };
+              
+              tryRestore();
+            }, 60);
           }
           // Clear the navigation source
           window._accountNavigationSource = null;
           window._accountNavigationListId = null;
           window._accountNavigationListName = null;
           window._accountNavigationListView = null;
+          window._listDetailReturn = null;
           return;
         }
         

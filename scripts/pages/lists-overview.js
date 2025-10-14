@@ -485,15 +485,18 @@
     const existingIds = Array.from(existingCards).map(card => card.getAttribute('data-id'));
     const newIds = items.map(item => item.id);
     
-    // Remove cards that no longer exist
+    // Remove cards that no longer exist with fade-out animation
     existingCards.forEach(card => {
       const id = card.getAttribute('data-id');
       if (!newIds.includes(id)) {
-        card.remove();
+        card.classList.add('card-fade-out');
+        card.addEventListener('animationend', () => {
+          card.remove();
+        }, { once: true });
       }
     });
     
-    // Add or update cards
+    // Add or update cards with staggered animations
     items.forEach((item, index) => {
       let existingCard = els.listContainer.querySelector(`.list-card[data-id="${item.id}"]`);
       const cardHtml = listCardHtml(item);
@@ -503,6 +506,10 @@
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = cardHtml;
         const newCard = tempDiv.firstElementChild;
+        
+        // Add animation class with staggered delay
+        newCard.classList.add('card-fade-in');
+        newCard.style.animationDelay = `${index * 50}ms`;
         
         // Insert at correct position
         const nextCard = els.listContainer.children[index];
@@ -516,6 +523,12 @@
             els.listContainer.appendChild(newCard);
           }
         }
+        
+        // Remove animation class after animation completes to prevent re-animation
+        newCard.addEventListener('animationend', () => {
+          newCard.classList.remove('card-fade-in');
+          newCard.style.animationDelay = '';
+        }, { once: true });
         
         // Attach event listeners for new card
         attachCardListeners(newCard);
@@ -555,39 +568,7 @@
         const kind = newBtn.getAttribute('data-kind');
         console.log('[Lists] action', action, { id, kind });
         if (action === 'Open') {
-          const listArr = kind === 'people' ? state.peopleLists : state.accountLists;
-          const item = (listArr || []).find(x => x.id === id);
-          const name = item?.name || 'List';
-          try {
-            const cache = window.listMembersCache?.[id];
-            console.debug('[ListsOverview] Open clicked cache status', {
-              id,
-              loaded: !!cache?.loaded,
-              people: cache?.people instanceof Set ? cache.people.size : (Array.isArray(cache?.people) ? cache.people.length : 0),
-              accounts: cache?.accounts instanceof Set ? cache.accounts.size : (Array.isArray(cache?.accounts) ? cache.accounts.length : 0)
-            });
-          } catch (_) {}
-          
-          // Store navigation state for back button functionality
-          try {
-            window._listDetailNavigationSource = 'lists';
-            window._listDetailReturn = getCurrentState();
-            console.log('[ListsOverview] Stored navigation state for back button:', window._listDetailReturn);
-          } catch (_) {}
-          
-          // Store context for the list detail page
-          window.listDetailContext = {
-            listId: id,
-            listName: name,
-            listKind: kind === 'people' ? 'people' : 'accounts'
-          };
-          
-          // Navigate to the list detail page
-          if (window.crm && typeof window.crm.navigateToPage === 'function') {
-            window.crm.navigateToPage('list-detail');
-          } else {
-            console.warn('Navigation not available');
-          }
+          handleOpenList(id, kind);
           return;
         }
         if (action === 'Delete') {
@@ -660,6 +641,99 @@
           <button class="btn-text" data-action="Delete" data-id="${id}" data-kind="${type}">Delete</button>
         </div>
       </div>`;
+  }
+
+  async function handleOpenList(id, kind) {
+    const listArr = kind === 'people' ? state.peopleLists : state.accountLists;
+    const item = (listArr || []).find(x => x.id === id);
+    const name = item?.name || 'List';
+    
+    try {
+      const cache = window.listMembersCache?.[id];
+      console.debug('[ListsOverview] Open clicked cache status', {
+        id,
+        loaded: !!cache?.loaded,
+        people: cache?.people instanceof Set ? cache.people.size : (Array.isArray(cache?.people) ? cache.people.length : 0),
+        accounts: cache?.accounts instanceof Set ? cache.accounts.size : (Array.isArray(cache?.accounts) ? cache.accounts.length : 0)
+      });
+    } catch (_) {}
+    
+    // RETRY MECHANISM: Ensure both contacts and accounts are loaded
+    let contactsData = [];
+    let accountsData = [];
+    
+    // Check contacts
+    if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+      contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+    } else if (typeof window.getPeopleData === 'function') {
+      contactsData = window.getPeopleData() || [];
+    }
+    
+    // Check accounts
+    if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+      accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+    } else if (typeof window.getAccountsData === 'function') {
+      accountsData = window.getAccountsData() || [];
+    }
+    
+    // If either is empty, wait for background loaders
+    if ((contactsData.length === 0 || accountsData.length === 0) && 
+        (window.BackgroundContactsLoader || window.BackgroundAccountsLoader)) {
+      console.log('[ListsOverview] Waiting for background loaders...', {
+        contacts: contactsData.length,
+        accounts: accountsData.length
+      });
+      
+      // Wait up to 3 seconds (30 attempts x 100ms)
+      for (let attempt = 0; attempt < 30; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (contactsData.length === 0 && window.BackgroundContactsLoader) {
+          contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+        }
+        
+        if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
+          accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+        }
+        
+        // Break if both are loaded
+        if (contactsData.length > 0 && accountsData.length > 0) {
+          console.log('[ListsOverview] ✓ Background loaders ready after', (attempt + 1) * 100, 'ms', {
+            contacts: contactsData.length,
+            accounts: accountsData.length
+          });
+          break;
+        }
+      }
+      
+      if (contactsData.length === 0 || accountsData.length === 0) {
+        console.warn('[ListsOverview] ⚠ Timeout waiting for data after 3 seconds', {
+          contacts: contactsData.length,
+          accounts: accountsData.length
+        });
+      }
+    }
+    
+    // Store navigation state for back button functionality
+    try {
+      window._listDetailNavigationSource = 'lists';
+      window._listDetailReturn = getCurrentState();
+      console.log('[ListsOverview] Stored navigation state for back button:', window._listDetailReturn);
+    } catch (_) {}
+    
+    // Store context for the list detail page
+    window.listDetailContext = {
+      listId: id,
+      listName: name,
+      listKind: kind === 'people' ? 'people' : 'accounts'
+    };
+    
+    // Navigate to the list detail page
+    if (window.crm && typeof window.crm.navigateToPage === 'function') {
+      window.crm.navigateToPage('list-detail');
+    } else {
+      console.warn('Navigation not available');
+    }
   }
 
   function showRenameDialog(id, kind) {
@@ -925,6 +999,65 @@
     document._listsRestoreBound = true;
   }
 
+  // Inject CSS animations for list cards
+  function injectCardAnimations() {
+    if (document.getElementById('lists-card-animations')) return;
+    const style = document.createElement('style');
+    style.id = 'lists-card-animations';
+    style.textContent = `
+      /* Smooth card fade-in animation */
+      @keyframes cardFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      
+      /* Smooth card fade-out animation */
+      @keyframes cardFadeOut {
+        from {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: translateY(-10px) scale(0.95);
+        }
+      }
+      
+      .list-card.card-fade-in {
+        animation: cardFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        opacity: 0;
+      }
+      
+      .list-card.card-fade-out {
+        animation: cardFadeOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      
+      /* Hover effects for cards */
+      .list-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      
+      .list-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+      }
+      
+      /* Smooth transitions for card content updates */
+      .list-card-title,
+      .list-card-count,
+      .list-card-meta {
+        transition: opacity 0.2s ease;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   // Expose API for other modules
   window.ListsOverview = {
     refreshCounts: refreshCounts,
@@ -933,6 +1066,7 @@
 
   // Initialize
   if (!initDom()) return;
+  injectCardAnimations();
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'people' || saved === 'accounts') state.kind = saved; // persist selection
