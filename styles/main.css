@@ -1,4 +1,50 @@
 /* Power Choosers CRM - Strategic CSS Foundation */
+
+/* Modern Page Transitions - 2025 */
+@view-transition {
+  navigation: auto;
+}
+
+/* Custom fade transition styles */
+::view-transition-old(root),
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  animation: fadeOut 0.3s ease-out;
+}
+
+::view-transition-new(root) {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+  
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
 /* === Toolbar spacing fix (robust) === */
 /* Ensure consistent spacing between email editor toolbar icons.
    This enforces gap and provides a fallback margin when flex gap isn't supported
