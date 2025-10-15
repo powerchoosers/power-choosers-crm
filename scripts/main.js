@@ -55,16 +55,16 @@ class PowerChoosersCRM {
         setTimeout(loadActivities, 50);
         setTimeout(loadActivities, 200);
         
-        // Start background calls loading after a short delay
-        // This enables "No Calls" badges on People/Accounts pages without blocking
+        // Start background calls loading immediately
+        // This ensures calls data is pre-loaded before user clicks calls page
         setTimeout(() => {
             if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.start === 'function') {
-                console.log('[CRM] Starting background calls loading for badge system...');
+                console.log('[CRM] Starting background calls loading immediately for instant access...');
                 window.BackgroundCallsLoader.start();
             } else {
                 console.warn('[CRM] BackgroundCallsLoader not available');
             }
-        }, 2500); // 2.5 second delay to ensure main scripts are ready
+        }, 100); // Start almost immediately - just wait for scripts to be ready
     }
 
     // Pre-load essential data for widgets and navigation
@@ -777,30 +777,41 @@ class PowerChoosersCRM {
             }
         }
         
-        // Hide all pages
-        document.querySelectorAll('.page').forEach(page => {
-            page.classList.remove('active');
-        });
+        // Use View Transitions API for smooth page transitions
+        const performNavigation = () => {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // Remove active class from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show target page
+            const targetPage = document.getElementById(`${pageName}-page`);
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
+            
+            // Activate corresponding nav item
+            // When on Account Details, keep highlight on Accounts in the sidebar
+            // When on List Detail, keep highlight on Lists in the sidebar
+            const navPageToActivate = (pageName === 'account-details') ? 'accounts' : 
+                                     (pageName === 'list-detail') ? 'lists' : pageName;
+            const targetNav = document.querySelector(`[data-page="${navPageToActivate}"]`);
+            if (targetNav) {
+                targetNav.classList.add('active');
+            }
+        };
         
-        // Remove active class from all nav items
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        // Show target page
-        const targetPage = document.getElementById(`${pageName}-page`);
-        if (targetPage) {
-            targetPage.classList.add('active');
-        }
-        
-        // Activate corresponding nav item
-        // When on Account Details, keep highlight on Accounts in the sidebar
-        // When on List Detail, keep highlight on Lists in the sidebar
-        const navPageToActivate = (pageName === 'account-details') ? 'accounts' : 
-                                 (pageName === 'list-detail') ? 'lists' : pageName;
-        const targetNav = document.querySelector(`[data-page="${navPageToActivate}"]`);
-        if (targetNav) {
-            targetNav.classList.add('active');
+        // Check if View Transitions API is supported
+        if (document.startViewTransition) {
+            document.startViewTransition(performNavigation);
+        } else {
+            // Fallback for browsers that don't support View Transitions API
+            performNavigation();
         }
         
         // Special handling for specific pages
