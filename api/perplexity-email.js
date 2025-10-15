@@ -539,6 +539,15 @@ ${transcript ? `- Call Notes: ${transcript}` : ''}
 ${notes ? `- Additional Notes: ${notes}` : ''}
 `;
 
+  // Debug log for recipient context
+  console.log(`[Debug] Recipient context for ${firstName} at ${company}:`, {
+    firstName,
+    company,
+    industry,
+    accountDescription: accountDescription ? accountDescription.substring(0, 50) + '...' : 'none',
+    researchData: researchData ? 'found' : 'none'
+  });
+
   // For HTML mode, return text-only prompts based on template type
   if (mode === 'html') {
     
@@ -593,10 +602,10 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are seeing X", "${company} likely faces Y challenge", "Current market conditions for ${industry || 'businesses like yours'}..."
-- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]".
+- opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are seeing X", "${company} likely faces Y challenge", "Current market conditions for ${industry || 'businesses like yours'}..." IMPORTANT: Always reference ${company} specifically, not other companies.
+- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional)
-- cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation.
+- cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
 
 CRITICAL QUALITY RULES:
@@ -609,6 +618,7 @@ CRITICAL QUALITY RULES:
 - USE ACCOUNT DESCRIPTION: If provided, naturally reference "${accountDescription || 'their business'}"
 - NATURAL LANGUAGE: Write like a real person, not a template
 - SPECIFIC TO THEM: Reference actual company details, not generic industry statements
+- COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
@@ -720,6 +730,7 @@ CRITICAL QUALITY RULES:
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
 - USE ACCOUNT DESCRIPTION: ${accountDescription ? `Must naturally reference: "${accountDescription}"` : 'Reference their specific business'}
 - NATURAL LANGUAGE: Write like a real person researching their company
+- COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
@@ -732,6 +743,7 @@ Examples:
 - "Companies in ${industry || 'your industry'} are facing [specific challenge]"
 - "With contracts renewing in 2025, ${company} is likely seeing [specific impact]"
 - "${industry || 'Your industry'} operations are experiencing [market condition]"
+IMPORTANT: Always reference ${company} specifically, not other companies.
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
 - Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
@@ -740,6 +752,7 @@ VALUE PROPOSITION (1-2 sentences MINIMUM):
 - Add social proof if relevant: "helped similar companies achieve [specific result]"
 - Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."
 - NEVER end with incomplete phrases or "within [company name]"
+- ALWAYS include a complete value proposition - never skip this field
 
 CTA:
 Use qualifying question or soft ask: "${ctaPattern.template}"
@@ -747,6 +760,7 @@ Use qualifying question or soft ask: "${ctaPattern.template}"
 - Avoid requesting specific meeting times in first email
 - Keep under 12 words
 - MUST be complete sentence with proper ending punctuation
+- NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .)
 - Generate ONLY ONE CTA
 
 SUBJECT LINE:
@@ -947,6 +961,15 @@ CRITICAL: Use these EXACT meeting times in your CTA.
               /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i,
               'secure better energy rates before contracts expire. Clients typically save 10-20% on annual costs.'
             );
+          }
+        }
+        
+        // Validate CTA completeness for cold emails
+        if (templateType === 'cold_email' && jsonData.cta_text) {
+          const incompleteCTA = /would you be open to a quick$/i.test(jsonData.cta_text);
+          if (incompleteCTA) {
+            console.warn('[Validation] Incomplete CTA detected, fixing...');
+            jsonData.cta_text = 'Would you be open to discussing your current energy setup?';
           }
         }
         
