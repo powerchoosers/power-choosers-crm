@@ -174,11 +174,6 @@ function getCTAPattern(recipient) {
       guidance: 'Conditional offer, provides value'
     },
     {
-      type: 'direct_meeting',
-      template: 'Does [time1] or [time2] work for a quick call?',
-      guidance: 'Direct but flexible - only for warm leads'
-    },
-    {
       type: 'industry_specific',
       template: `How is ${recipient?.company || 'your company'} approaching energy cost management for 2025?`,
       guidance: 'Company-specific strategic question'
@@ -188,10 +183,11 @@ function getCTAPattern(recipient) {
       template: 'Are rising electricity costs affecting your operational budget?',
       guidance: 'Problem-aware qualifying question'
     }
+    // REMOVED: direct_meeting pattern - only for warm follow-ups
   ];
   
-  // Weighted random selection (heavily favor qualifying and soft asks)
-  const weights = [0.25, 0.25, 0.20, 0.15, 0.10, 0.04, 0.01];
+  // Updated weights without direct_meeting
+  const weights = [0.30, 0.30, 0.20, 0.15, 0.04, 0.01];
   const random = Math.random();
   let cumulative = 0;
   
@@ -572,7 +568,7 @@ Generate text for these fields:
 - greeting: "Hello ${firstName}," 
 - call_reference: Mention when you spoke and what you discussed
 - main_message: Brief recap of conversation, value prop, urgency (2-3 sentences)
-- cta_text: Suggest 2 specific time slots like "Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?"`,
+- cta_text: Use a qualifying question or soft ask that invites dialogue without requesting a meeting. Examples: "When does your current energy contract expire?", "Would you be open to discussing your energy setup?"`,
 
       follow_up: `
 TEMPLATE: Follow-Up with Value Props
@@ -605,8 +601,8 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are seeing X", "${company} likely faces Y challenge", "Current market conditions for ${industry || 'businesses like yours'}..." IMPORTANT: Always reference ${company} specifically, not other companies.
-- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK.
+- opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are facing rising electricity costs", "${company} likely sees energy as a significant operational expense", "With contracts renewing in 2025, ${company} may be facing higher energy rates" IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational.
+- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional)
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
@@ -629,7 +625,7 @@ CRITICAL QUALITY RULES:
 - CTA LENGTH: CTAs should be 10-12 words maximum
 - VALUE PROP MUST: Include HOW we help AND WHAT results (e.g., "We help [industry] companies secure better rates before contracts expire. Clients typically save 10-20%.")
 
-FORBIDDEN PHRASES:
+FORBIDDEN PHRASES (especially in opening_hook):
 - "I've been tracking how [industry] companies..."
 - "Recently helped another [industry] company..."
 - "rising 15-25%"
@@ -638,17 +634,24 @@ FORBIDDEN PHRASES:
 - "driven by data center demand"
 - "15-25%"
 - "20-30%"
+- "10-20%"
 - "electricity rate increases of 15-25%"
 - "reduce annual energy costs by 20-30%"
+- "data centers drive up demand"
+- "data centers driving electricity rates up"
+- "sharp cost increases"
+- "Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?"
+- "Would Tuesday [time] or Thursday [time] work"
+- Any meeting time suggestions (Tuesday, Thursday, etc.)
 
 PREFERRED LANGUAGE:
-- "I noticed [company] [specific detail from description]..."
-- "Given [company]'s focus on [business aspect]..."
-- "With the current energy market..."
-- "Any thoughts on how [company] is approaching..."
-- "[Company] likely faces [specific operational challenge]..."
-- "Companies in [industry] are seeing [market condition]..."
-- "Current market conditions for [industry] operations..."
+- "Companies in [industry] are facing rising electricity costs..."
+- "[Company] likely sees energy as a significant operational expense..."
+- "With contracts renewing in 2025, [company] may be facing higher energy rates..."
+- "Given [company]'s focus on [business aspect], energy costs are probably on your radar..."
+- "[Company]'s [industry] operations typically require significant energy consumption..."
+- "As a [industry] company, [company] is probably seeing electricity rate increases..."
+- "Current market conditions are driving up energy costs for [industry] operations..."
 
 SUBJECT LINE RULES:
 - Under 50 characters
@@ -995,12 +998,26 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && jsonData.cta_text) {
           // Check if the CTA contains multiple questions or meeting requests
           const hasMultipleQuestions = (jsonData.cta_text.match(/\?/g) || []).length > 1;
-          const hasMeetingRequest = /does.*work.*call|tuesday|thursday|monday|wednesday|friday/i.test(jsonData.cta_text);
-          const hasStrategyQuestion = /energy strategy|energy setup/i.test(jsonData.cta_text);
+          const hasMeetingRequest = /does.*work.*call|tuesday|thursday|monday|wednesday|friday|15-minute|brief.*call|quick.*call|meeting|schedule|calendar/i.test(jsonData.cta_text);
+          const hasTimeSlot = /\d{1,2}(:\d{2})?\s*(am|pm|AM|PM)/i.test(jsonData.cta_text);
           
-          if (hasMultipleQuestions || (hasMeetingRequest && hasStrategyQuestion)) {
-            console.warn('[Validation] Duplicate CTA detected, using single qualifying question...');
+          if (hasMultipleQuestions || hasMeetingRequest || hasTimeSlot) {
+            console.warn('[Validation] Meeting request or duplicate CTA detected in cold email, replacing with qualifying question...');
             jsonData.cta_text = 'When does your current energy contract expire?';
+          }
+        }
+        
+        // Validate no statistics in opening_hook for cold emails
+        if (templateType === 'cold_email' && jsonData.opening_hook) {
+          const hasStatistics = /\d+[-–]\d+%|\d+%|save \$\d+|reduce costs by/i.test(jsonData.opening_hook);
+          if (hasStatistics) {
+            console.warn('[Validation] Statistics detected in opening_hook, this should only be in value_proposition');
+            // Strip out the statistics but keep the sentence structure
+            jsonData.opening_hook = jsonData.opening_hook
+              .replace(/\d+[-–]\d+%/g, 'significantly')
+              .replace(/\b\d+%\b/g, 'considerably')
+              .replace(/save \$[\d,]+/g, 'reduce costs')
+              .replace(/reduce costs by \$?[\d,]+/g, 'reduce operational costs');
           }
         }
         
