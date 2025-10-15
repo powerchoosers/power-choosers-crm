@@ -2179,7 +2179,7 @@
   }
 
   // Find the associated account for this contact (by id or normalized company name)
-  async function findAssociatedAccount(contact, maxRetries = 3) {
+  async function findAssociatedAccount(contact, maxRetries = 10) {
     try {
       let accounts = [];
       
@@ -2192,17 +2192,39 @@
           break;
         }
         
-        // Wait before retrying (50ms, 100ms, 200ms exponential backoff)
+        // Wait before retrying (100ms, 200ms, 400ms, 800ms, 1600ms... exponential backoff)
         if (attempt < maxRetries - 1) {
-          const delay = 50 * Math.pow(2, attempt);
+          const delay = 100 * Math.pow(2, attempt);
           console.log('[ContactDetail] No accounts yet, retrying in', delay, 'ms...');
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
       
       if (!contact || accounts.length === 0) {
-        console.warn('[ContactDetail] No accounts available after', maxRetries, 'retries');
-        return null;
+        console.warn('[ContactDetail] No accounts available after', maxRetries, 'retries, waiting for accounts-loaded event...');
+        
+        // Last resort: wait for accounts-loaded event
+        await new Promise(resolve => {
+          const handler = (e) => {
+            document.removeEventListener('pc:accounts-loaded', handler);
+            resolve();
+          };
+          document.addEventListener('pc:accounts-loaded', handler);
+          
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            document.removeEventListener('pc:accounts-loaded', handler);
+            resolve();
+          }, 5000);
+        });
+        
+        // Try one more time after the event
+        accounts = await getAccountsDataSafe();
+        
+        if (accounts.length === 0) {
+          console.warn('[ContactDetail] Still no accounts available after waiting for event');
+          return null;
+        }
       }
       
       // Prefer explicit accountId
@@ -6385,22 +6407,22 @@ async function createContactSequenceThenAdd(name) {
   }
 
   // Handle list selection (moved to global scope to fix reference error)
-  function handleListChoose(el) {
-    const action = el.getAttribute('data-action');
-    if (action === 'create') {
-      const name = window.prompt('New list name');
-      if (!name) return;
-      createContactListThenAdd(name.trim());
-      return;
-    }
-    const id = el.getAttribute('data-id');
-    const name = el.getAttribute('data-name') || 'List';
-    const memberDocId = el.getAttribute('data-member-id');
-    if (memberDocId) {
-      // Already a member -> remove from list
-      removeCurrentContactFromList(memberDocId, name);
-    } else {
-      addCurrentContactToList(id, name);
+    function handleListChoose(el) {
+      const action = el.getAttribute('data-action');
+      if (action === 'create') {
+        const name = window.prompt('New list name');
+        if (!name) return;
+        createContactListThenAdd(name.trim());
+        return;
+      }
+      const id = el.getAttribute('data-id');
+      const name = el.getAttribute('data-name') || 'List';
+      const memberDocId = el.getAttribute('data-member-id');
+      if (memberDocId) {
+        // Already a member -> remove from list
+        removeCurrentContactFromList(memberDocId, name);
+      } else {
+        addCurrentContactToList(id, name);
     }
   }
 
