@@ -52,7 +52,7 @@ async function researchCompanyInfo(companyName, industry) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-sonar-small-128k-online',
+        model: 'sonar',
         messages: [{ role: 'user', content: researchPrompt }],
         max_tokens: 150,
         temperature: 0.3
@@ -477,8 +477,11 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
-  // Clean and sanitize account description
-  let accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || '')
+  // Debug log to see what account data is available
+  console.log('[Debug] Full account data for', company, ':', JSON.stringify(r.account, null, 2));
+  
+  // Clean and sanitize account description - check multiple possible field names
+  let accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || r.account?.description || r.account?.companyDescription || r.account?.accountDescription || '')
     .replace(/Not disclosed/gi, '')
     .replace(/undefined/gi, '')
     .replace(/null/gi, '')
@@ -603,7 +606,7 @@ TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
 - opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are seeing X", "${company} likely faces Y challenge", "Current market conditions for ${industry || 'businesses like yours'}..." IMPORTANT: Always reference ${company} specifically, not other companies.
-- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field.
+- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional)
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
@@ -633,12 +636,19 @@ FORBIDDEN PHRASES:
 - "saving 20-30%"
 - "contracts ending in 2025-2026"
 - "driven by data center demand"
+- "15-25%"
+- "20-30%"
+- "electricity rate increases of 15-25%"
+- "reduce annual energy costs by 20-30%"
 
 PREFERRED LANGUAGE:
 - "I noticed [company] [specific detail from description]..."
 - "Given [company]'s focus on [business aspect]..."
 - "With the current energy market..."
 - "Any thoughts on how [company] is approaching..."
+- "[Company] likely faces [specific operational challenge]..."
+- "Companies in [industry] are seeing [market condition]..."
+- "Current market conditions for [industry] operations..."
 
 SUBJECT LINE RULES:
 - Under 50 characters
@@ -753,6 +763,7 @@ VALUE PROPOSITION (1-2 sentences MINIMUM):
 - Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
+- THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
 CTA:
 Use qualifying question or soft ask: "${ctaPattern.template}"
@@ -970,6 +981,26 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           if (incompleteCTA) {
             console.warn('[Validation] Incomplete CTA detected, fixing...');
             jsonData.cta_text = 'Would you be open to discussing your current energy setup?';
+          }
+        }
+        
+        // Validate missing value propositions for cold emails
+        if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
+          console.warn('[Validation] Missing value proposition detected, adding default...');
+          const industry = recipient?.industry || 'businesses';
+          jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs.`;
+        }
+        
+        // Validate for duplicate CTAs in cold emails
+        if (templateType === 'cold_email' && jsonData.cta_text) {
+          // Check if the CTA contains multiple questions or meeting requests
+          const hasMultipleQuestions = (jsonData.cta_text.match(/\?/g) || []).length > 1;
+          const hasMeetingRequest = /does.*work.*call|tuesday|thursday|monday|wednesday|friday/i.test(jsonData.cta_text);
+          const hasStrategyQuestion = /energy strategy|energy setup/i.test(jsonData.cta_text);
+          
+          if (hasMultipleQuestions || (hasMeetingRequest && hasStrategyQuestion)) {
+            console.warn('[Validation] Duplicate CTA detected, using single qualifying question...');
+            jsonData.cta_text = 'When does your current energy contract expire?';
           }
         }
         
