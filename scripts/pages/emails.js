@@ -868,6 +868,29 @@ class EmailManager {
             const output = data?.output || '';
             const templateType = data?.templateType || null;
             const metadata = data?.metadata || null;
+            const researchData = data?.researchData || null;
+            
+            // Handle real-time account description update
+            if (researchData && researchData.id) {
+                console.log('[AI] Account description researched and saved:', researchData);
+                // Dispatch event to update Account Detail page in real-time
+                try {
+                    const updateEvent = new CustomEvent('pc:account-updated', { 
+                        detail: { 
+                            id: researchData.id, 
+                            changes: { 
+                                shortDescription: researchData.description,
+                                descriptionUpdatedAt: researchData.timestamp,
+                                descriptionSource: 'web_research'
+                            } 
+                        } 
+                    });
+                    document.dispatchEvent(updateEvent);
+                    console.log('[AI] Dispatched pc:account-updated event for real-time UI update');
+                } catch (error) {
+                    console.error('[AI] Failed to dispatch account update event:', error);
+                }
+            }
             
             // Store tracking metadata for cold emails
             if (templateType === 'cold_email' && metadata) {
